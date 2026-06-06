@@ -80,16 +80,17 @@ Expected results:
 ## Pitfalls to watch for
 
 * **Cloudflare or AWS ALB in front** — those proxies terminate TLS
-  *before* nginx. Set `DATAFORGE_TLS_ENABLED=false` and use
-  server block C, otherwise nginx will fail to start without a cert.
+  *before* nginx. Use server block C (the commented HTTP-only fallback)
+  for environments behind a TLS-terminating proxy.
 * **Self-signed certs** — never use them in production. Letsencrypt
   and the major cloud CAs are free.
 * **HSTS preload** — submitting to the browser preload list is
   irreversible. Only enable `preload` if the team is committed to
   HTTPS for the lifetime of the domain.
-* **certbot renewal** — renewals are run as a separate container.
-  See `docker-compose.prod.yml`'s `certbot` service and the
-  `scripts/renew_certs.sh` helper.
+* **certbot renewal** — Automated Let's Encrypt renewal via a certbot
+  container is planned but not yet implemented in `docker-compose.prod.yml`.
+  Operators must manage certificate renewal manually (e.g. via a cron job
+  on the host, or by adding a certbot service).
 
 ## What this document is not
 

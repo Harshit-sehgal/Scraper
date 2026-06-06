@@ -4,11 +4,18 @@
   "private": true,
   "description": "DataForge Studio — frontend tooling (CSS lint)",
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@vitest/ui": "^4.1.8",
+    "jsdom": "^29.1.1",
     "stylelint": "^16.26.1",
-    "stylelint-config-standard": "^36.0.1"
+    "stylelint-config-standard": "^36.0.1",
+    "vitest": "^4.1.8"
   },
   "scripts": {
     "lint:css": "stylelint 'frontend/**/*.css'",
-    "lint:css:fix": "stylelint 'frontend/**/*.css' --fix"
+    "lint:css:fix": "stylelint 'frontend/**/*.css' --fix",
+    "test": "vitest run --config frontend/vitest.config.js",
+    "test:watch": "vitest --config frontend/vitest.config.js",
+    "test:e2e": "playwright test --config frontend/playwright.config.mjs"
   }
 }

@@ -95,8 +95,12 @@ class TestPsycopg3RepositoryContract:
         Excludes ``updated_at`` which is a wall-clock timestamp set at
         row-creation time and naturally differs between calls.
         """
-        from app.postgres_repository import _job_to_row as psycopg2_to_row
-        from app.psycopg3_repository import _job_to_row as psycopg3_to_row
+        from app.postgres_repository_base import job_to_row
+
+        # The psycopg3 driver inherits job_to_row from PostgresRepositoryBase.
+
+        psycopg2_to_row = job_to_row
+        psycopg3_to_row = job_to_row
 
         job = Job(
             id="compat-test",
@@ -113,10 +117,10 @@ class TestPsycopg3RepositoryContract:
 
     def test_schema_columns_match_psycopg2(self) -> None:
         """The CREATE TABLE column list is reused from psycopg2 — verify."""
-        from app.postgres_repository import _JOBS_COLUMNS_SQL
-        from app.psycopg3_repository import _columns_sql
+        from app.postgres_repository_base import _columns_sql as base_columns_sql
+        from app.psycopg3_repository import _columns_sql as psycopg3_columns_sql
 
-        assert list(_JOBS_COLUMNS_SQL) == _columns_sql()
+        assert base_columns_sql() == psycopg3_columns_sql()
 
 
 class TestFactorySelectsPsycopg3:

@@ -77,7 +77,7 @@ after the deep-research remediation pass (2026-06).
 - **Status:** `ci.yml` runs the fast lane on every PR. New `image-build.yml`
   builds the multi-arch image on `main` + tags and signs with cosign.
   Optional lanes (`postgres-tests.yml`, `browser-e2e.yml`, `golden-dataset.yml`,
-  `load-test.yml`, `optional-suites.yml`) run on schedule / manual dispatch.
+  `optional-suites.yml`) run on schedule / manual dispatch.
   Coverage report + route-inventory are uploaded as artifacts. Docs lint
   enforces 59 route families against `docs/API.md`.
 - **Next:** enable required status checks; wire the image-build lane to GHCR

@@ -180,16 +180,15 @@ def create_app() -> FastAPI:
             "content-quality scoring. See `docs/API.md` for the full "
             "endpoint reference."
         ),
-        version="2.0.0",
+        version="0.1.0",
         contact={
             "name": "DataForge Engineering",
             "url": "https://github.com/Harshit-sehgal/Scraper/issues",
         },
         license_info={
-            "name": "Proprietary",
+            "name": "MIT",
             "url": "https://github.com/Harshit-sehgal/Scraper/blob/main/LICENSE",
         },
-        terms_of_service="https://github.com/Harshit-sehgal/Scraper/blob/main/docs/TERMS.md",
         lifespan=lifespan,
         docs_url=_docs_url,
         redoc_url=_redoc_url,

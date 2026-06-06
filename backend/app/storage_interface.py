@@ -233,6 +233,41 @@ class JobRepository(ABC):
         """Check repository health. Returns a dict with 'ok' key and backend info."""
         return {"ok": True, "backend": self.__class__.__name__}
 
+    # ─── Worker heartbeat ────────────────────────────────────────────
+
+    def record_worker_heartbeat(self, worker_id: str, hostname: str, pid: int) -> None:
+        """Record a heartbeat from a worker process.
+
+        Upserts the worker's heartbeat timestamp so the healthcheck
+        can verify the worker is alive by checking recency.
+        """
+
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
+        """Return health info for a specific worker.
+
+        Returns a dict with:
+        - alive: bool — True if a heartbeat exists and is within ttl_seconds
+        - last_heartbeat: str | None — ISO timestamp of last heartbeat
+        - hostname: str | None
+        - pid: int | None
+        - worker_id: str
+        """
+        return {
+            "alive": False,
+            "worker_id": worker_id,
+            "last_heartbeat": None,
+            "hostname": None,
+            "pid": None,
+        }
+
+    def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict]:
+        """Return health info for all registered workers.
+
+        Returns a list of dicts, each with the same shape as
+        :meth:`get_worker_health`.
+        """
+        return []
+
     # ─── Individual repository operations (avoid full-state rewrites) ────
 
     def is_cancel_requested(self, job_id: str) -> bool:
@@ -283,6 +318,23 @@ class SQLiteJobRepository(JobRepository):
     """
 
     backend = "sqlite"
+
+    # ─── Worker heartbeat ────────────────────────────────────────────
+
+    def record_worker_heartbeat(self, worker_id: str, hostname: str, pid: int) -> None:
+        from app.job_store import record_worker_heartbeat as _record_hb
+
+        _record_hb(worker_id, hostname, pid)
+
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
+        from app.job_store import get_worker_health as _get_health
+
+        return _get_health(worker_id, ttl_seconds=ttl_seconds)
+
+    def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict]:
+        from app.job_store import get_all_worker_healths as _get_all
+
+        return _get_all(ttl_seconds=ttl_seconds)
 
     def health_check(self) -> dict:
         """Check the SQLite backend's health and schema state.

@@ -2,6 +2,8 @@
 
 This route list was generated from the FastAPI app during the audit. Production app config disables `/docs`, `/redoc`, and `/openapi.json`; Nginx behavior still needs runtime validation in a started production stack.
 
+**Note:** The access levels below reflect the *intended* contract. A fresh generated route-auth matrix (via `scripts/route_auth_matrix.py`) should be checked against this table after any auth reclassification.
+
 ## Public / Probe Routes
 
 | Method | Path | Access |

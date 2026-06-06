@@ -77,6 +77,18 @@ async def main():
     parser = argparse.ArgumentParser(description="DataForge Worker")
     parser.add_argument("--workers", type=int, default=4, help="Max concurrent workers")
     parser.add_argument("--once", action="store_true", help="Process one task then exit")
+    parser.add_argument(
+        "--heartbeat-interval",
+        type=float,
+        default=15.0,
+        help="Seconds between heartbeat writes (default: 15)",
+    )
+    parser.add_argument(
+        "--heartbeat-ttl",
+        type=float,
+        default=60.0,
+        help="Seconds before a missing heartbeat is considered dead (default: 60)",
+    )
     args = parser.parse_args()
 
     from app.worker_queue import get_worker_queue
@@ -84,6 +96,15 @@ async def main():
     queue = get_worker_queue()
     queue.set_max_concurrency(args.workers)
     queue.register_handler("scrape_job", scrape_job_handler)
+
+    # Start the heartbeat so Docker healthcheck can verify the worker is alive
+    # (skipped in --once mode — single-task execution is too brief to benefit)
+    heartbeat = None
+    if not args.once:
+        from app.worker_heartbeat import HeartbeatManager
+
+        heartbeat = HeartbeatManager(interval=args.heartbeat_interval, ttl=args.heartbeat_ttl)
+        await heartbeat.start()
 
     # Set up graceful shutdown
     shutdown_event = asyncio.Event()
@@ -142,6 +163,8 @@ async def main():
         logger.info("Shutting down worker...")
 
     await queue.stop(drain=True)
+    if heartbeat is not None:
+        await heartbeat.stop()
     logger.info("Worker stopped.")
 
 

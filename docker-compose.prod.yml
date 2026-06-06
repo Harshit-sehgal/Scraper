@@ -104,12 +104,14 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      # Check that the worker process is still running by sending
-      # signal 0 to PID 1. This is portable (works on any POSIX
-      # container, no /proc dependency) and avoids the brittleness of
-      # reading /proc/1/cmdline, which fails on non-Linux runtimes
-      # and breaks when /proc is not mounted read-only-friendly.
-      test: ["CMD", "python", "-c", "import os, sys; sys.exit(0 if os.kill(1, 0) == 0 else 1)"]
+      # Check that the worker process is alive by verifying a recent
+      # heartbeat exists in the database. The worker writes a heartbeat
+      # every 15 seconds (configurable via --heartbeat-interval); if the
+      # heartbeat is older than 60 seconds the worker is considered dead.
+      #
+      # This replaces the PID-based ``os.kill(pid, 0)`` approach which
+      # was brittle (PID reuse, stuck processes still have a PID).
+      test: ["CMD", "python", "/app/scripts/worker_healthcheck.py"]
       interval: 30s
       timeout: 10s
       retries: 3
