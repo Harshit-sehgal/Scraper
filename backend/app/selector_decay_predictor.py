@@ -79,7 +79,7 @@ class SelectorDecayPredictor:
             with open(path, "w") as f:  # noqa: PTH123
                 json.dump(data, f)
         except Exception:
-            logger.exception("Failed to persist selector decay snapshots: %s")
+            logger.exception("Failed to persist selector decay snapshots")
 
     def _load(self) -> None:
         import json
@@ -100,7 +100,7 @@ class SelectorDecayPredictor:
                 for domain, snapshots in data.items():
                     self._confidence_snapshots[domain] = [(float(t), float(c)) for t, c in snapshots]
             except Exception:
-                logger.exception("Failed to load selector decay snapshots: %s")
+                logger.exception("Failed to load selector decay snapshots")
 
     def record_observation(self, domain: str, confidence: float) -> None:
         """Record a confidence observation for a domain at the current time.

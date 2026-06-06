@@ -233,7 +233,11 @@ async def run_job(
             async with job_lock:
                 completed_count += 1
                 job.progress_current = completed_count
-                persist_job_state_fn()
+            # Persist outside the lock — persist_job_state_fn is a sync
+            # I/O call (SQLite write) and would block the event loop if
+            # held under asyncio.Lock. The lock only protects in-memory
+            # state mutation; the disk write is safe to run concurrently.
+            await run_in_threadpool(persist_job_state_fn)
 
         async def _safe_warning(msg: str) -> None:
             async with job_lock:
@@ -365,8 +369,9 @@ async def run_job(
                     }
 
                     await _safe_log(f"Extracted {len(results)} raw records from {url}")
+                    await run_in_threadpool(persist_job_state_fn)
                     async with job_lock:
-                        persist_job_state_fn()
+                        pass  # serialise against concurrent progress updates
                     await _mark_completed()
                     return idx, results, True, url_meta
                 except asyncio.CancelledError:
@@ -414,6 +419,12 @@ async def run_job(
             await asyncio.sleep(0.25)
 
         scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
+        # Log and count any per-URL exceptions surfaced by gather so a
+        # silent exception in one URL doesn't disappear from observability.
+        exceptions = [r for r in scraped_raw if isinstance(r, BaseException)]
+        if exceptions:
+            for exc in exceptions:
+                logging.warning("Job %s: per-URL scrape raised %s", job_id, exc)
         scraped: list[tuple[int, list[dict], bool, dict]] = [r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4]
 
         for _idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
@@ -698,6 +709,8 @@ async def run_job(
         logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
     except Exception as e:  # noqa: BLE001
+        # Single traceback emission at the top of the handler — the
+        # branch-specific logs below are summary lines, not duplicates.
         logging.exception("Job %s failed", job_id)
         if job.cancel_requested:
             mark_job_canceled(job)
@@ -708,5 +721,5 @@ async def run_job(
             job.error = str(e)
             job.completed_at = datetime.datetime.now().isoformat()
             _add_job_log(job, f"Job failed: {e!s}", level="error")
-            logging.exception("Job %s: Failed", job_id)
+            logging.error("Job %s: Failed (%s)", job_id, type(e).__name__)
         await _persist_job_state(critical=True)

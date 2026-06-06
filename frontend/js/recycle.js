@@ -64,7 +64,7 @@ export async function hardDeleteJob(id) {
         const r = await apiFetch(`${API}/api/recycle_bin/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Permanent delete failed');
-        toast('Job permanently deleted', 'error');
+        toast('Job permanently deleted', 'success');
         refreshRecycleBin();
     } catch (e) {
         toast(`Permanent delete failed: ${e.message}`, 'error');

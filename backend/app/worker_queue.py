@@ -292,6 +292,11 @@ class WorkerQueue:
         self._in_flight: dict[str, asyncio.Task] = {}
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
+        # Semaphore gives us atomic acquire/release for the concurrency
+        # budget, independent of the bookkeeping dict. The worker loop
+        # acquires a permit before dequeue and releases it when the
+        # dispatched task finishes — see _on_task_done below.
+        self._concurrency_sem = asyncio.Semaphore(max_concurrency)
         _ensure_schema(db_path=self._db_path)
 
     def _conn(self) -> sqlite3.Connection:
@@ -306,6 +311,24 @@ class WorkerQueue:
         The handler receives (task: QueueTask) and should return True on success.
         """
         self._handlers[task_type] = handler
+
+    def set_max_concurrency(self, value: int) -> None:
+        """Resize the concurrency budget at runtime.
+
+        Public API that replaces the previous reliance on the private
+        ``_max_concurrency`` attribute. The semaphore is swapped atomically;
+        the in-flight dict is left as-is so tasks already running keep
+        their slot until they complete.
+        """
+        if value < 1:
+            msg = f"max_concurrency must be >= 1, got {value}"
+            raise ValueError(msg)
+        self._max_concurrency = value
+        self._concurrency_sem = asyncio.Semaphore(value)
+
+    def get_poll_interval(self) -> float:
+        """Return the worker poll interval in seconds (public accessor)."""
+        return self._poll_interval
 
     # ─── Task lifecycle ────────────────────────────────────────────────
 
@@ -726,16 +749,26 @@ class WorkerQueue:
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:
-                # Check concurrency limit
-                async with self._in_flight_lock:
-                    active = len(self._in_flight)
-                if active >= self._max_concurrency:
-                    await asyncio.sleep(self._poll_interval)
+                # Acquire a concurrency permit *before* dequeue so the
+                # budget is reserved atomically. If the permit is not
+                # available we yield for a poll interval and try again —
+                # the semaphore is fair-ish and won't busy-spin.
+                acquired = False
+                try:
+                    await asyncio.wait_for(
+                        self._concurrency_sem.acquire(),
+                        timeout=self._poll_interval,
+                    )
+                    acquired = True
+                except TimeoutError:
+                    continue
+                if not acquired:
                     continue
 
                 # Dequeue a task
                 task = await self.dequeue(timeout=self._poll_interval)
                 if task is None:
+                    self._concurrency_sem.release()
                     continue
 
                 # Dispatch
@@ -762,12 +795,29 @@ class WorkerQueue:
                             tid,
                         )
 
+                def _release(_fut: object, tid: str = task_id) -> None:
+                    # Release the semaphore permit exactly once when the
+                    # task finishes (success, failure, or cancellation).
+                    try:
+                        self._concurrency_sem.release()
+                    except ValueError:
+                        # Permit already released — should not happen,
+                        # but never let a callback raise.
+                        logger.debug("Semaphore release failed for task %s", tid)
+
                 t.add_done_callback(_on_task_done)
+                t.add_done_callback(_release)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error("Worker loop error: %s", e, exc_info=True)
+                # Best-effort release if we acquired a permit but failed
+                # before installing the done-callback.
+                try:
+                    self._concurrency_sem.release()
+                except ValueError:
+                    pass
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
@@ -818,6 +868,12 @@ class WorkerQueue:
                             cooldown,
                             task.type,
                         )
+                        # Honour the cooldown before the next dequeue
+                        # attempt. Without this sleep the worker would
+                        # immediately pick the next same-type task and
+                        # burn another request against the rate-limited
+                        # endpoint.
+                        await asyncio.sleep(cooldown)
             except Exception:
                 pass  # nosec B110
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)

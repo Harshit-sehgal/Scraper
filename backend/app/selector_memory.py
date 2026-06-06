@@ -287,6 +287,29 @@ class SelectorMemory:
         self._memory[domain] = entry
         self._save()
 
+    def has_memory_for(self, url: str) -> bool:
+        """Public predicate: True if a memory entry exists for the URL's domain."""
+        domain = self._extract_domain(url)
+        return bool(domain and domain in self._memory)
+
+    def invalidate_domain(self, url: str) -> bool:
+        """Forget any cached selectors for the URL's domain.
+
+        Returns True if an entry was removed, False if there was nothing
+        to forget (or the URL had no parseable domain). Persists the
+        updated state to disk so the next process sees the change.
+
+        This is the public replacement for direct ``_memory`` /
+        ``_save`` access from recovery handlers and other kernel code.
+        """
+        domain = self._extract_domain(url)
+        if not domain or domain not in self._memory:
+            return False
+        logger.info("Invalidating selector memory for domain %s", domain)
+        del self._memory[domain]
+        self._save()
+        return True
+
     def get_memory_stats(self) -> dict[str, Any]:
         """Get current selector memory statistics.
 

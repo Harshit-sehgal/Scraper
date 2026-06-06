@@ -1174,7 +1174,7 @@ class PostgresJobRepository(JobRepository):
                     "recycle_bin_count": recycle_count or 0,
                 }
         except Exception as e:
-            logger.exception("Postgres health check failed: %s")
+            logger.exception("Postgres health check failed")
             return {
                 "ok": False,
                 "backend": "postgres",

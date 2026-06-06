@@ -79,10 +79,10 @@ async def main():
     parser.add_argument("--once", action="store_true", help="Process one task then exit")
     args = parser.parse_args()
 
-    from app.worker_queue import Priority, get_worker_queue
+    from app.worker_queue import get_worker_queue
 
     queue = get_worker_queue()
-    queue._max_concurrency = args.workers
+    queue.set_max_concurrency(args.workers)
     queue.register_handler("scrape_job", scrape_job_handler)
 
     # Set up graceful shutdown
@@ -102,38 +102,40 @@ async def main():
     await queue.start()
     logger.info(
         "Worker ready: %d max concurrency, polling every %.1fs",
-        queue._max_concurrency,
-        queue._poll_interval,
+        args.workers,
+        queue.get_poll_interval(),
     )
 
     if args.once:
-        # Single-task mode: enqueue one specific job and wait for completion
-        job_id = os.getenv("DATAFORGE_JOB_ID")
-        if not job_id:
-            msg = "DATAFORGE_JOB_ID is required when using --once"
-            raise SystemExit(msg)
-        task_id = await queue.enqueue(
-            "scrape_job",
-            {"job_id": job_id},
-            priority=Priority.HIGH,
-        )
-        logger.info("Enqueued single task: %s (job_id=%s)", task_id, job_id)
-        # Poll until task reaches terminal state using get_task_state
-        terminal_task_statuses = {"completed", "failed", "dead_letter", "cancelled"}
-        deadline = time.time() + 600  # Max 10 minute wait
+        # Drain mode: dequeue and process whatever pending tasks exist,
+        # then exit. This is the *opposite* of the original behaviour,
+        # which (mis)used --once to enqueue a fresh scrape — that turned
+        # the standalone worker into a job producer and broke operator
+        # expectations ("run what is queued, not create more work").
+        deadline = time.time() + 600  # 10-minute upper bound
+        processed = 0
         while time.time() < deadline:
-            task_state = queue.get_task_state(task_id)
-            if task_state is not None:
-                ts = task_state.get("status", "")
-                if ts in terminal_task_statuses:
-                    logger.info(
-                        "Task %s reached terminal state: %s",
-                        task_id,
-                        ts,
-                    )
-                    break
-                logger.debug("Task %s status: %s", task_id, ts)
-            await asyncio.sleep(5)
+            task = await queue.dequeue(timeout=2.0)
+            if task is None:
+                if processed == 0:
+                    logger.info("No pending tasks found; exiting.")
+                else:
+                    logger.info("Queue drained after %d task(s).", processed)
+                break
+            processed += 1
+            handler = queue._handlers.get(task.type)  # internal: enqueue→execute symmetry
+            if handler is None:
+                await queue.fail(task.id, f"No handler for task type: {task.type}", retry=False)
+                continue
+            try:
+                result = await asyncio.wait_for(handler(task), timeout=task.timeout_seconds)
+                if result is False:
+                    await queue.fail(task.id, "Handler returned False", retry=True)
+                else:
+                    await queue.complete(task.id, result)
+            except Exception as exc:  # noqa: BLE001
+                await queue.fail(task.id, f"{type(exc).__name__}: {exc}", retry=True)
+        logger.info("Drain mode processed %d task(s).", processed)
     else:
         # Continuous mode: run until shutdown
         await shutdown_event.wait()

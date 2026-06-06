@@ -117,11 +117,10 @@ async def handle_force_rediscovery(params: dict[str, Any], context: dict[str, An
     if not url:
         return False
     selector_memory = get_selector_memory()
-    domain = selector_memory._extract_domain(url)
-    if domain and domain in selector_memory._memory:
-        logger.info("Force rediscovery: clearing cached selectors for %s", domain)
-        del selector_memory._memory[domain]
-        selector_memory._save()
+    # Use the public invalidation API so the kernel does not depend on
+    # ``_memory`` / ``_save`` private state of SelectorMemory.
+    if selector_memory.invalidate_domain(url):
+        logger.info("Force rediscovery: cleared cached selectors for %s", url)
     if attempt_ctx:
         attempt_ctx.force_llm_discovery = True
         attempt_ctx.bypass_selector_memory = True
@@ -200,7 +199,8 @@ async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], a
         if url:
             from urllib.parse import urlparse
 
-            domain = urlparse(url).netloc.lower()
+            parsed = urlparse(url)
+            domain = parsed.netloc.lower() if parsed.hostname else ""
             if domain:
                 attempt_ctx.skip_domain = domain
     return True
@@ -227,10 +227,11 @@ async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], at
 
         get_domain_runtime_policy().set_abort_domain(url)
 
-    if attempt_ctx:
+    if attempt_ctx and url:
         from urllib.parse import urlparse
 
-        domain = urlparse(url).netloc.lower() if url else None
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower() if parsed.hostname else ""
         if domain:
             attempt_ctx.skip_domain = domain
     return True

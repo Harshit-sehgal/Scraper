@@ -50,7 +50,6 @@ source "$VENV_DIR/bin/activate"
 # ─── Check runtime dependencies ─────────────────────────────────────────────
 if ! python - <<'PY'
 import importlib
-from pathlib import Path
 
 missing = []
 
@@ -69,8 +68,12 @@ if not any(importlib.util.find_spec(name) for name in ("ddgs", "duckduckgo_searc
 if missing:
     raise SystemExit("Missing dependencies: " + ", ".join(missing))
 
+# Verify the Playwright Chromium browser binary exists on disk without
+# spawning a driver process (faster and avoids a stray Chrome/Chromium
+# instance lingering after this check).
 try:
     from playwright.sync_api import sync_playwright
+    from pathlib import Path
 
     with sync_playwright() as playwright:
         chromium_path = Path(playwright.chromium.executable_path)

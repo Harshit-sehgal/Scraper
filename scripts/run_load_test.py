@@ -78,10 +78,18 @@ async def run_load_test(url: str, concurrency: int, total_requests: int):
     count = len(latencies)
 
     avg_latency = sum(latencies) / count
-    p50 = latencies[int(count * 0.50)]
-    p90 = latencies[int(count * 0.90)]
-    p95 = latencies[int(count * 0.95)]
-    p99 = latencies[int(count * 0.99)]
+
+    # Use ceiling division (clamped to at least 1) so percentile
+    # indices never degenerate to 0 when the sample set is small —
+    # otherwise p99 with N=1 == p50 == min, which is misleading.
+    def _pct(q: float) -> float:
+        idx = max(0, min(count - 1, int(count * q + 0.5) - 1))
+        return latencies[idx]
+
+    p50 = _pct(0.50)
+    p90 = _pct(0.90)
+    p95 = _pct(0.95)
+    p99 = _pct(0.99)
     min_lat = latencies[0]
     max_lat = latencies[-1]
     rps = count / total_elapsed

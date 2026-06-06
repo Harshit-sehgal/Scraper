@@ -66,14 +66,14 @@ class DomainIntelligenceRegistry:
                     for domain, metrics in data.items():
                         self._registry[domain] = DomainIntelligence(domain, metrics)
             except Exception:
-                logger.exception("Failed to load domain intelligence: %s")
+                logger.exception("Failed to load domain intelligence")
 
     def _save(self) -> None:
         try:
             with open(self.path, "w") as f:  # noqa: PTH123
                 json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
         except Exception:
-            logger.exception("Failed to save domain intelligence: %s")
+            logger.exception("Failed to save domain intelligence")
 
     def get_intelligence(self, url: str) -> DomainIntelligence:
         """Get or create intelligence for a domain."""

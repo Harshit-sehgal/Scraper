@@ -70,7 +70,10 @@ exec: ## Run a command in the app container (usage: make exec CMD="python -c ...
 
 # ─── Testing ────────────────────────────────────────────────────────────────
 
-test: ## Run all tests (excluding API-dependent)
+test: ## Run all tests (excluding flaky live-network end-to-end)
+	# Excludes test_scrape_url_end_to_end_multiple_records: that test
+	# hits a live target and is environment-flaky in CI. Use
+	# `make test-all` to include it (requires a reachable network).
 	$(DC) exec $(SERVICE) python -m pytest -q --tb=short -k "not test_scrape_url_end_to_end_multiple_records"
 
 test-all: ## Run all tests (including API-dependent, requires GROQ_API_KEY)

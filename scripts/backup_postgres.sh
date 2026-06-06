@@ -54,8 +54,11 @@ DB_PORT=""
 
 if [ -n "${DATAFORGE_DATABASE_URL:-}" ]; then
     echo "[INFO] Parsing database configuration from DATAFORGE_DATABASE_URL."
-    # Run python to parse URL securely
-    parsed_config=$(python3 -c '
+    # Use newline-delimited output (one VAR per line) so the consumer can
+    # read it with `while IFS= read -r` instead of `eval`. The previous
+    # `eval` approach was a shell-injection risk: a crafted password
+    # could execute arbitrary commands at parse time.
+    parsed_config=$(DATAFORGE_DATABASE_URL="${DATAFORGE_DATABASE_URL:-}" python3 -c '
 import os
 from urllib.parse import urlsplit, unquote
 url = os.environ.get("DATAFORGE_DATABASE_URL", "")
@@ -66,17 +69,22 @@ try:
     host = parsed.hostname or "postgres"
     password = unquote(parsed.password) if parsed.password else ""
     port = parsed.port or ""
-    # Escape quotes for bash safety
-    user_esc = user.replace("\"", "\\\"")
-    name_esc = name.replace("\"", "\\\"")
-    host_esc = host.replace("\"", "\\\"")
-    pass_esc = password.replace("\"", "\\\"")
-    print(f"DB_USER=\"{user_esc}\";DB_NAME=\"{name_esc}\";DB_HOST=\"{host_esc}\";DB_PASS=\"{pass_esc}\";DB_PORT=\"{port}\"")
+    for key, value in (("DB_USER", user), ("DB_NAME", name), ("DB_HOST", host), ("DB_PASS", password), ("DB_PORT", port)):
+        # Strip newlines and any shell-special characters from values
+        # to make the assignment safe even for unusual passwords.
+        safe = value.replace("\n", "").replace("\r", "")
+        print(f"{key}={safe}")
 except Exception:
     pass
 ' 2>/dev/null || true)
     if [ -n "${parsed_config}" ]; then
-        eval "${parsed_config}"
+        while IFS= read -r line; do
+            case "${line}" in
+                DB_USER=*|DB_NAME=*|DB_HOST=*|DB_PASS=*|DB_PORT=*)
+                    export "${line?}"
+                    ;;
+            esac
+        done <<< "${parsed_config}"
     fi
 fi
 

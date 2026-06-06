@@ -243,7 +243,7 @@ class DomainHealthMonitor:
                 _background_tasks.add(_task)
                 _task.add_done_callback(_background_tasks.discard)
             except Exception:
-                logger.exception("Alert callback failed: %s")
+                logger.exception("Alert callback failed")
 
         self._last_alert_time[domain] = now
 

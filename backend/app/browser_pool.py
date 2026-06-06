@@ -76,7 +76,7 @@ class BrowserPool:
                     self._browser = await self._playwright.chromium.launch(headless=settings.PLAYWRIGHT_HEADLESS)
                 except Exception:
                     self.crash_count += 1
-                    logger.exception("[BrowserPool] Failed to launch browser: %s")
+                    logger.exception("[BrowserPool] Failed to launch browser")
                     try:
                         from app.metrics_collector import record_browser_launch
 
@@ -343,7 +343,7 @@ class BrowserPool:
         try:
             await self._hard_recycle()
         except Exception:
-            logger.exception("[BrowserPool] Hard recycle failed: %s")
+            logger.exception("[BrowserPool] Hard recycle failed")
         finally:
             self._recycling = False
             self._recycle_event.set()
