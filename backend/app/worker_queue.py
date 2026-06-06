@@ -89,7 +89,7 @@ class QueueTask:
         self.payload = payload or {}
         self.priority = priority
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.created_at = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
         self.started_at: str | None = None
         self.completed_at: str | None = None
         self.attempts = 0
@@ -173,7 +173,14 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
-_CURRENT_QUEUE_SCHEMA_VERSION = 2
+_CURRENT_QUEUE_SCHEMA_VERSION = 3
+
+# SQLite's ``datetime('now')`` returns ``"YYYY-MM-DD HH:MM:SS"`` (no ``T``/``Z``).
+# We use the same format from Python so textual ``scheduled_at <= datetime('now')``
+# comparisons work in both directions. Timestamps are UTC (mirroring Postgres's
+# ``NOW()``) so the SQLite and Postgres backends produce identical orderings
+# regardless of the host's local time zone.
+_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def _ensure_schema(db_path: Path | None = None) -> None:
@@ -247,6 +254,16 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                     except Exception:
                         pass  # nosec B110
                     current = 2
+
+                if current < 3:
+                    # Add execution_time_ms column for tracking task latencies
+                    # (mirrors the Postgres queue migration so both backends
+                    # share the same ``_CURRENT_QUEUE_SCHEMA_VERSION``).
+                    try:
+                        conn.execute("ALTER TABLE task_history ADD COLUMN execution_time_ms INTEGER")
+                    except Exception:
+                        pass  # nosec B110
+                    current = 3
 
                 conn.execute("DELETE FROM queue_schema_version")
                 conn.execute("INSERT INTO queue_schema_version (version) VALUES (?)", (current,))
@@ -362,13 +379,19 @@ class WorkerQueue:
         with _DB_LOCK:
             conn = self._conn()
             try:
+                # ``BEGIN IMMEDIATE`` acquires a write lock at the start of the
+                # transaction so the SELECT-then-UPDATE sequence is atomic
+                # across multiple processes (the module-level ``_DB_LOCK``
+                # only serializes operations *within* a single process).
+                conn.execute("BEGIN IMMEDIATE")
                 row = conn.execute("""SELECT * FROM tasks
                        WHERE status = 'pending'
-                         AND scheduled_at <= datetime('now', 'localtime')
+                         AND scheduled_at <= datetime('now')
                        ORDER BY priority ASC, created_at ASC
                        LIMIT 1""").fetchone()
 
                 if row is None:
+                    conn.execute("ROLLBACK")
                     return None
 
                 task_data = dict(row)
@@ -379,21 +402,21 @@ class WorkerQueue:
                     },
                 )
                 task.status = TaskStatus.RUNNING
-                task.started_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                task.started_at = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
                 task.attempts += 1
 
                 conn.execute(
                     "UPDATE tasks SET status = ?, started_at = ?, attempts = ? WHERE id = ?",
                     (task.status, task.started_at, task.attempts, task.id),
                 )
-                conn.commit()
+                conn.execute("COMMIT")
 
                 return task
             finally:
                 conn.close()
 
     def _complete_sync(self, task_id: str, result: dict | None) -> None:
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
         conn = self._conn()
         try:
             # Fetch task for history
@@ -465,7 +488,9 @@ class WorkerQueue:
                     else:
                         backoff = float(min(2 ** (attempts - 1) * 30, 3600))
 
-                    retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime("%Y-%m-%d %H:%M:%S")
+                    retry_at = (datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds=backoff)).strftime(
+                        _TIMESTAMP_FORMAT
+                    )
                     conn.execute(
                         "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
                         (TaskStatus.PENDING, error, retry_at, task_id),
@@ -542,7 +567,7 @@ class WorkerQueue:
         task_type: str | None = None,
     ) -> None:
         """Mark a task as failed. Retries if attempts remain."""
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
         async with self._in_flight_lock:
             await asyncio.to_thread(
                 self._fail_sync,
@@ -633,7 +658,7 @@ class WorkerQueue:
 
     async def cancel(self, task_id: str) -> bool:
         """Cancel a task. Handles both pending (SQLite) and in-flight (asyncio) tasks."""
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
         async with self._in_flight_lock:
             # Check in-flight tasks first (running tasks)
             if task_id in self._in_flight:
@@ -688,6 +713,9 @@ class WorkerQueue:
             self._worker_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task
+            # Clear the task handle so a subsequent start() doesn't see
+            # a stale task and re-create without awaiting the old one.
+            self._worker_task = None
 
         if drain:
             await self._drain_in_flight()
@@ -719,7 +747,20 @@ class WorkerQueue:
                     self._in_flight[task_id] = t
 
                 def _on_task_done(fut: object, tid: str = task_id) -> None:
-                    asyncio.ensure_future(self._cleanup_in_flight(tid))
+                    # Schedule the cleanup on the *currently running* event
+                    # loop, not on whichever loop ``asyncio.ensure_future``
+                    # happens to pick up.  This avoids a ``RuntimeError``
+                    # when the worker task is bound to a different loop
+                    # from the caller's context (e.g. across test scopes
+                    # or during shutdown).
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(self._cleanup_in_flight(tid))
+                    except RuntimeError:
+                        logger.debug(
+                            "No running event loop to schedule _cleanup_in_flight for %s",
+                            tid,
+                        )
 
                 t.add_done_callback(_on_task_done)
 
@@ -825,9 +866,18 @@ class WorkerQueue:
         """Return queue status for monitoring."""
         conn = self._conn()
         try:
+            # ``retrying`` is a future-only TaskStatus value: the queue
+            # currently transitions a failed task straight back to
+            # ``pending`` with a future ``scheduled_at``, so the count
+            # for this status is always zero.  We still emit the key for
+            # API stability, and we compute the "effectively retrying"
+            # count (pending + future scheduled_at) so dashboards have a
+            # meaningful metric.
             pending = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'pending'").fetchone()[0]
             running = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()[0]
-            retrying = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'retrying'").fetchone()[0]
+            retrying = conn.execute("""SELECT COUNT(*) FROM tasks
+                   WHERE status = 'pending'
+                     AND scheduled_at > datetime('now')""").fetchone()[0]
             dead_letter = conn.execute("SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'").fetchone()[0]
             completed_24h = conn.execute("""SELECT COUNT(*) FROM task_history
                    WHERE finished_at >= datetime('now', '-1 day')""").fetchone()[0]
@@ -884,7 +934,7 @@ class WorkerQueue:
                 """INSERT INTO tasks
                    (id, type, payload, priority, status, created_at,
                     scheduled_at, attempts, max_attempts, timeout_seconds)
-                   VALUES (?, ?, ?, ?, 'pending', ?, datetime('now', 'localtime'), 0, ?, ?)""",
+                    VALUES (?, ?, ?, ?, 'pending', ?, datetime('now'), 0, ?, ?)""",
                 (
                     task_data["id"],
                     task_data["type"],

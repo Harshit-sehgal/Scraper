@@ -294,7 +294,7 @@ def create_jobs_router(
             if job.results_on_disk:
                 from app.utils.job_results_store import load_job_results_from_disk
 
-                results_list = load_job_results_from_disk(job.id, job.results_file_path)
+                results_list = await run_in_threadpool(load_job_results_from_disk, job.id, job.results_file_path)
 
         dumped = job.model_dump()
         dumped.pop("results_file_path", None)
@@ -320,7 +320,8 @@ def create_jobs_router(
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
-            page, total = load_paginated_job_results_from_disk(
+            page, total = await run_in_threadpool(
+                load_paginated_job_results_from_disk,
                 job.id,
                 limit=limit,
                 offset=offset,
@@ -675,7 +676,7 @@ def create_jobs_router(
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
 
-            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+            results_list = await run_in_threadpool(load_job_results_from_disk, job.id, job.results_file_path)
             loaded_from_disk = True
 
         if not results_list:
@@ -770,14 +771,14 @@ def create_jobs_router(
             if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
                 from app.utils.job_results_store import save_job_results_to_disk
 
-                file_path = save_job_results_to_disk(job.id, job.results)
+                file_path = await run_in_threadpool(save_job_results_to_disk, job.id, job.results)
                 job.results_on_disk = True
                 job.results_file_path = file_path
                 job.results = []
             elif loaded_from_disk:
                 from app.utils.job_results_store import delete_job_results_from_disk
 
-                delete_job_results_from_disk(job.id, job.results_file_path)
+                await run_in_threadpool(delete_job_results_from_disk, job.id, job.results_file_path)
                 job.results_on_disk = False
                 job.results_file_path = None
 

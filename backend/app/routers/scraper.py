@@ -349,7 +349,7 @@ async def get_extraction_economics(window: Annotated[int, Query(ge=10, le=1000)]
 
     telemetry_history = get_scrape_telemetry().get_recent(window)
     tracker = EconomicTracker()
-    report = tracker.analyze(telemetry_history)
+    report = await run_in_threadpool(tracker.analyze, telemetry_history)
 
     return {
         "generated_at": report.generated_at,

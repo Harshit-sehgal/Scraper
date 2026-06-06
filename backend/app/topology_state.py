@@ -182,7 +182,7 @@ class TopologyState:
         if tx is not None:
             tx["tombstones"] = value
         else:
-            self._tombstones_real = value
+            setattr(self, "_tombstones_real", value)  # noqa: B010
 
     @property
     def _structural_change(self) -> bool:
@@ -231,6 +231,13 @@ class TopologyState:
 
         # ─── Distributed Recovery (Phase 60) ──────────────────────────
         self._topology_epoch: int = 1
+
+        # Tombstones track removed region_ids outside a transaction.
+        # MUST be initialised here, not via ``__dict__.get(..., set())``
+        # in the property getter, otherwise the getter returns a fresh
+        # empty set on every call and any ``.add()`` mutation is lost
+        # (the non-staging path in ``remove()`` would silently no-op).
+        self._tombstones_real: set[str] = set()
 
         # ─── Transaction Staging ──────────────────────────────────────
 
@@ -314,6 +321,8 @@ class TopologyState:
             if self._staging["structural_change"]:
                 self._topology_epoch += 1
 
+            tombstones = self._staging["tombstones"]
+
             self._regions = self._staging["regions"]
             self._communities = self._staging["communities"]
             self._schema_patterns = self._staging["schema_patterns"]
@@ -330,9 +339,11 @@ class TopologyState:
             self._crystalline_atoms = self._staging["crystalline_atoms"]
             self._meso_clusters = self._staging["meso_clusters"]
             self._macro_continents = self._staging["macro_continents"]
-            self._tombstones_real = self._staging["tombstones"]
 
             self._staging = None
+            # Route through the property setter so any future notification
+            # hook (e.g. invalidation observers) fires consistently.
+            self._tombstones = tombstones
             self._modified_regions.clear()
 
     def rollback(self) -> None:

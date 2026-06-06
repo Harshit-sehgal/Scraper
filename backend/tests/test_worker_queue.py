@@ -150,7 +150,11 @@ class TestWorkerQueueRetries:
         status = queue.get_status()
         assert status["pending"] >= 1, "Retry task should be pending, not retrying"
         assert status["running"] == 0
-        assert status["retrying"] == 0
+        # ``retrying`` now reflects the number of *pending* tasks with a
+        # future ``scheduled_at`` (i.e. the "effectively retrying" count).
+        # The exponential backoff starts at 30s, so the retried task is
+        # counted here.
+        assert status["retrying"] >= 1, "Retried task with future scheduled_at should count as retrying"
 
     def test_fail_exhausts_retries_moves_to_dead_letter(self, tmp_path) -> None:
         """Failing a task after exhausting all retries moves it to dead letter."""
@@ -179,9 +183,10 @@ class TestWorkerQueueRetries:
         asyncio.run(queue.fail(task_id, "Temporary error", retry=True))
 
         # Force scheduled_at to now so the task is immediately eligible
+        # (UTC, matching the format the production code writes in)
         conn = queue._conn()
         conn.execute(
-            "UPDATE tasks SET scheduled_at = datetime('now', 'localtime') WHERE id = ?",
+            "UPDATE tasks SET scheduled_at = datetime('now') WHERE id = ?",
             (task_id,),
         )
         conn.commit()

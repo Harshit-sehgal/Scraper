@@ -27,6 +27,11 @@ def test_is_safe_ip() -> None:
     assert is_safe_ip("224.0.0.1") is False
     assert is_safe_ip("240.0.0.0") is False
 
+    # Documentation / non-globally-routable ranges
+    assert is_safe_ip("192.0.2.1") is False  # TEST-NET-1
+    assert is_safe_ip("198.51.100.1") is False  # TEST-NET-2
+    assert is_safe_ip("203.0.113.1") is False  # TEST-NET-3
+
 
 def test_validate_public_http_url_basic_safety() -> None:
     # Public domains should pass
@@ -48,6 +53,26 @@ def test_validate_public_http_url_basic_safety() -> None:
     for host in ("169.254.169.254", "metadata.google.internal", "instance-data"):
         with pytest.raises(ValueError, match="restricted cloud metadata endpoint"):
             validate_public_http_url(f"http://{host}")
+
+
+def test_validate_public_http_url_port_allowlist(monkeypatch) -> None:
+    """Outbound HTTP requests are restricted to standard web ports.
+
+    Prevents SSRF probes from reaching internal services on non-HTTP
+    ports (SSH, Redis, Memcached, etc.). The allowlist is bypassed in
+    smoke-test mode (where integration endpoints may bind to ephemeral
+    ports).
+    """
+    # Ensure smoke-test mode is off so the port allowlist is enforced.
+    monkeypatch.delenv("DATAFORGE_SMOKE_TEST_MODE", raising=False)
+    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
+    # Allowed ports should pass
+    for port in (80, 443, 8080, 8443):
+        validate_public_http_url(f"http://google.com:{port}/path")
+    # Disallowed ports should be rejected
+    for port in (22, 23, 25, 3306, 5432, 6379, 9200, 11211, 27017):
+        with pytest.raises(ValueError, match="not in the allowed list"):
+            validate_public_http_url(f"http://google.com:{port}/path")
 
 
 def test_validate_public_http_url_dns_resolution(monkeypatch) -> None:
