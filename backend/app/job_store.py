@@ -1098,24 +1098,24 @@ def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:
 
     Args:
         include_deleted: If True, soft-deleted rows
-            (``deleted_at IS NOT NULL``) are included.
+            (from the recycle_bin table) are included.
     """
     counts: dict[str, int] = {}
     with _DB_LOCK:
         conn = _get_connection()
         try:
-            if include_deleted:
-                rows = conn.execute("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status").fetchall()
-            else:
-                # The schema uses ``deleted_at TEXT DEFAULT ''`` rather than
-                # NULL to record soft deletion, so an empty string is the
-                # "not deleted" sentinel.
-                rows = conn.execute(
-                    "SELECT status, COUNT(*) AS cnt FROM jobs WHERE deleted_at = '' OR deleted_at IS NULL GROUP BY status"
-                ).fetchall()
+            # SQLite stores active jobs in the 'jobs' table (which has no deleted_at column)
+            # and soft-deleted jobs in the 'recycle_bin' table.
+            rows = conn.execute("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status").fetchall()
             for row in rows:
                 key = str(row["status"])
                 counts[key] = int(row["cnt"])
+
+            if include_deleted:
+                rb_rows = conn.execute("SELECT status, COUNT(*) AS cnt FROM recycle_bin GROUP BY status").fetchall()
+                for row in rb_rows:
+                    key = str(row["status"])
+                    counts[key] = counts.get(key, 0) + int(row["cnt"])
         finally:
             conn.close()
     return counts

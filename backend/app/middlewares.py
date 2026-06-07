@@ -15,6 +15,39 @@ if TYPE_CHECKING:
     from fastapi import Request
 
 
+def _get_client_ip(request: Request) -> str:
+    """Extract the originating client IP, honoring reverse-proxy headers.
+
+    Trusted proxy: nginx. The deployment runs nginx as the single
+    ingress proxy in front of the API, and nginx is configured to
+    forward the original client IP via ``X-Forwarded-For`` and
+    ``X-Real-IP``. We read those headers here so audit logs reflect
+    the real caller, not the proxy's loopback address.
+
+    Precedence:
+    1. ``X-Forwarded-For`` first hop (the leftmost entry is the
+       original client when the header is appended at each hop).
+    2. ``X-Real-IP`` (single-IP variant nginx sometimes sets).
+    3. ``request.client.host`` as a last-resort fallback for direct
+       connections (no proxy) or unusual deployment topologies.
+
+    Returns ``"unknown"`` if none of the above yield a usable value.
+    """
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        # The first entry in a comma-separated list is the original
+        # client; subsequent entries are intermediate proxies.
+        first = xff.split(",", 1)[0].strip()
+        if first:
+            return first
+    xri = request.headers.get("X-Real-IP")
+    if xri:
+        return xri.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
 def _is_match(provided: str, expected: str) -> bool:
     """Constant-time API-key comparison.
 
@@ -131,7 +164,7 @@ async def api_key_middleware(request: Request, call_next):
 
             if not matched_role:
                 log_auth_event(
-                    actor=request.client.host if request.client else "unknown",
+                    actor=_get_client_ip(request),
                     action="api_key_auth",
                     resource=request.url.path,
                     outcome="failure",
@@ -143,7 +176,7 @@ async def api_key_middleware(request: Request, call_next):
                 )
             if request.method != "GET":
                 log_auth_event(
-                    actor=f"{matched_role}:{request.client.host if request.client else 'unknown'}",
+                    actor=f"{matched_role}:{_get_client_ip(request)}",
                     action="api_key_auth",
                     resource=request.url.path,
                     outcome="success",

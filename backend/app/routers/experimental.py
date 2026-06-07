@@ -194,9 +194,6 @@ async def merge_knowledge(
     """
     _require_admin_key(request)
 
-    if isinstance(req, dict):
-        req = KnowledgeMergeRequest(**req)
-
     from app.semantic_world_state import get_world_state
 
     ws = get_world_state()

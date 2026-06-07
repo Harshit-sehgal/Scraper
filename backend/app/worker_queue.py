@@ -1087,7 +1087,22 @@ def get_worker_queue(
             # if they want the default back; we replace the
             # singleton so a subsequent ``get_worker_queue()`` with
             # no args returns the new one.
-            _queue_instance = WorkerQueue(db_path=db_path)
+            #
+            # Defensive: if constructing the new ``WorkerQueue``
+            # raises (e.g. the requested path is unwritable, or the
+            # caller's fixture teardown has already deleted the
+            # tmp dir), the singleton must not be silently replaced
+            # with a half-initialized instance. We construct the
+            # new queue on a local first, swap only on success, and
+            # re-raise the original exception otherwise.
+            try:
+                candidate = WorkerQueue(db_path=db_path)
+            except Exception:
+                # Leave the cached singleton untouched and let the
+                # caller see the real error. ``reset_worker_queue``
+                # remains the supported recovery path.
+                raise
+            _queue_instance = candidate
     return _queue_instance
 
 

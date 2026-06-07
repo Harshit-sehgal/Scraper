@@ -214,6 +214,33 @@ def reset_queue():
         pass
 
 
+@pytest.fixture(autouse=True)
+def reset_lifespan_state_fixture():
+    """Reset the module-level lifespan state before and after each test.
+
+    Mirrors the pattern of ``reset_queue`` / ``reset_failure_injection``:
+    we call ``reset_lifespan_state()`` at fixture entry to clear any
+    cached ``job_repo`` / ``gossip`` / ``heartbeat_mgr`` from a previous
+    test, and again at teardown so a subsequent test in the same
+    process starts clean. The helper itself is a test-only backstop
+    (see ``app.lifespan.reset_lifespan_state``); production code does
+    not call it.
+    """
+    try:
+        from app.lifespan import reset_lifespan_state
+
+        reset_lifespan_state()
+    except ImportError:
+        pass
+    yield
+    try:
+        from app.lifespan import reset_lifespan_state
+
+        reset_lifespan_state()
+    except ImportError:
+        pass
+
+
 from app.models import FieldType, SchemaField
 
 

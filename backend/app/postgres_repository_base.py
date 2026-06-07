@@ -695,46 +695,88 @@ class PostgresRepositoryBase(JobRepository, ABC):
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         self._ensure()
         with self._conn() as conn:
-            job_rows = self._fetch_all(conn, "SELECT * FROM jobs WHERE deleted_at IS NULL")
-            jobs_store: dict[str, Job] = {}
-            for row in job_rows:
-                job = row_to_job(row)
-                if job:
-                    jobs_store[job.id] = job
+            # Cross-replica recovery contract: when more than one API
+            # replica starts up at the same time (rolling deploy, blue/
+            # green swap, K8s scaling event), each replica would
+            # independently observe in-progress jobs and race to mark
+            # them as failed. The second writer's UPDATE would clobber
+            # the first writer's, but the in-memory job objects
+            # (carrying the recovery error message) would diverge and
+            # any subsequent ``save_all`` from either replica would
+            # re-persist the *other* replica's state. We hold a
+            # Postgres advisory lock for the duration of the
+            # recovery sweep so only one replica mutates the rows at
+            # a time. The constant ``8675309`` is arbitrary; any
+            # fixed int64 that no other subsystem uses is fine.
+            # ``pg_advisory_unlock`` is called explicitly in the
+            # ``finally`` block so the lock is released even if the
+            # recovery code raises.
+            lock_acquired = False
+            try:
+                self._execute(conn, "SELECT pg_try_advisory_lock(8675309)")
+                lock_row = self._fetch_one(conn, "SELECT 1 AS held")
+                # ``pg_try_advisory_lock`` returns boolean; the
+                # function-call-as-query form loses that return value
+                # for some drivers, so we re-check by inspecting
+                # ``pg_locks`` directly.
+                held_row = self._fetch_one(
+                    conn,
+                    "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND objid = 8675309 AND pid = pg_backend_pid()",
+                )
+                if held_row is not None:
+                    lock_acquired = True
+                # ``lock_row`` is intentionally unused — kept for
+                # future assertions if a driver begins surfacing the
+                # boolean return value directly.
+                del lock_row
+                job_rows = self._fetch_all(conn, "SELECT * FROM jobs WHERE deleted_at IS NULL")
+                jobs_store: dict[str, Job] = {}
+                for row in job_rows:
+                    job = row_to_job(row)
+                    if job:
+                        jobs_store[job.id] = job
 
-            if recover_in_progress:
-                now_iso = datetime.datetime.now().isoformat()
-                dirty_ids = []
-                for job in list(jobs_store.values()):
-                    if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-                        job.status = JobStatus.FAILED
-                        job.error = "Recovered after restart while still in progress."
-                        job.completed_at = now_iso
-                        job.cancel_requested = False
-                        dirty_ids.append(job.id)
-                if dirty_ids:
-                    self._execute(
-                        conn,
-                        "UPDATE jobs SET status = 'failed', error = 'Recovered after restart while still in progress.', completed_at = %s, cancel_requested = FALSE WHERE id = ANY(%s)",
-                        (now_iso, dirty_ids),
-                    )
-                    logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))
+                if recover_in_progress:
+                    now_iso = datetime.datetime.now().isoformat()
+                    dirty_ids = []
+                    for job in list(jobs_store.values()):
+                        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+                            job.status = JobStatus.FAILED
+                            job.error = "Recovered after restart while still in progress."
+                            job.completed_at = now_iso
+                            job.cancel_requested = False
+                            dirty_ids.append(job.id)
+                    if dirty_ids:
+                        self._execute(
+                            conn,
+                            "UPDATE jobs SET status = 'failed', error = 'Recovered after restart while still in progress.', completed_at = %s, cancel_requested = FALSE WHERE id = ANY(%s)",
+                            (now_iso, dirty_ids),
+                        )
+                        logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))
 
-            recycle_rows = self._fetch_all(conn, "SELECT * FROM recycle_bin")
-            recycle_store: dict[str, Job] = {}
-            for row in recycle_rows:
-                job = row_to_job(row)
-                if job:
-                    recycle_store[job.id] = job
+                recycle_rows = self._fetch_all(conn, "SELECT * FROM recycle_bin")
+                recycle_store: dict[str, Job] = {}
+                for row in recycle_rows:
+                    job = row_to_job(row)
+                    if job:
+                        recycle_store[job.id] = job
 
-            ws_row = self._fetch_one(conn, "SELECT payload FROM world_state WHERE id = 'default'")
-            world_state_data: dict | None = None
-            if ws_row and ws_row.get("payload"):
-                try:
-                    world_state_data = json.loads(ws_row["payload"])
-                except (json.JSONDecodeError, TypeError) as e:
-                    logger.warning("Failed to deserialize world_state payload: %s", e)
-            return jobs_store, recycle_store, world_state_data
+                ws_row = self._fetch_one(conn, "SELECT payload FROM world_state WHERE id = 'default'")
+                world_state_data: dict | None = None
+                if ws_row and ws_row.get("payload"):
+                    try:
+                        world_state_data = json.loads(ws_row["payload"])
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.warning("Failed to deserialize world_state payload: %s", e)
+                return jobs_store, recycle_store, world_state_data
+            finally:
+                if lock_acquired:
+                    # Best-effort unlock; if it fails the lock will
+                    # be released when the session ends.
+                    try:
+                        self._execute(conn, "SELECT pg_advisory_unlock(8675309)")
+                    except Exception:
+                        logger.debug("pg_advisory_unlock(8675309) failed; will be released at session end")
 
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         self._ensure()

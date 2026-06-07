@@ -183,18 +183,43 @@ class DatabaseSlidingWindowCounter:
                 from app.postgres_repository import _conn, _execute, _fetch_one
 
                 with _conn() as conn:
+                    # Cross-connection contract: the rate_limits table is
+                    # shared across every API replica. The CTE-based
+                    # count+insert is atomic *within a single statement*,
+                    # but two API replicas running the same query at the
+                    # same time can both observe ``count < N`` and both
+                    # insert (the snapshot is statement-local, not
+                    # transaction-locked against concurrent writers).
+                    # To make the count+insert mutually exclusive we
+                    # take a Postgres transaction-scoped advisory lock
+                    # keyed by ``self.key`` before counting. The lock
+                    # is released automatically when the connection
+                    # returns to the pool, so we never need an explicit
+                    # unlock. The key is hashed into a 64-bit signed
+                    # integer so the same logical bucket always maps to
+                    # the same lock across replicas. The SQLite path
+                    # below uses ``BEGIN IMMEDIATE`` for the same
+                    # mutual-exclusion guarantee.
+                    _execute(
+                        conn,
+                        "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                        (self.key,),
+                    )
                     # Prune old entries first; safe in the same
                     # transaction as the count+insert below.
-                    _execute(conn, "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s", (self.key, cutoff))
+                    _execute(
+                        conn,
+                        "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s",
+                        (self.key, cutoff),
+                    )
                     # Atomic count+insert: the CTE selects the current
                     # count and the outer INSERT runs only when the
                     # count is strictly less than the limit. The whole
-                    # statement is a single SQL command, so two
-                    # concurrent requests cannot both see ``count < N``
+                    # statement runs after we've taken the advisory
+                    # lock above, so two concurrent requests on
+                    # different connections cannot both see ``count < N``
                     # and both insert. ``RETURNING`` tells us whether
-                    # the row was actually written. Postgres supports
-                    # this since 9.1 (CTEs) and 9.5 (INSERT...RETURNING
-                    # in CTEs).
+                    # the row was actually written.
                     row = _fetch_one(
                         conn,
                         """

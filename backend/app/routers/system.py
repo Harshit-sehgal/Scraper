@@ -786,22 +786,31 @@ async def metrics(request: Request):
         repo = get_job_repository()
         worker_healths = repo.get_all_worker_healths(ttl_seconds=60)
         if worker_healths:
+            # ``pid`` is part of the label set so multiple workers
+            # sharing the same ``hostname`` (a common pattern when
+            # scaling up within a single host, or when the same host
+            # name appears under different PIDs in tests) do not
+            # collide on the (worker_id, hostname) tuple. The
+            # ``worker_heartbeats`` row already carries a ``pid``
+            # column (see ``record_worker_heartbeat``) so we just
+            # project it through here.
             hb_alive_gauge = Gauge(
                 "dataforge_worker_heartbeat_alive",
                 "Whether a worker has a recent heartbeat (1=alive, 0=dead)",
-                ["worker_id", "hostname"],
+                ["worker_id", "hostname", "pid"],
                 registry=registry,
             )
             hb_age_gauge = Gauge(
                 "dataforge_worker_heartbeat_age_seconds",
                 "Seconds since the last worker heartbeat (-1 if never received)",
-                ["worker_id", "hostname"],
+                ["worker_id", "hostname", "pid"],
                 registry=registry,
             )
             for wh in worker_healths:
                 wid = wh.get("worker_id", "unknown")
                 hostname = wh.get("hostname", "")
-                hb_alive_gauge.labels(worker_id=wid, hostname=hostname).set(1 if wh.get("alive") else 0)
+                pid = str(wh.get("pid") or "unknown")
+                hb_alive_gauge.labels(worker_id=wid, hostname=hostname, pid=pid).set(1 if wh.get("alive") else 0)
                 last_hb = wh.get("last_heartbeat")
                 if last_hb:
                     try:
@@ -812,7 +821,7 @@ async def metrics(request: Request):
                         age = -1.0
                 else:
                     age = -1.0
-                hb_age_gauge.labels(worker_id=wid, hostname=hostname).set(age)
+                hb_age_gauge.labels(worker_id=wid, hostname=hostname, pid=pid).set(age)
     except (AttributeError, ImportError, RuntimeError):
         METRICS_COLLECTION_ERRORS += 1
         logger.debug("Metrics: worker heartbeat collection failed")

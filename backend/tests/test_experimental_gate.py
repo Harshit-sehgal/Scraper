@@ -154,3 +154,42 @@ def test_close_postgres_pool_is_not_gated(monkeypatch, caplog) -> None:
         close_postgres_pool()
     # We don't assert it was called (ImportError path is acceptable too),
     # but we DO assert the function did not raise.
+
+
+# ─── End-to-end 403 verification ───────────────────────────────────────
+
+
+def test_experimental_router_returns_403_when_disabled(monkeypatch) -> None:
+    """A request to an experimental endpoint must 403 when the gate is off.
+
+    This is the HTTP-level complement to the import-time gate tests
+    above. The experimental router is mounted with a single
+    ``Depends(verify_experimental_enabled)`` dependency on every
+    route, so flipping ``ENABLE_EXPERIMENTAL_ROUTES=False`` and
+    hitting any endpoint on the router must produce a 403 (not a
+    404 — that would suggest the router wasn't mounted, which is a
+    different failure mode than "feature flag is off").
+    """
+    from app.config import settings
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False, raising=False)
+
+    # Import the router lazily so we can mount it on a fresh app
+    # with the gate set to off. The router object itself is created
+    # at import time, but the dependency is evaluated per request,
+    # so a settings override at request time is what flips the gate.
+    from app.routers.experimental import router as experimental_router
+
+    test_app = FastAPI()
+    test_app.include_router(experimental_router)
+
+    with TestClient(test_app) as tc:
+        # /api/system/topology is a GET endpoint, so no body is needed.
+        resp = tc.get("/api/system/topology")
+    assert resp.status_code == 403, f"Expected 403 with gate off, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert "Experimental" in body.get("detail", "") or "experimental" in body.get("detail", "").lower()
+    # The 403 must name the env var so operators can self-diagnose.
+    assert "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES" in body.get("detail", "")
