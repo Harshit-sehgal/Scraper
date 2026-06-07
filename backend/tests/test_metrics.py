@@ -149,9 +149,13 @@ def test_metrics_worker_heartbeat_present(client, monkeypatch) -> None:
     # Heartbeat metric should be present
     assert "dataforge_worker_heartbeat_alive" in text, "Worker heartbeat alive metric must appear in /metrics output"
     assert "dataforge_worker_heartbeat_age_seconds" in text, "Worker heartbeat age metric must appear in /metrics output"
-    # The test worker should be marked alive (just wrote heartbeat)
-    assert 'dataforge_worker_heartbeat_alive{worker_id="metrics-test-worker"' in text, (
-        "Test worker should appear in heartbeat metrics"
-    )
+    # The test worker should be marked alive (just wrote heartbeat).
+    # prometheus_client sorts label keys alphabetically, so the rendered line
+    # is `dataforge_worker_heartbeat_alive{hostname="<host>",worker_id="metrics-test-worker"}`.
+    # Use a regex to avoid depending on the label order.
+    import re
+
+    pattern = re.compile(r'dataforge_worker_heartbeat_alive\{[^}]*worker_id="metrics-test-worker"[^}]*\}\s+1\.0')
+    assert pattern.search(text), f"Test worker should appear as alive in heartbeat metrics. Metrics text:\n{text}"
 
     reset_repository()

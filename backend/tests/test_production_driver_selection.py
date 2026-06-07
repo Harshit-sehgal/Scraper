@@ -21,6 +21,16 @@ def test_production_without_pg_driver_fails_fast(monkeypatch) -> None:
     )
     monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)
 
+    # pydantic-settings reads env vars at construction time. The module-level
+    # ``settings`` singleton was created at import time, so we also have to
+    # patch the ``ENV`` attribute directly (it's a static field, not a
+    # dynamic property like ``STORAGE_BACKEND``/``DATABASE_URL``) for the
+    # production gate in ``storage_interface.get_job_repository`` to see
+    # "production".
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENV", "production")
+
     import app.storage_interface as si
 
     si.reset_repository()

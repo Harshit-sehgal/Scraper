@@ -62,14 +62,19 @@ def postgres_container():
 def clean_db(postgres_container):
     """Clean the Postgres database between tests.
 
-    Calls _ensure_schema() first so all tables exist before DELETE statements
+    Calls ensure_schema() first so all tables exist before DELETE statements
     run — this prevents failures on fresh databases where tables don't exist yet.
     """
-    from app.postgres_repository import _conn, _ensure_schema, _execute
+    # Phase C refactor: schema helpers were moved to
+    # ``app.postgres_repository_base`` and renamed (no leading underscore).
+    # The connection-management helpers remained in ``app.postgres_repository``
+    # with backward-compat aliases (``_conn``, ``_execute``).
+    from app.postgres_repository import _conn, _execute
+    from app.postgres_repository_base import ensure_schema
 
     reset_repository()
-    _ensure_schema()
     with _conn() as conn:
+        ensure_schema(conn)
         _execute(conn, "DELETE FROM jobs")
         _execute(conn, "DELETE FROM recycle_bin")
         _execute(conn, "DELETE FROM schema_version")
