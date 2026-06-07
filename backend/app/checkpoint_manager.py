@@ -27,7 +27,7 @@ class CheckpointManager:
         filepath = self.base_dir / filename
 
         try:
-            with open(filepath, "w") as f:  # noqa: PTH123
+            with open(filepath, "w") as f:
                 json.dump(state_dict, f, indent=2)
             logging.getLogger(__name__).info("Created checkpoint: %s", filename)
             return str(filepath)
@@ -38,7 +38,7 @@ class CheckpointManager:
     def load_checkpoint(self, filepath: str) -> None:
         """Restore world state from a checkpoint file."""
         try:
-            with open(filepath) as f:  # noqa: PTH123
+            with open(filepath) as f:
                 state_dict = json.load(f)
             get_world_state().from_dict(state_dict)
             logging.getLogger(__name__).info("Restored from checkpoint: %s", filepath)

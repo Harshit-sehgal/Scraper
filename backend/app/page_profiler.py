@@ -30,7 +30,7 @@ class ValuePatterns:
 
     currencies: list[str] = field(default_factory=list)  # ["£", "$", "€", "₹"]
     dates: list[str] = field(default_factory=list)  # date format samples
-    # ["4.5 / 5", "★★★", "8.5"]  # noqa: ERA001
+    # ["4.5 / 5", "★★★", "8.5"]  # noqa: ERA001, RUF100
     ratings: list[str] = field(default_factory=list)
     codes_3letter: list[str] = field(default_factory=list)  # ["LON", "PAR", "BOM"]
     phones: list[str] = field(default_factory=list)
@@ -38,20 +38,20 @@ class ValuePatterns:
     numbers: list[str] = field(default_factory=list)
     durations: list[str] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
-    # ["250g", "1kg", "500 g", "2lb"]  # noqa: ERA001
+    # ["250g", "1kg", "500 g", "2lb"]  # noqa: ERA001, RUF100
     weights: list[str] = field(default_factory=list)
     percentages: list[str] = field(default_factory=list)  # ["8%", "20% off", "0.5%"]
-    # ["14:30", "2:30 PM", "08:00"]  # noqa: ERA001
+    # ["14:30", "2:30 PM", "08:00"]  # noqa: ERA001, RUF100
     times: list[str] = field(default_factory=list)
-    # ["Available", "In Stock", "Yes", "No"]  # noqa: ERA001
+    # ["Available", "In Stock", "Yes", "No"]  # noqa: ERA001, RUF100
     booleans: list[str] = field(default_factory=list)
-    # ["10x15cm", "5\"x7\"", "A4"]  # noqa: ERA001
+    # ["10x15cm", "5\"x7\"", "A4"]  # noqa: ERA001, RUF100
     dimensions: list[str] = field(default_factory=list)
-    # ["Pack of 6", "12 pieces", "500ml"]  # noqa: ERA001
+    # ["Pack of 6", "12 pieces", "500ml"]  # noqa: ERA001, RUF100
     quantities: list[str] = field(default_factory=list)
-    # ["SKU-12345", "#ABC123", "EAN 123456789"]  # noqa: ERA001
+    # ["SKU-12345", "#ABC123", "EAN 123456789"]  # noqa: ERA001, RUF100
     product_codes: list[str] = field(default_factory=list)
-    # ["per kg", "per item", "each", "dozen"]  # noqa: ERA001
+    # ["per kg", "per item", "each", "dozen"]  # noqa: ERA001, RUF100
     units: list[str] = field(default_factory=list)
     address_fragments: list[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
 

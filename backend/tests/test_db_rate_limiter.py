@@ -14,7 +14,7 @@ def _cleanup_rate_limit_key(key: str) -> None:
 
             with _conn() as conn:
                 _execute(conn, "DELETE FROM rate_limits WHERE key = %s", (key,))
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass
     else:
         try:
@@ -27,7 +27,7 @@ def _cleanup_rate_limit_key(key: str) -> None:
                     conn.commit()
                 finally:
                     conn.close()
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass
 
 

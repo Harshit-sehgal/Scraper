@@ -304,7 +304,7 @@ class TestPostgresQueueIntegration:
             with _conn() as conn:
                 _execute(conn, "DELETE FROM queue_tasks")
                 _execute(conn, "DELETE FROM queue_task_history")
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass  # Tables may not exist yet on first run
         yield
         reset_postgres_worker_queue()

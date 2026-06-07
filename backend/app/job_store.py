@@ -78,14 +78,14 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
                 row_data = _job_to_row(job)
                 cols = ", ".join(row_data.keys())
                 ph = ", ".join("?" for _ in row_data)
-                conn.execute(f"INSERT OR IGNORE INTO jobs ({cols}) VALUES ({ph})", list(row_data.values()))
+                conn.execute(f"INSERT OR IGNORE INTO jobs ({cols}) VALUES ({ph})", list(row_data.values()))  # noqa: RUF100, S608
         for raw in data.get("recycle_bin", []):
             job = _row_to_job(_job_from_raw(raw))
             if job:
                 row_data = _job_to_row(job)
                 cols = ", ".join(row_data.keys())
                 ph = ", ".join("?" for _ in row_data)
-                conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_data.values()))
+                conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_data.values()))  # noqa: RUF100, S608
         conn.commit()
         logger.info(
             "Migrated %d jobs + %d recycle-bin entries from JSON to SQLite",
@@ -413,7 +413,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     placeholders = ", ".join("?" for _ in overlapping_cols)
                     for r in existing:
                         vals = [r.get(col) for col in overlapping_cols]
-                        conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})", vals)
+                        conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})", vals)  # noqa: RUF100, S608
             current = 2
 
         if current < 3:
@@ -617,7 +617,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                     if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                         job.status = JobStatus.FAILED
                         job.error = "Recovered after restart while still in progress."
-                        job.completed_at = datetime.datetime.now().isoformat()
+                        job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
                         job.cancel_requested = False
 
                         row = _job_to_row(job)
@@ -625,7 +625,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                         placeholders = ", ".join("?" for _ in row)
                         values = list(row.values())
                         conn.execute(
-                            f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                            f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                             values,
                         )
                         dirty_recovery = True
@@ -675,7 +675,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
                 columns = ", ".join(row.keys())
                 placeholders = ", ".join("?" for _ in row)
                 conn.execute(
-                    f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                    f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                     list(row.values()),
                 )
                 _sync_job_results(conn, job.id, job.results)
@@ -689,7 +689,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
                 columns = ", ".join(row.keys())
                 placeholders = ", ".join("?" for _ in row)
                 conn.execute(
-                    f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                    f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                     list(row.values()),
                 )
                 _sync_job_results(conn, job.id, job.results)
@@ -720,7 +720,7 @@ def persist_state_single(job: Job) -> None:
             placeholders = ", ".join("?" for _ in row)
             values = list(row.values())
             conn.execute(
-                f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                 values,
             )
             _sync_job_results(conn, job.id, job.results)
@@ -1180,7 +1180,7 @@ def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
     so two workers on the same host can coexist. See the v6
     migration in :func:`_ensure_schema`.
     """
-    now = datetime.datetime.now().isoformat()
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     with _DB_LOCK:
         conn = _get_connection()
         try:
@@ -1238,7 +1238,7 @@ def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict:
     alive = False
     if last_heartbeat:
         try:
-            delta = datetime.datetime.now() - datetime.datetime.fromisoformat(last_heartbeat)
+            delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_heartbeat)
             alive = delta.total_seconds() < ttl_seconds
         except (ValueError, TypeError):
             alive = False
@@ -1268,7 +1268,7 @@ def get_all_worker_healths(ttl_seconds: int = 60) -> list[dict]:
         alive = False
         if last_hb:
             try:
-                delta = datetime.datetime.now() - datetime.datetime.fromisoformat(last_hb)
+                delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_hb)
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False

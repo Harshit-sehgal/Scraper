@@ -66,10 +66,15 @@ done
 
 echo "=== 4. Checking Unsafe eval() in Source ==="
 STEP=4
-# Check for eval( excluding ast.literal_eval
-if grep -R "eval(" backend/app 2>&1 | grep -qv "ast.literal_eval"; then
+# Check for eval( excluding ast.literal_eval. The previous
+# pipeline (``grep -R ... | grep -qv ast.literal_eval``) was
+# inverted — ``grep -qv`` returns 0 when the input has NO match
+# for ast.literal_eval, so the branch would always be taken on a
+# grep result that already had only safe calls. Use ``grep -q .``
+# to detect whether the filtered output has any remaining lines.
+if grep -RnE "eval\(" backend/app 2>&1 | grep -v "ast.literal_eval" | grep -q .; then
     echo "❌ ERROR: Unsafe eval() calls found!"
-    grep -R "eval(" backend/app 2>&1 | grep -v "ast.literal_eval"
+    grep -RnE "eval\(" backend/app 2>&1 | grep -v "ast.literal_eval"
     exit 1
 else
     echo "✅ No unsafe eval() calls detected."

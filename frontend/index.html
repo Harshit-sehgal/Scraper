@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws: wss:; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
     <title>DataForge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages.">
     <!-- NOTE: Google Fonts removed to comply with strict CSP policy (font-src 'self' only).
          If custom fonts are needed, vendor them locally in /frontend/fonts/ and reference via @font-face in styles.css -->
-    <link rel="icon" type="image/svg+xml" href="/app/favicon.svg">
-    <link rel="stylesheet" href="/app/styles.css">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
@@ -19,12 +20,12 @@
             <div class="topbar-left">
                 <span class="brand">DataForge Studio</span>
                 <span class="sep">/</span>
-                <nav class="tabs">
-                    <button type="button" class="tab active" data-view="jobs" id="tab-jobs">Jobs</button>
-                    <button type="button" class="tab" data-view="new" id="tab-new">New</button>
-                    <button type="button" class="tab recycle-tab" data-view="recycle" id="tab-recycle">Recycle Bin</button>
-                    <button type="button" class="tab cognition-tab" data-view="cognition" id="tab-cognition" title="Experimental research views — not production-validated">Cognition 🧪</button>
-                    <button type="button" class="tab dashboard-tab" data-view="dashboard" id="tab-dashboard">Dashboard</button>
+                <nav class="tabs" role="tablist">
+                    <button type="button" class="tab active" data-view="jobs" id="tab-jobs" role="tab" aria-selected="true">Jobs</button>
+                    <button type="button" class="tab" data-view="new" id="tab-new" role="tab" aria-selected="false">New</button>
+                    <button type="button" class="tab recycle-tab" data-view="recycle" id="tab-recycle" role="tab" aria-selected="false">Recycle Bin</button>
+                    <button type="button" class="tab cognition-tab" data-view="cognition" id="tab-cognition" role="tab" aria-selected="false" title="Experimental research views — not production-validated">Cognition 🧪</button>
+                    <button type="button" class="tab dashboard-tab" data-view="dashboard" id="tab-dashboard" role="tab" aria-selected="false">Dashboard</button>
                 </nav>
             </div>
             <div class="topbar-right">
@@ -608,7 +609,7 @@
     <div id="toasts"></div>
 
     <!-- API Key Modal -->
-    <div id="apikey-overlay" class="shortcut-overlay hidden">
+    <div id="apikey-overlay" class="shortcut-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="apikey-modal-title" aria-describedby="apikey-modal-desc">
         <div class="shortcut-modal">
             <h2 id="apikey-modal-title">🔑 API Key</h2>
             <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
@@ -628,21 +629,21 @@
     </div>
 
     <!-- Confirmation Modal (replaces browser confirm()) -->
-    <div id="confirm-overlay" class="shortcut-overlay hidden">
+    <div id="confirm-overlay" class="shortcut-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
         <div class="shortcut-modal confirm-modal">
             <h2 id="confirm-modal-title">Confirm</h2>
             <p id="confirm-modal-desc" class="modal-desc">Are you sure?</p>
             <div class="shortcut-close-row" style="margin-top: 1rem; justify-content: flex-end; gap: 0.5rem;">
                 <button type="button" class="btn ghost small" data-action="close-confirm" id="btn-confirm-cancel">Cancel</button>
-                <button type="button" class="btn primary small danger-confirm-btn" data-action="confirm-action" id="btn-confirm-ok">Confirm</button>
+                <button type="button" class="btn primary small" data-action="confirm-action" id="btn-confirm-ok">Confirm</button>
             </div>
         </div>
     </div>
 
     <!-- Shortcuts Modal -->
-    <div id="shortcut-overlay" class="shortcut-overlay hidden">
+    <div id="shortcut-overlay" class="shortcut-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="shortcut-modal-title">
         <div class="shortcut-modal">
-            <h2>⌨️ Keyboard Shortcuts</h2>
+            <h2 id="shortcut-modal-title">⌨️ Keyboard Shortcuts</h2>
             <div class="shortcut-list">
                 <div class="shortcut-item">
                     <span class="shortcut-key"><kbd>N</kbd></span>
@@ -666,11 +667,11 @@
                 </div>
             </div>
             <div class="shortcut-close-row">
-                <button type="button" class="btn secondary small" data-action="close-shortcuts">Close</button>
+                 <button type="button" class="btn secondary small" data-action="close-shortcuts">Close</button>
             </div>
         </div>
     </div>
 
-    <script type="module" src="/app/app.js"></script>
+    <script type="module" src="/app.js"></script>
 </body>
 </html>

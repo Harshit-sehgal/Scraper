@@ -461,14 +461,14 @@ def _extract_by_split(text: str, existing_spans: set[tuple[int, int]]) -> list[C
 
     segments = re.split(r"\s*[|\t]\s*", text)
     for seg in segments:
-        seg = seg.strip()
+        seg = seg.strip()  # noqa: PLW2901, RUF100
         if not seg or len(seg) < 2:
             position += 1
             continue
 
         sub_segments = re.split(r"\s{2,}", seg)
         for sub in sub_segments:
-            sub = sub.strip()
+            sub = sub.strip()  # noqa: PLW2901, RUF100
             if not sub or len(sub) < 2:
                 continue
 
@@ -516,7 +516,7 @@ def _extract_by_whitespace(text: str, existing_spans: set[tuple[int, int]]) -> l
         parts = text.split()
 
     for part in parts:
-        part = part.strip()
+        part = part.strip()  # noqa: PLW2901, RUF100
         if not part or len(part) < 2:
             continue
 
@@ -1117,14 +1117,16 @@ def resolve_overlaps(tokens: list[SemanticToken]) -> list[SemanticToken]:
 
             # Case 2: Semantic Value Containment (Lexical Overlap)
             # If tj.raw is a STRICT substring of ti.raw, it's likely a fragment
-            if len(tj.raw) > 2 and len(tj.raw) < len(ti.raw) and tj.raw.lower() in ti.raw.lower():
-                # Suppression rules for lexical containment:
-                # - If child is a NUMBER, always suppress
-                # - If child is same type as parent, always suppress
-                # - If parent is high-dominance (EMAIL, PHONE), always suppress child
-                if tj.primary_type in (SemanticType.NUMBER, ti.primary_type) or DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80:
-                    suppressed.add(j)
-                    continue
+            if (
+                len(tj.raw) > 2
+                and len(tj.raw) < len(ti.raw)
+                and tj.raw.lower() in ti.raw.lower()
+                and (
+                    tj.primary_type in (SemanticType.NUMBER, ti.primary_type) or DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80
+                )
+            ):
+                suppressed.add(j)
+                continue
 
     return [t for idx, t in enumerate(sorted_tokens) if idx not in suppressed]
 

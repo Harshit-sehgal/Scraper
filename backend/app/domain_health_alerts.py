@@ -297,7 +297,7 @@ class DomainHealthMonitor:
         self,
         level: DomainHealthLevel,
         metrics: DomainHealthMetrics,
-        score: float,
+        score: float,  # noqa: ARG002, RUF100
     ) -> list[str]:
         """Generate actionable recommendations based on health status."""
         recommendations = []

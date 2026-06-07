@@ -62,7 +62,7 @@ class SelectorMemory:
     def _load(self) -> None:
         if self.path.exists():
             try:
-                with open(self.path) as f:  # noqa: PTH123
+                with open(self.path) as f:
                     self._memory = json.load(f)
             except (OSError, json.JSONDecodeError):
                 logger.exception("Failed to load selector memory")
@@ -70,7 +70,7 @@ class SelectorMemory:
 
     def _save(self) -> None:
         try:
-            with open(self.path, "w") as f:  # noqa: PTH123
+            with open(self.path, "w") as f:
                 json.dump(self._memory, f, indent=2)
         except (OSError, TypeError):
             logger.exception("Failed to save selector memory")

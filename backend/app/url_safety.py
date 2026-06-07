@@ -97,11 +97,10 @@ def validate_public_http_url(url: str) -> None:
     # listening on non-HTTP ports (SSH, Redis, Memcached, etc.). The
     # allowlist is bypassed in smoke-test mode (where integration
     # endpoints may bind to ephemeral ports).
-    if parsed.port is not None and not settings.SMOKE_TEST_MODE:
-        if parsed.port not in _ALLOWED_HTTP_PORTS:
-            msg = f"URL port '{parsed.port}' is not in the allowed list."
-            _record_ssrf_reject("disallowed_port")
-            raise ValueError(msg)
+    if parsed.port is not None and not settings.SMOKE_TEST_MODE and parsed.port not in _ALLOWED_HTTP_PORTS:
+        msg = f"URL port '{parsed.port}' is not in the allowed list."
+        _record_ssrf_reject("disallowed_port")
+        raise ValueError(msg)
 
     # Lowercase for safe comparison
     hostname_lower = hostname.lower()
@@ -170,7 +169,7 @@ def validate_public_http_url(url: str) -> None:
             _record_ssrf_reject("dns_failure_prod")
             raise ValueError(
                 msg,
-            )
+            ) from e
         logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)
 
 
@@ -267,9 +266,9 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
 
     async def connect_unix_socket(
         self,
-        path: str,
-        timeout: float | None = None,
-        socket_options: Any = None,
+        path: str,  # noqa: ARG002, RUF100
+        timeout: float | None = None,  # noqa: ARG002, RUF100
+        socket_options: Any = None,  # noqa: ARG002, RUF100
     ) -> httpcore.AsyncNetworkStream:
         msg = "UNIX socket connections are disabled for security reasons."
         raise ValueError(msg)
@@ -316,9 +315,9 @@ class SafeNetworkBackend(httpcore.NetworkBackend):
 
     def connect_unix_socket(
         self,
-        path: str,
-        timeout: float | None = None,
-        socket_options: Any = None,
+        path: str,  # noqa: ARG002, RUF100
+        timeout: float | None = None,  # noqa: ARG002, RUF100
+        socket_options: Any = None,  # noqa: ARG002, RUF100
     ) -> httpcore.NetworkStream:
         msg = "UNIX socket connections are disabled for security reasons."
         raise ValueError(msg)

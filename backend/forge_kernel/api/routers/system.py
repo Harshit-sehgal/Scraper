@@ -16,16 +16,17 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 
 
 def _get_service(
-    jobs_store: dict[str, Job] = Depends(get_jobs_store),
-    recycle_bin: dict[str, Job] = Depends(get_recycle_bin_store),
+    jobs_store: Annotated[dict[str, Job], Depends(get_jobs_store)],
+    recycle_bin: Annotated[dict[str, Job], Depends(get_recycle_bin_store)],
 ) -> JobService:
+    """Build a JobService from injected dependencies."""
     return JobService(jobs_store=jobs_store, recycle_bin_store=recycle_bin)
 
 
 @router.get("/status")
 async def system_status(
     service: Annotated[JobService, Depends(_get_service)],
-    _=Depends(require_viewer),
+    _: Annotated[str, Depends(require_viewer)],
 ):
     """Detailed system status with job counts and runtime limits."""
     jobs = service.list_all()

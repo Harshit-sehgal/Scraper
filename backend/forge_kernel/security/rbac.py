@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import enum
 import secrets
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -38,7 +39,7 @@ def _resolve_role(api_key: str) -> UserRole | None:
 
 def get_current_role(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> UserRole | None:
     """Extract the current user role from the request (API key or Bearer token)."""
     # Check X-API-Key header first
@@ -60,7 +61,7 @@ def get_current_role(
 def require_role(allowed_roles: list[UserRole]):
     """FastAPI dependency that requires one of the specified roles."""
 
-    def _check(role: UserRole | None = Depends(get_current_role)) -> UserRole:
+    def _check(role: Annotated[UserRole | None, Depends(get_current_role)] = None) -> UserRole:
         if role is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

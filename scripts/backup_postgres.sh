@@ -8,7 +8,13 @@
 
 set -euo pipefail
 
-BACKUP_DIR="backups"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Resolve BACKUP_DIR against the project root, not the CWD. The
+# previous relative ``backups`` would land wherever the operator
+# happened to invoke the script from, which broke cron jobs and
+# CI tasks that ran from a different working directory.
+BACKUP_DIR="${DATAFORGE_BACKUP_DIR:-${PROJECT_DIR}/backups}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.sql.gz"
 
@@ -116,18 +122,30 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     if [ -n "${DB_PORT}" ]; then
         PORT_ARG="-p ${DB_PORT}"
     fi
-    PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" pg_dump ${PORT_ARG} -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${BACKUP_FILE}"
+    PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" pg_dump "${PORT_ARG}" -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}"
 else
     # Run pg_dump inside running docker container
     PORT_ARG=""
     if [ -n "${DB_PORT}" ]; then
         PORT_ARG="-p ${DB_PORT}"
     fi
-    docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -t "${CONTAINER_NAME}" pg_dump ${PORT_ARG} -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${BACKUP_FILE}"
-fi
+    docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -t "${CONTAINER_NAME}" pg_dump "${PORT_ARG}" -U "${DB_USER}" -d "${DB_NAME}"
+fi > "${BACKUP_FILE}.tmp"
 
-# Restrict permissions
-chmod 600 "${BACKUP_FILE}"
+# Lock down permissions on the temp file *before* validating it.
+# A chmod 600 over a partially-written or corrupt gzip would
+# otherwise mask the failure behind a readable-looking filename
+# for an hour until someone noticed the gzip -t failed at the
+# restore site. We also do a gzip -t round-trip on the temp file
+# to make sure pg_dump actually produced a non-empty, valid
+# stream — and only rename to the final BACKUP_FILE on success.
+chmod 600 "${BACKUP_FILE}.tmp"
+if ! gunzip -t "${BACKUP_FILE}.tmp"; then
+    echo "[ERROR] Backup integrity check failed (gunzip -t). Removing partial file."
+    rm -f "${BACKUP_FILE}.tmp"
+    exit 1
+fi
+mv "${BACKUP_FILE}.tmp" "${BACKUP_FILE}"
 
 echo "[SUCCESS] Postgres backup completed successfully."
 echo "          Backup File: ${BACKUP_FILE}"

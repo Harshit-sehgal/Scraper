@@ -17,7 +17,7 @@ export * from './js/cognition.js';
 export * from './js/dashboard.js';
 
 // ─── Init ───
-import { readUIState, updateJobsLastUpdatedLabel, initTheme, toggleTheme, showShortcuts, hideShortcuts, setEnginePolling, closeConfirm, executeConfirm } from './js/utils.js';
+import { readUIState, updateJobsLastUpdatedLabel, initTheme, toggleTheme, showShortcuts, hideShortcuts, setEnginePolling, closeConfirm, executeConfirm, toast } from './js/utils.js';
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from './js/jobs.js';
 import { onGlobalKeydown, switchView } from './js/views.js';
 import { onResultsSliderInput, onResultsTableScroll, onResultsCellDoubleClick, renderFilteredResults } from './js/results.js';
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusInterval = (typeof window.DATAFORGE_STATUS_INTERVAL === 'number') ? window.DATAFORGE_STATUS_INTERVAL : 10000;
     setInterval(() => {
         setEnginePolling(true);
-        Promise.resolve(refreshJobs()).catch(() => setEnginePolling(false));
+        Promise.resolve(refreshJobs()).finally(() => setEnginePolling(false));
         updateJobsLastUpdatedLabel();
     }, refreshInterval);
     setInterval(refreshSystemStatus, statusInterval);
@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             case 'toast-info': {
                 const msg = btn.getAttribute('data-message');
-                if (msg) import('./js/utils.js').then(m => m.toast(msg, 'info'));
+                if (msg) toast(msg, 'info');
                 break;
             }
             case 'save-apikey':               saveKeyFromModal(); break;
@@ -234,11 +234,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'close-shortcuts':            hideShortcuts(); break;
             case 'close-confirm':               closeConfirm(); break;
             case 'confirm-action':              executeConfirm(); break;
-            case 'copy-job-id':                 if (id) navigator.clipboard?.writeText(id).then(() => {
+            case 'copy-job-id':                 if (id) navigator.clipboard?.writeText?.(id)?.then?.(() => {
                                                     btn.textContent = '✓';
                                                     btn.classList.add('copied');
                                                     setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 2000);
-                                                }).catch(() => {}); break;
+                                                })?.catch?.(() => {}); break;
             case 'refresh-cognition':          refreshCognition(); break;
             case 'toggle-field-item': {
                 // If the user clicked the checkbox itself, the change handler
@@ -256,7 +256,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             }
         }
-        e.stopPropagation();
     });
 
     // ── Delegated change handler for filter operation select ──

@@ -238,7 +238,7 @@ class TransactionalPriorityQueue:
                     return True
         return False
 
-    def mark_completed(self, entry: PriorityQueueEntry) -> None:
+    def mark_completed(self, entry: PriorityQueueEntry) -> None:  # noqa: ARG002, RUF100
         """Increment completed counter (for metrics, entry already popped)."""
         self._completed_count += 1
 

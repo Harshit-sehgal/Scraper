@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import re
 from collections.abc import Callable
 from typing import Annotated
 
@@ -115,12 +116,35 @@ def register_jobs_write_routes(
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
+        # Defence-in-depth: reject SSRF targets in manual URLs (loopback,
+        # private RFC1918, link-local, cloud-metadata, internal TLDs)
+        # BEFORE persisting the job. Mirrors the same guard on
+        # /api/scraper/diagnostics so a manual-mode operator cannot pivot
+        # to internal services via the job queue.
+        from app.url_safety import validate_public_http_url
+
+        safe_urls: list[str] = []
+        for u in manual_urls:
+            try:
+                validate_public_http_url(u)
+                safe_urls.append(u)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"URL failed security validation: {u}",
+                ) from None
+        urls = safe_urls if job_data.mode == ScrapeMode.MANUAL else []
+
         idem_key = (request.headers.get("Idempotency-Key") or "").strip()
-        if idem_key and len(idem_key) > 128:
-            raise HTTPException(
-                status_code=400,
-                detail="Idempotency-Key header is too long (max 128 chars).",
-            )
+        if idem_key:
+            if not re.fullmatch(r"[A-Za-z0-9_\-]{1,128}", idem_key):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Idempotency-Key header is invalid. Allowed characters: "
+                        "letters, digits, underscore, hyphen. Max length: 128."
+                    ),
+                )
         if idem_key:
             existing_job_id = await run_in_threadpool(
                 lookup_idempotency_key,
@@ -199,7 +223,7 @@ def register_jobs_write_routes(
                     task_id=job.id,
                 )
                 logger.info("Job %s enqueued to worker queue (task=%s)", job.id, task_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 if settings.ENV.lower() == "production":
                     logger.exception(
                         "Failed to enqueue job %s to worker queue in production",
@@ -219,7 +243,7 @@ def register_jobs_write_routes(
                             "Inline fallback is disabled in production. "
                             "Check that the worker queue is running and healthy."
                         ),
-                    )
+                    ) from None
                 logger.warning(
                     "Failed to enqueue job %s to worker queue, falling back to inline: %s",
                     job.id,
@@ -244,23 +268,23 @@ def register_jobs_write_routes(
             if job_id not in manager.jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
             job = manager.jobs_store[job_id]
-        if job.status in {
-            JobStatus.COMPLETED,
-            JobStatus.DEGRADED,
-            JobStatus.EMPTY_RESULT,
-            JobStatus.FAILED,
-            JobStatus.CANCELED,
-        }:
-            return {
-                "job_id": job.id,
-                "status": job.status.value,
-                "cancel_requested": bool(job.cancel_requested),
-                "message": "Job already in terminal state",
-            }
+            if job.status in {
+                JobStatus.COMPLETED,
+                JobStatus.DEGRADED,
+                JobStatus.EMPTY_RESULT,
+                JobStatus.FAILED,
+                JobStatus.CANCELED,
+            }:
+                return {
+                    "job_id": job.id,
+                    "status": job.status.value,
+                    "cancel_requested": bool(job.cancel_requested),
+                    "message": "Job already in terminal state",
+                }
 
-        job.cancel_requested = True
-        if job.status == JobStatus.PENDING:
-            mark_job_canceled(job, "Canceled before execution.")
+            job.cancel_requested = True
+            if job.status == JobStatus.PENDING:
+                mark_job_canceled(job, "Canceled before execution.")
 
         if settings.WORKER_QUEUE:
             try:
@@ -268,7 +292,7 @@ def register_jobs_write_routes(
 
                 queue = get_worker_queue()
                 await queue.cancel(job_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(
                     "Failed to cancel queued task for job %s: %s",
                     job_id,
@@ -347,7 +371,7 @@ def register_jobs_write_routes(
         if not job.schema_fields:
             raise HTTPException(status_code=400, detail="Job has no schema fields for re-cleaning")
 
-        started = datetime.datetime.now().isoformat()
+        started = datetime.datetime.now(datetime.timezone.utc).isoformat()
         before_records = len(results_list)
         working_rows = [dict(r) for r in results_list]
         reclean_warnings: list[str] = []
@@ -384,7 +408,7 @@ def register_jobs_write_routes(
                 reclean_warnings.append(
                     f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logging.exception("Re-clean failed")
                 cleaned_rows = working_rows
                 reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
@@ -415,10 +439,10 @@ def register_jobs_write_routes(
             job.results = normalize_job_results(filtered_results, job.schema_fields)
             job.total_records = total
             job.filtered_records = filtered_count
-            job.completed_at = datetime.datetime.now().isoformat()
+            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             job.status = JobStatus.COMPLETED
 
-            scraped_at = datetime.datetime.now().isoformat()
+            scraped_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             for row in job.results:
                 row["scraped_at"] = scraped_at
 
@@ -482,7 +506,7 @@ def register_jobs_write_routes(
             }
             job.quality_report = quality
             await save_job(job)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logging.getLogger(__name__).exception(
                 "Job %s: Reclean failed irrecoverably, restoring previous status %s",
                 job_id,
@@ -492,7 +516,7 @@ def register_jobs_write_routes(
             reclean_warnings.append(f"Reclean failed: {e}")
             try:
                 await save_job(job)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logging.getLogger(__name__).exception(
                     "Job %s: Failed to persist job state after reclean rollback",
                     job_id,
@@ -521,6 +545,17 @@ def register_jobs_write_routes(
                     status_code=409,
                     detail="Cannot delete/recycle an active job. Cancel the job first.",
                 )
+        # Consistency contract: the in-memory pop is fast (microseconds) and
+        # the repo.move_to_recycle_bin call is the slow part (a network round
+        # trip + transaction). We deliberately release the lock between
+        # them so concurrent reads / writes to other jobs are not blocked
+        # while we wait for the DB. The trade-off is that, if the DB move
+        # fails after the in-memory pop, the in-memory store is consistent
+        # (job is gone) but the persistent store is not (job is still
+        # active). Callers therefore MUST treat the in-memory store as the
+        # source of truth; the persistent store is only a recovery record.
+        # If you need strict cross-store consistency, wrap both steps in
+        # a single ``with manager.lock:`` and accept the throughput cost.
         repo = get_job_repository()
         await run_in_threadpool(repo.move_to_recycle_bin, job_id)
         with manager.lock:
@@ -530,8 +565,8 @@ def register_jobs_write_routes(
 
     @router.delete("/api/jobs/cleanup/terminal")
     async def clear_terminal_jobs(
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
         keep_recent: Annotated[int, Query(ge=0, le=5000)] = 5,
-        _role: UserRole = Depends(require_role([UserRole.ADMIN])),  # noqa: B008
     ):
         terminal_statuses = {
             JobStatus.COMPLETED,

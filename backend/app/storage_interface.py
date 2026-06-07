@@ -254,7 +254,7 @@ class JobRepository(ABC):
         returns the original ``job_id`` rather than creating a duplicate.
         """
 
-    def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
+    def prune_idempotency_keys(self, older_than_days: int = 7) -> int:  # noqa: ARG002, RUF100
         """Delete idempotency keys older than ``older_than_days``.
 
         Returns the number of rows deleted. Default no-op for backends
@@ -314,7 +314,7 @@ class JobRepository(ABC):
 
     # ─── Individual repository operations (avoid full-state rewrites) ────
 
-    def is_cancel_requested(self, job_id: str) -> bool:
+    def is_cancel_requested(self, job_id: str) -> bool:  # noqa: ARG002, RUF100
         """Check from the persistent store whether a job has a pending cancellation request.
 
         Required for cross-process cancellation: the worker polls this method
@@ -396,7 +396,7 @@ class SQLiteJobRepository(JobRepository):
             from app.job_store import _CURRENT_SCHEMA_VERSION, get_storage_health
 
             return get_storage_health()
-        except Exception as exc:  # noqa: BLE001 - health probe must not raise
+        except Exception as exc:
             return {
                 "ok": False,
                 "backend": "sqlite",
@@ -441,11 +441,11 @@ class SQLiteJobRepository(JobRepository):
             params.append(cursor)
         params.append(safe_limit)
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608
+            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error, deleted_at "
             "FROM recycle_bin "
-            f"WHERE {where} "  # nosec B608
+            f"WHERE {where} "  # noqa: RUF100, S608
             "ORDER BY created_at DESC LIMIT ?"
         )
         with _DB_LOCK:
@@ -523,11 +523,11 @@ class SQLiteJobRepository(JobRepository):
             params.append(cursor)
         params.append(safe_limit)
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608
+            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error "
             "FROM jobs "
-            f"WHERE {where} "  # nosec B608
+            f"WHERE {where} "  # noqa: RUF100, S608
             "ORDER BY created_at DESC LIMIT ?"
         )
         with _DB_LOCK:
@@ -707,7 +707,7 @@ class SQLiteJobRepository(JobRepository):
         ) as f:
             f.write(json.dumps(payload, ensure_ascii=False, indent=2))
             tmp_path = f.name
-        os.replace(tmp_path, str(ws_path))  # noqa: PTH105
+        os.replace(tmp_path, str(ws_path))
 
     def load_world_state(self) -> dict | None:
         """Load semantic world state from the SQLite world_state.json file."""
@@ -743,12 +743,12 @@ class SQLiteJobRepository(JobRepository):
                 # Set deleted_at timestamp
                 import datetime
 
-                row_dict["deleted_at"] = datetime.datetime.now().isoformat()
+                row_dict["deleted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 # Insert into recycle_bin
                 columns = ", ".join(row_dict.keys())
                 placeholders = ", ".join("?" for _ in row_dict)
                 conn.execute(
-                    f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                    f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                     list(row_dict.values()),
                 )
                 conn.commit()
@@ -783,7 +783,7 @@ class SQLiteJobRepository(JobRepository):
                 columns = ", ".join(row_dict.keys())
                 placeholders = ", ".join("?" for _ in row_dict)
                 conn.execute(
-                    f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                    f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                     list(row_dict.values()),
                 )
                 conn.commit()
@@ -854,7 +854,7 @@ class SQLiteJobRepository(JobRepository):
                 col_names = [description[0] for description in cursor.description]
                 import datetime
 
-                now = datetime.datetime.now().isoformat()
+                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 for r in rows:
                     row_dict = dict(zip(col_names, r, strict=False))
                     jid = row_dict["id"]
@@ -866,7 +866,7 @@ class SQLiteJobRepository(JobRepository):
                     columns = ", ".join(row_dict.keys())
                     placeholders = ", ".join("?" for _ in row_dict)
                     conn.execute(
-                        f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                        f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",  # noqa: RUF100, S608
                         list(row_dict.values()),
                     )
                     # Explicitly clean up companion tables (no ON DELETE CASCADE)
@@ -1016,13 +1016,13 @@ def reset_repository() -> None:
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: RUF100, S110
                 pass  # nosec B110
         elif "Psycopg3JobRepository" in cls_name:
             try:
                 from app.psycopg3_repository import shutdown_psycopg3
 
                 shutdown_psycopg3()
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: RUF100, S110
                 pass  # nosec B110
     _repository_instance = None

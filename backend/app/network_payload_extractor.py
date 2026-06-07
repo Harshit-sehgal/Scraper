@@ -394,7 +394,7 @@ def extract_from_network_payloads(
     for raw in payloads:
         try:
             payload = json.loads(raw) if isinstance(raw, str) else raw
-        except Exception:  # nosec B112
+        except Exception:  # nosec B112  # noqa: RUF100, S112
             continue
 
         candidates = find_record_arrays(payload)

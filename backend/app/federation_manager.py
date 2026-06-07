@@ -251,9 +251,10 @@ class FederationManager:
                     remote_wins = False
                     if r_epoch > l_epoch:
                         remote_wins = True
-                    elif r_epoch == l_epoch:
-                        if r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))):
-                            remote_wins = True
+                    elif r_epoch == l_epoch and (
+                        r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node)))
+                    ):
+                        remote_wins = True
 
                     # 4. If remote wins, write remote cohesion and metadata
                     # Otherwise, remote is discarded (local retains authority)

@@ -32,7 +32,7 @@ def get_canonical_cache_path() -> str:
 
 def _acquire_lock():
     path = _get_lock_path()
-    if os.path.dirname(path):  # noqa: PTH120
+    if os.path.dirname(path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
     try:
@@ -58,7 +58,7 @@ def load_semantic_state() -> None:
 
     lock_fd = _acquire_lock()
     try:
-        with open(path) as f:  # noqa: PTH123
+        with open(path) as f:
             full_state = json.load(f)
         import app.semantic_world_state
 
@@ -81,7 +81,7 @@ def save_semantic_state() -> None:
         full_state = ws.to_dict()
         full_state["version"] = "3.0"
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:  # noqa: PTH123
+        with open(path, "w") as f:
             json.dump(full_state, f, indent=2)
         logging.getLogger(__name__).info("Saved unified semantic state to %s", path)
     except Exception:

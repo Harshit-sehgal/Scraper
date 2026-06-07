@@ -340,7 +340,7 @@ async def discover_urls(
                     score += 0.2
 
             # 2. High pressure (stress) rewards high-trust markers
-            # (Stabilization)  # noqa: ERA001
+            # (Stabilization)  # noqa: ERA001, RUF100
             if field_pressure > 0.6 and metadata["source_type"] == "official":
                 score += 0.15
 

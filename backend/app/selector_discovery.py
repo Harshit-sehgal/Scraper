@@ -403,7 +403,7 @@ async def analyze_url_for_fields(
         visible_text = soup.get_text(separator=" ", strip=True)
         chunks = []
         for tok in visible_text.split():
-            tok = tok.strip()
+            tok = tok.strip()  # noqa: PLW2901, RUF100
             if tok and len(tok) > 1 and len(tok) < 80 and tok not in chunks:
                 chunks.append(tok)
         container_values = chunks[:40]

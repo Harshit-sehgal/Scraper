@@ -70,10 +70,11 @@ def get_job_repository() -> JobRepository:
             from forge_kernel.persistence.postgres import PostgresJobRepository
 
             _repository_instance = PostgresJobRepository()
-            return _repository_instance
         except Exception as e:
             msg = f"Failed to create PostgresJobRepository: {e}"
-            raise RuntimeError(msg)
+            raise RuntimeError(msg) from None
+        else:
+            return _repository_instance
 
     from forge_kernel.persistence.sqlite import SQLiteJobRepository
 

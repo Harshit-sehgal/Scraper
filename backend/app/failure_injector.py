@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 
 
@@ -29,5 +30,22 @@ def get_injector() -> FailureInjector:
 
 
 def set_injection_probability(p: float) -> None:
+    """Set the singleton injector's probability.
+
+    Production guard: refuse to enable injection when ``DATAFORGE_ENV``
+    is ``production``. Failure injection is a research / test-only
+    utility; turning it on in production would cause random 5xx errors
+    to surface to real callers. We log a warning and leave the
+    probability at 0 so the injector stays inert.
+    """
+    env = (os.environ.get("DATAFORGE_ENV") or "").strip().lower()
+    if p > 0 and env == "production":
+        logging.getLogger(__name__).warning(
+            "Refusing to enable failure injection in production "
+            "(requested probability=%s). Failure injection is a test-only "
+            "utility; leaving probability at 0.",
+            p,
+        )
+        return
     _injector.probability = p
     _injector.active = p > 0

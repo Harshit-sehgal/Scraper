@@ -100,10 +100,18 @@ if [ -z "${CONTAINER_NAME}" ]; then
 fi
 
 echo "[WARNING] This action will OVERWRITE active database tables in '${DB_NAME}'."
-read -p "Are you absolutely sure you want to proceed with restore? (y/N): " -n 1 -r
+# ``-t 30`` puts a 30-second upper bound on the prompt so a
+# non-interactive shell (CI, cron, automation) doesn't hang
+# forever. ``read -t 0`` returns immediately with non-zero when
+# no input is available, which is the documented way to detect a
+# non-TTY. We treat both timeouts and non-TTY as "no" to avoid
+# accidentally restoring on a stray automated invocation.
+if ! read -t 30 -p "Are you absolutely sure you want to proceed with restore? (y/N): " -n 1 -r; then
+    REPLY=""
+fi
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Restore aborted."
+    echo "Restore aborted (no confirmation within 30s or non-TTY input)."
     exit 0
 fi
 

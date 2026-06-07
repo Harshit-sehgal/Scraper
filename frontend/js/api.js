@@ -2,7 +2,7 @@
    DataForge — API Layer
    ═══════════════════════════════════════════ */
 
-import { toast } from './utils.js';
+import { toast, attachFocusTrapTo, detachFocusTrapFrom } from './utils.js';
 
 // ─── API Base URL ───
 
@@ -54,7 +54,7 @@ export function getAdminKey() {
 }
 
 export function setAdminKey(key) {
-    _adminKey = key;
+    _adminKey = (key || '').trim();
 }
 
 // ─── Modal Key Management ───
@@ -85,6 +85,7 @@ function setupKeyModal(type) {
 
     _pendingKeyType = type;
     overlay.classList.remove('hidden');
+    attachFocusTrapTo(overlay);
     setTimeout(() => input.focus(), 100);
 }
 
@@ -92,6 +93,7 @@ function closeKeyModal() {
     const overlay = document.getElementById('apikey-overlay');
     if (overlay) overlay.classList.add('hidden');
     _pendingKeyType = null;
+    detachFocusTrapFrom();
 }
 
 function saveKeyFromModal() {

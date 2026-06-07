@@ -66,7 +66,7 @@ class TopologyMixin:
             )
 
     @requires_invariants
-    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:
+    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:  # noqa: ARG002, RUF100
         """Capture pre-allocation conflict topology from tokens with Relational Recall (Phase 31)."""
         with self.transaction("pre_allocation_capture"):
             from app.failure_injector import get_injector
@@ -591,7 +591,7 @@ class TopologyMixin:
         return {"micro": micro, "meso": meso, "macro": macro}
 
     @requires_invariants
-    def observe_field_perturbation(self, output: dict, tokens: list) -> None:
+    def observe_field_perturbation(self, output: dict, tokens: list) -> None:  # noqa: ARG002, RUF100
         from app.instability_api import get_immune_system
 
         immune = get_immune_system(ws=self)

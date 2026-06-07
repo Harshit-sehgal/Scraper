@@ -112,13 +112,18 @@ fi
 # ─── mypy ──────────────────────────────────────────────────────
 echo "[5/9] mypy"
 if [ "$MYPY_OK" -eq 1 ]; then
-    MYPY_OUTPUT=$(python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 || true)
-    if echo "$MYPY_OUTPUT" | tail -1 | grep -q "Success"; then
+    # Use the mypy exit code directly instead of grepping the
+    # trailing "Success" line — the latter breaks when mypy is
+    # configured with ``--no-error-summary``, when output is
+    # truncated, or when running against a single file. Exit 0
+    # from mypy is the canonical "0 errors" signal.
+    if python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports > /tmp/mypy.out 2>&1; then
         pass_check "mypy — 0 errors"
     else
         fail_check "mypy — errors found"
-        echo "$MYPY_OUTPUT" | grep "error:" | head -5
+        grep "error:" /tmp/mypy.out | head -5
     fi
+    rm -f /tmp/mypy.out
 else
     skip_check "mypy — not installed"
 fi
@@ -127,10 +132,18 @@ fi
 echo "[6/9] pytest"
 if [ "$PYTEST_OK" -eq 1 ]; then
     PYTEST_TMP=$(mktemp)
+    # Use ``-k "not profile_alignment_e2e"`` to skip the long
+    # end-to-end test by *name match* rather than ``--ignore`` of
+    # the file path. ``--ignore`` removes the file from
+    # collection entirely, which makes the report claim the file
+    # does not exist; ``-k`` keeps the file discoverable and just
+    # deselects the slow tests, which is what the sre_quick_check
+    # script already does. This also means new e2e tests in that
+    # file are skipped by name pattern, not by path glob.
     if PYTHONPATH="$BACKEND_DIR" DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
         python3 -m pytest "$BACKEND_DIR/tests" \
         -q -o "addopts=" \
-        --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
+        -k "not profile_alignment_e2e" \
         > "$PYTEST_TMP" 2>&1; then
         pass_check "pytest"
     else

@@ -61,7 +61,7 @@ class JobService:
         job.cancel_requested = True
         if job.status in (JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING):
             job.status = JobStatus.CANCELED
-            job.completed_at = datetime.datetime.now().isoformat()
+            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         self._persist()
         return job
 
@@ -97,12 +97,12 @@ class JobService:
 
         if job.cancel_requested:
             job.status = JobStatus.CANCELED
-            job.completed_at = datetime.datetime.now().isoformat()
+            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             self._persist()
             return
 
         job.status = JobStatus.RUNNING
-        job.started_at = datetime.datetime.now().isoformat()
+        job.started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         job.progress_total = len(job.urls) + 2
         job.progress_current = 0
         self._persist()
@@ -113,7 +113,7 @@ class JobService:
         for idx, url in enumerate(job.urls):
             if job.cancel_requested:
                 job.status = JobStatus.CANCELED
-                job.completed_at = datetime.datetime.now().isoformat()
+                job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 self._persist()
                 return
 
@@ -135,7 +135,7 @@ class JobService:
                 logger.warning("Timeout extracting %s, continuing", url)
                 job.warnings.append(f"Timeout extracting {url}")
             except Exception as e:
-                logger.exception("Failed to extract %s: %s", url, e)
+                logger.exception("Failed to extract %s", url)
                 job.warnings.append(f"Failed to extract {url}: {e}")
 
         # Finalize
@@ -161,7 +161,7 @@ class JobService:
         else:
             job.status = JobStatus.COMPLETED
 
-        job.completed_at = datetime.datetime.now().isoformat()
+        job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         job.progress_current = job.progress_total
         self._persist()
 
@@ -171,8 +171,8 @@ class JobService:
         try:
             repo = get_job_repository()
             repo.save_all(jobs=self._jobs, recycle_bin=self._recycle_bin)
-        except Exception as e:
-            logger.exception("Failed to persist state: %s", e)
+        except Exception:
+            logger.exception("Failed to persist state")
 
     def load_all(self):
         """Load all state from the persistent store."""
@@ -183,7 +183,8 @@ class JobService:
             self._jobs.update(jobs)
             self._recycle_bin.clear()
             self._recycle_bin.update(recycle)
-            return ws
-        except Exception as e:
-            logger.exception("Failed to load state: %s", e)
+        except Exception:
+            logger.exception("Failed to load state")
             return None
+        else:
+            return ws

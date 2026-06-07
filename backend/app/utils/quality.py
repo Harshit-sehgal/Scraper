@@ -96,11 +96,8 @@ def _value_quality(field: SchemaField, value) -> float:
         # swapped title.
         if len(text) > 25:
             score -= settings.QUALITY_STATUS_LONG_PENALTY
-        if not any(p in text.lower() for p in noise_status_phrases):
-            # If it's not a known status phrase AND it's not a simple number /
-            # code
-            if field.field_type == FieldType.STRING and len(text) > 10:
-                score -= settings.QUALITY_STATUS_MISMATCH_PENALTY
+        if not any(p in text.lower() for p in noise_status_phrases) and field.field_type == FieldType.STRING and len(text) > 10:
+            score -= settings.QUALITY_STATUS_MISMATCH_PENALTY
 
     # Type-specific quality "votes"
     if field.field_type == FieldType.EMAIL:

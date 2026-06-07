@@ -201,7 +201,7 @@ async def test_playwright_captures_network_response(browser_server) -> None:
                 try:
                     body = await response.text()
                     captured.append(body)
-                except Exception:
+                except Exception:  # noqa: RUF100, S110
                     pass
 
         page.on("response", handle_response)
@@ -224,7 +224,7 @@ async def test_playwright_captures_network_response(browser_server) -> None:
             if "results" in data:
                 json_body = body
                 break
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass
     assert json_body is not None, "No JSON API response captured"
     payload = json.loads(json_body)
@@ -318,7 +318,7 @@ async def test_playwright_network_capture_feeds_extractor(browser_server) -> Non
                 if "application/json" in ct or "results" in response.url.lower():
                     text = await response.text()
                     captured_payloads.append(text)
-            except Exception:
+            except Exception:  # noqa: RUF100, S110
                 pass
 
         page.on("response", handle_response)

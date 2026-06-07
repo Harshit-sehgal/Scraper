@@ -303,7 +303,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abst
 
         # Calculate community "Presence" in this record
         comm_max_scores: dict = {}
-        for (cand, role), score in graph.compatibility.items():
+        for (_, role), score in graph.compatibility.items():
             if role in role_comm_map:
                 c_idx = role_comm_map[role]
                 comm_max_scores[c_idx] = max(comm_max_scores.get(c_idx, 0.0), score)
@@ -344,7 +344,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abst
         # tokens
         for role_name, attr_val in attractor.items():
             if role_name in graph.roles:
-                for cand_val, token in graph.candidates.items():
+                for cand_val, _ in graph.candidates.items():
                     if cand_val == attr_val:
                         # Direct match found in crystalline unit; boost
                         # compatibility
@@ -378,7 +378,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abst
 
                     # Now check pairs within nearby candidates (O(k²) where k
                     # << n)
-                    for i, (c1, t1) in enumerate(candidates_in_bucket):
+                    for _, (c1, t1) in enumerate(candidates_in_bucket):
                         for c2, t2 in nearby_candidates:
                             if c1 == c2:
                                 continue
@@ -443,7 +443,7 @@ def _infer_role_type(role_name: str) -> SemanticType:
     return best_type
 
 
-def _compute_compatibility(token: SemanticToken, role_name: str, role: SemanticRole) -> float:
+def _compute_compatibility(token: SemanticToken, role_name: str, role: SemanticRole) -> float:  # noqa: ARG001, RUF100
     """Geometric compatibility: emergent from Role Manifold similarity."""
     reng = _get_role_engine()
     learned_compat = reng.get_compatibility(role_name, token.primary_type, token=token)
@@ -580,7 +580,7 @@ def allocate_semantic_roles(
     candidates = [(cand, role, score) for (cand, role), score in graph.compatibility.items()]
     hypotheses = []
 
-    for _strategy, key_fn in [
+    for _, key_fn in [
         ("primary", lambda x: -x[2]),
         ("noisy", lambda x: -x[2] + random.random() * 0.05),  # nosec B311
         ("random", lambda x: random.random()),  # nosec B311
@@ -644,10 +644,13 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
         if not conflicting:
             reng = _get_role_engine()
             for filled_role in filled:
-                if g.roles.get(filled_role) and g.roles[filled_role].filled_by == cand_key:
-                    if reng.get_learned_exclusion(role_name, filled_role) > _adaptive_runtime_exclusion_threshold():
-                        conflicting = True
-                        break
+                if (
+                    g.roles.get(filled_role)
+                    and g.roles[filled_role].filled_by == cand_key
+                    and reng.get_learned_exclusion(role_name, filled_role) > _adaptive_runtime_exclusion_threshold()
+                ):
+                    conflicting = True
+                    break
 
         if conflicting:
             continue

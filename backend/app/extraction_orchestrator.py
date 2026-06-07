@@ -284,7 +284,7 @@ async def orchestrate_extraction(
 
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass  # nosec B110
 
     # Extract network results
@@ -311,7 +311,7 @@ async def orchestrate_extraction(
             network_result.field_coverage,
         )
 
-    def _arbitrate_and_return(dom_res: ExtractionResult, warnings: list[str] | None = None) -> ExtractionResult:
+    def _arbitrate_and_return(dom_res: ExtractionResult, warnings: list[str] | None = None) -> ExtractionResult:  # noqa: ARG001, RUF100
         if not network_result:
             network_diagnostics.append("arbitration winner: dom (Reason: No network extraction result available)")
             dom_res.network_diagnostics = list(network_diagnostics)

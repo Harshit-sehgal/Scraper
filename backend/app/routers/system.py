@@ -14,7 +14,7 @@ from enum import StrEnum
 from typing import Annotated
 
 from app.config import settings
-from app.globals import config_view, jobs_store, recycle_bin_store
+from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
 from app.selector_discovery import analyze_url_for_fields
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
@@ -135,8 +135,9 @@ async def system_status(
             + counts.get(JobStatus.DISCOVERING.value, 0)
             + counts.get(JobStatus.RUNNING.value, 0)
         )
-        job_total = len(jobs_store)
-        recycle_count = len(recycle_bin_store)
+        with _jobs_store_lock:
+            job_total = len(jobs_store)
+            recycle_count = len(recycle_bin_store)
 
     response: dict = {
         "status": "online",
@@ -185,15 +186,21 @@ async def system_status(
 
 
 def _compute_job_counts() -> dict:
-    """Compute per-status job counts from the in-memory jobs_store."""
+    """Compute per-status job counts from the in-memory jobs_store.
+
+    Reads ``jobs_store`` under the project-wide ``_jobs_store_lock`` so
+    a concurrent mutation cannot cause ``RuntimeError: dictionary
+    changed size during iteration`` or skew the per-status counts.
+    """
     from app.models import JobStatus
 
     counts = {s.value: 0 for s in JobStatus}
-    for job in jobs_store.values():
-        status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
-        if status_key not in counts:
-            counts[status_key] = 0
-        counts[status_key] += 1
+    with _jobs_store_lock:
+        for job in jobs_store.values():
+            status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
+            if status_key not in counts:
+                counts[status_key] = 0
+            counts[status_key] += 1
     return counts
 
 
@@ -201,7 +208,7 @@ def _compute_job_counts() -> dict:
 
 
 @router.get("/api/system/diagnostics/export")
-async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
+async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):  # noqa: B008, RUF100
     """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
     # Regular expressions for PII sanitization
     email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -377,7 +384,7 @@ async def csp_violations(request: Request):
     if isinstance(directive, str):
         first_token = directive.strip().split(" ", 1)[0]
         if first_token:
-            directive_label = first_token.lower()
+            directive_label = first_token.lower()[:64] or "unspecified"
 
     try:
         from app.metrics_collector import record_csp_violation
@@ -555,14 +562,19 @@ def _render_basic_metrics_text() -> str:
         for wh in worker_healths:
             wid = wh.get("worker_id", "unknown")
             hostname = wh.get("hostname", "")
+            pid = str(wh.get("pid") or "unknown")
             alive = 1 if wh.get("alive") else 0
-            lines.append(_basic_metric_line("dataforge_worker_heartbeat_alive", alive, {"worker_id": wid, "hostname": hostname}))
+            lines.append(
+                _basic_metric_line(
+                    "dataforge_worker_heartbeat_alive", alive, {"worker_id": wid, "hostname": hostname, "pid": pid}
+                )
+            )
             last_hb = wh.get("last_heartbeat")
             if last_hb:
                 try:
                     import datetime as _dt
 
-                    age = (_dt.datetime.now() - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                    age = (_dt.datetime.now(_dt.timezone.utc) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
                 except (ValueError, TypeError):
                     age = -1.0
             else:
@@ -571,7 +583,7 @@ def _render_basic_metrics_text() -> str:
                 _basic_metric_line(
                     "dataforge_worker_heartbeat_age_seconds",
                     age,
-                    {"worker_id": wid, "hostname": hostname},
+                    {"worker_id": wid, "hostname": hostname, "pid": pid},
                 )
             )
     except (AttributeError, ImportError, RuntimeError):
@@ -816,7 +828,7 @@ async def metrics(request: Request):
                     try:
                         import datetime as _dt
 
-                        age = (_dt.datetime.now() - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                        age = (_dt.datetime.now(_dt.timezone.utc) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
                     except (ValueError, TypeError):
                         age = -1.0
                 else:

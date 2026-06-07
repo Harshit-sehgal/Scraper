@@ -64,7 +64,7 @@ class _BatchClient(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    async def post(self, path: str, json: dict) -> Any:  # noqa: A002
+    async def post(self, path: str, json: dict) -> Any:
         return await self.client.post(path, json=json)
 
 

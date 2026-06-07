@@ -69,7 +69,7 @@ def pytest_configure(config) -> None:
             )
 
         PostgresContainer.get_connection_url = patched_get_connection_url
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass
 
 
@@ -92,7 +92,7 @@ def pytest_sessionfinish(session, exitstatus) -> None:
         from app.state_store import flush_state_writes
 
         flush_state_writes()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass
 
     # Clean up test-generated sqlite files, logs, and locks to avoid workspace pollution
@@ -120,7 +120,7 @@ def pytest_sessionfinish(session, exitstatus) -> None:
                         if "golden_dataset" not in str(item.resolve()):
                             with contextlib.suppress(OSError):
                                 item.unlink()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass
 
 
@@ -145,7 +145,7 @@ os.environ.pop("DATAFORGE_DATABASE_URL", None)
 # gate tests (test_research_leak_tracking, test_main_routes_gate,
 # test_experimental_gate) explicitly set this to "false" and re-import
 # app.main to verify the gate holds.
-os.environ.setdefault("DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES", "true")
+os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
 
 main_mod: ModuleType | None = None
 try:
@@ -166,7 +166,7 @@ except ImportError as e:
 # ``AttributeError: module 'app.services' has no attribute 'state'`` in
 # full-suite collection order (PR review, 2026-06).
 try:
-    import app.services.state  # noqa: F401  (preload for client fixture)
+    import app.services.state
 except ImportError:
     pass
 
@@ -360,7 +360,7 @@ def client(monkeypatch):
                 conn.commit()
             finally:
                 conn.close()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass
 
     client = LocalASGIClient(main_mod.app)
@@ -379,5 +379,5 @@ def client(monkeypatch):
                 conn.commit()
             finally:
                 conn.close()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass

@@ -51,7 +51,7 @@ class CompoundRecord:
             "shared_fields": self.shared_fields,
         }
 
-    def flatten(self, schema_fields: list[str] | None = None) -> dict:
+    def flatten(self, schema_fields: list[str] | None = None) -> dict:  # noqa: ARG002, RUF100
         """Flatten into a single dict for schema-aligned output.
 
         Naming convention: {segment_label}_{field_name}
@@ -274,7 +274,7 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
     return fields
 
 
-def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> dict[str, str]:
+def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> dict[str, str]:  # noqa: ARG001, RUF100
     """Extract fields that apply to the entire compound record (not per-segment).
 
     Shared fields typically include: total price, rating, availability, status.
@@ -401,7 +401,7 @@ def assemble_compound_records(
 
 def assemble_single_container(
     element_text: str,
-    schema_fields: list | None = None,
+    schema_fields: list | None = None,  # noqa: ARG001, RUF100
 ) -> CompoundRecord | None:
     """Analyze a single container element's text and attempt to assemble
     a compound record from it.

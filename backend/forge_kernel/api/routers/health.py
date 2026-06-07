@@ -33,13 +33,13 @@ async def ready():
 
         # Simple health check via load
         repo.load_all()
-
-        return {
-            "status": "ready",
-            "backend": backend,
-        }
     except Exception as e:
         content = {"status": "not_ready"}
         if settings.security.ENV.lower() != "production":
             content["error"] = str(e)
         return JSONResponse(status_code=503, content=content)
+    else:
+        return {
+            "status": "ready",
+            "backend": backend,
+        }

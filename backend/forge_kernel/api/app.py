@@ -31,7 +31,7 @@ _background_tasks: list[asyncio.Task] = []
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Lifespan handler — initialize state from persistent store on startup."""
     # Load state from repository
     jobs_store = get_jobs_store()

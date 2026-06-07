@@ -46,10 +46,9 @@ async function dashboardApiFetch(url, options = {}) {
             const now = Date.now();
             if (now - dashboardApiLast403 > 15000) {
                 dashboardApiLast403 = now;
-                const current = getDashboardApiKey();
-                const newKey = prompt("API key required. Enter your DataForge API key:", current);
+                const newKey = await promptForApiKey();
                 if (newKey !== null) {
-                    setDashboardApiKey(newKey.trim());
+                    setDashboardApiKey(newKey);
                 }
             }
         }
@@ -57,6 +56,74 @@ async function dashboardApiFetch(url, options = {}) {
     } catch (err) {
         throw err;
     }
+}
+
+// Replace native window.prompt() with a non-blocking modal so the dashboard
+// can be embedded in an iframe (where prompts are blocked) and so the
+// underlying page remains visually responsive. The promise resolves with
+// the trimmed key, or null if the user cancelled.
+function promptForApiKey() {
+    return new Promise((resolve) => {
+        // If a modal is already open, reject further calls so we don't
+        // stack overlapping prompts during a flurry of 403s.
+        if (document.getElementById('dash-apikey-overlay')) {
+            resolve(null);
+            return;
+        }
+        const current = getDashboardApiKey();
+        const overlay = document.createElement('div');
+        overlay.id = 'dash-apikey-overlay';
+        overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:9999;';
+        overlay.innerHTML = `
+            <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:1.5rem; min-width:320px; max-width:90vw; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                <h3 style="margin:0 0 0.5rem; font-size:0.95rem; color:#f1f5f9;">API Key Required</h3>
+                <p style="margin:0 0 1rem; font-size:0.8rem; color:#94a3b8;">Enter your DataForge API key (session only, held in memory).</p>
+                <input type="password" id="dash-apikey-input" value="${(current || '').replace(/"/g, '&quot;')}" autocomplete="off" spellcheck="false"
+                    style="width:100%; padding:0.5rem; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#e2e8f0; font-family:monospace; font-size:0.85rem; box-sizing:border-box;" />
+                <div id="dash-apikey-error" style="color:#f87171; font-size:0.75rem; margin-top:0.4rem; display:none;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+                    <button type="button" id="dash-apikey-cancel" style="padding:0.4rem 0.9rem; background:transparent; border:1px solid #475569; color:#cbd5e1; border-radius:4px; cursor:pointer; font-size:0.8rem;">Cancel</button>
+                    <button type="button" id="dash-apikey-save" style="padding:0.4rem 0.9rem; background:#22c55e; border:none; color:#052e16; border-radius:4px; cursor:pointer; font-size:0.8rem; font-weight:600;">Save</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#dash-apikey-input');
+        const errorEl = overlay.querySelector('#dash-apikey-error');
+        input.focus();
+        input.select();
+
+        const close = (value) => {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            resolve(value);
+        };
+
+        overlay.querySelector('#dash-apikey-cancel').addEventListener('click', () => close(null));
+        overlay.querySelector('#dash-apikey-save').addEventListener('click', () => {
+            const v = (input.value || '').trim();
+            if (!v) {
+                errorEl.textContent = 'Please enter a key or click Cancel.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            close(v);
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const v = (input.value || '').trim();
+                if (!v) {
+                    errorEl.textContent = 'Please enter a key or click Cancel.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                close(v);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                close(null);
+            }
+        });
+    });
 }
 
 // Configurable API base — supports window.DATAFORGE_API_BASE override, same as app.js
@@ -180,7 +247,16 @@ function setupControls() {
         currentReplayIdx = parseInt(e.target.value, 10);
         if (topologyHistory[currentReplayIdx]) {
             const topology = topologyHistory[currentReplayIdx].topology || {};
-            renderTopology(topology.regions || [], topology.communities || [], []); // Hide edges in replay for now
+            // Use the same field names as the live render path so a snapshot
+            // captured during live mode can be replayed without field
+            // name mismatches (regions vs field_regions, etc.).
+            renderTopology(
+                topology.field_regions || [],
+                topology.global_communities || [],
+                [], // Hide edges in replay for now
+                topology.meso_clusters || [],
+                topology.macro_continents || []
+            );
         }
     };
 
@@ -265,6 +341,22 @@ async function updateLoop() {
     }
 
     document.getElementById('last-update').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
+
+    // Keep the static "Status: UI Loaded" line in sync with the
+    // current polling state. Without this, the line is misleading —
+    // it claims the UI is in its initial "loaded" state long after
+    // the first successful poll.
+    const statusLine = document.getElementById('dash-status-line');
+    if (statusLine) {
+        const failed = results.filter(r => r.status === 'rejected').length;
+        if (failed === 0) {
+            statusLine.innerText = 'Status: Live';
+        } else if (failed < results.length) {
+            statusLine.innerText = `Status: Degraded (${failed} of ${results.length} feeds)`;
+        } else {
+            statusLine.innerText = 'Status: Offline';
+        }
+    }
 
     // Reschedule with backoff
     if (pollTimer) clearTimeout(pollTimer);

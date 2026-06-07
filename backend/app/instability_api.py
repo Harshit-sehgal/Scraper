@@ -67,7 +67,7 @@ class ImmunityLayer:
 
     # ─── Mutation Operations ─────────────────────────────────────────────
 
-    def validate_perturbation(self, source: str, token: str, roles: list[str]) -> bool:
+    def validate_perturbation(self, source: str, token: str, roles: list[str]) -> bool:  # noqa: ARG002, RUF100
         """Evaluate if a data source is safe to perturb the field (Phase 42)."""
         trust = self._quarantined_sources.get(source, 1.0)
 

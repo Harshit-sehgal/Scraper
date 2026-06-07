@@ -163,7 +163,7 @@ def redistribute_instability(state: "TopologyState", damping: float = 1.0) -> di
             # Clamp gradient to prevent extreme oscillations
             fe_gradient = max(-FREE_ENERGY_CLAMP, min(FREE_ENERGY_CLAMP, fe_gradient))
 
-            # Flow = conductance * gradient * damping * COUPLING_COEFFICIENT  # noqa: ERA001
+            # Flow = conductance * gradient * damping * COUPLING_COEFFICIENT  # noqa: ERA001, RUF100
             flow = edge_conductance * fe_gradient * damping * COUPLING_COEFFICIENT
             flow = max(-0.1, min(0.1, flow))
 

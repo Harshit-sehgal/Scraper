@@ -37,10 +37,10 @@ def record_extraction_method_safe(method: str | None) -> None:
     """
     if not method:
         return
-    try:
+    from contextlib import suppress
+
+    with suppress(ImportError, AttributeError, TypeError, ValueError):
         record_extraction_method(method)
-    except (ImportError, AttributeError, TypeError, ValueError):
-        pass
 
 
 def limit_source_records(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:

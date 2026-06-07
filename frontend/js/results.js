@@ -2,7 +2,7 @@
    DataForge — Results Viewing & Export
    ═══════════════════════════════════════════ */
 
-import { esc, jsStr, toast, showConfirm } from './utils.js';
+import { esc, toast, showConfirm } from './utils.js';
 import { API, apiFetch } from './api.js';
 import { switchView } from './views.js';
 
@@ -187,7 +187,9 @@ export function renderLogs(logs) {
     const container = document.getElementById('logs-container');
     if (!container) return;
 
-    const sorted = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const sorted = [...logs]
+        .filter(log => log && log.timestamp != null && !isNaN(new Date(log.timestamp).getTime()))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     container.innerHTML = sorted.map(log => {
         const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -266,8 +268,7 @@ function renderTable(results, emptyMessage = 'No results') {
             if (Array.isArray(v)) v = v.join(', ');
             if (v === null || v === undefined || v === '{}' || v === '') v = '—';
             const text = String(v);
-            const cellClass = (k === '_is_unstable' && isUnstable) ? 'unstable-cell' : '';
-            return `<td class="${cellClass}" data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;
+            return `<td data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;
         }).join('')}</tr>`;
     }).join('');
 }
@@ -382,7 +383,7 @@ async function downloadExport(url, filename) {
         a.href = dlUrl;
         a.download = filename;
         a.click();
-        URL.revokeObjectURL(dlUrl);
+        setTimeout(() => URL.revokeObjectURL(dlUrl), 100);
     } catch (e) {
         toast(`Export error: ${e.message}`, 'error');
     }

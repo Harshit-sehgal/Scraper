@@ -387,8 +387,8 @@ class PostgresWorkerQueueBase(ABC):
                         "payload": json.loads(row["payload"]),
                     },
                 )
-        except Exception as e:
-            logger.error("Postgres dequeue error: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Postgres dequeue error")
             return None
 
     async def complete(self, task_id: str, result: dict | None = None) -> None:
@@ -735,14 +735,14 @@ class PostgresWorkerQueueBase(ABC):
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error("Worker loop error: %s", e, exc_info=True)
+            except Exception:
+                logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callbacks.
-                try:
+                from contextlib import suppress
+
+                with suppress(ValueError):
                     self._concurrency_sem.release()
-                except ValueError:
-                    pass
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
@@ -862,7 +862,7 @@ class PostgresWorkerQueueBase(ABC):
                     "next_tasks": top_pending,
                 }
         except Exception as e:
-            logger.exception("Failed to get Postgres queue status: %s", str(e))
+            logger.exception("Failed to get Postgres queue status")
             return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
     async def get_status_async(self) -> dict:
@@ -994,7 +994,7 @@ def _build_postgres_worker_queue() -> PostgresWorkerQueueBase:
                 f"Failed to import psycopg3 worker queue: {e}. Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
             ) from e
 
-    # Default: psycopg2 (legacy)
+    # Default: psycopg2 (legacy)  # noqa: ERA001, RUF100
     from app.worker_queue_postgres import PostgresWorkerQueue
 
     return PostgresWorkerQueue()

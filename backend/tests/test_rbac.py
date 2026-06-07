@@ -55,6 +55,10 @@ def test_rbac_endpoint_guards(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret")
     monkeypatch.setattr(settings, "API_KEY", "user-secret")
     monkeypatch.setattr(settings, "ENV", "production")
+    # /api/operator/mode is mounted in the experimental router, which is
+    # gated behind ``ENABLE_EXPERIMENTAL_ROUTES``. Enable it so the
+    # endpoint is reachable and RBAC can be tested.
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", True)
 
     # --- 1. Test create job route (Requires Admin or Operator) ---
     # Try as User (Should fail with 403)

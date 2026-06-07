@@ -22,9 +22,10 @@ _export_service = ExportService()
 
 
 def _get_service(
-    jobs_store: dict[str, Job] = Depends(get_jobs_store),
-    recycle_bin: dict[str, Job] = Depends(get_recycle_bin_store),
+    jobs_store: Annotated[dict[str, Job], Depends(get_jobs_store)],
+    recycle_bin: Annotated[dict[str, Job], Depends(get_recycle_bin_store)],
 ) -> JobService:
+    """Build a JobService from injected dependencies."""
     return JobService(jobs_store=jobs_store, recycle_bin_store=recycle_bin)
 
 
@@ -32,7 +33,7 @@ def _get_service(
 async def export_csv(
     job_id: str,
     service: Annotated[JobService, Depends(_get_service)],
-    _=Depends(require_viewer),
+    _: Annotated[str, Depends(require_viewer)],
 ):
     """Export job results as CSV."""
     job = service.get(job_id)
@@ -54,7 +55,7 @@ async def export_csv(
 async def export_json(
     job_id: str,
     service: Annotated[JobService, Depends(_get_service)],
-    _=Depends(require_viewer),
+    _: Annotated[str, Depends(require_viewer)],
 ):
     """Export job results as JSON."""
     job = service.get(job_id)
@@ -74,7 +75,7 @@ async def export_json(
 async def export_xlsx(
     job_id: str,
     service: Annotated[JobService, Depends(_get_service)],
-    _=Depends(require_viewer),
+    _: Annotated[str, Depends(require_viewer)],
 ):
     """Export job results as Excel (XLSX)."""
     job = service.get(job_id)

@@ -41,7 +41,7 @@ class _HostileInnerAsyncTransport(httpx.AsyncBaseTransport):
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:  # noqa: ARG002
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(str(request.url))
         msg = "Hostile inner transport must never be reached for a private IP."
         raise AssertionError(msg)
@@ -56,7 +56,7 @@ class _HostileInnerSyncTransport(httpx.BaseTransport):
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def handle_request(self, request: httpx.Request) -> httpx.Response:  # noqa: ARG002
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(str(request.url))
         msg = "Hostile inner sync transport must never be reached for a private IP."
         raise AssertionError(msg)

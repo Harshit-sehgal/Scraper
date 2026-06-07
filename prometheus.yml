@@ -25,9 +25,13 @@ rule_files:
 # ─── Alertmanager ─────────────────────────────────────────────────────
 alerting:
   alert_relabel_configs:
-    # Drop labels that are not needed in alerts to reduce cardinality
+    # Drop labels that are not needed in alerts to reduce cardinality.
+    # ``__name__`` is a reserved label and CANNOT be labeldrop'd — using
+    # it in the regex causes Prometheus to refuse the config. We drop
+    # the actual instance label the Prometheus self-scrape adds so it
+    # doesn't leak into the alert stream.
     - action: labeldrop
-      regex: "(prometheus|__name__)"
+      regex: "^(prometheus_instance|prometheus)$"
   alertmanagers:
     - static_configs:
         - targets:
@@ -38,9 +42,16 @@ alerting:
 
 scrape_configs:
   # ─── Prometheus Self-monitoring ──────────────────────────────────────
+  # Use the service name (resolved by Docker DNS) rather than
+  # ``localhost`` so the self-scrape works regardless of which
+  # network the container is attached to. ``localhost`` inside
+  # the prometheus container would still hit the prometheus
+  # process, but only because the metrics endpoint listens on
+  # 0.0.0.0; using the service name makes the intent obvious and
+  # matches the other scrape job targets below.
   - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['prometheus:9090']
 
   # ─── DataForge Application Metrics ──────────────────────────────────
   - job_name: 'dataforge'

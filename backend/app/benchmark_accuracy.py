@@ -101,9 +101,9 @@ def calculate_extraction_accuracy(
     metrics.schema_conformity = conforming_schema_fields / extracted_schema_fields if extracted_schema_fields > 0 else 0.0
 
     # Per-field accuracy
-    for k in field_totals:
-        if field_totals[k] > 0:
-            metrics.field_accuracy[k] = round(field_hits[k] / field_totals[k], 3)
+    for k, total in field_totals.items():
+        if total > 0:
+            metrics.field_accuracy[k] = round(field_hits.get(k, 0) / total, 3)
 
     # 4. Duplicate Rate
     unique_count = len({_record_hash(r) for r in extracted})

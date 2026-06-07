@@ -322,9 +322,9 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
 
     events: list[dict[str, Any]] = []
     try:
-        with open(log_path, encoding="utf-8") as f:  # noqa: PTH123
+        with open(log_path, encoding="utf-8") as f:
             for line in f:
-                line = line.strip()
+                line = line.strip()  # noqa: PLW2901, RUF100
                 if not line:
                     continue
                 parsed = _parse_audit_log_line(line)

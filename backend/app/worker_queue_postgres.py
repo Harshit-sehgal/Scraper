@@ -45,9 +45,9 @@ def _require_psycopg2():
     optional dependency. Keeping the import lazy lets the dispatcher
     (and the module itself) be importable in psycopg2-absent environments.
     """
-    import psycopg2  # noqa: PLC0415  - lazy import for production-mimic environments
-    from psycopg2 import pool as pg_pool  # noqa: PLC0415
-    from psycopg2.extras import RealDictCursor  # noqa: PLC0415
+    import psycopg2
+    from psycopg2 import pool as pg_pool
+    from psycopg2.extras import RealDictCursor
 
     return psycopg2, pg_pool, RealDictCursor
 
@@ -115,10 +115,10 @@ def _db_conn():
         conn.commit()
     except BaseException:
         conn.rollback()
-        try:
+        from contextlib import suppress
+
+        with suppress(Exception):
             record_error("database")
-        except Exception:  # nosec B110  # noqa: BLE001 - metrics must not mask the original DB error
-            pass  # nosec B110
         raise
     finally:
         pool.putconn(conn)

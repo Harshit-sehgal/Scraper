@@ -7,9 +7,14 @@ ensuring Nginx routing is secure, Prometheus metrics are protected, container
 health metrics are valid, TLS limits are configured, and no defaults are leaked.
 
 Run on the target host:
-    python3 scripts/verify_production_deployment.py
+    python3 scripts/verify_production_deployment.py [--port 18080]
+
+Exits non-zero (1) if any check fails so the script can be used as
+a CI gate. The previous version printed PASS/FAIL lines but always
+returned 0, which made it useless as a gate.
 """
 
+import argparse
 import json
 import os
 import subprocess  # nosec B404 — operational script, hardcoded command vectors
@@ -44,10 +49,29 @@ def run_compose_ps() -> tuple[int, str, str]:
     return code, out, "none"
 
 
-def main():
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="DataForge Production Deployment Verification Tool",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=18080,
+        help="TCP port the nginx reverse proxy is listening on (default: 18080)",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    port = args.port
+
     print("=" * 70)
     print("DataForge Production Deployment Verification Tool")
     print("=" * 70)
+    print(f"  Probing nginx on http://127.0.0.1:{port}")
+
+    failures: list[str] = []
 
     # 1. Environment and Config Checks
     print("\n[1] Environment & Central Configuration...")
@@ -74,6 +98,25 @@ def main():
         print("  [FAIL] check_prod_env validation failed. Out:")
         print(f"         {out}")
         print("  Please resolve configuration failures before proceeding.")
+        failures.append("env validation")
+
+    # 1b. ADMIN_API_KEY end-to-end protection
+    # Powerful admin endpoints (operator-mode switching, knowledge
+    # manifold merge, ML selector optimization, etc.) gate themselves
+    # on ``DATAFORGE_ADMIN_API_KEY`` in addition to the regular
+    # API key. The runtime check at
+    # ``app.routers.experimental._require_admin_key`` only emits a
+    # warning when this key is empty; it does NOT fail-closed. The
+    # fail-closed protection lives here in the deployment gate: if
+    # the env var is unset in production, refuse the gate.
+    admin_key = os.environ.get("DATAFORGE_ADMIN_API_KEY", "").strip()
+    if not admin_key:
+        print("  [FAIL] DATAFORGE_ADMIN_API_KEY is unset. Admin endpoints would")
+        print("         fall back to the regular API key check. Set a strong")
+        print("         admin key before deploying to production.")
+        failures.append("admin api key unset")
+    else:
+        print("  [OK] DATAFORGE_ADMIN_API_KEY is set (admin endpoints are gated).")
 
     # 2. Container Stack Health Checks
     print("\n[2] Docker Compose Container Statuses...")
@@ -81,6 +124,7 @@ def main():
     if code != 0:
         print("  [FAIL] Could not execute Docker Compose status checks. Is the stack started?")
         print(f"         Error: {ps_out}")
+        failures.append("compose ps")
     else:
         try:
             # Parse container statuses
@@ -94,6 +138,7 @@ def main():
 
             if not containers:
                 print("  [FAIL] No running containers found in the production stack.")
+                failures.append("no running containers")
             else:
                 unhealthy = []
                 for c in containers:
@@ -106,22 +151,27 @@ def main():
 
                 if unhealthy:
                     print(f"  [FAIL] The following containers are not healthy: {', '.join(unhealthy)}")
+                    failures.append("unhealthy containers")
                 else:
                     print(f"  [OK] All core containers are healthy via {compose_label}.")
         except Exception as e:
             print(f"  [WARNING] Could not parse Compose JSON status: {e}. Ps output follows:")
             print(ps_out)
+            failures.append("compose ps parse")
 
     # 3. Ingress Route Enforcements
     print("\n[3] Ingress Routing & Route Blocks Validation...")
-    # Check default Nginx port (18080 or 80 depending on configuration/proxy)
+    # Probe the operator-supplied port (default 18080) so the same
+    # script works for both ``docker compose port 18080:80`` setups
+    # and bare ``80:80`` mappings. The previous hard-coded 18080
+    # failed for any deployment that mapped 80 directly.
     test_urls = [
-        ("http://127.0.0.1:18080/health", 200, "Liveness Probe"),
-        ("http://127.0.0.1:18080/ready", 200, "Readiness Probe"),
-        ("http://127.0.0.1:18080/docs", 404, "Swagger UI Block"),
-        ("http://127.0.0.1:18080/redoc", 404, "ReDoc Block"),
-        ("http://127.0.0.1:18080/openapi.json", 404, "OpenAPI Schema Block"),
-        ("http://127.0.0.1:18080/metrics", 404, "Public Metrics Block"),
+        (f"http://127.0.0.1:{port}/health", 200, "Liveness Probe"),
+        (f"http://127.0.0.1:{port}/ready", 200, "Readiness Probe"),
+        (f"http://127.0.0.1:{port}/docs", 404, "Swagger UI Block"),
+        (f"http://127.0.0.1:{port}/redoc", 404, "ReDoc Block"),
+        (f"http://127.0.0.1:{port}/openapi.json", 404, "OpenAPI Schema Block"),
+        (f"http://127.0.0.1:{port}/metrics", 404, "Public Metrics Block"),
     ]
 
     ingress_passed = True
@@ -148,6 +198,7 @@ def main():
         print("  [OK] Public Nginx route boundaries are strictly enforced.")
     else:
         print("  [FAIL] One or more public routing security checks failed.")
+        failures.append("ingress routing")
 
     # 4. Egress and SSRF Protections
     print("\n[4] SSRF and Egress Validation...")
@@ -177,11 +228,17 @@ def main():
         print("  [OK] SSRF routing filters function correctly.")
     else:
         print("  [FAIL] SSRF validation boundary did not meet requirements.")
+        failures.append("ssrf validation")
 
     print("\n" + "=" * 70)
-    print("Verification Completed.")
+    if failures:
+        print(f"Verification Completed WITH FAILURES: {', '.join(failures)}")
+        print("=" * 70)
+        return 1
+    print("Verification Completed — all checks passed.")
     print("=" * 70)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

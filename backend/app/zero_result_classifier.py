@@ -88,11 +88,11 @@ _MESSAGES: dict[str, dict[str, str]] = {
 
 
 def classify_zero_result(
-    acquisition_lineage: dict | None = None,
+    acquisition_lineage: dict | None = None,  # noqa: ARG001, RUF100
     session_detection: dict | None = None,
     empty_check: dict | None = None,
     anti_bot_score: float = 0.0,
-    final_url: str = "",
+    final_url: str = "",  # noqa: ARG001, RUF100
     html: str | None = None,
     visible_text: str | None = None,
     detected_forms: list | None = None,

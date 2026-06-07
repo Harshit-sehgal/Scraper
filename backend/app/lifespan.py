@@ -49,7 +49,7 @@ def reset_lifespan_state() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # noqa: ARG001, RUF100
     """Lifespan event handler for FastAPI startup / shutdown.
 
     Handles all initialization: recovery framework, domain health,
@@ -202,8 +202,8 @@ def schedule_background_task(coro):
             t.result()
         except asyncio.CancelledError:
             pass  # nosec B110
-        except (AttributeError, ImportError) as e:
-            logger.error("Background task failed: %s", e, exc_info=True)
+        except (AttributeError, ImportError):
+            logger.exception("Background task failed")
 
     task.add_done_callback(_handle_task_result)
     return task
@@ -215,7 +215,7 @@ def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     if job:
         try:
             get_job_repository().save_single(job)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("Failed to persist single job %s", job_id)
             if critical:
                 raise

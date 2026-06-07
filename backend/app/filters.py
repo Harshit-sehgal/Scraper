@@ -257,7 +257,7 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
 # ──────────────────────────────────────────────
 
 
-async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:
+async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, RUF100
     """Check if a single record passes a filter rule.
     Returns True if the record should be KEPT.
     """

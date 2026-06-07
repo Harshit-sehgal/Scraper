@@ -267,7 +267,7 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: RUF100, S110
                 pass  # nosec B110
 
             return StrategyRecommendation(
@@ -306,7 +306,7 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:  # nosec B110
+        except Exception:  # nosec B110  # noqa: RUF100, S110
             pass  # nosec B110
 
         best_strategy = state.get_best_strategy()

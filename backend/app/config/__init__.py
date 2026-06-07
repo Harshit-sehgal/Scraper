@@ -160,9 +160,8 @@ class Settings(
     @model_validator(mode="after")
     def _auto_promote_db_backed_rate_limit(self) -> Settings:
         """Promote ``RATE_LIMIT_DB_BACKED`` to True in production-like envs."""
-        if self.ENV.lower() in {"production", "staging"}:
-            if "RATE_LIMIT_DB_BACKED" not in self.model_fields_set:
-                self.RATE_LIMIT_DB_BACKED = True
+        if self.ENV.lower() in {"production", "staging"} and "RATE_LIMIT_DB_BACKED" not in self.model_fields_set:
+            self.RATE_LIMIT_DB_BACKED = True
         return self
 
 

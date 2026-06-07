@@ -9,6 +9,7 @@ from a pre-mutation snapshot.
 import functools
 import logging
 from collections.abc import Callable
+from contextlib import suppress
 
 from app.field_validator import validate_world_state
 
@@ -47,14 +48,12 @@ def requires_invariants(mutation_fn: Callable):
             except Exception as snapshot_err:
                 snapshot = None
                 logger.warning("Could not take snapshot before %s — rollback unavailable", mutation_fn.__name__)
-                try:
+                with suppress(Exception):
                     ws.record_degradation(
                         subsystem="invariant_firewall",
                         severity="warning",
                         cause=f"Snapshot failed before {mutation_fn.__name__}: {snapshot_err}",
                     )
-                except Exception:
-                    pass  # nosec B110
 
             # Check pre-conditions
             pre_issues = validate_world_state(ws)
@@ -79,26 +78,22 @@ def requires_invariants(mutation_fn: Callable):
                         logger.warning("Rolled back %s — %d issue(s) prevented", mutation_fn.__name__, len(post_issues))
                     except Exception as rollback_err:
                         logger.critical("ROLLBACK FAILED for %s: %s — state may be corrupt!", mutation_fn.__name__, rollback_err)
-                        try:
+                        with suppress(Exception):
                             ws.record_degradation(
                                 subsystem="invariant_firewall",
                                 severity="critical",
                                 cause=f"Rollback failed for {mutation_fn.__name__}: {rollback_err}. State may be corrupt!",
                             )
-                        except Exception:
-                            pass  # nosec B110
                     finally:
                         setattr(ws, _ROLLBACK_GUARD_ATTR, False)
                 else:
                     logger.critical("Cannot rollback %s — no snapshot available. State may be corrupt!", mutation_fn.__name__)
-                    try:
+                    with suppress(Exception):
                         ws.record_degradation(
                             subsystem="invariant_firewall",
                             severity="critical",
                             cause=f"Cannot rollback {mutation_fn.__name__} — no snapshot available. State may be corrupt!",
                         )
-                    except Exception:
-                        pass  # nosec B110
                 msg = (
                     f"Invariant violation in {mutation_fn.__name__}: "
                     f"{post_issues[0]}{' (+' + str(len(post_issues) - 1) + ' more)' if len(post_issues) > 1 else ''}"

@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from app.strategy_evolution import FetchStrategy
 
+from contextlib import suppress
+
 import httpx
 from bs4 import BeautifulSoup
 
@@ -472,10 +474,8 @@ async def fetch_page_content(
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 loading_selectors = [".loading", ".spinner", ".loader", "[class*='Loading']", "[class*='Spinner']"]
                 for sel in loading_selectors:
-                    try:
+                    with suppress(Exception):
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception:
-                        pass  # nosec B110
 
             # Adaptive post-network buffer: check DOM stabilization
             from app.telemetry_state import get_telemetry_state
@@ -492,7 +492,7 @@ async def fetch_page_content(
             settle_timeout = max(settle_timeout, 3.0)
 
             min_wait_ms = 2500
-            try:
+            with suppress(Exception):
                 await page.wait_for_function(
                     f"""() => {{
                          const body = document.body;
@@ -520,8 +520,6 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception:
-                pass  # nosec B110
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
 
@@ -559,7 +557,7 @@ async def fetch_page_content(
                     raise ValueError(msg)
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:
+            except Exception:  # noqa: RUF100, S110
                 pass  # nosec B110
 
             logger.warning(
@@ -607,10 +605,8 @@ async def fetch_page_content(
     except Exception as e:
         html_content = ""
         if page:
-            try:
+            with suppress(Exception):
                 html_content = await page.content()
-            except Exception:
-                pass  # nosec B110
 
         err_msg = str(e).lower()
         is_antibot = False
@@ -629,7 +625,7 @@ async def fetch_page_content(
                 url,
             )
             msg = f"Anti-bot challenge detected: {e}"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
         logger.exception("[Scraper] %s failed for %s. Final fallback to httpx_basic", strategy.value, url)
         return await _fetch_with_httpx(
@@ -640,10 +636,8 @@ async def fetch_page_content(
         )
     finally:
         if page:
-            try:
+            with suppress(Exception):
                 await page.close()
-            except Exception:  # nosec B110
-                pass  # nosec B110
 
 
 async def _fetch_with_httpx(

@@ -18,7 +18,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="DataForge Forge Kernel API server")
     parser.add_argument(
         "--host",
-        default="0.0.0.0",  # nosec B104 — CLI default for a public-bind API server; override with --host 127.0.0.1 in dev
+        default="0.0.0.0",  # noqa: S104 — CLI default for a public-bind API server; override with --host 127.0.0.1 in dev
         help="Bind address (default: 0.0.0.0)",
     )
     parser.add_argument(

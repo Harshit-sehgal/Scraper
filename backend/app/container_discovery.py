@@ -157,7 +157,7 @@ def discover_containers(
 
 def _refine_container_score(
     container: CandidateContainer,
-    evidence: PageEvidence,
+    evidence: PageEvidence,  # noqa: ARG001, RUF100
 ) -> float:
     """Refine a container's score using page-level context and refined heuristics.
 
@@ -249,9 +249,14 @@ def _refine_container_score(
             score *= 0.7
 
     # Container with only a link / button and no descriptive text
-    if container.has_link and not container.has_price and not container.has_date and not container.has_organization:
-        if combined_len < 60:
-            score *= 0.3
+    if (
+        container.has_link
+        and not container.has_price
+        and not container.has_date
+        and not container.has_organization
+        and combined_len < 60
+    ):
+        score *= 0.3
 
     return round(min(score, 1.0), 4)
 
@@ -265,7 +270,7 @@ async def multi_pass_container_extraction(
     html: str,
     schema_fields: list,
     url: str = "",
-    user_intent: str = "",
+    user_intent: str = "",  # noqa: ARG001, RUF100
     min_quality: float = 0.3,
     max_passes: int = 5,
 ) -> MultiPassResult:
@@ -362,7 +367,7 @@ async def _extract_from_container(
     container: CandidateContainer,
     html: str,
     schema_fields: list,
-    url: str = "",
+    url: str = "",  # noqa: ARG001, RUF100
 ) -> ContainerExtractionResult:
     """Attempt to extract structured records from a single container.
 
@@ -626,10 +631,10 @@ def _collect_all_pattern_matches(
             matches["organization"].append((val, m.start(), m.end()))
 
     # Deduplicate each list (same value, keep first occurrence)
-    for key in matches:
+    for key, match_list in matches.items():
         seen = set()
         unique = []
-        for val, start, end in matches[key]:
+        for val, start, end in match_list:
             if val not in seen:
                 seen.add(val)
                 unique.append((val, start, end))

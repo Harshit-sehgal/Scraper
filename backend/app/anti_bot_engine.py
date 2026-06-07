@@ -290,7 +290,7 @@ class AntiBotEngine:
         age_hours = (time.time() - last_update) / 3600
         return age_hours > max_age_hours
 
-    def get_retry_policy(self, url: str, last_score: float) -> dict:
+    def get_retry_policy(self, url: str, last_score: float) -> dict:  # noqa: ARG002, RUF100
         """Determine the next step based on the block score and domain history."""
         policy = {}
 
@@ -327,7 +327,7 @@ class AntiBotEngine:
             self.proxy_manager.record_failure()
             logger.info("Hard block detected on %s, recorded proxy failure", domain)
 
-    def record_success(self, domain: str) -> None:
+    def record_success(self, domain: str) -> None:  # noqa: ARG002, RUF100
         """Record successful fetch from domain."""
         if self.proxy_manager.enabled:
             self.proxy_manager.record_success()

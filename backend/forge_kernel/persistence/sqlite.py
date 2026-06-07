@@ -31,7 +31,7 @@ def _get_store():
             }
         except ImportError:
             msg = "Cannot import app.job_store — ensure PYTHONPATH includes backend/"
-            raise RuntimeError(msg)
+            raise RuntimeError(msg) from None
     return _job_store
 
 
@@ -84,15 +84,16 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 import datetime
 
-                row_dict["deleted_at"] = datetime.datetime.now().isoformat()
+                row_dict["deleted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 cols = ", ".join(row_dict.keys())
                 ph = ", ".join("?" for _ in row_dict)
-                conn.execute(f"INSERT OR REPLACE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_dict.values()))
+                conn.execute(f"INSERT OR REPLACE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_dict.values()))  # noqa: RUF100, S608
                 conn.commit()
-                return True
             except Exception:
                 conn.rollback()
                 raise
+            else:
+                return True
             finally:
                 conn.close()
 
@@ -112,12 +113,13 @@ class SQLiteJobRepository(JobRepository):
                 row_dict.pop("deleted_at", None)
                 cols = ", ".join(row_dict.keys())
                 ph = ", ".join("?" for _ in row_dict)
-                conn.execute(f"INSERT OR REPLACE INTO jobs ({cols}) VALUES ({ph})", list(row_dict.values()))
+                conn.execute(f"INSERT OR REPLACE INTO jobs ({cols}) VALUES ({ph})", list(row_dict.values()))  # noqa: RUF100, S608
                 conn.commit()
-                return True
             except Exception:
                 conn.rollback()
                 raise
+            else:
+                return True
             finally:
                 conn.close()
 
@@ -131,9 +133,10 @@ class SQLiteJobRepository(JobRepository):
                 cursor = conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
                 deleted = cursor.rowcount
                 conn.commit()
-                return deleted > 0
             except Exception:
                 conn.rollback()
                 raise
+            else:
+                return deleted > 0
             finally:
                 conn.close()

@@ -61,7 +61,7 @@ class DomainIntelligenceRegistry:
     def _load(self) -> None:
         if self.path.exists():
             try:
-                with open(self.path) as f:  # noqa: PTH123
+                with open(self.path) as f:
                     data = json.load(f)
                     for domain, metrics in data.items():
                         self._registry[domain] = DomainIntelligence(domain, metrics)
@@ -70,7 +70,7 @@ class DomainIntelligenceRegistry:
 
     def _save(self) -> None:
         try:
-            with open(self.path, "w") as f:  # noqa: PTH123
+            with open(self.path, "w") as f:
                 json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
         except Exception:
             logger.exception("Failed to save domain intelligence")
@@ -108,12 +108,8 @@ class DomainIntelligenceRegistry:
 
         # 4. Strategy Analysis
         strategy = telemetry.get("fallback_usage", "none")
-        if not telemetry.get("error") and strategy != "none":
-            # If successful, consider this a candidate for preferred strategy
-            # For now, we just track the most recent successful non-discovery
-            # strategy
-            if strategy in ["profile", "memory", "regex", "httpx"]:
-                intel.preferred_strategy = strategy
+        if not telemetry.get("error") and strategy != "none" and strategy in ["profile", "memory", "regex", "httpx"]:
+            intel.preferred_strategy = strategy
 
         # 5. Selector Decay Rate
         decay_signal = 1.0 if telemetry.get("fallback_triggered") else 0.0

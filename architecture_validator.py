@@ -8,6 +8,7 @@ Detects architectural drift, symbolic regressions, and ontological inconsistenci
 import ast
 import collections
 import os
+import re
 import sys
 
 # Laws and forbidden patterns
@@ -88,17 +89,34 @@ def check_dangling_references(filepath, symbols):
                 line_code = line
 
             for sym in KILLED_SYMBOLS:
-                if sym in line_code:
-                    # Ignore if it's a definition or import
-                    if "def " + sym in line_code or "import " + sym in line_code or "class " + sym in line_code:
-                        continue
-                    # Ignore if it's inside a string (rough check)
-                    if (line_code.count("'") >= 2 and sym in line_code.split("'")[1]) or (
-                        line_code.count('"') >= 2 and sym in line_code.split('"')[1]
-                    ):
-                        continue
+                # Use word-boundary regex so a function with the killed
+                # symbol as a parameter (``def foo(detect_allocation_contradictions):``)
+                # or as a substring of an unrelated name is NOT
+                # incorrectly flagged. The previous implementation did
+                # a raw ``"def " + sym in line_code`` substring check
+                # which misclassified parameter and attribute references.
+                if not re.search(r"\b" + re.escape(sym) + r"\b", line_code):
+                    continue
+                # Definition sites are NOT references — ``def sym(``,
+                # ``class sym:``, ``from X import sym``,
+                # ``import X.sym``, ``import sym``. All of these
+                # legitimately re-introduce the symbol.
+                is_definition = bool(
+                    re.search(r"\bdef\s+" + re.escape(sym) + r"\s*\(", line_code)
+                    or re.search(r"\bclass\s+" + re.escape(sym) + r"\b", line_code)
+                    or re.search(r"\bfrom\s+\S+\s+import\s+.*\b" + re.escape(sym) + r"\b", line_code)
+                    or re.search(r"\bimport\s+\S*\." + re.escape(sym) + r"\b", line_code)
+                    or re.search(r"\bimport\s+" + re.escape(sym) + r"\b", line_code)
+                )
+                if is_definition:
+                    continue
+                # Ignore if it's inside a string (rough check)
+                if (line_code.count("'") >= 2 and sym in line_code.split("'")[1]) or (
+                    line_code.count('"') >= 2 and sym in line_code.split('"')[1]
+                ):
+                    continue
 
-                    errors.append(f"Reference to killed symbol '{sym}' at {filepath}:{i}")
+                errors.append(f"Reference to killed symbol '{sym}' at {filepath}:{i}")
     return errors
 
 

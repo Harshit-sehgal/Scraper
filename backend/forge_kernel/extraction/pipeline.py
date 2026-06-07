@@ -162,7 +162,7 @@ class ExtractionPipeline:
             )
 
         except Exception as e:
-            logger.exception("Extraction failed for %s: %s", url, e)
+            logger.exception("Extraction failed for %s", url)
             duration = (time.monotonic() - start) * 1000
             self._attempts.append(
                 ExtractionAttempt(

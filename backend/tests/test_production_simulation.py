@@ -125,7 +125,7 @@ class TestRateLimiting:
                     conn.commit()
                 finally:
                     conn.close()
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass  # Table may not exist yet — that's fine
 
     def test_rate_limiter_enforces_max_requests(self) -> None:

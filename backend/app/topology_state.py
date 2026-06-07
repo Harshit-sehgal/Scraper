@@ -182,7 +182,7 @@ class TopologyState:
         if tx is not None:
             tx["tombstones"] = value
         else:
-            setattr(self, "_tombstones_real", value)  # noqa: B010
+            self._tombstones_real = value
 
     @property
     def _structural_change(self) -> bool:
@@ -237,7 +237,7 @@ class TopologyState:
         # in the property getter, otherwise the getter returns a fresh
         # empty set on every call and any ``.add()`` mutation is lost
         # (the non-staging path in ``remove()`` would silently no-op).
-        self._tombstones_real: set[str] = set()
+        self._tombstones_real: set[str] = set()  # type: ignore[no-redef]
 
         # ─── Transaction Staging ──────────────────────────────────────
 

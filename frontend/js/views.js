@@ -20,12 +20,18 @@ export function setCurrentMode(mode) {
 export function switchView(name) {
     currentView = name;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+    });
     document.getElementById(`view-${name}`).classList.add('active');
 
-    const tabMap = { jobs: 'tab-jobs', new: 'tab-new', results: 'tab-jobs', recycle: 'tab-recycle', cognition: 'tab-cognition', dashboard: 'tab-dashboard' };
+    const tabMap = { jobs: 'tab-jobs', new: 'tab-new', recycle: 'tab-recycle', cognition: 'tab-cognition', dashboard: 'tab-dashboard' };
     const tabEl = document.getElementById(tabMap[name]);
-    if (tabEl) tabEl.classList.add('active');
+    if (tabEl) {
+        tabEl.classList.add('active');
+        tabEl.setAttribute('aria-selected', 'true');
+    }
 
     if (name === 'jobs') import('./jobs.js').then(m => m.refreshJobs()).catch(() => {});
     if (name === 'new') import('./form.js').then(m => m.initForm()).catch(() => {});

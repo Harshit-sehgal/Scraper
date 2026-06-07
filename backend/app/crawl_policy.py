@@ -258,7 +258,7 @@ class CrawlPolicyEngine:
                 crawl_delay = 0.0
 
                 for line in text.splitlines():
-                    line = line.strip()
+                    line = line.strip()  # noqa: PLW2901, RUF100
                     if not line or line.startswith("#"):
                         continue
 

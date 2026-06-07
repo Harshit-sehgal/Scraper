@@ -24,7 +24,7 @@ class FieldConflictRegion:
     instability: float = 1.0  # [0, 1] entropy / tension level
     region_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
 
-    # Dynamics (Internal)  # noqa: ERA001
+    # Dynamics (Internal)  # noqa: ERA001, RUF100
     recurrence_score: float = 0.0
     persistence: float = 1.0
     stability_momentum: float = 0.0

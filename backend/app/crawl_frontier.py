@@ -225,7 +225,7 @@ class CrawlFrontier:
             async with self._lock:
                 if not self._queue:
                     # No more items in queue! Restore tried items before
-                    # returning  # noqa: ERA001
+                    # returning  # noqa: ERA001, RUF100
                     for item in tried:
                         if item.url not in self._completed:
                             heapq.heappush(self._queue, item)

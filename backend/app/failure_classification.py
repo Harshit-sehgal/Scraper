@@ -278,7 +278,7 @@ def classify_failure(
     domain_intel: dict | None = None,
     status_code: int | None = None,
     error_message: str | None = None,
-    fetch_method: str | None = None,
+    fetch_method: str | None = None,  # noqa: ARG001, RUF100
 ) -> FailureClassification:
     """Classify an extraction failure based on available signals.
 
@@ -341,9 +341,11 @@ def classify_failure(
     ):
         signals.append({"signal": "timeout", "source": "error_message"})
         # Could be multiple categories; check for hydration specifics
-        if telemetry.get("fetch_method") == "playwright":
-            if telemetry.get("dom_nodes", 0) < settings.CLASSIFY_HYDRATION_DOM_THRESHOLD:
-                return _build_classification(FailureCategory.HYDRATION_FAILURE, 0.75, signals)
+        if (
+            telemetry.get("fetch_method") == "playwright"
+            and telemetry.get("dom_nodes", 0) < settings.CLASSIFY_HYDRATION_DOM_THRESHOLD
+        ):
+            return _build_classification(FailureCategory.HYDRATION_FAILURE, 0.75, signals)
         return _build_classification(FailureCategory.TIMEOUT, 0.70, signals)
 
     if any(

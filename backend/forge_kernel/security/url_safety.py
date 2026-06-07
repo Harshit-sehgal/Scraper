@@ -19,9 +19,10 @@ def _is_safe_ip(ip_str: str) -> bool:
     """Return True if the IP address is a public, routable IP address."""
     try:
         ip = ipaddress.ip_address(ip_str)
-        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
     except ValueError:
         return False
+    else:
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
 
 
 def validate_public_http_url(url: str) -> None:
@@ -50,7 +51,7 @@ def validate_public_http_url(url: str) -> None:
             return
 
     # Reject explicit loopback / internal names
-    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104 — string literal in a hostname-deny list, not a bind address
+    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # noqa: S104 — string literal in a hostname-deny list, not a bind address
         msg = f"URL hostname '{hostname}' is a restricted local loopback target."
         raise ValueError(msg)
 
@@ -87,5 +88,5 @@ def validate_public_http_url(url: str) -> None:
     except (socket.gaierror, OSError) as e:
         if sec.ENV.lower() in ("production", "staging"):
             msg = f"URL hostname '{hostname}' could not be resolved — rejected for security."
-            raise ValueError(msg)
+            raise ValueError(msg) from e
         logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)

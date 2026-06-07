@@ -104,7 +104,7 @@ class GlobalCognitiveScheduler:
                 task.handler(*task.args, **task.kwargs)
                 self._execution_stats["tasks_completed"] += 1
                 self._execution_stats["priority_counts"][task.priority.name] += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logging.getLogger(__name__).exception("TASK FAILED: [%s]", task.task_id)
                 # Record degradation telemetry (best-effort)
                 try:
@@ -114,7 +114,7 @@ class GlobalCognitiveScheduler:
                             severity="warning",
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
-                except Exception:  # nosec B110  # noqa: BLE001
+                except Exception:  # nosec B110  # noqa: RUF100, S110
                     pass  # nosec B110
 
             duration = time.time() - t0
@@ -211,17 +211,17 @@ _scheduler: Any = None
 _initializing = False
 
 
-def get_scheduler() -> GraphUpdateScheduler:
+def get_scheduler() -> GraphUpdateScheduler | None:
     global _scheduler, _initializing
     if _scheduler is None:
         if _initializing:
-            return None  # type: ignore[return-value]
+            return None
         _initializing = True
         try:
             _scheduler = GraphUpdateScheduler()
         finally:
             _initializing = False
-    return _scheduler  # type: ignore[no-any-return]
+    return _scheduler
 
 
 def reset_scheduler() -> None:

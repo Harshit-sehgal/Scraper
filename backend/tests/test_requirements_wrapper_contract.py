@@ -54,7 +54,7 @@ def _is_wrapper(content: str) -> bool:
 def _parse_lock(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     for line in path.read_text().splitlines():
-        line = line.strip()
+        line = line.strip()  # noqa: PLW2901, RUF100
         # Strip PEP 508 extras like ``coverage[toml]`` before matching.
         normalised = re.sub(r"\[[^\]]*\]", "", line)
         m = re.match(r"^([A-Za-z0-9_.\-]+)==([0-9][^\s#]*)", normalised)

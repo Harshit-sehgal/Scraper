@@ -29,7 +29,7 @@ _SAVE_RETRIES = 3
 
 
 def _now_iso() -> str:
-    return datetime.datetime.now().isoformat()
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
 def get_state_file_path() -> Path:

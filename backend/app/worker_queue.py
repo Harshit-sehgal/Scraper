@@ -249,20 +249,16 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                 if current < 2:
                     # Add result column to task_history (used for storing
                     # successful task results)
-                    try:
+                    with contextlib.suppress(Exception):
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception:
-                        pass  # nosec B110
                     current = 2
 
                 if current < 3:
                     # Add execution_time_ms column for tracking task latencies
                     # (mirrors the Postgres queue migration so both backends
                     # share the same ``_CURRENT_QUEUE_SCHEMA_VERSION``).
-                    try:
+                    with contextlib.suppress(Exception):
                         conn.execute("ALTER TABLE task_history ADD COLUMN execution_time_ms INTEGER")
-                    except Exception:
-                        pass  # nosec B110
                     current = 3
 
                 conn.execute("DELETE FROM queue_schema_version")
@@ -544,8 +540,8 @@ class WorkerQueue:
                         from app.metrics_collector import record_worker_failure
 
                         record_worker_failure(actual_type)
-                    except Exception:
-                        pass  # noqa: BLE001  # nosec B110
+                    except Exception:  # noqa: RUF100, S110
+                        pass  # nosec B110
                     conn.execute(
                         """INSERT OR REPLACE INTO task_history
                            (id, type, payload, priority, status, created_at,
@@ -822,14 +818,12 @@ class WorkerQueue:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error("Worker loop error: %s", e, exc_info=True)
+            except Exception:
+                logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callback.
-                try:
+                with contextlib.suppress(ValueError):
                     self._concurrency_sem.release()
-                except ValueError:
-                    pass
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
@@ -886,7 +880,7 @@ class WorkerQueue:
                         # burn another request against the rate-limited
                         # endpoint.
                         await asyncio.sleep(cooldown)
-            except Exception:
+            except Exception:  # noqa: RUF100, S110
                 pass  # nosec B110
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 

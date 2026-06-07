@@ -539,7 +539,7 @@ class ManifoldState:
                 )
                 r_inst = remote_inst.get(role, 0.5)
 
-                # reliability = 1 - instability  # noqa: ERA001
+                # reliability = 1 - instability  # noqa: ERA001, RUF100
                 l_rel = 1.0 - l_inst
                 r_rel = 1.0 - r_inst
 

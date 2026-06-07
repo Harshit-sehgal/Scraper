@@ -88,7 +88,7 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
         retry_dt = parsedate_to_datetime(raw)
         delta = (retry_dt - datetime.datetime.now(datetime.UTC)).total_seconds()
         return max(0.0, delta)
-    except Exception:  # nosec B110
+    except Exception:  # nosec B110  # noqa: RUF100, S110
         pass  # nosec B110
 
     return None

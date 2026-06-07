@@ -9,6 +9,11 @@ on:
   workflow_dispatch:
     # Allow manual trigger from the GitHub Actions UI for ad-hoc validation.
 
+# Cancel in-flight runs on the same ref when a new run is triggered.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   postgres:
     name: Postgres Integration
