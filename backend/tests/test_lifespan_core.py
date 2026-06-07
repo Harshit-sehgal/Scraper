@@ -138,9 +138,12 @@ async def test_rate_limit_prune_loop_runs_one_iteration(monkeypatch) -> None:
 
     from app.lifespan import _rate_limit_prune_loop
 
-    # Patch the prune_all call to verify it was invoked.
+    # Patch the prune_all call at its definition site (app.rate_limiter)
+    # to verify it was invoked by the loop. ``DatabaseSlidingWindowCounter``
+    # is imported lazily inside ``_rate_limit_prune_loop``, so the patch
+    # must target the module where the class is defined, not lifespan.
     mock_prune = MagicMock()
-    with patch("app.lifespan.DatabaseSlidingWindowCounter.prune_all", mock_prune):
+    with patch("app.rate_limiter.DatabaseSlidingWindowCounter.prune_all", mock_prune):
         # Patch the interval to 0.1s so the sleep is short.
         with patch("app.lifespan.settings.RATE_LIMIT_PRUNE_INTERVAL", 0.1):
             task = asyncio.create_task(_rate_limit_prune_loop())

@@ -12,17 +12,19 @@ export async function refreshDashboard() {
   if (btn) btn.disabled = true;
 
   try {
-    const [modeRes, dashRes, healthRes, predRes] = await Promise.all([
+    const [modeRes, dashRes, healthRes, predRes, rateLimitRes] = await Promise.all([
       apiFetch(`${API}/api/operator/mode`).catch(() => null),
       apiFetch(`${API}/api/operator/dashboard`).catch(() => null),
       apiFetch(`${API}/api/operator/health`).catch(() => null),
       apiFetch(`${API}/api/operator/predictions`).catch(() => null),
+      apiFetch(`${API}/api/system/rate-limit-stats`).catch(() => null),
     ]);
 
     const modeData = modeRes?.ok ? await modeRes.json() : null;
     const dashData = dashRes?.ok ? await dashRes.json() : null;
     const healthData = healthRes?.ok ? await healthRes.json() : null;
     const predData = predRes?.ok ? await predRes.json() : null;
+    const rateLimitData = rateLimitRes?.ok ? await rateLimitRes.json() : null;
 
     // Mode switcher
     const modeBadge = document.getElementById("dash-current-mode");
@@ -62,6 +64,9 @@ export async function refreshDashboard() {
 
     // Predictions
     if (predData) renderPredictions(predData);
+
+    // Rate Limits
+    if (rateLimitData) renderRateLimits(rateLimitData);
 
     // Telemetry
     if (dashData?.telemetry) renderTelemetry(dashData.telemetry);
@@ -248,6 +253,60 @@ function renderPredictions(data) {
     .join("");
 }
 
+// ─── Rate Limits ───
+
+function renderRateLimits(data) {
+  const el = document.getElementById("dash-rate-limits");
+  if (!el) return;
+
+  const tierBadge = document.getElementById("dash-rate-limit-tier");
+  if (tierBadge && data.backend) {
+    tierBadge.textContent = data.backend.toUpperCase();
+  }
+
+  const remaining_percent = data.global_limit > 0 ? Math.round((data.global_remaining / data.global_limit) * 100) : 0;
+  const barColor =
+    remaining_percent > 50 ? "var(--success)" : remaining_percent > 20 ? "var(--warning)" : "var(--danger)";
+
+  el.innerHTML = `
+        <div class="dash-metrics-grid">
+            <div class="dash-metric">
+                <span class="dash-metric-label">Global Limit</span>
+                <span class="dash-metric-val">${data.global_limit ?? "—"} / min</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Global Remaining</span>
+                <span class="dash-metric-val" style="color:${barColor}">${data.global_remaining ?? "—"}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Per-IP Limit</span>
+                <span class="dash-metric-val">${data.per_ip_limit ?? "—"} / min</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Per-IP Remaining</span>
+                <span class="dash-metric-val">${data.per_ip_remaining ?? "—"}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Window</span>
+                <span class="dash-metric-val">${data.window_seconds ?? "—"}s</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Client IP</span>
+                <span class="dash-metric-val" style="font-size:0.75rem;font-family:monospace">${esc(data.client_ip || "—")}</span>
+            </div>
+        </div>
+        <div class="dash-rate-limit-bar" style="margin-top:0.5rem">
+            <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--ink-soft);margin-bottom:0.15rem">
+                <span>Global capacity</span>
+                <span>${data.global_remaining ?? 0} / ${data.global_limit ?? 0}</span>
+            </div>
+            <div style="height:4px;background:var(--bg-soft);border-radius:2px;overflow:hidden">
+                <div style="height:100%;width:${Math.min(remaining_percent, 100)}%;background:${barColor};border-radius:2px;transition:width 0.3s ease"></div>
+            </div>
+        </div>
+    `;
+}
+
 // ─── Telemetry ───
 
 function renderTelemetry(data) {
@@ -271,6 +330,48 @@ function renderTelemetry(data) {
             <div class="dash-metric">
                 <span class="dash-metric-label">Success Rate</span>
                 <span class="dash-metric-val">${data.success_rate != null ? `${(data.success_rate * 100).toFixed(0)}%` : "—"}</span>
+            </div>
+        </div>
+    `;
+}
+
+// ─── Rate Limits ───
+
+function renderRateLimits(data) {
+  const badge = document.getElementById("dash-rate-limit-tier");
+  if (badge) {
+    if (data.enabled) {
+      badge.textContent = "ENABLED";
+      badge.style.background = "var(--success-soft)";
+      badge.style.color = "var(--success)";
+    } else {
+      badge.textContent = "DISABLED";
+      badge.style.background = "var(--danger-soft)";
+      badge.style.color = "var(--danger)";
+    }
+  }
+
+  const el = document.getElementById("dash-rate-limits");
+  if (!el) return;
+
+  if (!data.enabled) {
+    el.innerHTML = '<div class="dash-empty">Rate limiting is currently disabled</div>';
+    return;
+  }
+
+  el.innerHTML = `
+        <div class="dash-metrics-grid" style="grid-template-columns: repeat(2, 1fr)">
+            <div class="dash-metric">
+                <span class="dash-metric-label">Global Limit</span>
+                <span class="dash-metric-val">${data.global_limit_per_window || 0} req / ${data.global_window_seconds || 0}s</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Per-IP Limit</span>
+                <span class="dash-metric-val">${data.per_ip_enabled ? `${data.per_ip_limit_per_window} req / ${data.per_ip_window_seconds}s` : "DISABLED"}</span>
+            </div>
+            <div class="dash-metric" style="grid-column: span 2">
+                <span class="dash-metric-label">Active Tracked Clients</span>
+                <span class="dash-metric-val">${data.active_keys ?? 0}</span>
             </div>
         </div>
     `;
