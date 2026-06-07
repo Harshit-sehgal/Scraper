@@ -258,8 +258,8 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     "[SessionRecovery] URL %s is session-bound but no search_params provided",
                     url,
                 )
-        except Exception:
-            pass
+        except Exception:  # nosec B110  # noqa: BLE001 - optional session-bound detection; must not block recovery
+            pass  # nosec B110
     return None
 
 
@@ -654,8 +654,8 @@ async def scrape_url(
     if world_state and hasattr(world_state, "solidified_motifs"):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:
-            pass
+        except Exception:  # nosec B110  # noqa: BLE001 - solidified_motifs is best-effort telemetry
+            pass  # nosec B110
 
     # ── Step 4: Extraction Cascade ─────────────────────────────────
     result_warnings: list[str] = []
