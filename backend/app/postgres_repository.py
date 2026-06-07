@@ -119,8 +119,8 @@ def _db_conn() -> Iterator[psycopg2.extensions.connection]:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:
-            pass
+        except Exception:  # nosec B110  # noqa: BLE001 - metrics must not mask the original DB error
+            pass  # nosec B110
         raise
     finally:
         pool.putconn(conn)
