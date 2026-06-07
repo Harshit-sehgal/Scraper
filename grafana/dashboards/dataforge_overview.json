@@ -521,6 +521,69 @@
         "legend": {"calcs": ["last"], "displayMode": "table", "placement": "right"},
         "tooltip": {"mode": "multi", "sort": "desc"}
       }
+    },
+    {
+      "id": 26,
+      "title": "Rate Limit Blocks (1h)",
+      "type": "stat",
+      "description": "Total global-tier rate limit blocks in the last hour — sustained blocking may indicate a misconfigured RATE_LIMIT_GLOBAL setting",
+      "gridPos": {"h": 4, "w": 3, "x": 0, "y": 44},
+      "targets": [{"expr": "sum(increase(dataforge_rate_limit_global_hits_total[1h])) or vector(0)", "legendFormat": "Global Blocks"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 100}, {"color": "red", "value": 500}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
+    },
+    {
+      "id": 27,
+      "title": "Per-IP Blocks (1h)",
+      "type": "stat",
+      "description": "Total per-IP rate limit blocks in the last hour — sustained blocking indicates an upstream proxy or aggressive client",
+      "gridPos": {"h": 4, "w": 3, "x": 3, "y": 44},
+      "targets": [{"expr": "sum(increase(dataforge_rate_limit_per_ip_hits_total[1h])) or vector(0)", "legendFormat": "Per-IP Blocks"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 50}, {"color": "red", "value": 200}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
+    },
+    {
+      "id": 28,
+      "title": "Rate Limit Block Rate",
+      "type": "timeseries",
+      "description": "Rate of rate-limit blocks over time, broken down by global and per-IP tiers. Spikes indicate misconfigured limits or aggressive traffic patterns.",
+      "gridPos": {"h": 8, "w": 12, "x": 6, "y": 44},
+      "targets": [
+        {"expr": "rate(dataforge_rate_limit_global_hits_total[5m])", "legendFormat": "Global"},
+        {"expr": "rate(dataforge_rate_limit_per_ip_hits_total[5m])", "legendFormat": "Per-IP"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.1}, {"color": "red", "value": 0.5}]
+          },
+          "color": {"mode": "palette-classic"}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
     }
   ],
   "links": [

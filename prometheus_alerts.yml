@@ -155,3 +155,18 @@ groups:
         annotations:
           summary: "Worker heartbeat stale — worker may be dead"
           description: "Worker {{ $labels.worker_id }} (hostname: {{ $labels.hostname }}) has not sent a heartbeat within its TTL for more than 2 minutes. If all workers are affected, check the shared database connection. If an individual worker is affected, check its container/process health."
+
+      # 14. High Rate Limit Block Rate — NEW
+      - alert: HighRateLimitBlockRate
+        expr: |
+          (
+            sum(rate(dataforge_rate_limit_global_hits_total[5m]))
+            +
+            sum(rate(dataforge_rate_limit_per_ip_hits_total[5m]))
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate limit block rate"
+          description: "Rate limiter is blocking {{ $value | humanize }} requests/sec across both global and per-IP tiers for more than 5 minutes (threshold > 0.5 req/s). This may indicate aggressive crawling, a misconfigured RATE_LIMIT_GLOBAL setting, or a traffic spike."

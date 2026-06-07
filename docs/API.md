@@ -262,3 +262,28 @@ The following Prometheus metrics are exposed:
 | `dataforge_rate_limit_per_ip_hits_total` | Gauge | — | Cumulative rate limit hits by the per-IP fair-sharing tier |
 
 Both rate-limit hit counters are reset on process restart. They are incremented whenever the rate limiter middleware returns a 429 Too Many Requests response, and are exposed in both the Prometheus exposition format and the fallback text output.
+
+### Alerting Rules (Prometheus)
+
+The following alert rules are defined in `prometheus_alerts.yml` and evaluated by the DataForge Prometheus instance:
+
+| Alert | Severity | Condition | Description |
+| --- | --- | --- | --- |
+| `DataForgeAPIInstanceDown` | critical | `up{job="dataforge"} == 0` for 1m | API server unreachable |
+| `QueueBacklogHigh` | warning | `dataforge_queue_pending > 100` for 5m | Pending queue depth exceeds 100 |
+| `HighJobFailureRate` | warning | `rate(dataforge_jobs_total{status="failed"}[5m]) > 0.1` for 10m | Jobs failing at > 0.1 req/s |
+| `HighRateLimitBlockRate` | warning | `sum(rate(dataforge_rate_limit_global_hits_total[5m]) + rate(dataforge_rate_limit_per_ip_hits_total[5m])) > 0.5` for 5m | Rate limiter blocking > 0.5 req/s across both tiers |
+| `WorkerHeartbeatStale` | critical | `dataforge_worker_heartbeat_alive == 0` for 2m | Worker process heartbeat stale |
+| Database errors, CSP violations, SSRF, browser launch failures, extraction anomalies | varied | See `prometheus_alerts.yml` for full list | |
+
+### Grafana Dashboard
+
+The DataForge Production Overview dashboard (`grafana/dashboards/dataforge_overview.json`) includes the following rate-limit-related panels:
+
+| Panel | Type | Metrics | Description |
+| --- | --- | --- | --- |
+| Rate Limit Blocks (1h) | Stat | `sum(increase(dataforge_rate_limit_global_hits_total[1h]))` | Total global-tier rate limit blocks in the last hour |
+| Per-IP Blocks (1h) | Stat | `sum(increase(dataforge_rate_limit_per_ip_hits_total[1h]))` | Total per-IP rate limit blocks in the last hour |
+| Rate Limit Block Rate | Timeseries | `rate(dataforge_rate_limit_global_hits_total[5m])` and `rate(dataforge_rate_limit_per_ip_hits_total[5m])` | Rate of blocks over time, broken down by tier, with threshold reference lines at 0.1 and 0.5 req/s |
+
+Alerts for these panels route through Alertmanager (`alertmanager.yml`) to email and Slack channels based on severity.
