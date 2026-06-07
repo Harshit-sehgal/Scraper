@@ -124,3 +124,34 @@ class TestResetLifespanState:
         reset_lifespan_state()
         # Second call must also be a no-op and not raise.
         reset_lifespan_state()
+
+
+# ─── rate limit prune loop ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_prune_loop_runs_one_iteration(monkeypatch) -> None:
+    """The background prune loop executes at least one prune cycle and
+    can be cancelled cleanly without raising."""
+    import asyncio
+    from unittest.mock import MagicMock, patch
+
+    from app.lifespan import _rate_limit_prune_loop
+
+    # Patch the prune_all call to verify it was invoked.
+    mock_prune = MagicMock()
+    with patch("app.lifespan.DatabaseSlidingWindowCounter.prune_all", mock_prune):
+        # Patch the interval to 0.1s so the sleep is short.
+        with patch("app.lifespan.settings.RATE_LIMIT_PRUNE_INTERVAL", 0.1):
+            task = asyncio.create_task(_rate_limit_prune_loop())
+            # Let it sleep for the 0.1s interval and run prune_all once.
+            await asyncio.sleep(0.3)
+            task.cancel()
+            # Wait for cancellation to propagate.
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    # prune_all should have been called at least once.
+    assert mock_prune.called, "prune_all was not called during the prune loop iteration"
