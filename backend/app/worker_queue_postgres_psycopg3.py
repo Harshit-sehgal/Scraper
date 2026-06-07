@@ -80,7 +80,7 @@ def _close_pool() -> None:
             if pool is not None:
                 try:
                     pool.close()
-                except Exception:
+                except Exception:  # nosec B110  # noqa: BLE001 - shutdown cleanup best-effort
                     logger.debug("Failed to close psycopg3 worker queue pool during shutdown")
                 logger.info("Closed psycopg3 worker queue pool")
 
@@ -98,7 +98,7 @@ def _conn() -> Iterator:
         try:
             yield conn
             conn.commit()
-        except BaseException:
+        except BaseException:  # nosec B110  # noqa: BLE001 - catch all to ensure rollback, then re-raise
             conn.rollback()
             try:
                 from app.metrics_collector import record_error
@@ -156,7 +156,7 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
             try:
                 yield conn
                 conn.commit()
-            except BaseException:
+            except BaseException:  # nosec B110  # noqa: BLE001 - catch all to ensure rollback, then re-raise
                 conn.rollback()
                 try:
                     from app.metrics_collector import record_error

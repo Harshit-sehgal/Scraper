@@ -31,7 +31,18 @@ export async function refreshCognition() {
     renderCognitionSkeleton();
     try {
         const res = await apiFetch(`${API}/api/system/topology`);
-        if (!res.ok) throw new Error('Topology unavailable');
+        // The topology endpoint sits behind the experimental-routes
+        // gate. When ``DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES`` is unset
+        // the backend returns 403 with a ``X-DataForge-Feature-Flag``
+        // header. Surface a friendly message instead of a generic
+        // "Topology unavailable" toast that operators can't act on.
+        if (res.status === 403) {
+            _renderExperimentalGate(
+                'Cognition topology is part of the experimental surface and is disabled in this build.',
+            );
+            return;
+        }
+        if (!res.ok) throw new Error(`Topology unavailable (${res.status})`);
         const data = await res.json();
 
         const metrics = data.metrics || {};
@@ -48,6 +59,38 @@ export async function refreshCognition() {
         renderBasins(data.field_regions);
     } catch (e) {
         toast(`Failed to load cognition state: ${e.message}`, 'error');
+    }
+}
+
+
+function _renderExperimentalGate(message) {
+    // Replace the skeleton/empty panels with a single in-place notice
+    // so the operator knows the panel is unavailable by design and not
+    // because of a transient error.
+    const ids = [
+        'community-list',
+        'schema-pattern-list',
+        'exclusion-list',
+        'role-similarity-list',
+        'basin-list',
+    ];
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = `<div class="empty" style="padding:0.75rem;color:var(--text-muted);"><p>${esc(message)}</p></div>`;
+        }
+    }
+    for (const id of [
+        'kpi-pressure',
+        'kpi-integrity',
+        'kpi-energy',
+        'kpi-exclusions',
+        'kpi-basins',
+    ]) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = '—';
+        }
     }
 }
 

@@ -1,8 +1,6 @@
 import asyncio
-import os
-
-os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
 import contextlib
+import os
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -143,6 +141,11 @@ os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
 # Force SQLite for tests to avoid Postgres env bleed from .env
 os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
 os.environ.pop("DATAFORGE_DATABASE_URL", None)
+# Enable experimental routes for the default test client. Production-mode
+# gate tests (test_research_leak_tracking, test_main_routes_gate,
+# test_experimental_gate) explicitly set this to "false" and re-import
+# app.main to verify the gate holds.
+os.environ.setdefault("DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES", "true")
 
 main_mod: ModuleType | None = None
 try:
@@ -305,6 +308,11 @@ def client(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "OPERATOR_API_KEY", "")
     monkeypatch.setattr(main_mod.settings, "METRICS_TOKEN", "")
     monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", True)
+    # ENABLE_EXPERIMENTAL_ROUTES is set at conftest import time (see
+    # ``os.environ.setdefault`` above) so the experimental router is
+    # already mounted on ``app``. The settings attribute override
+    # below is kept for tests that re-import app.main with the
+    # flag off — they need it re-enabled for the client fixture.
     monkeypatch.setattr(main_mod.settings, "ENABLE_EXPERIMENTAL_ROUTES", True)
 
     main_mod.jobs_store.clear()

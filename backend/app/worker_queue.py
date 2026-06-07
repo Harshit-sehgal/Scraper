@@ -775,11 +775,18 @@ class WorkerQueue:
                 t = asyncio.create_task(self._execute_task(task))
 
                 task_id = task.id
+                # Capture the semaphore reference for this task's release
+                # callback. ``set_max_concurrency`` swaps
+                # ``self._concurrency_sem`` atomically; if the callback
+                # looked up the attribute on release it could end up
+                # releasing the *new* semaphore and inflating the budget
+                # beyond the configured limit.
+                acquired_sem = self._concurrency_sem
 
                 async with self._in_flight_lock:
                     self._in_flight[task_id] = t
 
-                def _on_task_done(fut: object, tid: str = task_id) -> None:
+                def _on_task_done(_fut: object, tid: str = task_id) -> None:
                     # Schedule the cleanup on the *currently running* event
                     # loop, not on whichever loop ``asyncio.ensure_future``
                     # happens to pick up.  This avoids a ``RuntimeError``
@@ -795,11 +802,16 @@ class WorkerQueue:
                             tid,
                         )
 
-                def _release(_fut: object, tid: str = task_id) -> None:
+                def _release(_fut: object, tid: str = task_id, sem: asyncio.Semaphore = acquired_sem) -> None:
                     # Release the semaphore permit exactly once when the
                     # task finishes (success, failure, or cancellation).
+                    # The semaphore is the one whose permit was acquired
+                    # in this iteration — see the ``acquired_sem``
+                    # capture above. Looking it up via ``self`` here
+                    # would be wrong if ``set_max_concurrency`` had
+                    # swapped the semaphore in the meantime.
                     try:
-                        self._concurrency_sem.release()
+                        sem.release()
                     except ValueError:
                         # Permit already released — should not happen,
                         # but never let a callback raise.
@@ -1062,12 +1074,20 @@ def get_worker_queue(
 
     # SQLite backend (default)
     global _queue_instance
-    if _queue_instance is None:
-        with _queue_lock:
-            if _queue_instance is None:
-                _queue_instance = WorkerQueue(db_path=db_path)
-    elif db_path is not None and _queue_instance._db_path != db_path:
-        return WorkerQueue(db_path=db_path)
+    with _queue_lock:
+        if _queue_instance is None:
+            _queue_instance = WorkerQueue(db_path=db_path)
+        elif db_path is not None and _queue_instance._db_path != db_path:
+            # A different ``db_path`` was requested (typical of tests
+            # that scope a queue to a tmp_path fixture). The previous
+            # implementation returned the new instance without
+            # caching it, so the next call with the *default* path
+            # would still return the original singleton. The
+            # caller is now responsible for ``reset_worker_queue()``
+            # if they want the default back; we replace the
+            # singleton so a subsequent ``get_worker_queue()`` with
+            # no args returns the new one.
+            _queue_instance = WorkerQueue(db_path=db_path)
     return _queue_instance
 
 

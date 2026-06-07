@@ -5,11 +5,24 @@
 # Run selected checks used by GitHub Actions: pyflakes, ruff (lint + format),
 # research-boundary CI check, mypy, pytest, frontend JS validation,
 # shell script syntax, and git diff check.
+#
+# This script is **archive-hostile** — it tolerates:
+#   * Source archives without a .git directory
+#   * Missing dev tools (e.g. pyflakes, ruff, mypy not installed)
+#   * Missing Node.js for frontend JS checks
+#
+# Each check is independent: a failure in one does not abort the others.
+# A final summary is always printed before exiting.
 # =============================================================================
-set -euo pipefail
+
+# Note: We intentionally do NOT use `set -e` here because the whole point
+# of this script is to surface ALL failing checks, not bail on the first
+# one. Each check guards its own exit code.
+set -uo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,37 +31,73 @@ BACKEND_DIR="$PROJECT_DIR/backend"
 
 PASS=0
 FAIL=0
+SKIP=0
 
 pass_check() { echo -e "  ${GREEN}PASS${NC} — $1"; PASS=$((PASS + 1)); }
 fail_check() { echo -e "  ${RED}FAIL${NC} — $1"; FAIL=$((FAIL + 1)); }
+skip_check() { echo -e "  ${YELLOW}SKIP${NC} — $1"; SKIP=$((SKIP + 1)); }
+
+# Tool-availability probe — record missing tools up front.
+PYFLAKES_OK=0
+command -v python3 >/dev/null 2>&1 && python3 -m pyflakes --version >/dev/null 2>&1 && PYFLAKES_OK=1
+
+RUFF_OK=0
+command -v python3 >/dev/null 2>&1 && python3 -m ruff --version >/dev/null 2>&1 && RUFF_OK=1
+
+MYPY_OK=0
+command -v python3 >/dev/null 2>&1 && python3 -m mypy --version >/dev/null 2>&1 && MYPY_OK=1
+
+PYTEST_OK=0
+command -v python3 >/dev/null 2>&1 && python3 -m pytest --version >/dev/null 2>&1 && PYTEST_OK=1
+
+NODE_OK=0
+command -v node >/dev/null 2>&1 && NODE_OK=1
+
+GIT_OK=0
+command -v git >/dev/null 2>&1 && [ -d "$PROJECT_DIR/.git" ] && GIT_OK=1
 
 echo "============================================"
 echo " verify_all.sh — Local selected checks"
 echo "============================================"
 echo ""
+echo "Tool availability: pyflakes=$PYFLAKES_OK ruff=$RUFF_OK mypy=$MYPY_OK"
+echo "                   pytest=$PYTEST_OK node=$NODE_OK git_repo=$GIT_OK"
+echo ""
 
 # ─── pyflakes ──────────────────────────────────────────────────
 echo "[1/9] pyflakes"
-if python3 -m pyflakes "$BACKEND_DIR/app" "$BACKEND_DIR/tests" 2>&1; then
-    pass_check "pyflakes — 0 issues"
+if [ "$PYFLAKES_OK" -eq 1 ]; then
+    if python3 -m pyflakes "$BACKEND_DIR/app" "$BACKEND_DIR/tests" 2>&1; then
+        pass_check "pyflakes — 0 issues"
+    else
+        fail_check "pyflakes — issues found"
+    fi
 else
-    fail_check "pyflakes — issues found"
+    skip_check "pyflakes — not installed"
 fi
 
 # ─── ruff lint ─────────────────────────────────────────────────
 echo "[2/9] ruff lint"
-if python3 -m ruff check "$BACKEND_DIR/app" "$BACKEND_DIR/tests" "$PROJECT_DIR/scripts" 2>&1; then
-    pass_check "ruff lint — clean"
+if [ "$RUFF_OK" -eq 1 ]; then
+    if python3 -m ruff check "$BACKEND_DIR/app" "$BACKEND_DIR/tests" "$PROJECT_DIR/scripts" 2>&1; then
+        pass_check "ruff lint — clean"
+    else
+        fail_check "ruff lint — issues found"
+    fi
 else
-    fail_check "ruff lint — issues found"
+    skip_check "ruff lint — not installed"
 fi
 
 # ─── ruff format ───────────────────────────────────────────────
 echo "[3/9] ruff format"
-if python3 -m ruff format --check "$BACKEND_DIR/app" "$BACKEND_DIR/tests" "$PROJECT_DIR/scripts" 2>&1; then
-    pass_check "ruff format — clean"
+if [ "$RUFF_OK" -eq 1 ]; then
+    if python3 -m ruff format --check "$BACKEND_DIR/app" "$BACKEND_DIR/tests" "$PROJECT_DIR/scripts" 2>&1; then
+        pass_check "ruff format — clean"
+    else
+        fail_check "ruff format — would reformat"
+    fi
 else
-    fail_check "ruff format — would reformat"
+    skip_check "ruff format — not installed"
 fi
 
 # ─── research-shell boundary ───────────────────────────────────
@@ -62,51 +111,69 @@ fi
 
 # ─── mypy ──────────────────────────────────────────────────────
 echo "[5/9] mypy"
-if python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 | tail -1 | grep -q "Success"; then
-    pass_check "mypy — 0 errors"
+if [ "$MYPY_OK" -eq 1 ]; then
+    MYPY_OUTPUT=$(python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 || true)
+    if echo "$MYPY_OUTPUT" | tail -1 | grep -q "Success"; then
+        pass_check "mypy — 0 errors"
+    else
+        fail_check "mypy — errors found"
+        echo "$MYPY_OUTPUT" | grep "error:" | head -5
+    fi
 else
-    fail_check "mypy — errors found"
-    python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 | grep "error:" | head -5
+    skip_check "mypy — not installed"
 fi
 
 # ─── pytest ────────────────────────────────────────────────────
 echo "[6/9] pytest"
-PYTEST_TMP=$(mktemp)
-set +e
-PYTHONPATH="$BACKEND_DIR" DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest "$BACKEND_DIR/tests" \
-    -q -o "addopts=" \
-    --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
-    > "$PYTEST_TMP" 2>&1
-PYTEST_EXIT=$?
-set -e
-tail -3 "$PYTEST_TMP"
-if [ $PYTEST_EXIT -eq 0 ]; then
-    pass_check "pytest"
+if [ "$PYTEST_OK" -eq 1 ]; then
+    PYTEST_TMP=$(mktemp)
+    if PYTHONPATH="$BACKEND_DIR" DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+        python3 -m pytest "$BACKEND_DIR/tests" \
+        -q -o "addopts=" \
+        --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
+        > "$PYTEST_TMP" 2>&1; then
+        pass_check "pytest"
+    else
+        fail_check "pytest — failures"
+        tail -3 "$PYTEST_TMP"
+        grep -E "FAILED|ERROR" "$PYTEST_TMP" | head -10
+    fi
+    rm -f "$PYTEST_TMP"
 else
-    fail_check "pytest — failures"
-    grep -E "FAILED|ERROR" "$PYTEST_TMP" | head -10
+    skip_check "pytest — not installed"
 fi
-rm -f "$PYTEST_TMP"
 
 # ─── frontend JS ───────────────────────────────────────────────
 echo "[7/9] frontend JS validation"
-JS_OK=true
-for jsfile in "$PROJECT_DIR/frontend/app.js" "$PROJECT_DIR/frontend/dashboard/dashboard.js"; do
-    if ! node -c "$jsfile" 2>/dev/null; then
-        JS_OK=false
+if [ "$NODE_OK" -eq 1 ]; then
+    JS_OK=true
+    JS_FILES=()
+    [ -f "$PROJECT_DIR/frontend/app.js" ] && JS_FILES+=("$PROJECT_DIR/frontend/app.js")
+    [ -f "$PROJECT_DIR/frontend/dashboard/dashboard.js" ] && JS_FILES+=("$PROJECT_DIR/frontend/dashboard/dashboard.js")
+    if [ ${#JS_FILES[@]} -eq 0 ]; then
+        skip_check "frontend JS — no files found"
+    else
+        for jsfile in "${JS_FILES[@]}"; do
+            if ! node -c "$jsfile" 2>/dev/null; then
+                JS_OK=false
+            fi
+        done
+        if $JS_OK; then
+            pass_check "frontend JS — valid"
+        else
+            fail_check "frontend JS — invalid"
+        fi
     fi
-done
-if $JS_OK; then
-    pass_check "frontend JS — valid"
 else
-    fail_check "frontend JS — invalid"
+    skip_check "frontend JS — node not installed"
 fi
 
 # ─── shell scripts ─────────────────────────────────────────────
 echo "[8/9] shell scripts"
 SH_OK=true
+SH_FILES=()
 for shfile in "$PROJECT_DIR/scripts"/*.sh; do
+    [ -f "$shfile" ] || continue
     if ! bash -n "$shfile" 2>/dev/null; then
         SH_OK=false
     fi
@@ -119,16 +186,20 @@ fi
 
 # ─── git diff ──────────────────────────────────────────────────
 echo "[9/9] git diff --check"
-if git -C "$PROJECT_DIR" diff --check 2>/dev/null; then
-    pass_check "git diff — clean"
+if [ "$GIT_OK" -eq 1 ]; then
+    if git -C "$PROJECT_DIR" diff --check 2>&1; then
+        pass_check "git diff — clean"
+    else
+        fail_check "git diff — whitespace issues"
+    fi
 else
-    fail_check "git diff — whitespace issues"
+    skip_check "git diff — no .git directory or git not installed"
 fi
 
 # ─── Summary ───────────────────────────────────────────────────
 echo ""
 echo "============================================"
-echo " Results: $PASS passed, $FAIL failed"
+echo " Results: $PASS passed, $FAIL failed, $SKIP skipped"
 echo "============================================"
 
 if [ "$FAIL" -gt 0 ]; then

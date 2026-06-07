@@ -13,9 +13,10 @@ jobs:
   postgres:
     name: Postgres Integration
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
@@ -54,6 +55,7 @@ jobs:
   browser-e2e:
     name: Browser E2E (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
@@ -79,6 +81,7 @@ jobs:
   golden-dataset:
     name: Golden Dataset Live
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
@@ -103,6 +106,7 @@ jobs:
     name: Telegram Notification
     needs: [postgres, browser-e2e, golden-dataset]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Send Telegram Message

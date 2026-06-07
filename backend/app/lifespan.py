@@ -29,6 +29,25 @@ heartbeat_mgr = None
 _background_tasks: list[asyncio.Task] = []
 
 
+def reset_lifespan_state() -> None:
+    """Clear the module-level lifespan state.
+
+    Used by tests that drive the app through multiple lifespan cycles
+    in the same process. Without this reset, the second startup would
+    inherit the gossip/heartbeat_mgr/_background_tasks from the first
+    cycle, leading to double-registered asyncio tasks and stale
+    references.
+
+    This is a backstop for test isolation; production code should
+    not call it.
+    """
+    global job_repo, gossip, heartbeat_mgr, _background_tasks
+    job_repo = None
+    gossip = None
+    heartbeat_mgr = None
+    _background_tasks = []
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for FastAPI startup / shutdown.

@@ -511,31 +511,47 @@ class TestStreamingExportWithLargeDataset:
 
 
 class TestExcelWorksheetCreation:
-    """Edge case: Workbook.active returns None."""
+    """Edge cases that exercise the export route's error-handling path."""
 
     @pytest.mark.asyncio
-    async def test_excel_ws_none_returns_500(self) -> None:
-        """When openpyxl's Workbook().active is None, return 500."""
+    async def test_excel_create_sheet_raises_returns_500(self) -> None:
+        """When ``Workbook.create_sheet`` raises, the route must return 500.
+
+        The earlier version of this test mocked ``Workbook().active`` to
+        ``None``. That mock was a no-op against the current code path
+        (the route uses ``Workbook(write_only=True)`` and calls
+        ``create_sheet`` explicitly — it never reads ``.active``), so
+        the test silently asserted a 200 response. This rewrite mocks a
+        failure the production code actually performs, which is what
+        we want to test: a sheet-creation failure (e.g. an openpyxl
+        validation error on a malformed title) bubbles up as a 500
+        response.
+        """
         from unittest.mock import patch as mock_patch
 
         from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)
-        jobs_store["ws-none"] = _make_job(
-            "ws-none",
+        jobs_store["ws-broken"] = _make_job(
+            "ws-broken",
             results=[{"x": "1"}],
             schema_fields=[SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)],
         )
         test_app = FastAPI()
         test_app.include_router(router)
-        transport = ASGITransport(app=test_app)
-        # Mock openpyxl's Workbook to return a workbook with .active = None
+        # ``raise_app_exceptions=False`` lets the route's
+        # ``except Exception: raise`` re-raise bubble up to FastAPI's
+        # default 500 handler, so the test sees an HTTP response
+        # instead of an unhandled exception in the AsyncClient
+        # context. The default ``True`` (used everywhere else) is
+        # what we want for normal happy-path tests.
+        transport = ASGITransport(app=test_app, raise_app_exceptions=False)
         async with AsyncClient(transport=transport, base_url="http://testserver") as c:
             with mock_patch("app.routers.exports.Workbook") as mock_wb_cls:
                 mock_wb = mock_wb_cls.return_value
-                mock_wb.active = None
-                resp = await c.get("/api/jobs/ws-none/export/excel")
+                mock_wb.create_sheet.side_effect = RuntimeError("openpyxl rejected the sheet title")
+                resp = await c.get("/api/jobs/ws-broken/export/excel")
         assert resp.status_code == 500
 
 

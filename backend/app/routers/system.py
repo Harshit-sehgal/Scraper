@@ -102,17 +102,14 @@ async def system_status(
             job_total = health.get("job_count", 0)
             recycle_count = health.get("recycle_bin_count", 0)
 
-            # Use list_job_summaries with a high limit to compute
-            # per-status counts without loading full job rows.
-            summaries = await run_in_threadpool(repo.list_job_summaries, limit=5000)
-            counts = {s.value: 0 for s in JobStatus}
-            for s in summaries:
-                raw_status = s.get("status") or ""
-                if hasattr(raw_status, "value"):
-                    status_key = raw_status.value
-                else:
-                    status_key = str(raw_status)
-                counts[status_key] = counts.get(status_key, 0) + 1
+            # Use a single ``GROUP BY status`` query for per-status counts.
+            # The previous approach called ``list_job_summaries(limit=5000)``
+            # which the storage layer silently clamped to 500, producing
+            # wrong counts whenever the store held more than 500 jobs.
+            counts = await run_in_threadpool(repo.count_jobs_by_status)
+            # Backfill any missing JobStatus values with 0 so the response
+            # always has the same shape.
+            counts = {s.value: counts.get(s.value, 0) for s in JobStatus}
 
             active = (
                 counts.get(JobStatus.PENDING.value, 0)
@@ -461,6 +458,27 @@ async def analyze_url(
 # ─── Prometheus /metrics ────────────────────────────────────────────────
 
 METRICS_COLLECTION_ERRORS = 0
+_METRICS_TOKEN_WARN_EMITTED = False
+
+
+def _warn_metrics_token_unset_once() -> None:
+    """Log a one-time warning that ``METRICS_TOKEN`` is unset in dev.
+
+    In production the ``/metrics`` endpoint refuses to serve without a
+    token, so we never reach this helper. In development the endpoint
+    stays open for convenience, but the operator should still be told
+    that the deployment is shipping metrics to anyone who can reach the
+    port. The warning is emitted at most once per process to avoid
+    log spam on every scrape.
+    """
+    global _METRICS_TOKEN_WARN_EMITTED
+    if _METRICS_TOKEN_WARN_EMITTED:
+        return
+    _METRICS_TOKEN_WARN_EMITTED = True
+    logger.warning(
+        "DATAFORGE_METRICS_TOKEN is not set; /metrics is publicly readable. "
+        "Set a token before deploying outside of local development.",
+    )
 
 
 def _prometheus_label_text(labels: dict[str, str]) -> str:
@@ -625,6 +643,26 @@ def _render_basic_metrics_text() -> str:
 async def metrics(request: Request):
     """Prometheus-formatted metrics endpoint for DataForge scraper."""
     # Auth check
+    if not settings.METRICS_TOKEN:
+        # Fail-secure: in production, an unset METRICS_TOKEN would
+        # expose queue depths, error rates, job counts, and the host's
+        # worker roster to anyone who can reach the port. Reject the
+        # request outright. In development we keep the open behavior
+        # so local scrapers can scrape without a token — but we log a
+        # one-time warning on the first call so the operator knows.
+        if settings.ENV == "production":
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        "DATAFORGE_METRICS_TOKEN is not configured. The "
+                        "/metrics endpoint refuses to serve without a token "
+                        "in production. Set DATAFORGE_METRICS_TOKEN in the "
+                        "environment to enable scraping."
+                    ),
+                },
+            )
+        _warn_metrics_token_unset_once()
     if settings.METRICS_TOKEN:
         auth_header = request.headers.get("Authorization", "")
         api_key_header = request.headers.get("X-API-Key", "")

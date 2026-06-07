@@ -10,6 +10,7 @@ jobs:
   syntax-and-architecture:
     name: Syntax & Architecture Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +35,7 @@ jobs:
   test-collection:
     name: Test Collection
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -58,9 +60,51 @@ jobs:
           COLLECTED=$(grep "tests collected" /tmp/collection.log | awk '{print $1}')
           echo "Collected tests: $COLLECTED"
 
+  audit-research-leak:
+    name: Research-Shell Quarantine Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # This job is a dedicated gate for the Phase R2 research-shell
+    # quarantine. It runs the four test files that own the
+    # "experimental routes must not be eagerly imported" invariant
+    # independently of the full ``test-sqlite`` job, so a regression
+    # in ``app.main`` is surfaced with a clear error rather than
+    # buried in a 2000-test report. If any of these files vanish
+    # from the repo, the build fails here before the full suite
+    # runs, which prevents the gate from silently regressing.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run research-leak tripwires
+        run: |
+          set -e
+          for f in \
+              backend/tests/test_research_leak_tracking.py \
+              backend/tests/test_experimental_gate.py \
+              backend/tests/test_main_routes_gate.py \
+              backend/tests/test_html_utils_quarantine.py; do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::Research-leak gate file $f is missing. The R2 quarantine invariant cannot be verified."
+              exit 1
+            fi
+            pytest "$f" -v --tb=short --no-header
+          done
+
   test-sqlite:
     name: Test SQLite Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -108,6 +152,7 @@ jobs:
   test-security:
     name: Security Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -140,6 +185,7 @@ jobs:
   test-benchmarks:
     name: Benchmark Smoke Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -168,9 +214,10 @@ jobs:
   test-postgres:
     name: Postgres Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
@@ -217,6 +264,7 @@ jobs:
   test-browser-e2e:
     name: Browser E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -265,6 +313,7 @@ jobs:
   test-golden-dataset:
     name: Golden Dataset Live Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -296,6 +345,7 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -315,6 +365,7 @@ jobs:
   docs-validation:
     name: Documentation Consistency
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -347,6 +398,7 @@ jobs:
   final-report:
     name: Generate Validation Report
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs:
       - syntax-and-architecture
       - test-collection
@@ -421,6 +473,7 @@ jobs:
       - docs-validation
       - final-report
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Send Telegram Message

@@ -37,31 +37,64 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
     """Threadpool-safe wrapper around the repository's idempotency-key lookup.
 
     Uses the ``JobRepository`` interface so both SQLite and Postgres
-    backends are supported. Falls back to ``None`` on failure.
+    backends are supported.
+
+    On lookup failure the function returns ``None`` and logs at warning
+    level. Returning ``None`` is the *fail-open* behavior required so
+    that a transient DB outage does not block every job submission,
+    but the warning makes the silent dedup-miss visible to operators
+    who can then decide whether to block writes until the DB recovers.
     """
     try:
         repo = get_job_repository()
         return repo.lookup_idempotency_key(idem_key)
     except Exception:
+        logger.warning(
+            "idempotency-key lookup failed; treating as a cache miss (fail-open). "
+            "Duplicate retries with idem_key=%r may create duplicate jobs until the "
+            "repository recovers. Check the storage backend health.",
+            idem_key,
+            exc_info=True,
+        )
         return None
 
 
 def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
-    """Threadpool-safe wrapper around the repository's request fingerprint lookup."""
+    """Threadpool-safe wrapper around the repository's request fingerprint lookup.
+
+    Same fail-open contract as :func:`lookup_idempotency_key`. A lookup
+    failure logs at warning level so a sustained outage is visible.
+    """
     try:
         repo = get_job_repository()
         return repo.lookup_idempotency_fingerprint(idem_key)
     except Exception:
+        logger.warning(
+            "idempotency-fingerprint lookup failed; treating as a cache miss. "
+            "A retry with idem_key=%r will not be recognized as a duplicate "
+            "of the original request.",
+            idem_key,
+            exc_info=True,
+        )
         return None
 
 
 def record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None:
-    """Threadpool-safe wrapper around the repository's idempotency-key recording."""
+    """Threadpool-safe wrapper around the repository's idempotency-key recording.
+
+    A failure is logged at warning level (not just debug) so the operator
+    can see that subsequent retries with the same ``idem_key`` will
+    not be deduplicated.
+    """
     try:
         repo = get_job_repository()
         repo.record_idempotency_key(idem_key, job_id, fingerprint)
     except Exception:
-        logger.debug("Failed to record idempotency key %s", idem_key)
+        logger.warning(
+            "Failed to record idempotency key %s; subsequent retries will not be deduplicated.",
+            idem_key,
+            exc_info=True,
+        )
 
 
 def is_worker_mode() -> bool:
