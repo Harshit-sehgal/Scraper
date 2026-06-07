@@ -355,9 +355,12 @@ class TestPostgresParity:
         # We rely on the schema being identical between the two backends
         # (job_events / job_results / idempotency_keys / jobs / recycle_bin).
         import psycopg2
-        from app.postgres_repository import _get_database_url
 
-        with psycopg2.connect(_get_database_url()) as conn:
+        # get_database_url was moved to app.postgres_repository_base (and
+        # renamed from _get_database_url) during Phase C deduplication.
+        from app.postgres_repository_base import get_database_url
+
+        with psycopg2.connect(get_database_url()) as conn:
             with conn.cursor() as cur:
                 for ts, level, message in [
                     ("2026-06-01T10:00:00Z", "info", "started"),

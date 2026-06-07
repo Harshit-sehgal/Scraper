@@ -211,13 +211,16 @@ class TestSQLiteJobRepository:
 
 
 class TestPostgresSerialization:
-    """Test the _job_to_row / _row_to_job serialization functions."""
+    """Test the job_to_row / row_to_job serialization functions."""
 
     def _import_postgres_module(self):
         try:
-            from app.postgres_repository import _job_to_row, _row_to_job
+            # The serialization helpers were moved to app.postgres_repository_base
+            # during Phase C deduplication and renamed (no leading underscore)
+            # to signal they are part of the module's public surface.
+            from app.postgres_repository_base import job_to_row, row_to_job
 
-            return _job_to_row, _row_to_job
+            return job_to_row, row_to_job
         except ImportError:
             pytest.skip("psycopg2 not installed")
             return None, None
@@ -352,13 +355,16 @@ class TestPostgresSchemaRepair:
 
     def _import(self):
         try:
-            from app.postgres_repository import (
-                _build_create_jobs_sql,
-                _build_create_recycle_bin_sql,
-                _ensure_required_tables,
+            # These helpers were moved to app.postgres_repository_base during
+            # Phase C deduplication and renamed (no leading underscore) to
+            # signal they are part of the module's public surface.
+            from app.postgres_repository_base import (
+                build_create_jobs_sql,
+                build_create_recycle_bin_sql,
+                ensure_required_tables,
             )
 
-            return _ensure_required_tables, _build_create_jobs_sql, _build_create_recycle_bin_sql
+            return ensure_required_tables, build_create_jobs_sql, build_create_recycle_bin_sql
         except ImportError:
             pytest.skip("psycopg2 not installed")
             return None, None, None
@@ -398,7 +404,7 @@ class TestPostgresSchemaRepair:
 
     def test_current_schema_version_is_2(self) -> None:
         try:
-            from app.postgres_repository import _CURRENT_SCHEMA_VERSION
+            from app.postgres_repository_base import _CURRENT_SCHEMA_VERSION
 
             assert _CURRENT_SCHEMA_VERSION >= 2
         except ImportError:
