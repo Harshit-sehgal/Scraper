@@ -55,8 +55,10 @@ class URLPreviewRequest(BaseModel):
 
 
 @router.get("/api/system/storage/status")
-async def storage_status():
-    """Detailed storage backend status."""
+async def storage_status(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Detailed storage backend status. Requires operator or admin."""
     repo = get_job_repository()
     if getattr(repo, "backend", "") == "postgres":
         health = await run_in_threadpool(repo.health_check)
@@ -75,8 +77,10 @@ async def storage_status():
 
 
 @router.get("/api/system/status")
-async def system_status():
-    """Detailed system and active jobs overview.
+async def system_status(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Detailed system and active jobs overview. Requires operator or admin.
 
     In worker mode (multi-process deployment), queries the persistent
     repository for job counts rather than relying on the API process's

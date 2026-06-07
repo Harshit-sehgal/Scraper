@@ -75,7 +75,7 @@ Expected results:
 | 5 | "no HSTS on HTTP (correct)" |
 | 6 | `location: https://api.example.com/api/jobs` |
 | 7 | "no mixed-content references" |
-| 8 | 200 or 404 (certbot not running) — never 301 |
+| 8 | 200 or 404 — never 301 |
 
 ## Pitfalls to watch for
 
@@ -87,10 +87,10 @@ Expected results:
 * **HSTS preload** — submitting to the browser preload list is
   irreversible. Only enable `preload` if the team is committed to
   HTTPS for the lifetime of the domain.
-* **certbot renewal** — Automated Let's Encrypt renewal via a certbot
-  container is planned but not yet implemented in `docker-compose.prod.yml`.
-  Operators must manage certificate renewal manually (e.g. via a cron job
-  on the host, or by adding a certbot service).
+* **Certificate renewal** — Let's Encrypt certificates should be renewed
+  before expiry. Operators can use a cron job on the host, a certbot
+  container (not included in docker-compose.prod.yml), or a managed
+  certificate service from their cloud provider.
 
 ## What this document is not
 

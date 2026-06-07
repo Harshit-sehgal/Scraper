@@ -14,7 +14,6 @@ pydantic-settings reads env vars at construction time.  Once the module-level
 have no effect.  We must use monkeypatch.setattr() on the singleton.
 """
 
-import asyncio
 import contextlib
 
 import httpx
@@ -22,7 +21,7 @@ import pytest
 
 
 class LocalASGIClient:
-    """Small sync wrapper around httpx ASGITransport."""
+    """Async httpx ASGITransport test client compatible with pytest-asyncio Mode.STRICT."""
 
     def __init__(self, app) -> None:
         self.app = app
@@ -32,14 +31,14 @@ class LocalASGIClient:
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
             return await ac.request(method, url, **kwargs)
 
-    def request(self, method: str, url: str, **kwargs):
-        return asyncio.run(self._request(method, url, **kwargs))
+    async def request(self, method: str, url: str, **kwargs):
+        return await self._request(method, url, **kwargs)
 
-    def get(self, url: str, **kwargs):
-        return self.request("GET", url, **kwargs)
+    async def get(self, url: str, **kwargs):
+        return await self._request("GET", url, **kwargs)
 
-    def post(self, url: str, **kwargs):
-        return self.request("POST", url, **kwargs)
+    async def post(self, url: str, **kwargs):
+        return await self._request("POST", url, **kwargs)
 
 
 # ── Route matrix: (method, path, min_role) ────────────────────────────────
@@ -60,35 +59,40 @@ ROUTE_MATRIX = [
     ("GET", "/", "public"),
     # ── User-level routes (any valid API key) ───────────────────────────
     ("GET", "/api/jobs", "user"),
-    ("GET", "/api/system/status", "user"),
     ("GET", "/api/system/topology", "user"),
     ("GET", "/api/system/observability", "user"),
-    ("GET", "/api/scraper/config", "user"),
-    ("GET", "/api/scraper/telemetry", "user"),
-    ("GET", "/api/scraper/stats", "user"),
     ("GET", "/api/scraper/trends", "user"),
     ("GET", "/api/scraper/economics", "user"),
     ("GET", "/api/scraper/health/summary", "user"),
-    ("GET", "/api/scraper/selectors/stats", "user"),
     ("GET", "/api/operator/mode", "user"),
     ("GET", "/api/operator/dashboard", "user"),
     ("GET", "/api/operator/health", "user"),
     ("GET", "/api/operator/predictions", "user"),
     ("GET", "/api/recycle_bin", "user"),
     # ── Operator-level routes (ADMIN or OPERATOR key) ───────────────────
+    ("GET", "/api/system/status", "operator"),
+    ("GET", "/api/scraper/config", "operator"),
+    ("GET", "/api/scraper/telemetry", "operator"),
+    ("GET", "/api/scraper/stats", "operator"),
+    ("GET", "/api/scraper/selectors/stats", "operator"),
     ("POST", "/api/discover", "operator"),
     ("POST", "/api/schema/suggest", "operator"),
     ("POST", "/api/url/analyze", "operator"),
-    ("POST", "/api/scraper/selectors/cleanup", "operator"),
     ("POST", "/api/scraper/strategy/record", "operator"),
     ("POST", "/api/scraper/strategy/evolve/example.com", "operator"),
     ("POST", "/api/scraper/ml/learn", "operator"),
+    ("GET", "/api/system/storage/status", "operator"),
     # ── Admin-level routes (ADMIN key only) ─────────────────────────────
     ("DELETE", "/api/scraper/telemetry", "admin"),
     ("POST", "/api/operator/mode", "admin"),
     ("DELETE", "/api/recycle_bin", "admin"),
     ("POST", "/api/system/scheduler/step", "admin"),
     ("POST", "/api/system/refactor/compress", "admin"),
+    ("POST", "/api/scraper/selectors/cleanup", "admin"),
+    ("POST", "/api/scraper/regressions/generate-all-tests", "admin"),
+    # Note: POST /api/scraper/regressions/{entry_id}/generate-test is admin-only
+    # but cannot be tested without a real regression entry in the database.
+    # See test_route_auth_admin_key for the pattern used by other admin tests.
 ]
 
 
@@ -156,7 +160,6 @@ def _setup_settings(monkeypatch) -> None:
     `settings` singleton exists, monkeypatch.setenv() has no effect.
     We must use monkeypatch.setattr() on the singleton attributes.
     """
-    # Import the singleton (may have been created by a previous test's import)
     from app.config import settings
 
     monkeypatch.setattr(settings, "API_KEY", "test_user_key")
@@ -178,8 +181,8 @@ def client(monkeypatch):
     import sys
 
     mp = pytest.MonkeyPatch()
-    mp.setenv("DATAFORGE_STATE_FILE", "/tmp/test_auth_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
-    mp.setenv("DATAFORGE_SEMANTIC_STATE_PATH", "/tmp/test_auth_semantic.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+    mp.setenv("DATAFORGE_STATE_FILE", "/tmp/test_auth_state.json")
+    mp.setenv("DATAFORGE_SEMANTIC_STATE_PATH", "/tmp/test_auth_semantic.json")
 
     # Force ENABLE_EXPERIMENTAL_ROUTES = True
     from app.config import settings
@@ -200,54 +203,57 @@ def client(monkeypatch):
         pytest.skip(f"Could not initialize app for auth tests: {e}")
     finally:
         mp.undo()
-        for f in ["/tmp/test_auth_state.json", "/tmp/test_auth_semantic.json"]:  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+        for f in ["/tmp/test_auth_state.json", "/tmp/test_auth_semantic.json"]:
             with contextlib.suppress(OSError):
                 os.remove(f)
-        # Restore sys.modules
         for m in modules_to_pop:
             sys.modules.pop(m, None)
             if old_modules[m] is not None:
-                sys.modules[m] = old_modules[m]  # type: ignore[assignment]
+                sys.modules[m] = old_modules[m]
 
 
 # ── Parameterized route auth tests ─────────────────────────────────────
 
 
 @pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
-def test_route_auth_no_key(client, method, path, min_role) -> None:
+@pytest.mark.asyncio
+async def test_route_auth_no_key(client, method, path, min_role) -> None:
     """Without any API key, public routes work but /api/* returns 403."""
     expected = expected_status(method, path, "none", min_role)
-    response = client.request(method, path, headers=NO_AUTH)
+    response = await client.request(method, path, headers=NO_AUTH)
     if response.status_code == 422:
-        return  # Body validation failure is expected for POST without payload
+        return
     assert response.status_code == expected, f"{method} {path} (no auth): expected {expected}, got {response.status_code}"
 
 
 @pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
-def test_route_auth_user_key(client, method, path, min_role) -> None:
+@pytest.mark.asyncio
+async def test_route_auth_user_key(client, method, path, min_role) -> None:
     """With a USER-level API key, user routes work; operator/admin routes blocked."""
     expected = expected_status(method, path, "user", min_role)
-    response = client.request(method, path, headers=USER_AUTH)
+    response = await client.request(method, path, headers=USER_AUTH)
     if response.status_code == 422:
         return
     assert response.status_code == expected, f"{method} {path} (user auth): expected {expected}, got {response.status_code}"
 
 
 @pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
-def test_route_auth_operator_key(client, method, path, min_role) -> None:
+@pytest.mark.asyncio
+async def test_route_auth_operator_key(client, method, path, min_role) -> None:
     """With an OPERATOR-level API key, user + operator routes work; admin routes blocked."""
     expected = expected_status(method, path, "operator", min_role)
-    response = client.request(method, path, headers=OPERATOR_AUTH)
+    response = await client.request(method, path, headers=OPERATOR_AUTH)
     if response.status_code == 422:
         return
     assert response.status_code == expected, f"{method} {path} (operator auth): expected {expected}, got {response.status_code}"
 
 
 @pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
-def test_route_auth_admin_key(client, method, path, min_role) -> None:
+@pytest.mark.asyncio
+async def test_route_auth_admin_key(client, method, path, min_role) -> None:
     """With an ADMIN-level API key, all routes work."""
     expected = expected_status(method, path, "admin", min_role)
-    response = client.request(method, path, headers=ADMIN_AUTH)
+    response = await client.request(method, path, headers=ADMIN_AUTH)
     if response.status_code == 422:
         return
     assert response.status_code == expected, f"{method} {path} (admin auth): expected {expected}, got {response.status_code}"
@@ -256,39 +262,44 @@ def test_route_auth_admin_key(client, method, path, min_role) -> None:
 # ── Specific auth scenarios ────────────────────────────────────────────
 
 
-def test_invalid_api_key_returns_403(client) -> None:
+@pytest.mark.asyncio
+async def test_invalid_api_key_returns_403(client) -> None:
     """An unrecognized API key should be rejected with 403."""
-    response = client.get("/api/jobs", headers=make_headers(api_key="invalid_key"))
+    response = await client.get("/api/jobs", headers=make_headers(api_key="invalid_key"))
     assert response.status_code == 403, f"Expected 403, got {response.status_code}"
 
 
-def test_bearer_token_auth(client) -> None:
+@pytest.mark.asyncio
+async def test_bearer_token_auth(client) -> None:
     """Bearer token in Authorization header should work like X-API-Key."""
-    response = client.get(
+    response = await client.get(
         "/api/jobs",
         headers={"Authorization": "Bearer test_user_key"},
     )
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
 
-def test_wrong_role_details_in_response(client) -> None:
+@pytest.mark.asyncio
+async def test_wrong_role_details_in_response(client) -> None:
     """When require_role denies access, the response should indicate the required roles."""
-    response = client.post("/api/operator/mode", json={"mode": "production"}, headers=USER_AUTH)
+    response = await client.post("/api/operator/mode", json={"mode": "production"}, headers=USER_AUTH)
     assert response.status_code == 403, f"Expected 403, got {response.status_code}"
     body = response.json()
     assert "detail" in body
     assert "admin" in body["detail"].lower()
 
 
-def test_no_auth_public_routes_work(client) -> None:
+@pytest.mark.asyncio
+async def test_no_auth_public_routes_work(client) -> None:
     """Public routes outside /api/ are accessible without any authentication."""
-    response = client.get("/health")
+    response = await client.get("/health")
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
 
-def test_admin_via_x_admin_key(client) -> None:
+@pytest.mark.asyncio
+async def test_admin_via_x_admin_key(client) -> None:
     """X-Admin-Key header should also work for admin routes."""
-    response = client.post(
+    response = await client.post(
         "/api/operator/mode",
         json={"mode": "production"},
         headers={"X-Admin-Key": "test_admin_key"},
@@ -296,7 +307,8 @@ def test_admin_via_x_admin_key(client) -> None:
     assert response.status_code in (200, 422), f"Expected 200 or 422, got {response.status_code}: {response.text[:200]}"
 
 
-def test_no_keys_no_auth_required(client, monkeypatch) -> None:
+@pytest.mark.asyncio
+async def test_no_keys_no_auth_required(client, monkeypatch) -> None:
     """When no API keys are configured, /api/* routes should not require auth."""
     from app.config import settings
 
@@ -304,6 +316,5 @@ def test_no_keys_no_auth_required(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
 
-    response = client.get("/api/jobs")
-    # Should work without auth when no keys configured
+    response = await client.get("/api/jobs")
     assert response.status_code in (200, 422), f"Expected 200 or 422 (no auth, no keys), got {response.status_code}"

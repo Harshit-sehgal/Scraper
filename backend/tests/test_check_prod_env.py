@@ -483,3 +483,75 @@ class TestCheckProdEnvIntegration:
 
         env = mod.load_env_file(env_file)
         assert not mod.check_var(env, "GRAFANA_PASSWORD", required=True, validator=mod.check_grafana_password)
+
+
+class TestCheckProdEnvPgDriver:
+    """Tests for the DATAFORGE_PG_DRIVER production check.
+
+    The production image ships only psycopg3 (psycopg2 is intentionally
+    excluded). Production must explicitly set DATAFORGE_PG_DRIVER=psycopg3 so
+    the repository and worker queue resolve to the psycopg3 paths. This
+    prevents the post-build "ModuleNotFoundError: No module named psycopg2"
+    failure mode observed in the audit.
+    """
+
+    def _import_module(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "check_prod_env",
+            _SCRIPT_PATH / "check_prod_env.py",
+        )
+        assert spec is not None
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_check_pg_driver_accepts_psycopg3(self) -> None:
+        """psycopg3 should pass in production."""
+        mod = self._import_module()
+        assert mod.check_pg_driver("psycopg3")
+        assert mod.check_pg_driver(" psycopg3 ")
+
+    def test_check_pg_driver_rejects_psycopg2(self) -> None:
+        """psycopg2 must be rejected in production."""
+        mod = self._import_module()
+        assert not mod.check_pg_driver("psycopg2")
+        assert not mod.check_pg_driver("PSYCOG2")
+
+    def test_check_pg_driver_rejects_empty(self) -> None:
+        """Empty string must be rejected in production."""
+        mod = self._import_module()
+        assert not mod.check_pg_driver("")
+        assert not mod.check_pg_driver("   ")
+
+    def test_check_pg_driver_rejects_garbage(self) -> None:
+        """Any unknown value must be rejected in production."""
+        mod = self._import_module()
+        assert not mod.check_pg_driver("sqlite")
+        assert not mod.check_pg_driver("mysql")
+        assert not mod.check_pg_driver("pg8000")
+
+    def test_valid_env_with_pg_driver_psycopg3_passes(self, env_file) -> None:
+        """A fully valid env with DATAFORGE_PG_DRIVER=psycopg3 should pass."""
+        mod = self._import_module()
+        _write_env(
+            env_file,
+            {
+                "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+                "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
+                "DATAFORGE_DB_PASSWORD": "secure-password-123",
+                "DATAFORGE_STORAGE_BACKEND": "postgres",
+                "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-password-123@postgres:5432/dataforge",
+                "DATAFORGE_WORKER_QUEUE": "true",
+                "DATAFORGE_QUEUE_BACKEND": "postgres",
+                "DATAFORGE_METRICS_TOKEN": "metrics-token-a1b2c3d4e5f6a1b2",
+                "DATAFORGE_ENV": "production",
+                "DATAFORGE_PG_DRIVER": "psycopg3",
+                "GRAFANA_PASSWORD": "strong-grafana-password-123",
+            },
+        )
+
+        env = mod.load_env_file(env_file)
+        assert mod.check_var(env, "DATAFORGE_PG_DRIVER", required=True, validator=mod.check_pg_driver)

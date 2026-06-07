@@ -253,3 +253,79 @@ currently flagged by the invariant — they have already been brought into
 compliance as a side-effect of the R5 cleanup — but a future
 deep-research report may identify new top-level kernel→research edges
 that the gate will then surface as violations.
+
+## Phase C Step 8 — Workers & System Observability
+
+Completed comprehensive worker health monitoring replacing PID-based process-signal
+healthchecks with a durable DB-backed heartbeat system, plus Prometheus metrics,
+system status enhancements, and alerting.
+
+### Worker Heartbeat Health Model
+
+| What | Where | Status |
+| --- | --- | --- |
+| Heartbeat ABC methods (`record_worker_heartbeat`, `get_worker_health`, `get_all_worker_healths`) | `backend/app/storage_interface.py` | Done |
+| Schema migration v5 (`worker_heartbeats` table) | `backend/app/postgres_repository_base.py`, `backend/app/job_store.py` | Done |
+| Postgres heartbeat implementation | `backend/app/postgres_repository_base.py` | Done |
+| SQLite heartbeat implementation | `backend/app/job_store.py` | Done |
+| `HeartbeatManager` class (15s interval, 60s TTL) | `backend/app/worker_heartbeat.py` (NEW) | Done |
+| Standalone healthcheck CLI | `scripts/worker_healthcheck.py` (NEW) | Done |
+| Integrated into `run_worker.py` (skipped in `--once` mode) | `scripts/run_worker.py` | Done |
+| Docker healthcheck updated to use DB-backed check | `docker-compose.prod.yml` | Done |
+| Contract smoke tests (5 test cases) | `backend/tests/test_contract_smoke.py` | Done |
+
+### Repository-Backed System Status
+
+| What | Where | Status |
+| --- | --- | --- |
+| Worker-mode system status queries repo (not in-memory) | `backend/app/routers/system.py` | Done |
+| New response fields: `worker_mode`, `recycle_bin_count`, `workers`, `queue` | `backend/app/routers/system.py` | Done |
+| Updated API regression tests | `backend/tests/test_api_regressions.py` | Done |
+
+### Worker Heartbeat Prometheus Metrics
+
+| Metric | Type | Labels |
+| --- | --- | --- |
+| `dataforge_worker_heartbeat_alive` | Gauge | worker_id, hostname |
+| `dataforge_worker_heartbeat_age_seconds` | Gauge | worker_id, hostname |
+
+Both metrics appear in `_render_basic_metrics_text()` and the `/metrics`
+prometheus_client endpoint. 11 metrics tests pass including heartbeat coverage.
+
+### Prometheus Alert Rule
+
+| Rule | Expression | Severity |
+| --- | --- | --- |
+| `WorkerHeartbeatStale` | `dataforge_worker_heartbeat_alive == 0 for 2m` | critical |
+
+Added to `prometheus_alerts.yml` with a clarifying comment about adjusting `for`
+duration if the worker TTL is increased beyond the 60s default.
+
+### Worker ID Deduplication & Code Quality
+
+| What | Where | Status |
+| --- | --- | --- |
+| Shared `resolve_worker_id()` extracted from both callers | `backend/app/utils/worker_id.py` (NEW) | Done |
+| Package init for `app.utils` | `backend/app/utils/__init__.py` (NEW) | Done |
+| `scripts/worker_healthcheck.py` imports from shared utility | `scripts/worker_healthcheck.py` | Done |
+| Unit tests for `resolve_worker_id()` (3 tests) | `backend/tests/test_worker_id.py` (NEW) | Done |
+
+### Pre-existing Test Fixes (Phase C Refactoring Compatibility)
+
+Fixed 9 test breakages from the Phase C main.py refactoring:
+- Re-added backward-compatible re-exports to `scraper.py`
+- Cleaned unused imports from `scraper_postprocess.py`
+- Fixed monkeypatch import-site references in `test_ga_hardening.py` and `test_production_hardening.py`
+- Fixed import paths in `test_psycopg3_repository.py` and `test_contact_enrichment.py`
+- Removed stale `.pyc` file
+
+### Validation
+
+| Check | Result |
+| --- | --- |
+| Full test suite | 2829 passed, 5 failed (pre-existing operator tests), 96 skipped |
+| Contract smoke tests | 12/12 pass |
+| Metrics tests | 11/11 pass |
+| Worker ID unit tests | 3/3 pass |
+| Compilation | Passes |
+| Flaky heartbeat test | Fixed (was intermittently failing due to shared SQLite file between tests)

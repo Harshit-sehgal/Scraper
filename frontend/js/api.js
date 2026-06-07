@@ -168,4 +168,4 @@ export async function apiFetch(url, options = {}) {
     }
 }
 
-export { getApiKey, isKeyModalVisible, closeKeyModal, saveKeyFromModal, clearApiKey };
+export { getApiKey, setApiKey, isKeyModalVisible, closeKeyModal, saveKeyFromModal, clearApiKey };

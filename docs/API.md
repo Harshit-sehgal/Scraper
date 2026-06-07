@@ -51,17 +51,13 @@ This route list was generated from the FastAPI app during the audit. Production 
 
 ## Scraper/Telemetry Routes
 
-Most scraper mutation or diagnostic routes should be operator/admin only. Read-only telemetry routes still require API authentication when keys are configured.
+All scraper routes require operator or admin access. Read-only routes (GET) and mutation routes (POST/DELETE) are both protected by `require_role` with appropriate role restrictions.
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
 | GET | `/api/scraper/browser` | Operator or admin |
 | GET | `/api/scraper/config` | Operator or admin |
-| GET | `/api/scraper/economics` | Operator or admin |
-| GET | `/api/scraper/health/summary` | Operator or admin |
 | GET | `/api/scraper/health/legacy` | Operator or admin |
-| GET | `/api/scraper/health/domains` | Operator or admin |
-| GET | `/api/scraper/health/domain/{domain}` | Operator or admin |
 | GET | `/api/scraper/memory/stats` | Operator or admin |
 | GET | `/api/scraper/regressions` | Operator or admin |
 | GET | `/api/scraper/regressions/{entry_id}` | Operator or admin |
@@ -69,47 +65,25 @@ Most scraper mutation or diagnostic routes should be operator/admin only. Read-o
 | GET | `/api/scraper/selectors/low-confidence` | Operator or admin |
 | GET | `/api/scraper/selectors/stats` | Operator or admin |
 | GET | `/api/scraper/stats` | Operator or admin |
-| GET | `/api/scraper/strategy/domain/{domain}` | Operator or admin |
-| GET | `/api/scraper/strategy/recommend/{domain}` | Operator or admin |
-| GET | `/api/scraper/strategy/report` | Operator or admin |
 | GET | `/api/scraper/telemetry` | Operator or admin |
-| GET | `/api/scraper/trends` | Operator or admin |
-| GET | `/api/scraper/trends/{domain}` | Operator or admin |
-| GET | `/api/scraper/ml/optimize/domain/{domain}/history` | Operator or admin |
 | DELETE | `/api/scraper/telemetry` | Admin |
 | POST | `/api/scraper/diagnostics` | Operator or admin |
 | POST | `/api/scraper/regressions/generate-all-tests` | Admin |
 | POST | `/api/scraper/regressions/{entry_id}/generate-test` | Admin |
 | POST | `/api/scraper/selectors/cleanup` | Admin |
-| POST | `/api/scraper/strategy/evolve/{domain}` | Admin |
-| POST | `/api/scraper/strategy/record` | Operator or admin |
-| POST | `/api/scraper/ml/learn` | Admin |
-| POST | `/api/scraper/ml/optimize/domain/{domain}` | Admin |
 
 ## Operator and System Routes
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
-| GET | `/api/operator/dashboard` | Operator or admin |
-| GET | `/api/operator/health` | Operator or admin |
-| GET | `/api/operator/mode` | Operator or admin |
-| GET | `/api/operator/predictions` | Operator or admin |
-| GET | `/api/operator/predictions/{domain}` | Operator or admin |
-| POST | `/api/operator/mode` | Admin |
 | GET | `/api/system/status` | Operator or admin |
 | GET | `/api/system/storage/status` | Operator or admin |
 | GET | `/api/system/diagnostics/export` | Admin |
-| POST | `/api/system/csp-violations` | Unauthenticated (browser-reported) |
-
-Admin-only routes include system merge, scheduler step, refactor compression, diagnostics export, and operator mode changes.
-
-## Metrics
-
-`GET /metrics` is protected by `DATAFORGE_METRICS_TOKEN` if configured. Local Compose verified public Nginx returns 404 for `/metrics`, while Prometheus scrapes `http://dataforge:8000/metrics` internally with the configured bearer token. Repeat this check behind the target ingress.
+| POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
 
 ## Batch Export
 
-`POST /api/exports/batch` — Export results from multiple jobs in a single request.
+`POST /api/exports/batch` — Export results from multiple jobs in a single request. Operator or admin.
 
 | Property | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -214,3 +188,67 @@ default (operators can call `prune_idempotency_keys(older_than_days=...)`).
 This is a best-effort deduplication mechanism for client retry loops.
 A conflicting `request_fingerprint` does not currently cause a
 409; the latest record wins.
+
+## Experimental / Research Routes (Gated)
+
+The following routes are backed by research-shell modules and are **only available when `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`**. They are not mounted in the default app configuration. See `backend/app/routers/experimental.py` for details.
+
+### Operator Mode & Dashboard
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/operator/dashboard` | Authenticated user |
+| GET | `/api/operator/health` | Authenticated user |
+| GET | `/api/operator/mode` | Authenticated user |
+| GET | `/api/operator/predictions` | Authenticated user |
+| GET | `/api/operator/predictions/{domain}` | Authenticated user |
+| POST | `/api/operator/mode` | Admin |
+
+### Scraper Research & ML
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/scraper/economics` | Authenticated user |
+| GET | `/api/scraper/health/summary` | Authenticated user |
+| GET | `/api/scraper/health/domains` | Authenticated user |
+| GET | `/api/scraper/health/domain/{domain}` | Authenticated user |
+| GET | `/api/scraper/strategy/domain/{domain}` | Authenticated user |
+| GET | `/api/scraper/strategy/recommend/{domain}` | Authenticated user |
+| GET | `/api/scraper/strategy/report` | Authenticated user |
+| GET | `/api/scraper/trends` | Authenticated user |
+| GET | `/api/scraper/trends/{domain}` | Authenticated user |
+| GET | `/api/scraper/ml/optimize/domain/{domain}/history` | Authenticated user |
+| POST | `/api/scraper/strategy/evolve/{domain}` | Operator or admin |
+| POST | `/api/scraper/strategy/record` | Operator or admin |
+| POST | `/api/scraper/ml/learn` | Operator or admin |
+| POST | `/api/scraper/ml/optimize/domain/{domain}` | Operator or admin |
+
+### System Research Endpoints
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/system/topology` | Authenticated user |
+| GET | `/api/system/crystalline` | Authenticated user |
+| GET | `/api/system/export/knowledge` | Authenticated user |
+| GET | `/api/system/search` | Authenticated user |
+| GET | `/api/system/observability` | Authenticated user |
+| GET | `/api/system/history/topology` | Authenticated user |
+| GET | `/api/system/agency` | Authenticated user |
+| GET | `/api/system/replay/status` | Authenticated user |
+| GET | `/api/system/replay/chain` | Authenticated user |
+| GET | `/api/system/replay/events` | Authenticated user |
+| POST | `/api/system/scheduler/step` | Admin |
+| POST | `/api/system/refactor/compress` | Admin |
+| GET | `/api/system/domain-policy` | Authenticated user |
+| GET | `/api/system/acquisition/telemetry` | Authenticated user |
+| POST | `/api/system/merge/knowledge` | Admin |
+
+Enable experimental routes:
+```bash
+# Set this environment variable before starting the server
+export DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true
+```
+
+## Metrics
+
+`GET /metrics` is protected by `DATAFORGE_METRICS_TOKEN` if configured. Local Compose verified public Nginx returns 404 for `/metrics`, while Prometheus scrapes `http://dataforge:8000/metrics` internally with the configured bearer token. Repeat this check behind the target ingress.

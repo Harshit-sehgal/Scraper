@@ -83,6 +83,7 @@ def _live_routes() -> set[tuple[str, str]]:
             "PYTHONPATH": "backend",
             "DATAFORGE_DOTENV_PATH": "/dev/null",
             "DATAFORGE_STORAGE_BACKEND": "sqlite",
+            "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
         },
     )
     if proc.returncode != 0:

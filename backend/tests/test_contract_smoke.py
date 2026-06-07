@@ -286,11 +286,19 @@ def test_worker_healthcheck_docker_compose_reference() -> None:
 
 def test_worker_heartbeat_manager_initializes_worker_id() -> None:
     """HeartbeatManager must produce a valid worker_id and start/stop cleanly."""
+    import socket
+
     from app.worker_heartbeat import HeartbeatManager
 
     mgr = HeartbeatManager(interval=60.0, ttl=120.0)
     assert mgr.worker_id, "HeartbeatManager must have a non-empty worker_id"
-    assert "-" in mgr.worker_id, "worker_id should contain hostname-PID format"
+    assert mgr.worker_id == socket.gethostname(), (
+        f"worker_id should match hostname ({socket.gethostname()!r}), "
+        f"got {mgr.worker_id!r}. "
+        "HeartbeatManager resolves worker_id via resolve_worker_id() which "
+        "returns the hostname (not hostname-PID) so the Docker healthcheck "
+        "(a separate process with a different PID) can look up the same row."
+    )
     assert mgr.interval == 60.0
 
     # Start and stop should not raise
@@ -311,6 +319,22 @@ def test_worker_heartbeat_can_record_and_check(monkeypatch) -> None:
 
     repo = get_job_repository()
     worker_id = "test-worker-123"
+
+    # Wipe any stale heartbeat row that may persist in the shared on-disk
+    # SQLite database from a prior test (reset_repository() only clears the
+    # Python-level repo singleton, not the database file itself).
+    from app.job_store import _DB_LOCK, _get_connection
+
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            conn.execute(
+                "DELETE FROM worker_heartbeats WHERE worker_id = ?",
+                (worker_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     # Initially, no heartbeat → not alive
     health = repo.get_worker_health(worker_id, ttl_seconds=60)
