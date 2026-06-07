@@ -129,4 +129,28 @@ describe("renderDomainHealth", () => {
     const fills = el.querySelectorAll(".dash-health-fill");
     expect(fills[0].style.width).toBe("0%");
   });
+
+  it("handles partial sub-object with missing fields", () => {
+    renderDomainHealth({ domains: { total_monitored: 5 } });
+    const el = document.getElementById("dash-domains");
+    // Missing healthy/degrading/unhealthy/critical should default to 0
+    expect(el.innerHTML).toContain("5");
+    expect(el.innerHTML).toContain("0%");
+  });
+
+  it("renders all domains critical edge case", () => {
+    renderDomainHealth({ domains: { total_monitored: 10, healthy: 0, degrading: 0, unhealthy: 0, critical: 10 } });
+    const el = document.getElementById("dash-domains");
+    expect(el.innerHTML).toContain(">10<");
+    expect(el.innerHTML).toContain("0%");
+    const fills = el.querySelectorAll(".dash-health-fill");
+    // 0% healthy + 0% degrading + 100% bad (unhealthy + critical = 10/10)
+    expect(fills[2].style.width).toBe("100%");
+  });
+
+  it("renders 100% health rate", () => {
+    renderDomainHealth({ domains: { total_monitored: 25, healthy: 25, degrading: 0, unhealthy: 0, critical: 0 } });
+    const el = document.getElementById("dash-domains");
+    expect(el.innerHTML).toContain("100%");
+  });
 });
