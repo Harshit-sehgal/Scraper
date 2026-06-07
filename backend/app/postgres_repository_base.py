@@ -730,6 +730,25 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 out.append({"_unparseable": row["payload"]})
         return out
 
+    def count_results(self, job_id: str) -> int:
+        """Return the total number of result rows for a job.
+
+        This is a separate, indexed ``COUNT(*)`` query so the pagination
+        ``total`` field on ``GET /api/jobs/{id}/results`` is accurate even
+        when only one page of results is fetched.
+        """
+        self._ensure()
+        try:
+            with self._conn() as conn:
+                row = self._fetch_one(
+                    conn,
+                    "SELECT COUNT(*) AS cnt FROM job_results WHERE job_id = %s",
+                    (job_id,),
+                )
+            return int(row["cnt"]) if row else 0
+        except Exception:
+            return 0
+
     def read_events(self, job_id: str, limit: int = 200, offset: int = 0, level_prefix: str | None = None) -> list[dict]:
         self._ensure()
         safe_limit = max(1, min(int(limit), 1000))

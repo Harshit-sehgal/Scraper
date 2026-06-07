@@ -29,8 +29,14 @@ logger = logging.getLogger(__name__)
 
 def verify_experimental_enabled() -> None:
     if not settings.ENABLE_EXPERIMENTAL_ROUTES:
+        # Use 403 (not 404) so callers can distinguish "feature is
+        # disabled by configuration" from "path does not exist". A 404
+        # makes monitoring and operator probes think the deployment is
+        # broken rather than that a feature flag is off. The
+        # ``X-DataForge-Feature-Flag`` header is added by the
+        # ``feature_flag_headers`` middleware on the response.
         raise HTTPException(
-            status_code=404,
+            status_code=403,
             detail=(
                 "Experimental / research routes are disabled in this environment. "
                 "Set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable them."

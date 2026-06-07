@@ -183,6 +183,19 @@ class JobRepository(ABC):
         caller can fall back to the ``Job.results`` list.
         """
 
+    def count_results(self, job_id: str) -> int:
+        """Return the total number of result rows for a job.
+
+        Subclasses that back the storage-split (v4+) table MUST override
+        this so the pagination ``total`` field on ``GET /api/jobs/{id}/results``
+        is accurate. The base implementation raises ``NotImplementedError``;
+        older backends that read from ``Job.results`` will not reach this
+        code path because the caller falls back to ``len(job.results)`` first.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement count_results()",
+        )
+
     @abstractmethod
     def save_single(self, job: Job) -> None:
         """Atomically upsert or save a single job's status, progress, or logs."""
@@ -240,7 +253,14 @@ class JobRepository(ABC):
 
         Upserts the worker's heartbeat timestamp so the healthcheck
         can verify the worker is alive by checking recency.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently dropping heartbeats.
         """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement record_worker_heartbeat()",
+        )
 
     def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
         """Return health info for a specific worker.
@@ -251,22 +271,26 @@ class JobRepository(ABC):
         - hostname: str | None
         - pid: int | None
         - worker_id: str
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly.
         """
-        return {
-            "alive": False,
-            "worker_id": worker_id,
-            "last_heartbeat": None,
-            "hostname": None,
-            "pid": None,
-        }
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement get_worker_health()",
+        )
 
     def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict]:
         """Return health info for all registered workers.
 
         Returns a list of dicts, each with the same shape as
         :meth:`get_worker_health`.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly.
         """
-        return []
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement get_all_worker_healths()",
+        )
 
     # ─── Individual repository operations (avoid full-state rewrites) ────
 
