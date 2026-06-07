@@ -284,7 +284,7 @@ export async function clearTerminalJobs() {
 
 // ─── Filtering ───
 
-function applyJobFilters(jobs) {
+export function applyJobFilters(jobs) {
   const q = (document.getElementById("jobs-search")?.value || "").trim().toLowerCase();
   const status = (document.getElementById("jobs-status-filter")?.value || "all").toLowerCase();
 
@@ -309,7 +309,7 @@ export function onJobsFilterChanged() {
 
 // ─── Rendering ───
 
-function updateKPIs(jobs) {
+export function updateKPIs(jobs) {
   document.getElementById("kpi-total").textContent = jobs.length;
   document.getElementById("kpi-running").textContent = jobs.filter(
     (j) => j.status === "running" || j.status === "discovering" || j.status === "pending",
