@@ -406,7 +406,7 @@ class TopologyMixin:
 
                 for role in reng.manifold:
                     if role not in anchored_roles:
-                        noise = [random.uniform(-0.1, 0.1) for _ in range(16)]  # nosec B311
+                        noise = [random.uniform(-0.1, 0.1) for _ in range(16)]  # nosec B311  # noqa: S311
                         self._manifold.apply_force_to_manifold(role, noise)
             except Exception as e:
                 logger.warning("Manifold perturbation failed: %s", e)

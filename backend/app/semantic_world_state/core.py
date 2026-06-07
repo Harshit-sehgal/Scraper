@@ -7,12 +7,12 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
 from app.invariant_firewall import requires_invariants
-from app.semantic_world_state.events import EventMixin
+from app.semantic_world_state.events import EventMixin  # type: ignore[attr-defined]
 from app.semantic_world_state.locks import NonBlockingRLock
-from app.semantic_world_state.memory import MemoryMixin
-from app.semantic_world_state.metrics import MetricsMixin
-from app.semantic_world_state.serialization import SerializationMixin
-from app.semantic_world_state.topology import TopologyMixin
+from app.semantic_world_state.memory import MemoryMixin  # type: ignore[attr-defined]
+from app.semantic_world_state.metrics import MetricsMixin  # type: ignore[attr-defined]
+from app.semantic_world_state.serialization import SerializationMixin  # type: ignore[attr-defined]
+from app.semantic_world_state.topology import TopologyMixin  # type: ignore[attr-defined]
 from app.transaction_context import active_transaction
 
 if TYPE_CHECKING:

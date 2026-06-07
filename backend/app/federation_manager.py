@@ -249,10 +249,9 @@ class FederationManager:
 
                     # 3. Apply Deterministic Multi-Shard Consensus Policies
                     remote_wins = False
-                    if r_epoch > l_epoch:
-                        remote_wins = True
-                    elif r_epoch == l_epoch and (
-                        r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node)))
+                    if r_epoch > l_epoch or (
+                        r_epoch == l_epoch
+                        and (r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))))
                     ):
                         remote_wins = True
 

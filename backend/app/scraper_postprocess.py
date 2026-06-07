@@ -15,15 +15,15 @@ from typing import TYPE_CHECKING, Any
 from app.compound_record_assembler import assemble_compound_records
 from app.config import settings
 from app.data_utils import _limit_source_records as _base_limit_source_records
-from app.extraction_orchestrator import ExtractionResult
 from app.extraction_provenance import ProvenanceBuilder, enrich_records_with_provenance
 from app.html_utils import _is_empty_value
 from app.metrics_collector import record_extraction_method
-from app.scraper_models import ScrapeAttemptResult
 from app.selector_engine import build_selector_field_metadata
 
 if TYPE_CHECKING:
+    from app.extraction_orchestrator import ExtractionResult
     from app.models import SchemaField
+    from app.scraper_models import ScrapeAttemptResult
 
 logger = logging.getLogger(__name__)
 

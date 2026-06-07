@@ -30,7 +30,7 @@ if BACKEND_DIR not in sys.path:
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec B603 — hardcoded command vectors (docker, curl, ls)
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec B603 — hardcoded command vectors (docker, curl, ls)  # noqa: S603
         return res.returncode, res.stdout.strip() or res.stderr.strip()
     except Exception as e:
         return -1, str(e)
@@ -177,8 +177,8 @@ def main() -> int:
     ingress_passed = True
     for url, expected_code, desc in test_urls:
         try:
-            req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 — hardcoded local probe URLs
+            req = urllib.request.Request(url, method="GET")  # noqa: S310
+            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 — hardcoded local probe URLs  # noqa: S310
                 status = resp.status
         except urllib.error.HTTPError as e:
             status = e.code

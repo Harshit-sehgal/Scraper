@@ -281,11 +281,11 @@ class StrategyEvolutionEngine:
         # Exploration vs exploitation is only useful after the cold-start safe
         # path has gathered enough samples. Exploring before that can choose a
         # non-browser fetch for JavaScript-backed pages and miss network data.
-        if random.random() < self.exploration_probability:  # nosec B311
+        if random.random() < self.exploration_probability:  # nosec B311  # noqa: S311
             # Randomly pick a strategy we haven't failed too much on
             untried = [s for s in FetchStrategy if state.strategies[s].failure_count < 3]
             if untried:
-                selected = random.choice(untried)  # nosec B311
+                selected = random.choice(untried)  # nosec B311  # noqa: S311
                 return StrategyRecommendation(
                     recommended_strategy=selected,
                     alternatives=[FetchStrategy.PLAYWRIGHT_FULL],

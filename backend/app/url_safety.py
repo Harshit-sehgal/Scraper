@@ -27,7 +27,7 @@ def is_safe_ip(ip_str: str) -> bool:
         # Check standard unsafe ranges plus non-globally-routable ranges.
         # `is_global` rejects documentation, benchmark, and IETF-assigned
         # blocks that the other predicates do not always cover.
-        return not (
+        return not (  # noqa: TRY300
             ip.is_private
             or ip.is_loopback
             or ip.is_link_local
@@ -112,7 +112,7 @@ def validate_public_http_url(url: str) -> None:
             return
 
     # 2. Reject explicit loopback / internal names
-    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104 — rejecting 0.0.0.0, not binding to it
+    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # noqa: S104  # nosec B104 — rejecting 0.0.0.0, not binding to it
         msg = f"URL hostname '{hostname}' is a restricted local loopback target."
         _record_ssrf_reject("loopback_name")
         raise ValueError(msg)
@@ -231,7 +231,7 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         self,
         host: str,
         port: int,
-        timeout: float | None = None,
+        timeout: float | None = None,  # noqa: ASYNC109
         local_address: str | None = None,
         socket_options: Any = None,
     ) -> httpcore.AsyncNetworkStream:
@@ -267,7 +267,7 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
     async def connect_unix_socket(
         self,
         path: str,  # noqa: ARG002, RUF100
-        timeout: float | None = None,  # noqa: ARG002, RUF100
+        timeout: float | None = None,  # noqa: ARG002, ASYNC109, RUF100
         socket_options: Any = None,  # noqa: ARG002, RUF100
     ) -> httpcore.AsyncNetworkStream:
         msg = "UNIX socket connections are disabled for security reasons."
@@ -624,7 +624,7 @@ def verify_ssrf_self_check() -> dict:
             )
             return diag
 
-        return diag
+        return diag  # noqa: TRY300
     except Exception as e:
         diag["ok"] = False
         diag["reason"] = f"Self-check raised: {e}"

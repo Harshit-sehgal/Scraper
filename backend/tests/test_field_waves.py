@@ -21,7 +21,9 @@ def clean_state() -> None:
     # Re-setup scheduler subscription
     from app.graph_update_scheduler import get_scheduler
 
-    get_scheduler()._setup_subscriptions()
+    scheduler = get_scheduler()
+    if scheduler:
+        scheduler._setup_subscriptions()
 
 
 @pytest.mark.asyncio

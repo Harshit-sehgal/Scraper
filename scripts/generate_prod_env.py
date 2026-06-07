@@ -7,6 +7,7 @@ unique, randomly generated cryptographic keys and passwords, preventing default
 placeholders from leaking into deployment.
 """
 
+import contextlib
 import os
 import secrets
 import sys
@@ -123,10 +124,8 @@ GRAFANA_PASSWORD={grafana_password}
             # If the write itself fails, close and unlink the
             # half-written file so we don't leave a 0o600 stub
             # with a misleading ``.env.production`` next to it.
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(TARGET_FILE)
-            except OSError:
-                pass
             raise
         print(f"\n[SUCCESS] Secure production configuration successfully written to '{TARGET_FILE}'.")
         print("          File permissions set to owner read/write only (chmod 600).")

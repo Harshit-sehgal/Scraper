@@ -112,7 +112,7 @@ class ChaosSimulator:
         self.failure_history.append(impact_metrics)
         return impact_metrics
 
-    async def _wait_for_recovery(self, failure_mode: FailureMode, timeout: float = 60.0) -> bool:
+    async def _wait_for_recovery(self, failure_mode: FailureMode, timeout: float = 60.0) -> bool:  # noqa: ASYNC109
         """Wait for system to recover from failure."""
         start = time.time()
         while time.time() - start < timeout:

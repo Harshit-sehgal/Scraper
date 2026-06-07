@@ -236,7 +236,7 @@ class BrowserPool:
         """Return a randomized browser user agent."""
         import random
 
-        return random.choice(settings.STEALTH_UA_POOL.split(","))  # nosec B311
+        return random.choice(settings.STEALTH_UA_POOL.split(","))  # nosec B311  # noqa: S311
 
     async def check_health(self) -> bool:
         """Perform a basic health check on the browser instance."""
@@ -249,7 +249,7 @@ class BrowserPool:
             page = await ctx.new_page()
             await page.close()
             await ctx.close()
-            return True
+            return True  # noqa: TRY300
         except Exception as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False

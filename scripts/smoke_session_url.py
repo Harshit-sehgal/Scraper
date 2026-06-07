@@ -59,7 +59,7 @@ async def fetch_and_capture(url: str) -> tuple[str, list[str | dict], dict]:
                         # Best-effort capture: non-JSON bodies are not JSON
                         # payloads. Dropping them is the intended behavior.
                         pass
-            except Exception:  # nosec B110 — network/transport errors on a single response must not abort the whole scrape
+            except Exception:  # nosec B110 — network/transport errors on a single response must not abort the whole scrape  # noqa: S110
                 # Best-effort capture: network/transport errors on a single
                 # response should not abort the whole scrape.
                 pass
@@ -86,10 +86,7 @@ def check_secret_leakage(records: list[dict], field_map: typing.Any) -> bool:
     data_to_serialize = {"records": records, "field_map": {k: v.__dict__ for k, v in field_map.items()} if field_map else {}}
     serialized = json.dumps(data_to_serialize).lower()
     secret_patterns = ("bearer", "csrf", "session_id", "api_key", "password", "secret", "token", "jwt", "cookie")
-    for pattern in secret_patterns:
-        if pattern in serialized:
-            return True
-    return False
+    return any(pattern in serialized for pattern in secret_patterns)
 
 
 async def smoke(url: str, fields_str: str | None = None):

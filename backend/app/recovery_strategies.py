@@ -17,7 +17,7 @@ import asyncio
 import logging
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.failure_classification import FailureCategory, FailureClassification
 
@@ -112,7 +112,7 @@ class RecoveryStrategist:
     """Generates tailored recovery plans for failures."""
 
     # Per-failure-type recovery escalation paths
-    RECOVERY_PATHS: dict[FailureCategory, dict] = {
+    RECOVERY_PATHS: ClassVar[dict[FailureCategory, dict]] = {
         # ── Fetch / Transport failures ────────────────────────────────
         FailureCategory.HYDRATION_FAILURE: {
             "primary": RecoveryAction.INCREASE_HYDRATION_WAIT,

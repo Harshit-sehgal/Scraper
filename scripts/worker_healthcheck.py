@@ -95,7 +95,7 @@ def _check_db_heartbeat(worker_id: str, ttl_seconds: int) -> tuple[bool, str]:
 
         repo = get_job_repository()
         health = repo.get_worker_health(worker_id, ttl_seconds=ttl_seconds)
-    except Exception as exc:  # noqa: BLE001 — healthcheck must not crash
+    except Exception as exc:
         return False, f"db heartbeat check raised: {exc}"
     if health.get("alive"):
         return True, ""

@@ -49,7 +49,7 @@ def _color(val: float, low: float, high: float, green: str = "", red: str = "") 
     """Color a value red if above high, green if below low."""
     if val <= low:
         return f"{green}{val}{red}" if green else str(val)
-    elif val >= high:
+    if val >= high:
         return f"{red}{val}{green}" if red else str(val)
     return str(val)
 
@@ -408,7 +408,7 @@ def run_test_job(mode: str = "manual"):
 # ─── List Jobs ─────────────────────────────────────────────────────────────
 
 
-def list_jobs(limit: int = 10):
+def list_jobs(limit: int = 10):  # noqa: ARG001
     """List recent scraping jobs."""
     _print_header("RECENT JOBS")
     data = api_get("/api/system/status")
@@ -460,7 +460,7 @@ def run_test_suite():
     _print_header("TEST SUITE")
     import subprocess  # nosec B404 — operational script, hardcoded command vector
 
-    result = subprocess.run(  # nosec B603 — hardcoded pytest invocation, no shell, no untrusted input
+    result = subprocess.run(  # nosec B603 # noqa: S603
         [sys.executable, "-m", "pytest", "backend/tests/", "-v", "--tb=short", "-x"],
         capture_output=True,
         text=True,

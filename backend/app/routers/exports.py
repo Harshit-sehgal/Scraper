@@ -152,7 +152,7 @@ def create_exports_router(jobs_store: dict):
             raise
         else:
             _record_export_outcome("csv", True)
-            return
+            return None
 
     async def _export_csv_impl(job_id: str):
         if job_id not in jobs_store:
@@ -251,7 +251,7 @@ def create_exports_router(jobs_store: dict):
             raise
         else:
             _record_export_outcome("json", True)
-            return
+            return None
 
     async def _export_json_impl(job_id: str):
         if job_id not in jobs_store:
@@ -453,7 +453,7 @@ def create_exports_router(jobs_store: dict):
             raise
         else:
             _record_export_outcome(f"batch_{body.format}", True)
-            return
+            return None
 
     async def _batch_export_impl(body: BatchExportRequest):
         fmt = body.format.lower()
@@ -649,10 +649,7 @@ def create_exports_router(jobs_store: dict):
             sheet_name = base
             suffix = 2
             while sheet_name in used_flatten_names:
-                if suffix == 2:
-                    candidate = f"{base[: 31 - 4]} (2)"
-                else:
-                    candidate = f"{base[: 31 - 4]} ({suffix})"
+                candidate = f"{base[: 31 - 4]} (2)" if suffix == 2 else f"{base[: 31 - 4]} ({suffix})"
                 sheet_name = candidate[:31]
                 suffix += 1
                 if suffix > 999:
@@ -675,10 +672,7 @@ def create_exports_router(jobs_store: dict):
                 sheet_name = base
                 suffix = 2
                 while sheet_name in used_sheet_names or sheet_name == "Sheet":
-                    if suffix == 2 and base != "Sheet":
-                        candidate = f"{base[: 31 - 4]} (2)"
-                    else:
-                        candidate = f"{base[: 31 - 4]} ({suffix})"
+                    candidate = f"{base[: 31 - 4]} (2)" if suffix == 2 and base != "Sheet" else f"{base[: 31 - 4]} ({suffix})"
                     sheet_name = candidate[:31]
                     suffix += 1
                     if suffix > 999:

@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import asyncio
+import contextlib
 import logging
 import os
 import signal
@@ -121,10 +122,8 @@ async def main():
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
+        with contextlib.suppress(ValueError, RuntimeError):
             loop.add_signal_handler(sig, _signal_handler)
-        except (ValueError, RuntimeError):
-            pass
 
     await queue.start()
     logger.info(
@@ -162,13 +161,13 @@ async def main():
                 # negative timeout on the queued task (e.g. an
                 # older row in the DB with ``timeout_seconds=0``).
                 if not task.timeout_seconds or task.timeout_seconds <= 0:
-                    raise ValueError(f"task {task.id} has non-positive timeout_seconds={task.timeout_seconds!r}")
+                    raise ValueError(f"task {task.id} has non-positive timeout_seconds={task.timeout_seconds!r}")  # noqa: TRY003, TRY301
                 result = await asyncio.wait_for(handler(task), timeout=task.timeout_seconds)
                 if result is False:
                     await queue.fail(task.id, "Handler returned False", retry=True)
                 else:
                     await queue.complete(task.id, result)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 await queue.fail(task.id, f"{type(exc).__name__}: {exc}", retry=True)
         logger.info("Drain mode processed %d task(s).", processed)
     else:

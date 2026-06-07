@@ -145,9 +145,8 @@ def check_var(
             if hint:
                 print(f"          Hint: {hint}")
             return False
-        else:
-            print(f"  [INFO]  {name} is not set (optional).")
-            return True
+        print(f"  [INFO]  {name} is not set (optional).")
+        return True
 
     if validator and not validator(value):
         print(f"  [FAIL]  {name} = {_mask_value(name, value)!r} failed validation.")
@@ -477,7 +476,7 @@ def check_postgres_connection(db_url: str) -> bool:
             cursor.close()
             conn.close()
             print("  [OK]    Postgres is reachable and responding.")
-            return True
+            return True  # noqa: TRY300
         except OperationalError as e:
             print(f"  [FAIL]  Could not connect to Postgres: {e}")
             print("          Ensure Postgres service is running and accessible at the configured URL.")
@@ -494,12 +493,11 @@ def check_postgres_connection(db_url: str) -> bool:
         print("          Install with: pip install 'psycopg[binary]>=3.2'")
         return True
     try:
-        with psycopg.connect(db_url, connect_timeout=5) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
+        with psycopg.connect(db_url, connect_timeout=5) as conn, conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
         print("  [OK]    Postgres is reachable and responding.")
-        return True
+        return True  # noqa: TRY300
     except psycopg.OperationalError as e:
         print(f"  [FAIL]  Could not connect to Postgres: {e}")
         print("          Ensure Postgres service is running and accessible at the configured URL.")
@@ -613,9 +611,8 @@ def main() -> int:
     if all_pass:
         print("Result: required production environment checks passed.")
         return 0
-    else:
-        print("Result: ONE OR MORE CHECKS FAILED — fix the issues above before deploying.")
-        return 1
+    print("Result: ONE OR MORE CHECKS FAILED — fix the issues above before deploying.")
+    return 1
 
 
 if __name__ == "__main__":

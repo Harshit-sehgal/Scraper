@@ -49,11 +49,16 @@ line-length = 130
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B"]
+select = [
+    "E", "F", "W", "I", "B",
+    "S", "RUF", "SIM", "TRY", "RET", "ARG", "ASYNC", "TCH",
+]
 ignore = ["E203", "E501", "B904", "B905", "B007", "B027", "B008", "E402", "B023"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"backend/tests/*" = ["S101", "ARG001", "ARG002", "ARG005", "TRY003", "S108", "S106", "S105", "S311", "S113", "S310", "S603", "S104", "RUF059", "RUF043", "RUF012", "RUF003", "SIM117", "SIM102", "SIM118", "SIM105", "TRY300", "TRY301", "TRY002", "ASYNC240", "ASYNC230", "ASYNC109", "TC003", "TC002"]
+"backend/benchmarks/*" = ["S101", "ARG001", "ARG005", "S110", "S311"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -64,17 +69,10 @@ warn_unused_ignores = false
 check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
-[[tool.mypy.overrides]]
-module = [
-    "app.semantic_world_state.core",
-    "app.semantic_world_state.events",
-    "app.semantic_world_state.memory",
-    "app.semantic_world_state.metrics",
-    "app.semantic_world_state.serialization",
-    "app.semantic_world_state.topology",
-    "app.semantic_world_state.locks"
-]
-ignore_errors = true
+# The ``ignore_errors = true`` override was removed in Round 24 because it
+# silently hid type errors across 7 modules. The override section is
+# intentionally empty — if project constraints later require one, prefer
+# a narrow ``disable_error_code = ["..."]`` over blanket suppression.
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests", "backend/benchmarks"]

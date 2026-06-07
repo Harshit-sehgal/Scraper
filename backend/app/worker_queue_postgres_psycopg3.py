@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from app.config import settings as _settings
 from app.postgres_repository_base import get_database_url
@@ -25,6 +25,9 @@ from app.worker_queue_postgres_base import (
     PostgresWorkerQueueBase,
     _ensure_schema_via,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 

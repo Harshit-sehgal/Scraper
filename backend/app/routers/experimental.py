@@ -79,10 +79,7 @@ class KnowledgeMergeRequest(BaseModel):
         """
         # Fast-path: pydantic does the type validation; we just enforce
         # the size caps.
-        if isinstance(data, dict):
-            payload = dict(data)
-        else:  # pragma: no cover -- FastAPI guarantees a dict
-            payload = data
+        payload = dict(data) if isinstance(data, dict) else data  # pragma: no cover -- FastAPI guarantees a dict
         if isinstance(payload.get("role_manifold"), dict) and len(payload["role_manifold"]) > cls.MAX_ROLES:
             payload["role_manifold"] = dict(list(payload["role_manifold"].items())[: cls.MAX_ROLES])
         if isinstance(payload.get("learned_exclusions"), dict) and len(payload["learned_exclusions"]) > cls.MAX_EXCLUSIONS:
@@ -500,7 +497,7 @@ async def get_domain_trend(
         domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
 
         if not domain_events:
-            raise HTTPException(
+            raise HTTPException(  # noqa: TRY301
                 status_code=404,
                 detail=f"No telemetry data found for domain: {domain}",
             )
@@ -720,7 +717,7 @@ async def set_operator_mode(
             adjustments,
         )
 
-        return {
+        return {  # noqa: TRY300
             "active_mode": target_mode.value,
             "adjustments": adjustments,
             "message": f"Switched to {target_mode.value} mode",
@@ -841,7 +838,7 @@ async def get_degradation_predictions(
             result["top_risks"] = [r for r in result["top_risks"] if r.get("confidence", 0) >= min_confidence]
             result["summary"]["total_filtered"] = len(result["predictions"])
 
-        return result
+        return result  # noqa: TRY300
     except Exception:
         logger.exception("Failed to get degradation predictions")
         raise HTTPException(status_code=500, detail="Failed to get degradation predictions") from None
@@ -865,7 +862,7 @@ async def get_domain_prediction(
         domain_events = [e for e in telemetry_history if TrendAnalyzer.extract_domain(e.get("url", "")) == domain.lower()]
 
         if not domain_events:
-            raise HTTPException(
+            raise HTTPException(  # noqa: TRY301
                 status_code=404,
                 detail=f"No telemetry data found for domain: {domain}",
             )
@@ -982,7 +979,7 @@ async def optimize_domain_selectors(
             cached = selector_memory.get_selectors(url)
 
             if not cached:
-                raise HTTPException(status_code=404, detail=f"No selectors found for domain: {domain}")
+                raise HTTPException(status_code=404, detail=f"No selectors found for domain: {domain}")  # noqa: TRY301
 
             selectors = cached
 
@@ -1046,7 +1043,7 @@ async def record_selector_learning(
         optimizer = get_selector_optimizer()
         await run_in_threadpool(optimizer.learn_from_results, domain, selector, quality)
 
-        return {
+        return {  # noqa: TRY300
             "status": "learned",
             "domain": domain,
             "quality": quality,
@@ -1110,7 +1107,7 @@ async def record_strategy_attempt(
 
         await run_in_threadpool(engine.record_fetch_attempt, domain, strategy_enum, success, time_ms, quality, failure_reason)
 
-        return {
+        return {  # noqa: TRY300
             "status": "recorded",
             "domain": domain,
             "strategy": strategy,
@@ -1180,7 +1177,7 @@ async def evolve_domain_strategy(
                 "switches": state.strategy_switch_count,
             }
 
-        return {
+        return {  # noqa: TRY300
             "domain": domain,
             "new_strategy": new_strategy.value,
             "status": "evolved",

@@ -151,7 +151,7 @@ if __name__ == "__main__":
     # backend/tests/test_extraction_precision.py and test_accuracy.py.
     import os
 
-    if not os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") == "1":
+    if os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") != "1":
         print(
             "Live benchmark disabled. Set DATAFORGE_RUN_LIVE_BENCHMARKS=1 to enable.",
             file=sys.stderr,
