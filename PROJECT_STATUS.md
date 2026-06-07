@@ -1,11 +1,10 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-06
-**Commit inspected:** `384abb0` (latest)
-**Working tree at refresh:** committed snapshot + smoke-test fix
-**GitHub Actions status:** CI verified locally (last known CI run: `26924524929`, passed 2026-06-02) — all fast gates, lint, and test suite pass 100% cleanly. Staging smoke test auth resolution fixed.
-**Status:** CI/CD stabilized. The core CI focuses on fast correctness gates (syntax, architecture, sqlite benchmark smoke, route auth matrix). The staging smoke test now works unconditionally (fixed auth resolution).
-**Maturity:** about 65–70% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
+**Last refreshed:** 2026-06-07
+**Commit inspected:** working tree (post-refresh)
+**GitHub Actions status:** CI verified locally — all fast gates, lint, and test suite pass 100% cleanly.
+**Status:** CI/CD stabilized. Prettier JS/CSS formatting and Dependabot lockfile management added. Rate limiter observability extended with stats endpoint, Prometheus hit counters, DB-backed table pruning cron, and comprehensive test coverage.
+**Maturity:** about 70–75% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
@@ -28,6 +27,11 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | API key/RBAC utilities exist | `backend/app/utils/rbac.py`, route dependencies, route-auth tests | Verified |
 | SSRF-oriented URL safety checks exist | `backend/app/url_safety.py` rejects non-http(s), loopback/private IPs, metadata hosts, and internal names | Verified by code inspection and tests |
 | Rate limiting exists | `backend/app/rate_limiter.py`; `DatabaseSlidingWindowCounter` implements thread/process-safe sliding window counters using SQLite or Postgres | Verified, in-memory or shared DB-backed |
+| Rate limit stats endpoint exists | `GET /api/system/rate-limit-stats` exposes enabled/disabled state, limits, active keys, route overrides | Verified |
+| Rate limit Prometheus hit counters exist | `dataforge_rate_limit_global_hits_total` and `dataforge_rate_limit_per_ip_hits_total` gauges emitted by `/metrics` | Verified |
+| Rate limits table background pruning exists | Background asyncio task calls `prune_all()` on configurable `RATE_LIMIT_PRUNE_INTERVAL` (default 1h); middleware also prunes per-request | Verified |
+| Prettier JS/CSS formatting enabled | `.prettierrc` config, `lint:js`/`lint:js:fix` npm scripts, pre-commit hook, CI check step | Verified |
+| Dependabot lockfile updates configured | `.github/dependabot.yml` for weekly pip (grouped) and npm updates with rebase strategy | Verified |
 | Unauthenticated public LLM fallbacks are disabled by default | `settings.LLM_ENABLE_PUBLIC_FALLBACKS` defaults to `False` (disabled through `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false`); tests verify disabled fallbacks do not issue unauthenticated Pollinations/g4f calls | Verified |
 | Production env validator rejects placeholders | `scripts/check_prod_env.py --env-file .env.production.example` failed intentionally on placeholder keys/passwords/token | Verified |
 | Docs disabled in production app config | `backend/app/main.py` disables `/docs`, `/redoc`, `/openapi.json` when `settings.ENV == "production"` | Verified by code inspection |
@@ -45,7 +49,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `ruff check backend/app backend/tests backend/benchmarks scripts` | `All checks passed!` | Ruff lint passes cleanly |
-| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `420 files already formatted` | Ruff format passes |
+| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `453 files already formatted` | Ruff format passes |
 | `scripts/check_research_boundary.py` | `VALIDATION PASSED: 85 product-kernel files` | No research imports leaking into kernel |
 | `scripts/validate_dependency_bounds.py` | `Dependency validation OK: 63 prod, 112 dev` | Lockfile bounds are consistent |
 | SQLite backend suite (no-golden/no-benchmark/no-browser/no-postgres) | `2699 passed, 3 skipped, 0 failed in 209.50s` | Full SQLite functional test suite passes |
@@ -146,7 +150,9 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 75.3% |
 | Bandit | ✅ Running | 0 Low/0 Medium/0 High — all findings clean |
 | pip-audit | ✅ Running | 0 known vulnerabilities |
-| pre-commit | ✅ Configured | `.pre-commit-config.yaml` with 4 repos |
+| Prettier | ✅ Configured | `.prettierrc`, pre-commit hook (`mirrors-prettier`), CI `JS/CSS Format Check` step, `lint:js` npm script |
+| Dependabot | ✅ Configured | `.github/dependabot.yml` — weekly pip (grouped) + npm updates, rebase strategy |
+| pre-commit | ✅ Configured | `.pre-commit-config.yaml` with 6 repos (ruff, mypy, bandit, prettier, pre-commit-hooks) |
 
 ## Current Blockers
 
@@ -197,15 +203,14 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 
 ## Next Actions
 
-1. Fix the job-level `if` conditional syntax error in `.github/workflows/validate-production.yml` by defining `SLACK_WEBHOOK` as a global workflow env variable (Completed).
-2. Implement transport-layer SSRF mitigation (DNS pinning / IP checking) for all async and sync HTTP requests (Completed).
-3. Secure Playwright browser requests against loopback and metadata endpoint SSRF (Completed).
-4. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
-5. Improve golden dataset extraction quality, especially books and country listing.
-6. Add production-mode dashboard/CSP checks against a browser and real origin.
-7. Add backup/restore, load, alert delivery, and recovery validation (Postgres backup and restore scripts refactored to read configuration dynamically from connection URL and settings — Completed).
-8. Add real benchmark tests with enforceable thresholds.
-9. Clean runtime artifacts before every commit.
+1. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
+2. Improve golden dataset extraction quality, especially books and country listing.
+3. Add production-mode dashboard/CSP checks against a browser and real origin.
+4. Add backup/restore, load, alert delivery, and recovery validation.
+5. Add real benchmark tests with enforceable thresholds.
+6. Clean runtime artifacts before every commit.
+7. Set up the CI workflow to auto-commit the regenerated route table when it changes on main.
+8. Add Grafana dashboard panels for the new rate limit hit counter metrics.
 
 ## Recent Boundary Work (Phase R1 — Research Shell Quarantine)
 
