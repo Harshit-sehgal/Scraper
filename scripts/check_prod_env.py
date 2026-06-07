@@ -241,6 +241,26 @@ def check_queue_backend(value: str) -> bool:
     return True
 
 
+def check_pg_driver(value: str) -> bool:
+    """Validate DATAFORGE_PG_DRIVER is 'psycopg3' for production.
+
+    The production image installs only psycopg3 (psycopg2 is intentionally
+    excluded to keep the image small and to force the new driver path). The
+    code default of 'psycopg2' is appropriate for the legacy dev environment
+    but MUST be overridden in production.
+    """
+    normalized = value.strip().lower()
+    if normalized != "psycopg3":
+        print(
+            f"  [FAIL]  DATAFORGE_PG_DRIVER={value!r}. Production requires 'psycopg3' "
+            "because the production image only ships the psycopg3 driver. "
+            "Set DATAFORGE_PG_DRIVER=psycopg3 in .env.production.example "
+            "and in both the dataforge and worker services of docker-compose.prod.yml."
+        )
+        return False
+    return True
+
+
 def check_grafana_password(value: str) -> bool:
     """Validate GRAFANA_PASSWORD is not a default/placeholder value."""
     if _is_placeholder_secret(value):
@@ -419,6 +439,12 @@ def main() -> int:
             True,
             check_queue_backend,
             "Must be 'postgres' for production — set DATAFORGE_QUEUE_BACKEND=postgres",
+        ),
+        (
+            "DATAFORGE_PG_DRIVER",
+            True,
+            check_pg_driver,
+            "Must be 'psycopg3' for production — the production image ships only the psycopg3 driver",
         ),
         (
             "DATAFORGE_METRICS_TOKEN",

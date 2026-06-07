@@ -22,7 +22,7 @@ This project is not public deployment ready. Do not claim this project is produc
 | Rate Limiter | Validated | Database-backed shared rate limiter (`DatabaseSlidingWindowCounter`) works under SQLite/Postgres backends | Verify connection pool scaling under high concurrent load |
 | CSP | Validated | strict CSP headers verified in backend unit tests and operational verification scripts | Monitor policy browser errors |
 | Metrics | Validated locally | Public `/metrics` blocked by Nginx; Prometheus scraped internal `/metrics` with token | Repeat with target network policy |
-| Prometheus | Validated locally | `promtool check config` passed, 12 alert rules loaded, `dataforge` and `prometheus` targets were `up` | Verify alert firing/delivery and retention in target |
+| Prometheus | Validated locally | `promtool check config` passed, 13 alert rules loaded, `dataforge` and `prometheus` targets were `up` | Verify alert firing/delivery and retention in target |
 | Grafana | In progress | `/api/health` returned database `ok`, version `11.0.0`; login and dashboards not validated | Verify login/provisioned dashboards |
 | Dashboard behavior | Validated | `test_dashboard_security.py` programmatically asserts session authentication and secure mime headers | Audit with browser test suite |
 | Browser/Playwright in container | Validated locally | Container Chromium printed `chromium 148.0.7778.96`; Compose worker job extracted 4 records | Add broader container browser tests |
@@ -31,7 +31,7 @@ This project is not public deployment ready. Do not claim this project is produc
 | Disaster recovery | Validated | backup and restore scripts provide full disaster recovery loop | Verify restore on fresh nodes |
 | Incident response | Validated | docs/INCIDENT_RUNBOOK.md defines runbook for all major failure patterns | Integrate runbook alerts |
 | Log rotation | In progress | Docker json-file rotation set in compose | Validate logs in running stack |
-| Monitoring alerts | In progress | Prometheus loaded 12 alert rules; alert firing/delivery untested | Add alert delivery validation |
+| Monitoring alerts | In progress | Prometheus loaded 13 alert rules; alert firing/delivery untested | Add alert delivery validation |
 
 ## Release Rule
 

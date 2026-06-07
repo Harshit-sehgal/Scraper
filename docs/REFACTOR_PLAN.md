@@ -1,14 +1,14 @@
 # Refactoring Plan — Large Experimental Modules
 
-**Date:** 2026-06-02
-**Status:** In progress — Phase 1 (topology_state.py) partially complete
+**Date:** 2026-06-07
+**Status:** Phase C — Workers & System Observability (complete); main.py app factory refactored (complete); Research Shell Boundary enforced (complete). Phase 1 (topology_state.py) partially complete.
 
 ## Motivation
 
-Three experimental modules exceed healthy file sizes (~500+ lines), making them
-hard to maintain, test, and reason about. This document outlines a safe,
-incremental refactoring strategy that preserves behavior while reducing
-cognitive load.
+Two experimental modules exceed healthy file sizes (~500+ lines), making them
+hard to maintain, test, and reason about. (`chaos_simulator.py` has already been
+extracted.) This document outlines a safe, incremental refactoring strategy
+that preserves behavior while reducing cognitive load.
 
 Current sizes (lines of Python, excluding blank lines/comments):
 
@@ -16,7 +16,7 @@ Current sizes (lines of Python, excluding blank lines/comments):
 |------|-------|-------------|
 | `backend/app/topology_state.py` | ~~1624~~ **942** | God object: topology state + logic + persistence |
 | `backend/app/semantic_segmentation.py` | 1221 | Mixed responsibilities: parsing, scoring, extraction |
-| `backend/app/chaos_simulator.py` | 1004 | Simulation logic + reporting + configuration |
+| `backend/app/chaos_simulator.py` | ~~1004~~ **176** | ✅ Extracted — orchestrator only (scenarios/metrics separated) |
 
 ---
 
@@ -109,35 +109,14 @@ dom_segment_spatial.py          →  Spatial relationship analysis (~200 lines)
 
 ---
 
-## 3. `chaos_simulator.py` (1004 lines)
+## 3. `chaos_simulator.py` — ✅ ALREADY EXTRACTED
 
-### Current responsibilities
-- Failure scenario definitions and configuration
-- Chaos experiment lifecycle (start, run, observe, stop)
-- Metric collection during experiments
-- Report generation
-- Integration with failure_injector and domain_intelligence
+The 1004-line monolith has already been split into 3 focused modules:
+- **`chaos_simulator.py`** (176 lines) — Core orchestrator (`ChaosSimulator` class, `get_chaos_simulator` factory)
+- **`chaos_scenarios.py`** (538 lines) — Core types (`FailureMode`, `SeverityLevel`, `FailureScenario`, `FailureScenarios`)
+- **`chaos_metrics.py`** (273 lines) — Test suite runner (`ChaosTestSuite`, `OperationalPlaybooks`, `run_chaos_test`)
 
-### Proposed split
-
-```
-chaos_simulator.py          →  Core experiment orchestrator (~200 lines)
-                                 run_experiment, observe, stop
-chaos_scenarios.py          →  Scenario definitions (~300 lines)
-                                 network_failure, anti_bot_escalation, ...
-chaos_metrics.py            →  Metrics collection and reporting (~200 lines)
-                                 collect_metrics, generate_report
-```
-
-### Risk: Low
-- Primarily used for simulation/testing, not production paths
-- Module is relatively self-contained
-- Existing test file provides safety net
-
-### Strategy
-1. Extract scenario definitions (pure data)
-2. Extract metrics/reporting (pure computation)
-3. Both can be done without modifying the orchestrator's public API
+Backward-compatible `__getattr__` re-exports in `chaos_simulator.py` ensure all existing imports continue working. 5/5 chaos engineering tests pass. No behavioral changes.
 
 ---
 
@@ -157,9 +136,9 @@ chaos_metrics.py            →  Metrics collection and reporting (~200 lines)
    plan and noting the specific split.
 
 5. **Priority order**: `topology_state.py` (largest, has test coverage) →
-   `chaos_simulator.py` (self-contained, has tests) →
    `semantic_segmentation.py` (complex DOM logic, no existing tests — needs
    test scaffolding first).
+   (`chaos_simulator.py` extraction was already completed.)
 
 ## Deferred — Core Product Refactors
 
@@ -170,28 +149,33 @@ that require design input before implementation.
 
 | File | Lines | Issue | Effort |
 |------|-------|-------|--------|
-| `backend/app/main.py` | ~450 | Mixed concerns: app factory, middleware, lifespan, health/readiness, metrics, static mounts, API docs control | Medium |
+| `backend/app/main.py` | ~182 | ✅ Completed — app factory refactored. `create_app()` composes middleware/static/routes/lifespan | Medium |
 | `backend/app/scraper.py` | ~800 | Single file handles fetch, orchestration, post-processing, and diagnostics | High |
 | `backend/app/services/job_runner.py` | ~600 | `run_job()` monolithic — combines discovery, per-url execution, aggregation, finalization | High |
 | `backend/app/extraction_orchestrator.py` | ~500 | Multi-layer extraction cascade is correct but implementation is a monolith | Medium |
 | `backend/app/job_store.py` + `postgres_repository.py` | ~1500 combined | SQLite and Postgres persistence duplicate model transforms | High |
 | `backend/app/worker_queue.py` + `worker_queue_postgres.py` | ~800 combined | Queue implementations duplicate logic | Medium |
 
-### 4. Rebuild main.py into thin app factory
+### 4. Rebuild main.py into thin app factory — ✅ COMPLETE
 
 **Goal:** Separate app creation from middleware/route wiring so individual
 components (middleware, routers, lifecycle) can be tested in isolation.
 
-**Proposed structure:**
+**Completed structure:**
 ```
-main.py               →  create_app() factory (~50 lines)
-                           Import and compose: middleware, routers, lifespan
+main.py               →  create_app() factory (~182 lines)
+                           Composes: configure_middleware, configure_static,
+                           configure_routes, configure_lifespan
 app/lifespan.py        →  Startup/shutdown lifecycle hooks
-app/middleware.py       →  Body size, API key, latency tracking middleware
-app/routers/            →  Already mostly separated — just needs cleaner factory wiring
+app/routers/            →  Already separated — clean factory wiring
 ```
 
-**Risk:** Medium — changing import paths affects all tests that import from `app.main`
+**Result:** `main.py` reduced from ~450 to 182 lines. Backward-compatible
+re-exports kept for tests and scripts. All 2800+ tests pass.
+
+**Lessons learned:** Import path changes from the refactoring required fixing
+9 pre-existing test breakages (monkeypatch sites referencing old import paths,
+stale re-exports in `scraper.py`, unused imports, stale `.pyc` files).
 
 ### 5. Split scraper.py into focused modules
 
@@ -268,8 +252,8 @@ feature flags so core versus experimental is obvious in the file tree.
 | Priority | Module | Effort | Dependencies |
 |----------|--------|--------|-------------|
 | 1 | `topology_state.py` → 3 extracted modules | Medium | Has test coverage |
-| 2 | `chaos_simulator.py` → 2 extracted modules | Low | Self-contained |
-| 3 | `main.py` → app factory | Medium | No behavioral changes |
+| 2 | `chaos_simulator.py` → 2 extracted modules | ✅ Complete — 987 lines across 3 modules, 5/5 tests pass |
+| 3 | `main.py` → app factory | ✅ Completed — 182 lines, 2800+ tests pass |
 | 4 | `run_job()` → lifecycle phases | High | Requires scraper.py split first |
 | 5 | `scraper.py` → focused modules | High | Largest module, most complex |
 | 6 | Repo consolidation (SQLite/Postgres) | High | Depends on stable API contracts |

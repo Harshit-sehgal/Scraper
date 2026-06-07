@@ -142,3 +142,16 @@ groups:
         annotations:
           summary: "LLM-based extraction rate anomaly"
           description: "LLM-based extraction accounts for less than 5% of extractions over 30 minutes (currently {{ $value | humanizePercentage }}). This may indicate an LLM API outage or configuration issue if LLM extraction was expected to be dominant."
+
+      # 13. Worker Heartbeat Stale Alert — NEW
+      # NOTE: `for: 2m` assumes the default heartbeat TTL of 60s (~2 missed beats).
+      # If the worker's --heartbeat-ttl is increased significantly, this `for`
+      # duration should be adjusted to at least 2× the TTL to avoid false positives.
+      - alert: WorkerHeartbeatStale
+        expr: dataforge_worker_heartbeat_alive == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker heartbeat stale — worker may be dead"
+          description: "Worker {{ $labels.worker_id }} (hostname: {{ $labels.hostname }}) has not sent a heartbeat within its TTL for more than 2 minutes. If all workers are affected, check the shared database connection. If an individual worker is affected, check its container/process health."

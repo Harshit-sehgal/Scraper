@@ -1,8 +1,7 @@
 """Tests for storage/health/readiness endpoints."""
 
-import asyncio
-
 import httpx
+import pytest
 from app.main import app
 
 # Module-level in-memory job overrides —
@@ -12,7 +11,7 @@ from app.main import app
 
 
 class LocalASGIClient:
-    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
+    """Async httpx ASGITransport test client compatible with pytest-asyncio Mode.STRICT."""
 
     def __init__(self, app) -> None:
         self.app = app
@@ -22,11 +21,8 @@ class LocalASGIClient:
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
             return await ac.request(method, url, **kwargs)
 
-    def request(self, method: str, url: str, **kwargs):
-        return asyncio.run(self._request(method, url, **kwargs))
-
-    def get(self, url: str, **kwargs):
-        return self.request("GET", url, **kwargs)
+    async def get(self, url: str, **kwargs):
+        return await self._request("GET", url, **kwargs)
 
 
 client = LocalASGIClient(app)
@@ -35,20 +31,22 @@ client = LocalASGIClient(app)
 class TestHealthEndpoint:
     """Tests for the /health liveness probe."""
 
-    def test_health_returns_200(self) -> None:
+    @pytest.mark.asyncio
+    async def test_health_returns_200(self) -> None:
         """/health should always return 200 with status ok."""
-        response = client.get("/health")
+        response = await client.get("/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
 
-    def test_health_is_fast(self) -> None:
+    @pytest.mark.asyncio
+    async def test_health_is_fast(self) -> None:
         """/health should respond quickly (lightweight check)."""
         import time
 
         start = time.monotonic()
         for _ in range(10):
-            client.get("/health")
+            await client.get("/health")
         elapsed = time.monotonic() - start
         # 10 calls in < 5s is very generous for a local health check
         assert elapsed < 5.0, f"Health check too slow: {elapsed:.2f}s for 10 calls"
@@ -63,33 +61,37 @@ class TestReadyEndpoint:
 
         monkeypatch.setattr("app.main.get_job_repository", SQLiteJobRepository)
 
-    def test_ready_returns_storage_ok(self) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_returns_storage_ok(self) -> None:
         """/ready should check SQLite and return status."""
-        response = client.get("/ready")
+        response = await client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ready"
         assert data["storage"] == "ok"
         assert data["migrations"] == "ok"
 
-    def test_ready_includes_backend_type(self) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_includes_backend_type(self) -> None:
         """/ready should include the backend type."""
-        response = client.get("/ready")
+        response = await client.get("/ready")
         data = response.json()
         assert "backend" in data
         assert data["backend"] in ("sqlite", "postgres")
 
-    def test_ready_includes_schema_version(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_includes_schema_version(self, monkeypatch) -> None:
         """/ready should include schema_version >= 2."""
         self._mock_sqlite_backend(monkeypatch)
-        response = client.get("/ready")
+        response = await client.get("/ready")
         data = response.json()
         assert "schema_version" in data
         assert data["schema_version"] >= 2
 
-    def test_ready_includes_job_and_recycle_counts(self) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_includes_job_and_recycle_counts(self) -> None:
         """/ready should include job_count and recycle_bin_count."""
-        response = client.get("/ready")
+        response = await client.get("/ready")
         data = response.json()
         assert "job_count" in data
         assert data["job_count"] >= 0
@@ -100,38 +102,42 @@ class TestReadyEndpoint:
 class TestDomainPolicyEndpoint:
     """Tests for the /api/system/domain-policy endpoint."""
 
-    def test_domain_policy_returns_dict(self) -> None:
+    @pytest.mark.asyncio
+    async def test_domain_policy_returns_dict(self) -> None:
         """Domain policy endpoint should return a dict."""
-        response = client.get("/api/system/domain-policy")
+        response = await client.get("/api/system/domain-policy")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, dict)
 
-    def test_domain_policy_includes_domain_keys(self) -> None:
+    @pytest.mark.asyncio
+    async def test_domain_policy_includes_domain_keys(self) -> None:
         """After recording failures, the endpoint should include that domain."""
         from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
 
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-domain-policy.com/page")
-        response = client.get("/api/system/domain-policy")
+        response = await client.get("/api/system/domain-policy")
         data = response.json()
         assert "test-domain-policy.com" in data
 
-    def test_domain_policy_includes_recommended_action(self) -> None:
+    @pytest.mark.asyncio
+    async def test_domain_policy_includes_recommended_action(self) -> None:
         """Each domain entry should include a recommended_action."""
         from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
 
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-action.com/page")
-        response = client.get("/api/system/domain-policy")
+        response = await client.get("/api/system/domain-policy")
         data = response.json()
         entry = data.get("test-action.com", {})
         assert "recommended_action" in entry
         assert isinstance(entry["recommended_action"], str)
 
-    def test_domain_policy_fields(self) -> None:
+    @pytest.mark.asyncio
+    async def test_domain_policy_fields(self) -> None:
         """Each domain entry should have the expected fields."""
         from app.domain_runtime_policy import reset_domain_runtime_policy
 
@@ -141,7 +147,7 @@ class TestDomainPolicyEndpoint:
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-fields.com/page")
         policy.record_success("https://test-fields-ok.com/page")
-        response = client.get("/api/system/domain-policy")
+        response = await client.get("/api/system/domain-policy")
         data = response.json()
         for entry in data.values():
             assert "max_parallel" in entry
@@ -160,53 +166,59 @@ class TestStorageStatusEndpoint:
 
         monkeypatch.setattr("app.main.get_job_repository", SQLiteJobRepository)
 
-    def test_storage_status_returns_200(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_returns_200(self, monkeypatch) -> None:
         """Storage status should return 200 with SQLite backend info."""
         self._mock_sqlite_backend(monkeypatch)
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "sqlite"
         assert "db_path" in data
         assert data["db_path"].endswith(".db")
 
-    def test_storage_status_includes_schema_version(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_includes_schema_version(self, monkeypatch) -> None:
         """Storage status should report schema version."""
         self._mock_sqlite_backend(monkeypatch)
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         data = response.json()
         assert "schema_version" in data
         assert data["schema_version"] >= 2
         assert "latest_schema_version" in data
 
-    def test_storage_status_includes_job_counts(self) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_includes_job_counts(self) -> None:
         """Storage status should report job and recycle bin counts."""
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         data = response.json()
         assert "job_count" in data
         assert data["job_count"] >= 0
         assert "recycle_bin_count" in data
 
-    def test_storage_status_includes_wal_mode(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_includes_wal_mode(self, monkeypatch) -> None:
         """Storage status should report WAL mode."""
         self._mock_sqlite_backend(monkeypatch)
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         data = response.json()
         assert "wal_mode" in data
         assert data["wal_mode"] == "wal"
 
-    def test_ready_reports_sqlite_backend(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_reports_sqlite_backend(self, monkeypatch) -> None:
         """/ready should report sqlite backend when using SQLite."""
         self._mock_sqlite_backend(monkeypatch)
-        response = client.get("/ready")
+        response = await client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "sqlite"
 
-    def test_storage_status_reports_sqlite(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_reports_sqlite(self, monkeypatch) -> None:
         """/api/system/storage/status should report sqlite backend when using SQLite."""
         self._mock_sqlite_backend(monkeypatch)
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "sqlite"
@@ -243,12 +255,13 @@ class TestReadyWithMockedPostgres:
             }
         return mock_repo
 
-    def test_ready_reports_postgres_backend(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_reports_postgres_backend(self, monkeypatch) -> None:
         """/ready should report postgres backend when Postgres repository is active."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
-        response = client.get("/ready")
+        response = await client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "postgres"
@@ -256,23 +269,25 @@ class TestReadyWithMockedPostgres:
         assert data["job_count"] == 5
         assert data["recycle_bin_count"] == 2
 
-    def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch) -> None:
         """/ready should return 503 when Postgres repository is unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
-        response = client.get("/ready")
+        response = await client.get("/ready")
         assert response.status_code == 503
         data = response.json()
         assert data["status"] == "not_ready"
         assert "error" in data
 
-    def test_storage_status_reports_postgres_counts(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_reports_postgres_counts(self, monkeypatch) -> None:
         """/api/system/storage/status should report postgres backend with counts."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "postgres"
@@ -281,12 +296,13 @@ class TestReadyWithMockedPostgres:
         assert data["job_count"] == 5
         assert data["recycle_bin_count"] == 2
 
-    def test_storage_status_reports_postgres_unhealthy(self, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_storage_status_reports_postgres_unhealthy(self, monkeypatch) -> None:
         """/api/system/storage/status should report postgres as not ok when unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
-        response = client.get("/api/system/storage/status")
+        response = await client.get("/api/system/storage/status")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "postgres"

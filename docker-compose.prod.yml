@@ -35,6 +35,7 @@ services:
     environment:
       - DATAFORGE_ENV=production
       - DATAFORGE_STORAGE_BACKEND=postgres
+      - DATAFORGE_PG_DRIVER=psycopg3
       - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
       - DATAFORGE_QUEUE_BACKEND=postgres
@@ -87,6 +88,7 @@ services:
     environment:
       - DATAFORGE_ENV=production
       - DATAFORGE_STORAGE_BACKEND=postgres
+      - DATAFORGE_PG_DRIVER=psycopg3
       - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
       - DATAFORGE_QUEUE_BACKEND=postgres

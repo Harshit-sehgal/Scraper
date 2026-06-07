@@ -875,9 +875,19 @@ def get_job_repository() -> JobRepository:
                     msg,
                 )
             # Phase A: driver selection via DATAFORGE_PG_DRIVER. Defaults to
-            # psycopg2 (preserves existing behaviour). Set
-            # DATAFORGE_PG_DRIVER=psycopg3 to opt in to the new driver.
-            pg_driver = (os.environ.get("DATAFORGE_PG_DRIVER") or "psycopg2").strip().lower()
+            # psycopg2 in dev (preserves existing behaviour) but FAILS FAST in
+            # production if not set, because the production image ships only
+            # psycopg3 and psycopg2 would crash the worker on first use.
+            pg_driver_env = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
+            if not pg_driver_env and settings.ENV.lower() == "production":
+                raise RuntimeError(
+                    "DATAFORGE_PG_DRIVER is not set. Production requires "
+                    "DATAFORGE_PG_DRIVER=psycopg3 because the production image "
+                    "installs only psycopg3 (psycopg2 is intentionally excluded). "
+                    "Set DATAFORGE_PG_DRIVER=psycopg3 in the dataforge and worker "
+                    "service environment in docker-compose.prod.yml."
+                )
+            pg_driver = pg_driver_env or "psycopg2"
 
             if pg_driver == "psycopg3":
                 try:

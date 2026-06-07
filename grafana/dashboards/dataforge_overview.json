@@ -448,6 +448,79 @@
           "color": {"mode": "thresholds"}
         }
       }
+    },
+    {
+      "id": 23,
+      "title": "Workers Alive",
+      "type": "stat",
+      "description": "Number of worker processes currently sending heartbeats. Should match the expected replica count. Zero means no workers are running.",
+      "gridPos": {"h": 4, "w": 3, "x": 0, "y": 36},
+      "targets": [{
+        "expr": "count(dataforge_worker_heartbeat_alive == 1) or vector(0)",
+        "legendFormat": "Alive Workers"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 1}, {"color": "green", "value": 2}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
+    },
+    {
+      "id": 24,
+      "title": "Max Heartbeat Age",
+      "type": "stat",
+      "description": "Age of the oldest worker heartbeat in seconds. Values approaching the TTL (default 60s) indicate a worker may be about to be marked dead.",
+      "gridPos": {"h": 4, "w": 3, "x": 3, "y": 36},
+      "targets": [{
+        "expr": "max(dataforge_worker_heartbeat_age_seconds) or vector(-1)",
+        "legendFormat": "Max Age (s)"
+      }],
+      "unit": "s",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 30}, {"color": "red", "value": 55}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
+    },
+    {
+      "id": 25,
+      "title": "Worker Heartbeat Status",
+      "type": "timeseries",
+      "description": "Individual worker heartbeat status over time. 1 = alive, 0 = stale/missing. A drop to 0 followed by recovery indicates a container restart.",
+      "gridPos": {"h": 8, "w": 12, "x": 6, "y": 36},
+      "targets": [{
+        "expr": "dataforge_worker_heartbeat_alive",
+        "legendFormat": "{{worker_id}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "fillOpacity": 40,
+            "lineWidth": 2,
+            "lineInterpolation": "stepBefore"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["last"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
     }
   ],
   "links": [

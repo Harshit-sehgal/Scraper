@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/config")
-async def get_scraper_config():
-    """Return current scraper-related settings."""
+async def get_scraper_config(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return current scraper-related settings. Requires operator or admin."""
     return {
         "playwright_timeout": settings.PLAYWRIGHT_TIMEOUT,
         "page_settle_delay": settings.PAGE_SETTLE_DELAY,
@@ -43,14 +45,19 @@ async def get_scraper_config():
 
 
 @router.get("/telemetry")
-async def get_recent_telemetry(n: int = 20):
-    """Return the N most recent scrape telemetry events."""
+async def get_recent_telemetry(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    n: int = 20,
+):
+    """Return the N most recent scrape telemetry events. Requires operator or admin."""
     return get_scrape_telemetry().get_recent(n)
 
 
 @router.get("/memory/stats")
-async def get_selector_memory_brief():
-    """Return brief statistics on remembered selectors."""
+async def get_selector_memory_brief(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return brief statistics on remembered selectors. Requires operator or admin."""
     memory = get_selector_memory()
     return {
         "domain_count": len(memory._memory),
@@ -65,14 +72,18 @@ async def get_selector_memory_brief():
 
 
 @router.get("/browser")
-async def get_browser_stats():
-    """Return browser pool operational metrics."""
+async def get_browser_stats(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return browser pool operational metrics. Requires operator or admin."""
     return get_browser_pool().get_metrics()
 
 
 @router.get("/health/legacy")
-async def get_legacy_domain_health():
-    """Return health scores for all tracked domains (legacy crawl policy)."""
+async def get_legacy_domain_health(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return health scores for all tracked domains (legacy crawl policy). Requires operator or admin."""
     from app.crawl_policy import get_crawl_policy
 
     policy = get_crawl_policy()
@@ -88,8 +99,10 @@ async def get_legacy_domain_health():
 
 
 @router.get("/stats")
-async def get_scraper_stats():
-    """Return aggregated scraper performance statistics."""
+async def get_scraper_stats(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return aggregated scraper performance statistics. Requires operator or admin."""
     telemetry = get_scrape_telemetry()
     recent_latency = telemetry.get_recent(10)
     recent_success = telemetry.get_recent(20)
@@ -142,19 +155,12 @@ async def get_scraper_diagnostics(
 
 
 @router.get("/regressions")
-async def get_regression_archive(limit: Annotated[int, Query(ge=1, le=100)] = 20):
+async def get_regression_archive(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+):
     """Return the regression capture archive — statistics and recent captures.
-
-    The regression capture system automatically archives extraction failures
-    as named fixtures in fixtures / pages/, building an organic benchmark suite
-    from real operational failures.
-
-    Args:
-        limit: Maximum number of recent captures to return (1 - 100).
-
-    Returns:
-        Archive statistics and the most recent capture entries.
-    """
+    Requires operator or admin."""
     try:
         capture = get_regression_capture()
         stats = await run_in_threadpool(capture.get_statistics)
@@ -167,8 +173,11 @@ async def get_regression_archive(limit: Annotated[int, Query(ge=1, le=100)] = 20
 
 
 @router.get("/regressions/{entry_id}")
-async def get_regression_detail(entry_id: str):
-    """Return detailed information about a specific regression capture."""
+async def get_regression_detail(
+    entry_id: str,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return detailed information about a specific regression capture. Requires operator or admin."""
     try:
         capture = get_regression_capture()
         registry = await run_in_threadpool(capture.get_registry)
@@ -199,7 +208,7 @@ async def get_regression_detail(entry_id: str):
 @router.post("/regressions/{entry_id}/generate-test")
 async def generate_regression_replay_test(
     entry_id: str,
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
 ):
     """Generate a pytest replay test for a captured regression."""
     try:
@@ -219,7 +228,7 @@ async def generate_regression_replay_test(
 
 
 @router.post("/regressions/generate-all-tests")
-async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
+async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
     """Generate replay tests for all captured regressions that lack one."""
     try:
         capture = get_regression_capture()
@@ -237,7 +246,9 @@ async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_r
 
 
 @router.get("/selectors/stats")
-async def get_selector_memory_stats():
+async def get_selector_memory_stats(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
     """Get selector memory pool statistics.
 
     Returns aggregate statistics about cached selectors:
@@ -245,6 +256,8 @@ async def get_selector_memory_stats():
     - Average confidence across all selectors
     - Distribution by confidence level
     - High / medium / low confidence counts
+
+    Requires operator or admin.
     """
     selector_memory = get_selector_memory()
     stats = selector_memory.get_memory_stats()
@@ -261,7 +274,10 @@ async def get_selector_memory_stats():
 
 
 @router.get("/selectors/domain/{domain}")
-async def get_domain_selector_confidence(domain: str):
+async def get_domain_selector_confidence(
+    domain: str,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
     """Get selector confidence for a specific domain.
 
     Returns detailed confidence metrics:
@@ -270,6 +286,8 @@ async def get_domain_selector_confidence(domain: str):
     - Freshness factor (penalty for non-use)
     - Final confidence score
     - Reason (detailed explanation)
+
+    Requires operator or admin.
     """
     selector_memory = get_selector_memory()
 
@@ -291,8 +309,8 @@ async def get_domain_selector_confidence(domain: str):
 
 
 @router.post("/selectors/cleanup")
-async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
-    """Manually trigger selector memory cleanup.
+async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
+    """Manually trigger selector memory cleanup. Admin only.
 
     Forces deletion of all selectors below the confidence threshold,
     regardless of the normal cleanup interval.
@@ -317,10 +335,14 @@ async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_ro
 
 
 @router.get("/selectors/low-confidence")
-async def get_low_confidence_selectors(threshold: Annotated[float, Query(ge=0, le=1)] = 0.5):
+async def get_low_confidence_selectors(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    threshold: Annotated[float, Query(ge=0, le=1)] = 0.5,
+):
     """Get all selectors scoring below the specified threshold.
 
     Useful for identifying domains at risk of extraction failure.
+    Requires operator or admin.
     """
     selector_memory = get_selector_memory()
     low_confidence = []

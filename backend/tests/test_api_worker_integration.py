@@ -9,7 +9,6 @@ These tests use a temp SQLite queue DB and mocked scraping to avoid
 real browser/network dependencies.
 """
 
-import asyncio
 import os
 from pathlib import Path
 
@@ -24,7 +23,7 @@ from app.storage_interface import (
 
 
 class LocalASGIClient:
-    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
+    """Async httpx ASGITransport test client compatible with pytest-asyncio Mode.STRICT."""
 
     def __init__(self, app) -> None:
         self.app = app
@@ -34,14 +33,11 @@ class LocalASGIClient:
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
             return await ac.request(method, url, **kwargs)
 
-    def request(self, method: str, url: str, **kwargs):
-        return asyncio.run(self._request(method, url, **kwargs))
+    async def get(self, url: str, **kwargs):
+        return await self._request("GET", url, **kwargs)
 
-    def get(self, url: str, **kwargs):
-        return self.request("GET", url, **kwargs)
-
-    def post(self, url: str, **kwargs):
-        return self.request("POST", url, **kwargs)
+    async def post(self, url: str, **kwargs):
+        return await self._request("POST", url, **kwargs)
 
 
 @pytest.fixture(autouse=True)
@@ -64,6 +60,8 @@ def client(monkeypatch):
 
     # Mock run_job to keep jobs in pending state
     async def fake_run_job(job_id: str) -> None:
+        import asyncio
+
         await asyncio.sleep(0.01)
 
     from app import main as main_mod
@@ -93,7 +91,8 @@ def tmp_queue_db(tmp_path):
 class TestApiEnqueuesJob:
     """Verify that the API enqueues a job to the worker queue when enabled."""
 
-    def test_job_is_enqueued_when_worker_queue_enabled(self, client, tmp_queue_db, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_job_is_enqueued_when_worker_queue_enabled(self, client, tmp_queue_db, monkeypatch) -> None:
         """When DATAFORGE_WORKER_QUEUE=true, creating a job should enqueue it."""
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
 
@@ -101,7 +100,7 @@ class TestApiEnqueuesJob:
 
         queue = get_worker_queue(db_path=tmp_queue_db)
 
-        response = client.post(
+        response = await client.post(
             "/api/jobs",
             json={
                 "name": "Integration Test Job",
@@ -123,7 +122,8 @@ class TestApiEnqueuesJob:
         task_ids = [t["id"] for t in next_tasks]
         assert job_id in task_ids, f"Job {job_id} not found in queued tasks: {task_ids}"
 
-    def test_job_is_not_enqueued_when_worker_queue_disabled(self, client, tmp_queue_db, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_job_is_not_enqueued_when_worker_queue_disabled(self, client, tmp_queue_db, monkeypatch) -> None:
         """When DATAFORGE_WORKER_QUEUE is not set, job should not be enqueued."""
         monkeypatch.delenv("DATAFORGE_WORKER_QUEUE", raising=False)
 
@@ -131,7 +131,7 @@ class TestApiEnqueuesJob:
 
         queue = get_worker_queue(db_path=tmp_queue_db)
 
-        response = client.post(
+        response = await client.post(
             "/api/jobs",
             json={
                 "name": "Inline Test Job",
@@ -154,8 +154,11 @@ class TestApiEnqueuesJob:
 class TestWorkerPicksQueuedJob:
     """Verify that the worker dequeue and job execution flow works correctly."""
 
-    def test_worker_picks_queued_job_and_updates_repo(self, client, tmp_queue_db, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_worker_picks_queued_job_and_updates_repo(self, client, tmp_queue_db, monkeypatch) -> None:
         """Worker should dequeue a job, process it, and update the repository."""
+        import asyncio
+
         from app.worker_queue import get_worker_queue, reset_worker_queue
 
         reset_worker_queue()
@@ -199,7 +202,7 @@ class TestWorkerPicksQueuedJob:
         queue.register_handler("scrape_job", mock_handler)
 
         # Create a job via API
-        response = client.post(
+        response = await client.post(
             "/api/jobs",
             json={
                 "name": "Worker Pickup Test",
@@ -211,7 +214,7 @@ class TestWorkerPicksQueuedJob:
         job_id = response.json()["job_id"]
 
         # Dequeue and execute the task
-        task = asyncio.run(queue.dequeue(timeout=2.0))
+        task = await asyncio.wait_for(queue.dequeue(timeout=2.0), timeout=5.0)
         assert task is not None, "Worker should have dequeued the task"
         assert task.payload.get("job_id") == job_id
 
@@ -226,7 +229,7 @@ class TestWorkerPicksQueuedJob:
         assert job_id in jobs_store, f"Job {job_id} should be in the store"
 
         # Complete the task
-        asyncio.run(queue.complete(task.id, {"result": "ok"}))
+        await asyncio.wait_for(queue.complete(task.id, {"result": "ok"}), timeout=5.0)
 
         # Verify task is gone from active queue
         status = queue.get_status()
@@ -249,7 +252,8 @@ class TestWorkerPicksQueuedJob:
 class TestRealWorkerHandler:
     """Tests using the actual scripts.run_worker.scrape_job_handler."""
 
-    def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:
+    @pytest.mark.asyncio
+    async def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:
         """End-to-end test using the real scrape_job_handler from scripts/run_worker.
 
         Flow:
@@ -260,9 +264,12 @@ class TestRealWorkerHandler:
         5. Execute real scrape_job_handler(task)
         6. Assert repository job reaches terminal status
         """
-        # ── Ensure project root is on path for scripts.run_worker import ─
+        import asyncio
         import sys
 
+        from app.worker_queue import get_worker_queue, reset_worker_queue
+
+        # ── Ensure project root is on path for scripts.run_worker import ─
         project_root = str(Path(__file__).resolve().parents[2])
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
@@ -323,18 +330,16 @@ class TestRealWorkerHandler:
         jobs_store.clear()
         recycle_bin_store.clear()
 
-        from app.worker_queue import get_worker_queue, reset_worker_queue
-
         reset_worker_queue()
         queue = get_worker_queue(db_path=tmp_path / "test_real_handler_queue.db")
         queue.register_handler("scrape_job", scrape_job_handler)
 
         from app.main import app as main_app
 
-        client = LocalASGIClient(main_app)
+        ac = LocalASGIClient(main_app)
 
         # ── Step 1: Create job via API ──────────────────────────────────
-        response = client.post(
+        response = await ac.post(
             "/api/jobs",
             json={
                 "name": "Real Handler E2E",
@@ -351,12 +356,12 @@ class TestRealWorkerHandler:
         assert status["pending"] >= 1, f"Expected pending tasks, got {status}"
 
         # ── Step 3: Dequeue the task ────────────────────────────────────
-        task = asyncio.run(queue.dequeue(timeout=5.0))
+        task = await asyncio.wait_for(queue.dequeue(timeout=5.0), timeout=10.0)
         assert task is not None, "Worker should dequeue the task"
         assert task.payload.get("job_id") == job_id
 
         # ── Step 4: Execute real scrape_job_handler ─────────────────────
-        result = asyncio.run(scrape_job_handler(task))
+        result = await scrape_job_handler(task)
         assert result is not None
         assert result["job_id"] == job_id
         assert result["status"] in ("completed", "degraded"), f"Expected terminal status, got {result['status']}"
@@ -378,7 +383,8 @@ class TestRealWorkerHandler:
         jobs_store.clear()
         recycle_bin_store.clear()
 
-    def test_real_worker_handler_missing_job_id_raises_error(self) -> None:
+    @pytest.mark.asyncio
+    async def test_real_worker_handler_missing_job_id_raises_error(self) -> None:
         """When task has no job_id, the real handler should raise ValueError."""
         import sys
 
@@ -398,7 +404,7 @@ class TestRealWorkerHandler:
         )
 
         with pytest.raises(ValueError, match="No job_id"):
-            asyncio.run(scrape_job_handler(task))
+            await scrape_job_handler(task)
 
 
 @pytest.mark.postgres
@@ -482,6 +488,7 @@ class TestWorkerPreservesRecycleBin:
         repo.save_all({}, recycle_store)
 
         # Three save cycles
+        active_jobs = {}
         for cycle in range(3):
             active = Job(
                 id=f"active-{cycle}",
@@ -489,6 +496,7 @@ class TestWorkerPreservesRecycleBin:
                 urls=["https://example.com"],
                 status=JobStatus.RUNNING,
             )
+            active_jobs[active.id] = active
             loaded_jobs, loaded_recycle, _ = repo.load_all()
             loaded_jobs[active.id] = active
             repo.save_all(loaded_jobs, loaded_recycle)
@@ -496,6 +504,6 @@ class TestWorkerPreservesRecycleBin:
         # Verify all recycle bin entries survive
         _, final_recycle, _ = repo.load_all()
         for i in range(3):
-            assert f"recycled-{i}" in final_recycle, f"recycled-{i} missing after {cycle} save cycles"
+            assert f"recycled-{i}" in final_recycle, f"recycled-{i} missing after save cycles"
 
         reset_job_store_for_tests()

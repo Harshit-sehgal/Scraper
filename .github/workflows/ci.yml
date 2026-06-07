@@ -69,6 +69,11 @@ jobs:
             echo "✅ check_prod_env.py correctly failed on placeholder secrets (expected behaviour)."
           fi
 
+      - name: Run Contract Smoke Tests (OpenAPI, CSP, Worker Heartbeat, Metadata)
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m pytest backend/tests/test_contract_smoke.py -q -o addopts= --tb=short
+
   # ── Benchmarks (needs Playwright browser — cached) ────────────────
   ci-gates-benchmarks:
     name: In-Corpus Benchmarks
@@ -180,6 +185,9 @@ jobs:
 
       - name: CSS Lint (stylelint)
         run: npx stylelint 'frontend/**/*.css'
+
+      - name: Frontend Unit Tests (vitest)
+        run: npm test
 
       - name: Docs Lint
         run: python scripts/docs_lint.py

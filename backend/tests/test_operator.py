@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
+import app.browser_pool as _browser_pool_mod
+import app.degradation_predictor as _degradation_predictor_mod
+import app.domain_health_alerts as _domain_health_mod
+import app.routers.experimental as _experimental_mod
+import app.trend_analyzer as _trend_analyzer_mod
+import app.visualization as _visualization_mod
 import httpx
 import pytest
 from app.routers.experimental import router as experimental_router
@@ -17,7 +22,13 @@ from fastapi import FastAPI
 
 
 class LocalASGIClient:
-    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
+    """Async httpx ASGITransport-based test client.
+
+    Uses async methods throughout so it is compatible with
+    pytest-asyncio ``Mode.STRICT``. Previously used ``asyncio.run()``
+    inside sync methods, which failed when the event loop was already
+    running from a prior async test in the same session.
+    """
 
     def __init__(self, app) -> None:
         self.app = app
@@ -27,14 +38,11 @@ class LocalASGIClient:
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
             return await ac.request(method, url, **kwargs)
 
-    def request(self, method: str, url: str, **kwargs):
-        return asyncio.run(self._request(method, url, **kwargs))
+    async def get(self, url: str, **kwargs):
+        return await self._request("GET", url, **kwargs)
 
-    def get(self, url: str, **kwargs):
-        return self.request("GET", url, **kwargs)
-
-    def post(self, url: str, **kwargs):
-        return self.request("POST", url, **kwargs)
+    async def post(self, url: str, **kwargs):
+        return await self._request("POST", url, **kwargs)
 
 
 @pytest.fixture
@@ -58,8 +66,9 @@ def client(app):
 
 
 class TestGetMode:
-    def test_get_mode_returns_valid_response(self, client) -> None:
-        with patch("app.visualization.get_governance_dashboard") as mock_dash:
+    @pytest.mark.asyncio
+    async def test_get_mode_returns_valid_response(self, client) -> None:
+        with patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.PRODUCTION
             mock_instance.get_governance_summary.return_value = {
@@ -67,7 +76,7 @@ class TestGetMode:
             }
             mock_dash.return_value = mock_instance
 
-            resp = client.get("/api/operator/mode")
+            resp = await client.get("/api/operator/mode")
             assert resp.status_code == 200
             data = resp.json()
             assert data["active_mode"] == "production"
@@ -75,58 +84,63 @@ class TestGetMode:
             assert "production" in data["available_modes"]
             assert "forensic" in data["available_modes"]
 
-    def test_get_mode_has_all_five_modes(self, client) -> None:
-        with patch("app.visualization.get_governance_dashboard") as mock_dash:
+    @pytest.mark.asyncio
+    async def test_get_mode_has_all_five_modes(self, client) -> None:
+        with patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.PRODUCTION
             mock_instance.get_governance_summary.return_value = {}
             mock_dash.return_value = mock_instance
 
-            resp = client.get("/api/operator/mode")
+            resp = await client.get("/api/operator/mode")
             modes = resp.json()["available_modes"]
             for expected in ("production", "benchmark", "forensic", "stealth", "low_cost"):
                 assert expected in modes, f"Missing mode: {expected}"
 
 
 class TestSetMode:
-    def test_set_mode_valid(self, client) -> None:
-        with patch("app.visualization.get_governance_dashboard") as mock_dash:
+    @pytest.mark.asyncio
+    async def test_set_mode_valid(self, client) -> None:
+        with patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.FORENSIC
             mock_instance.set_operator_mode.return_value = {"settle_delay": 1500}
             mock_dash.return_value = mock_instance
 
-            resp = client.post("/api/operator/mode", json={"mode": "forensic"})
+            resp = await client.post("/api/operator/mode", json={"mode": "forensic"})
             assert resp.status_code == 200
             data = resp.json()
             assert data["active_mode"] == "forensic"
             assert "message" in data
 
-    def test_set_mode_invalid(self, client) -> None:
-        resp = client.post("/api/operator/mode", json={"mode": "invalid_mode"})
+    @pytest.mark.asyncio
+    async def test_set_mode_invalid(self, client) -> None:
+        resp = await client.post("/api/operator/mode", json={"mode": "invalid_mode"})
         assert resp.status_code == 400
         assert "detail" in resp.json()
 
-    def test_set_mode_case_insensitive(self, client) -> None:
-        with patch("app.visualization.get_governance_dashboard") as mock_dash:
+    @pytest.mark.asyncio
+    async def test_set_mode_case_insensitive(self, client) -> None:
+        with patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.STEALTH
             mock_instance.set_operator_mode.return_value = {"stealth": True}
             mock_dash.return_value = mock_instance
 
-            resp = client.post("/api/operator/mode", json={"mode": "STEALTH"})
+            resp = await client.post("/api/operator/mode", json={"mode": "STEALTH"})
             assert resp.status_code == 200
             assert resp.json()["active_mode"] == "stealth"
 
-    def test_set_mode_all_modes_valid(self, client) -> None:
+    @pytest.mark.asyncio
+    async def test_set_mode_all_modes_valid(self, client) -> None:
         for mode in ("production", "benchmark", "forensic", "stealth", "low_cost"):
-            with patch("app.visualization.get_governance_dashboard") as mock_dash:
+            with patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash:
                 mock_instance = MagicMock()
                 mock_instance.active_mode = OperatorMode(mode)
                 mock_instance.set_operator_mode.return_value = {}
                 mock_dash.return_value = mock_instance
 
-                resp = client.post("/api/operator/mode", json={"mode": mode})
+                resp = await client.post("/api/operator/mode", json={"mode": mode})
                 assert resp.status_code == 200, f"Mode '{mode}' failed: {resp.json()}"
 
 
@@ -136,12 +150,13 @@ class TestSetMode:
 
 
 class TestDashboard:
-    def test_dashboard_returns_all_sections(self, client) -> None:
+    @pytest.mark.asyncio
+    async def test_dashboard_returns_all_sections(self, client) -> None:
         with (
-            patch("app.visualization.get_governance_dashboard") as mock_dash,
-            patch("app.domain_health_alerts.get_domain_health_monitor") as mock_monitor,
-            patch("app.browser_pool.get_browser_pool") as mock_pool,
-            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
+            patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash,
+            patch.object(_domain_health_mod, "get_domain_health_monitor") as mock_monitor,
+            patch.object(_browser_pool_mod, "get_browser_pool") as mock_pool,
+            patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry,
         ):
             # Mock dashboard
             dash_instance = MagicMock()
@@ -178,7 +193,7 @@ class TestDashboard:
             ]
             mock_telemetry.return_value = telemetry_instance
 
-            resp = client.get("/api/operator/dashboard")
+            resp = await client.get("/api/operator/dashboard")
             assert resp.status_code == 200
             data = resp.json()
 
@@ -199,23 +214,25 @@ class TestDashboard:
 
 
 class TestPredictionEndpoints:
-    def test_get_predictions_no_data(self, client) -> None:
-        with patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry:
+    @pytest.mark.asyncio
+    async def test_get_predictions_no_data(self, client) -> None:
+        with patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = []
             mock_telemetry.return_value = telemetry_instance
 
-            resp = client.get("/api/operator/predictions")
+            resp = await client.get("/api/operator/predictions")
             assert resp.status_code == 200
             data = resp.json()
             assert data["domains_analyzed"] == 0
             assert "message" in data
 
-    def test_get_predictions_with_data(self, client) -> None:
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_data(self, client) -> None:
         with (
-            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
-            patch("app.degradation_predictor.get_degradation_predictor") as mock_predictor,
-            patch("app.trend_analyzer.TrendAnalyzer") as mock_analyzer_cls,
+            patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry,
+            patch.object(_degradation_predictor_mod, "get_degradation_predictor") as mock_predictor,
+            patch.object(_trend_analyzer_mod, "TrendAnalyzer") as mock_analyzer_cls,
         ):
             # Telemetry with data
             telemetry_instance = MagicMock()
@@ -239,17 +256,18 @@ class TestPredictionEndpoints:
             }
             mock_predictor.return_value = predictor_instance
 
-            resp = client.get("/api/operator/predictions")
+            resp = await client.get("/api/operator/predictions")
             assert resp.status_code == 200
             data = resp.json()
             assert data["domains_analyzed"] == 1
             assert data["systemic_risk_level"] == "low"
 
-    def test_get_predictions_min_confidence_filter(self, client) -> None:
+    @pytest.mark.asyncio
+    async def test_get_predictions_min_confidence_filter(self, client) -> None:
         with (
-            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
-            patch("app.degradation_predictor.get_degradation_predictor") as mock_predictor,
-            patch("app.trend_analyzer.TrendAnalyzer") as mock_analyzer_cls,
+            patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry,
+            patch.object(_degradation_predictor_mod, "get_degradation_predictor") as mock_predictor,
+            patch.object(_trend_analyzer_mod, "TrendAnalyzer") as mock_analyzer_cls,
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"url": "https://example.com/page", "success": True} for _ in range(10)]
@@ -273,18 +291,19 @@ class TestPredictionEndpoints:
             }
             mock_predictor.return_value = predictor_instance
 
-            resp = client.get("/api/operator/predictions?min_confidence=0.7")
+            resp = await client.get("/api/operator/predictions?min_confidence=0.7")
             assert resp.status_code == 200
             data = resp.json()
             assert data["summary"]["total_filtered"] == 1
 
-    def test_get_domain_prediction_not_found(self, client) -> None:
-        with patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry:
+    @pytest.mark.asyncio
+    async def test_get_domain_prediction_not_found(self, client) -> None:
+        with patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"url": "https://other.com/page", "success": True}]
             mock_telemetry.return_value = telemetry_instance
 
-            resp = client.get("/api/operator/predictions/unknown.com")
+            resp = await client.get("/api/operator/predictions/unknown.com")
             assert resp.status_code == 404
 
 
@@ -294,12 +313,13 @@ class TestPredictionEndpoints:
 
 
 class TestHealthSummary:
-    def test_health_summary_healthy(self, client) -> None:
+    @pytest.mark.asyncio
+    async def test_health_summary_healthy(self, client) -> None:
         with (
-            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
-            patch("app.browser_pool.get_browser_pool") as mock_pool,
-            patch("app.domain_health_alerts.get_domain_health_monitor") as mock_monitor,
-            patch("app.visualization.get_governance_dashboard") as mock_dash,
+            patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry,
+            patch.object(_browser_pool_mod, "get_browser_pool") as mock_pool,
+            patch.object(_domain_health_mod, "get_domain_health_monitor") as mock_monitor,
+            patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash,
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"fallback_triggered": False} for _ in range(20)]
@@ -319,7 +339,7 @@ class TestHealthSummary:
             dash_instance.active_mode = OperatorMode.PRODUCTION
             mock_dash.return_value = dash_instance
 
-            resp = client.get("/api/operator/health")
+            resp = await client.get("/api/operator/health")
             assert resp.status_code == 200
             data = resp.json()
             assert data["status"] == "healthy"
@@ -327,12 +347,13 @@ class TestHealthSummary:
             assert data["success_rate"] == 1.0
             assert data["domains_degraded"] == 0
 
-    def test_health_summary_degraded(self, client) -> None:
+    @pytest.mark.asyncio
+    async def test_health_summary_degraded(self, client) -> None:
         with (
-            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
-            patch("app.browser_pool.get_browser_pool") as mock_pool,
-            patch("app.domain_health_alerts.get_domain_health_monitor") as mock_monitor,
-            patch("app.visualization.get_governance_dashboard") as mock_dash,
+            patch.object(_experimental_mod, "get_scrape_telemetry") as mock_telemetry,
+            patch.object(_browser_pool_mod, "get_browser_pool") as mock_pool,
+            patch.object(_domain_health_mod, "get_domain_health_monitor") as mock_monitor,
+            patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash,
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [
@@ -354,7 +375,7 @@ class TestHealthSummary:
             dash_instance.active_mode = OperatorMode.BENCHMARK
             mock_dash.return_value = dash_instance
 
-            resp = client.get("/api/operator/health")
+            resp = await client.get("/api/operator/health")
             assert resp.status_code == 200
             data = resp.json()
             assert data["status"] == "degraded"
