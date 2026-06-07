@@ -91,7 +91,7 @@ function _renderExperimentalGate(message) {
 
 // ─── Render Helpers ───
 
-function renderCommunities(communities) {
+export function renderCommunities(communities) {
   const el = document.getElementById("community-list");
   if (!communities || !communities.length) {
     el.innerHTML = '<div class="empty"><p>No stable communities identified</p></div>';
@@ -110,7 +110,7 @@ function renderCommunities(communities) {
   }
 }
 
-function renderSchemaPatterns(patterns) {
+export function renderSchemaPatterns(patterns) {
   const el = document.getElementById("schema-pattern-list");
   if (!patterns || !patterns.length) {
     el.innerHTML = '<div class="empty"><p>No recurring schemas learned yet</p></div>';
@@ -133,7 +133,7 @@ function renderSchemaPatterns(patterns) {
   }
 }
 
-function renderExclusions(exclusions) {
+export function renderExclusions(exclusions) {
   const el = document.getElementById("exclusion-list");
   if (!exclusions || !exclusions.length) {
     el.innerHTML = '<div class="empty"><p>No exclusions learned yet</p></div>';
@@ -152,27 +152,31 @@ function renderExclusions(exclusions) {
   }
 }
 
-function renderRoleSimilarities(compats) {
+export function renderRoleSimilarities(compats) {
   const el = document.getElementById("role-similarity-list");
   if (!compats || !compats.length) {
     el.innerHTML = '<div class="empty"><p>Manifold is cold</p></div>';
   } else {
-    el.innerHTML = compats
-      .filter((c) => c.score > 0.7)
-      .sort((a, b) => b.score - a.score)
-      .map(
-        (c) => `
+    const filtered = compats.filter((c) => c.score > 0.7);
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty"><p>Manifold is cold</p></div>';
+    } else {
+      el.innerHTML = filtered
+        .sort((a, b) => b.score - a.score)
+        .map(
+          (c) => `
                 <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
                     <span style="font-weight:600; color:var(--text-main);">${esc(c.role)} <span style="color:var(--text-muted); font-weight:400;">≈</span> ${esc(c.type)}</span>
                     <span style="color:var(--text-muted);">Score: ${c.score.toFixed(3)}</span>
                 </div>
             `,
-      )
-      .join("");
+        )
+        .join("");
+    }
   }
 }
 
-function renderBasins(basins) {
+export function renderBasins(basins) {
   const el = document.getElementById("basin-list");
   if (!basins || !basins.length) {
     el.innerHTML = '<div class="empty"><p>No active conflict basins</p></div>';
