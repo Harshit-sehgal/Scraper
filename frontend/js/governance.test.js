@@ -111,4 +111,41 @@ describe("renderGovernance", () => {
     expect(el.innerHTML).toContain("$0.000");
     expect(el.innerHTML).toContain("\u2014 / \u2014");
   });
+
+  it("escapes HTML in mode value", () => {
+    renderGovernance({
+      active_mode: '<script>alert("xss")</script>',
+      resources: {},
+      browser: {},
+      governor: {},
+    });
+    const el = document.getElementById("dash-governance");
+    expect(el.innerHTML).toContain("&lt;script&gt;");
+    expect(el.innerHTML).not.toContain("<script>");
+  });
+
+  it("handles all zero numeric values", () => {
+    renderGovernance({
+      active_mode: "manual",
+      resources: { proxy_health: 0 },
+      browser: { active_contexts: 0, total_contexts: 0 },
+      governor: { token_spend_dollars: 0, queue_sheds: 0, browser_prunes: 0 },
+    });
+    const el = document.getElementById("dash-governance");
+    expect(el.innerHTML).toContain("$0.000");
+    expect(el.innerHTML).toContain("0%");
+    expect(el.innerHTML).toContain("0 / 0");
+  });
+
+  it("handles very large proxy health values", () => {
+    renderGovernance({
+      active_mode: "auto",
+      resources: { proxy_health: 999 },
+      browser: { active_contexts: 0, total_contexts: 0 },
+      governor: {},
+    });
+    const el = document.getElementById("dash-governance");
+    // 999 * 100 = 99900%
+    expect(el.innerHTML).toContain("99900%");
+  });
 });

@@ -207,4 +207,64 @@ describe("renderPredictions", () => {
     if (badge) badge.remove();
     expect(() => renderPredictions(PREDICTION_DATA)).not.toThrow();
   });
+
+  it("renders multiple predictions", () => {
+    const multiData = {
+      systemic_risk_level: "high",
+      predictions: [
+        PREDICTION_DATA.predictions[0],
+        {
+          domain: "test.org",
+          risk_level: "low",
+          predicted_failure_type: "timeout",
+          confidence: 0.55,
+          health_score_current: 85,
+        },
+      ],
+    };
+    renderPredictions(multiData);
+    const el = document.getElementById("dash-predictions");
+    const cards = el.querySelectorAll(".dash-prediction");
+    expect(cards.length).toBe(2);
+    expect(el.innerHTML).toContain("example.com");
+    expect(el.innerHTML).toContain("test.org");
+    expect(el.innerHTML).toContain("55%");
+  });
+
+  it("renders all risk levels on badge", () => {
+    const levels = ["low", "medium", "high", "critical"];
+    for (const level of levels) {
+      document.getElementById("dash-predictions").innerHTML = '<div class="dash-loading">Loading...</div>';
+      renderPredictions({ systemic_risk_level: level, predictions: [] });
+      const badge = document.getElementById("dash-systemic-risk");
+      expect(badge.textContent).toBe(`Systemic: ${level.toUpperCase()}`);
+      expect(badge.className).toContain(`risk-${level}`);
+    }
+  });
+
+  it("shows 0% for zero confidence", () => {
+    const data = {
+      systemic_risk_level: "low",
+      predictions: [{ ...PREDICTION_DATA.predictions[0], confidence: 0 }],
+    };
+    renderPredictions(data);
+    const el = document.getElementById("dash-predictions");
+    expect(el.innerHTML).toContain("0%");
+  });
+
+  it("handles missing prediction sub-fields gracefully", () => {
+    renderPredictions({
+      systemic_risk_level: "low",
+      predictions: [{ domain: "partial.example" }],
+    });
+    const el = document.getElementById("dash-predictions");
+    expect(el.innerHTML).toContain("partial.example");
+    // Should not throw — missing fields use defaults
+    expect(() =>
+      renderPredictions({
+        systemic_risk_level: "low",
+        predictions: [{}],
+      }),
+    ).not.toThrow();
+  });
 });
