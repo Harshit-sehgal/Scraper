@@ -90,7 +90,7 @@ export async function analyzeURL() {
 
 // ─── Render Analysis Info ───
 
-function renderAnalysisInfo(data) {
+export function renderAnalysisInfo(data) {
   const structureEl = document.getElementById("ai-structure");
   const recordsEl = document.getElementById("ai-records");
   const antibotEl = document.getElementById("ai-antibot");
@@ -117,16 +117,17 @@ function renderAnalysisInfo(data) {
 
 // ─── Render Field List ───
 
-function renderFieldList() {
+export function renderFieldList(fields) {
   const fieldList = document.getElementById("analyze-field-list");
   const fieldCount = document.getElementById("analyze-field-count");
+  const items = fields ?? _analyzedFields;
 
-  if (fieldCount) fieldCount.textContent = String(_analyzedFields.length);
+  if (fieldCount) fieldCount.textContent = String(items.length);
 
-  if (!_analyzedFields.length) {
+  if (!items.length) {
     fieldList.innerHTML = '<div class="empty"><p>No data fields detected on this page</p></div>';
   } else {
-    fieldList.innerHTML = _analyzedFields
+    fieldList.innerHTML = items
       .map((f, i) => {
         const conf = Math.min(f.confidence || 0.5, 1.0);
         const confPct = Math.round(conf * 100);
@@ -151,7 +152,7 @@ function renderFieldList() {
 
 // ─── Render Acquisition Banner ───
 
-function renderAcquisitionBanner(data, url) {
+export function renderAcquisitionBanner(data, url) {
   const acqBanner = document.getElementById("acquisition-banner");
   if (!acqBanner) return;
 
