@@ -179,3 +179,48 @@ def test_metrics_unset_token_fails_secure_in_any_production_casing(client, monke
         # env-var name (case-insensitive) is enough to confirm the
         # fail-secure path fired rather than the dev open path.
         assert "metrics_token" in r.text.lower()
+
+
+def test_metrics_token_warn_once(client, monkeypatch, caplog) -> None:
+    """The 'METRICS_TOKEN unset' warning must be emitted at most once.
+
+    When ``METRICS_TOKEN`` is empty and ``ENV`` is not production,
+    ``/metrics`` stays open for local development but logs a warning
+    the first time it is hit. Subsequent scrapes must NOT re-emit
+    the warning, otherwise a busy local Prometheus scrape would
+    spam the log file.
+
+    The test resets the module-level ``_METRICS_TOKEN_WARN_EMITTED``
+    sentinel both at entry and exit so it is order-independent
+    relative to other tests in the suite.
+    """
+    import logging
+
+    from app.routers import system as system_router
+
+    monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "")
+    monkeypatch.setattr("app.config.settings.ENV", "development")
+    monkeypatch.setattr(system_router, "_METRICS_TOKEN_WARN_EMITTED", False)
+
+    with caplog.at_level(logging.WARNING, logger="app.routers.system"):
+        first = client.get("/metrics")
+        second = client.get("/metrics")
+        third = client.get("/metrics")
+
+    # All three requests must succeed (dev open behavior).
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 200
+
+    warning_lines = [
+        record.getMessage()
+        for record in caplog.records
+        if "METRICS_TOKEN" in record.getMessage() and record.levelno == logging.WARNING
+    ]
+    # Exactly one warning across three calls — the helper is
+    # designed to short-circuit on subsequent invocations.
+    assert len(warning_lines) == 1, (
+        f"Expected exactly one METRICS_TOKEN warning across three calls, got {len(warning_lines)}: {warning_lines!r}"
+    )
+    # Reset the sentinel so other tests in the suite see a clean slate.
+    monkeypatch.setattr(system_router, "_METRICS_TOKEN_WARN_EMITTED", False)
