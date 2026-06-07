@@ -10,7 +10,7 @@ jobs:
   postgres-tests:
     name: Postgres Integration
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:16-alpine

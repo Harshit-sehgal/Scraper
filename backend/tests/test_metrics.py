@@ -160,4 +160,22 @@ def test_metrics_worker_heartbeat_present(client, monkeypatch) -> None:
     pattern = re.compile(r'dataforge_worker_heartbeat_alive\{[^}]*worker_id="metrics-test-worker"[^}]*\}\s+1(?:\.0)?\b')
     assert pattern.search(text), f"Test worker should appear as alive in heartbeat metrics. Metrics text:\n{text}"
 
-    reset_repository()
+
+def test_metrics_unset_token_fails_secure_in_any_production_casing(client, monkeypatch) -> None:
+    """When ``METRICS_TOKEN`` is unset and ``ENV`` is set to any
+    case-variant of ``production`` (``Production``, ``PRODUCTION``,
+    ``  production  ``), the ``/metrics`` endpoint must 503. The check
+    is intentionally case-insensitive and whitespace-trimmed so a
+    copy-paste from a deploy doc doesn't silently fall through to the
+    dev open behavior in production.
+    """
+    monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "")
+    for env_value in ("production", "Production", "PRODUCTION", "  production  "):
+        monkeypatch.setattr("app.config.settings.ENV", env_value)
+        r = client.get("/metrics")
+        assert r.status_code == 503, f"METRICS_TOKEN unset + ENV={env_value!r} should 503, got {r.status_code}"
+        # The error message names the env var in its canonical
+        # underscore form ("METRICS_TOKEN"). A substring match on the
+        # env-var name (case-insensitive) is enough to confirm the
+        # fail-secure path fired rather than the dev open path.
+        assert "metrics_token" in r.text.lower()

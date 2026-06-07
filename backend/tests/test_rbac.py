@@ -122,6 +122,31 @@ def test_api_middleware_accepts_bearer_tokens_before_rbac(client, monkeypatch) -
     assert admin_resp.status_code in (200, 400)
 
 
+def test_api_middleware_admin_key_wins_over_user_key(client, monkeypatch) -> None:
+    """Admin-first auth priority: a request that carries BOTH an admin
+    Bearer and a user X-API-Key header must be attributed to the admin
+    role, not the user role. This is the contract that the auth
+    middleware enforces by checking ``ADMIN_API_KEY`` before
+    ``API_KEY``."""
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret")
+    monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret")
+    monkeypatch.setattr(settings, "API_KEY", "user-secret")
+    monkeypatch.setattr(settings, "ENV", "production")
+
+    # /api/operator/mode is admin-only; user-secret would 403.
+    resp = client.post(
+        "/api/operator/mode",
+        json={"mode": "production"},
+        headers={
+            "X-API-Key": "user-secret",
+            "Authorization": "Bearer admin-secret",
+        },
+    )
+    assert resp.status_code in (200, 400), (
+        f"admin role was not detected when both keys were present. got {resp.status_code}: {resp.text}"
+    )
+
+
 def test_rbac_development_fallback(monkeypatch) -> None:
     """Verify that development fallback behavior requires ALLOW_INSECURE_DEV_AUTH."""
     from typing import Any

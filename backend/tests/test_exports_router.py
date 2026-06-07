@@ -629,8 +629,16 @@ class TestExportFilename:
     async def test_json_filename_clean(self, name_client) -> None:
         resp = await name_client.get("/api/jobs/n2/export/json")
         disp = resp.headers.get("content-disposition", "")
-        # Special chars should be sanitized
+        # Special chars (slashes, colons) must be stripped from the
+        # filename segment so the Content-Disposition header is
+        # syntactically valid for every browser. We assert both that
+        # the meaningful parts of the job name are preserved and that
+        # the unsafe separators are absent.
         assert ".json" in disp
+        for allowed in ("special", "chars", "test"):
+            assert allowed in disp, f"expected {allowed!r} in {disp!r}"
+        for forbidden in ("/", ":"):
+            assert forbidden not in disp, f"{forbidden!r} leaked into {disp!r}"
 
 
 # ═══════════════════════════════════════════════════════════════════

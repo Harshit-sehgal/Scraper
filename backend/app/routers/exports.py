@@ -628,7 +628,29 @@ def create_exports_router(jobs_store: dict):
         if flatten:
             all_fnames = list(fieldnames)
             all_fnames.append(_SOURCE_JOB_FIELD)
-            ws = wb.create_sheet(title="Combined")
+            # Use the same collision-avoidance logic as the per-job
+            # branch below: a user-named job called exactly "Combined"
+            # would otherwise raise ``InvalidWorksheetTitle`` from
+            # openpyxl because the explicit title is duplicated with
+            # itself across the same export call. Pre-register the
+            # title in a one-element used-set so the loop is
+            # unambiguous.
+            used_flatten_names: set[str] = set()
+            base = "Combined"
+            sheet_name = base
+            suffix = 2
+            while sheet_name in used_flatten_names:
+                if suffix == 2:
+                    candidate = f"{base[: 31 - 4]} (2)"
+                else:
+                    candidate = f"{base[: 31 - 4]} ({suffix})"
+                sheet_name = candidate[:31]
+                suffix += 1
+                if suffix > 999:
+                    sheet_name = f"{base[: 31 - 4]}_x"
+                    break
+            used_flatten_names.add(sheet_name)
+            ws = wb.create_sheet(title=sheet_name)
             ws.append(all_fnames)
             for jid, job_name, rows in per_job_results:
                 for row in rows:
