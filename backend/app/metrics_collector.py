@@ -68,6 +68,14 @@ _repo_query_latencies_lock = threading.Lock()
 _csp_violations: dict[str, int] = {}
 _csp_violations_lock = threading.Lock()
 
+# Rate limit hit counters: incremented by the rate limiter middleware when
+# a request is blocked by the aggregate global tier or the per-IP tier.
+# Exposed as Prometheus gauges via /metrics.
+_rate_limit_global_hits: int = 0
+_rate_limit_global_hits_lock = threading.Lock()
+_rate_limit_per_ip_hits: int = 0
+_rate_limit_per_ip_hits_lock = threading.Lock()
+
 
 def record_request_latency(duration_seconds: float) -> None:
     """Record an API request duration for metrics export."""
@@ -213,6 +221,32 @@ def record_csp_violation(directive: str) -> None:
         _csp_violations[label] = _csp_violations.get(label, 0) + 1
 
 
+def record_rate_limit_global_hit() -> None:
+    """Increment the global rate limit hit counter.
+
+    Called by the rate limiter middleware when the aggregate global tier
+    blocks a request (429 Too Many Requests). Exposed as a Prometheus
+    gauge via /metrics so operators can alert on sustained global
+    rate-limiting.
+    """
+    global _rate_limit_global_hits
+    with _rate_limit_global_hits_lock:
+        _rate_limit_global_hits += 1
+
+
+def record_rate_limit_per_ip_hit() -> None:
+    """Increment the per-IP rate limit hit counter.
+
+    Called by the rate limiter middleware when the per-IP fair-sharing
+    tier blocks a request (429 Too Many Requests). Exposed as a
+    Prometheus gauge via /metrics so operators can spot a single
+    aggressive client being throttled.
+    """
+    global _rate_limit_per_ip_hits
+    with _rate_limit_per_ip_hits_lock:
+        _rate_limit_per_ip_hits += 1
+
+
 def get_request_latencies() -> list[float]:
     with _request_latencies_lock:
         return list(_request_latencies)
@@ -278,9 +312,19 @@ def get_csp_violations() -> dict[str, int]:
         return dict(_csp_violations)
 
 
+def get_rate_limit_global_hits() -> int:
+    with _rate_limit_global_hits_lock:
+        return _rate_limit_global_hits
+
+
+def get_rate_limit_per_ip_hits() -> int:
+    with _rate_limit_per_ip_hits_lock:
+        return _rate_limit_per_ip_hits
+
+
 def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
-    global _llm_calls_total, _requests_total
+    global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits
     with _request_latencies_lock:
         _request_latencies.clear()
     with _worker_failures_lock:
@@ -307,3 +351,7 @@ def reset_for_testing() -> None:
         _repo_query_latencies.clear()
     with _csp_violations_lock:
         _csp_violations.clear()
+    with _rate_limit_global_hits_lock:
+        _rate_limit_global_hits = 0
+    with _rate_limit_per_ip_hits_lock:
+        _rate_limit_per_ip_hits = 0

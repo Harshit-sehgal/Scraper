@@ -335,6 +335,7 @@ body::after {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -480,24 +481,31 @@ body::after {
 .job-row:nth-child(1) {
   animation-delay: 0.02s;
 }
+
 .job-row:nth-child(2) {
   animation-delay: 0.04s;
 }
+
 .job-row:nth-child(3) {
   animation-delay: 0.06s;
 }
+
 .job-row:nth-child(4) {
   animation-delay: 0.08s;
 }
+
 .job-row:nth-child(5) {
   animation-delay: 0.1s;
 }
+
 .job-row:nth-child(6) {
   animation-delay: 0.12s;
 }
+
 .job-row:nth-child(7) {
   animation-delay: 0.14s;
 }
+
 .job-row:nth-child(8) {
   animation-delay: 0.16s;
 }
@@ -507,6 +515,7 @@ body::after {
     opacity: 0;
     transform: translateX(-8px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
@@ -534,6 +543,7 @@ body::after {
   0% {
     background: var(--accent-soft);
   }
+
   100% {
     background: transparent;
   }
@@ -602,6 +612,7 @@ body::after {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -615,9 +626,11 @@ body::after {
   0% {
     filter: brightness(1);
   }
+
   50% {
     filter: brightness(1.5);
   }
+
   100% {
     filter: brightness(1);
   }
@@ -693,22 +706,27 @@ body::after {
   color: #005d9f;
   background: #d7ecfb;
 }
+
 .badge.completed {
   color: #116943;
   background: var(--success-soft);
 }
+
 .badge.degraded {
   color: #8a5a10;
   background: var(--warning-soft);
 }
+
 .badge.empty_result {
   color: #8a3a10;
   background: #fde8d0;
 }
+
 .badge.canceled {
   color: #6b4f8a;
   background: #eee2fb;
 }
+
 .badge.failed {
   color: #972a2a;
   background: var(--danger-soft);
@@ -1155,6 +1173,7 @@ select {
 .log-msg.error {
   color: var(--danger);
 }
+
 .log-msg.warning {
   color: var(--warning);
 }
@@ -1310,6 +1329,7 @@ tr:hover td {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+
   to {
     opacity: 0;
     transform: translateY(-8px) scale(0.95);
@@ -1319,12 +1339,15 @@ tr:hover td {
 .toast.success {
   border-left: 4px solid var(--success);
 }
+
 .toast.error {
   border-left: 4px solid var(--danger);
 }
+
 .toast.info {
   border-left: 4px solid var(--info);
 }
+
 .toast.warning {
   border-left: 4px solid var(--warning);
 }
@@ -1341,12 +1364,15 @@ tr:hover td {
 .toast.success .toast-timer {
   background: var(--success);
 }
+
 .toast.error .toast-timer {
   background: var(--danger);
 }
+
 .toast.info .toast-timer {
   background: var(--info);
 }
+
 .toast.warning .toast-timer {
   background: var(--warning);
 }
@@ -1355,6 +1381,7 @@ tr:hover td {
   from {
     width: 100%;
   }
+
   to {
     width: 0%;
   }
@@ -1365,6 +1392,7 @@ tr:hover td {
     opacity: 0;
     transform: translateY(12px) scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1402,6 +1430,7 @@ tr:hover td {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1473,9 +1502,11 @@ tr:hover td {
 .anim-dot:nth-child(2) {
   animation-delay: 0.3s;
 }
+
 .anim-dot:nth-child(3) {
   animation-delay: 0.6s;
 }
+
 .anim-dot:nth-child(4) {
   animation-delay: 0.9s;
 }
@@ -1485,6 +1516,7 @@ tr:hover td {
   100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-6px);
   }
@@ -1495,6 +1527,7 @@ tr:hover td {
   100% {
     opacity: 0.4;
   }
+
   50% {
     opacity: 0.8;
   }
@@ -1506,6 +1539,7 @@ tr:hover td {
     opacity: 0.2;
     transform: scale(1);
   }
+
   50% {
     opacity: 1;
     transform: scale(1.3);
@@ -1561,6 +1595,7 @@ tr:hover td {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -1570,9 +1605,11 @@ tr:hover td {
   width: 100%;
   max-width: 240px;
 }
+
 .skeleton-bar.med {
   width: 80px;
 }
+
 .skeleton-bar.narrow {
   width: 50px;
 }
@@ -1613,6 +1650,7 @@ tr:hover td {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1623,6 +1661,7 @@ tr:hover td {
     opacity: 0;
     transform: translateY(12px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);

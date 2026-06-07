@@ -384,7 +384,92 @@ class DatabaseSlidingWindowCounter:
                 return self._fallback_counter.reset_in()
 
     def is_expired(self) -> bool:
-        return False
+        """Check if this DB-backed counter has any recent entries for its key."""
+        if not self._initialized:
+            return True
+        from app.config import settings
+
+        backend = settings.STORAGE_BACKEND
+        now = time.time()
+        cutoff = now - self.window_seconds
+
+        if backend == "postgres":
+            try:
+                from app.postgres_repository import _conn, _fetch_one
+
+                with _conn() as conn:
+                    row = _fetch_one(
+                        conn, "SELECT 1 AS alive FROM rate_limits WHERE key = %s AND timestamp > %s LIMIT 1", (self.key, cutoff)
+                    )
+                    return row is None
+            except Exception:
+                return True
+        else:
+            try:
+                from app.job_store import _DB_LOCK, _get_connection
+
+                with _DB_LOCK:
+                    conn = _get_connection()
+                    try:
+                        row = conn.execute(
+                            "SELECT 1 FROM rate_limits WHERE key = ? AND timestamp > ? LIMIT 1",
+                            (self.key, cutoff),
+                        ).fetchone()
+                        return row is None
+                    finally:
+                        conn.close()
+            except Exception:
+                return True
+
+    @staticmethod
+    def prune_all(max_age_seconds: float = 3600.0) -> int:
+        """Delete all rate_limits rows older than ``max_age_seconds`` across every key.
+
+        Returns the count of remaining rows after pruning (caller uses this
+        only for debug logging). Called periodically by the rate limiter
+        middleware's ``_prune_expired_counters()`` to prevent the
+        ``rate_limits`` table from accumulating orphaned rows for keys that
+        are no longer active. The default retention is 1 hour (3600s),
+        which is well beyond the longest rate-limit window (1 hour).
+
+        Safe to call before any ``_ensure_table()`` has run — the SQL
+        ``DELETE`` is a no-op on a missing table (Postgres returns 0;
+        SQLite silently ignores).
+        """
+        from app.config import settings
+
+        backend = settings.STORAGE_BACKEND
+        cutoff = time.time() - max_age_seconds
+
+        if backend == "postgres":
+            try:
+                from app.postgres_repository import _conn, _execute, _fetch_one
+
+                with _conn() as conn:
+                    _execute(conn, "DELETE FROM rate_limits WHERE timestamp <= %s", (cutoff,))
+                    remaining = _fetch_one(conn, "SELECT COUNT(*) AS c FROM rate_limits")
+                    return remaining["c"] if remaining else 0
+            except Exception:
+                logger.debug("Postgres rate_limits prune_all failed")
+                return 0
+        else:
+            try:
+                from app.job_store import _DB_LOCK, _get_connection
+
+                with _DB_LOCK:
+                    conn = _get_connection()
+                    try:
+                        conn.execute("DELETE FROM rate_limits WHERE timestamp <= ?", (cutoff,))
+                        row = conn.execute("SELECT COUNT(*) AS c FROM rate_limits").fetchone()
+                        result = row["c"] if row else 0
+                        conn.commit()
+                    finally:
+                        conn.close()
+            except Exception:
+                logger.debug("SQLite rate_limits prune_all failed")
+                return 0
+            else:
+                return result  # type: ignore[no-any-return]
 
 
 class SlidingWindowCounter:
@@ -571,7 +656,12 @@ class RateLimiterMiddleware:
         return counter
 
     def _prune_expired_counters(self) -> None:
-        """Remove expired counters to prevent unbounded memory growth."""
+        """Remove expired counters to prevent unbounded memory growth.
+
+        Also prunes stale rows from the shared ``rate_limits`` table
+        so that orphaned per-IP entries (from clients that have not
+        sent a request in over an hour) do not accumulate indefinitely.
+        """
         now = time.time()
         if now - self._last_cleanup < self._cleanup_interval:
             return
@@ -581,6 +671,18 @@ class RateLimiterMiddleware:
         after = len(self._counters)
         if before > after:
             logger.debug("Rate limiter: pruned %d expired counter(s)", before - after)
+
+        # Global rate_limits table pruning (DB-backed counters).
+        # Remove rows older than 1 hour (3600s) across all keys.
+        try:
+            from app.config import settings
+
+            if settings.RATE_LIMIT_DB_BACKED:
+                deleted = DatabaseSlidingWindowCounter.prune_all()
+                if deleted:
+                    logger.debug("Rate limiter: pruned %d stale rate_limits row(s)", deleted)
+        except Exception:
+            logger.debug("Rate limiter: rate_limits table prune_all failed (non-blocking)")
 
     # ── Rate-limit response builder ───────────────────────────────────
 
@@ -650,6 +752,9 @@ class RateLimiterMiddleware:
             agg_counter = self._get_or_create_counter(agg_key, *agg_limit)
 
             if not agg_counter.allow():
+                from app.metrics_collector import record_rate_limit_global_hit
+
+                record_rate_limit_global_hit()
                 return self._build_429_response(agg_counter, client_ip, path)
 
         # ── Tier 2: Per-IP counter ─────────────────────────────────
@@ -666,6 +771,9 @@ class RateLimiterMiddleware:
             active_per_ip_counter = ip_counter
 
             if not ip_counter.allow():
+                from app.metrics_collector import record_rate_limit_per_ip_hit
+
+                record_rate_limit_per_ip_hit()
                 return self._build_429_response(ip_counter, client_ip, path)
 
         # ── Proceed with the request ───────────────────────────────

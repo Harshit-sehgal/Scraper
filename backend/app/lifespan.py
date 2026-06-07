@@ -155,6 +155,14 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, RUF100
     if gossip_task:
         _background_tasks.append(gossip_task)
 
+    # Schedule periodic rate_limits table pruning (DB-backed counters).
+    # Independently of the middleware's per-request pruning (every 300s),
+    # this background task ensures stale rows are cleaned up even when
+    # there is no API traffic.
+    if settings.RATE_LIMIT_PRUNE_INTERVAL > 0:
+        prune_task = schedule_background_task(_rate_limit_prune_loop())
+        _background_tasks.append(prune_task)
+
     yield
     # ─── SHUTDOWN ─────────────────────────────────────────────────────
 
@@ -240,6 +248,30 @@ async def run_job_wrapper(job_id: str) -> None:
         persist_state_single_fn=lambda: persist_single_fn(job_id, critical=False),
         persist_state_single_critical_fn=lambda: persist_single_fn(job_id, critical=True),
     )
+
+
+async def _rate_limit_prune_loop() -> None:
+    """Periodically prune stale rows from the ``rate_limits`` table.
+
+    Runs on the ``RATE_LIMIT_PRUNE_INTERVAL`` (default 3600s). Catches
+    all exceptions so a transient DB error never kills the loop. The
+    loop is cancelled by the lifespan shutdown handler which cancels
+    all ``_background_tasks``.
+
+    The method is idempotent and safe to call even when the
+    ``rate_limits`` table has never been created (the DELETE is
+    silently ignored by both SQLite and Postgres).
+    """
+    from app.rate_limiter import DatabaseSlidingWindowCounter
+
+    while True:
+        try:
+            await asyncio.sleep(settings.RATE_LIMIT_PRUNE_INTERVAL)
+            DatabaseSlidingWindowCounter.prune_all()
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Rate limit table pruning background task failed (non-blocking)")
 
 
 def persist_state_wrapper() -> None:
