@@ -81,6 +81,11 @@ jobs:
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m pytest backend/tests/test_contract_smoke.py -q -o addopts= --tb=short
 
+      - name: Validate Grafana Dashboard JSON Structure
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m pytest backend/tests/test_grafana_dashboard.py -q -o addopts= --tb=short
+
   # ── Benchmarks (needs Playwright browser — cached) ────────────────
   ci-gates-benchmarks:
     name: In-Corpus Benchmarks
@@ -195,8 +200,8 @@ jobs:
       - name: CSS Lint (stylelint)
         run: npx stylelint 'frontend/**/*.css'
 
-      - name: JS/CSS Format Check (Prettier)
-        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' 'package.json' '.stylelintrc.json' '.prettierrc'
+      - name: JS/CSS/JSON Format Check (Prettier)
+        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' 'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
 
       - name: Frontend Unit Tests (vitest)
         run: npm test
