@@ -5,5 +5,13 @@
   "trailingComma": "all",
   "printWidth": 120,
   "bracketSpacing": true,
-  "arrowParens": "always"
+  "arrowParens": "always",
+  "overrides": [
+    {
+      "files": "grafana/**/*.json",
+      "options": {
+        "parser": "json"
+      }
+    }
+  ]
 }
