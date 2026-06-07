@@ -41,10 +41,10 @@ def test_pollinations_api() -> None:
         match = re.search(r"\[.*\]", content, re.DOTALL)
         json.loads(match.group(0)) if match else json.loads(content)
 
-    except Exception as e:
+    except Exception:
         import logging
 
-        logging.exception(e)
+        logging.exception("Pollinations API test failed")
 
 
 if __name__ == "__main__":

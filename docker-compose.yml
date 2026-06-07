@@ -7,10 +7,10 @@
 #
 # Production: see docker-compose.prod.yml
 # =============================================================================
-# `version` is a deprecated top-level key in Compose v2, but Compose
-# v1 (still present on some CI images) requires it. Drop once v1 is
-# fully retired.
-version: "3.8"
+# The deprecated top-level ``version`` key is intentionally omitted
+# (Compose v2 ignores it; Compose v1 is end-of-life). Some
+# interactive ``docker compose config`` invocations still warn on
+# its presence, which is why we removed it.
 
 x-logging: &default-logging
   driver: "json-file"

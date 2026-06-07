@@ -426,7 +426,7 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
 def extract_raw_from_selectors(
     html: str,
     selectors_map: dict,
-    base_url: str = "",
+    base_url: str = "",  # noqa: ARG001, RUF100
 ) -> list[dict]:
     """Extract every field in the selector map from each item container (unmapped keys)."""
     container_sel = selectors_map.get("item_container")
@@ -758,10 +758,14 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 if not heading:
                     for child in container.find_all(["span", "div", "p", "b", "i"], recursive=True, limit=10):
                         child_text = child.get_text(strip=True)
-                        if child_text and len(child_text) < 60 and child_text != text:
-                            if re.match(r"^[A-Za-z]\w+(\s+[A-Za-z]\w+){0,4}$", child_text):
-                                heading = child
-                                break
+                        if (
+                            child_text
+                            and len(child_text) < 60
+                            and child_text != text
+                            and re.match(r"^[A-Za-z]\w+(\s+[A-Za-z]\w+){0,4}$", child_text)
+                        ):
+                            heading = child
+                            break
 
                 candidate = (
                     heading.get("alt")

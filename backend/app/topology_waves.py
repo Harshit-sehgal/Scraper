@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def emit_field_wave(state: "TopologyState", source_region_id: str, intensity: float) -> None:
+def emit_field_wave(state: "TopologyState", source_region_id: str, intensity: float) -> None:  # noqa: ARG001, RUF100
     """Emit a semantic wave from a region into the field.
 
     Instead of a global scheduler calling propagate(), individual regions
@@ -99,10 +99,12 @@ def process_field_wave(state: "TopologyState", source_region_id: str, intensity:
                     # recursion
                     from app.graph_update_scheduler import TaskPriority, get_scheduler
 
-                    get_scheduler().schedule(
-                        f"wave_hop:{target.region_id}",
-                        TaskPriority.NORMAL,
-                        state.emit_field_wave,
-                        target.region_id,
-                        received_intensity * 0.5,
-                    )
+                    scheduler = get_scheduler()
+                    if scheduler is not None:
+                        scheduler.schedule(
+                            f"wave_hop:{target.region_id}",
+                            TaskPriority.NORMAL,
+                            state.emit_field_wave,
+                            target.region_id,
+                            received_intensity * 0.5,
+                        )

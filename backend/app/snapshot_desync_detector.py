@@ -179,7 +179,7 @@ class SnapshotDesyncDetector:
 
     # ─── Clock Comparison ────────────────────────────────────────────
 
-    def _compare_clocks(self, clock_a: dict, clock_b: dict, node_a: str, node_b: str) -> str:
+    def _compare_clocks(self, clock_a: dict, clock_b: dict, node_a: str, node_b: str) -> str:  # noqa: ARG002, RUF100
         """Determine causal relation between two vector clocks."""
         self_newer = False
         other_newer = False

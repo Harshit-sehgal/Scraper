@@ -138,13 +138,16 @@ def create_exports_router(jobs_store: dict):
                 logger.debug("Failed to refresh job %s from repo for export", job_id)
 
     @router.get("/api/jobs/{job_id}/export/csv")
-    async def export_csv(job_id: str):
+    async def export_csv(
+        job_id: str,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         try:
             return await _export_csv_impl(job_id)
         except HTTPException:
             _record_export_outcome("csv", False)
             raise
-        except Exception:  # noqa: BLE001
+        except Exception:
             _record_export_outcome("csv", False)
             raise
         else:
@@ -234,13 +237,16 @@ def create_exports_router(jobs_store: dict):
         )
 
     @router.get("/api/jobs/{job_id}/export/json")
-    async def export_json(job_id: str):
+    async def export_json(
+        job_id: str,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         try:
             return await _export_json_impl(job_id)
         except HTTPException:
             _record_export_outcome("json", False)
             raise
-        except Exception:  # noqa: BLE001
+        except Exception:
             _record_export_outcome("json", False)
             raise
         else:
@@ -316,13 +322,16 @@ def create_exports_router(jobs_store: dict):
         )
 
     @router.get("/api/jobs/{job_id}/export/excel")
-    async def export_excel(job_id: str):
+    async def export_excel(
+        job_id: str,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         try:
             result = await _export_excel_impl(job_id)
         except HTTPException:
             _record_export_outcome("excel", False)
             raise
-        except Exception:  # noqa: BLE001
+        except Exception:
             _record_export_outcome("excel", False)
             raise
         _record_export_outcome("excel", True)
@@ -439,7 +448,7 @@ def create_exports_router(jobs_store: dict):
         except HTTPException:
             _record_export_outcome(f"batch_{body.format}", False)
             raise
-        except Exception:  # noqa: BLE001
+        except Exception:
             _record_export_outcome(f"batch_{body.format}", False)
             raise
         else:
@@ -453,11 +462,11 @@ def create_exports_router(jobs_store: dict):
 
         # Resolve all jobs — fail fast on any missing ID.
         missing: list[str] = []
-        for jid in body.job_ids:
-            if jid not in jobs_store:
-                missing.append(jid)
+        for _jid in body.job_ids:
+            if _jid not in jobs_store:
+                missing.append(_jid)
             else:
-                await run_in_threadpool(_refresh_job_for_export, jid)
+                await run_in_threadpool(_refresh_job_for_export, _jid)
 
         if missing:
             raise HTTPException(
@@ -468,8 +477,8 @@ def create_exports_router(jobs_store: dict):
         # Collect per-job results: (job_id, job_name, cleaned_results_list)
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]] = []
         has_any_data = False
-        for jid in body.job_ids:
-            job = jobs_store.get(jid)
+        for _jid in body.job_ids:
+            job = jobs_store.get(_jid)
             if not job:
                 continue
 
@@ -494,7 +503,7 @@ def create_exports_router(jobs_store: dict):
             if raw:
                 has_any_data = True
                 per_job_results.append(
-                    (jid, job.name or jid, _strip_system_fields(raw)),
+                    (_jid, job.name or _jid, _strip_system_fields(raw)),
                 )
 
         if not has_any_data:
@@ -516,7 +525,7 @@ def create_exports_router(jobs_store: dict):
             return await run_in_threadpool(_batch_csv, per_job_results, fieldnames, body.flatten)
         if fmt == "json":
             return await run_in_threadpool(_batch_json, per_job_results, fieldnames, body.flatten)
-        # fmt == "xlsx"
+        # fmt == "xlsx"  # noqa: ERA001, RUF100
         return await run_in_threadpool(_batch_xlsx, per_job_results, fieldnames, body.flatten)
 
     def _batch_csv(
@@ -537,7 +546,7 @@ def create_exports_router(jobs_store: dict):
             all_fieldnames.append(_SOURCE_JOB_FIELD)
             writer = csv.DictWriter(output, fieldnames=all_fieldnames)
             writer.writeheader()
-            for jid, job_name, rows in per_job_results:
+            for _, job_name, rows in per_job_results:
                 for row in rows:
                     flat = _flat_row(row, fieldnames)
                     flat[_SOURCE_JOB_FIELD] = job_name
@@ -545,7 +554,7 @@ def create_exports_router(jobs_store: dict):
         else:
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
-            for idx, (jid, job_name, rows) in enumerate(per_job_results):
+            for idx, (_, job_name, rows) in enumerate(per_job_results):
                 if idx > 0:
                     # Blank separator row between job groups
                     sep: dict[str, str] = {f: "" for f in fieldnames}
@@ -555,7 +564,7 @@ def create_exports_router(jobs_store: dict):
                     writer.writerow(_flat_row(row, fieldnames))
 
         output.seek(0)
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         return Response(
             content=output.getvalue(),
             media_type="text/csv",
@@ -564,7 +573,7 @@ def create_exports_router(jobs_store: dict):
 
     def _batch_json(
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
-        fieldnames: list[str],
+        fieldnames: list[str],  # noqa: ARG001, RUF100
         flatten: bool,
     ) -> Response:
         """Generate a batch JSON response.
@@ -576,7 +585,7 @@ def create_exports_router(jobs_store: dict):
         """
         if flatten:
             combined: list[dict[str, Any]] = []
-            for jid, job_name, rows in per_job_results:
+            for _, job_name, rows in per_job_results:
                 for row in rows:
                     tagged = dict(row)
                     tagged[_SOURCE_JOB_FIELD] = job_name
@@ -595,7 +604,7 @@ def create_exports_router(jobs_store: dict):
             payload = {"exports": exports}
 
         json_content = json.dumps(payload, indent=2)
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         return Response(
             content=json_content,
             media_type="application/json",
@@ -652,7 +661,7 @@ def create_exports_router(jobs_store: dict):
             used_flatten_names.add(sheet_name)
             ws = wb.create_sheet(title=sheet_name)
             ws.append(all_fnames)
-            for jid, job_name, rows in per_job_results:
+            for _, job_name, rows in per_job_results:
                 for row in rows:
                     vals = _row_values(row, fieldnames)
                     vals.append(job_name)
@@ -661,7 +670,7 @@ def create_exports_router(jobs_store: dict):
             # Track used sheet names to avoid ``InvalidWorksheetTitle`` from
             # openpyxl when two jobs share the same 31-char prefix.
             used_sheet_names: set[str] = set()
-            for jid, job_name, rows in per_job_results:
+            for _, job_name, rows in per_job_results:
                 base = (job_name or "Sheet")[:31] or "Sheet"
                 sheet_name = base
                 suffix = 2
@@ -688,7 +697,7 @@ def create_exports_router(jobs_store: dict):
         wb.save(output)
         output.seek(0)
 
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         return Response(
             content=output.getvalue(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

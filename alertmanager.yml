@@ -18,10 +18,22 @@
 # visible in the Prometheus UI and Grafana but will not produce
 # out-of-band notifications.
 #
-# ⚠️  If ALERTMANAGER_SMTP_HOST is empty, Alertmanager will log a
-#    warning at startup but will continue running without email
-#    notifications. Slack notifications similarly skip when the
-#    webhook URL is empty. Set both to enable full alert delivery.
+# ⚠️  Alertmanager v0.27+ auto-rejects an empty smtp_smarthost. The
+#    operator MUST provide one of:
+#      (a) set ALERTMANAGER_SMTP_HOST in .env, then let the
+#          docker-compose.prod.yml entrypoint ``envsubst`` the
+#          placeholders below at container start (see command
+#          block), OR
+#      (b) mount a fully-rendered alertmanager.yml into
+#          /etc/alertmanager/alertmanager.yml.
+#    The placeholders below default to empty strings so a vanilla
+#    ``docker compose -f docker-compose.prod.yml config`` validates,
+#    but a production stack will refuse to deliver email until
+#    option (a) or (b) is taken.
+#
+#    The envsubst pattern in docker-compose.prod.yml replaces
+#    ``__ALERTMANAGER_SMTP_HOST__`` (and friends) with the values
+#    from .env. Edit those vars and re-deploy to enable delivery.
 #
 #    Required env vars for full functionality:
 #      ALERTMANAGER_SMTP_HOST=smtp.example.com:587
@@ -33,15 +45,21 @@
 # =============================================================================
 
 global:
-  # Default SMTP configuration (overridable per receiver)
-  smtp_smarthost: '{{ .Env.ALERTMANAGER_SMTP_HOST }}'
-  smtp_from: '{{ .Env.ALERTMANAGER_EMAIL_FROM }}'
-  smtp_auth_username: '{{ .Env.ALERTMANAGER_SMTP_USER }}'
-  smtp_auth_password: '{{ .Env.ALERTMANAGER_SMTP_PASS }}'
+  # Default SMTP configuration (overridable per receiver).
+  # These empty defaults are filled in by ``envsubst`` at container
+  # start — see docker-compose.prod.yml alertmanager command. The
+  # placeholder names match the env var names so the substitution
+  # is obvious. Do NOT use ``{{ .Env.X }}`` Go-template syntax here:
+  # Alertmanager does not parse Go templates from env vars.
+  smtp_smarthost: '__ALERTMANAGER_SMTP_HOST__'
+  smtp_from: '__ALERTMANAGER_EMAIL_FROM__'
+  smtp_auth_username: '__ALERTMANAGER_SMTP_USER__'
+  smtp_auth_password: '__ALERTMANAGER_SMTP_PASS__'
   smtp_require_tls: true
 
-  # Default Slack configuration (overridable per receiver)
-  slack_api_url: '{{ .Env.ALERTMANAGER_SLACK_WEBHOOK_URL }}'
+  # Default Slack configuration (overridable per receiver). Same
+  # envsubst pattern as SMTP.
+  slack_api_url: '__ALERTMANAGER_SLACK_WEBHOOK_URL__'
 
   # How long to wait before re-notifying on a still-firing alert
   repeat_interval: 4h
@@ -83,9 +101,14 @@ route:
 # ─── Receivers ─────────────────────────────────────────────────────────────
 receivers:
   # ── Default: Email (fallback when no severity match) ──
+  # ``ALERTMANAGER_EMAIL_TO`` is replaced by envsubst at container
+  # start (see docker-compose.prod.yml). The template below uses
+  # Alertmanager's own Go template syntax for the *body* fields
+  # (``{{ .GroupLabels.alertname }}`` etc.), which IS valid —
+  # only the *values* are substituted at runtime, not the *fields*.
   - name: 'default'
     email_configs:
-      - to: '{{ .Env.ALERTMANAGER_EMAIL_TO }}'
+      - to: '__ALERTMANAGER_EMAIL_TO__'
         send_resolved: true
         headers:
           subject: '[DataForge] {{ .GroupLabels.alertname }} — {{ .Status }}'
@@ -93,7 +116,7 @@ receivers:
   # ── Critical: Email + Slack — immediate attention ──
   - name: 'critical'
     email_configs:
-      - to: '{{ .Env.ALERTMANAGER_EMAIL_TO }}'
+      - to: '__ALERTMANAGER_EMAIL_TO__'
         send_resolved: true
         headers:
           subject: '[DataForge CRITICAL] {{ .GroupLabels.alertname }} — {{ .Status }}'
@@ -114,7 +137,7 @@ receivers:
           *Summary:* {{ .CommonAnnotations.summary }}
           *Severity:* CRITICAL
           *Instance:* {{ .CommonLabels.instance }}
-          *See:* <http://localhost:9090|Prometheus> | <http://localhost:3000|Grafana>
+          *See:* <{{ .ExternalURL }}|Prometheus> | <{{ .ExternalURL }}/../graph|Grafana>
 
   # ── Warning: Slack only ──
   - name: 'warning'

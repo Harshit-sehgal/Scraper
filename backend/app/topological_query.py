@@ -82,12 +82,10 @@ class TopologicalQuery:
             stable_roles = [r for r in self.ws.get_manifold_roles() if self.ws.metrics.get_schema_instability(r) <= threshold]
             return {"type": "roles", "data": stable_roles}
 
-        if cmd == "EXCLUSIONS":
-            # Syntax: EXCLUSIONS FOR <role>
-            if len(parts) >= 3 and parts[1].upper() == "FOR":
-                role = parts[2]
-                excl = {str(k): v for k, v in self.ws.learned_exclusions.items() if role in k}
-                return {"type": "exclusions", "role": role, "data": excl}
+        if cmd == "EXCLUSIONS" and len(parts) >= 3 and parts[1].upper() == "FOR":
+            role = parts[2]
+            excl = {str(k): v for k, v in self.ws.learned_exclusions.items() if role in k}
+            return {"type": "exclusions", "role": role, "data": excl}
 
         return {"error": f"Unknown TQL command: {cmd}"}
 

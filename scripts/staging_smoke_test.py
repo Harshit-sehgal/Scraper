@@ -11,7 +11,6 @@ sys.path.insert(0, str(backend_dir))
 # Configure temporary state database file path
 temp_db_dir = tempfile.mkdtemp()
 temp_state_file = Path(temp_db_dir) / "staging_jobs_state.json"
-temp_db_file = Path(temp_db_dir) / "staging_jobs_state.db"
 
 os.environ["STATE_FILE_PATH"] = str(temp_state_file)
 
@@ -24,6 +23,15 @@ settings.STATE_FILE_PATH = str(temp_state_file)
 # dev auth bypass unconditionally. This ensures the script works whether
 # the caller passes DATAFORGE_API_KEY, DATAFORGE_OPERATOR_API_KEY, or
 # DATAFORGE_ADMIN_API_KEY — or none at all.
+#
+# ⚠️  WARNING: this is a global mutation of the imported ``settings``
+#     singleton. The previous code set the flag and never reset it,
+#     so any later import of ``app.config.settings`` from the same
+#     process would inherit ``ALLOW_INSECURE_DEV_AUTH=True`` and
+#     silently disable production auth. We save the previous value
+#     and restore it in the ``finally`` below to avoid leaking the
+#     bypass into whatever runs after this script.
+_PREV_ALLOW_INSECURE_DEV_AUTH = getattr(settings, "ALLOW_INSECURE_DEV_AUTH", False)
 settings.ALLOW_INSECURE_DEV_AUTH = True
 
 from app.job_store import _get_connection, load_state, reset_job_store_for_tests
@@ -277,5 +285,9 @@ if __name__ == "__main__":
     try:
         run_drill()
     finally:
+        # Restore the previous auth setting so a subsequent import
+        # of ``app.config.settings`` in the same process doesn't
+        # silently inherit the dev bypass.
+        settings.ALLOW_INSECURE_DEV_AUTH = _PREV_ALLOW_INSECURE_DEV_AUTH
         # Cleanup temp directory
         shutil.rmtree(temp_db_dir)

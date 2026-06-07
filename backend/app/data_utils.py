@@ -245,7 +245,7 @@ def align_extracted_keys_to_schema(
     candidates.sort(key=lambda x: x[0], reverse=True)
     mapping: dict[str, str] = {}
     used_schema: set[str] = set()
-    for sc, pk, sf_name in candidates:
+    for _sc, pk, sf_name in candidates:
         if pk in mapping or sf_name in used_schema:
             continue
         mapping[pk] = sf_name

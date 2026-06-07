@@ -167,7 +167,7 @@ class BrowserPool:
                         self._cumulative_fetches,
                     )
 
-                    def on_close(p) -> None:
+                    def on_close(p) -> None:  # noqa: ARG001, RUF100
                         self._active_fetches = max(0, self._active_fetches - 1)
                         logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
                         # Only schedule a recycle check if recycling might be

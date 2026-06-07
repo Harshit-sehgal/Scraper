@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 # The re-export below intentionally makes the parent ``conftest.py`` hooks
 # visible to the benchmarks test tree. Some of those names are only
 # referenced by pytest's plugin discovery, so ruff cannot see their use.
-from conftest import (  # noqa: F401  -- re-exported for pytest discovery
+from conftest import (  # noqa: F401, RUF100
     pytest_addoption,
     pytest_collection_modifyitems,
     pytest_configure,

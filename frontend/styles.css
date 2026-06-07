@@ -1219,6 +1219,7 @@ tr:hover td {
 .toast.success { border-left: 4px solid var(--success); }
 .toast.error { border-left: 4px solid var(--danger); }
 .toast.info { border-left: 4px solid var(--info); }
+.toast.warning { border-left: 4px solid var(--warning); }
 
 .toast .toast-timer {
     position: absolute;
@@ -1232,6 +1233,7 @@ tr:hover td {
 .toast.success .toast-timer { background: var(--success); }
 .toast.error .toast-timer { background: var(--danger); }
 .toast.info .toast-timer { background: var(--info); }
+.toast.warning .toast-timer { background: var(--warning); }
 
 @keyframes toastTimerShrink {
     from { width: 100%; }

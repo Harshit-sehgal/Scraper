@@ -31,7 +31,7 @@ def _get_feedback_engine():
     return _MotifFeedbackEngine()
 
 
-def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict:
+def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict:  # noqa: ARG001, RUF100
     """Analyze high-level page structure and value patterns to guide LLM discovery."""
     profile = detect_page_structure(html)
     patterns = detect_value_patterns(html)

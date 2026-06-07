@@ -400,7 +400,7 @@ class SelectorOptimizationEngine:
 
     def learn_from_results(
         self,
-        domain: str,
+        domain: str,  # noqa: ARG002, RUF100
         selector: str,
         actual_quality: float,
     ) -> None:

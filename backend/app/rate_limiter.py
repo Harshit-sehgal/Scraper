@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import os
 import time
 from typing import TYPE_CHECKING
 
@@ -31,6 +32,33 @@ if TYPE_CHECKING:
     from fastapi import Request, Response
 
 logger = logging.getLogger(__name__)
+
+# ─── Trusted-proxy allowlist ──────────────────────────────────────────
+# Only TCP peers whose address is in this list may inject X-Forwarded-For
+# headers. The previous implementation trusted ANY RFC1918 / loopback
+# address, which means a malicious client on a co-tenant VPC could forge
+# XFF values to evade per-IP rate limits. Operators should set
+# ``DATAFORGE_TRUSTED_PROXIES`` to the exact CIDR list of the load
+# balancer / reverse proxy that fronts the API. The default is the
+# localhost / RFC1918 ranges, which is safe behind a single-hop proxy
+# (nginx on the same host, Docker bridge) but should be tightened in
+# any environment with multiple internal subnets.
+_TRUSTED_PROXIES_DEFAULT = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+_TRUSTED_PROXIES_ENV = (os.environ.get("DATAFORGE_TRUSTED_PROXIES") or _TRUSTED_PROXIES_DEFAULT).strip()
+_TRUSTED_PROXY_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = tuple(
+    ipaddress.ip_network(cidr.strip(), strict=False) for cidr in _TRUSTED_PROXIES_ENV.split(",") if cidr.strip()
+)
+
+
+def _is_trusted_proxy(client_host: str) -> bool:
+    """Return True when ``client_host`` is in the configured trusted-proxy allowlist."""
+    if not client_host:
+        return False
+    try:
+        peer = ipaddress.ip_address(client_host)
+    except ValueError:
+        return False
+    return any(peer in net for net in _TRUSTED_PROXY_NETWORKS)
 
 
 class RateLimitExceeded(Exception):
@@ -61,11 +89,14 @@ def _get_effective_route_limits(method: str | None = None) -> dict[str, tuple[in
     from app.config import settings
 
     limits = dict(_ROUTE_LIMITS)
-    if hasattr(settings, "RATE_LIMIT_JOB_CREATE") and settings.RATE_LIMIT_JOB_CREATE:
-        if method is None or method.upper() == "POST":
-            parsed = _parse_rate_limit(settings.RATE_LIMIT_JOB_CREATE)
-            if parsed != (0, 0):
-                limits["/api/jobs"] = parsed
+    if (
+        hasattr(settings, "RATE_LIMIT_JOB_CREATE")
+        and settings.RATE_LIMIT_JOB_CREATE
+        and (method is None or method.upper() == "POST")
+    ):
+        parsed = _parse_rate_limit(settings.RATE_LIMIT_JOB_CREATE)
+        if parsed != (0, 0):
+            limits["/api/jobs"] = parsed
     if hasattr(settings, "RATE_LIMIT_DISCOVER") and settings.RATE_LIMIT_DISCOVER:
         parsed = _parse_rate_limit(settings.RATE_LIMIT_DISCOVER)
         if parsed != (0, 0):
@@ -238,9 +269,7 @@ class DatabaseSlidingWindowCounter:
                         """,
                         (self.key, self.key, now, self.max_requests),
                     )
-                if not row or not row.get("allowed"):
-                    return False
-                return True
+                return bool(row and row.get("allowed"))
             except Exception as e:
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
@@ -470,8 +499,12 @@ class RateLimiterMiddleware:
         """Extract the client IP safely.
 
         Trusts X-Forwarded-For ONLY when the direct connection comes from
-        a trusted internal address (localhost, Docker subnet). This prevents
-        IP spoofing by external clients.
+        a trusted proxy in the ``_TRUSTED_PROXY_NETWORKS`` allowlist
+        (configurable via ``DATAFORGE_TRUSTED_PROXIES``). The default
+        allowlist is the localhost / RFC1918 ranges; tighten it for
+        multi-VPC deployments. This prevents IP spoofing by external
+        clients and by malicious co-tenants on internal subnets that
+        are not part of the proxy chain.
 
         Falls back to the direct TCP remote address.
         """
@@ -479,13 +512,7 @@ class RateLimiterMiddleware:
         if not client_host:
             return "unknown"
 
-        try:
-            peer_ip = ipaddress.ip_address(client_host)
-            is_trusted_proxy = peer_ip.is_private or peer_ip.is_loopback
-        except ValueError:
-            is_trusted_proxy = client_host == "localhost"
-
-        if is_trusted_proxy:
+        if _is_trusted_proxy(client_host):
             forwarded = request.headers.get("X-Forwarded-For", "")
             if forwarded:
                 return forwarded.split(",")[0].strip()

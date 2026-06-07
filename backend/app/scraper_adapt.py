@@ -163,8 +163,8 @@ def _run_self_tuning_extraction(
 
 
 def run_all_adaptive_hooks(
-    url: str,
-    html: str,
+    url: str,  # noqa: ARG001, RUF100
+    html: str,  # noqa: ARG001, RUF100
     domain: str,
     results: list[dict],
     schema_fields: list,

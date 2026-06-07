@@ -1,0 +1,18 @@
+# =============================================================================
+# DataForge Scraper — Prometheus Web Configuration
+# =============================================================================
+# Used by Prometheus when ``--web.config.file`` is set. Currently
+# scopes the lifecycle endpoints (``/-/reload``, ``/-/quit``).
+#
+# To enable authenticated lifecycle reloads, populate
+# ``basic_auth_users`` with one or more ``username: bcrypt_hash``
+# entries. Generate the hash with:
+#   apt-get install -y apache2-utils && htpasswd -nBC 12 "" | tr -d ':\n'
+# (then paste the resulting hash between the ``$2y$`` markers).
+#
+# Leaving ``basic_auth_users`` empty disables the lifecycle endpoints
+# entirely — the safer default for a production stack where the
+# config rarely changes at runtime.
+# =============================================================================
+
+basic_auth_users: {}

@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 def extract_from_network(
     hydration_data: dict[str, Any],
     schema_fields: list,
-    url: str = "",
+    url: str = "",  # noqa: ARG001, RUF100
     network_payloads: list[dict] | None = None,
 ) -> list[dict]:
     """Try to extract structured records from page hydration / network data.
@@ -717,9 +717,9 @@ _ALIAS_MAP: dict[str, list[str]] = {
 
 
 def _find_value_for_field(
-    field_name: str,
+    field_name: str,  # noqa: ARG001, RUF100
     field_lower: str,
-    field_type: Any,
+    field_type: Any,  # noqa: ARG001, RUF100
     flat_values: dict[str, Any],
 ) -> Any:
     """Find the best value for a schema field from flat JSON key-value pairs."""

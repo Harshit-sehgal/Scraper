@@ -6,6 +6,12 @@ on:
     - cron: '0 2 * * 0'
   workflow_dispatch: # Allows manual trigger
 
+# Cancel in-flight runs on the same ref when a new run is triggered,
+# so a stale manual dispatch does not double-spend CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   browser-e2e:
     name: Browser E2E (Playwright)

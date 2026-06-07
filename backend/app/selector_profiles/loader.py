@@ -72,7 +72,7 @@ def _load_all_profiles() -> dict[str, dict]:
 
     for fpath in sorted(profiles_dir.glob("*.json")):
         try:
-            with open(fpath) as f:  # noqa: PTH123
+            with open(fpath) as f:
                 profile = json.load(f)
             domain = profile.get("domain", "").strip().lower()
             if not domain:
@@ -229,7 +229,7 @@ async def extract_with_profile(
 
             try:
                 await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("[ProfileExtractor] networkidle timeout, trying domcontentloaded")
                 await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_FALLBACK_TIMEOUT)
 
@@ -237,7 +237,7 @@ async def extract_with_profile(
             if wait_for_sel:
                 try:
                     await page.wait_for_selector(wait_for_sel, timeout=max_wait * 1000)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",
                         wait_for_sel,
@@ -253,7 +253,7 @@ async def extract_with_profile(
                 await asyncio.sleep(settings.PAGE_SETTLE_DELAY / 2)
                 try:
                     count = await container_locator.count()
-                except Exception:  # noqa: BLE001
+                except Exception:
                     count = 0
                 if count > 0 and count == prev_count:
                     stable_polls += 1
@@ -304,19 +304,19 @@ async def extract_with_profile(
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
             return records  # type: ignore[no-any-return]
 
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("[ProfileExtractor] Fatal error for %s", url)
         return []
     finally:
         if context is not None:
             try:
                 await context.close()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("[ProfileExtractor] Failed to close browser context gracefully")
         if browser is not None:
             try:
                 await browser.close()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("[ProfileExtractor] Failed to close browser gracefully")
 
 

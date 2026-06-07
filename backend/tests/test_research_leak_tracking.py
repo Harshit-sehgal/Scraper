@@ -101,7 +101,7 @@ def _clean_import_app_main() -> None:
         from app.config import settings
 
         settings.ENABLE_EXPERIMENTAL_ROUTES = False
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         # If app.config can't be imported yet, the re-import below will
         # construct it from the env var we just set.
         pass

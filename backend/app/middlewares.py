@@ -233,15 +233,13 @@ async def csp_report_only_middleware(request: Request, call_next):
         return await call_next(request)
 
     response = await call_next(request)
-    try:
+    from contextlib import suppress
+
+    with suppress(AttributeError, TypeError, ValueError):
         response.headers.setdefault(
             "Content-Security-Policy-Report-Only",
             DEFAULT_CSP_REPORT_ONLY_POLICY,
         )
-    except (AttributeError, TypeError, ValueError):
-        # Some response types (StreamingResponse, Response without headers
-        # mutation) may reject setdefault; never let CSP break the response.
-        pass
     return response
 
 

@@ -74,7 +74,7 @@ class TestPsycopg3RepositoryContract:
             repo.get_job("does-not-matter")
         except NotImplementedError:
             pytest.fail("Got NotImplementedError - method is not actually implemented")
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass  # Expected - any real driver exception proves the method is wired
 
     @pytest.mark.skipif(not HAS_PSYCOPG3, reason="psycopg_pool not installed")
@@ -85,7 +85,7 @@ class TestPsycopg3RepositoryContract:
             repo.list_job_summaries(limit=10)
         except NotImplementedError:
             pytest.fail("Got NotImplementedError - method is not actually implemented")
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass  # Expected - any real driver exception proves the method is wired
 
     def test_serialization_helpers_match_psycopg2(self) -> None:
@@ -141,7 +141,8 @@ class TestFactorySelectsPsycopg3:
         fake_repo._schema_ensured = True
 
         # Build a fake factory function that the resolver can call.
-        fake_ctor = lambda *a, **kw: fake_repo  # noqa: E731
+        def fake_ctor(*args, **kw):
+            return fake_repo
 
         # Patch the symbols the resolver actually looks up.
         with (

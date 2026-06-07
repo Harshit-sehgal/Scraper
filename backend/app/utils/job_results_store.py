@@ -91,10 +91,10 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
     except Exception:
         logger.exception("Failed to write job results to disk for %s", job_id)
         if temp_path.exists():
-            try:
+            from contextlib import suppress
+
+            with suppress(Exception):
                 temp_path.unlink()
-            except Exception:  # nosec B110
-                pass  # nosec B110
         raise
 
     return str(path)
@@ -118,7 +118,7 @@ def load_job_results_from_disk(job_id: str, file_path: str | None = None) -> lis
     try:
         with gzip.open(path, "rt", encoding="utf-8") as f:
             for line in f:
-                line = line.strip()
+                line = line.strip()  # noqa: PLW2901, RUF100
                 if line:
                     results.append(json.loads(line))
     except Exception:
@@ -153,7 +153,7 @@ def load_paginated_job_results_from_disk(
     try:
         with gzip.open(path, "rt", encoding="utf-8") as f:
             for line in f:
-                line = line.strip()
+                line = line.strip()  # noqa: PLW2901, RUF100
                 if not line:
                     continue
                 # ``total_count`` is the index in the record stream
@@ -195,7 +195,7 @@ def load_job_results_from_disk_safe(
     try:
         with gzip.open(path, "rt", encoding="utf-8") as f:
             for idx, line in enumerate(f, 1):
-                line = line.strip()
+                line = line.strip()  # noqa: PLW2901, RUF100
                 if not line:
                     continue
                 try:

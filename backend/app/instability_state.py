@@ -165,7 +165,7 @@ class InstabilityState:
                 import ast
 
                 try:
-                    k = ast.literal_eval(k)  # nosec
+                    k = ast.literal_eval(k)  # nosec  # noqa: PLW2901, RUF100
                 except (ValueError, SyntaxError):
                     continue
             if isinstance(k, (list, tuple)) and len(k) == 2:

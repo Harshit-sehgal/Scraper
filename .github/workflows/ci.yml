@@ -7,6 +7,12 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel in-flight runs on the same branch when a new push lands, so
+# an obsolete CI run does not burn minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── Fast checks (no Playwright browser download) ───────────────────
   ci-gates-fast:
@@ -255,8 +261,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install syft
+        # Install via the official pip distribution of syft's CLI
+        # binding. The previous ``curl | sh`` from a mutable
+        # ``main`` branch ref was a supply-chain risk (no integrity
+        # check, no pinned commit). The PyPI release is signed and
+        # reproducible; bumping the pinned version below is the only
+        # place to update when syft ships a new release.
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          python -m pip install --upgrade pip
+          pip install "syft>=0.9,<2"
 
       - name: Generate SBOM (CycloneDX JSON)
         run: |

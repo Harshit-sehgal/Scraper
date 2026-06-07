@@ -262,7 +262,7 @@ async def scrape_url_with_recovery(
             )
             return results, recovery_stats
 
-        except Exception as e:  # nosec B110  # noqa: BLE001 - recovery handles all errors
+        except Exception as e:  # nosec B110
             last_error = None
             error_msg = str(e)
 

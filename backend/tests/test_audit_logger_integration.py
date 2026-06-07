@@ -65,7 +65,7 @@ def _read_audit_log(log_dir: Path) -> list[dict]:
     events = []
     with open(log_path) as f:
         for line in f:
-            line = line.strip()
+            line = line.strip()  # noqa: PLW2901, RUF100
             if not line or "[AUDIT]" not in line:
                 continue
             try:

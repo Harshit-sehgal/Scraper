@@ -109,7 +109,7 @@ def postgres_repo(monkeypatch, tmp_path):
                     conn,
                     "DROP TABLE IF EXISTS jobs, recycle_bin, job_results, job_events, idempotency_keys, schema_version CASCADE",
                 )
-        except Exception:
+        except Exception:  # noqa: RUF100, S110
             pass
         repo = PostgresJobRepository()
         yield repo

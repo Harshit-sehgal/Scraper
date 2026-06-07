@@ -10,14 +10,15 @@ export function esc(s) {
     return d.innerHTML;
 }
 
-export function jsStr(s) {
-    if (typeof s !== 'string') s = String(s || '');
+export function attrStr(s) {
+    if (s === null || s === undefined) return '';
+    if (typeof s !== 'string') s = String(s);
     return s
-        .replace(/\\/g, '\\\\')
-        .replace(/'/g, "\\'")
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // ─── Toast Notifications ───
@@ -141,14 +142,76 @@ function updateThemeToggleIcon(theme) {
 
 // ─── Shortcut Help Modal ───
 
+function getFocusableIn(root) {
+    if (!root) return [];
+    const sel = 'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(root.querySelectorAll(sel)).filter(el => {
+        if (el.hasAttribute('hidden')) return false;
+        const rects = el.getClientRects();
+        return rects.length > 0;
+    });
+}
+
+let _activeFocusTrap = null;
+
+function attachFocusTrap(overlay) {
+    if (!overlay) return;
+    detachFocusTrap();
+    const handler = (e) => {
+        if (e.key !== 'Tab') return;
+        const items = getFocusableIn(overlay);
+        if (!items.length) {
+            e.preventDefault();
+            return;
+        }
+        const first = items[0];
+        const last = items[items.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey) {
+            if (active === first || !overlay.contains(active)) {
+                e.preventDefault();
+                last.focus();
+            }
+        } else {
+            if (active === last || !overlay.contains(active)) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    };
+    overlay.addEventListener('keydown', handler);
+    _activeFocusTrap = { overlay, handler };
+}
+
+function detachFocusTrap() {
+    if (_activeFocusTrap) {
+        _activeFocusTrap.overlay.removeEventListener('keydown', _activeFocusTrap.handler);
+        _activeFocusTrap = null;
+    }
+}
+
 export function showShortcuts() {
     const overlay = document.getElementById('shortcut-overlay');
-    if (overlay) overlay.classList.remove('hidden');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        attachFocusTrap(overlay);
+        const closeBtn = overlay.querySelector('button');
+        if (closeBtn) setTimeout(() => closeBtn.focus(), 50);
+    }
 }
 
 export function hideShortcuts() {
     const overlay = document.getElementById('shortcut-overlay');
     if (overlay) overlay.classList.add('hidden');
+    detachFocusTrap();
+}
+
+export function attachFocusTrapTo(overlay) {
+    attachFocusTrap(overlay);
+}
+
+export function detachFocusTrapFrom() {
+    detachFocusTrap();
 }
 
 export function isShortcutsVisible() {
@@ -232,6 +295,8 @@ export function showConfirm(title, description, onConfirm) {
     overlay.classList.remove('hidden');
     _pendingConfirm = onConfirm || null;
 
+    attachFocusTrap(overlay);
+
     // Focus the cancel button by default (safer)
     const cancelBtn = document.getElementById('btn-confirm-cancel');
     if (cancelBtn) setTimeout(() => cancelBtn.focus(), 50);
@@ -241,6 +306,7 @@ export function closeConfirm() {
     const overlay = document.getElementById('confirm-overlay');
     if (overlay) overlay.classList.add('hidden');
     _pendingConfirm = null;
+    detachFocusTrap();
 }
 
 export function executeConfirm() {

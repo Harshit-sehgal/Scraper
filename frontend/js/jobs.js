@@ -75,8 +75,10 @@ export async function refreshJobs() {
                 list.innerHTML = '';
                 list.appendChild(empty);
                 empty.classList.remove('hidden');
-                empty.querySelector('p').textContent = 'Unable to connect to server';
-                empty.querySelector('.subtle').textContent = 'Check that the backend is running on ' + API;
+                const titleEl = empty.querySelector('.empty-state-title');
+                const descEl = empty.querySelector('.empty-state-desc');
+                if (titleEl) titleEl.textContent = 'Unable to connect to server';
+                if (descEl) descEl.textContent = 'Check that the backend is running on ' + API;
             }
         }
     }
@@ -195,11 +197,15 @@ async function pollJob(id) {
             if (_consumeRecentUserAction(id)) {
                 return;
             }
-            if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
-            else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
-            else if (j.status === 'empty_result') toast(`"${j.name}" finished — 0 records. ${j.error || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
-            else if (j.status === 'canceled') toast(`"${j.name}" canceled`, 'info');
-            else toast(`"${j.name}" failed: ${j.error}`, 'error');
+            const truncate = (s, n) => {
+                const str = String(s || '');
+                return str.length > n ? str.slice(0, n) + '…' : str;
+            };
+            if (j.status === 'completed') toast(`"${truncate(j.name, 60)}" done — ${j.filtered_records} records`, 'success');
+            else if (j.status === 'degraded') toast(`"${truncate(j.name, 60)}" finished with partial results — ${j.filtered_records} records`, 'info');
+            else if (j.status === 'empty_result') toast(`"${truncate(j.name, 60)}" finished — 0 records. ${truncate(j.error, 80) || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
+            else if (j.status === 'canceled') toast(`"${truncate(j.name, 60)}" canceled`, 'info');
+            else toast(`"${truncate(j.name, 60)}" failed: ${truncate(j.error, 80)}`, 'error');
         }
     } catch (e) { /* ignore */ }
 }
@@ -307,11 +313,11 @@ function renderJobs(jobs) {
             (j.status === 'running' || j.status === 'discovering' || j.status === 'pending') ? 'running-highlight' : '';
 
         return `
-            <div class="job-row${highlightClass ? ' ' + highlightClass : ''}" data-id="${j.id}">
+            <div class="job-row${highlightClass ? ' ' + highlightClass : ''}" data-id="${esc(j.id)}">
                 <div class="job-name-col">
                     <div class="job-name">
                         ${esc(j.name)}
-                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${j.id}" title="Copy job ID">📋</button>
+                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${esc(j.id)}" title="Copy job ID">📋</button>
                         <span class="mode-tag">${j.mode === 'auto' ? 'auto' : 'manual'}</span>
                     </div>
                     ${isActive && hasProgress ? `
@@ -321,13 +327,13 @@ function renderJobs(jobs) {
                         </div>
                     ` : ''}
                 </div>
-                <div class="job-urls">${j.urls.length} URL${j.urls.length !== 1 ? 's' : ''}</div>
-                <div><span class="badge ${j.status}">${j.status}</span></div>
-                <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
+                <div class="job-urls">${Array.isArray(j.urls) ? j.urls.length : 0} URL${(Array.isArray(j.urls) ? j.urls.length : 0) !== 1 ? 's' : ''}</div>
+                <div><span class="badge ${esc(j.status)}">${esc(j.status)}</span></div>
+                <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : '—'}</div>
                 <div class="job-actions">
-                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${j.id}">View</button>` : ''}
-                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${j.id}">Cancel</button>` : ''}
-                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${j.id}">✕</button>
+                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${esc(j.id)}">View</button>` : ''}
+                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${esc(j.id)}">Cancel</button>` : ''}
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${esc(j.id)}">✕</button>
                 </div>
             </div>
         `;

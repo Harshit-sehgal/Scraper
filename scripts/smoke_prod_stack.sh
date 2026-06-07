@@ -20,6 +20,11 @@
 
 set -euo pipefail
 
+# Ensure the prod stack is torn down on script exit — success OR failure.
+# Without this, a failed smoke test leaves containers running and the
+# next developer/CI run collides with a half-up stack.
+trap '"${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml down' EXIT
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 

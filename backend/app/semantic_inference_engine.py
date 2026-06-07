@@ -254,10 +254,8 @@ class RoleEmbeddingEngine:
         # Skip learning if role is extremely stable to reduce churn and journal
         # bloat
         certainty = self.ws._manifold.get_role_certainty(role)
-        if success and certainty > 0.98:
-            # High certainty role: only learn if the new signal is very strong
-            if delta < 0.1:  # Increased breakthrough threshold
-                return
+        if success and certainty > 0.98 and delta < 0.1:  # Increased breakthrough threshold
+            return
 
         role_vec = self.ws.get_manifold_vector(role)
         type_vec = self._get_type_vector(token_type)
@@ -468,7 +466,7 @@ class RoleEmbeddingEngine:
             boosts[role_i] = boost / max(len(items) - 1, 1)
         return boosts
 
-    def learn_contradiction(self, role_a: str, role_b: str, token_type: str) -> None:
+    def learn_contradiction(self, role_a: str, role_b: str, token_type: str) -> None:  # noqa: ARG002, RUF100
         from app.instability_api import InstabilityAPI
 
         inst_api = InstabilityAPI(ws=self.ws)

@@ -579,7 +579,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             logger.info(
                 "FEDERATION: Merged %s roles. Firewall filtered %s roles.",
                 len(remote_manifold) - filtered_count,
-                filtered_count,  # noqa: G004
+                filtered_count,
             )
             self.record_delta("global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count})
 

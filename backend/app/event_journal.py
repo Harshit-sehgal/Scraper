@@ -96,7 +96,7 @@ class EventJournal:
         if len(self._entries) > self._max:
             # Phase 57 / 58 / 61 / 66: Semantic Retention Prioritization
             # We keep recent entries AND historical structural transitions
-            # (Skeletonization)  # noqa: ERA001
+            # (Skeletonization)  # noqa: ERA001, RUF100
             keep_count = self._max // 2
 
             recent = self._entries[-keep_count:]

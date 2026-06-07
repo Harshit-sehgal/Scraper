@@ -79,10 +79,10 @@ class HeartbeatManager:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            from contextlib import suppress
+
+            with suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
         logger.info("Heartbeat stopped: worker_id=%s", self._worker_id)
 

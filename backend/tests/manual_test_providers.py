@@ -11,10 +11,10 @@ async def test_provider(provider) -> bool:
             messages=[{"role": "user", "content": 'Hello, return exactly this JSON: [{"test": 123}]'}],
         )
         return True
-    except Exception as e:
+    except Exception:
         import logging
 
-        logging.exception(e)
+        logging.exception("Provider test failed")
         return False
 
 

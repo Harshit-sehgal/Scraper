@@ -7,10 +7,10 @@
 # Logs:   docker compose -f docker-compose.prod.yml logs -f
 # Stop:   docker compose -f docker-compose.prod.yml down
 # =============================================================================
-# `version` is a deprecated top-level key in Compose v2, but Compose
-# v1 (still present on some CI images) requires it. Drop once v1 is
-# fully retired.
-version: "3.8"
+# The deprecated top-level ``version`` key is intentionally omitted
+# (Compose v2 ignores it; Compose v1 is end-of-life). Some
+# interactive ``docker compose config`` invocations still warn on
+# its presence, which is why we removed it.
 
 x-logging: &default-logging
   driver: "json-file"
@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import http.client; c=http.client.HTTPConnection('localhost', 8000); c.request('GET', '/ready'); r=c.getresponse(); exit(0 if r.status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import http.client; c=http.client.HTTPConnection('localhost', 8000, timeout=8); c.request('GET', '/ready'); r=c.getresponse(); exit(0 if r.status==200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -71,6 +71,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=256m
+    # ``init: true`` injects a tiny PID-1 reaper so any child
+    # processes the app spawns (Playwright driver, etc.) are
+    # cleaned up on container shutdown. Without it, zombies
+    # accumulate and ``docker stop`` waits the full 10s grace
+    # period on every restart.
+    init: true
     networks:
       - dataforge-net
 
@@ -132,6 +138,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=512m
+    init: true
     networks:
       - dataforge-net
 
@@ -148,6 +155,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init-db:/docker-entrypoint-initdb.d:ro
+    # Postgres opens a socket per connection plus a handful of
+    # internal FDs (WAL, replication, autovacuum workers). The
+    # default 1024 ulimit is fine for trivial databases but
+    # quickly clips under load with many concurrent workers.
+    # Bump to 65536 to match the upstream-recommended value for
+    # production Postgres deployments.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dataforge"]
@@ -188,7 +205,14 @@ services:
       PG_HOST: postgres
       PG_PORT: "5432"
       PG_DB: dataforge
-      PG_SSLMODE: require
+      # ``prefer`` lets the exporter fall back to a plaintext
+      # connection if the server doesn't advertise SSL. The
+      # alternative ``require`` would refuse to start against the
+      # SSL-less postgres container in this compose file. The data
+      # network is internal-only (``dataforge-net``), so plaintext
+      # is acceptable here. Bump to ``verify-full`` and mount a
+      # server cert when running across an untrusted network.
+      PG_SSLMODE: prefer
       PG_EXPORTER_DISABLE_DEFAULT_METRICS: "true"
       PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yaml
     volumes:
@@ -208,6 +232,7 @@ services:
           cpus: "0.1"
     security_opt:
       - no-new-privileges:true
+    init: true
     networks:
       - dataforge-net
 
@@ -232,6 +257,7 @@ services:
           cpus: "0.25"
     security_opt:
       - no-new-privileges:true
+    init: true
     networks:
       - dataforge-net
 
@@ -248,17 +274,28 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro
       - ./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro
+      # web.yml carries the lifecycle-reload basic-auth users. The
+      # list is empty by default so ``/-/reload`` is rejected
+      # outright — add a ``basic_auth_users:`` block here and pass
+      # the matching credentials to enable runtime config reloads
+      # without exposing an unauthenticated restart endpoint.
+      - ./prometheus_web.yml:/etc/prometheus/web.yml:ro
       - prometheus_data:/prometheus
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         sed "s|__DATAFORGE_METRICS_TOKEN__|$${DATAFORGE_METRICS_TOKEN}|g" /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml
+        if grep -q '__DATAFORGE_METRICS_TOKEN__' /tmp/prometheus.yml; then
+          echo "ERROR: prometheus.yml token substitution failed (placeholder remains)" >&2
+          exit 1
+        fi
         exec /bin/prometheus \
           --config.file=/tmp/prometheus.yml \
           --storage.tsdb.path=/prometheus \
           --storage.tsdb.retention.time=30d \
           --web.console.libraries=/etc/prometheus/console_libraries \
           --web.console.templates=/etc/prometheus/consoles \
+          --web.config.file=/etc/prometheus/web.yml \
           --web.enable-lifecycle
     restart: unless-stopped
     logging: *default-logging
@@ -267,6 +304,7 @@ services:
         limits:
           memory: 256m
           cpus: "0.25"
+    init: true
     networks:
       - dataforge-net
 
@@ -277,7 +315,14 @@ services:
       - "3000"
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD is required}
+      # Grafana reads the admin password from a file path when the
+      # env var ends in ``__FILE`` (note the double underscore —
+      # this is a Grafana convention, not a Docker one). The file
+      # is mounted from a Docker secret, so the plaintext password
+      # is not visible in ``docker inspect``. The secret file must
+      # contain only the password (no trailing newline stripping is
+      # required — Grafana trims whitespace internally).
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
       - GF_AUTH_ANONYMOUS_ENABLED=false
@@ -285,6 +330,8 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    secrets:
+      - grafana_admin_password
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -294,6 +341,7 @@ services:
         limits:
           memory: 256m
           cpus: "0.25"
+    init: true
     networks:
       - dataforge-net
 
@@ -311,21 +359,38 @@ services:
       - ALERTMANAGER_SMTP_PASS=${ALERTMANAGER_SMTP_PASS:-}
       - ALERTMANAGER_EMAIL_FROM=${ALERTMANAGER_EMAIL_FROM:-}
       - ALERTMANAGER_EMAIL_TO=${ALERTMANAGER_EMAIL_TO:-}
-      - ALERTMANAGER_SLACK_WEBHOOK_URL=${ALERTMANAGER_SLACK_WEBHOOK_URL:-}
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # alertmanager.yml.template has placeholders that get
+      # substituted at container start; the rendered file lives in
+      # /tmp (tmpfs, never written to disk) so the webhook URL
+      # never lands in a host-mounted file.
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml.template:ro
+      # The Slack webhook is mounted as a Docker secret so the
+      # URL never appears in ``docker inspect`` env. The
+      # entrypoint reads the secret, sets the env var, then
+      # execs the alertmanager binary.
       - alertmanager_data:/alertmanager
+    secrets:
+      - slack_webhook
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      # Template the external URL so it matches the deployment's
-      # hostname. The default ``http://localhost:9093`` is a
-      # sensible local-dev fallback, but production deployments
-      # with a real hostname need the URL to point at the
-      # public-facing address so alertmanager links in firing
-      # alerts route the on-call engineer to the correct UI.
-      - '--web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://localhost:9093}'
-      - '--cluster.listen-address=' # Single-node, no clustering
+      - |
+        if [ -f /run/secrets/slack_webhook ]; then
+          export ALERTMANAGER_SLACK_WEBHOOK_URL="$$(cat /run/secrets/slack_webhook)"
+        else
+          export ALERTMANAGER_SLACK_WEBHOOK_URL=''
+        fi
+        envsubst < /etc/alertmanager/alertmanager.yml.template \
+          > /tmp/alertmanager.yml
+        if grep -q '__ALERTMANAGER_SMTP_HOST__\|__ALERTMANAGER_EMAIL_FROM__' /tmp/alertmanager.yml; then
+          echo 'ERROR: alertmanager template substitution failed for SMTP_HOST / EMAIL_FROM' >&2
+          exit 1
+        fi
+        exec /bin/alertmanager \
+          --config.file=/tmp/alertmanager.yml \
+          --storage.path=/alertmanager \
+          --web.external-url=$${ALERTMANAGER_EXTERNAL_URL:-http://localhost:9093} \
+          --cluster.listen-address=
     restart: unless-stopped
     logging: *default-logging
     deploy:
@@ -333,6 +398,7 @@ services:
         limits:
           memory: 64m
           cpus: "0.1"
+    init: true
     networks:
       - dataforge-net
 
@@ -348,16 +414,22 @@ volumes:
   grafana_data:
     name: dataforge_grafana_data
 
-# Secrets for ``postgres-exporter``. The files are generated by
-# ``scripts/generate_prod_env.py`` (mode 0600) and consumed by the
-# exporter via the ``PG_USER_FILE`` / ``PG_PASSWORD_FILE`` env
-# vars. This avoids putting the plaintext DB password on the
-# container's env list, which is visible in ``docker inspect``.
+# Secrets for ``postgres-exporter`` and ``alertmanager``. The files
+# are generated by ``scripts/generate_prod_env.py`` (mode 0600) and
+# consumed by the exporter via the ``PG_USER_FILE`` /
+# ``PG_PASSWORD_FILE`` env vars, and by alertmanager via the
+# entrypoint that reads ``slack_webhook``. This avoids putting the
+# plaintext DB password or Slack webhook URL on any container's env
+# list, which would be visible in ``docker inspect``.
 secrets:
   pg_exporter_user:
     file: ./.secrets/pg_exporter_user
   pg_exporter_password:
     file: ./.secrets/pg_exporter_password
+  slack_webhook:
+    file: ./.secrets/slack_webhook
+  grafana_admin_password:
+    file: ./.secrets/grafana_admin_password
 
 networks:
   dataforge-net:

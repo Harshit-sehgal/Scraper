@@ -226,11 +226,15 @@ bash scripts/backup_postgres.sh
 
 ## Escalation Contacts
 
+<!-- TODO: insert real on-call numbers before publishing this document.
+     The placeholders below MUST be replaced with the real rotation numbers;
+     do not publish the runbook with XXX-XXX-XXXX entries left in place. -->
+
 | Role | Phone | Slack |
 | ---- | ----- | ----- |
-| On-call Engineer | XXX-XXX-XXXX | @on-call |
-| Engineering Lead | XXX-XXX-XXXX | @eng-lead |
-| VP Engineering | XXX-XXX-XXXX | @vp-eng |
+| On-call Engineer | _TODO: insert real on-call numbers before publishing_ | @on-call |
+| Engineering Lead | _TODO: insert real on-call numbers before publishing_ | @eng-lead |
+| VP Engineering | _TODO: insert real on-call numbers before publishing_ | @vp-eng |
 
 ---
 

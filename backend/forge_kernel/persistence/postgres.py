@@ -26,7 +26,7 @@ def _get_pg_repo():
             _postgres_repo = _PG()
         except ImportError as e:
             msg = f"Cannot import app.postgres_repository: {e}. Install psycopg2-binary."
-            raise RuntimeError(msg)
+            raise RuntimeError(msg) from e
     return _postgres_repo
 
 

@@ -76,7 +76,7 @@ class SelectorDecayPredictor:
             path = self._get_snapshots_path()
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
-            with open(path, "w") as f:  # noqa: PTH123
+            with open(path, "w") as f:
                 json.dump(data, f)
         except Exception:
             logger.exception("Failed to persist selector decay snapshots")
@@ -94,7 +94,7 @@ class SelectorDecayPredictor:
         path = self._get_snapshots_path()
         if Path(path).exists():
             try:
-                with open(path) as f:  # noqa: PTH123
+                with open(path) as f:
                     data = json.load(f)
                 self._confidence_snapshots.clear()
                 for domain, snapshots in data.items():
@@ -206,7 +206,7 @@ class SelectorDecayPredictor:
 
     def _generate_recommendations(
         self,
-        domain: str,
+        domain: str,  # noqa: ARG002, RUF100
         risk_level: str,
         decay_risk: float,
         velocity: float,

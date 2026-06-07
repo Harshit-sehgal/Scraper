@@ -13,6 +13,7 @@ they do not cause startup failures if those modules are unavailable.
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import time
 from typing import Annotated, ClassVar
@@ -96,9 +97,23 @@ class ModeBody(BaseModel):
 
 
 def _require_admin_key(request: Request) -> None:
-    """Check admin API key for powerful system routes."""
+    """Check admin API key for powerful system routes.
+
+    When ``settings.ADMIN_API_KEY`` is empty we emit a loud warning and
+    fall back to the regular API key check. The end-to-end fail-closed
+    guard (refusing to start at all without an admin key) lives in
+    ``scripts/verify_production_deployment.py`` and in the startup
+    sequence — see ``app.lifespan``. Do not silence the warning: an
+    unset ``ADMIN_API_KEY`` in production is a misconfiguration that
+    must be flagged, not hidden.
+    """
     if not settings.ADMIN_API_KEY:
-        return  # No admin key configured — fall back to regular API key
+        logger.warning(
+            "ADMIN_API_KEY is unset; admin-key-guarded endpoints are "
+            "falling back to the regular API key check. This is a "
+            "configuration error in production.",
+        )
+        return
     provided = request.headers.get("X-Admin-Key", "")
     if not secrets.compare_digest(provided, settings.ADMIN_API_KEY):
         raise HTTPException(
@@ -179,7 +194,7 @@ async def export_knowledge():
 async def merge_knowledge(
     request: Request,
     req: KnowledgeMergeRequest,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN])),  # noqa: B008
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
 ):
     """Merge an external knowledge manifold into the current field.
 
@@ -324,7 +339,7 @@ async def system_topology_history(limit: int = 20):
 
 
 @router.post("/api/system/scheduler/step")
-async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
+async def process_cognitive_tasks(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))], budget_ms: float = 100.0):  # noqa: B008, RUF100
     """Manually trigger processing of the cognitive task queue."""
     from app.semantic_world_state import get_world_state
 
@@ -406,7 +421,7 @@ async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
 
 
 @router.post("/api/system/refactor/compress")
-async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
+async def trigger_manifold_compression(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):  # noqa: B008, RUF100
     """Trigger a manifold compression cycle."""
     from app.llm_bridge import get_plugin_manager
     from app.semantic_world_state import get_world_state
@@ -592,6 +607,11 @@ async def get_domain_health(domain: str):
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.domain_health_alerts``.
     """
+    if not re.fullmatch(r"[a-z0-9.\-]{1,253}", domain):
+        raise HTTPException(
+            status_code=400,
+            detail=("Invalid domain. Allowed characters: lowercase letters, digits, dot, hyphen. Max length: 253."),
+        )
     from app.domain_health_alerts import get_domain_health_monitor
 
     monitor = get_domain_health_monitor()
@@ -690,7 +710,7 @@ async def set_operator_mode(
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid mode: '{mode}'. Valid modes: {[m.value for m in OperatorMode]}",
-            )
+            ) from None
 
         dashboard = get_governance_dashboard()
         adjustments = await run_in_threadpool(dashboard.set_operator_mode, target_mode)
@@ -938,13 +958,18 @@ async def get_operator_health_summary():
 @router.post("/api/scraper/ml/optimize/domain/{domain}")
 async def optimize_domain_selectors(
     domain: str,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
     selectors: dict | None = None,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Optimize selectors for a domain using ML predictions.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.selector_ml_optimizer``.
     """
+    if not re.fullmatch(r"[a-z0-9.\-]{1,253}", domain):
+        raise HTTPException(
+            status_code=400,
+            detail=("Invalid domain. Allowed characters: lowercase letters, digits, dot, hyphen. Max length: 253."),
+        )
     try:
         from app.selector_memory import get_selector_memory
         from app.selector_ml_optimizer import get_selector_optimizer
@@ -1008,8 +1033,8 @@ async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1
 async def record_selector_learning(
     domain: str,
     selector: str,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
     quality: Annotated[float, Query(ge=0, le=1)] = 0.0,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Record actual selector performance for ML model improvement.
 
@@ -1064,10 +1089,10 @@ async def record_strategy_attempt(
     domain: str,
     strategy: str,
     success: bool,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
     time_ms: Annotated[float, Query(ge=0)] = 0,
     quality: Annotated[float, Query(ge=0, le=1)] = 0.5,
     failure_reason: str | None = None,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Record a strategy attempt for learning.
 
@@ -1081,7 +1106,7 @@ async def record_strategy_attempt(
         try:
             strategy_enum = FetchStrategy(strategy)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
+            raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}") from None
 
         await run_in_threadpool(engine.record_fetch_attempt, domain, strategy_enum, success, time_ms, quality, failure_reason)
 
@@ -1133,7 +1158,7 @@ async def get_all_strategies_report():
 @router.post("/api/scraper/strategy/evolve/{domain}")
 async def evolve_domain_strategy(
     domain: str,
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
 ):
     """Manually trigger strategy evolution for a domain.
 

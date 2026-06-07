@@ -78,6 +78,12 @@ async def main():
     parser.add_argument("--workers", type=int, default=4, help="Max concurrent workers")
     parser.add_argument("--once", action="store_true", help="Process one task then exit")
     parser.add_argument(
+        "--drain-timeout",
+        type=float,
+        default=600.0,
+        help="Upper bound (seconds) for --once drain mode (default: 600)",
+    )
+    parser.add_argument(
         "--heartbeat-interval",
         type=float,
         default=15.0,
@@ -113,7 +119,7 @@ async def main():
         logger.info("Shutdown signal received, draining workers...")
         shutdown_event.set()
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, _signal_handler)
@@ -133,7 +139,7 @@ async def main():
         # which (mis)used --once to enqueue a fresh scrape — that turned
         # the standalone worker into a job producer and broke operator
         # expectations ("run what is queued, not create more work").
-        deadline = time.time() + 600  # 10-minute upper bound
+        deadline = time.time() + args.drain_timeout
         processed = 0
         while time.time() < deadline:
             task = await queue.dequeue(timeout=2.0)
@@ -149,6 +155,14 @@ async def main():
                 await queue.fail(task.id, f"No handler for task type: {task.type}", retry=False)
                 continue
             try:
+                # ``asyncio.wait_for(..., timeout=0)`` returns
+                # immediately and never awaits the coroutine, so
+                # any handler that finished successfully would be
+                # racing the timeout. Guard against a zero or
+                # negative timeout on the queued task (e.g. an
+                # older row in the DB with ``timeout_seconds=0``).
+                if not task.timeout_seconds or task.timeout_seconds <= 0:
+                    raise ValueError(f"task {task.id} has non-positive timeout_seconds={task.timeout_seconds!r}")
                 result = await asyncio.wait_for(handler(task), timeout=task.timeout_seconds)
                 if result is False:
                     await queue.fail(task.id, "Handler returned False", retry=True)

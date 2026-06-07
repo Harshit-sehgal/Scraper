@@ -119,7 +119,7 @@ async def run_job(
     }
     started_at = time.monotonic()
     if not job.started_at:
-        job.started_at = datetime.datetime.now().isoformat()
+        job.started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     if job.cancel_requested or await _cancel_requested_from_db():
         job.cancel_requested = True
@@ -184,7 +184,7 @@ async def run_job(
                 else:
                     job.status = JobStatus.FAILED
                     job.error = "Could not discover any URLs for this topic"
-                    job.completed_at = datetime.datetime.now().isoformat()
+                    job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_job_state_fn)
                     await _persist_job_state(critical=True)
                 return
@@ -385,7 +385,7 @@ async def run_job(
                     await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
                     await _mark_completed()
                     return idx, [], False, {}
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     policy.record_failure(url, failure_type=type(e).__name__)
                     logging.exception("Job %s: URL scrape failed: %s", job_id, url)
                     await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
@@ -500,7 +500,7 @@ async def run_job(
                 )
                 _add_job_log(job, "AI structuring timed out, using fallback", level="warning")
                 logging.warning("Job %s: AI structuring timed out", job_id)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logging.exception("Job %s: AI structuring failed", job_id)
                 warnings.append("AI structuring failed; continuing with deterministic processing.")
                 _add_job_log(job, "AI structuring failed, using fallback", level="error")
@@ -558,18 +558,21 @@ async def run_job(
         source_breakdown = compute_source_breakdown(filtered_results)
 
         has_contact_fields = any(field.field_type in {FieldType.EMAIL, FieldType.PHONE} for field in job.schema_fields)
-        if has_contact_fields and ai_source_prediction["sources_attempted"] > 0:
-            if ai_source_prediction["records_ai_structured"] == 0:
-                if settings.GROQ_API_KEY:
-                    warnings.append(
-                        "AI source structuring covered 0% rows in this run; "
-                        "provider timeouts / rate limits may reduce phone / email extraction.",
-                    )
-                else:
-                    warnings.append(
-                        "AI source structuring covered 0% rows in this run; "
-                        "set GROQ_API_KEY to improve phone / email extraction reliability.",
-                    )
+        if (
+            has_contact_fields
+            and ai_source_prediction["sources_attempted"] > 0
+            and ai_source_prediction["records_ai_structured"] == 0
+        ):
+            if settings.GROQ_API_KEY:
+                warnings.append(
+                    "AI source structuring covered 0% rows in this run; "
+                    "provider timeouts / rate limits may reduce phone / email extraction.",
+                )
+            else:
+                warnings.append(
+                    "AI source structuring covered 0% rows in this run; "
+                    "set GROQ_API_KEY to improve phone / email extraction reliability.",
+                )
 
         job.quality_report = build_quality_report(
             raw_results=all_raw_results,
@@ -596,7 +599,7 @@ async def run_job(
         )
 
         # Add scraped_at timestamp to each record
-        scraped_at = datetime.datetime.now().isoformat()
+        scraped_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         for record in job.results:
             record["scraped_at"] = scraped_at
 
@@ -631,7 +634,7 @@ async def run_job(
                     insight_timeout_seconds,
                 )
                 job.analysis = "Insight generation timed out."
-            except Exception:  # noqa: BLE001
+            except Exception:
                 job.total_llm_calls += get_llm_call_count()
                 logging.exception("Job %s: AI insight generation failed", job_id)
                 _add_job_log(job, "AI insight generation failed", level="error")
@@ -658,7 +661,7 @@ async def run_job(
                         settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD
                     } records).",
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logging.exception("Job %s: Failed to offload results to disk", job_id)
                 _add_job_log(job, f"Failed to offload results to disk: {e}", level="warning")
 
@@ -691,7 +694,7 @@ async def run_job(
             job.status = JobStatus.COMPLETED
             job.error = ""
         job.cancel_requested = False
-        job.completed_at = datetime.datetime.now().isoformat()
+        job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         job.progress_current = job.progress_total
         save_semantic_state()
         # Contextual completion log message — use critical persistence for
@@ -708,7 +711,7 @@ async def run_job(
 
         logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         # Single traceback emission at the top of the handler — the
         # branch-specific logs below are summary lines, not duplicates.
         logging.exception("Job %s failed", job_id)
@@ -719,7 +722,7 @@ async def run_job(
         else:
             job.status = JobStatus.FAILED
             job.error = str(e)
-            job.completed_at = datetime.datetime.now().isoformat()
+            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             _add_job_log(job, f"Job failed: {e!s}", level="error")
             logging.error("Job %s: Failed (%s)", job_id, type(e).__name__)
         await _persist_job_state(critical=True)

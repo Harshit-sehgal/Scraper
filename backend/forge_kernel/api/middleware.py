@@ -91,7 +91,7 @@ class LatencyTrackingMiddleware(BaseHTTPMiddleware):
             from forge_kernel.observability import get_kernel_metrics
 
             get_kernel_metrics().record("request_duration_ms", duration)
-        except Exception:  # nosec B110 — observability failure must not affect response delivery
+        except Exception:  # noqa: S110 — observability failure must not affect response delivery
             pass
         return response
 

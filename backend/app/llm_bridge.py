@@ -197,7 +197,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
@@ -280,7 +280,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
@@ -337,7 +337,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
@@ -452,7 +452,7 @@ class SubstratePluginManager:
                 return f"Success: Merged {role_b} into {role_a}"
         return "Fail"
 
-    def _native_manifold_compressor(self, **kwargs) -> str:
+    def _native_manifold_compressor(self, **kwargs) -> str:  # noqa: ARG002, RUF100
         """Native Tool: Prune low-impact manifold dimensions (Phase 44)."""
         if not self.ws:
             return "Fail: No WS"
@@ -483,7 +483,7 @@ class SubstratePluginManager:
             # In a real system, we'd rebuild the manifold.
             # Here we emit telemetry and log success.
             logging.getLogger(__name__).info(
-                "REFACTOR: Compressed manifold from %s to %s (Pruned Dim %s with var %.4f)",  # noqa: G004
+                "REFACTOR: Compressed manifold from %s to %s (Pruned Dim %s with var %.4f)",
                 dim,
                 dim - 1,
                 min_idx,

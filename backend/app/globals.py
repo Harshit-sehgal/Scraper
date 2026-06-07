@@ -19,10 +19,23 @@ The migration path is:
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 jobs_store: dict[str, Any] = {}
 recycle_bin_store: dict[str, Any] = {}
+
+# Project-wide lock guarding read and write access to the module-level
+# ``jobs_store`` and ``recycle_bin_store``. Code paths that read these
+# stores (e.g. ``/api/system/status``) and code paths that mutate them
+# (e.g. ``/api/jobs/{id}`` write routes) must acquire this lock to
+# avoid ``RuntimeError: dictionary changed size during iteration`` and
+# torn-read inconsistencies. The router-local ``JobStoreManager`` uses
+# a separate per-router ``threading.Lock`` for its own compositions; do
+# not replace that with this lock — the two guards exist at different
+# scopes (router-level state mutations vs. module-level shared state
+# reads).
+_jobs_store_lock = threading.Lock()
 
 # Legacy defaults kept only as a sanity floor; the authoritative values
 # live on ``app.config.settings``. ``rebuild_config_from_settings`` will

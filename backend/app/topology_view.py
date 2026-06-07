@@ -61,7 +61,7 @@ class TopologyView:
             self._read_callback(r.region_id, r.version)
         # Thermodynamic free energy = internal energy - temperature * entropy
         # For field regions: local_energy (potential) - local_temperature *
-        # instability (disorder)  # noqa: ERA001
+        # instability (disorder)  # noqa: ERA001, RUF100
         free_energy = r.local_energy - r.local_temperature * r.instability
         return RegionSnapshot(
             region_id=r.region_id,
@@ -156,7 +156,7 @@ class TopologyView:
             repulsion = _clamp01(max(-law, 1.0 if impossible else 0.0))
             route_strength = _clamp01(affinity * (1.0 - repulsion) * (1.0 - uncertainty * 0.5))
             # Thermodynamic edge pressure: field-derived from region free energy
-            # pressure = (uncertainty + repulsion) * (1.0 - affinity * 0.5)  # noqa: ERA001
+            # pressure = (uncertainty + repulsion) * (1.0 - affinity * 0.5)  # noqa: ERA001, RUF100
             pressure = _clamp01((uncertainty + repulsion) * (1.0 - affinity * 0.5))
             if repulsion > affinity and repulsion >= 0.2:
                 semantics = "repulsive"

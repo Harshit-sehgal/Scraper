@@ -133,8 +133,8 @@ async def _try_profile_extraction(
     schema_fields: list[SchemaField],
     min_record_score: float,
     user_intent: str,
-    selectors_map: dict | None,
-    attempt_ctx: AttemptContext | None,
+    selectors_map: dict | None,  # noqa: ARG001, RUF100
+    attempt_ctx: AttemptContext | None,  # noqa: ARG001, RUF100
     skip_profiles: bool = False,
 ) -> tuple[ScrapeAttemptResult | None, dict | None, str | None]:
     """Try profile-based extraction as the first extraction strategy.
@@ -258,7 +258,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     "[SessionRecovery] URL %s is session-bound but no search_params provided",
                     url,
                 )
-        except Exception:  # nosec B110  # noqa: BLE001 - optional session-bound detection; must not block recovery
+        except Exception:  # nosec B110  # noqa: RUF100, S110
             pass  # nosec B110
     return None
 
@@ -275,7 +275,7 @@ async def _classify_and_capture_zero_result(
     ext_result: Any,
     is_failure_page: bool,
     classification: Any | None,
-    start_time: float,
+    start_time: float,  # noqa: ARG001, RUF100
 ) -> tuple[Any | None, str | None, list[str]]:
     """Classify zero-result scenarios and capture regression candidates.
 
@@ -652,10 +652,10 @@ async def scrape_url(
     # ── Solidified motifs count pre-extraction ────────────────────
     solidified_motifs_count = 0
     if world_state and hasattr(world_state, "solidified_motifs"):
-        try:
+        from contextlib import suppress
+
+        with suppress(Exception):
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:  # nosec B110  # noqa: BLE001 - solidified_motifs is best-effort telemetry
-            pass  # nosec B110
 
     # ── Step 4: Extraction Cascade ─────────────────────────────────
     result_warnings: list[str] = []
@@ -793,4 +793,4 @@ async def scrape_url(
 
 
 # Backward-compatible alias used by tests
-_record_extraction_method_safe = record_extraction_method_safe  # noqa: F811
+_record_extraction_method_safe = record_extraction_method_safe

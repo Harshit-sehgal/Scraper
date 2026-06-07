@@ -309,12 +309,19 @@ def check_db_password(value: str) -> bool:
 
 
 def _check_password_secret(name: str, value: str) -> bool:
-    """Validate a database-style password is not a default/placeholder value."""
+    """Validate a database-style password is not a default/placeholder value.
+
+    Note: the minimum length is 16 chars (not 8). The previous 8-char
+    floor was inherited from the API-key check and undersold the
+    brute-force cost for a role that authenticates Postgres itself —
+    the database is the most-likely pivot point for a stolen-secret
+    attack, so the bar is the same as for API keys.
+    """
     if _is_placeholder_secret(value):
         print(f"  [FAIL]  {name}={_mask_value(name, value)} is a known default/placeholder value. Use a strong, unique password.")
         return False
-    if len(value) < 8:
-        print(f"  [FAIL]  {name} is too short ({len(value)} chars). Must be at least 8 characters.")
+    if len(value) < 16:
+        print(f"  [FAIL]  {name} is too short ({len(value)} chars). Must be at least 16 characters.")
         return False
     return True
 

@@ -50,7 +50,7 @@ def clean_db(monkeypatch):
         for f in os.listdir(tmp_dir):
             os.remove(os.path.join(tmp_dir, f))
         os.rmdir(tmp_dir)
-    except Exception:
+    except Exception:  # noqa: RUF100, S110
         pass
 
 

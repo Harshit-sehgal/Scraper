@@ -275,7 +275,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
     # Second pass: split oversized groups (likely merged cards) by
     # detecting repeated pattern boundaries within the same prefix
     cards: list[VisualCard] = []
-    for prefix, group in groups.items():
+    for _, group in groups.items():
         # A good card has 3 - 12 blocks. If a group fits, keep it.
         if len(group) <= 12:
             if _is_meaningful_card(group):
@@ -290,7 +290,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
                 sub_groups[sub_prefix] = []
             sub_groups[sub_prefix].append(block)
 
-        for sub_prefix, sub_group in sub_groups.items():
+        for _, sub_group in sub_groups.items():
             # If still too large, split by depth 5
             if len(sub_group) > 12:
                 finer_groups: dict[str, list[VisibleTextBlock]] = {}
@@ -299,7 +299,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
                     if fine_prefix not in finer_groups:
                         finer_groups[fine_prefix] = []
                     finer_groups[fine_prefix].append(block)
-                for fine_prefix, fine_group in finer_groups.items():
+                for _, fine_group in finer_groups.items():
                     if _is_meaningful_card(fine_group):
                         cards.append(_build_card(fine_group, len(cards)))
             elif _is_meaningful_card(sub_group):
@@ -314,7 +314,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
             if prefix not in broader:
                 broader[prefix] = []
             broader[prefix].append(block)
-        for prefix, group in broader.items():
+        for _, group in broader.items():
             if len(group) > 12:
                 # Still too large — don't force merge everything
                 continue
@@ -652,10 +652,10 @@ def _collect_card_pattern_matches(
             matches["organization"].append((val, m.start(), m.end()))
 
     # Deduplicate each list
-    for key in matches:
+    for key, match_list in matches.items():
         seen = set()
         unique = []
-        for val, start, end in matches[key]:
+        for val, start, end in match_list:
             if val not in seen:
                 seen.add(val)
                 unique.append((val, start, end))

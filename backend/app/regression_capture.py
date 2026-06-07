@@ -485,12 +485,10 @@ class RegressionCapture:
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(payload)
             f.flush()
-            try:
+            from contextlib import suppress
+
+            with suppress(OSError):
                 os.fsync(f.fileno())
-            except OSError:
-                # Some filesystems (e.g. tmpfs) do not support fsync;
-                # the rename is still atomic, so this is best-effort.
-                pass
         os.replace(tmp_path, self._registry_path)
 
     def _get_entry(self, entry_id: str) -> RegressionEntry | None:

@@ -378,7 +378,7 @@ def create_token(
     primary_type: SemanticType = SemanticType.TEXT,
     confidence: float = 0.85,
     extraction_method: str = "pattern",
-    source_field: str = "",
+    source_field: str = "",  # noqa: ARG001, RUF100
 ) -> SemanticToken:
     """Factory for creating SemanticToken with sensible defaults.
 
@@ -400,7 +400,7 @@ def create_token(
     return tok
 
 
-def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: SemanticGraph | None = None) -> None:
+def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: SemanticGraph | None = None) -> None:  # noqa: ARG001, RUF100
     """Populate the 16-dimensional embedding from graph context."""
     if graph:
         from app.semantic_inference_engine import RelationshipEmbeddingSpace

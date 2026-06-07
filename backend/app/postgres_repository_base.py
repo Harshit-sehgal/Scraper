@@ -148,7 +148,7 @@ def job_to_row(job: Job) -> dict:
         "started_at": job.started_at if job.started_at is not None else "",
         "results_on_disk": job.results_on_disk,
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
-        "updated_at": datetime.datetime.now().isoformat(),
+        "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "deleted_at": None,
     }
 
@@ -239,7 +239,7 @@ def sync_job_events(conn, job_id: str, logs) -> None:
         if hasattr(entry, "model_dump"):
             try:
                 entry_dict = entry.model_dump()
-            except Exception:  # nosec B110  # noqa: BLE001 - pydantic dump fallback
+            except Exception:  # nosec B110
                 entry_dict = {"timestamp": "", "level": "info", "message": str(entry)}
         elif isinstance(entry, dict):
             entry_dict = entry
@@ -268,13 +268,13 @@ def ensure_required_tables(conn) -> None:
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:  # nosec B110  # noqa: BLE001 - schema migration best-effort
+        except Exception:  # nosec B110
             logger.debug("ALTER TABLE jobs ADD COLUMN %s failed (ignored)", col_def)
     execute(conn, build_create_recycle_bin_sql())
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:  # nosec B110  # noqa: BLE001 - schema migration best-effort
+        except Exception:  # nosec B110
             logger.debug("ALTER TABLE recycle_bin ADD COLUMN %s failed (ignored)", col_def)
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -283,7 +283,7 @@ def ensure_required_tables(conn) -> None:
     ]:
         try:
             execute(conn, idx_sql)
-        except Exception:  # nosec B110  # noqa: BLE001 - schema migration best-effort
+        except Exception:  # nosec B110
             logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
 
 
@@ -341,7 +341,7 @@ def _migrate_worker_heartbeats_v6(conn) -> None:
                 """
             )
             cur.execute("DROP TABLE worker_heartbeats_v5_backup")
-        except Exception:  # nosec B110  # noqa: BLE001 - migration rollback
+        except Exception:  # nosec B110
             cur.execute("ROLLBACK TO SAVEPOINT migrate_wh_v6")
             logger.exception(
                 "worker_heartbeats v5→v6 migration failed; the table is "
@@ -632,7 +632,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql)
-        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns empty
+        except Exception:  # nosec B110
             return {}
         return {str(row["status"]): int(row["cnt"]) for row in rows}
 
@@ -737,7 +737,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                         jobs_store[job.id] = job
 
                 if recover_in_progress:
-                    now_iso = datetime.datetime.now().isoformat()
+                    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     dirty_ids = []
                     for job in list(jobs_store.values()):
                         if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
@@ -797,7 +797,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id")
                 self._execute(
                     conn,
-                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608
+                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608  # noqa: RUF100, S608
                     [row[k] for k in safe_keys],
                 )
                 sync_job_results(conn, job.id, job.results)
@@ -813,13 +813,13 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
             for job in recycle_bin.values():
                 row = job_to_row(job)
-                now_iso = datetime.datetime.now().isoformat()
+                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 row["deleted_at"] = now_iso
                 cols = ", ".join(row.keys())
                 ph = ", ".join("%s" for _ in row)
                 self._execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",  # nosec B608
+                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",  # nosec B608  # noqa: RUF100, S608
                     list(row.values()),
                 )
                 self._execute(
@@ -845,7 +845,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row if k != "id")
             self._execute(
                 conn,
-                f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608
+                f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608  # noqa: RUF100, S608
                 list(row.values()),
             )
             sync_job_results(conn, job.id, job.results)
@@ -859,7 +859,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
-        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns empty
+        except Exception:  # nosec B110
             return []
         out: list[dict] = []
         for row in rows:
@@ -885,7 +885,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (job_id,),
                 )
             return int(row["cnt"]) if row else 0
-        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns 0
+        except Exception:  # nosec B110
             return 0
 
     def read_events(self, job_id: str, limit: int = 200, offset: int = 0, level_prefix: str | None = None) -> list[dict]:
@@ -902,7 +902,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, tuple(params))
-        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns empty
+        except Exception:  # nosec B110
             return []
         return [
             {
@@ -974,7 +974,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (f"{int(older_than_days)} days",),
                 )
                 return int(cur.rowcount) if cur.rowcount else 0
-        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns 0
+        except Exception:  # nosec B110
             return 0
 
     def cleanup_companion_data(self, job_id: str) -> None:
@@ -1002,7 +1002,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             row = self._fetch_one(conn, "SELECT * FROM jobs WHERE id = %s AND deleted_at IS NULL", (job_id,))
             if not row:
                 return False
-            now = datetime.datetime.now().isoformat()
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
             self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, job_id))
             cols_to_copy = [k for k in row if k != "deleted_at"]
             insert_cols = ", ".join(cols_to_copy)
@@ -1010,7 +1010,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             params = [row[k] for k in cols_to_copy] + [now]
             self._execute(
                 conn,
-                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608
+                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608  # noqa: RUF100, S608
                 params,
             )
             return True
@@ -1028,7 +1028,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             update_parts = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
             self._execute(
                 conn,
-                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",  # nosec B608
+                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",  # nosec B608  # noqa: RUF100, S608
                 [row[k] for k in cols],
             )
             return True
@@ -1049,19 +1049,19 @@ class PostgresRepositoryBase(JobRepository, ABC):
         with self._conn() as conn:
             rows = self._fetch_all(
                 conn,
-                "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"
-                + (" AND completed_at < %s" if older_than else ""),  # nosec B608
+                "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"  # nosec B608  # noqa: RUF100, S608
+                + (" AND completed_at < %s" if older_than else ""),  # nosec B608  # noqa: RUF100, S608
                 (list(terminal_statuses), older_than) if older_than else (list(terminal_statuses),),
             )
             for row in rows:
-                now = datetime.datetime.now().isoformat()
+                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, row["id"]))
                 cols = [k for k in row if k != "deleted_at"]
                 col_list = ", ".join(cols)
                 ph = ", ".join("%s" for _ in cols)
                 self._execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608
+                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608  # noqa: RUF100, S608
                     [row[k] for k in cols] + [now],
                 )
                 self._execute(conn, "DELETE FROM job_results WHERE job_id = %s", (row["id"],))
@@ -1081,7 +1081,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
     def save_world_state(self, payload: dict) -> None:
         self._ensure()
-        now = datetime.datetime.now().isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         payload_json = json.dumps(payload, ensure_ascii=False)
         with self._conn() as conn:
             self._execute(
@@ -1095,7 +1095,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
     def record_worker_heartbeat(self, worker_id: str, hostname: str, pid: int) -> None:
         self._ensure()
-        now = datetime.datetime.now().isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with self._conn() as conn:
             # The composite primary key (worker_id, pid) — see schema v6 —
             # lets two workers on the same host coexist. The v5 schema
@@ -1145,7 +1145,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         alive = False
         if last_heartbeat:
             try:
-                delta = datetime.datetime.now() - datetime.datetime.fromisoformat(last_heartbeat)
+                delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_heartbeat)
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False
@@ -1168,7 +1168,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             alive = False
             if last_hb:
                 try:
-                    delta = datetime.datetime.now() - datetime.datetime.fromisoformat(last_hb)
+                    delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_hb)
                     alive = delta.total_seconds() < ttl_seconds
                 except (ValueError, TypeError):
                     alive = False
@@ -1201,7 +1201,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "job_count": job_count or 0,
                     "recycle_bin_count": recycle_count or 0,
                 }
-        except Exception as e:  # nosec B110  # noqa: BLE001 - health check failure
+        except Exception as e:  # nosec B110
             logger.exception("Postgres health check failed")
             return {
                 "ok": False,

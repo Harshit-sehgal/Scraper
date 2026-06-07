@@ -215,9 +215,9 @@ class JobCreate(BaseModel):
                         or not u.startswith(("http://", "https://"))
                     ):
                         msg = "Manual mode requires valid http(s) URLs"
-                        raise ValueError(msg)
+                        raise ValueError(msg) from e
                     msg = f"URL '{u}' failed security check: {e}"
-                    raise ValueError(msg)
+                    raise ValueError(msg) from e
             self.urls = cleaned_urls
 
         if self.mode == ScrapeMode.AUTO:
@@ -269,7 +269,7 @@ class JobStatus(StrEnum):
 class LogEntry(BaseModel):
     """A single log entry for a job."""
 
-    timestamp: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     message: str
     level: str = "info"
 
@@ -301,7 +301,7 @@ class Job(BaseModel):
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     started_at: str | None = None
     completed_at: str | None = None
     total_records: int = 0

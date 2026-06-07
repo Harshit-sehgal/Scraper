@@ -143,7 +143,7 @@ def validate_production_credentials(settings) -> None:
             password = parsed.password
         except Exception as e:
             msg = f"Production check failed: DATAFORGE_DATABASE_URL is not parseable: {e}"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
         if not password:
             msg = (

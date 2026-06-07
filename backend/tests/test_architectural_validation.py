@@ -93,7 +93,7 @@ class ArchitecturalValidator:
                                     imports.add(imported)
 
                 self.imports_map[module_name] = imports
-            except Exception:
+            except Exception:  # noqa: RUF100, S110
                 pass
 
     def get_layer(self, module: str) -> str:
@@ -402,7 +402,7 @@ class TestAsyncBoundaries:
                     if "async def" in content and "requests." in content:
                         # Async with blocking requests library
                         async_violations.append(py_file.name)
-            except BaseException:
+            except BaseException:  # noqa: RUF100, S110
                 pass
 
         assert len(async_violations) == 0, f"Found {len(async_violations)} async functions with blocking I/O"
@@ -448,7 +448,7 @@ class TestAsyncBoundaries:
                                             source = ast.unparse(node)
                                             if "depth" not in source and "MAX_" not in source:
                                                 violations.append(f"{py_file.name}::{node.name}")
-            except BaseException:
+            except BaseException:  # noqa: RUF100, S110
                 pass
 
         # Some recursion is OK (but should be limited)

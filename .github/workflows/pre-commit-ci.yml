@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
 
+# Cancel in-flight runs on the same ref so a follow-up push does not
+# queue behind the prior run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ruff:
     name: Ruff Lint & Format

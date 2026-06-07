@@ -328,9 +328,13 @@ class GossipSubstrate:
                         # a self-merge would inflate the vector clock and
                         # overwrite our own state with the same state.
                         local_provider = self.peers.get(self.node_id) if self.node_id in self.peers else None
-                        if local_provider is not None and local_provider is not peer_provider:
-                            if hasattr(local_provider, "to_dict") and hasattr(peer_provider, "merge_state"):
-                                peer_provider.merge_state(local_provider.to_dict())
+                        if (
+                            local_provider is not None
+                            and local_provider is not peer_provider
+                            and hasattr(local_provider, "to_dict")
+                            and hasattr(peer_provider, "merge_state")
+                        ):
+                            peer_provider.merge_state(local_provider.to_dict())
                     success_count += 1
                     self.peer_health[peer_id].success_count += 1
                     self.peer_health[peer_id].last_seen = time.time()

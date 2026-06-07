@@ -42,6 +42,17 @@ def main():
     db_password = generate_strong_password()
     grafana_password = generate_strong_password()
 
+    # The previous implementation hard-coded ``postgres:5432`` as
+    # the database host. That is correct for a docker-compose.prod.yml
+    # deploy but wrong for an external managed Postgres (RDS,
+    # Cloud SQL, etc.). Ask the operator so the generated URL is
+    # usable in the most common setups.
+    default_db_host = "postgres:5432"
+    db_host = input(f"Postgres host:port (default {default_db_host}): ").strip() or default_db_host
+    # Strip any scheme prefix the operator might paste; the
+    # generated DSN below always uses postgresql://.
+    db_host = db_host.split("://", 1)[-1].strip("/")
+
     config_content = f"""# DataForge Production Environment Configuration
 # Generated automatically by scripts/generate_prod_env.py
 
@@ -66,10 +77,28 @@ DATAFORGE_WORKER_QUEUE=true
 
 # Postgres Database configuration
 DATAFORGE_DB_PASSWORD={db_password}
-DATAFORGE_DATABASE_URL=postgresql://dataforge:{db_password}@postgres:5432/dataforge
+DATAFORGE_DATABASE_URL=postgresql://dataforge:{db_password}@{db_host}/dataforge
 
 # Infrastructure passwords
 GRAFANA_PASSWORD={grafana_password}
+
+# -----------------------------------------------------------------------------
+# ⚠️  ALERTMANAGER SECRETS — must be set manually (this script does NOT
+#     generate them). Without these, alertmanager will start in a
+#     degraded state and refuse to deliver email or Slack alerts.
+#
+#   ALERTMANAGER_SMTP_HOST=smtp.example.com:587
+#   ALERTMANAGER_SMTP_USER=alerts@example.com
+#   ALERTMANAGER_SMTP_PASS=...                 # never commit
+#   ALERTMANAGER_EMAIL_FROM=alertmanager@example.com
+#   ALERTMANAGER_EMAIL_TO=ops@example.com
+#   ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+#                                                  # never commit
+#
+#   For docker-compose.prod.yml, the SLACK_WEBHOOK_URL is also accepted
+#   as a Docker secret at ./.secrets/slack_webhook so it never appears
+#   in ``docker inspect`` env output.
+# -----------------------------------------------------------------------------
 """
 
     try:
@@ -108,7 +137,11 @@ GRAFANA_PASSWORD={grafana_password}
 
     print("\nNext Actions:")
     print(f"1. Open '{TARGET_FILE}' and replace 'https://yourdomain.com' with your actual production domain.")
-    print("2. Run the environment validator to verify your newly generated configuration:")
+    print("2. Set the ALERTMANAGER_* secrets listed at the bottom of the file")
+    print("   (SMTP_HOST, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO,")
+    print("   SLACK_WEBHOOK_URL). The generator does NOT create them because")
+    print("   they are operator-specific (your mail relay, your Slack workspace).")
+    print("3. Run the environment validator to verify your newly generated configuration:")
     print(f"   python3 scripts/check_prod_env.py --env-file {TARGET_FILE}")
     print("=" * 60)
 

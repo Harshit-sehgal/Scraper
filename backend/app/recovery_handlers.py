@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════
 
 
-async def handle_rotate_proxy(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_rotate_proxy(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Rotate to next proxy in the pool."""
     logger.info("Rotating proxy for %s", context.get("url", ""))
     pm = get_proxy_manager()
@@ -61,7 +61,7 @@ async def handle_backoff_and_slow(params: dict[str, Any], context: dict[str, Any
     return True
 
 
-async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Increase the time waited for JS hydration."""
     extra_ms = params.get("extra_delay_ms", 5000)
     max_wait = params.get("max_hydration_wait", 30000)
@@ -72,7 +72,7 @@ async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[s
     return True
 
 
-async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Increase the overall fetch timeout."""
     timeout_ms = params.get("timeout_ms", 40000)
     logger.info("Increasing timeout to %dms", timeout_ms)
@@ -81,7 +81,7 @@ async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any
     return True
 
 
-async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Reduce concurrent fetches and update domain runtime policy."""
     url = context.get("url", "")
     logger.info("Reducing concurrency for %s", url)
@@ -94,7 +94,7 @@ async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, A
     return True
 
 
-async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Retry with DNS cache flush.
 
     Parameters
@@ -112,7 +112,7 @@ async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str,
     return True
 
 
-async def handle_force_rediscovery(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_force_rediscovery(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     url = context.get("url")
     if not url:
         return False
@@ -165,7 +165,7 @@ async def handle_lower_score_threshold(params: dict[str, Any], context: dict[str
     return True
 
 
-async def handle_retry_with_field_focus(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_retry_with_field_focus(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Retry with focus on critical fields only."""
     logger.info("Recovery action: retry with field focus strategy")
     if attempt_ctx:
@@ -174,7 +174,7 @@ async def handle_retry_with_field_focus(params: dict[str, Any], context: dict[st
     return True
 
 
-async def handle_escalate_to_llm(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_escalate_to_llm(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Escalate to LLM-based discovery."""
     logger.info("Recovery action: escalating to LLM-based discovery")
     if attempt_ctx:
@@ -206,7 +206,7 @@ async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], a
     return True
 
 
-async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     logger.info("Recovery action: switching to httpx fallback fetch method")
     if attempt_ctx:
         attempt_ctx.prefer_httpx = True
@@ -214,7 +214,7 @@ async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, A
     return True
 
 
-async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Skip domain permanently (for this job).
 
     Also records an abort in the domain runtime policy so future scheduling
@@ -237,7 +237,7 @@ async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], at
     return True
 
 
-async def handle_skip_url(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+async def handle_skip_url(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:  # noqa: ARG001, RUF100
     """Skip this specific URL.
 
     Parameters

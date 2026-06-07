@@ -257,7 +257,7 @@ class SemanticBoundaryEngine:
     def decision_history(self) -> list:
         return get_world_state().decision_history  # type: ignore[no-any-return]
 
-    def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> BoundaryScore:
+    def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> BoundaryScore:  # noqa: ARG002, RUF100
         """Score an adjacent token pair for cohesion vs separation."""
         score = BoundaryScore()
 
@@ -445,17 +445,15 @@ def group_adjacent_entities(records: list) -> list:
                 v_head = record.get(k_head, "")
                 v_next = record.get(k_next, "")
 
-                if v_head and v_next:
-                    # Boundary engine scores based on types and values
-                    if score_boundary(t_head, t_next, v_head, v_next, h_start, n_start):
-                        # Merge into head
-                        record[k_head] = f"{v_head} {v_next}".strip()
-                        record[k_next] = None
-                        merged_keys.add(k_next)
-                        # Update head's end span for next adjacency check
-                        h_end = n_end
-                        lookahead += 1
-                        continue
+                if v_head and v_next and score_boundary(t_head, t_next, v_head, v_next, h_start, n_start):
+                    # Merge into head
+                    record[k_head] = f"{v_head} {v_next}".strip()
+                    record[k_next] = None
+                    merged_keys.add(k_next)
+                    # Update head's end span for next adjacency check
+                    h_end = n_end
+                    lookahead += 1
+                    continue
 
                 # If no merge, stop lookahead for this head
                 break

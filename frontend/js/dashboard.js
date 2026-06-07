@@ -2,7 +2,7 @@
    DataForge — Operations Dashboard
    ═══════════════════════════════════════════ */
 
-import { esc, jsStr, toast } from './utils.js';
+import { esc, attrStr, toast } from './utils.js';
 import { API, apiFetch } from './api.js';
 
 // ─── Refresh Dashboard ───
@@ -192,18 +192,19 @@ function renderPredictions(data) {
             critical: 'var(--danger)', high: '#c7851b', medium: '#8a5a10', low: 'var(--success)',
         };
         const color = riskColors[p.risk_level] || 'var(--ink-soft)';
+        const confidence = p.confidence != null ? `${(p.confidence * 100).toFixed(0)}%` : '—';
         return `
             <div class="dash-prediction">
                 <div class="dash-prediction-header">
                     <span class="dash-prediction-domain">${esc(p.domain)}</span>
                     <span class="dash-prediction-risk" style="color:${color}; background:${color}18;">
-                        ${esc(p.risk_level.toUpperCase())}
+                        ${esc(String(p.risk_level || '').toUpperCase())}
                     </span>
                 </div>
                 <div class="dash-prediction-body">
                     <div class="dash-prediction-detail">
                         <span>Failure: <strong>${esc(p.predicted_failure_type)}</strong></span>
-                        <span>Confidence: <strong>${(p.confidence * 100).toFixed(0)}%</strong></span>
+                        <span>Confidence: <strong>${confidence}</strong></span>
                         <span>Health: <strong>${p.health_score_current?.toFixed(0) || '?'}/100</strong></span>
                     </div>
                     ${p.estimated_time_to_failure_hours ? `
@@ -214,7 +215,7 @@ function renderPredictions(data) {
                     ` : ''}
                     ${p.recommended_actions?.length ? `
                         <div class="dash-prediction-actions">
-                            ${p.recommended_actions.map(a => `<button class="btn ghost small" data-action="toast-info" data-message="${jsStr(a)}">${esc(a)}</button>`).join('')}
+                            ${p.recommended_actions.map(a => `<button class="btn ghost small" data-action="toast-info" data-message="${attrStr(a)}">${esc(a)}</button>`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -245,7 +246,7 @@ function renderTelemetry(data) {
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Success Rate</span>
-                <span class="dash-metric-val">${(data.success_rate * 100).toFixed(0)}%</span>
+                <span class="dash-metric-val">${data.success_rate != null ? `${(data.success_rate * 100).toFixed(0)}%` : '—'}</span>
             </div>
         </div>
     `;

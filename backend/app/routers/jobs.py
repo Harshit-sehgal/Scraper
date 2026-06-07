@@ -25,10 +25,10 @@ from fastapi import APIRouter
 def create_jobs_router(
     jobs_store: dict[str, Job],
     recycle_bin_store: dict[str, Job],
-    persist_state_fn: Callable | None = None,
+    persist_state_fn: Callable | None = None,  # noqa: ARG001, RUF100
     schedule_task_fn: Callable | None = None,
     run_job_coro_fn: Callable | None = None,
-    config: dict | None = None,
+    config: dict | None = None,  # noqa: ARG001, RUF100
 ) -> APIRouter:
     """Create and return an APIRouter with all job-related endpoints.
 

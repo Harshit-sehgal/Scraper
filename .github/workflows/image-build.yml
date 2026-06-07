@@ -11,6 +11,12 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Cancel in-flight image builds on the same ref so a follow-up push
+# to main does not queue behind the prior build.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-production:
     name: Build production image

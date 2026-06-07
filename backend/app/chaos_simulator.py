@@ -171,6 +171,6 @@ if __name__ == "__main__":
             categories[cat] = []
         categories[cat].append(scenario)
 
-    for cat, scenarios_in_cat in sorted(categories.items()):
-        for scenario in scenarios_in_cat:
+    for _cat, scenarios_in_cat in sorted(categories.items()):
+        for _scenario in scenarios_in_cat:
             pass

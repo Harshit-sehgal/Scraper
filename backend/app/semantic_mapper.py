@@ -235,14 +235,13 @@ def is_child_fragment(value: str, seen_values: set) -> bool:
                     return True
 
         # Strategy 2: Prefix / Suffix suppression for fragments
-        if seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower):
-            # Only suppress if it's very short and part of a multi-word or
-            # compound value
-            if len(value_lower) < 5:
-                # If the separator is space or punctuation, it's a fragment
-                if value_is_digit or any(c in " /-,." for c in seen_lower.replace(value_lower, "", 1)):
-                    if not (value_lower.isalpha() and len(value_lower) == 1):
-                        return True
+        if (
+            (seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower))
+            and len(value_lower) < 5
+            and (value_is_digit or any(c in " /-,." for c in seen_lower.replace(value_lower, "", 1)))
+            and not (value_lower.isalpha() and len(value_lower) == 1)
+        ):
+            return True
 
     return False
 
@@ -391,19 +390,17 @@ def _find_best_value_for_need(
         for i, header in enumerate(headers):
             header_lower = header.lower()
             for keyword in need_keywords:
-                if keyword in header_lower:
-                    # Try to get corresponding value from record
-                    if i < len(values) and values[i]:
-                        return FieldMapping(
-                            field_name=semantic_need,
-                            semantic_need=semantic_need,
-                            original_value=values[i],
-                            mapped_value=values[i].strip(),
-                            confidence=0.8,
-                            matched_by="header",
-                            evidence=f"Header '{header}' matches '{keyword}'",
-                            signals=[f"header_match:{header}", "keyword_matched"],
-                        )
+                if keyword in header_lower and i < len(values) and values[i]:
+                    return FieldMapping(
+                        field_name=semantic_need,
+                        semantic_need=semantic_need,
+                        original_value=values[i],
+                        mapped_value=values[i].strip(),
+                        confidence=0.8,
+                        matched_by="header",
+                        evidence=f"Header '{header}' matches '{keyword}'",
+                        signals=[f"header_match:{header}", "keyword_matched"],
+                    )
 
     # Strategy 3: Value pattern detection from page
     value_type = _detect_value_type(values, value_patterns)

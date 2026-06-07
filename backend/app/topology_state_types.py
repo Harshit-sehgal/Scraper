@@ -20,7 +20,7 @@ def parse_topology_key(raw: str) -> tuple[str, str]:
         value = ast.literal_eval(raw)  # nosec
     except (SyntaxError, ValueError, TypeError):
         msg = f"Invalid topology key format: {raw!r}"
-        raise ValueError(msg)
+        raise ValueError(msg) from None
 
     if not isinstance(value, tuple) or len(value) != 2 or not all(isinstance(item, str) for item in value):
         msg = f"Invalid topology key structure: {raw!r}"

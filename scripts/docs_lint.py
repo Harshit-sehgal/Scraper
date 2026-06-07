@@ -8,10 +8,17 @@ fails when a route is registered in code but missing from
 We deliberately ignore path parameters, HTTP methods that are not
 ``GET``/``POST``/``PUT``/``PATCH``/``DELETE``/``OPTIONS``/``HEAD``,
 and routes that are explicitly marked ``include_in_schema=False``.
+
+By default the experimental routes (those gated by
+``DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES``) are NOT included in the
+lint comparison — they are not part of the stable public API and
+documenting them would create churn. Pass ``--include-experimental``
+to opt in.
 """
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -54,7 +61,7 @@ def _declared_routes_in_doc() -> set[tuple[str, str]]:
     return out
 
 
-def _live_routes() -> set[tuple[str, str]]:
+def _live_routes(include_experimental: bool) -> set[tuple[str, str]]:
     """Import the FastAPI app and dump the (method, path) tuple set.
 
     We do this in a subprocess so this script can run without the
@@ -72,19 +79,23 @@ def _live_routes() -> set[tuple[str, str]]:
         "for m in r.methods if m.upper() in {'GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'}];"
         "print(json.dumps(sorted(out)))"
     )
+    env = {
+        **__import__("os").environ,
+        "PYTHONPATH": "backend",
+        "DATAFORGE_DOTENV_PATH": "/dev/null",
+        "DATAFORGE_STORAGE_BACKEND": "sqlite",
+    }
+    # Default to NOT including experimental routes so the public API
+    # lint stays stable. ``--include-experimental`` is the explicit
+    # opt-in for maintainers who want a complete view.
+    env["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true" if include_experimental else "false"
     proc = subprocess.run(
         [sys.executable, "-c", code],
         check=False,
         capture_output=True,
         text=True,
         cwd=str(REPO),
-        env={
-            **__import__("os").environ,
-            "PYTHONPATH": "backend",
-            "DATAFORGE_DOTENV_PATH": "/dev/null",
-            "DATAFORGE_STORAGE_BACKEND": "sqlite",
-            "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
-        },
+        env=env,
     )
     if proc.returncode != 0:
         print("Failed to import app.main:", file=sys.stderr)
@@ -93,7 +104,18 @@ def _live_routes() -> set[tuple[str, str]]:
     return {tuple(x) for x in json.loads(proc.stdout)}
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Lint docs/API.md against the live FastAPI route table.")
+    parser.add_argument(
+        "--include-experimental",
+        action="store_true",
+        help="Include experimental routes (gated by DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES) in the lint comparison.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
     if not API_DOC.exists():
         print(f"docs file missing: {API_DOC}", file=sys.stderr)
         return 2
@@ -101,7 +123,7 @@ def main() -> int:
     if not declared:
         print(f"no routes declared in {API_DOC}", file=sys.stderr)
         return 2
-    live = _live_routes()
+    live = _live_routes(include_experimental=args.include_experimental)
     if not live:
         print("could not enumerate live routes (import failed); skipping", file=sys.stderr)
         return 0
@@ -124,7 +146,8 @@ def main() -> int:
         for f in failures:
             print(f, file=sys.stderr)
         return 1
-    print(f"docs lint OK: {len(norm_declared)} routes match between app and {API_DOC.name}.")
+    scope = "with experimental routes" if args.include_experimental else "stable routes only"
+    print(f"docs lint OK: {len(norm_declared)} routes match between app and {API_DOC.name} ({scope}).")
     return 0
 
 
