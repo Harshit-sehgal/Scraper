@@ -1,0 +1,35 @@
+# Dependabot keeps the lockfiles fresh.
+# Both pip and npm are checked weekly on a rebase-only schedule so
+# dependabot PRs don't collide with in-flight work. Group-level
+# settings are used for pip (all Python deps in one PR) and npm is
+# open per-package because the tree is small.
+#
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    # Group all pip dependency bumps into a single PR to reduce noise.
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+    # Rebase the branch on every new commit to main; no open/close cycle.
+    rebase-strategy: "rebase"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "Asia/Kolkata"
+    # npm ecosystem does not support groups natively — each dep gets
+    # its own PR, which is fine given the small devDependency set.
+    rebase-strategy: "rebase"

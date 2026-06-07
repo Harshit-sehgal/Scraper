@@ -2,9 +2,17 @@
    DataForge — Jobs Management
    ═══════════════════════════════════════════ */
 
-import { esc, toast, setEngineStatus, setJobsUpdatedAt, updateJobsLastUpdatedLabel, writeUIState, showConfirm } from './utils.js';
-import { API, apiFetch } from './api.js';
-import { currentView } from './views.js';
+import {
+  esc,
+  toast,
+  setEngineStatus,
+  setJobsUpdatedAt,
+  updateJobsLastUpdatedLabel,
+  writeUIState,
+  showConfirm,
+} from "./utils.js";
+import { API, apiFetch } from "./api.js";
+import { currentView } from "./views.js";
 
 // ─── State ───
 
@@ -22,75 +30,81 @@ const _recentUserActions = new Map(); // jobId -> expiresAt (ms)
 const _USER_ACTION_TTL_MS = 8000;
 
 function _markUserAction(id) {
-    _recentUserActions.set(id, Date.now() + _USER_ACTION_TTL_MS);
+  _recentUserActions.set(id, Date.now() + _USER_ACTION_TTL_MS);
 }
 
 function _consumeRecentUserAction(id) {
-    const exp = _recentUserActions.get(id);
-    if (exp === undefined) return false;
-    _recentUserActions.delete(id);
-    return exp >= Date.now();
+  const exp = _recentUserActions.get(id);
+  if (exp === undefined) return false;
+  _recentUserActions.delete(id);
+  return exp >= Date.now();
 }
 
-export function getJobsCache() { return jobsCache; }
-export function getPollers() { return pollers; }
+export function getJobsCache() {
+  return jobsCache;
+}
+export function getPollers() {
+  return pollers;
+}
 
 // ─── Refresh System Status ───
 
 export async function refreshSystemStatus() {
-    try {
-        const r = await apiFetch(`${API}/api/system/status`);
-        if (!r.ok) throw new Error('status unavailable');
-        const data = await r.json();
-        const active = Number((data.jobs || {}).active || 0);
-        setEngineStatus(active > 0 ? `Online • ${active} active` : 'Online • Idle');
-    } catch (e) {
-        setEngineStatus('Offline', true);
-    }
+  try {
+    const r = await apiFetch(`${API}/api/system/status`);
+    if (!r.ok) throw new Error("status unavailable");
+    const data = await r.json();
+    const active = Number((data.jobs || {}).active || 0);
+    setEngineStatus(active > 0 ? `Online • ${active} active` : "Online • Idle");
+  } catch (e) {
+    setEngineStatus("Offline", true);
+  }
 }
 
 // ─── Refresh Jobs ───
 
 export async function refreshJobs() {
-    // Show skeleton while loading
-    renderSkeleton();
+  // Show skeleton while loading
+  renderSkeleton();
 
-    try {
-        const res = await apiFetch(`${API}/api/jobs`);
-        const data = await res.json();
-        jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
-        renderJobs(applyJobFilters(jobsCache));
-        updateKPIs(jobsCache);
-        syncPollers(jobsCache);
-        setJobsUpdatedAt(Date.now());
-        updateJobsLastUpdatedLabel();
-    } catch (e) {
-        setEngineStatus('Offline', true);
-        updateJobsLastUpdatedLabel('Unable to refresh');
-        // If cache is empty, show empty state on error
-        if (!jobsCache.length) {
-            const list = document.getElementById('jobs-list');
-            const empty = document.getElementById('empty-state');
-            if (list && empty) {
-                list.innerHTML = '';
-                list.appendChild(empty);
-                empty.classList.remove('hidden');
-                const titleEl = empty.querySelector('.empty-state-title');
-                const descEl = empty.querySelector('.empty-state-desc');
-                if (titleEl) titleEl.textContent = 'Unable to connect to server';
-                if (descEl) descEl.textContent = 'Check that the backend is running on ' + API;
-            }
-        }
+  try {
+    const res = await apiFetch(`${API}/api/jobs`);
+    const data = await res.json();
+    jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
+    renderJobs(applyJobFilters(jobsCache));
+    updateKPIs(jobsCache);
+    syncPollers(jobsCache);
+    setJobsUpdatedAt(Date.now());
+    updateJobsLastUpdatedLabel();
+  } catch (e) {
+    setEngineStatus("Offline", true);
+    updateJobsLastUpdatedLabel("Unable to refresh");
+    // If cache is empty, show empty state on error
+    if (!jobsCache.length) {
+      const list = document.getElementById("jobs-list");
+      const empty = document.getElementById("empty-state");
+      if (list && empty) {
+        list.innerHTML = "";
+        list.appendChild(empty);
+        empty.classList.remove("hidden");
+        const titleEl = empty.querySelector(".empty-state-title");
+        const descEl = empty.querySelector(".empty-state-desc");
+        if (titleEl) titleEl.textContent = "Unable to connect to server";
+        if (descEl) descEl.textContent = "Check that the backend is running on " + API;
+      }
     }
+  }
 }
 
 // ─── Skeleton Loading ───
 
 function renderSkeleton() {
-    const list = document.getElementById('jobs-list');
-    if (!list) return;
+  const list = document.getElementById("jobs-list");
+  if (!list) return;
 
-    const rows = Array.from({ length: 4 }, () => `
+  const rows = Array.from(
+    { length: 4 },
+    () => `
         <div class="skeleton">
             <div class="skeleton-grid">
                 <div class="skeleton-bar wide"></div>
@@ -103,251 +117,280 @@ function renderSkeleton() {
                 </div>
             </div>
         </div>
-    `).join('');
+    `,
+  ).join("");
 
-    list.innerHTML = rows;
+  list.innerHTML = rows;
 }
 
 export async function refreshJobsManual() {
-    const btn = document.getElementById('btn-refresh-jobs');
-    const prevText = btn ? btn.textContent : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Refreshing...';
-    }
+  const btn = document.getElementById("btn-refresh-jobs");
+  const prevText = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Refreshing...";
+  }
 
-    try {
-        await refreshJobs();
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = prevText || 'Refresh';
-        }
+  try {
+    await refreshJobs();
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevText || "Refresh";
     }
+  }
 }
 
 // ─── Pollers ───
 
 function syncPollers(jobs) {
-    const activeIds = new Set(
-        jobs
-            .filter(j => ['running', 'pending', 'discovering'].includes(j.status))
-            .map(j => j.id)
-    );
+  const activeIds = new Set(
+    jobs.filter((j) => ["running", "pending", "discovering"].includes(j.status)).map((j) => j.id),
+  );
 
-    Object.keys(pollers).forEach(id => {
-        if (!activeIds.has(id)) {
-            clearInterval(pollers[id]);
-            delete pollers[id];
-        }
-    });
+  Object.keys(pollers).forEach((id) => {
+    if (!activeIds.has(id)) {
+      clearInterval(pollers[id]);
+      delete pollers[id];
+    }
+  });
 
-    activeIds.forEach(id => {
-        if (!pollers[id]) {
-            const pollInterval = (typeof window.DATAFORGE_POLL_JOB_INTERVAL === 'number') ? window.DATAFORGE_POLL_JOB_INTERVAL : 3000;
-            pollers[id] = setInterval(() => pollJob(id), pollInterval);
-        }
-    });
+  activeIds.forEach((id) => {
+    if (!pollers[id]) {
+      const pollInterval =
+        typeof window.DATAFORGE_POLL_JOB_INTERVAL === "number" ? window.DATAFORGE_POLL_JOB_INTERVAL : 3000;
+      pollers[id] = setInterval(() => pollJob(id), pollInterval);
+    }
+  });
 }
 
 async function pollJob(id) {
-    try {
-        const r = await apiFetch(`${API}/api/jobs/${id}`);
-        if (!r.ok) return;
-        const j = await r.json();
+  try {
+    const r = await apiFetch(`${API}/api/jobs/${id}`);
+    if (!r.ok) return;
+    const j = await r.json();
 
-        // If looking at this job's results, refresh logs/progress
-        if (currentView === 'results') {
-            const { currentJobId } = await import('./results.js');
-            if (currentJobId === id) {
-                const logsPanel = document.getElementById('logs-panel');
-                if (Array.isArray(j.logs) && j.logs.length) {
-                    logsPanel.classList.remove('hidden');
-                    const { renderLogs } = await import('./results.js');
-                    renderLogs(j.logs);
-                }
-
-                const resProgWrap = document.getElementById('res-progress-wrap');
-                if (j.progress_total > 0) {
-                    resProgWrap.classList.remove('hidden');
-                    const pct = Math.round((j.progress_current / j.progress_total) * 100);
-                    document.getElementById('res-progress-bar').style.width = `${pct}%`;
-                    document.getElementById('res-progress-text').textContent = `${pct}%`;
-                } else {
-                    resProgWrap.classList.add('hidden');
-                }
-
-                if (['completed', 'degraded', 'empty_result', 'failed', 'canceled'].includes(j.status)) {
-                    const { viewResults } = await import('./results.js');
-                    viewResults(id);
-                }
-            }
+    // If looking at this job's results, refresh logs/progress
+    if (currentView === "results") {
+      const { currentJobId } = await import("./results.js");
+      if (currentJobId === id) {
+        const logsPanel = document.getElementById("logs-panel");
+        if (Array.isArray(j.logs) && j.logs.length) {
+          logsPanel.classList.remove("hidden");
+          const { renderLogs } = await import("./results.js");
+          renderLogs(j.logs);
         }
 
-        if (['completed', 'degraded', 'empty_result', 'failed', 'canceled'].includes(j.status)) {
-            clearInterval(pollers[id]);
-            delete pollers[id];
-            // Mark this job for a status-change flash on the next render
-            _flashJobId = id;
-            refreshJobs();
-            // Skip the poller's terminal-state toast if the user just
-            // initiated the action — they already saw the "Cancellation
-            // requested" / "Job deleted" toast and a second one for the
-            // same event would be noisy and confusing.
-            if (_consumeRecentUserAction(id)) {
-                return;
-            }
-            const truncate = (s, n) => {
-                const str = String(s || '');
-                return str.length > n ? str.slice(0, n) + '…' : str;
-            };
-            if (j.status === 'completed') toast(`"${truncate(j.name, 60)}" done — ${j.filtered_records} records`, 'success');
-            else if (j.status === 'degraded') toast(`"${truncate(j.name, 60)}" finished with partial results — ${j.filtered_records} records`, 'info');
-            else if (j.status === 'empty_result') toast(`"${truncate(j.name, 60)}" finished — 0 records. ${truncate(j.error, 80) || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
-            else if (j.status === 'canceled') toast(`"${truncate(j.name, 60)}" canceled`, 'info');
-            else toast(`"${truncate(j.name, 60)}" failed: ${truncate(j.error, 80)}`, 'error');
+        const resProgWrap = document.getElementById("res-progress-wrap");
+        if (j.progress_total > 0) {
+          resProgWrap.classList.remove("hidden");
+          const pct = Math.round((j.progress_current / j.progress_total) * 100);
+          document.getElementById("res-progress-bar").style.width = `${pct}%`;
+          document.getElementById("res-progress-text").textContent = `${pct}%`;
+        } else {
+          resProgWrap.classList.add("hidden");
         }
-    } catch (e) { /* ignore */ }
+
+        if (["completed", "degraded", "empty_result", "failed", "canceled"].includes(j.status)) {
+          const { viewResults } = await import("./results.js");
+          viewResults(id);
+        }
+      }
+    }
+
+    if (["completed", "degraded", "empty_result", "failed", "canceled"].includes(j.status)) {
+      clearInterval(pollers[id]);
+      delete pollers[id];
+      // Mark this job for a status-change flash on the next render
+      _flashJobId = id;
+      refreshJobs();
+      // Skip the poller's terminal-state toast if the user just
+      // initiated the action — they already saw the "Cancellation
+      // requested" / "Job deleted" toast and a second one for the
+      // same event would be noisy and confusing.
+      if (_consumeRecentUserAction(id)) {
+        return;
+      }
+      const truncate = (s, n) => {
+        const str = String(s || "");
+        return str.length > n ? str.slice(0, n) + "…" : str;
+      };
+      if (j.status === "completed") toast(`"${truncate(j.name, 60)}" done — ${j.filtered_records} records`, "success");
+      else if (j.status === "degraded")
+        toast(`"${truncate(j.name, 60)}" finished with partial results — ${j.filtered_records} records`, "info");
+      else if (j.status === "empty_result")
+        toast(
+          `"${truncate(j.name, 60)}" finished — 0 records. ${truncate(j.error, 80) || "Page may be empty, blocked, or require JS rendering."}`,
+          "warning",
+        );
+      else if (j.status === "canceled") toast(`"${truncate(j.name, 60)}" canceled`, "info");
+      else toast(`"${truncate(j.name, 60)}" failed: ${truncate(j.error, 80)}`, "error");
+    }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 // ─── CRUD ───
 
 export async function cancelJob(id) {
-    showConfirm('Cancel Job?', 'Cancel this running job?', async () => {
+  showConfirm("Cancel Job?", "Cancel this running job?", async () => {
     try {
-        _markUserAction(id);
-        const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data.detail || 'Cancel failed');
-        toast(data.message || 'Cancellation requested', 'info');
-        refreshJobs();
+      _markUserAction(id);
+      const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: "POST" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "Cancel failed");
+      toast(data.message || "Cancellation requested", "info");
+      refreshJobs();
     } catch (e) {
-        toast(`Cancel failed: ${e.message}`, 'error');
+      toast(`Cancel failed: ${e.message}`, "error");
     }
-    });
+  });
 }
 
 export async function deleteJob(id) {
-    showConfirm('Delete Job?', 'Move this job to the recycle bin?', async () => {
+  showConfirm("Delete Job?", "Move this job to the recycle bin?", async () => {
     try {
-        _markUserAction(id);
-        const r = await apiFetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data.detail || 'Delete failed');
-        toast('Job deleted');
-        refreshJobs();
+      _markUserAction(id);
+      const r = await apiFetch(`${API}/api/jobs/${id}`, { method: "DELETE" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "Delete failed");
+      toast("Job deleted");
+      refreshJobs();
     } catch (e) {
-        toast(`Delete failed: ${e.message}`, 'error');
+      toast(`Delete failed: ${e.message}`, "error");
     }
-    });
+  });
 }
 
 export async function clearTerminalJobs() {
-    const keepRecent = 5;
-    showConfirm('Clear Terminal Jobs?', `Remove completed/failed/canceled jobs, keeping the latest ${keepRecent}?`, async () => {
-
-    try {
-        const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
+  const keepRecent = 5;
+  showConfirm(
+    "Clear Terminal Jobs?",
+    `Remove completed/failed/canceled jobs, keeping the latest ${keepRecent}?`,
+    async () => {
+      try {
+        const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: "DELETE" });
         const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data.detail || 'Terminal cleanup failed');
-        toast(data.message || 'Terminal jobs cleared', 'info');
+        if (!r.ok) throw new Error(data.detail || "Terminal cleanup failed");
+        toast(data.message || "Terminal jobs cleared", "info");
         refreshJobs();
-    } catch (e) {
-        toast(`Cleanup failed: ${e.message}`, 'error');
-    }
-    });
+      } catch (e) {
+        toast(`Cleanup failed: ${e.message}`, "error");
+      }
+    },
+  );
 }
 
 // ─── Filtering ───
 
 function applyJobFilters(jobs) {
-    const q = (document.getElementById('jobs-search')?.value || '').trim().toLowerCase();
-    const status = (document.getElementById('jobs-status-filter')?.value || 'all').toLowerCase();
+  const q = (document.getElementById("jobs-search")?.value || "").trim().toLowerCase();
+  const status = (document.getElementById("jobs-status-filter")?.value || "all").toLowerCase();
 
-    return jobs.filter(j => {
-        const name = String(j.name || '').toLowerCase();
-        const topic = String(j.topic || '').toLowerCase();
-        const statusMatch = status === 'all' || String(j.status || '').toLowerCase() === status;
-        const queryMatch = !q || name.includes(q) || topic.includes(q);
-        return statusMatch && queryMatch;
-    });
+  return jobs.filter((j) => {
+    const name = String(j.name || "").toLowerCase();
+    const topic = String(j.topic || "").toLowerCase();
+    const statusMatch = status === "all" || String(j.status || "").toLowerCase() === status;
+    const queryMatch = !q || name.includes(q) || topic.includes(q);
+    return statusMatch && queryMatch;
+  });
 }
 
 export function onJobsFilterChanged() {
-    const jobsSearch = document.getElementById('jobs-search');
-    const jobsStatus = document.getElementById('jobs-status-filter');
-    writeUIState({
-        jobsSearch: jobsSearch ? jobsSearch.value : '',
-        jobsStatus: jobsStatus ? jobsStatus.value : 'all',
-    });
-    renderJobs(applyJobFilters(jobsCache));
+  const jobsSearch = document.getElementById("jobs-search");
+  const jobsStatus = document.getElementById("jobs-status-filter");
+  writeUIState({
+    jobsSearch: jobsSearch ? jobsSearch.value : "",
+    jobsStatus: jobsStatus ? jobsStatus.value : "all",
+  });
+  renderJobs(applyJobFilters(jobsCache));
 }
 
 // ─── Rendering ───
 
 function updateKPIs(jobs) {
-    document.getElementById('kpi-total').textContent = jobs.length;
-    document.getElementById('kpi-running').textContent = jobs.filter(j => j.status === 'running' || j.status === 'discovering' || j.status === 'pending').length;
-    document.getElementById('kpi-done').textContent = jobs.filter(j => ['completed', 'degraded', 'empty_result', 'canceled'].includes(j.status)).length;
-    document.getElementById('kpi-records').textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
+  document.getElementById("kpi-total").textContent = jobs.length;
+  document.getElementById("kpi-running").textContent = jobs.filter(
+    (j) => j.status === "running" || j.status === "discovering" || j.status === "pending",
+  ).length;
+  document.getElementById("kpi-done").textContent = jobs.filter((j) =>
+    ["completed", "degraded", "empty_result", "canceled"].includes(j.status),
+  ).length;
+  document.getElementById("kpi-records").textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
 }
 
 function renderJobs(jobs) {
-    const list = document.getElementById('jobs-list');
-    const empty = document.getElementById('empty-state');
+  const list = document.getElementById("jobs-list");
+  const empty = document.getElementById("empty-state");
 
-    if (!jobs.length) {
-        list.innerHTML = '';
-        list.appendChild(empty);
-        empty.classList.remove('hidden');
-        return;
-    }
+  if (!jobs.length) {
+    list.innerHTML = "";
+    list.appendChild(empty);
+    empty.classList.remove("hidden");
+    return;
+  }
 
-    list.innerHTML = jobs.map(j => {
-        const isActive = ['pending', 'discovering', 'running'].includes(j.status);
-        const hasProgress = j.progress_total > 0;
-        const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
+  list.innerHTML = jobs
+    .map((j) => {
+      const isActive = ["pending", "discovering", "running"].includes(j.status);
+      const hasProgress = j.progress_total > 0;
+      const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
 
-        const highlightClass = j.status === 'completed' || j.status === 'degraded' ? 'completed-highlight' :
-            j.status === 'failed' ? 'failed-highlight' :
-            (j.status === 'running' || j.status === 'discovering' || j.status === 'pending') ? 'running-highlight' : '';
+      const highlightClass =
+        j.status === "completed" || j.status === "degraded"
+          ? "completed-highlight"
+          : j.status === "failed"
+            ? "failed-highlight"
+            : j.status === "running" || j.status === "discovering" || j.status === "pending"
+              ? "running-highlight"
+              : "";
 
-        return `
-            <div class="job-row${highlightClass ? ' ' + highlightClass : ''}" data-id="${esc(j.id)}">
+      return `
+            <div class="job-row${highlightClass ? " " + highlightClass : ""}" data-id="${esc(j.id)}">
                 <div class="job-name-col">
                     <div class="job-name">
                         ${esc(j.name)}
                         <button class="btn-copy-id" data-action="copy-job-id" data-id="${esc(j.id)}" title="Copy job ID">📋</button>
-                        <span class="mode-tag">${j.mode === 'auto' ? 'auto' : 'manual'}</span>
+                        <span class="mode-tag">${j.mode === "auto" ? "auto" : "manual"}</span>
                     </div>
-                    ${isActive && hasProgress ? `
+                    ${
+                      isActive && hasProgress
+                        ? `
                         <div class="job-progress-wrap">
                             <div class="job-progress-bar" style="width: ${pct}%"></div>
                             <span class="job-progress-text">${pct}%</span>
                         </div>
-                    ` : ''}
+                    `
+                        : ""
+                    }
                 </div>
-                <div class="job-urls">${Array.isArray(j.urls) ? j.urls.length : 0} URL${(Array.isArray(j.urls) ? j.urls.length : 0) !== 1 ? 's' : ''}</div>
+                <div class="job-urls">${Array.isArray(j.urls) ? j.urls.length : 0} URL${(Array.isArray(j.urls) ? j.urls.length : 0) !== 1 ? "s" : ""}</div>
                 <div><span class="badge ${esc(j.status)}">${esc(j.status)}</span></div>
-                <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : '—'}</div>
+                <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "—"}</div>
                 <div class="job-actions">
-                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${esc(j.id)}">View</button>` : ''}
-                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${esc(j.id)}">Cancel</button>` : ''}
+                    ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${esc(j.id)}">View</button>` : ""}
+                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${esc(j.id)}">Cancel</button>` : ""}
                     <button class="btn danger-ghost small" data-action="delete-job" data-id="${esc(j.id)}">✕</button>
                 </div>
             </div>
         `;
-    }).join('');
+    })
+    .join("");
 
-    // Apply status-change flash animation if a job just transitioned
-    if (_flashJobId) {
-        const flashRow = list.querySelector(`[data-id="${_flashJobId}"]`);
-        if (flashRow) {
-            flashRow.classList.add('status-change');
-            flashRow.addEventListener('animationend', () => {
-                flashRow.classList.remove('status-change');
-            }, { once: true });
-        }
-        _flashJobId = null;
+  // Apply status-change flash animation if a job just transitioned
+  if (_flashJobId) {
+    const flashRow = list.querySelector(`[data-id="${_flashJobId}"]`);
+    if (flashRow) {
+      flashRow.classList.add("status-change");
+      flashRow.addEventListener(
+        "animationend",
+        () => {
+          flashRow.classList.remove("status-change");
+        },
+        { once: true },
+      );
     }
+    _flashJobId = null;
+  }
 }

@@ -7,6 +7,7 @@
     "@playwright/test": "^1.60.0",
     "@vitest/ui": "^4.1.8",
     "jsdom": "^29.1.1",
+    "prettier": "^3.8.3",
     "stylelint": "^16.26.1",
     "stylelint-config-standard": "^36.0.1",
     "vitest": "^4.1.8"
@@ -14,6 +15,8 @@
   "scripts": {
     "lint:css": "stylelint 'frontend/**/*.css'",
     "lint:css:fix": "stylelint 'frontend/**/*.css' --fix",
+    "lint:js": "prettier --check 'frontend/**/*.{js,css,html,mjs}' 'package.json' '.stylelintrc.json' '.prettierrc'",
+    "lint:js:fix": "prettier --write 'frontend/**/*.{js,css,html,mjs}' 'package.json' '.stylelintrc.json' '.prettierrc'",
     "test": "vitest run --config frontend/vitest.config.js",
     "test:watch": "vitest --config frontend/vitest.config.js",
     "test:e2e": "playwright test --config frontend/playwright.config.mjs"

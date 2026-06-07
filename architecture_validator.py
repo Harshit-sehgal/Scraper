@@ -63,7 +63,7 @@ def check_duplicate_definitions(filepath):
     return errors
 
 
-def check_dangling_references(filepath, symbols):
+def check_dangling_references(filepath):
     """Detect references to symbols that no longer exist or are forbidden."""
     KILLED_SYMBOLS = [
         "detect_allocation_contradictions",
@@ -83,10 +83,7 @@ def check_dangling_references(filepath, symbols):
 
             # Check for symbol in line (not inside a string or comment)
             # This is a bit complex to do perfectly with regex, so we use a simple heuristic
-            if "#" in line:
-                line_code = line.split("#")[0]
-            else:
-                line_code = line
+            line_code = line.split("#")[0] if "#" in line else line
 
             for sym in KILLED_SYMBOLS:
                 # Use word-boundary regex so a function with the killed
@@ -140,11 +137,10 @@ def check_metric_ownership(filepath):
     for cls in classes:
         # Check for field declarations (in dataclasses)
         for node in cls.body:
-            if isinstance(node, ast.AnnAssign):
-                if isinstance(node.target, ast.Name) and node.target.id in FORBIDDEN_FIELDS:
-                    errors.append(
-                        f"Illegal direct storage of derived metric '{node.target.id}' in class '{cls.name}' ({filepath})",
-                    )
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id in FORBIDDEN_FIELDS:
+                errors.append(
+                    f"Illegal direct storage of derived metric '{node.target.id}' in class '{cls.name}' ({filepath})",
+                )
 
     return errors
 
@@ -159,7 +155,7 @@ def main():
 
     for f in files:
         all_errors.extend(check_duplicate_definitions(f))
-        all_errors.extend(check_dangling_references(f, []))
+        all_errors.extend(check_dangling_references(f))
         all_errors.extend(check_metric_ownership(f))
 
     if all_errors:
