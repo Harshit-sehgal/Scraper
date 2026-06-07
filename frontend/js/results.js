@@ -225,7 +225,7 @@ export function renderLogs(logs) {
 
 // ─── Table Rendering ───
 
-function applyResultSearch(rows) {
+export function applyResultSearch(rows) {
   const q = (document.getElementById("inp-result-search")?.value || "").trim().toLowerCase();
   if (!q) return rows;
 
@@ -254,7 +254,7 @@ export function renderFilteredResults() {
   syncResultsScrollSlider();
 }
 
-function renderTable(results, emptyMessage = "No results") {
+export function renderTable(results, emptyMessage = "No results") {
   const thead = document.getElementById("res-thead");
   const tbody = document.getElementById("res-tbody");
   if (!results.length) {
