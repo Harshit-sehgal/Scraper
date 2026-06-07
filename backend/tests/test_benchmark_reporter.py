@@ -2,42 +2,35 @@
 
 from __future__ import annotations
 
-import contextlib
 import os
 import time
+from pathlib import Path
 
 import pytest
-from app.benchmark_reporter import DASHBOARD_PATH, DB_PATH, BenchmarkReporter, BenchmarkRun
+from app.benchmark_reporter import BenchmarkReporter, BenchmarkRun
 
 
-def _clean_benchmark_db_files() -> None:
-    """Remove benchmark DB and dashboard files along with any WAL / SHM journal files."""
-    for path in [DB_PATH, DASHBOARD_PATH]:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(path)
-    # Also clean up WAL / SHM journal files for DB_PATH
-    base = DB_PATH
-    for suffix in ["-wal", "-shm", "-journal"]:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(base + suffix)
+@pytest.fixture
+def benchmark_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Set up an isolated benchmark directory per test.
+
+    Uses ``tmp_path`` so tests never share a database file, eliminating
+    the ordering flake that occurred when ``test_db_initialization`` ran
+    after other tests had already created (or torn down) the shared DB.
+    """
+    db_path = str(tmp_path / "benchmark.db")
+    dashboard_path = str(tmp_path / "regression_dashboard.md")
+    monkeypatch.setattr("app.benchmark_reporter.DASHBOARD_PATH", dashboard_path)
+    return db_path
 
 
-@pytest.fixture(autouse=True)
-def clean_benchmark_env():
-    # Remove existing files if any (including WAL / SHM journal files)
-    _clean_benchmark_db_files()
-    yield
-    # Cleanup files after test run
-    _clean_benchmark_db_files()
+def test_db_initialization(benchmark_env: str) -> None:
+    BenchmarkReporter(db_path=benchmark_env)
+    assert os.path.exists(benchmark_env)
 
 
-def test_db_initialization() -> None:
-    BenchmarkReporter()
-    assert os.path.exists(DB_PATH)
-
-
-def test_record_run() -> None:
-    reporter = BenchmarkReporter()
+def test_record_run(benchmark_env: str) -> None:
+    reporter = BenchmarkReporter(db_path=benchmark_env)
     run = BenchmarkRun(
         run_id="run-1",
         timestamp=time.time(),
@@ -57,8 +50,8 @@ def test_record_run() -> None:
     assert sorted(history[0].failed_selectors) == sorted(["#price", ".rating"])
 
 
-def test_regression_alert_trigger() -> None:
-    reporter = BenchmarkReporter()
+def test_regression_alert_trigger(benchmark_env: str) -> None:
+    reporter = BenchmarkReporter(db_path=benchmark_env)
 
     # Record strong historic runs
     for i in range(3):
@@ -89,8 +82,8 @@ def test_regression_alert_trigger() -> None:
     assert comparison["precision_drift"] < -0.05
 
 
-def test_dashboard_generation() -> None:
-    reporter = BenchmarkReporter()
+def test_dashboard_generation(benchmark_env: str) -> None:
+    reporter = BenchmarkReporter(db_path=benchmark_env)
     run = BenchmarkRun(
         run_id="dashboard-run",
         timestamp=time.time(),
@@ -100,6 +93,8 @@ def test_dashboard_generation() -> None:
         latency_ms=950.0,
     )
     reporter.record_run(run)
+
+    from app.benchmark_reporter import DASHBOARD_PATH
 
     assert os.path.exists(DASHBOARD_PATH)
     with open(DASHBOARD_PATH, encoding="utf-8") as f:
