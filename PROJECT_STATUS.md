@@ -66,7 +66,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally | Production environment validator correctly rejects placeholder values |
 | Grafana dashboard JSON validation test | `18 passed in 0.08s` | Dashboard panel IDs are unique, grid positions don't overlap, all panels have required fields, Prometheus metrics use `dataforge_` prefix |
 | Prettier check (includes `grafana/**/*.json`) | `All matched files use Prettier code style!` | Grafana dashboard JSON and all frontend JS/CSS/HTML are prettier-formatted |
-| Frontend vitest suite | `130 passed (130) — 9 files` | All unit tests pass — 5 modules extracted from dashboard.js with 48 new tests |
+| Frontend vitest suite | `165 passed (165) — 9 files` | All unit tests pass — 5 modules extracted from dashboard.js (48 new tests) + 35 utils.js tests added |
+| Frontend Playwright e2e suite | `7 passed (7) — 1 file` | All smoke tests pass — brand, tabs, theme toggle, Create Job nav, dashboard panels |
+| Frontend utils.js test coverage | `35 new tests across 7 describe blocks` | attrStr, theme helpers, shortcuts modal, confirm modal, UI state persistence, jobs updated label, isTypingTarget |
 
 ## Partially Verified
 

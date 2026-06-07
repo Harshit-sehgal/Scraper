@@ -217,7 +217,7 @@ export function detachFocusTrapFrom() {
 
 export function isShortcutsVisible() {
   const overlay = document.getElementById("shortcut-overlay");
-  return overlay && !overlay.classList.contains("hidden");
+  return !!(overlay && !overlay.classList.contains("hidden"));
 }
 
 // ─── UI State Persistence ───
@@ -321,7 +321,7 @@ export function executeConfirm() {
 
 export function isConfirmVisible() {
   const overlay = document.getElementById("confirm-overlay");
-  return overlay && !overlay.classList.contains("hidden");
+  return !!(overlay && !overlay.classList.contains("hidden"));
 }
 
 // ─── Keyboard Helpers ───
@@ -329,5 +329,14 @@ export function isConfirmVisible() {
 export function isTypingTarget(target) {
   if (!target) return false;
   const tag = String(target.tagName || "").toLowerCase();
-  return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+  // isContentEditable is a boolean read-only property available in
+  // real browsers. In jsdom the property is undefined, so we also
+  // check the reflected contenteditable attribute as a fallback.
+  return !!(
+    tag === "input" ||
+    tag === "textarea" ||
+    tag === "select" ||
+    target.isContentEditable ||
+    target.getAttribute?.("contenteditable") === "true"
+  );
 }

@@ -206,6 +206,28 @@ jobs:
       - name: Frontend Unit Tests (vitest)
         run: npm test
 
+      - name: Verify Frontend Assets Exist
+        run: |
+          missing=false
+          for f in frontend/app.js frontend/styles.css frontend/favicon.svg frontend/index.html; do
+            if [ ! -f "$f" ]; then
+              echo "❌ MISSING: $f"
+              missing=true
+            else
+              echo "✅ $f exists ($(stat --format=%s "$f") bytes)"
+            fi
+          done
+          # Verify index.html uses relative paths for assets (the dev server
+          # mounts frontend at /app; absolute paths would 404).
+          if grep -q 'src="/app.js"' frontend/index.html || grep -q 'href="/styles.css"' frontend/index.html; then
+            echo "❌ index.html still uses absolute asset paths (dev server will 404)"
+            missing=true
+          fi
+          if [ "$missing" = true ]; then
+            exit 1
+          fi
+          echo "✅ All frontend assets present and paths are relative"
+
       - name: Docs Lint
         run: python scripts/docs_lint.py --include-experimental
 
@@ -301,7 +323,7 @@ jobs:
         # Pinned to a specific commit SHA for supply-chain integrity.
         # Update via Dependabot (or manual bump) when upstream ships.
         # See: https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
-        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b  # master @ 2026-04-08
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b # master @ 2026-04-08
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}

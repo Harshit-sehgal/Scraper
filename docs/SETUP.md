@@ -17,7 +17,17 @@ playwright install chromium
 PYTHONPATH=backend python3 -m uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/app` for the dashboard.
+Open `http://localhost:8000/app/` for the dashboard.
+
+> **Note:** The dev server mounts the `frontend/` directory at the `/app`
+> prefix via FastAPI's `StaticFiles`. Assets (`app.js`, `styles.css`,
+> `favicon.svg`) use **relative paths** in `index.html` so they resolve
+> correctly to `/app/app.js` etc. If you ever see 404s for these assets
+> in the browser console, check that the page URL ends with a trailing
+> slash — `/app/` not `/app` — so relative paths resolve from
+> the `/app/` directory rather than the server root. Production deployments
+> behind nginx use different path resolution (see `nginx.conf`) and are
+> not affected by this quirk.
 
 ## Local Configuration
 

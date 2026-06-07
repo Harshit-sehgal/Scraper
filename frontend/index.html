@@ -11,8 +11,8 @@
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
     <!-- NOTE: Google Fonts removed to comply with strict CSP policy (font-src 'self' only).
          If custom fonts are needed, vendor them locally in /frontend/fonts/ and reference via @font-face in styles.css -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="app">
@@ -22,13 +22,32 @@
           <span class="brand">DataForge Studio</span>
           <span class="sep">/</span>
           <nav class="tabs" role="tablist">
-            <button type="button" class="tab active" data-view="jobs" id="tab-jobs" role="tab" aria-selected="true">
+            <button
+              type="button"
+              class="tab active"
+              data-action="switch-view"
+              data-view="jobs"
+              id="tab-jobs"
+              role="tab"
+              aria-selected="true"
+            >
               Jobs
             </button>
-            <button type="button" class="tab" data-view="new" id="tab-new" role="tab" aria-selected="false">New</button>
+            <button
+              type="button"
+              class="tab"
+              data-action="switch-view"
+              data-view="new"
+              id="tab-new"
+              role="tab"
+              aria-selected="false"
+            >
+              New
+            </button>
             <button
               type="button"
               class="tab recycle-tab"
+              data-action="switch-view"
               data-view="recycle"
               id="tab-recycle"
               role="tab"
@@ -39,6 +58,7 @@
             <button
               type="button"
               class="tab cognition-tab"
+              data-action="switch-view"
               data-view="cognition"
               id="tab-cognition"
               role="tab"
@@ -50,6 +70,7 @@
             <button
               type="button"
               class="tab dashboard-tab"
+              data-action="switch-view"
               data-view="dashboard"
               id="tab-dashboard"
               role="tab"
@@ -1057,6 +1078,11 @@
       </div>
     </div>
 
-    <script type="module" src="/app.js"></script>
+    <!-- NOTE: Relative asset paths (app.js, styles.css, favicon.svg) resolve
+         correctly when the page URL ends with a trailing slash (/app/ not /app).
+         FastAPI's StaticFiles mount at /app serves these files from the
+         frontend/ directory. Production nginx deployments are unaffected
+         (nginx has dedicated location blocks for both /app/ and root paths). -->
+    <script type="module" src="app.js"></script>
   </body>
 </html>
