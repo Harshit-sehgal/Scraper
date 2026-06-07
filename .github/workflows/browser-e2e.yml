@@ -3,7 +3,7 @@ name: Browser E2E Tests (Playwright)
 on:
   schedule:
     # Weekly on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
+    - cron: "0 2 * * 0"
   workflow_dispatch: # Allows manual trigger
 
 # Cancel in-flight runs on the same ref when a new run is triggered,
@@ -55,11 +55,53 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: python -m playwright install-deps chromium
 
-      - name: Run Browser E2E tests
+      - name: Run Backend Browser E2E tests
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m pytest -v backend/tests --run-browser -o addopts= \
           --tb=short --reruns 3 --reruns-delay 10
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-e2e-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install npm dependencies (Playwright test runner)
+        run: npm ci
+
+      - name: Run Frontend E2E (Playwright smoke tests)
+        run: |
+          # Start the FastAPI dev server in the background
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level warning &>/tmp/server-e2e.log &
+          SERVER_PID=$!
+
+          # Wait for the server to be ready
+          for i in $(seq 1 15); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/ 2>/dev/null || echo "000")
+            if [ "$CODE" != "000" ]; then
+              echo "Server ready (HTTP $CODE)"
+              break
+            fi
+            sleep 1
+          done
+
+          # Run the frontend Playwright smoke tests
+          npx playwright test --config frontend/playwright.config.mjs --reporter=list 2>&1
+          E2E_EXIT=$?
+
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+          wait $SERVER_PID 2>/dev/null || true
+
+          if [ $E2E_EXIT -ne 0 ]; then
+            echo "❌ Frontend E2E tests failed"
+            exit $E2E_EXIT
+          fi
+          echo "✅ Frontend E2E tests passed"
 
   notify:
     name: Telegram Notification
