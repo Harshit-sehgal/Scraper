@@ -35,6 +35,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Grafana rate limit dashboard panels exist | `grafana/dashboards/dataforge_overview.json` panels 26-28: Rate Limit Blocks stat, Per-IP Blocks stat, Rate Limit Block Rate timeseries | Verified |
 | Prometheus rate limit alert rule exists | `prometheus_alerts.yml` rule #14 `HighRateLimitBlockRate` — fires warning when combined blocking > 0.5 req/s for 5m | Verified |
 | Frontend dashboard rate limit panel exists | `frontend/index.html`, `frontend/js/rate-limits.js`, `frontend/js/dashboard.js` — fetches `/api/system/rate-limit-stats` and renders global/per-IP limits | Verified |
+| Dashboard renderGovernance extracted to module | `frontend/js/governance.js` — 6-card metrics grid (active mode, browsers, proxy health, token spend, queue sheds, browser prunes) with 12 tests | Verified |
+| Dashboard renderDomainHealth extracted to module | `frontend/js/domain-health.js` — 6-card grid + stacked health bar (healthy/degrading/bad segments) with empty state, 16 tests | Verified |
+| Dashboard renderPredictions extracted to module | `frontend/js/predictions.js` — systemic risk badge + prediction cards with conditional timer/evidence/action sections, 20 tests | Verified |
 | Alert rules and Grafana panels documented | `docs/API.md` Metrics section — two tables documenting alert rules and rate-limit Grafana panels | Verified |
 | Grafana dashboard JSON validation test exists | `backend/tests/test_grafana_dashboard.py` — 18 tests validating panel IDs, grid positions, required fields, and Prometheus metric name conventions | Verified |
 | Unauthenticated public LLM fallbacks are disabled by default | `settings.LLM_ENABLE_PUBLIC_FALLBACKS` defaults to `False` (disabled through `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false`); tests verify disabled fallbacks do not issue unauthenticated Pollinations/g4f calls | Verified |
@@ -63,7 +66,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally | Production environment validator correctly rejects placeholder values |
 | Grafana dashboard JSON validation test | `18 passed in 0.08s` | Dashboard panel IDs are unique, grid positions don't overlap, all panels have required fields, Prometheus metrics use `dataforge_` prefix |
 | Prettier check (includes `grafana/**/*.json`) | `All matched files use Prettier code style!` | Grafana dashboard JSON and all frontend JS/CSS/HTML are prettier-formatted |
-| Frontend vitest suite | `73 passed (73) — 5 files` | All unit tests pass including new `rate-limits.test.js` (14 tests) |
+| Frontend vitest suite | `130 passed (130) — 9 files` | All unit tests pass — 5 modules extracted from dashboard.js with 48 new tests |
 
 ## Partially Verified
 
