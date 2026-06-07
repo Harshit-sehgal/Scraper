@@ -3,7 +3,7 @@
 **Last refreshed:** 2026-06-07
 **Commit inspected:** working tree (post-refresh)
 **GitHub Actions status:** CI verified locally — all fast gates, lint, and test suite pass 100% cleanly.
-**Status:** CI/CD stabilized. Prettier JS/CSS formatting and Dependabot lockfile management added. Rate limiter observability extended with stats endpoint, Prometheus hit counters, DB-backed table pruning cron, and comprehensive test coverage.
+**Status:** CI/CD stabilized. Prettier JS/CSS formatting and Dependabot lockfile management added. Rate limiter observability extended with stats endpoint, Prometheus hit counters, DB-backed table pruning cron, Grafana dashboard panels, Prometheus alert rules, and frontend rate limit dashboard panel. Alert rules and Grafana panels documented in API docs.
 **Maturity:** about 70–75% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
@@ -30,8 +30,13 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Rate limit stats endpoint exists | `GET /api/system/rate-limit-stats` exposes enabled/disabled state, limits, active keys, route overrides | Verified |
 | Rate limit Prometheus hit counters exist | `dataforge_rate_limit_global_hits_total` and `dataforge_rate_limit_per_ip_hits_total` gauges emitted by `/metrics` | Verified |
 | Rate limits table background pruning exists | Background asyncio task calls `prune_all()` on configurable `RATE_LIMIT_PRUNE_INTERVAL` (default 1h); middleware also prunes per-request | Verified |
-| Prettier JS/CSS formatting enabled | `.prettierrc` config, `lint:js`/`lint:js:fix` npm scripts, pre-commit hook, CI check step | Verified |
+| Prettier JS/CSS/JSON formatting enabled | `.prettierrc` config, `lint:js`/`lint:js:fix` npm scripts include `grafana/**/*.json`, pre-commit hook, CI check step | Verified |
 | Dependabot lockfile updates configured | `.github/dependabot.yml` for weekly pip (grouped) and npm updates with rebase strategy | Verified |
+| Grafana rate limit dashboard panels exist | `grafana/dashboards/dataforge_overview.json` panels 26-28: Rate Limit Blocks stat, Per-IP Blocks stat, Rate Limit Block Rate timeseries | Verified |
+| Prometheus rate limit alert rule exists | `prometheus_alerts.yml` rule #14 `HighRateLimitBlockRate` — fires warning when combined blocking > 0.5 req/s for 5m | Verified |
+| Frontend dashboard rate limit panel exists | `frontend/index.html`, `frontend/js/rate-limits.js`, `frontend/js/dashboard.js` — fetches `/api/system/rate-limit-stats` and renders global/per-IP limits | Verified |
+| Alert rules and Grafana panels documented | `docs/API.md` Metrics section — two tables documenting alert rules and rate-limit Grafana panels | Verified |
+| Grafana dashboard JSON validation test exists | `backend/tests/test_grafana_dashboard.py` — 18 tests validating panel IDs, grid positions, required fields, and Prometheus metric name conventions | Verified |
 | Unauthenticated public LLM fallbacks are disabled by default | `settings.LLM_ENABLE_PUBLIC_FALLBACKS` defaults to `False` (disabled through `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false`); tests verify disabled fallbacks do not issue unauthenticated Pollinations/g4f calls | Verified |
 | Production env validator rejects placeholders | `scripts/check_prod_env.py --env-file .env.production.example` failed intentionally on placeholder keys/passwords/token | Verified |
 | Docs disabled in production app config | `backend/app/main.py` disables `/docs`, `/redoc`, `/openapi.json` when `settings.ENV == "production"` | Verified by code inspection |
@@ -56,6 +61,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Staging smoke test (`scripts/staging_smoke_test.py`) | `🎉 ALL STAGING DRILL...FULLY PASSED!` | Durability and state invariant checks pass |
 | Docker base image build | `Successfully built` | Base stage compiles correctly |
 | `scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally | Production environment validator correctly rejects placeholder values |
+| Grafana dashboard JSON validation test | `18 passed in 0.08s` | Dashboard panel IDs are unique, grid positions don't overlap, all panels have required fields, Prometheus metrics use `dataforge_` prefix |
+| Prettier check (includes `grafana/**/*.json`) | `All matched files use Prettier code style!` | Grafana dashboard JSON and all frontend JS/CSS/HTML are prettier-formatted |
+| Frontend vitest suite | `73 passed (73) — 5 files` | All unit tests pass including new `rate-limits.test.js` (14 tests) |
 
 ## Partially Verified
 
@@ -82,7 +90,7 @@ Benchmarks | 25% | Golden dataset live extraction freshly passes (modest F1 thre
 Dashboard | 50% | Internal static dashboard works. Session/hostile-browser risks unresolved.
 Experimental modules | 40% | Code exists and tests pass. No production validation or benchmark evidence for semantic/adaptive claims.
 
-Overall maturity: **65–70%** — Excellent local foundation with SQLite, Postgres, browser, and Golden Dataset suites all passing 100% clean. Production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment.
+Overall maturity: **70–75%** — Excellent local foundation with SQLite, Postgres, browser, and Golden Dataset suites all passing 100% clean. Rate limiter observability, Grafana dashboards, alerting rules, frontend dashboard panel, and comprehensive tests added. Production ingress, TLS, backup/restore, alerts delivery, and sustained load remain unvalidated in the target environment.
 
 ## Claims Audit
 
@@ -210,7 +218,9 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 5. Add real benchmark tests with enforceable thresholds.
 6. Clean runtime artifacts before every commit.
 7. Set up the CI workflow to auto-commit the regenerated route table when it changes on main.
-8. Add Grafana dashboard panels for the new rate limit hit counter metrics.
+8. Add automated Grafana dashboard integration tests to validate panel queries against the Prometheus endpoint.
+9. Add frontend vitest unit tests for the `renderRateLimits` function in the operations dashboard.
+10. Run the Grafana dashboard JSON validation test in CI to prevent regressions on dashboard edits.
 
 ## Recent Boundary Work (Phase R1 — Research Shell Quarantine)
 
