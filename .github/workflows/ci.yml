@@ -12,6 +12,7 @@ jobs:
   ci-gates-fast:
     name: Fast CI Gates
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -78,6 +79,7 @@ jobs:
   ci-gates-benchmarks:
     name: In-Corpus Benchmarks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -133,6 +135,7 @@ jobs:
   lint-type-checks:
     name: Lint, Type & Security Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -242,6 +245,7 @@ jobs:
   sbom:
     name: SBOM Generation
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -269,6 +273,7 @@ jobs:
     name: Telegram Notification
     needs: [ci-gates-fast, ci-gates-benchmarks, lint-type-checks, sbom]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Send Telegram Message

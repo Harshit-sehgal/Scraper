@@ -28,7 +28,7 @@ from app.models import Job, JobStatus, SourcePolicy
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 5
+_CURRENT_SCHEMA_VERSION = 6
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -507,6 +507,49 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 )
             """)
             current = 5
+
+        if current < 6:
+            # v6: make worker_heartbeats primary key composite (worker_id, pid)
+            # so two workers on the same host (same resolved worker_id) do
+            # not overwrite each other's heartbeat. The v5 schema used
+            # ``worker_id TEXT PRIMARY KEY`` which silently lost one
+            # worker's row when a second started on the same host.
+            # SQLite has limited ALTER TABLE support; we rebuild the
+            # table by renaming, creating, copying (with deduplication
+            # by last_heartbeat), and dropping the backup.
+            conn.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
+            conn.execute("""
+                CREATE TABLE worker_heartbeats (
+                    worker_id TEXT NOT NULL,
+                    last_heartbeat TEXT NOT NULL,
+                    hostname TEXT NOT NULL DEFAULT '',
+                    pid INTEGER NOT NULL DEFAULT 0,
+                    started_at TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (worker_id, pid)
+                )
+            """)
+            # SQLite's INSERT...SELECT supports GROUP BY but not DISTINCT ON
+            # (Postgres). We pick the most recent heartbeat per (worker_id,
+            # pid) via an aggregate.
+            conn.execute(
+                """
+                INSERT INTO worker_heartbeats
+                    (worker_id, last_heartbeat, hostname, pid, started_at)
+                SELECT worker_id, last_heartbeat, hostname, pid, started_at
+                FROM (
+                    SELECT
+                        worker_id, last_heartbeat, hostname, pid, started_at,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY worker_id, pid
+                            ORDER BY last_heartbeat DESC
+                        ) AS rn
+                    FROM worker_heartbeats_v5_backup
+                ) latest
+                WHERE rn = 1
+                """
+            )
+            conn.execute("DROP TABLE worker_heartbeats_v5_backup")
+            current = 6
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
@@ -1025,6 +1068,41 @@ def get_storage_health() -> dict:
         }
 
 
+def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:
+    """Return a ``{status_value: count}`` mapping for all jobs.
+
+    This is a single ``GROUP BY status`` query and is O(distinct statuses)
+    rather than O(rows), so it stays cheap even when the store has
+    millions of jobs. The previous approach was to call
+    ``list_job_summaries(limit=5000)`` and count in Python, but the
+    storage layer silently capped the limit to 500, producing a wrong
+    count whenever the store held more than 500 jobs.
+
+    Args:
+        include_deleted: If True, soft-deleted rows
+            (``deleted_at IS NOT NULL``) are included.
+    """
+    counts: dict[str, int] = {}
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            if include_deleted:
+                rows = conn.execute("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status").fetchall()
+            else:
+                # The schema uses ``deleted_at TEXT DEFAULT ''`` rather than
+                # NULL to record soft deletion, so an empty string is the
+                # "not deleted" sentinel.
+                rows = conn.execute(
+                    "SELECT status, COUNT(*) AS cnt FROM jobs WHERE deleted_at = '' OR deleted_at IS NULL GROUP BY status"
+                ).fetchall()
+            for row in rows:
+                key = str(row["status"])
+                counts[key] = int(row["cnt"])
+        finally:
+            conn.close()
+    return counts
+
+
 def get_storage_status() -> dict:
     """Return detailed storage backend status.
 
@@ -1077,6 +1155,12 @@ def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
 
     Upserts the worker's heartbeat timestamp so the healthcheck
     can verify the worker is alive by checking recency.
+
+    The v5 schema used ``ON CONFLICT(worker_id)`` which silently
+    overwrote a co-resident worker's heartbeat on the same host.
+    The v6 schema has a composite primary key ``(worker_id, pid)``
+    so two workers on the same host can coexist. See the v6
+    migration in :func:`_ensure_schema`.
     """
     now = datetime.datetime.now().isoformat()
     with _DB_LOCK:
@@ -1086,7 +1170,7 @@ def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
                 """INSERT INTO worker_heartbeats
                    (worker_id, last_heartbeat, hostname, pid, started_at)
                    VALUES (?, ?, ?, ?, ?)
-                   ON CONFLICT(worker_id) DO UPDATE SET
+                   ON CONFLICT(worker_id, pid) DO UPDATE SET
                      last_heartbeat = excluded.last_heartbeat,
                      hostname = excluded.hostname,
                      pid = excluded.pid""",
@@ -1106,12 +1190,20 @@ def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict:
     - hostname: str | None
     - pid: int | None
     - worker_id: str
+
+    When multiple pids share a ``worker_id`` (multiple workers on the
+    same host), the freshest heartbeat is returned and the worker is
+    reported ``alive=True`` if any of its pids are within the TTL.
     """
     with _DB_LOCK:
         conn = _get_connection()
         try:
             row = conn.execute(
-                "SELECT last_heartbeat, hostname, pid FROM worker_heartbeats WHERE worker_id = ?",
+                """SELECT last_heartbeat, hostname, pid
+                   FROM worker_heartbeats
+                   WHERE worker_id = ?
+                   ORDER BY last_heartbeat DESC
+                   LIMIT 1""",
                 (worker_id,),
             ).fetchone()
         finally:

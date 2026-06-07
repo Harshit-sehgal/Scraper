@@ -705,7 +705,7 @@ class PostgresWorkerQueueBase(ABC):
                 async with self._in_flight_lock:
                     self._in_flight[task_id] = t
 
-                def _on_task_done(fut: object, tid: str = task_id) -> None:
+                def _on_task_done(_fut: object, tid: str = task_id) -> None:
                     # Schedule cleanup on the currently running event loop,
                     # not whichever loop ``asyncio.ensure_future`` happens
                     # to pick up. Avoids a ``RuntimeError`` when the worker

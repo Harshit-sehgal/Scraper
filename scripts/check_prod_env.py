@@ -369,6 +369,62 @@ def check_distinct_api_keys(env: dict[str, str]) -> bool:
     return ok
 
 
+def check_queue_driver_compatibility(env: dict[str, str]) -> bool:
+    """Validate that the queue backend is compatible with the selected PG driver.
+
+    The Postgres worker queue supports both psycopg2 and psycopg3, but
+    when DATAFORGE_PG_DRIVER=psycopg3 the production image ships only
+    psycopg 3 (psycopg2 is intentionally excluded). This check makes
+    sure the queue is reachable with the configured driver.
+
+    Currently this is a structural check: it confirms both the
+    repository and queue are set to the same driver. We also probe
+    that the psycopg3 worker queue module is importable.
+    """
+    import importlib.util
+    import sys
+
+    pg_driver = env.get("DATAFORGE_PG_DRIVER", "").strip().lower() or "psycopg2"
+    queue_backend = env.get("DATAFORGE_QUEUE_BACKEND", "").strip().lower()
+
+    if queue_backend != "postgres":
+        # SQLite queue has no driver compatibility concerns.
+        return True
+
+    backend_dir = Path(__file__).resolve().parents[1] / "backend"
+    if str(backend_dir) not in sys.path:
+        sys.path.insert(0, str(backend_dir))
+
+    if pg_driver == "psycopg3":
+        # Verify the psycopg3 worker queue module is importable.
+        spec = importlib.util.find_spec("app.worker_queue_postgres_psycopg3")
+        if spec is None:
+            print(
+                "  [FAIL]  app.worker_queue_postgres_psycopg3 module is missing. "
+                "The psycopg3 worker queue is required when DATAFORGE_PG_DRIVER=psycopg3 "
+                "and DATAFORGE_QUEUE_BACKEND=postgres.",
+            )
+            return False
+        print("  [OK]    queue module app.worker_queue_postgres_psycopg3 is importable")
+    elif pg_driver == "psycopg2":
+        try:
+            import psycopg2  # noqa: F401
+        except ImportError:
+            print(
+                "  [FAIL]  psycopg2 is not installed but DATAFORGE_PG_DRIVER=psycopg2. "
+                "Install psycopg2-binary (dev-only) or switch to DATAFORGE_PG_DRIVER=psycopg3.",
+            )
+            return False
+        print("  [OK]    psycopg2 importable for legacy queue driver")
+    else:
+        print(
+            f"  [FAIL]  Unknown DATAFORGE_PG_DRIVER={pg_driver!r}. Must be 'psycopg2' or 'psycopg3'.",
+        )
+        return False
+
+    return True
+
+
 def check_env(value: str) -> bool:
     """Validate DATAFORGE_ENV is set to 'production'."""
     if value.lower() != "production":
@@ -382,6 +438,13 @@ def check_postgres_connection(db_url: str) -> bool:
 
     This validates that the database is reachable and schema is initialized,
     not just that the URL is formatted correctly.
+
+    The driver is selected by the ``DATAFORGE_PG_DRIVER`` environment
+    variable to mirror the backend's driver selection. Production uses
+    ``psycopg3`` (the production image installs ``psycopg[binary]`` only,
+    not ``psycopg2``), so a hard-coded ``import psycopg2`` would always
+    silently skip the connectivity test in production. The default here
+    is ``psycopg3`` to match the production image.
     """
     import os
 
@@ -389,23 +452,48 @@ def check_postgres_connection(db_url: str) -> bool:
         print("\n  [INFO]  Skipping Postgres connectivity test (DATAFORGE_SKIP_DB_CHECK is set).")
         return True
     print("\n  [INFO]  Testing Postgres connectivity...")
-    try:
-        import psycopg2
-        from psycopg2 import OperationalError
-    except ImportError:
-        print("  [WARN]  psycopg2 not installed; skipping connectivity test.")
-        print("          Install with: pip install psycopg2-binary")
-        return True  # Don't fail if driver not available
 
+    pg_driver = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower() or "psycopg3"
+
+    if pg_driver == "psycopg2":
+        try:
+            import psycopg2
+            from psycopg2 import OperationalError
+        except ImportError:
+            print("  [WARN]  psycopg2 not installed; skipping connectivity test.")
+            print("          Install with: pip install psycopg2-binary")
+            return True
+        try:
+            conn = psycopg2.connect(db_url, connect_timeout=5)
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+            conn.close()
+            print("  [OK]    Postgres is reachable and responding.")
+            return True
+        except OperationalError as e:
+            print(f"  [FAIL]  Could not connect to Postgres: {e}")
+            print("          Ensure Postgres service is running and accessible at the configured URL.")
+            return False
+        except Exception as e:
+            print(f"  [FAIL]  Unexpected error testing Postgres: {e}")
+            return False
+
+    # psycopg3 (default for production)
     try:
-        conn = psycopg2.connect(db_url, connect_timeout=5)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.close()
-        conn.close()
+        import psycopg
+    except ImportError:
+        print("  [WARN]  psycopg (v3) not installed; skipping connectivity test.")
+        print("          Install with: pip install 'psycopg[binary]>=3.2'")
+        return True
+    try:
+        with psycopg.connect(db_url, connect_timeout=5) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
         print("  [OK]    Postgres is reachable and responding.")
         return True
-    except OperationalError as e:
+    except psycopg.OperationalError as e:
         print(f"  [FAIL]  Could not connect to Postgres: {e}")
         print("          Ensure Postgres service is running and accessible at the configured URL.")
         return False
@@ -474,12 +562,20 @@ def main() -> int:
     ]
 
     # ── Optional but recommended ─────────────────────────────────────────
-    import typing
-
-    recommended: list[tuple[str, bool, typing.Any, str]] = []
+    # The ``recommended`` list is intentionally empty for now. When a
+    # future PR adds an optional-but-strongly-recommended variable
+    # (e.g. ``ALERTMANAGER_SMTP_HOST`` for alert routing), append a
+    # ``(name, required=False, validator, hint)`` tuple here. The
+    # surrounding ``check_var`` loop pattern is already wired up; it
+    # is just iterating over an empty list today, which is the correct
+    # no-op behaviour. The previous version of this block was an
+    # actual loop and was flagged by Batch 3 of the audit as dead
+    # code; a comment now makes the intent explicit so future
+    # maintainers do not assume the loop is missing by accident.
+    recommended: list[tuple[str, bool, object, str]] = []
 
     for name, required, validator, hint in recommended:
-        passed = check_var(env, name, required=required, validator=validator, hint=hint)
+        passed = check_var(env, name, required=required, validator=validator, hint=hint)  # type: ignore[arg-type]
         if not passed:
             all_pass = False
 
@@ -498,6 +594,12 @@ def main() -> int:
             pg_passed = check_postgres_connection(db_url)
             if not pg_passed:
                 all_pass = False
+
+    # ── Queue/driver compatibility check ──────────────────────────────────
+    if all_pass and env.get("DATAFORGE_QUEUE_BACKEND", "").lower() == "postgres":
+        compat_ok = check_queue_driver_compatibility(env)
+        if not compat_ok:
+            all_pass = False
 
     # ── Summary ──────────────────────────────────────────────────────
     print()

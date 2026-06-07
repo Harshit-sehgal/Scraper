@@ -59,12 +59,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resultBody = document.getElementById('res-tbody');
     if (resultBody) resultBody.addEventListener('dblclick', onResultsCellDoubleClick);
 
-    // URL Analyzer: Enter key triggers analysis
+    // URL Analyzer: Enter key triggers analysis. The handler also
+    // checks the analyze button's disabled state so a fast double
+    // press of Enter — which would otherwise bypass the button
+    // debounce and fire two parallel API calls — is ignored while
+    // the first request is in flight.
     const analyzeUrlInput = document.getElementById('inp-analyze-url');
     if (analyzeUrlInput) {
         analyzeUrlInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                const analyzeBtn = document.getElementById('btn-analyze-url');
+                if (analyzeBtn && analyzeBtn.disabled) return;
                 analyzeURL();
             }
         });
@@ -98,16 +104,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('keydown', onGlobalKeydown);
 
     // ── Window focus / visibility ──
-    window.addEventListener('focus', () => {
-        refreshSystemStatus();
-        refreshJobs();
-        updateJobsLastUpdatedLabel();
-    });
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
+    // Tab-switching in modern browsers fires a flurry of
+    // ``visibilitychange`` and ``focus`` events when the user
+    // hovers over the tab strip or alt-tabs. Each of those events
+    // would otherwise kick off three API calls, so we coalesce
+    // them with a one-shot timer. The latest event wins; earlier
+    // ones are dropped before they reach the network.
+    let _focusRefreshTimer = null;
+    const _scheduleFocusRefresh = () => {
+        if (_focusRefreshTimer) return;
+        _focusRefreshTimer = setTimeout(() => {
+            _focusRefreshTimer = null;
             refreshSystemStatus();
             refreshJobs();
             updateJobsLastUpdatedLabel();
+        }, 250);
+    };
+    window.addEventListener('focus', _scheduleFocusRefresh);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            _scheduleFocusRefresh();
         }
     });
 

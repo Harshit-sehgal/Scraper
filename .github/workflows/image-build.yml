@@ -15,6 +15,7 @@ jobs:
   build-production:
     name: Build production image
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -89,6 +90,7 @@ jobs:
     name: Telegram Notification
     needs: [build-production]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Send Telegram Message

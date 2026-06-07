@@ -155,7 +155,9 @@ def test_metrics_worker_heartbeat_present(client, monkeypatch) -> None:
     # Use a regex to avoid depending on the label order.
     import re
 
-    pattern = re.compile(r'dataforge_worker_heartbeat_alive\{[^}]*worker_id="metrics-test-worker"[^}]*\}\s+1\.0')
+    # Accept either " 1" or " 1.0" — the integer alive value renders as
+    # ``1`` in basic metrics text (no decimal point is added for ints).
+    pattern = re.compile(r'dataforge_worker_heartbeat_alive\{[^}]*worker_id="metrics-test-worker"[^}]*\}\s+1(?:\.0)?\b')
     assert pattern.search(text), f"Test worker should appear as alive in heartbeat metrics. Metrics text:\n{text}"
 
     reset_repository()

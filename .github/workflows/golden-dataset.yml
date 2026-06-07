@@ -10,6 +10,7 @@ jobs:
   golden-dataset:
     name: Golden Dataset Live Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +46,7 @@ jobs:
     name: Telegram Notification
     needs: [golden-dataset]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Send Telegram Message

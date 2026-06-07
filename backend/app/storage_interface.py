@@ -99,6 +99,26 @@ class JobRepository(ABC):
                 returns ``created_at`` values that callers can pass back.
         """
 
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
+        """Return a ``{status_value: count}`` mapping for all jobs.
+
+        This is the authoritative per-status count for the system
+        dashboard. It is implemented as a single ``GROUP BY status`` query
+        on the backend (SQLite + Postgres) so it is O(distinct statuses)
+        rather than O(rows). Subclasses MUST override this; the base
+        implementation raises ``NotImplementedError`` to avoid the
+        previous behaviour of silently capping ``list_job_summaries`` to
+        500 rows and returning a wrong count when the store held more.
+
+        Args:
+            include_deleted: If True, soft-deleted rows
+                (``deleted_at IS NOT NULL``) are included. Default False
+                matches the behaviour of ``GET /api/system/status``.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement count_jobs_by_status()",
+        )
+
     @abstractmethod
     def list_recycle_summaries(
         self,
@@ -359,6 +379,11 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import get_all_worker_healths as _get_all
 
         return _get_all(ttl_seconds=ttl_seconds)
+
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
+        from app.job_store import count_jobs_by_status as _count
+
+        return _count(include_deleted=include_deleted)
 
     def health_check(self) -> dict:
         """Check the SQLite backend's health and schema state.

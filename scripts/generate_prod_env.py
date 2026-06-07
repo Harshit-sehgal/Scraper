@@ -73,9 +73,32 @@ GRAFANA_PASSWORD={grafana_password}
 """
 
     try:
-        with open(TARGET_FILE, "w") as f:
-            f.write(config_content)
-        os.chmod(TARGET_FILE, 0o600)  # Restrict permissions to owner read/write only
+        # Create the file with mode 0o600 atomically. Setting the
+        # umask before ``open`` closes the small window during which
+        # the file existed with the user's default umask (typically
+        # 0644, which would make plaintext production secrets
+        # world-readable on a shared host). A concurrent process
+        # could otherwise ``open()`` the file between the ``open``
+        # and the ``os.chmod`` in the original implementation.
+        # ``os.open`` with ``O_CREAT|O_WRONLY|O_TRUNC`` applies the
+        # mode at inode-creation time, before any data is written.
+        fd = os.open(
+            TARGET_FILE,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            0o600,
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(config_content)
+        except Exception:
+            # If the write itself fails, close and unlink the
+            # half-written file so we don't leave a 0o600 stub
+            # with a misleading ``.env.production`` next to it.
+            try:
+                os.unlink(TARGET_FILE)
+            except OSError:
+                pass
+            raise
         print(f"\n[SUCCESS] Secure production configuration successfully written to '{TARGET_FILE}'.")
         print("          File permissions set to owner read/write only (chmod 600).")
         print("          Remember: Keep this file secure and NEVER commit it to Git.")

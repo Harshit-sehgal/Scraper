@@ -16,6 +16,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -458,17 +460,38 @@ class RegressionCapture:
             return RegressionRegistry()
 
     def _save_registry(self) -> None:
-        """Persist the registry to disk."""
+        """Persist the registry to disk.
+
+        The write is performed atomically by writing to a sibling
+        ``.tmp`` file and then renaming it on top of the target. A
+        plain ``write_text`` would leave a half-written file if the
+        process were killed mid-write, losing all captured regressions
+        and silently breaking the next startup. The rename is atomic
+        on POSIX (and on Windows when the target exists), so a reader
+        either sees the previous valid file or the new one.
+        """
         data = {
             "entries": [asdict(e) for e in self._registry.entries],
             "total_captured": self._registry.total_captured,
             "total_with_replay_tests": self._registry.total_with_replay_tests,
             "last_capture_at": self._registry.last_capture_at,
         }
-        self._registry_path.write_text(
-            json.dumps(data, indent=2, default=str),
-            encoding="utf-8",
-        )
+        payload = json.dumps(data, indent=2, default=str)
+        self._registry_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._registry_path.with_suffix(self._registry_path.suffix + ".tmp")
+        # Write to the tmp file first, then replace. ``os.replace`` is
+        # atomic on POSIX and on Windows when the target exists, so the
+        # rename either happens in full or not at all.
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(payload)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                # Some filesystems (e.g. tmpfs) do not support fsync;
+                # the rename is still atomic, so this is best-effort.
+                pass
+        os.replace(tmp_path, self._registry_path)
 
     def _get_entry(self, entry_id: str) -> RegressionEntry | None:
         """Look up an entry by ID."""
@@ -520,11 +543,23 @@ def {safe_name}(hostile_base_url):
 
 # Module-level singleton
 _capture: RegressionCapture | None = None
+_capture_lock = threading.Lock()
 
 
 def get_regression_capture() -> RegressionCapture:
-    """Return the singleton RegressionCapture instance."""
+    """Return the singleton RegressionCapture instance.
+
+    The double-checked locking pattern (module-level ``_capture_lock``
+    + a fast-path identity check) is used to avoid the time-of-check
+    to time-of-use (TOCTOU) race where two threads simultaneously
+    observe ``_capture is None`` and each construct a fresh
+    ``RegressionCapture``. Without the lock, the second writer would
+    clobber the first writer's state, dropping every regression
+    captured between the two ``RegressionCapture()`` calls.
+    """
     global _capture
     if _capture is None:
-        _capture = RegressionCapture()
+        with _capture_lock:
+            if _capture is None:
+                _capture = RegressionCapture()
     return _capture

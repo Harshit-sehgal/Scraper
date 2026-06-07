@@ -183,15 +183,38 @@ class DatabaseSlidingWindowCounter:
                 from app.postgres_repository import _conn, _execute, _fetch_one
 
                 with _conn() as conn:
-                    # Prune old entries
+                    # Prune old entries first; safe in the same
+                    # transaction as the count+insert below.
                     _execute(conn, "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s", (self.key, cutoff))
-                    # Check current count
-                    row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
-                    count = row["count"] if row else 0
-                    if count >= self.max_requests:
-                        return False
-                    # Insert new request timestamp
-                    _execute(conn, "INSERT INTO rate_limits (key, timestamp) VALUES (%s, %s)", (self.key, now))
+                    # Atomic count+insert: the CTE selects the current
+                    # count and the outer INSERT runs only when the
+                    # count is strictly less than the limit. The whole
+                    # statement is a single SQL command, so two
+                    # concurrent requests cannot both see ``count < N``
+                    # and both insert. ``RETURNING`` tells us whether
+                    # the row was actually written. Postgres supports
+                    # this since 9.1 (CTEs) and 9.5 (INSERT...RETURNING
+                    # in CTEs).
+                    row = _fetch_one(
+                        conn,
+                        """
+                        WITH slot AS (
+                            SELECT COUNT(*) AS count
+                            FROM rate_limits
+                            WHERE key = %s
+                        ), inserted AS (
+                            INSERT INTO rate_limits (key, timestamp)
+                            SELECT %s, %s
+                            WHERE (SELECT count FROM slot) < %s
+                            RETURNING key
+                        )
+                        SELECT (SELECT count FROM slot) AS count,
+                               EXISTS (SELECT 1 FROM inserted) AS allowed
+                        """,
+                        (self.key, self.key, now, self.max_requests),
+                    )
+                if not row or not row.get("allowed"):
+                    return False
                 return True
             except Exception as e:
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
@@ -203,16 +226,28 @@ class DatabaseSlidingWindowCounter:
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
-                        # Prune old entries
+                        # BEGIN IMMEDIATE acquires the writer lock at
+                        # the start of the transaction, so the
+                        # count+insert below runs without any other
+                        # connection being able to interleave. This
+                        # closes the time-of-check / time-of-use race
+                        # between ``SELECT COUNT`` and ``INSERT`` that
+                        # the previous implementation had. SQLite
+                        # does not support atomic count+insert via a
+                        # CTE the way Postgres does, so the explicit
+                        # write lock is the portable alternative.
+                        conn.execute("BEGIN IMMEDIATE")
+                        # Prune old entries first.
                         conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp <= ?", (self.key, cutoff))
-                        # Check current count
+                        # Check current count.
                         row = conn.execute("SELECT COUNT(*) AS count FROM rate_limits WHERE key = ?", (self.key,)).fetchone()
                         count = row["count"] if row else 0
                         if count >= self.max_requests:
+                            conn.execute("COMMIT")
                             return False
-                        # Insert new request timestamp
+                        # Insert new request timestamp.
                         conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (self.key, now))
-                        conn.commit()
+                        conn.execute("COMMIT")
                     finally:
                         conn.close()
                 return True

@@ -23,7 +23,7 @@ from app.storage_interface import JobRepository
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 5
+_CURRENT_SCHEMA_VERSION = 6
 
 # ───────────────────────────────────────────────────────────────────────
 # Database URL resolution (shared between driver implementations)
@@ -239,7 +239,7 @@ def sync_job_events(conn, job_id: str, logs) -> None:
         if hasattr(entry, "model_dump"):
             try:
                 entry_dict = entry.model_dump()
-            except Exception:
+            except Exception:  # nosec B110  # noqa: BLE001 - pydantic dump fallback
                 entry_dict = {"timestamp": "", "level": "info", "message": str(entry)}
         elif isinstance(entry, dict):
             entry_dict = entry
@@ -268,13 +268,13 @@ def ensure_required_tables(conn) -> None:
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - schema migration best-effort
             logger.debug("ALTER TABLE jobs ADD COLUMN %s failed (ignored)", col_def)
     execute(conn, build_create_recycle_bin_sql())
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - schema migration best-effort
             logger.debug("ALTER TABLE recycle_bin ADD COLUMN %s failed (ignored)", col_def)
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -283,8 +283,74 @@ def ensure_required_tables(conn) -> None:
     ]:
         try:
             execute(conn, idx_sql)
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - schema migration best-effort
             logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
+
+
+def _migrate_worker_heartbeats_v6(execute, _fetch_all, _fetch_one, conn) -> None:
+    """Schema v6: make worker_heartbeats primary key composite (worker_id, pid).
+
+    The original v5 schema used ``worker_id TEXT PRIMARY KEY``. When two
+    workers on the same host share the same resolved ``worker_id``
+    (hostname), the second worker's heartbeat would overwrite the
+    first worker's row, leaving the healthcheck with stale data and
+    the wrong worker reported as alive.
+
+    The migration:
+      1. Renames the old table to a backup.
+      2. Creates a new table with a composite (worker_id, pid) PK.
+      3. Copies the most recent heartbeat per (worker_id, pid) into the new
+         table. If the old table had two rows for the same (worker_id,
+         pid) — impossible under the v5 schema, but defensive — the most
+         recent ``last_heartbeat`` wins.
+      4. Drops the backup.
+
+    The whole migration runs inside a SAVEPOINT so a failure rolls back
+    to the v5 schema state cleanly.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SAVEPOINT migrate_wh_v6")
+        try:
+            cur.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
+            cur.execute(
+                """
+                CREATE TABLE worker_heartbeats (
+                    worker_id TEXT NOT NULL,
+                    last_heartbeat TEXT NOT NULL,
+                    hostname TEXT NOT NULL DEFAULT '',
+                    pid INTEGER NOT NULL DEFAULT 0,
+                    started_at TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (worker_id, pid)
+                )
+                """
+            )
+            # Carry the most recent row per (worker_id, pid) forward.
+            # DISTINCT ON is the cleanest Postgres-only way to do this
+            # without a window function.
+            cur.execute(
+                """
+                INSERT INTO worker_heartbeats
+                    (worker_id, last_heartbeat, hostname, pid, started_at)
+                SELECT worker_id, last_heartbeat, hostname, pid, started_at
+                FROM (
+                    SELECT DISTINCT ON (worker_id, pid)
+                        worker_id, last_heartbeat, hostname, pid, started_at
+                    FROM worker_heartbeats_v5_backup
+                    ORDER BY worker_id, pid, last_heartbeat DESC
+                ) latest
+                """
+            )
+            cur.execute("DROP TABLE worker_heartbeats_v5_backup")
+        except Exception:  # nosec B110  # noqa: BLE001 - migration rollback
+            cur.execute("ROLLBACK TO SAVEPOINT migrate_wh_v6")
+            logger.exception(
+                "worker_heartbeats v5→v6 migration failed; the table is "
+                "left in its previous state. Heartbeat writes will continue "
+                "to work but two workers on the same host will collide.",
+            )
+            raise
+        else:
+            cur.execute("RELEASE SAVEPOINT migrate_wh_v6")
 
 
 def ensure_schema(conn) -> None:
@@ -355,6 +421,16 @@ def ensure_schema(conn) -> None:
                     started_at TEXT NOT NULL DEFAULT ''
                 )""",
             )
+
+        if current < 6:
+            # v6: Make the worker_heartbeats primary key composite
+            # (worker_id, pid) so two workers on the same host — sharing
+            # the same resolved worker_id (hostname) — do not overwrite
+            # each other's heartbeat. The old single-column PK is dropped
+            # and a composite PK is added. Existing rows are preserved;
+            # any historical collision (where the same worker_id had two
+            # pids) is resolved by keeping the most recent row per pid.
+            _migrate_worker_heartbeats_v6(execute, _fetch_all, _fetch_one, conn)
 
         execute(conn, "DELETE FROM schema_version")
         execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
@@ -539,6 +615,27 @@ class PostgresRepositoryBase(JobRepository, ABC):
             )
         return summaries
 
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
+        """Return a ``{status_value: count}`` mapping for all jobs.
+
+        Implemented as a single ``GROUP BY status`` query so it stays
+        O(distinct statuses) even on million-row tables. The previous
+        approach of calling ``list_job_summaries(limit=5000)`` was
+        silently capped to 500 by the storage layer and produced wrong
+        counts for any store with more than 500 jobs.
+        """
+        self._ensure()
+        sql = "SELECT status, COUNT(*) AS cnt FROM jobs"
+        if not include_deleted:
+            sql += " WHERE deleted_at IS NULL"
+        sql += " GROUP BY status"
+        try:
+            with self._conn() as conn:
+                rows = self._fetch_all(conn, sql)
+        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns empty
+            return {}
+        return {str(row["status"]): int(row["cnt"]) for row in rows}
+
     def load_recycle_bin(self) -> dict[str, Job]:
         self._ensure()
         with self._conn() as conn:
@@ -720,7 +817,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns empty
             return []
         out: list[dict] = []
         for row in rows:
@@ -746,7 +843,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (job_id,),
                 )
             return int(row["cnt"]) if row else 0
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns 0
             return 0
 
     def read_events(self, job_id: str, limit: int = 200, offset: int = 0, level_prefix: str | None = None) -> list[dict]:
@@ -763,7 +860,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, tuple(params))
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns empty
             return []
         return [
             {
@@ -835,7 +932,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (f"{int(older_than_days)} days",),
                 )
                 return int(cur.rowcount) if cur.rowcount else 0
-        except Exception:
+        except Exception:  # nosec B110  # noqa: BLE001 - query failure returns 0
             return 0
 
     def cleanup_companion_data(self, job_id: str) -> None:
@@ -958,23 +1055,40 @@ class PostgresRepositoryBase(JobRepository, ABC):
         self._ensure()
         now = datetime.datetime.now().isoformat()
         with self._conn() as conn:
+            # The composite primary key (worker_id, pid) — see schema v6 —
+            # lets two workers on the same host coexist. The v5 schema
+            # used ``ON CONFLICT (worker_id)`` which silently overwrote
+            # a co-resident worker's heartbeat.
             self._execute(
                 conn,
                 """INSERT INTO worker_heartbeats (worker_id, last_heartbeat, hostname, pid, started_at)
                    VALUES (%s, %s, %s, %s, %s)
-                   ON CONFLICT (worker_id) DO UPDATE SET
+                   ON CONFLICT (worker_id, pid) DO UPDATE SET
                      last_heartbeat = EXCLUDED.last_heartbeat,
                      hostname = EXCLUDED.hostname,
-                     pid = EXCLUDED.pid""",
+                     started_at = CASE
+                       WHEN worker_heartbeats.pid = EXCLUDED.pid
+                         THEN worker_heartbeats.started_at
+                       ELSE EXCLUDED.started_at
+                     END""",
                 (worker_id, now, hostname, pid, now),
             )
 
     def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
         self._ensure()
         with self._conn() as conn:
+            # When multiple pids share a worker_id, return the freshest
+            # heartbeat and mark the worker alive if any of its pids are
+            # within the TTL. This matches the contract that the
+            # healthcheck expects: ``alive=True`` means "at least one
+            # worker process with this worker_id is up".
             row = self._fetch_one(
                 conn,
-                "SELECT last_heartbeat, hostname, pid, started_at FROM worker_heartbeats WHERE worker_id = %s",
+                """SELECT last_heartbeat, hostname, pid, started_at
+                   FROM worker_heartbeats
+                   WHERE worker_id = %s
+                   ORDER BY last_heartbeat DESC
+                   LIMIT 1""",
                 (worker_id,),
             )
         if not row:
@@ -1045,7 +1159,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "job_count": job_count or 0,
                     "recycle_bin_count": recycle_count or 0,
                 }
-        except Exception as e:
+        except Exception as e:  # nosec B110  # noqa: BLE001 - health check failure
             logger.exception("Postgres health check failed")
             return {
                 "ok": False,

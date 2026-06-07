@@ -98,7 +98,7 @@ _RATE_LIMIT_STATE: dict[str, float] = {}
 """In-memory rate-limit state keyed by domain / task-type: next_allowed_at timestamp."""
 
 
-def get_cooldown_seconds(domain_or_type: str, base_cooldown: float = 30.0) -> float:
+def get_cooldown_seconds(domain_or_type: str) -> float:
     """Return the cooldown remaining (seconds) for a domain or task type.
 
     Checks if we're currently cooling down after a rate-limit hit.

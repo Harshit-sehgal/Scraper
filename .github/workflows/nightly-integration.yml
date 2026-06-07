@@ -10,6 +10,7 @@ jobs:
   nightly-sqlite:
     name: Full SQLite Test Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +43,7 @@ jobs:
     name: Telegram Notification
     needs: [nightly-sqlite]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Send Telegram Message

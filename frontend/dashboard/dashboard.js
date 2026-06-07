@@ -3,6 +3,19 @@
  * Polling topology visualization and drift monitoring.
  */
 
+// Wrap the entire dashboard in an IIFE so the module-level state
+// (``_dashboardApiKey``, ``dashboardApiLast403``, ``currentInterval``,
+// ``failedPolls``, ``pollTimer``, ``historyData``) does not leak to
+// the global scope. Without this, vitest or other test harnesses
+// that import the script would accumulate state across runs, and
+// embedding the dashboard in an SPA could collide with sibling
+// instances. The handful of helpers that *must* stay reachable from
+// outside (e.g. inline ``onclick`` handlers in the HTML) are
+// re-exported on ``window.DataForgeDashboard`` at the end of the
+// file.
+(function () {
+'use strict';
+
 // ─── API key management (shared with main dashboard) ───────────────────
 // SECURITY: API key is held in memory only — never in sessionStorage /
 // localStorage. Page reload clears the key; the user re-enters it.
@@ -695,7 +708,18 @@ function updateTelemetry(events) {
         let detailsStr = '';
         if (e.type === 'scrape') {
             const d = e.details || {};
-            detailsStr = `Records: ${d.records} | Fetch: ${d.fetch_ms?.toFixed(0)}ms (${d.fallback_type || 'none'}) | HR: ${(d.selector_hit_rate*100)?.toFixed(0)}% | R: ${d.retries} | AB: ${d.anti_bot.toFixed(2)}`;
+            // The backend can omit any of these fields depending on
+            // which metrics were collected. Optional chaining with
+            // nullish coalescing keeps the line renderable instead
+            // of throwing on a single missing key, which would
+            // blank out the entire events panel.
+            const records = d.records ?? '—';
+            const fetchMs = (d.fetch_ms != null) ? `${d.fetch_ms.toFixed(0)}ms` : '—';
+            const fallback = d.fallback_type || 'none';
+            const hitRate = (d.selector_hit_rate != null) ? `${(d.selector_hit_rate * 100).toFixed(0)}%` : '—';
+            const retries = d.retries ?? '—';
+            const antiBot = (d.anti_bot != null) ? d.anti_bot.toFixed(2) : '—';
+            detailsStr = `Records: ${records} | Fetch: ${fetchMs} (${fallback}) | HR: ${hitRate} | R: ${retries} | AB: ${antiBot}`;
         }
  else {
             detailsStr = JSON.stringify(e.details || {}).substring(0, 80);
@@ -749,3 +773,16 @@ function updateCharts(m, communities, driftLogs) {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// Expose the helpers that are referenced by inline ``onclick``
+// handlers in ``frontend/dashboard/index.html`` so they remain
+// reachable from the page. The IIFE keeps the rest of the state
+// (poll timers, API key, backoff counters) private.
+window.DataForgeDashboard = Object.freeze({
+    getDashboardApiKey,
+    setDashboardApiKey,
+    clearDashboardApiKey,
+    dashboardApiFetch,
+});
+
+})();
