@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING
 
 from app.postgres_repository_base import (
@@ -43,7 +43,16 @@ def _get_pool_min_max() -> tuple[int, int]:
 
 
 def _get_pool():
-    """Get or create a psycopg 3 ``ConnectionPool``."""
+    """Get or create a psycopg 3 ``ConnectionPool``.
+
+    The pool's ``open()`` call blocks until at least ``min_size`` connections
+    can be established, so we set a short ``timeout`` to avoid hanging the
+    whole process when Postgres is unreachable (for example, when a test
+    instantiates ``Psycopg3JobRepository`` with a fake DSN). The 10-second
+    per-connection timeout is long enough to ride out a transient blip
+    but short enough that an outage surfaces as a real
+    ``psycopg_pool.PoolTimeout`` rather than an indefinite hang.
+    """
     global _pool
     if _pool is None:
         with _pool_lock:
@@ -52,14 +61,35 @@ def _get_pool():
 
                 dsn = get_database_url()
                 minconn, maxconn = _get_pool_min_max()
+                # The DSN may legitimately be empty in non-development
+                # environments when ``DATAFORGE_DATABASE_URL`` is unset.
+                # Surface a clear error rather than letting psycopg try
+                # to parse ``""`` and hang on a bad connection attempt.
+                if not dsn:
+                    msg = (
+                        "Cannot create psycopg3 pool: DATAFORGE_DATABASE_URL is not set. "
+                        "Set it in the environment (e.g. "
+                        "postgresql://user:pass@host:5432/dataforge) or switch "
+                        "STORAGE_BACKEND to sqlite."
+                    )
+                    raise RuntimeError(msg)
                 _pool = ConnectionPool(
                     conninfo=dsn,
                     min_size=minconn,
                     max_size=maxconn,
-                    kwargs={"autocommit": False},
+                    kwargs={"autocommit": False, "connect_timeout": 10},
                     open=False,
+                    timeout=10,
                 )
-                _pool.open()
+                try:
+                    _pool.open()
+                except Exception:
+                    # Reset the cached pool so the next call retries
+                    # instead of holding a half-initialised singleton.
+                    with suppress(Exception):
+                        _pool.close()
+                    _pool = None
+                    raise
                 logger.info(
                     "Created psycopg3 pool (min=%d, max=%d) for %s",
                     minconn,

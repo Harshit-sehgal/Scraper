@@ -12,17 +12,18 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
+
 from app.browser_pool import get_browser_pool
 from app.config import settings
-from app.models import ScraperDiagnosticsRequest  # noqa: TC002
+from app.models import ScraperDiagnosticsRequest  # noqa: TC001
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
 from app.selector_memory import get_selector_memory
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
-from fastapi import APIRouter, Depends, HTTPException, Query
-from starlette.concurrency import run_in_threadpool
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)

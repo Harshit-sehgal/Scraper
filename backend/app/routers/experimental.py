@@ -18,12 +18,13 @@ import secrets
 import time
 from typing import Annotated, ClassVar
 
-from app.config import settings
-from app.scrape_telemetry import get_scrape_telemetry
-from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
+
+from app.config import settings
+from app.scrape_telemetry import get_scrape_telemetry
+from app.utils.rbac import UserRole, require_role
 
 logger = logging.getLogger(__name__)
 

@@ -632,6 +632,17 @@ class ObservabilityState:
         Enhanced with Value-Aware Pruning to preserve semantic continuity.
         Uses snapshot for memory estimation, then mutates live state for pruning.
         """
+        import threading
+
+        from app.config import settings
+        from app.utils.telegram_notifier import notifier
+
+        if settings.TELEGRAM_NOTIFY_ON_CRITICAL_ERROR:
+            threading.Thread(
+                target=notifier.send_message,
+                args=("📉 <b>RESOURCE SHEDDING</b>\nSubstrate memory exceeded threshold. Pruning state...",),
+                daemon=True,
+            ).start()
         profile = self.get_memory_profile(snapshot)
         if profile["total_estimated_bytes"] < max_bytes:
             return False

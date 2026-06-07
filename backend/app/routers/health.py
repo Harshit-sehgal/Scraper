@@ -9,11 +9,12 @@ from __future__ import annotations
 import logging
 import time
 
-from app.config import settings
-from app.globals import jobs_store, recycle_bin_store
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+
+from app.config import settings
+from app.globals import jobs_store, recycle_bin_store
 
 logger = logging.getLogger(__name__)
 

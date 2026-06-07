@@ -12,10 +12,11 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from app.routers.jobs_state import JobStoreManager, is_worker_mode
-from app.storage_interface import get_job_repository
 from fastapi import APIRouter, Query
 from starlette.concurrency import run_in_threadpool
+
+from app.routers.jobs_state import JobStoreManager, is_worker_mode
+from app.storage_interface import get_job_repository
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,6 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             else:
                 results_list = list(job.results)
                 total = len(results_list)
-                page = results_list[offset : offset + limit]
                 page = results_list[offset : offset + limit]
 
         next_offset = offset + limit if (offset + limit) < total else None
