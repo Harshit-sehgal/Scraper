@@ -104,3 +104,19 @@ class CommunicationSettings(BaseSettings):
     # ─── Email Validation ──────────────────────────────────────────────
     EMAIL_BLOCKED_DOMAINS: str = "example.com,test.com,localhost"
     """Comma-separated list of email domains to reject as invalid."""
+
+    # ─── Telegram Notifications ─────────────────────────────────────────
+    TELEGRAM_BOT_TOKEN: str = ""
+    """Telegram bot token for sending notifications. Get from @BotFather."""
+    TELEGRAM_CHAT_ID: str = ""
+    """Telegram chat ID to send notifications to. Get from @userinfobot or similar."""
+    TELEGRAM_ENABLED: bool = False
+    """Enable Telegram notifications for tests and critical events."""
+    TELEGRAM_NOTIFY_ON_TEST_START: bool = True
+    """Send notification when test suite starts."""
+    TELEGRAM_NOTIFY_ON_TEST_END: bool = True
+    """Send notification when test suite ends (pass/fail)."""
+    TELEGRAM_NOTIFY_ON_TEST_FAILURE: bool = True
+    """Send notification on individual test failures."""
+    TELEGRAM_NOTIFY_ON_CRITICAL_ERROR: bool = True
+    """Send notification on critical application errors."""

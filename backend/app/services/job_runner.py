@@ -5,6 +5,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
+from starlette.concurrency import run_in_threadpool
+
 from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
 from app.filters import apply_location_radius, process_results
@@ -16,7 +18,6 @@ from app.scraper import (
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from starlette.concurrency import run_in_threadpool
 
 
 # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---

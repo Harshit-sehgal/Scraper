@@ -52,8 +52,8 @@ def test_factory_psycopg2_env_explicit_selects_psycopg2(monkeypatch: pytest.Monk
 
 def test_factory_env_whitespace_and_case_normalised(monkeypatch: pytest.MonkeyPatch) -> None:
     """Env value is case-insensitive and whitespace-stripped."""
-    monkeypatch.setenv("DATAFORGE_PG_DRIVER", "  Psycog3  ")
-    assert _driver_selection() == "psycog3"
+    monkeypatch.setenv("DATAFORGE_PG_DRIVER", "  Psycopg3  ")
+    assert _driver_selection() == "psycopg3"
     monkeypatch.setenv("DATAFORGE_PG_DRIVER", "  PSYCOPG3  ")
     assert _driver_selection() == "psycopg3"
     monkeypatch.setenv("DATAFORGE_PG_DRIVER", "PSYCOPG2")

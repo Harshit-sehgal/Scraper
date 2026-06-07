@@ -15,6 +15,9 @@ import logging
 import re
 from typing import TYPE_CHECKING, Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from starlette.concurrency import run_in_threadpool
+
 from app.config import settings
 from app.discovery import (
     DiscoveryDependencyError,
@@ -42,8 +45,6 @@ from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.utils.rbac import UserRole, require_role
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from starlette.concurrency import run_in_threadpool
 
 if TYPE_CHECKING:
     from collections.abc import Callable

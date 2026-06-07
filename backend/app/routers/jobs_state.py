@@ -14,10 +14,11 @@ import logging
 import threading
 from typing import TYPE_CHECKING
 
-from app.config import settings
-from app.storage_interface import get_job_repository
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
+
+from app.config import settings
+from app.storage_interface import get_job_repository
 
 if TYPE_CHECKING:
     from app.models import Job
