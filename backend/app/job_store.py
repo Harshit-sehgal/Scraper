@@ -517,6 +517,13 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
             # SQLite has limited ALTER TABLE support; we rebuild the
             # table by renaming, creating, copying (with deduplication
             # by last_heartbeat), and dropping the backup.
+            #
+            # Safety: each DDL statement is its own implicit transaction
+            # in SQLite, so a bare try/except rollback would only undo
+            # the INSERT...SELECT (DML). If the INSERT fails we
+            # explicitly DROP the half-built v6 table and RENAME the
+            # v5 backup back so the connection is left in the v5
+            # state — not the broken intermediate state.
             conn.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
             conn.execute("""
                 CREATE TABLE worker_heartbeats (
@@ -531,23 +538,34 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
             # SQLite's INSERT...SELECT supports GROUP BY but not DISTINCT ON
             # (Postgres). We pick the most recent heartbeat per (worker_id,
             # pid) via an aggregate.
-            conn.execute(
-                """
-                INSERT INTO worker_heartbeats
-                    (worker_id, last_heartbeat, hostname, pid, started_at)
-                SELECT worker_id, last_heartbeat, hostname, pid, started_at
-                FROM (
-                    SELECT
-                        worker_id, last_heartbeat, hostname, pid, started_at,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY worker_id, pid
-                            ORDER BY last_heartbeat DESC
-                        ) AS rn
-                    FROM worker_heartbeats_v5_backup
-                ) latest
-                WHERE rn = 1
-                """
-            )
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO worker_heartbeats
+                        (worker_id, last_heartbeat, hostname, pid, started_at)
+                    SELECT worker_id, last_heartbeat, hostname, pid, started_at
+                    FROM (
+                        SELECT
+                            worker_id, last_heartbeat, hostname, pid, started_at,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY worker_id, pid
+                                ORDER BY last_heartbeat DESC
+                            ) AS rn
+                        FROM worker_heartbeats_v5_backup
+                    ) latest
+                    WHERE rn = 1
+                    """
+                )
+            except Exception:
+                # Roll back to the v5 state: drop the half-built v6
+                # table and rename the backup back to the original
+                # name. Without this, the next call to ensure_schema
+                # would see ``worker_heartbeats_v5_backup`` (no
+                # current row) and try to re-run the migration,
+                # re-raising the same error.
+                conn.execute("DROP TABLE worker_heartbeats")
+                conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
+                raise
             conn.execute("DROP TABLE worker_heartbeats_v5_backup")
             current = 6
 

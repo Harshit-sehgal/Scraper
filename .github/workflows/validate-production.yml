@@ -398,7 +398,7 @@ jobs:
   final-report:
     name: Generate Validation Report
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     needs:
       - syntax-and-architecture
       - test-collection
@@ -473,7 +473,7 @@ jobs:
       - docs-validation
       - final-report
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     if: always()
     steps:
       - name: Send Telegram Message

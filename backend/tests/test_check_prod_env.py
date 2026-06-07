@@ -555,3 +555,115 @@ class TestCheckProdEnvPgDriver:
 
         env = mod.load_env_file(env_file)
         assert mod.check_var(env, "DATAFORGE_PG_DRIVER", required=True, validator=mod.check_pg_driver)
+
+
+class TestCheckQueueDriverCompatibility:
+    """Tests for the queue/driver compatibility check in check_prod_env.py.
+
+    The Postgres worker queue supports both psycopg2 and psycopg3, but the
+    production image ships only psycopg3 (psycopg2 is dev-only). This check
+    guards against the post-build "psycopg2 not found" failure mode.
+    """
+
+    def _import_module(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "check_prod_env",
+            _SCRIPT_PATH / "check_prod_env.py",
+        )
+        assert spec is not None
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_sqlite_queue_skips_driver_check(self) -> None:
+        """When the queue is SQLite, the driver check is a no-op."""
+        mod = self._import_module()
+        env = {"DATAFORGE_QUEUE_BACKEND": "sqlite"}
+        assert mod.check_queue_driver_compatibility(env) is True
+
+    def test_psycopg3_queue_works_when_module_present(self) -> None:
+        """psycopg3 + postgres queue passes when the module is importable."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "psycopg3",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+        assert mod.check_queue_driver_compatibility(env) is True
+
+    def test_psycopg2_queue_works_when_module_present(self) -> None:
+        """psycopg2 + postgres queue passes when psycopg2 is importable."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "psycopg2",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+        assert mod.check_queue_driver_compatibility(env) is True
+
+    def test_psycopg3_queue_fails_when_module_missing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """psycopg3 + postgres queue fails if the queue module can't be found."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "psycopg3",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+        # Hide the module so find_spec returns None.
+        monkeypatch.setitem(sys.modules, "app.worker_queue_postgres_psycopg3", None)
+        with monkeypatch.context() as m:
+            m.setitem(sys.modules, "app.worker_queue_postgres_psycopg3", None)
+            # Patch find_spec to return None for the psycopg3 queue module.
+            import importlib.util as _ilu
+
+            original_find_spec = _ilu.find_spec
+
+            def fake_find_spec(name, *args, **kwargs):
+                if name == "app.worker_queue_postgres_psycopg3":
+                    return None
+                return original_find_spec(name, *args, **kwargs)
+
+            m.setattr(_ilu, "find_spec", fake_find_spec)
+            assert mod.check_queue_driver_compatibility(env) is False
+
+    def test_unknown_pg_driver_is_rejected(self) -> None:
+        """An unknown DATAFORGE_PG_DRIVER value must be rejected."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "pg8000",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+        assert mod.check_queue_driver_compatibility(env) is False
+
+    def test_default_pg_driver_is_psycopg2(self) -> None:
+        """Without DATAFORGE_PG_DRIVER set, the default is psycopg2."""
+        mod = self._import_module()
+        env = {"DATAFORGE_QUEUE_BACKEND": "postgres"}  # no DATAFORGE_PG_DRIVER
+        # psycopg2 is installed in dev — should pass.
+        assert mod.check_queue_driver_compatibility(env) is True
+
+    def test_psycopg2_fails_when_module_not_installed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """psycopg2 + postgres queue fails if psycopg2 is not importable."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "psycopg2",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+
+        import builtins
+
+        original_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "psycopg2" or name.startswith("psycopg2."):
+                raise ImportError("psycopg2 simulated not installed")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        assert mod.check_queue_driver_compatibility(env) is False

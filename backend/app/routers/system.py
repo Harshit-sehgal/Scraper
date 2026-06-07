@@ -650,7 +650,13 @@ async def metrics(request: Request):
         # request outright. In development we keep the open behavior
         # so local scrapers can scrape without a token — but we log a
         # one-time warning on the first call so the operator knows.
-        if settings.ENV == "production":
+        #
+        # The check is intentionally case-insensitive on whitespace-
+        # trimmed input. Operators regularly set ``DATAFORGE_ENV`` to
+        # ``Production`` or ``PRODUCTION`` from copy-pasted deployment
+        # docs; an exact-match would silently let the dev open
+        # behavior run in production and expose the metrics.
+        if (settings.ENV or "").strip().lower() == "production":
             return JSONResponse(
                 status_code=503,
                 content={

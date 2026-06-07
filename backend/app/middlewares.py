@@ -14,6 +14,20 @@ from app.rate_limiter import RateLimiterMiddleware
 if TYPE_CHECKING:
     from fastapi import Request
 
+
+def _is_match(provided: str, expected: str) -> bool:
+    """Constant-time API-key comparison.
+
+    Hoisted to module scope so we don't allocate a new function object
+    on every request. The empty-string short-circuit keeps the constant
+    time characteristic for unequal-length inputs (one branch returns
+    immediately; the other compares two known-non-empty strings).
+    """
+    if not expected or not provided:
+        return False
+    return secrets.compare_digest(provided, expected)
+
+
 logger = logging.getLogger(__name__)
 
 MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
@@ -83,7 +97,12 @@ async def api_key_middleware(request: Request, call_next):
         # and body-size-capped by the other middlewares.
         if request.url.path == "/api/system/csp-violations":
             return await call_next(request)
-        is_docs_path = "/docs" in request.url.path or "/openapi" in request.url.path
+        # Use exact-match / prefix-match on the docs / openapi paths.
+        # Substring matching (e.g. ``"/docs" in path``) would falsely
+        # exempt any path containing those letters, including a
+        # future ``/api/dossier`` or ``/api/some-openapi-redirect``.
+        docs_paths = ("/docs", "/openapi.json")
+        is_docs_path = request.url.path in docs_paths or request.url.path.startswith(("/docs/", "/redoc", "/openapi"))
         if not is_docs_path or settings.ENV.lower() == "production":
             api_key = request.headers.get("X-API-Key", "")
             admin_key_header = request.headers.get("X-Admin-Key", "")
@@ -91,26 +110,23 @@ async def api_key_middleware(request: Request, call_next):
             auth_scheme, _, auth_token = auth_header.partition(" ")
             bearer_token = auth_token.strip() if auth_scheme.lower() == "bearer" else ""
 
-            def is_match(provided, expected):
-                if not expected or not provided:
-                    return False
-                return secrets.compare_digest(provided, expected)
-
             matched_role: str | None = None
-            # Match the HIGHEST privilege first so a request that carries
-            # (or claims to carry) the admin key is correctly attributed
-            # to the admin role, not the lower-privilege user role.
+            # Match the HIGHEST privilege first so a request that
+            # successfully authenticates against the admin key is
+            # attributed to the admin role, even if it also carries a
+            # user or operator key. A *wrong* admin key falls through
+            # to the operator/user checks (no early 403).
             if settings.ADMIN_API_KEY and (
-                is_match(api_key, settings.ADMIN_API_KEY)
-                or is_match(bearer_token, settings.ADMIN_API_KEY)
-                or is_match(admin_key_header, settings.ADMIN_API_KEY)
+                _is_match(api_key, settings.ADMIN_API_KEY)
+                or _is_match(bearer_token, settings.ADMIN_API_KEY)
+                or _is_match(admin_key_header, settings.ADMIN_API_KEY)
             ):
                 matched_role = "admin"
             elif getattr(settings, "OPERATOR_API_KEY", "") and (
-                is_match(api_key, settings.OPERATOR_API_KEY) or is_match(bearer_token, settings.OPERATOR_API_KEY)
+                _is_match(api_key, settings.OPERATOR_API_KEY) or _is_match(bearer_token, settings.OPERATOR_API_KEY)
             ):
                 matched_role = "operator"
-            elif settings.API_KEY and (is_match(api_key, settings.API_KEY) or is_match(bearer_token, settings.API_KEY)):
+            elif settings.API_KEY and (_is_match(api_key, settings.API_KEY) or _is_match(bearer_token, settings.API_KEY)):
                 matched_role = "user"
 
             if not matched_role:

@@ -287,7 +287,7 @@ def ensure_required_tables(conn) -> None:
             logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
 
 
-def _migrate_worker_heartbeats_v6(execute, _fetch_all, _fetch_one, conn) -> None:
+def _migrate_worker_heartbeats_v6(conn) -> None:
     """Schema v6: make worker_heartbeats primary key composite (worker_id, pid).
 
     The original v5 schema used ``worker_id TEXT PRIMARY KEY``. When two
@@ -430,7 +430,7 @@ def ensure_schema(conn) -> None:
             # and a composite PK is added. Existing rows are preserved;
             # any historical collision (where the same worker_id had two
             # pids) is resolved by keeping the most recent row per pid.
-            _migrate_worker_heartbeats_v6(execute, _fetch_all, _fetch_one, conn)
+            _migrate_worker_heartbeats_v6(conn)
 
         execute(conn, "DELETE FROM schema_version")
         execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
