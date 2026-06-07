@@ -15,6 +15,7 @@ from typing import Annotated
 
 from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
+from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
@@ -402,6 +403,34 @@ async def csp_violations(request: Request):
     return JSONResponse(status_code=204, content=None)
 
 
+# ─── Rate Limiter Stats ─────────────────────────────────────────────────
+
+
+@router.get("/api/system/rate-limit-stats")
+async def rate_limit_stats(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Return current rate limiter configuration and active counter stats.
+
+    Exposes the rate limiter's internal state for operational debugging:
+    - ``enabled`` — whether any tier (global or per-IP) is active
+    - ``global_limit_per_window`` / ``global_window_seconds`` — aggregate cap
+    - ``per_ip_enabled`` / ``per_ip_limit_per_window`` / ``per_ip_window_seconds`` — fair-share cap
+    - ``active_keys`` — how many distinct counter keys are currently tracked
+    - ``route_limits`` — per-route override limits (max + window per prefix)
+
+    Requires operator or admin role.
+    """
+    try:
+        return _rate_limiter.get_stats()
+    except (AttributeError, RuntimeError, ImportError) as e:
+        logger.warning("Failed to get rate limiter stats: %s", e)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Rate limiter stats unavailable.", "error": str(e)},
+        )
+
+
 # ─── URL Analyzer Endpoint ──────────────────────────────────────────────
 
 
@@ -510,6 +539,8 @@ def _render_basic_metrics_text() -> str:
         get_extraction_method_counts,
         get_health_check_latencies,
         get_llm_calls,
+        get_rate_limit_global_hits,
+        get_rate_limit_per_ip_hits,
         get_repo_query_latencies,
         get_request_latencies,
         get_requests_total,
@@ -647,6 +678,14 @@ def _render_basic_metrics_text() -> str:
         lines.append(
             _basic_metric_line("dataforge_csp_violations_total", count, {"directive": directive}),
         )
+
+    # Rate limit hit counters
+    lines.append(
+        _basic_metric_line("dataforge_rate_limit_global_hits_total", get_rate_limit_global_hits()),
+    )
+    lines.append(
+        _basic_metric_line("dataforge_rate_limit_per_ip_hits_total", get_rate_limit_per_ip_hits()),
+    )
 
     return "\n".join(lines) + "\n"
 
@@ -903,6 +942,8 @@ async def metrics(request: Request):
         get_csp_violations,
         get_export_outcomes,
         get_extraction_method_counts,
+        get_rate_limit_global_hits,
+        get_rate_limit_per_ip_hits,
         get_repo_query_latencies,
         get_ssrf_rejects,
     )
@@ -994,5 +1035,19 @@ async def metrics(request: Request):
         )
         for directive, count in csp_violations.items():
             csp_gauge.labels(directive=directive).set(count)
+
+    # Rate limit hit counters
+    rl_global = Gauge(
+        "dataforge_rate_limit_global_hits_total",
+        "Cumulative rate limit hits by the aggregate global tier",
+        registry=registry,
+    )
+    rl_global.set(get_rate_limit_global_hits())
+    rl_per_ip = Gauge(
+        "dataforge_rate_limit_per_ip_hits_total",
+        "Cumulative rate limit hits by the per-IP fair-sharing tier",
+        registry=registry,
+    )
+    rl_per_ip.set(get_rate_limit_per_ip_hits())
 
     return Response(content=generate_latest(registry), media_type="text/plain")

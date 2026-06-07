@@ -79,6 +79,7 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/system/status` | Operator or admin |
 | GET | `/api/system/storage/status` | Operator or admin |
 | GET | `/api/system/diagnostics/export` | Admin |
+| GET | `/api/system/rate-limit-stats` | Operator or admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
 
 ## Batch Export
@@ -252,3 +253,12 @@ export DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true
 ## Metrics
 
 `GET /metrics` is protected by `DATAFORGE_METRICS_TOKEN` if configured. Local Compose verified public Nginx returns 404 for `/metrics`, while Prometheus scrapes `http://dataforge:8000/metrics` internally with the configured bearer token. Repeat this check behind the target ingress.
+
+The following Prometheus metrics are exposed:
+
+| Metric | Type | Labels | Description |
+| --- | --- | --- | --- |
+| `dataforge_rate_limit_global_hits_total` | Gauge | — | Cumulative rate limit hits by the aggregate global tier |
+| `dataforge_rate_limit_per_ip_hits_total` | Gauge | — | Cumulative rate limit hits by the per-IP fair-sharing tier |
+
+Both rate-limit hit counters are reset on process restart. They are incremented whenever the rate limiter middleware returns a 429 Too Many Requests response, and are exposed in both the Prometheus exposition format and the fallback text output.

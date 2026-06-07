@@ -138,3 +138,57 @@ def test_db_sliding_window_counter_fallback() -> None:
         assert counter.remaining() == 0
         assert counter.allow() is False
         assert counter.reset_in() > 0.0
+
+
+def test_prune_all_removes_old_entries() -> None:
+    """Verify that prune_all() deletes rows older than max_age_seconds."""
+    test_key = _generate_test_key()
+    _cleanup_rate_limit_key(test_key)
+    counter = DatabaseSlidingWindowCounter(max_requests=10, window_seconds=60.0, key=test_key)
+
+    try:
+        # Insert some entries via allow() calls
+        for _ in range(3):
+            counter.allow()
+
+        # All 3 should be within the 60s window, so remaining should be 7
+        assert counter.remaining() == 7
+
+        # Call prune_all with max_age_seconds=0 to delete ALL entries
+        DatabaseSlidingWindowCounter.prune_all(max_age_seconds=0)
+
+        # After pruning all rows, the counter should be empty (remaining == max)
+        assert counter.remaining() == 10
+    finally:
+        _cleanup_rate_limit_key(test_key)
+
+
+def test_prune_all_safe_before_initialization() -> None:
+    """Verify prune_all() is a no-op when the rate_limits table has never been created."""
+    # Calling prune_all() before any _ensure_table() should not raise.
+    # The DELETE on a missing table is silently ignored by both SQLite and Postgres.
+    result = DatabaseSlidingWindowCounter.prune_all()
+    assert isinstance(result, int)
+
+
+def test_db_counter_is_expired() -> None:
+    """Verify that DatabaseSlidingWindowCounter.is_expired() returns True for
+    a counter with no recent entries and False after activity."""
+    test_key = _generate_test_key()
+    _cleanup_rate_limit_key(test_key)
+    counter = DatabaseSlidingWindowCounter(max_requests=5, window_seconds=2.0, key=test_key)
+
+    try:
+        # Before initialization, is_expired should return True (no DB table yet)
+        assert counter.is_expired() is True
+
+        # After an allow() call, the table exists and has entries, so is_expired should be False
+        counter.allow()
+        assert counter.is_expired() is False
+
+        # Manually delete the entry via prune_all to simulate expiration
+        DatabaseSlidingWindowCounter.prune_all(max_age_seconds=0)
+        # is_expired should now return True (no recent entries)
+        assert counter.is_expired() is True
+    finally:
+        _cleanup_rate_limit_key(test_key)

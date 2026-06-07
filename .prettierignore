@@ -1,0 +1,10 @@
+# Ignore third-party vendor directories
+frontend/dashboard/vendor/
+
+# Ignore backend and system files/directories
+backend/
+grafana/
+.vscode/
+node_modules/
+package-lock.json
+*.json

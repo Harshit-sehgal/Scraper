@@ -65,3 +65,10 @@ class PathSettings(BaseSettings):
     # ─── Feature Flags ─────────────────────────────────────────────────
     ENABLE_EXPERIMENTAL_ROUTES: bool = False
     """Enable experimental / research-only API routes."""
+
+    # ─── Rate Limiter Background Pruning ────────────────────────
+    RATE_LIMIT_PRUNE_INTERVAL: int = 3600
+    """Seconds between background prunes of the ``rate_limits`` table.
+    Default 3600 (1 hour). Set to 0 to disable the background cron;
+    the middleware's request-time pruning (every 300s) still runs.
+    """

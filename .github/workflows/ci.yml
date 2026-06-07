@@ -195,6 +195,9 @@ jobs:
       - name: CSS Lint (stylelint)
         run: npx stylelint 'frontend/**/*.css'
 
+      - name: JS/CSS Format Check (Prettier)
+        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' 'package.json' '.stylelintrc.json' '.prettierrc'
+
       - name: Frontend Unit Tests (vitest)
         run: npm test
 

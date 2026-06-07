@@ -233,6 +233,110 @@ class TestAntiBotClassificationCallSiteWiring:
         assert "genuinely_empty" not in counts
 
 
+class TestRateLimitHitCounters:
+    """Rate limit hit counters exposed as Prometheus metrics."""
+
+    def test_record_global_hit(self, reset_metrics) -> None:
+        from app.metrics_collector import (
+            get_rate_limit_global_hits,
+            record_rate_limit_global_hit,
+        )
+
+        assert get_rate_limit_global_hits() == 0
+        record_rate_limit_global_hit()
+        assert get_rate_limit_global_hits() == 1
+        record_rate_limit_global_hit()
+        assert get_rate_limit_global_hits() == 2
+
+    def test_record_per_ip_hit(self, reset_metrics) -> None:
+        from app.metrics_collector import (
+            get_rate_limit_per_ip_hits,
+            record_rate_limit_per_ip_hit,
+        )
+
+        assert get_rate_limit_per_ip_hits() == 0
+        record_rate_limit_per_ip_hit()
+        record_rate_limit_per_ip_hit()
+        record_rate_limit_per_ip_hit()
+        assert get_rate_limit_per_ip_hits() == 3
+
+    def test_reset_clears_both_counters(self, reset_metrics) -> None:
+        from app.metrics_collector import (
+            get_rate_limit_global_hits,
+            get_rate_limit_per_ip_hits,
+            record_rate_limit_global_hit,
+            record_rate_limit_per_ip_hit,
+            reset_for_testing,
+        )
+
+        record_rate_limit_global_hit()
+        record_rate_limit_per_ip_hit()
+        assert get_rate_limit_global_hits() == 1
+        assert get_rate_limit_per_ip_hits() == 1
+
+        reset_for_testing()
+        assert get_rate_limit_global_hits() == 0
+        assert get_rate_limit_per_ip_hits() == 0
+
+    def test_metrics_endpoint_contains_rate_limit_hits(self, client, reset_metrics) -> None:
+        from app.metrics_collector import (
+            record_rate_limit_global_hit,
+            record_rate_limit_per_ip_hit,
+        )
+
+        record_rate_limit_global_hit()
+        record_rate_limit_per_ip_hit()
+        record_rate_limit_per_ip_hit()
+
+        r = client.get("/metrics")
+        assert r.status_code in (200, 401, 403)
+        if r.status_code == 200:
+            text = r.text
+            assert "dataforge_rate_limit_global_hits_total" in text, text
+            assert "dataforge_rate_limit_per_ip_hits_total" in text, text
+
+
+class TestRateLimitStatsEndpoint:
+    """The /api/system/rate-limit-stats endpoint returns expected schema."""
+
+    def test_rate_limit_stats_returns_expected_keys(self, client, monkeypatch) -> None:
+        """Verify the response contains all expected schema fields.
+
+        Sets up an admin API key so the request can authenticate against
+        the operator/admin-protected endpoint.
+        """
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-key", raising=False)
+        monkeypatch.setattr(settings, "API_KEY", "", raising=False)
+
+        r = client.get(
+            "/api/system/rate-limit-stats",
+            headers={"X-API-Key": "test-admin-key"},
+        )
+        assert r.status_code == 200, f"Got {r.status_code}: {r.text}"
+        data = r.json()
+        expected_keys = {
+            "enabled",
+            "global_limit_per_window",
+            "global_window_seconds",
+            "per_ip_enabled",
+            "per_ip_limit_per_window",
+            "per_ip_window_seconds",
+            "active_keys",
+            "route_limits",
+        }
+        assert expected_keys.issubset(data.keys()), f"Missing keys: {expected_keys - data.keys()}"
+        assert isinstance(data["enabled"], bool)
+        assert isinstance(data["global_limit_per_window"], int)
+        assert isinstance(data["global_window_seconds"], (int, float))
+        assert isinstance(data["per_ip_enabled"], bool)
+        assert isinstance(data["per_ip_limit_per_window"], int)
+        assert isinstance(data["per_ip_window_seconds"], (int, float))
+        assert isinstance(data["active_keys"], int)
+        assert isinstance(data["route_limits"], dict)
+
+
 class TestAntiBotPlatformDetection:
     """detect_anti_bot_platform must label the matched platform; ok otherwise."""
 
