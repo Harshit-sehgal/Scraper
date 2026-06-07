@@ -336,10 +336,6 @@ def create_exports_router(jobs_store: dict):
 
         def _build_excel_content():
             wb = Workbook(write_only=True)
-            from unittest.mock import Mock
-
-            if isinstance(wb, Mock) and getattr(wb, "active", None) is None:
-                raise HTTPException(status_code=500, detail="Failed to create worksheet")
             ws = wb.create_sheet(title="Scraped Data")
 
             if job.results_on_disk:
@@ -617,11 +613,7 @@ def create_exports_router(jobs_store: dict):
         sheet with a ``_source_job`` column. When False, each job gets
         its own sheet named after the job (truncated to 31 chars).
         """
-        from unittest.mock import Mock
-
         wb = Workbook(write_only=True)
-        if isinstance(wb, Mock) and getattr(wb, "active", None) is None:
-            raise HTTPException(status_code=500, detail="Failed to create worksheet")
 
         def _row_values(row: dict[str, Any], fnames: list[str]) -> list[Any]:
             vals: list[Any] = []
@@ -644,8 +636,27 @@ def create_exports_router(jobs_store: dict):
                     vals.append(job_name)
                     ws.append(vals)
         else:
+            # Track used sheet names to avoid ``InvalidWorksheetTitle`` from
+            # openpyxl when two jobs share the same 31-char prefix.
+            used_sheet_names: set[str] = set()
             for jid, job_name, rows in per_job_results:
-                sheet_name = job_name[:31]  # Excel sheet name limit
+                base = (job_name or "Sheet")[:31] or "Sheet"
+                sheet_name = base
+                suffix = 2
+                while sheet_name in used_sheet_names or sheet_name == "Sheet":
+                    if suffix == 2 and base != "Sheet":
+                        candidate = f"{base[: 31 - 4]} (2)"
+                    else:
+                        candidate = f"{base[: 31 - 4]} ({suffix})"
+                    sheet_name = candidate[:31]
+                    suffix += 1
+                    if suffix > 999:
+                        # Defensive cap — at this point we have hundreds of
+                        # jobs with the same 31-char prefix, which is itself
+                        # a data-quality issue, but we should not loop forever.
+                        sheet_name = f"{base[: 31 - 4]}_x"
+                        break
+                used_sheet_names.add(sheet_name)
                 ws = wb.create_sheet(title=sheet_name)
                 ws.append(fieldnames)
                 for row in rows:

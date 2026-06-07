@@ -963,13 +963,12 @@ class TestPostgresQueueMocked:
     def test_get_status_handles_exception(self, monkeypatch):
         """get_status returns error dict when _conn raises."""
         import app.worker_queue_postgres as wqp
+        from app.worker_queue_postgres import PostgresWorkerQueue
 
         # Mock _ensure_schema to no-op so construction doesn't hit failing _conn
-        monkeypatch.setattr(wqp, "_ensure_schema", MagicMock())
+        monkeypatch.setattr(PostgresWorkerQueue, "_ensure_schema", MagicMock())
         monkeypatch.setattr(wqp, "_conn", MagicMock(side_effect=Exception("Connection failed")))
         monkeypatch.setattr(wqp, "_execute", MagicMock())
-
-        from app.worker_queue_postgres import PostgresWorkerQueue
 
         q = PostgresWorkerQueue()
         status = q.get_status()

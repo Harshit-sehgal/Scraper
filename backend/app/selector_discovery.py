@@ -551,14 +551,16 @@ async def analyze_url_for_fields(
     acquisition_lineage.ephemeral_params = list(session_detection.get("ephemeral_params") or [])
 
     # Enrich lineage with evidence-based quality signals
-    acquisition_lineage.data_evidence_score = (
-        round(
-            1.0
-            if content_quality.get("has_data_containers")
-            else 0.0 + (0.5 if not empty_check.is_empty else 0.0) - anti_bot_score * 0.3,
-        )
-        / 1.5
-    )
+    # Note: parentheses are required around the ternary expression because
+    # Python's `x if cond else y` has lower precedence than `+`/`-`. Without
+    # them, the expression was being parsed as
+    #   `1.0 if has_data_containers else 0.0 + (...) - ...`
+    # which silently ignored the `empty_check` and `anti_bot_score` whenever
+    # `has_data_containers` was True.
+    has_containers = bool(content_quality.get("has_data_containers"))
+    not_empty_score = 0.5 if not empty_check.is_empty else 0.0
+    data_score = (1.0 if has_containers else 0.0) + not_empty_score - anti_bot_score * 0.3
+    acquisition_lineage.data_evidence_score = round(data_score, 3) / 1.5
     acquisition_lineage.anti_bot_score = round(anti_bot_score, 3)
     acquisition_lineage.containers_detected = content_quality.get("data_container_count", 0)
     acquisition_lineage.forms_detected = 1 if (search_form or {}).get("detected") else 0

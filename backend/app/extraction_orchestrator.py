@@ -383,10 +383,16 @@ async def orchestrate_extraction(
             "source_path": network_result.source,
             "fields": {k: v.mapped_from for k, v in field_map.items()},
         }
+        # Only claim ``selector_success`` if at least one field actually
+        # has a non-empty selector to apply. An empty ``mapped_from`` for
+        # every field would otherwise let the downstream orchestrator try
+        # to apply a useless CSS selector that always fails, masking the
+        # real reason network extraction lost to a fallback path.
+        selector_success = any((v.mapped_from or "").strip() for v in field_map.values())
         res = ExtractionResult(
             winning_records,
             winning_source,
-            selector_success=True,
+            selector_success=selector_success,
             selectors=net_selectors,
         )
         res.network_diagnostics = list(network_diagnostics)

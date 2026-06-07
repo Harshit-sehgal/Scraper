@@ -135,13 +135,24 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             )
         else:
             repo = get_job_repository()
-            results_list = await run_in_threadpool(repo.read_results, job.id, limit + offset, 0)
-            if results_list:
-                total = len(results_list)
-                page = results_list[offset : offset + limit]
+            # Fetch only the requested page from the persistent store. The
+            # previous implementation asked for ``limit + offset`` rows and
+            # used the count as ``total``, which always yielded
+            # ``next_offset = None`` because the cap and the requested count
+            # were the same value (``limit < limit`` is always False).
+            results_list = await run_in_threadpool(repo.read_results, job.id, limit, offset)
+            if results_list or getattr(repo, "backend", "sqlite") != "sqlite":
+                # Prefer the authoritative COUNT(*) when the storage backend
+                # supports it; fall back to the in-memory list otherwise.
+                try:
+                    total = await run_in_threadpool(repo.count_results, job.id)
+                except (AttributeError, NotImplementedError):
+                    total = len(list(job.results))
+                page = list(results_list)
             else:
                 results_list = list(job.results)
                 total = len(results_list)
+                page = results_list[offset : offset + limit]
                 page = results_list[offset : offset + limit]
 
         next_offset = offset + limit if (offset + limit) < total else None

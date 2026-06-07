@@ -97,18 +97,21 @@ async def api_key_middleware(request: Request, call_next):
                 return secrets.compare_digest(provided, expected)
 
             matched_role: str | None = None
-            if settings.API_KEY and (is_match(api_key, settings.API_KEY) or is_match(bearer_token, settings.API_KEY)):
-                matched_role = "user"
-            elif getattr(settings, "OPERATOR_API_KEY", "") and (
-                is_match(api_key, settings.OPERATOR_API_KEY) or is_match(bearer_token, settings.OPERATOR_API_KEY)
-            ):
-                matched_role = "operator"
-            elif settings.ADMIN_API_KEY and (
+            # Match the HIGHEST privilege first so a request that carries
+            # (or claims to carry) the admin key is correctly attributed
+            # to the admin role, not the lower-privilege user role.
+            if settings.ADMIN_API_KEY and (
                 is_match(api_key, settings.ADMIN_API_KEY)
                 or is_match(bearer_token, settings.ADMIN_API_KEY)
                 or is_match(admin_key_header, settings.ADMIN_API_KEY)
             ):
                 matched_role = "admin"
+            elif getattr(settings, "OPERATOR_API_KEY", "") and (
+                is_match(api_key, settings.OPERATOR_API_KEY) or is_match(bearer_token, settings.OPERATOR_API_KEY)
+            ):
+                matched_role = "operator"
+            elif settings.API_KEY and (is_match(api_key, settings.API_KEY) or is_match(bearer_token, settings.API_KEY)):
+                matched_role = "user"
 
             if not matched_role:
                 log_auth_event(

@@ -225,6 +225,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                 }).catch(() => {}); break;
             case 'refresh-cognition':          refreshCognition(); break;
             case 'toggle-field-item': {
+                // If the user clicked the checkbox itself, the change handler
+                // below will already have toggled the `selected` class. Skip
+                // here to avoid double-toggling (which would silently undo the
+                // user's click).
+                if (e.target.matches('.analyze-field-checkbox')) {
+                    break;
+                }
                 const checkbox = btn.querySelector('.analyze-field-checkbox');
                 if (checkbox) {
                     checkbox.checked = !checkbox.checked;
