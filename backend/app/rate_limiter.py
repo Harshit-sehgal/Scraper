@@ -304,7 +304,7 @@ class DatabaseSlidingWindowCounter:
                         conn.execute("COMMIT")
                     finally:
                         conn.close()
-                return True
+                return True  # noqa: TRY300
             except Exception as e:
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()

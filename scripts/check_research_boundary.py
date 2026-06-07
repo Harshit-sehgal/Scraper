@@ -39,7 +39,7 @@ _BACKEND = os.path.normpath(os.path.join(_HERE, "..", "backend"))
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 
-from app.research import RESEARCH_MODULES  # noqa: E402
+from app.research import RESEARCH_MODULES
 
 # Files / packages that are part of the kernel boundary but may
 # legitimately reference the research registry itself. None of these do
@@ -142,7 +142,7 @@ def collect_violations(app_root: str) -> tuple[list[tuple[str, int, str, list[st
     Each violation is a tuple of ``(relative_path, lineno, module, names)``.
     """
     if not os.path.isdir(app_root):
-        raise FileNotFoundError(f"app root not found: {app_root}")
+        raise FileNotFoundError(f"app root not found: {app_root}")  # noqa: TRY003
 
     violations: list[tuple[str, int, str, list[str]]] = []
     files_checked = 0

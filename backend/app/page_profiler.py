@@ -119,8 +119,8 @@ VALUE_PATTERNS = {
         r"\b(?:Yes|No|True|False|Available|Unavailable|In\s+Stock|Out\s+of\s+Stock|Sold\s+Out|Inactive|Active|Enabled|Disabled)\b",
     ],
     "dimension": [
-        # 10x15cm, 5x7
-        r"\d+[\.\,]?\d*\s*(?:x|×|\*)\s*\d+[\.\,]?\d*\s*(?:cm|mm|m|in|inches|ft|feet)?",
+        # 10x15cm, 5x7 — intentional Unicode multiplication sign matching page content
+        r"\d+[\.\,]?\d*\s*(?:x|×|\*)\s*\d+[\.\,]?\d*\s*(?:cm|mm|m|in|inches|ft|feet)?",  # noqa: RUF001
         r"(?:A[0-5]|Letter|Legal|Tabloid)",  # Paper sizes
     ],
     "quantity": [

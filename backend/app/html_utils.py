@@ -554,7 +554,7 @@ async def fetch_page_content(
                         url,
                     )
                     msg = f"Anti-bot challenge detected during {wait_until}: {e}"
-                    raise ValueError(msg)
+                    raise ValueError(msg)  # noqa: TRY301
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
             except Exception:  # noqa: RUF100, S110
@@ -601,7 +601,7 @@ async def fetch_page_content(
                 url,
             )
 
-        return html, js_render_delay_ms, method_used, 0
+        return html, js_render_delay_ms, method_used, 0  # noqa: TRY300
     except Exception as e:
         html_content = ""
         if page:
@@ -738,7 +738,7 @@ async def _fetch_with_httpx(
                 if set_cookie:
                     anti_bot.update_cookies(domain, set_cookie)
 
-                return resp.text, 0.0, method_used, retry_count
+                return resp.text, 0.0, method_used, retry_count  # noqa: TRY300
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt < settings.MAX_RETRIES - 1:
                     wait = settings.HTTP_BACKOFF_FACTOR * (attempt + 1)

@@ -74,7 +74,7 @@ async def _call_openai_compatible_json(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
-    timeout: int | None = None,
+    timeout: int | None = None,  # noqa: ASYNC109
     max_attempts: int | None = None,
     backoff_seconds: float | None = None,
 ):
@@ -122,7 +122,7 @@ async def _call_openai_compatible_text(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
-    timeout: int | None = None,
+    timeout: int | None = None,  # noqa: ASYNC109
     max_attempts: int | None = None,
     backoff_seconds: float | None = None,
 ) -> str:
@@ -192,7 +192,7 @@ def _public_llm_fallbacks_enabled() -> bool:
     return bool(settings.LLM_ENABLE_PUBLIC_FALLBACKS)
 
 
-async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):  # noqa: ASYNC109
     try:
         from app.metrics_collector import record_llm_call
 
@@ -258,7 +258,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if not res.choices:
                     msg = "Empty choices in LLM response"
-                    raise ValueError(msg)
+                    raise ValueError(msg)  # noqa: TRY301
                 return res.choices[0].message.content.strip()
 
             content = await asyncio.to_thread(_run_g4f_json)
@@ -274,7 +274,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
     return {}
 
 
-async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):  # noqa: ASYNC109
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     try:
         from app.metrics_collector import record_llm_call
@@ -332,7 +332,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     return {}
 
 
-async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
+async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:  # noqa: ASYNC109
     try:
         from app.metrics_collector import record_llm_call
 
@@ -395,13 +395,13 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if not res.choices:
                     msg = "Empty choices in LLM response"
-                    raise ValueError(msg)
+                    raise ValueError(msg)  # noqa: TRY301
                 return (res.choices[0].message.content or "").strip()
 
             result = await asyncio.to_thread(_run_g4f_text)
             if result is None:
                 return ""
-            return result  # type: ignore[no-any-return]
+            return result  # type: ignore[no-any-return]  # noqa: TRY300
         except Exception:
             logging.exception("g4f text fallback failed")
         return ""
@@ -516,13 +516,13 @@ class SubstratePluginManager:
                 policy = get_policy_engine(ws=self.ws)
                 if not policy.can_dispatch_action(handler_name, self.ws.get_system_pressure()):
                     msg = f"Action [{handler_name}] blocked by substrate policy"
-                    raise PermissionError(msg)
+                    raise PermissionError(msg)  # noqa: TRY301
 
             # Actual execution
             result = handler(**kwargs)
 
             self._execution_history.append({"handler": handler_name, "status": "success", "result_type": str(type(result))})
-            return result
+            return result  # noqa: TRY300
 
         except Exception as e:
             self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})

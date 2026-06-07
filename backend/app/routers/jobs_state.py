@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING
 
 from app.config import settings
-from app.models import Job
 from app.storage_interface import get_job_repository
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
+
+if TYPE_CHECKING:
+    from app.models import Job
 
 logger = logging.getLogger(__name__)
 

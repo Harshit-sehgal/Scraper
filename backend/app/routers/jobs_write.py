@@ -13,8 +13,7 @@ import asyncio
 import datetime
 import logging
 import re
-from collections.abc import Callable
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from app.config import settings
 from app.discovery import (
@@ -45,6 +44,9 @@ from app.utils.quality import build_quality_report, compute_source_breakdown, sa
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -136,15 +138,13 @@ def register_jobs_write_routes(
         urls = safe_urls if job_data.mode == ScrapeMode.MANUAL else []
 
         idem_key = (request.headers.get("Idempotency-Key") or "").strip()
-        if idem_key:
-            if not re.fullmatch(r"[A-Za-z0-9_\-]{1,128}", idem_key):
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Idempotency-Key header is invalid. Allowed characters: "
-                        "letters, digits, underscore, hyphen. Max length: 128."
-                    ),
-                )
+        if idem_key and not re.fullmatch(r"[A-Za-z0-9_\-]{1,128}", idem_key):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Idempotency-Key header is invalid. Allowed characters: letters, digits, underscore, hyphen. Max length: 128."
+                ),
+            )
         if idem_key:
             existing_job_id = await run_in_threadpool(
                 lookup_idempotency_key,

@@ -1071,7 +1071,7 @@ def get_storage_health() -> dict:
                 "expected_version": _CURRENT_SCHEMA_VERSION,
             }
 
-        return {
+        return {  # noqa: TRY300
             "ok": True,
             "schema_version": schema_version,
             "expected_version": _CURRENT_SCHEMA_VERSION,

@@ -9,12 +9,13 @@ so the original environment is restored automatically.
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def _reset_injector() -> None:
+def _reset_injector() -> Generator[None, None, None]:
     """Always leave the injector disabled after each test."""
     from app.failure_injector import set_injection_probability
 

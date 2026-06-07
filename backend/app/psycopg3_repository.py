@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from app.postgres_repository_base import (
     PostgresRepositoryBase,
     _columns_sql,
     get_database_url,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _ = (_columns_sql,)
 
@@ -151,13 +154,12 @@ def verify_psycopg3_connectivity() -> dict:
         import psycopg
 
         dsn = get_database_url()
-        with psycopg.connect(dsn, connect_timeout=10) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                result = cur.fetchone()
-                if result is None:
-                    return {"ok": False, "error": "No result from health check query"}
-                return {"ok": result[0] == 1}
+        with psycopg.connect(dsn, connect_timeout=10) as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            result = cur.fetchone()
+            if result is None:
+                return {"ok": False, "error": "No result from health check query"}
+            return {"ok": result[0] == 1}
     except ImportError as e:
         return {"ok": False, "error": f"psycopg 3 not installed: {e}"}
     except Exception as e:

@@ -181,12 +181,11 @@ async def run_job(
                     _add_job_log(job, "Job canceled during discovery", level="warning", persist_fn=persist_job_state_fn)
                     await _persist_job_state(critical=True)
                     return
-                else:
-                    job.status = JobStatus.FAILED
-                    job.error = "Could not discover any URLs for this topic"
-                    job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                    _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_job_state_fn)
-                    await _persist_job_state(critical=True)
+                job.status = JobStatus.FAILED
+                job.error = "Could not discover any URLs for this topic"
+                job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_job_state_fn)
+                await _persist_job_state(critical=True)
                 return
 
             _add_job_log(job, f"Discovered {len(job.urls)} potential source URLs", persist_fn=persist_job_state_fn)
@@ -373,7 +372,7 @@ async def run_job(
                     async with job_lock:
                         pass  # serialise against concurrent progress updates
                     await _mark_completed()
-                    return idx, results, True, url_meta
+                    return idx, results, True, url_meta  # noqa: TRY300
                 except asyncio.CancelledError:
                     policy.record_failure(url, failure_type="canceled")
                     await _safe_log(f"Canceled scrape for {url}", level="warning")
@@ -724,5 +723,5 @@ async def run_job(
             job.error = str(e)
             job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             _add_job_log(job, f"Job failed: {e!s}", level="error")
-            logging.error("Job %s: Failed (%s)", job_id, type(e).__name__)
+            logging.exception("Job %s: Failed (%s)", job_id, type(e).__name__)
         await _persist_job_state(critical=True)

@@ -15,11 +15,14 @@ import datetime
 import json
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from app.models import Job, JobStatus
 from app.storage_interface import JobRepository
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -475,21 +478,21 @@ def _fetch_all(conn, sql: str, params=None) -> list[dict]:
     """Module-level wrapper delegating to the current driver's _fetch_all."""
     fn = _driver_fetch_all
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
+        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")  # noqa: TRY003
     return fn(conn, sql, params)
 
 
 def _fetch_one(conn, sql: str, params=None) -> dict | None:
     fn = _driver_fetch_one
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
+        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")  # noqa: TRY003
     return fn(conn, sql, params)
 
 
 def execute(conn, sql: str, params=None):
     fn = _driver_execute
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
+        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")  # noqa: TRY003
     return fn(conn, sql, params)
 
 

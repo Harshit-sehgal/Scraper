@@ -14,7 +14,7 @@ from typing import Annotated
 
 from app.browser_pool import get_browser_pool
 from app.config import settings
-from app.models import ScraperDiagnosticsRequest
+from app.models import ScraperDiagnosticsRequest  # noqa: TC002
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
@@ -166,7 +166,7 @@ async def get_regression_archive(
         stats = await run_in_threadpool(capture.get_statistics)
         # Trim recent captures to the requested limit
         stats["recent_captures"] = stats.get("recent_captures", [])[:limit]
-        return stats
+        return stats  # noqa: TRY300
     except Exception:
         logger.exception("Failed to get regression archive")
         raise HTTPException(status_code=500, detail="Failed to get regression archive") from None
@@ -197,7 +197,7 @@ async def get_regression_detail(
                     "has_replay_test": e.replay_test_generated,
                     "telemetry_snapshot": e.telemetry_snapshot,
                 }
-        raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")
+        raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")  # noqa: TRY301
     except HTTPException:
         raise
     except Exception:
@@ -215,11 +215,11 @@ async def generate_regression_replay_test(
         capture = get_regression_capture()
         test_code = await run_in_threadpool(capture.generate_replay_test, entry_id)
         if test_code is None:
-            raise HTTPException(
+            raise HTTPException(  # noqa: TRY301
                 status_code=404,
                 detail=f"Regression entry not found or fixture missing: {entry_id}",
             )
-        return {"entry_id": entry_id, "test_code": test_code}
+        return {"entry_id": entry_id, "test_code": test_code}  # noqa: TRY300
     except HTTPException:
         raise
     except Exception:

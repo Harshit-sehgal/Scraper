@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 import psycopg2
 from psycopg2 import pool as pg_pool
@@ -20,6 +20,9 @@ from app.postgres_repository_base import (
     PostgresRepositoryBase,
     get_database_url,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 

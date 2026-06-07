@@ -13,13 +13,17 @@ tests, and scripts continue to work.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from app.models import Job
 from app.routers.jobs_read import register_jobs_read_routes
 from app.routers.jobs_state import JobStoreManager
 from app.routers.jobs_write import register_jobs_write_routes
 from fastapi import APIRouter
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from app.models import Job
 
 
 def create_jobs_router(

@@ -752,7 +752,7 @@ class SQLiteJobRepository(JobRepository):
                     list(row_dict.values()),
                 )
                 conn.commit()
-                return True
+                return True  # noqa: TRY300
             except Exception:
                 conn.rollback()
                 raise
@@ -787,7 +787,7 @@ class SQLiteJobRepository(JobRepository):
                     list(row_dict.values()),
                 )
                 conn.commit()
-                return True
+                return True  # noqa: TRY300
             except Exception:
                 conn.rollback()
                 raise
@@ -819,7 +819,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM job_results WHERE job_id = ?", (job_id,))
                 conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
                 conn.commit()
-                return deleted > 0
+                return deleted > 0  # noqa: TRY300
             except Exception:
                 conn.rollback()
                 raise
@@ -929,7 +929,7 @@ def get_job_repository() -> JobRepository:
             # psycopg3 and psycopg2 would crash the worker on first use.
             pg_driver_env = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
             if not pg_driver_env and settings.ENV.lower() == "production":
-                raise RuntimeError(
+                raise RuntimeError(  # noqa: TRY003
                     "DATAFORGE_PG_DRIVER is not set. Production requires "
                     "DATAFORGE_PG_DRIVER=psycopg3 because the production image "
                     "installs only psycopg3 (psycopg2 is intentionally excluded). "
@@ -953,11 +953,11 @@ def get_job_repository() -> JobRepository:
                             "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL "
                             "and ensure the database is running."
                         )
-                        raise RuntimeError(msg)
+                        raise RuntimeError(msg)  # noqa: TRY301
                     repo: JobRepository = Psycopg3JobRepository()
                     _repository_instance = repo
                     logger.info("Using Psycopg3JobRepository (STORAGE_BACKEND=postgres, PG_DRIVER=psycopg3)")
-                    return repo
+                    return repo  # noqa: TRY300
                 except RuntimeError:
                     raise
                 except Exception as e:
@@ -977,13 +977,13 @@ def get_job_repository() -> JobRepository:
                         "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
                         "the database is running."
                     )
-                    raise RuntimeError(
+                    raise RuntimeError(  # noqa: TRY301
                         msg,
                     )
                 repo = PostgresJobRepository()
                 _repository_instance = repo
                 logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
-                return repo
+                return repo  # noqa: TRY300
             except RuntimeError:
                 raise
             except Exception as e:

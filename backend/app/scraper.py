@@ -242,8 +242,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     )
                     if recovery_result.get("success") and recovery_result.get("fresh_html"):
                         return recovery_result["fresh_html"]
-                    else:
-                        logger.warning("[SessionRecovery] Recovery failed: %s", recovery_result.get("error", "unknown"))
+                    logger.warning("[SessionRecovery] Recovery failed: %s", recovery_result.get("error", "unknown"))
                 else:
                     logger.info("[SessionRecovery] No search form detected on %s", url)
         except Exception as recovery_err:
@@ -637,9 +636,7 @@ async def scrape_url(
     dom_nodes = estimate_dom_nodes(html)
 
     try:
-        if anti_bot >= settings.ANTIBOT_HARD_BLOCK_THRESHOLD:
-            record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
-        elif anti_bot >= settings.CLASSIFY_ANTIBOT_SCORE_THRESHOLD:
+        if anti_bot >= settings.ANTIBOT_HARD_BLOCK_THRESHOLD or anti_bot >= settings.CLASSIFY_ANTIBOT_SCORE_THRESHOLD:
             record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
         else:
             record_anti_bot_classification("ok")

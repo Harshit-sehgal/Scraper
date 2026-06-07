@@ -199,7 +199,7 @@ jobs:
         run: npm test
 
       - name: Docs Lint
-        run: python scripts/docs_lint.py
+        run: python scripts/docs_lint.py --include-experimental
 
       - name: Generate Route Inventory Artifact
         run: |
