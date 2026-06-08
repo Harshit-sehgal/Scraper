@@ -120,3 +120,5 @@ class CommunicationSettings(BaseSettings):
     """Send notification on individual test failures."""
     TELEGRAM_NOTIFY_ON_CRITICAL_ERROR: bool = True
     """Send notification on critical application errors."""
+    TELEGRAM_API_BASE: str = "https://api.telegram.org"
+    """Telegram Bot API base URL. Override for local Bot API server."""

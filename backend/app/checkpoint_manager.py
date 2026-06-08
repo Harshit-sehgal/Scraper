@@ -53,8 +53,12 @@ class CheckpointManager:
 
     def load_checkpoint(self, filepath: str) -> None:
         """Restore world state from a checkpoint file."""
+        resolved = Path(filepath).resolve()
+        if not str(resolved).startswith(str(self.base_dir.resolve())):
+            msg = f"Checkpoint path {filepath} is outside base directory"
+            raise ValueError(msg)
         try:
-            with open(filepath) as f:
+            with open(resolved) as f:
                 state_dict = json.load(f)
             get_world_state().from_dict(state_dict)
             logging.getLogger(__name__).info("Restored from checkpoint: %s", filepath)

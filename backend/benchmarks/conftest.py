@@ -11,7 +11,9 @@ from conftest import (  # noqa: F401, RUF100
     pytest_addoption,
     pytest_collection_modifyitems,
     pytest_configure,
+    pytest_runtest_logreport,
     pytest_sessionfinish,
+    pytest_sessionstart,
     reset_failure_injection,
     reset_semantic_world_state,
 )

@@ -82,6 +82,25 @@ test-all: ## Run all tests (including API-dependent, requires GROQ_API_KEY)
 test-file: ## Run tests in a specific file (usage: make test-file FILE=test_foo.py)
 	$(DC) exec $(SERVICE) python -m pytest -q --tb=short backend/tests/$(FILE)
 
+test-telegram: ## Print the current Telegram notifier status
+	@PYTHONPATH=backend python3 scripts/send_telegram.py --status || true
+	@echo "(exit code 0 = fully configured; non-zero = disabled or misconfigured)"
+
+test-telegram-ping: ## Send a one-off test message via the configured bot
+	@PYTHONPATH=backend python3 scripts/send_telegram.py --enable \
+		"🔔 DataForge test ping — sent at $(date -u +%FT%TZ)"
+
+test-telegram-summary: ## Send a fake pass/fail summary via the bot (override RESULT/COUNT via env)
+	@PYTHONPATH=backend python3 scripts/send_telegram.py --enable --summary \
+		--suite "manual-summary" --result "$${RESULT:-PASSED}" \
+		--passed "$${PASSED:-120}" --failed "$${FAILED:-0}" --skipped "$${SKIPPED:-3}"
+
+test-notify: ## Run all tests with Telegram notifications enabled
+	# Convenience wrapper: forces TELEGRAM_ENABLED=true for this run so the
+	# pytest conftest hooks send start/end/failure notifications.
+	$(DC) exec -e TELEGRAM_ENABLED=true $(SERVICE) \
+		python -m pytest -q --tb=short -k "not test_scrape_url_end_to_end_multiple_records"
+
 # ─── Linting ────────────────────────────────────────────────────────────────
 
 lint: ## Run all linters (ruff lint + format)

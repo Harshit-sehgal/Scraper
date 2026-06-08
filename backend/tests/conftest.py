@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import os
 import sys
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -122,6 +123,93 @@ def pytest_sessionfinish(session, exitstatus) -> None:
                                 item.unlink()
     except Exception:  # noqa: RUF100, S110
         pass
+
+    # ─── Telegram end-of-session summary ──────────────────────────────────
+    # The notifier short-circuits silently when TELEGRAM_ENABLED is false
+    # or the credentials are missing, so this is always safe to call.
+    try:
+        stats = getattr(session, "_telegram_stats", None)
+        if stats is not None:
+            from app.utils.telegram_notifier import get_notifier
+
+            duration = time.monotonic() - stats.get("started_at", time.monotonic())
+            notifier = get_notifier()
+            if notifier.is_configured:
+                result = "PASSED" if stats["failed"] == 0 and exitstatus == 0 else "FAILED"
+                notifier.notify_test_end(
+                    suite_name=stats["suite_name"],
+                    result=result,
+                    passed=stats["passed"],
+                    failed=stats["failed"],
+                    skipped=stats["skipped"],
+                    duration_seconds=duration,
+                )
+    except Exception:  # noqa: RUF100, S110
+        pass
+
+
+# ─── Telegram session-start / per-test / session-finish hooks ─────────────
+# These hooks only do work when TELEGRAM_ENABLED is true. The notifier
+# itself short-circuits, but we also guard the import so that a
+# mis-configured environment cannot break test collection.
+
+
+def pytest_sessionstart(session) -> None:
+    """Send a start-of-session notification (if enabled)."""
+    try:
+        # Best-effort import: app.config pulls in pydantic-settings and
+        # the rest of the settings graph. The notifier itself swallows
+        # all errors, but the import must not fail.
+        from app.utils.telegram_notifier import get_notifier
+
+        notifier = get_notifier()
+    except Exception:
+        return
+
+    if not notifier.is_configured:
+        return
+
+    # Derive a human-readable suite name from the rootdir / first arg.
+    rootdir = str(getattr(session.config, "rootdir", "") or "tests")
+    suite_name = f"{Path(rootdir).name} (pytest)"
+
+    session._telegram_stats = {
+        "suite_name": suite_name,
+        "started_at": time.monotonic(),
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
+    notifier.notify_test_start(suite_name)
+
+
+def pytest_runtest_logreport(report) -> None:
+    """Track per-test outcomes and notify on individual failures."""
+    if report.when != "call":
+        return
+    try:
+        from app.utils.telegram_notifier import get_notifier
+
+        notifier = get_notifier()
+    except Exception:
+        return
+
+    session = getattr(report, "session", None)
+    stats = getattr(session, "_telegram_stats", None) if session is not None else None
+
+    if report.outcome == "failed":
+        if stats is not None:
+            stats["failed"] += 1
+        if notifier.is_configured:
+            # report.longrepr is None for some non-test failures; guard.
+            error = str(report.longrepr) if report.longrepr else "<no longrepr>"
+            notifier.notify_test_failure(report.nodeid, error)
+    elif report.outcome == "skipped":
+        if stats is not None:
+            stats["skipped"] += 1
+    elif report.outcome == "passed":
+        if stats is not None:
+            stats["passed"] += 1
 
 
 ROOT = Path(__file__).resolve().parents[2]
