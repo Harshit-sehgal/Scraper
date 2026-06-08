@@ -9,16 +9,21 @@ import { API, apiFetch } from "./api.js";
 
 export function renderCognitionSkeleton() {
   // Show skeleton loading state in the cognition view
-  document.getElementById("kpi-pressure").innerHTML =
-    '<span class="skeleton-bar" style="width:60%;height:14px;display:inline-block"></span>';
-  document.getElementById("kpi-integrity").innerHTML =
-    '<span class="skeleton-bar" style="width:50%;height:14px;display:inline-block"></span>';
-  document.getElementById("kpi-energy").innerHTML =
-    '<span class="skeleton-bar" style="width:55%;height:14px;display:inline-block"></span>';
-  document.getElementById("kpi-exclusions").innerHTML =
-    '<span class="skeleton-bar" style="width:40%;height:14px;display:inline-block"></span>';
-  document.getElementById("kpi-basins").innerHTML =
-    '<span class="skeleton-bar" style="width:45%;height:14px;display:inline-block"></span>';
+  const kpiPressure = document.getElementById("kpi-pressure");
+  if (kpiPressure)
+    kpiPressure.innerHTML = '<span class="skeleton-bar" style="width:60%;height:14px;display:inline-block"></span>';
+  const kpiIntegrity = document.getElementById("kpi-integrity");
+  if (kpiIntegrity)
+    kpiIntegrity.innerHTML = '<span class="skeleton-bar" style="width:50%;height:14px;display:inline-block"></span>';
+  const kpiEnergy = document.getElementById("kpi-energy");
+  if (kpiEnergy)
+    kpiEnergy.innerHTML = '<span class="skeleton-bar" style="width:55%;height:14px;display:inline-block"></span>';
+  const kpiExclusions = document.getElementById("kpi-exclusions");
+  if (kpiExclusions)
+    kpiExclusions.innerHTML = '<span class="skeleton-bar" style="width:40%;height:14px;display:inline-block"></span>';
+  const kpiBasins = document.getElementById("kpi-basins");
+  if (kpiBasins)
+    kpiBasins.innerHTML = '<span class="skeleton-bar" style="width:45%;height:14px;display:inline-block"></span>';
 
   ["community-list", "schema-pattern-list", "exclusion-list", "role-similarity-list", "basin-list"].forEach((id) => {
     const el = document.getElementById(id);
@@ -52,13 +57,16 @@ export async function refreshCognition() {
     const data = await res.json();
 
     const metrics = data.metrics || {};
-    document.getElementById("kpi-pressure").textContent = (metrics.field_pressure || 0).toFixed(3);
-    document.getElementById("kpi-integrity").textContent = (metrics.integrity_score || 0).toFixed(3);
-    document.getElementById("kpi-energy").textContent = (metrics.global_energy || 0).toFixed(3);
-    document.getElementById("kpi-exclusions").textContent = metrics.exclusion_count || 0;
-    document.getElementById("kpi-basins").textContent = Array.isArray(data.field_regions)
-      ? data.field_regions.length
-      : 0;
+    const kpiPressure = document.getElementById("kpi-pressure");
+    if (kpiPressure) kpiPressure.textContent = (metrics.field_pressure || 0).toFixed(3);
+    const kpiIntegrity = document.getElementById("kpi-integrity");
+    if (kpiIntegrity) kpiIntegrity.textContent = (metrics.integrity_score || 0).toFixed(3);
+    const kpiEnergy = document.getElementById("kpi-energy");
+    if (kpiEnergy) kpiEnergy.textContent = (metrics.global_energy || 0).toFixed(3);
+    const kpiExclusions = document.getElementById("kpi-exclusions");
+    if (kpiExclusions) kpiExclusions.textContent = metrics.exclusion_count || 0;
+    const kpiBasins = document.getElementById("kpi-basins");
+    if (kpiBasins) kpiBasins.textContent = Array.isArray(data.field_regions) ? data.field_regions.length : 0;
 
     renderCommunities(data.global_communities);
     renderSchemaPatterns(data.schema_patterns);
@@ -93,6 +101,7 @@ function _renderExperimentalGate(message) {
 
 export function renderCommunities(communities) {
   const el = document.getElementById("community-list");
+  if (!el) return;
   if (!communities || !communities.length) {
     el.innerHTML = '<div class="empty"><p>No stable communities identified</p></div>';
   } else {
@@ -112,6 +121,7 @@ export function renderCommunities(communities) {
 
 export function renderSchemaPatterns(patterns) {
   const el = document.getElementById("schema-pattern-list");
+  if (!el) return;
   if (!patterns || !patterns.length) {
     el.innerHTML = '<div class="empty"><p>No recurring schemas learned yet</p></div>';
   } else {
@@ -135,6 +145,7 @@ export function renderSchemaPatterns(patterns) {
 
 export function renderExclusions(exclusions) {
   const el = document.getElementById("exclusion-list");
+  if (!el) return;
   if (!exclusions || !exclusions.length) {
     el.innerHTML = '<div class="empty"><p>No exclusions learned yet</p></div>';
   } else {
@@ -154,6 +165,7 @@ export function renderExclusions(exclusions) {
 
 export function renderRoleSimilarities(compats) {
   const el = document.getElementById("role-similarity-list");
+  if (!el) return;
   if (!compats || !compats.length) {
     el.innerHTML = '<div class="empty"><p>Manifold is cold</p></div>';
   } else {
@@ -178,6 +190,7 @@ export function renderRoleSimilarities(compats) {
 
 export function renderBasins(basins) {
   const el = document.getElementById("basin-list");
+  if (!el) return;
   if (!basins || !basins.length) {
     el.innerHTML = '<div class="empty"><p>No active conflict basins</p></div>';
   } else {

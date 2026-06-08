@@ -19,19 +19,29 @@ export function setCurrentJobId(id) {
 
 function renderResultsSkeleton() {
   // Show skeleton loading state in the results view
-  document.getElementById("res-title").textContent = "Loading...";
-  document.getElementById("res-meta").textContent = "Fetching results...";
-  document.getElementById("export-group").style.display = "none";
-  document.getElementById("result-warning").style.display = "none";
-  document.getElementById("lineage-summary").style.display = "none";
-  document.getElementById("ai-insight-panel").classList.add("hidden");
-  document.getElementById("logs-panel").classList.add("hidden");
-  document.getElementById("quality-panel").classList.add("hidden");
-  document.getElementById("res-progress-wrap").classList.add("hidden");
+  const title = document.getElementById("res-title");
+  if (title) title.textContent = "Loading...";
+  const meta = document.getElementById("res-meta");
+  if (meta) meta.textContent = "Fetching results...";
+  const exportGrp = document.getElementById("export-group");
+  if (exportGrp) exportGrp.style.display = "none";
+  const warnBanner = document.getElementById("result-warning");
+  if (warnBanner) warnBanner.style.display = "none";
+  const lineage = document.getElementById("lineage-summary");
+  if (lineage) lineage.style.display = "none";
+  const aiPanel = document.getElementById("ai-insight-panel");
+  if (aiPanel) aiPanel.classList.add("hidden");
+  const logsPanel = document.getElementById("logs-panel");
+  if (logsPanel) logsPanel.classList.add("hidden");
+  const qualityPanel = document.getElementById("quality-panel");
+  if (qualityPanel) qualityPanel.classList.add("hidden");
+  const progressWrap = document.getElementById("res-progress-wrap");
+  if (progressWrap) progressWrap.classList.add("hidden");
 
   const thead = document.getElementById("res-thead");
   const tbody = document.getElementById("res-tbody");
-  thead.innerHTML = `
+  if (thead)
+    thead.innerHTML = `
         <tr>
             ${["Column 1", "Column 2", "Column 3", "Column 4", "Column 5"]
               .map(
@@ -40,9 +50,10 @@ function renderResultsSkeleton() {
               )
               .join("")}
         </tr>`;
-  tbody.innerHTML = Array.from(
-    { length: 6 },
-    (_, i) => `
+  if (tbody)
+    tbody.innerHTML = Array.from(
+      { length: 6 },
+      (_, i) => `
         <tr>
             ${Array.from(
               { length: 5 },
@@ -51,7 +62,7 @@ function renderResultsSkeleton() {
             `,
             ).join("")}
         </tr>`,
-  ).join("");
+    ).join("");
 
   const label = document.getElementById("result-count-label");
   if (label) label.textContent = "loading...";
@@ -68,9 +79,10 @@ export async function viewResults(id) {
     // another job's "View Results", ``currentJobId`` will have been
     // updated and this response is no longer relevant.
     if (currentJobId !== id) return;
-    document.getElementById("res-title").textContent = j.name;
-    document.getElementById("res-meta").textContent =
-      `${j.filtered_records} records extracted (${j.total_records} total)`;
+    const resTitle = document.getElementById("res-title");
+    if (resTitle) resTitle.textContent = j.name;
+    const resMeta = document.getElementById("res-meta");
+    if (resMeta) resMeta.textContent = `${j.filtered_records} records extracted (${j.total_records} total)`;
 
     // Warning banner
     const warnBanner = document.getElementById("result-warning");
@@ -91,7 +103,8 @@ export async function viewResults(id) {
     // Lineage Summary
     renderLineageSummary(j);
 
-    document.getElementById("export-group").style.display = j.results.length ? "flex" : "none";
+    const exportGrp = document.getElementById("export-group");
+    if (exportGrp) exportGrp.style.display = j.results.length ? "flex" : "none";
     const tableWrap = document.querySelector("#view-results .table-wrap");
     if (tableWrap) tableWrap.scrollLeft = 0;
 
@@ -99,17 +112,18 @@ export async function viewResults(id) {
     const aiPanel = document.getElementById("ai-insight-panel");
     if (j.analysis) {
       aiPanel.classList.remove("hidden");
-      document.getElementById("ai-insight-text").textContent = j.analysis;
+      const aiText = document.getElementById("ai-insight-text");
+      if (aiText) aiText.textContent = j.analysis;
     } else {
       aiPanel.classList.add("hidden");
     }
 
     // Logs
     const logsPanel = document.getElementById("logs-panel");
-    if (Array.isArray(j.logs) && j.logs.length) {
+    if (logsPanel && Array.isArray(j.logs) && j.logs.length) {
       logsPanel.classList.remove("hidden");
       renderLogs(j.logs);
-    } else {
+    } else if (logsPanel) {
       logsPanel.classList.add("hidden");
     }
 
@@ -120,12 +134,14 @@ export async function viewResults(id) {
     const isActive = ["pending", "discovering", "running"].includes(j.status);
     const resProgWrap = document.getElementById("res-progress-wrap");
     if (isActive && j.progress_total > 0) {
-      resProgWrap.classList.remove("hidden");
+      if (resProgWrap) resProgWrap.classList.remove("hidden");
       const pct = Math.round((j.progress_current / j.progress_total) * 100);
-      document.getElementById("res-progress-bar").style.width = `${pct}%`;
-      document.getElementById("res-progress-text").textContent = `${pct}%`;
+      const bar = document.getElementById("res-progress-bar");
+      if (bar) bar.style.width = `${pct}%`;
+      const progressText = document.getElementById("res-progress-text");
+      if (progressText) progressText.textContent = `${pct}%`;
     } else {
-      resProgWrap.classList.add("hidden");
+      if (resProgWrap) resProgWrap.classList.add("hidden");
     }
 
     currentResultsCache = Array.isArray(j.results) ? j.results : [];
@@ -257,6 +273,7 @@ export function renderFilteredResults() {
 export function renderTable(results, emptyMessage = "No results") {
   const thead = document.getElementById("res-thead");
   const tbody = document.getElementById("res-tbody");
+  if (!thead || !tbody) return;
   if (!results.length) {
     thead.innerHTML = "";
     tbody.innerHTML = `<tr><td class="empty-cell" colspan="100">${esc(emptyMessage)}</td></tr>`;

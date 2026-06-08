@@ -21,12 +21,20 @@ class CheckpointManager:
 
     def create_checkpoint(self, label: str = "auto") -> str:
         """Save a new versioned checkpoint of the current world state."""
+        if not label or not label.isascii() or not label.replace("_", "").replace("-", "").isalnum():
+            msg = f"Invalid checkpoint label: {label!r}"
+            raise ValueError(msg)
+
         ws = get_world_state()
         state_dict = ws.to_dict()
 
         timestamp = int(time.time())
         filename = f"checkpoint_{label}_{timestamp}.json"
         filepath = self.base_dir / filename
+
+        if not str(filepath.resolve()).startswith(str(self.base_dir.resolve())):
+            msg = f"Resolved checkpoint path {filepath} is outside base directory"
+            raise ValueError(msg)
 
         fd: int | None = None
         tmp_path: str | None = None

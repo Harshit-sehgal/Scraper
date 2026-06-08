@@ -341,11 +341,13 @@ export async function submitJob(e) {
   let maxPages = parseInt(document.getElementById("inp-max-pages").value, 10) || 10;
 
   if (currentMode === "manual") {
-    urls = document
-      .getElementById("inp-urls")
-      .value.split("\n")
-      .map((u) => u.trim())
-      .filter((u) => u);
+    const urlsEl = document.getElementById("inp-urls");
+    urls = urlsEl
+      ? urlsEl.value
+          .split("\n")
+          .map((u) => u.trim())
+          .filter((u) => u)
+      : [];
     if (!urls.length) {
       toast("Enter at least one URL", "error");
       return;
