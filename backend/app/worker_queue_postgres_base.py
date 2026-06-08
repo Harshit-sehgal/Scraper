@@ -10,8 +10,7 @@ implementations are:
 
 The public factory ``get_postgres_worker_queue()`` lives in
 ``app.worker_queue_postgres`` for backward compatibility; it dispatches
-to the correct driver based on ``DATAFORGE_PG_DRIVER`` (or the
-``settings.PG_DRIVER`` value).
+to the correct driver based on ``DATAFORGE_PG_DRIVER``.
 """
 
 from __future__ import annotations
@@ -970,7 +969,7 @@ def get_postgres_worker_queue_base() -> PostgresWorkerQueueBase:
     """Get or create the global PostgresWorkerQueueBase instance.
 
     The factory selects the right driver (psycopg2 vs psycopg 3) based on
-    ``DATAFORGE_PG_DRIVER`` (or ``settings.PG_DRIVER``). The returned
+    ``DATAFORGE_PG_DRIVER`` environment variable. The returned
     instance is cached as a module-level singleton so all callers share
     the same instance.
     """
@@ -984,9 +983,9 @@ def get_postgres_worker_queue_base() -> PostgresWorkerQueueBase:
 
 def _build_postgres_worker_queue() -> PostgresWorkerQueueBase:
     """Build a fresh PostgresWorkerQueueBase using the configured driver."""
-    from app.config import settings as _settings
+    import os
 
-    pg_driver = _settings.PG_DRIVER
+    pg_driver = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
     if pg_driver == "psycopg3":
         try:
             from app.worker_queue_postgres_psycopg3 import PostgresWorkerQueuePsycopg3

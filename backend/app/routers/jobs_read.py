@@ -190,8 +190,8 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             events = await run_in_threadpool(
                 repo.read_events,
                 job_id,
-                limit + offset,
-                0,
+                limit,
+                offset,
                 level,
             )
         except (AttributeError, RuntimeError):
@@ -240,7 +240,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
 
     @router.get("/api/recycle_bin")
     async def list_recycle_bin(
-        limit: int = 100,
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
         cursor: str | None = None,
     ):
         if is_worker_mode():

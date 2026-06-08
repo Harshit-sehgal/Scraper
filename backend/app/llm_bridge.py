@@ -15,6 +15,8 @@ import httpx
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 # ─── Legacy LLM Utility Support ──────────────────────────────────────
 
 
@@ -98,7 +100,7 @@ async def _call_openai_compatible_json(
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
         except Exception as error:
-            logging.exception("API call failed")
+            logger.exception("API call failed")
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -145,7 +147,7 @@ async def _call_openai_compatible_text(
                 data = response.json()
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
-            logging.exception("API call failed")
+            logger.exception("API call failed")
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -222,9 +224,9 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 if parsed is not None:
                     return parsed
             except Exception as e:
-                logging.exception("LLM JSON call failed")
+                logger.exception("LLM JSON call failed")
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
-                logging.exception("%s failed: %s", stage, model)
+                logger.exception("%s failed: %s", stage, model)
                 _record_llm_degradation(subsystem="groq", cause=f"{stage} ({model}) failed: {e}")
 
     if _public_llm_fallbacks_enabled():
@@ -239,7 +241,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             if parsed is not None:
                 return parsed
         except Exception as e:
-            logging.exception("Pollinations JSON call failed (prompt_len=%d)", len(messages))
+            logger.exception("Pollinations JSON call failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
         try:
@@ -248,7 +250,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 try:
                     from g4f.client import Client
                 except ImportError:
-                    logging.warning("g4f not installed — skipping g4f JSON fallback")
+                    logger.warning("g4f not installed — skipping g4f JSON fallback")
                     return None
                 client = Client()
                 res = client.chat.completions.create(
@@ -268,7 +270,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             if parsed is not None:
                 return parsed
         except Exception as e:
-            logging.exception("g4f JSON fallback failed (prompt_len=%d): %s", len(messages))
+            logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
     return {}
@@ -305,9 +307,9 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
                 if parsed is not None:
                     return parsed
             except Exception as e:
-                logging.exception("Groq fast JSON call failed")
+                logger.exception("Groq fast JSON call failed")
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
-                logging.exception("%s failed: %s", stage, model)
+                logger.exception("%s failed: %s", stage, model)
                 _record_llm_degradation(subsystem="groq_fast", cause=f"{stage} ({model}) failed: {e}")
 
     if _public_llm_fallbacks_enabled():
@@ -326,7 +328,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
             if parsed is not None:
                 return parsed
         except Exception as e:
-            logging.exception("Pollinations fast JSON call failed")
+            logger.exception("Pollinations fast JSON call failed")
             _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
     return {}
@@ -362,9 +364,9 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 if text:
                     return text
             except Exception:
-                logging.exception("Groq text call failed")
+                logger.exception("Groq text call failed")
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
-                logging.exception("%s failed: %s", stage, model)
+                logger.exception("%s failed: %s", stage, model)
 
     if _public_llm_fallbacks_enabled():
         try:
@@ -377,7 +379,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
             if text:
                 return text
         except Exception:
-            logging.exception("Pollinations text call failed")
+            logger.exception("Pollinations text call failed")
 
         try:
 
@@ -385,7 +387,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 try:
                     from g4f.client import Client
                 except ImportError:
-                    logging.warning("g4f not installed — skipping g4f text fallback")
+                    logger.warning("g4f not installed — skipping g4f text fallback")
                     return None
                 client = Client()
                 res = client.chat.completions.create(
@@ -403,7 +405,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 return ""
             return result  # type: ignore[no-any-return]  # noqa: TRY300
         except Exception:
-            logging.exception("g4f text fallback failed")
+            logger.exception("g4f text fallback failed")
         return ""
 
     return ""
@@ -421,6 +423,7 @@ class SubstratePluginManager:
         self._handlers: dict[str, Callable] = {}
         # Sandbox state (placeholders for now)
         self._execution_history: list[dict] = []
+        self._max_history = 500
 
         # ─── Self-Optimization Tools (Phase 44) ───
         self._register_native_tools()
@@ -522,10 +525,14 @@ class SubstratePluginManager:
             result = handler(**kwargs)
 
             self._execution_history.append({"handler": handler_name, "status": "success", "result_type": str(type(result))})
+            if len(self._execution_history) > self._max_history:
+                self._execution_history = self._execution_history[-self._max_history // 2 :]
             return result  # noqa: TRY300
 
         except Exception as e:
             self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})
+            if len(self._execution_history) > self._max_history:
+                self._execution_history = self._execution_history[-self._max_history // 2 :]
             logging.getLogger(__name__).exception("TOOL FAIL: [%s]", handler_name)
             raise
 

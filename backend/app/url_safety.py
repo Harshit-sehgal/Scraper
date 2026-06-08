@@ -237,7 +237,7 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
     ) -> httpcore.AsyncNetworkStream:
         import asyncio
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         infos = await loop.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
         safe_ip: str | None = None
         for _family, _type, _proto, _canonname, sockaddr in infos:

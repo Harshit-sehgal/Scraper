@@ -11,6 +11,8 @@ from app.async_utils import run_sync_in_thread
 from app.config import settings
 from app.models import SourcePolicy
 
+logger = logging.getLogger(__name__)
+
 NOISY_URL_PARTS = (
     "/login",
     "/signin",
@@ -108,7 +110,7 @@ def _canonicalize_url(url: str) -> str:
         path = (p.path or "/").rstrip("/") or "/"
         return urlunparse((p.scheme.lower(), p.netloc.lower(), path, "", "", ""))
     except Exception:
-        logging.exception("Failed to canonicalize URL: %s", url)
+        logger.exception("Failed to canonicalize URL: %s", url)
         return ""
 
 
@@ -193,7 +195,7 @@ def _extract_domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
     except Exception:
-        logging.exception("Failed to extract domain from URL: %s", url)
+        logger.exception("Failed to extract domain from URL: %s", url)
         return ""
 
 
@@ -277,7 +279,7 @@ async def discover_urls(
         max_distance_km=max_distance_km,
     )
 
-    logging.info("DuckDuckGo query: '%s' (max %d)", search_query, num_results)
+    logger.info("DuckDuckGo query: '%s' (max %d)", search_query, num_results)
 
     results = []
     try:
@@ -387,12 +389,12 @@ async def discover_urls(
             if len(results) >= num_results:
                 break
 
-        logging.info("Found %d real URLs.", len(results))
+        logger.info("Found %d real URLs.", len(results))
         return results  # noqa: TRY300
     except DiscoveryDependencyError:
         raise
     except Exception:
-        logging.exception("URL discovery failed for query: %s", query)
+        logger.exception("URL discovery failed for query: %s", query)
         return []
 
 

@@ -390,6 +390,8 @@ class SelectorOptimizationEngine:
         if domain not in self.optimization_history:
             self.optimization_history[domain] = []
         self.optimization_history[domain].append(report)
+        if len(self.optimization_history[domain]) > 100:
+            self.optimization_history[domain] = self.optimization_history[domain][-50:]
 
         return report
 

@@ -59,10 +59,20 @@ RUN pip install --no-cache-dir -r /tmp/requirements-dev.lock.txt && \
 # Install Playwright browsers (deferred to runtime in dev for faster image builds)
 RUN playwright install chromium
 
+# Create non-root user for dev
+RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologin dataforge
+
 # Copy application code (thin layer — source changes don't invalidate deps)
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY scripts/ scripts/
+
+# Ensure data directory exists and is owned by dataforge
+RUN mkdir -p /app/backend/data && chown -R dataforge:dataforge /app/backend/data
+
+# Security: drop root privileges
+RUN chown -R dataforge:dataforge /app
+USER dataforge
 
 # Health check — must exercise /ready (proves storage reachability, not
 # just that the process answers TCP). Status check guards against the

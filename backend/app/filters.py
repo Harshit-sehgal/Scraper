@@ -13,12 +13,13 @@ from geopy.geocoders import Nominatim
 from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField
 
+logger = logging.getLogger(__name__)
+
 # ──────────────────────────────────────────────
 # Geocoding & Distance (Nominatim; no paid API key required)
 # ──────────────────────────────────────────────
 
 _geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=settings.GEOCODER_TIMEOUT)
-_geocode_cache: dict[str, tuple[float, float] | None] = {}
 _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", "pincode")
 
 
@@ -45,7 +46,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
             break  # If geocoding succeeded but returned no location, break early
         except Exception as e:
             if attempt < max_retries - 1:
-                logging.warning(
+                logger.warning(
                     "Geocoding attempt %d failed for '%s' (retrying in %.1fs): %s",
                     attempt + 1,
                     address,
@@ -55,7 +56,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
                 await asyncio.sleep(backoff)
                 backoff *= 2.0  # Exponential backoff
             else:
-                logging.exception("Geocode error for %s after %d attempts", address, max_retries)
+                logger.exception("Geocode error for %s after %d attempts", address, max_retries)
 
     cache.set_negative(address)
     return None
@@ -135,7 +136,7 @@ def coerce_value(value: Any, field_type: FieldType):
         return str(value) if value is not None else None
 
     except Exception:
-        logging.exception("Failed to coerce value")
+        logger.exception("Failed to coerce value")
         return str(value) if value is not None else None
 
 
@@ -298,9 +299,13 @@ async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[Schem
             if rule.operator == FilterOperator.LESS_EQUAL:
                 return num_val <= num_compare
 
-        # Regex matching
+        # Regex matching — validate pattern before executing to prevent ReDoS
         if rule.operator == FilterOperator.MATCHES_REGEX:
-            return bool(re.search(compare_value, str(value), re.IGNORECASE))
+            try:
+                compiled = re.compile(compare_value, re.IGNORECASE)
+            except re.error:
+                return False
+            return bool(compiled.search(str(value)))
 
         # String comparisons
         str_val = str(value).lower()
@@ -323,7 +328,7 @@ async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[Schem
             return str_val in allowed
 
     except (ValueError, TypeError) as e:
-        logging.warning("Could not apply filter on %s: %s", rule.field_name, e)
+        logger.warning("Could not apply filter on %s: %s", rule.field_name, e)
         return False
 
     return True
@@ -340,7 +345,7 @@ async def _apply_distance_filter(location_value, rule: FilterRule) -> bool:
     origin_coords = await geocode_address(rule.origin_address)
 
     if not target_coords or not origin_coords:
-        logging.warning("Could not geocode: %s or %s", location_value, rule.origin_address)
+        logger.warning("Could not geocode: %s or %s", location_value, rule.origin_address)
         return False
 
     unit = rule.distance_unit or "km"

@@ -183,7 +183,7 @@ def _build(failure_class: str, confidence: float) -> ZeroResultClassification:
 
         if failure_class in ("anti_bot_block", "auth_required", "empty_response"):
             record_anti_bot_classification(failure_class)
-    except (ImportError, AttributeError, TypeError, ValueError):
+    except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
         pass
 
     return ZeroResultClassification(
