@@ -5,6 +5,8 @@ import os
 import time
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 
 def get_world_state():
     import app.semantic_world_state
@@ -47,10 +49,10 @@ class CheckpointManager:
                 json.dump(state_dict, f, indent=2)
             os.replace(tmp_path, filepath)
             tmp_path = None  # ownership transferred via rename
-            logging.getLogger(__name__).info("Created checkpoint: %s", filename)
+            logger.info("Created checkpoint: %s", filename)
             return str(filepath)
         except Exception:
-            logging.getLogger(__name__).exception("Failed to create checkpoint")
+            logger.exception("Failed to create checkpoint")
             with contextlib.suppress(OSError):
                 if fd is not None:
                     os.close(fd)
@@ -69,9 +71,9 @@ class CheckpointManager:
             with open(resolved) as f:
                 state_dict = json.load(f)
             get_world_state().from_dict(state_dict)
-            logging.getLogger(__name__).info("Restored from checkpoint: %s", filepath)
+            logger.info("Restored from checkpoint: %s", filepath)
         except Exception:
-            logging.getLogger(__name__).exception("Failed to load checkpoint")
+            logger.exception("Failed to load checkpoint")
             raise
 
     def list_checkpoints(self) -> list[dict]:

@@ -322,14 +322,19 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
 
     events: list[dict[str, Any]] = []
     try:
+        from collections import deque
+
+        def _parse_lines(f):
+            for raw in f:
+                stripped = raw.strip()
+                if stripped:
+                    parsed = _parse_audit_log_line(stripped)
+                    if parsed:
+                        yield parsed
+
         with open(log_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()  # noqa: PLW2901, RUF100
-                if not line:
-                    continue
-                parsed = _parse_audit_log_line(line)
-                if parsed:
-                    events.append(parsed)
+            recent = deque(_parse_lines(f), maxlen=count)
+            events = list(recent)
     except OSError as e:
         logging.getLogger(__name__).warning("Failed to read audit log: %s", e)
         return []

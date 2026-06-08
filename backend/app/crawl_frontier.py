@@ -272,7 +272,7 @@ class CrawlFrontier:
                             item.added_at,
                         )
                     except Exception:
-                        logger.exception("Failed to restore URL to SQLite: %s")
+                        logger.exception("Failed to restore URL to SQLite: %s", item.url)
                     # Restore other tried items under the lock
                     for t_item in tried:
                         if t_item.url not in self._completed:

@@ -20,17 +20,17 @@ export function renderDomainHealth(data) {
   if (!el) return;
 
   const domains = data.domains || {};
-  const total = domains.total_monitored || 0;
+  const total = Number(domains.total_monitored) || 0;
 
   if (!total) {
     el.innerHTML = '<div class="dash-empty">No domains monitored yet</div>';
     return;
   }
 
-  const healthy = domains.healthy || 0;
-  const degrading = domains.degrading || 0;
-  const unhealthy = domains.unhealthy || 0;
-  const critical = domains.critical || 0;
+  const healthy = Number(domains.healthy) || 0;
+  const degrading = Number(domains.degrading) || 0;
+  const unhealthy = Number(domains.unhealthy) || 0;
+  const critical = Number(domains.critical) || 0;
   const pctHealthy = total > 0 ? Math.round((healthy / total) * 100) : 0;
 
   el.innerHTML = `

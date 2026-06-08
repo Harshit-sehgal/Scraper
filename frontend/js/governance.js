@@ -30,23 +30,23 @@ export function renderGovernance(data) {
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Active Browsers</span>
-                <span class="dash-metric-val">${browser.active_contexts ?? "\u2014"} / ${browser.total_contexts ?? "\u2014"}</span>
+                <span class="dash-metric-val">${browser.active_contexts != null ? Number(browser.active_contexts) : "\u2014"} / ${browser.total_contexts != null ? Number(browser.total_contexts) : "\u2014"}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Proxy Health</span>
-                <span class="dash-metric-val">${resources.proxy_health != null ? `${(resources.proxy_health * 100).toFixed(0)}%` : "\u2014"}</span>
+                <span class="dash-metric-val">${resources.proxy_health != null ? `${(Number(resources.proxy_health) * 100).toFixed(0)}%` : "\u2014"}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Token Spend</span>
-                <span class="dash-metric-val">$${(governor.token_spend_dollars || 0).toFixed(3)}</span>
+                <span class="dash-metric-val">$${(Number(governor.token_spend_dollars) || 0).toFixed(3)}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Queue Sheds</span>
-                <span class="dash-metric-val">${governor.queue_sheds ?? 0}</span>
+                <span class="dash-metric-val">${Number(governor.queue_sheds) || 0}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Browser Prunes</span>
-                <span class="dash-metric-val">${governor.browser_prunes ?? 0}</span>
+                <span class="dash-metric-val">${Number(governor.browser_prunes) || 0}</span>
             </div>
         </div>
     `;

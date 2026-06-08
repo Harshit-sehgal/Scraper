@@ -460,7 +460,7 @@ def run_test_suite():
     _print_header("TEST SUITE")
     import subprocess  # nosec B404 — operational script, hardcoded command vector
 
-    result = subprocess.run(  # nosec B603
+    result = subprocess.run(
         [sys.executable, "-m", "pytest", "backend/tests/", "-v", "--tb=short", "-x"],
         capture_output=True,
         text=True,

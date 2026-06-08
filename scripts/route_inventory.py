@@ -34,7 +34,7 @@ def _live_routes() -> set[tuple[str, str]]:
         "for m in r.methods if m.upper() in {'GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'}];"
         "print(json.dumps(sorted(out)))"
     )
-    proc = subprocess.run(  # noqa: S603
+    proc = subprocess.run(
         [sys.executable, "-c", code],
         check=False,
         capture_output=True,

@@ -51,15 +51,15 @@ export function renderRateLimits(data) {
         <div class="dash-metrics-grid" style="grid-template-columns: repeat(2, 1fr)">
             <div class="dash-metric">
                 <span class="dash-metric-label">Global Limit</span>
-                <span class="dash-metric-val">${data.global_limit_per_window || 0} req / ${data.global_window_seconds || 0}s</span>
+                <span class="dash-metric-val">${Number(data.global_limit_per_window) || 0} req / ${Number(data.global_window_seconds) || 0}s</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Per-IP Limit</span>
-                <span class="dash-metric-val">${data.per_ip_enabled ? `${data.per_ip_limit_per_window} req / ${data.per_ip_window_seconds}s` : "DISABLED"}</span>
+                <span class="dash-metric-val">${data.per_ip_enabled ? `${Number(data.per_ip_limit_per_window) || 0} req / ${Number(data.per_ip_window_seconds) || 0}s` : "DISABLED"}</span>
             </div>
             <div class="dash-metric" style="grid-column: span 2">
                 <span class="dash-metric-label">Active Tracked Clients</span>
-                <span class="dash-metric-val">${data.active_keys ?? 0}</span>
+                <span class="dash-metric-val">${Number(data.active_keys) || 0}</span>
             </div>
         </div>
     `;
