@@ -428,7 +428,7 @@ async def rate_limit_stats(
         logger.warning("Failed to get rate limiter stats: %s", e)
         return JSONResponse(
             status_code=503,
-            content={"detail": "Rate limiter stats unavailable.", "error": str(e)},
+            content={"detail": "Rate limiter stats unavailable."},
         )
 
 
@@ -553,9 +553,10 @@ def _render_basic_metrics_text() -> str:
     lines: list[str] = []
 
     counts = {s.value: 0 for s in JobStatus}
-    for job in jobs_store.values():
-        status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
-        counts[status_key] = counts.get(status_key, 0) + 1
+    with _jobs_store_lock:
+        for job in jobs_store.values():
+            status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
+            counts[status_key] = counts.get(status_key, 0) + 1
     for status, count in counts.items():
         lines.append(_basic_metric_line("dataforge_jobs_total", count, {"status": status}))
 

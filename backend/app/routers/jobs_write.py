@@ -522,7 +522,7 @@ def register_jobs_write_routes(
                     "Job %s: Failed to persist job state after reclean rollback",
                     job_id,
                 )
-            raise HTTPException(status_code=500, detail=f"Reclean failed: {e}") from e
+            raise HTTPException(status_code=500, detail="Reclean failed due to an internal error.") from e
 
         return {
             "job_id": job.id,
