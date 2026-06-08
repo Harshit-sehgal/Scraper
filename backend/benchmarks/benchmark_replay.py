@@ -37,7 +37,7 @@ def benchmark_replay(transaction_count: int = 10000) -> bool:
             for _ in range(3):
                 ws.set_manifold_vector(random.choice(roles), [random.random() for _ in range(16)])  # nosec B311 — synthetic load generator, no security need
 
-    time.time() - start_gen
+    _gen_elapsed = time.time() - start_gen
 
     # 2. Replay Phase
     journal = ws.trace_causality(limit=transaction_count + 100)

@@ -243,20 +243,24 @@ export function onFilterOpChange(sel) {
 // ─── Preview Discovery ───
 
 export async function previewDiscovery() {
-  const topic = document.getElementById("inp-topic").value.trim();
+  const _val = (id) => document.getElementById(id)?.value ?? "";
+  const topic = _val("inp-topic").trim();
   if (!topic) {
     toast("Enter a topic first", "error");
     return;
   }
 
-  const discoverInput = parseInt(document.getElementById("inp-discover-pages").value, 10);
+  const discoverInput = parseInt(_val("inp-discover-pages"), 10);
   const discoverCount = Number.isFinite(discoverInput) ? Math.max(1, Math.min(20, discoverInput)) : 8;
-  document.getElementById("inp-discover-pages").value = String(discoverCount);
-  const perDomainInput = parseInt(document.getElementById("inp-max-per-domain").value, 10);
+  const discoverEl = document.getElementById("inp-discover-pages");
+  if (discoverEl) discoverEl.value = String(discoverCount);
+  const perDomainInput = parseInt(_val("inp-max-per-domain"), 10);
   const maxPerDomain = Number.isFinite(perDomainInput) ? Math.max(1, Math.min(25, perDomainInput)) : 4;
-  document.getElementById("inp-max-per-domain").value = String(maxPerDomain);
+  const perDomainEl = document.getElementById("inp-max-per-domain");
+  if (perDomainEl) perDomainEl.value = String(maxPerDomain);
 
   const preview = document.getElementById("discovery-preview");
+  if (!preview) return;
   preview.classList.remove("hidden");
   preview.innerHTML = '<div class="disc-loading"><span class="spinner"></span> Discovering URLs...</div>';
 
@@ -266,17 +270,17 @@ export async function previewDiscovery() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         topic,
-        location: document.getElementById("inp-location").value.trim(),
-        domain: document.getElementById("inp-domain").value.trim(),
+        location: _val("inp-location").trim(),
+        domain: _val("inp-domain").trim(),
         num_results: discoverCount,
         max_per_domain: maxPerDomain,
-        source_policy: document.getElementById("inp-source-policy").value || "official_plus_directory",
+        source_policy: _val("inp-source-policy") || "official_plus_directory",
         schema_field_names: Array.from(document.querySelectorAll(".sf-name"))
           .map((i) => i.value.trim())
           .filter(Boolean),
-        origin_location: document.getElementById("inp-origin-location").value.trim(),
+        origin_location: _val("inp-origin-location").trim(),
         max_distance_km: (() => {
-          const n = parseFloat(document.getElementById("inp-max-distance-km").value);
+          const n = parseFloat(_val("inp-max-distance-km"));
           return Number.isFinite(n) ? n : null;
         })(),
       }),

@@ -367,16 +367,20 @@
         currentInterval = Math.min(UPDATE_INTERVAL * Math.pow(2, failedPolls), MAX_INTERVAL);
         console.warn(`Dashboard poll #${failedPolls} partial failure, backing off to ${currentInterval}ms`);
 
-        document.getElementById("status-badge").innerText = "DEGRADED";
-        document.getElementById("status-badge").className =
-          "px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-800 rounded-full text-xs font-bold";
+        setText("status-badge", "DEGRADED");
+        setClassName(
+          "status-badge",
+          "px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-800 rounded-full text-xs font-bold",
+        );
       } else {
         // Reset backoff on success
         failedPolls = 0;
         currentInterval = UPDATE_INTERVAL;
-        document.getElementById("status-badge").innerText = "POLLING VIEW";
-        document.getElementById("status-badge").className =
-          "px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse";
+        setText("status-badge", "POLLING VIEW");
+        setClassName(
+          "status-badge",
+          "px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse",
+        );
       }
 
       // Extract values safely — use empty objects for failed fetches
@@ -952,6 +956,7 @@
   }
 
   function updateCharts(m, communities, driftLogs) {
+    if (!energyChart || !driftChart || !communityChart) return;
     communities = communities || [];
     // Energy Chart
     energyChart.data.labels.push("");
