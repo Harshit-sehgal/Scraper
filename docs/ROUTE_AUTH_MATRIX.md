@@ -44,7 +44,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 Latest verified result:
 
 ```text
-183 passed in 1.83s
+203 passed in 14.17s
 ```
 
 This proves route registration/dependency classification, production-secret validation tests, and backend CORS preflight behavior. It is not a penetration test.

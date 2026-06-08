@@ -172,10 +172,10 @@ jobs:
           pip install types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
 
       - name: Run Ruff Lint
-        run: ruff check backend/app backend/tests
+        run: ruff check backend/app backend/tests backend/benchmarks scripts
 
       - name: Run Ruff Format Check
-        run: ruff format --check backend/app backend/tests
+        run: ruff format --check backend/app backend/tests backend/benchmarks scripts
 
       - name: Run Mypy Typecheck
         run: python -m mypy backend/app backend/tests --check-untyped-defs

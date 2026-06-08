@@ -6,6 +6,7 @@ Ported from the existing export router logic into a clean service.
 from __future__ import annotations
 
 import csv
+import datetime
 import io
 import json
 import logging
@@ -79,17 +80,18 @@ class ExportService:
 
     async def export(self, fmt: str, records: list[dict], field_names: list[str] | None = None) -> ExportArtifact:
         """Generate an export in the specified format."""
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         if fmt == "csv":
             content = self.to_csv(records, field_names)
-            return ExportArtifact(format="csv", row_count=len(records), generated_at="", byte_size=len(content))
+            return ExportArtifact(format="csv", row_count=len(records), generated_at=now, byte_size=len(content.encode("utf-8")))
         if fmt == "json":
             content = self.to_json(records)
-            return ExportArtifact(format="json", row_count=len(records), generated_at="", byte_size=len(content))
+            return ExportArtifact(format="json", row_count=len(records), generated_at=now, byte_size=len(content.encode("utf-8")))
         if fmt == "xlsx":
             xlsx_content = self.to_xlsx(records, field_names)
             if xlsx_content is None:
                 msg = "XLSX export requires openpyxl: pip install openpyxl"
                 raise ValueError(msg)
-            return ExportArtifact(format="xlsx", row_count=len(records), generated_at="", byte_size=len(xlsx_content))
+            return ExportArtifact(format="xlsx", row_count=len(records), generated_at=now, byte_size=len(xlsx_content))
         msg = f"Unsupported export format: {fmt}"
         raise ValueError(msg)

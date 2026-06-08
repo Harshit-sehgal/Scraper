@@ -2,8 +2,8 @@
 
 **Repository:** [Harshit-sehgal/Scraper](https://github.com/Harshit-sehgal/Scraper)
 **Last Updated:** 2026-06-08
-**Commit Inspected:** `89bba9c117a4a471732baca858282160ba952d47` (HEAD of `main`)
-**Target Truth Commit:** `3d1c2600ded60b2f347334e99c7dfd031bef1205`
+**Commit Inspected:** `6eeadb3` (HEAD of `main`)
+**Previous Inspection:** `89bba9c117a4a471732baca858282160ba952d47` (no longer HEAD)
 
 ---
 
@@ -11,8 +11,8 @@
 
 | Workflow | Latest Run | Status | Failed Job | Failed Step | Reason | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
-| **CI** | [26824524929](https://github.com/Harshit-sehgal/Scraper/actions/runs/26824524929)<br>*(2026-06-02 13:56:05 UTC)* | ✅ Success | None | None | N/A | N/A |
-| **Validate Production Readiness** | [26824522663](https://github.com/Harshit-sehgal/Scraper/actions/runs/26824522663)<br>*(2026-06-02 13:56:02 UTC)* | ❌ Failure | None *(Orchestration / Parsing failure)* | None | **Syntax validation error**: The job-level condition `if: failure() && env.SLACK_WEBHOOK != ''` incorrectly referenced the job-level environment variable `env.SLACK_WEBHOOK`. Job-level environments are not in scope for job-level `if:` evaluations since they are evaluated prior to runner/environment initialization. | **Fixed in workspace**: Moved the `SLACK_WEBHOOK` variable definition to the global workflow-level `env:` block. Global environments are successfully evaluated in job-level conditionals. |
+| **CI** | [26824524929](https://github.com/Harshit-sehgal/Scraper/actions/runs/26824524929)<br>*(2026-06-02 13:56:05 UTC)* — last verified run; rerun needed for fresh status | ✅ Success | None | None | N/A | N/A |
+| **Validate Production Readiness** | [26824522663](https://github.com/Harshit-sehgal/Scraper/actions/runs/26824522663)<br>*(2026-06-02 13:56:02 UTC)* — last verified run; fix applied but not re-run | ❌ Failure | None *(Orchestration / Parsing failure)* | None | **Syntax validation error**: The job-level condition `if: failure() && env.SLACK_WEBHOOK != ''` incorrectly referenced the job-level environment variable `env.SLACK_WEBHOOK`. Job-level environments are not in scope for job-level `if:` evaluations since they are evaluated prior to runner/environment initialization. | **Fixed in workspace**: Moved the `SLACK_WEBHOOK` variable definition to the global workflow-level `env:` block. Global environments are successfully evaluated in job-level conditionals. |
 
 ---
 
@@ -31,29 +31,13 @@
         *   `Generate Route Authorization Matrix` (Success)
         *   `Validate Production Env Checker` (Success)
     *   **Advisory Lint & Type Checks** (`advisory-linting`): Passed.
-        *   `Run Pyflakes (Advisory)` (Success)
+        *   `Run Ruff Lint (Advisory)` (Success)
         *   `Run Mypy Typecheck (Advisory)` (Success)
 
 ### Validate Production Readiness Workflow (`validate-production.yml`) - Run ID: 26824522663
 *   **Status**: Orchestrator-level syntax error. No jobs started, and no logs were written (returned 404 logs from the GitHub API).
-*   **Root Cause**: Lines 409-411 in `.github/workflows/validate-production.yml`:
-    ```yaml
-    notify-on-failure:
-      runs-on: ubuntu-latest
-      needs: ...
-      if: failure() && env.SLACK_WEBHOOK != ''
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-    ```
-    Referring to `env.SLACK_WEBHOOK` at the job-level `if` statement was illegal because it was defined inside the `notify-on-failure` job.
-*   **Applied Fix**:
-    1. Added global workflow environment block:
-       ```yaml
-       env:
-         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-       ```
-    2. Removed the job-level `env` block under the `notify-on-failure` job.
-    3. Updated `webhook_url` under the Notify Slack step to reference `${{ env.SLACK_WEBHOOK }}`.
+*   **Root Cause**: The job-level `if: failure() && env.SLACK_WEBHOOK != ''` condition referenced a job-level environment variable, which is evaluated before runner/environment initialization.
+*   **Applied Fix**: The workflow has since been updated to use Telegram notifications (`appleboy/telegram-action`) instead of Slack. The original Slack-related fix is no longer applicable.
 
 ---
 

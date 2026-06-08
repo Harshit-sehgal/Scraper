@@ -45,7 +45,7 @@ after the deep-research remediation pass (2026-06).
   no client reads `Job.results` / `Job.logs` directly. v6 release migrates the
   heavy payloads to JSONB.
 - **Done in this pass:** v4 schema, dual-write helpers, readers, parity tests
-  (`test_storage_split_v4.py`, 10 tests), cutover plan doc, recycle-summaries
+  (`test_storage_split_v4.py`, 17 tests), cutover plan doc, recycle-summaries
   contract on all three backends.
 
 ### W3 — Idempotency keys for `POST /api/jobs` — done in this pass
@@ -55,7 +55,7 @@ after the deep-research remediation pass (2026-06).
   `idempotency_keys` companion table (no FK to `jobs`; key survives job
   hard-delete). Helpers in `job_store.py`: `lookup_idempotency_key`,
   `record_idempotency_key`, `prune_idempotency_keys(older_than_days=7)`. Pinned
-  by `test_idempotency_keys.py` (6 tests).
+  by `test_idempotency_keys.py` (11 tests).
 - **Next:** tighten conflict resolution (return 409 on payload-fingerprint
   mismatch). Add pruning cron / operator CLI.
 - **Done in this pass:** header support, storage helpers, tests, docs.
@@ -94,11 +94,10 @@ after the deep-research remediation pass (2026-06).
   extraction methods, browser launches, export outcomes, SSRF rejects by
   reason, CSP violations by directive, repo query latency quantiles, and
   queue depth. Prometheus alert rules (`prometheus_alerts.yml`) define
-  14 alert rules: 3 critical (API down, DB errors, browser failures),
-  9 warning (queue backlog, job failures, latency, anti-bot blocks, export
-  failures, SSRF blocks, repo latency degradation, extraction method
-  anomaly, rate limit blocks), and 2 info (CSP violation rate, worker
-  heartbeat stale). Alertmanager
+  14 alert rules: 4 critical (API down, DB errors, browser failures, worker
+  heartbeat stale), 9 warning (queue backlog, job failures, latency, anti-bot
+  blocks, export failures, SSRF blocks, repo latency degradation, extraction
+  method anomaly, rate limit blocks), and 1 info (CSP violation rate). Alertmanager
   (`alertmanager.yml`) routes alerts by severity to email and Slack with
   3 inhibition rules and rate-limiting varying by severity (1h critical,
   4h warning, 24h info). See W14 for Alertmanager details.
@@ -108,7 +107,7 @@ after the deep-research remediation pass (2026-06).
 - **Done in this pass:** 28-panel Grafana dashboard, 14 Prometheus alert
   rules, Alertmanager config + docker-compose integration, Severity-based
   routing + inhibition, metrics collectors + call-site wiring, metric
-  tests (21 + 10 tests), CSP report-only middleware.
+  tests (21 + 13 tests), CSP report-only middleware.
 
 ### W7 — Security & TLS — done in this pass
 
@@ -164,7 +163,7 @@ after the deep-research remediation pass (2026-06).
 
 ### W10 — Test strategy — done in this pass
 
-- **Status:** 3026 tests pass, 80 skipped (fast lane). The optional
+- **Status:** 3025 tests pass, 78 skipped (fast lane). The optional
   postgres / browser / golden-dataset lanes are opt-in.
 - **Status details:**
   1. **Repository parity tests** — `test_repository_parity.py` provides
@@ -204,7 +203,7 @@ after the deep-research remediation pass (2026-06).
 
 - **Status:** global `fail_under=60`; per-module floors enforced by
   `check_coverage_floors.py`; coverage report uploaded as a CI artifact.
-  Global coverage after the remediation pass: **78.6%**. Per-module floors:
+  Global coverage after the remediation pass: **78.2%**. Per-module floors:
   `url_safety` 60, `storage_interface` 70, `routers/jobs` 70,
   `routers/exports` 60, `lifespan` 40, `psycopg3_repository` 24,
   `postgres_repository` 24.
@@ -292,8 +291,6 @@ after the deep-research remediation pass (2026-06).
   `DATAFORGE_RATE_LIMIT_PER_IP_ENABLED`. In production/staging, counters
   auto-promote to the shared `rate_limits` database table for
   multi-worker consistency. Pinned by 25 tests.
-- **Next:** add Prometheus counters for global vs per-IP rate limit hits.
-  Expose `get_stats()` at `/api/system/rate-limit-stats`.
 - **Done in this pass:** `RATE_LIMIT_PER_IP` and `RATE_LIMIT_PER_IP_ENABLED`
   settings, dual-layer middleware dispatch (aggregate aggregate + per-IP),
   `_get_aggregate_key` / `_get_per_ip_key` key builders,

@@ -16,6 +16,16 @@
 (function () {
   "use strict";
 
+  // ─── Safe DOM helpers ─────────────────────────────────────────────
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = val;
+  }
+  function setClassName(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.className = val;
+  }
+
   // ─── API key management (shared with main dashboard) ───────────────────
   // SECURITY: API key is held in memory only — never in sessionStorage /
   // localStorage. Page reload clears the key; the user re-enters it.
@@ -401,7 +411,7 @@
         );
         updateTelemetry(observability.telemetry || []);
         updateCharts(topology.metrics || {}, topology.global_communities || [], topology.drift_logs || {});
-        scrubber.value = scrubber.max;
+        if (scrubber) scrubber.value = scrubber.max;
       }
 
       const lastUpdateEl = document.getElementById("last-update");
@@ -426,6 +436,10 @@
       // Reschedule with backoff
       if (pollTimer) clearTimeout(pollTimer);
       pollTimer = setTimeout(updateLoop, currentInterval);
+    } catch (e) {
+      console.error("Dashboard poll error:", e);
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = setTimeout(updateLoop, currentInterval);
     } finally {
       _updating = false;
     }
@@ -443,43 +457,40 @@
     systemStatus,
   ) {
     m = m || {};
-    document.getElementById("metric-pressure").innerText = Number(m.field_pressure || 0).toFixed(3);
-    document.getElementById("metric-energy").innerText = Number(m.global_energy || 0).toFixed(3);
-    document.getElementById("metric-entropy").innerText = Number(m.global_entropy || 0).toFixed(3);
-    document.getElementById("metric-energy-balance").innerText = Number(m.energy_balance || 0).toFixed(4);
-    document.getElementById("metric-regions").innerText = Number(m.region_count || 0);
-    document.getElementById("metric-meso-count").innerText = Number(mesoClusters ? mesoClusters.length : 0);
-    document.getElementById("metric-macro-count").innerText = Number(macroContinents ? macroContinents.length : 0);
-    document.getElementById("metric-health").innerText = Number(health ? health.score || health : 0).toFixed(2);
+    setText("metric-pressure", Number(m.field_pressure || 0).toFixed(3));
+    setText("metric-energy", Number(m.global_energy || 0).toFixed(3));
+    setText("metric-entropy", Number(m.global_entropy || 0).toFixed(3));
+    setText("metric-energy-balance", Number(m.energy_balance || 0).toFixed(4));
+    setText("metric-regions", Number(m.region_count || 0));
+    setText("metric-meso-count", Number(mesoClusters ? mesoClusters.length : 0));
+    setText("metric-macro-count", Number(macroContinents ? macroContinents.length : 0));
+    setText("metric-health", Number(health ? health.score || health : 0).toFixed(2));
 
     // Scraper Phase 78 Metrics
     if (browserStats) {
-      document.getElementById("metric-browser-contexts").innerText = browserStats.active_contexts || 0;
-      document.getElementById("metric-browser-reuse").innerText =
-        `Reuse Rate: ${((browserStats.context_reuse_rate || 0) * 100).toFixed(0)}%`;
+      setText("metric-browser-contexts", browserStats.active_contexts || 0);
+      setText("metric-browser-reuse", `Reuse Rate: ${((browserStats.context_reuse_rate || 0) * 100).toFixed(0)}%`);
     }
     if (scraperStats) {
-      document.getElementById("metric-latency").innerText = `${(scraperStats.recent_latency_avg || 0).toFixed(0)}ms`;
-      document.getElementById("metric-success-rate").innerText =
-        `${((scraperStats.recent_success_rate || 0) * 100).toFixed(0)}%`;
+      setText("metric-latency", `${(scraperStats.recent_latency_avg || 0).toFixed(0)}ms`);
+      setText("metric-success-rate", `${((scraperStats.recent_success_rate || 0) * 100).toFixed(0)}%`);
     }
     if (memoryStats) {
-      document.getElementById("metric-memory-domains").innerText = memoryStats.domain_count || 0;
+      setText("metric-memory-domains", memoryStats.domain_count || 0);
     }
 
     // Acquisition Pipeline Metrics (Phase 92)
     if (acqTelemetry) {
       const t = acqTelemetry;
-      document.getElementById("metric-session-bound").innerText = t.session_bound_urls || 0;
-      document.getElementById("metric-total-acquisitions").innerText = t.total_acquisitions || 0;
+      setText("metric-session-bound", t.session_bound_urls || 0);
+      setText("metric-total-acquisitions", t.total_acquisitions || 0);
 
       const rate = t.recovery_success_rate != null ? (t.recovery_success_rate * 100).toFixed(0) : null;
-      document.getElementById("metric-recovery-rate").innerText = rate != null ? `${rate}%` : "--%";
-      document.getElementById("metric-recovery-detail").innerText =
-        `${t.recovery_successes || 0} / ${t.recovery_attempts || 0} attempts`;
+      setText("metric-recovery-rate", rate != null ? `${rate}%` : "--%");
+      setText("metric-recovery-detail", `${t.recovery_successes || 0} / ${t.recovery_attempts || 0} attempts`);
 
       const emptyCount = (t.state_distribution && t.state_distribution.empty_response) || 0;
-      document.getElementById("metric-empty-200").innerText = emptyCount;
+      setText("metric-empty-200", emptyCount);
 
       // Acquisition mode distribution
       const dist = t.state_distribution || {};
@@ -489,54 +500,52 @@
       if (dist.session_expired) modes.push(`expired:${dist.session_expired}`);
       if (dist.empty_response) modes.push(`empty:${dist.empty_response}`);
       if (dist.awaiting_search_params) modes.push(`awaiting:${dist.awaiting_search_params}`);
-      document.getElementById("metric-acq-modes").innerText = modes.length ? modes.join("  ") : "--";
+      setText("metric-acq-modes", modes.length ? modes.join("  ") : "--");
 
       // Color-code recovery rate
-      const recoveryEl = document.getElementById("metric-recovery-rate");
       if (rate != null) {
-        if (rate >= 80) recoveryEl.className = "metric-value text-green-500";
-        else if (rate >= 40) recoveryEl.className = "metric-value text-yellow-500";
-        else recoveryEl.className = "metric-value text-red-500";
+        if (rate >= 80) setClassName("metric-recovery-rate", "metric-value text-green-500");
+        else if (rate >= 40) setClassName("metric-recovery-rate", "metric-value text-yellow-500");
+        else setClassName("metric-recovery-rate", "metric-value text-red-500");
       }
 
       // Style empty-200 count
-      const emptyEl = document.getElementById("metric-empty-200");
-      if (emptyCount > 0) emptyEl.className = "metric-value text-red-500";
+      if (emptyCount > 0) setClassName("metric-empty-200", "metric-value text-red-500");
     }
 
     if (systemStatus) {
       const jobs = systemStatus.jobs || {};
-      document.getElementById("metric-jobs-completed").innerText = jobs.completed || 0;
-      document.getElementById("metric-jobs-degraded").innerText = jobs.degraded || 0;
-      document.getElementById("metric-jobs-empty-result").innerText = jobs.empty_result || 0;
-      document.getElementById("metric-jobs-failed").innerText = jobs.failed || 0;
+      setText("metric-jobs-completed", jobs.completed || 0);
+      setText("metric-jobs-degraded", jobs.degraded || 0);
+      setText("metric-jobs-empty-result", jobs.empty_result || 0);
+      setText("metric-jobs-failed", jobs.failed || 0);
     }
 
     // Style energy balance based on conservation status
-    const balanceEl = document.getElementById("metric-energy-balance");
     const balanceVal = Number(m.energy_balance || 0);
     if (Math.abs(balanceVal) < 0.01) {
-      balanceEl.className = "metric-value text-green-500"; // conserved
+      setClassName("metric-energy-balance", "metric-value text-green-500");
     } else if (Math.abs(balanceVal) < 0.1) {
-      balanceEl.className = "metric-value text-yellow-500"; // slight drift
+      setClassName("metric-energy-balance", "metric-value text-yellow-500");
     } else {
-      balanceEl.className = "metric-value text-red-500"; // conservation violation
+      setClassName("metric-energy-balance", "metric-value text-red-500");
     }
 
     if (health) {
-      document.getElementById("metric-health").innerText = Number(health.score || 0).toFixed(2);
-      const statusEl = document.getElementById("health-status");
+      setText("metric-health", Number(health.score || 0).toFixed(2));
       const metrics = health.metrics || {};
       const monocultureRisk = Number(metrics.monoculture_risk || 0);
       const diversity = Number(metrics.diversity || 0);
       const alert = monocultureRisk > 0.5 ? "MONOCULTURE RISK" : health.status || "unknown";
-      statusEl.innerText = `${alert} // DR: ${diversity.toFixed(2)}`;
-      statusEl.className =
+      setText("health-status", `${alert} // DR: ${diversity.toFixed(2)}`);
+      setClassName(
+        "health-status",
         health.status === "optimal" && monocultureRisk < 0.5
           ? "text-[10px] text-green-500 mt-1 uppercase"
           : health.status === "degraded" || monocultureRisk >= 0.5
             ? "text-[10px] text-yellow-500 mt-1 uppercase"
-            : "text-[10px] text-red-500 mt-1 uppercase";
+            : "text-[10px] text-red-500 mt-1 uppercase",
+      );
     }
   }
 

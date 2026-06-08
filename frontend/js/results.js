@@ -399,6 +399,7 @@ export async function onResultsCellDoubleClick(e) {
 
 export async function recleanCurrentJob() {
   if (!currentJobId) return;
+  const id = currentJobId;
 
   showConfirm("AI Re-clean?", "Run AI re-clean on this dataset without re-scraping URLs?", async () => {
     const btn = document.getElementById("btn-reclean");
@@ -409,12 +410,12 @@ export async function recleanCurrentJob() {
     }
 
     try {
-      const res = await apiFetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: "POST" });
+      const res = await apiFetch(`${API}/api/jobs/${id}/reclean`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "Re-clean failed");
 
       toast(`Re-cleaned rows: ${data.before_records || 0} -> ${data.after_records || 0}`, "success");
-      await viewResults(currentJobId);
+      await viewResults(id);
       const { refreshJobs } = await import("./jobs.js");
       await refreshJobs();
     } catch (err) {

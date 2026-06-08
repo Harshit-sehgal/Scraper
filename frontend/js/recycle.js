@@ -24,6 +24,7 @@ export async function refreshRecycleBin() {
       return;
     }
 
+    if (!list) return;
     list.innerHTML = jobs
       .map(
         (j) => `

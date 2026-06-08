@@ -26,7 +26,7 @@ Current audit result: local smoke built `dataforge:local` image successfully.
 5. Validate compose syntax:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.yml config -q
+docker compose -f docker-compose.prod.yml config -q
 ```
 
 Current audit result: passed as part of local Compose startup with a temporary ignored `.env`.
@@ -34,8 +34,8 @@ Current audit result: passed as part of local Compose startup with a temporary i
 6. Start and verify the stack:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml ps
 curl -i http://localhost/health
 curl -i http://localhost/ready
 ```

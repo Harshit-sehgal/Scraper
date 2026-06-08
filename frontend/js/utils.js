@@ -124,12 +124,20 @@ export function toggleTheme() {
   const isDark = document.documentElement.getAttribute("data-theme") === "dark";
   if (isDark) {
     document.documentElement.removeAttribute("data-theme");
-    localStorage.setItem(THEME_KEY, "light");
+    try {
+      localStorage.setItem(THEME_KEY, "light");
+    } catch {
+      /* private browsing */
+    }
     updateThemeToggleIcon("light");
     toast("Light mode", "info");
   } else {
     document.documentElement.setAttribute("data-theme", "dark");
-    localStorage.setItem(THEME_KEY, "dark");
+    try {
+      localStorage.setItem(THEME_KEY, "dark");
+    } catch {
+      /* private browsing */
+    }
     updateThemeToggleIcon("dark");
     toast("Dark mode", "info");
   }

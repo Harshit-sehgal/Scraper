@@ -35,9 +35,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Grafana rate limit dashboard panels exist                    | `grafana/dashboards/dataforge_overview.json` panels 26-28: Rate Limit Blocks stat, Per-IP Blocks stat, Rate Limit Block Rate timeseries                                                                          | Verified                                 |
 | Prometheus rate limit alert rule exists                      | `prometheus_alerts.yml` rule #14 `HighRateLimitBlockRate` — fires warning when combined blocking > 0.5 req/s for 5m                                                                                              | Verified                                 |
 | Frontend dashboard rate limit panel exists                   | `frontend/index.html`, `frontend/js/rate-limits.js`, `frontend/js/dashboard.js` — fetches `/api/system/rate-limit-stats` and renders global/per-IP limits                                                        | Verified                                 |
-| Dashboard renderGovernance extracted to module               | `frontend/js/governance.js` — 6-card metrics grid (active mode, browsers, proxy health, token spend, queue sheds, browser prunes) with 12 tests                                                                  | Verified                                 |
-| Dashboard renderDomainHealth extracted to module             | `frontend/js/domain-health.js` — 6-card grid + stacked health bar (healthy/degrading/bad segments) with empty state, 16 tests                                                                                    | Verified                                 |
-| Dashboard renderPredictions extracted to module              | `frontend/js/predictions.js` — systemic risk badge + prediction cards with conditional timer/evidence/action sections, 20 tests                                                                                  | Verified                                 |
+| Dashboard renderGovernance extracted to module               | `frontend/js/governance.js` — 6-card metrics grid (active mode, browsers, proxy health, token spend, queue sheds, browser prunes) with 14 tests                                                                  | Verified                                 |
+| Dashboard renderDomainHealth extracted to module             | `frontend/js/domain-health.js` — 6-card grid + stacked health bar (healthy/degrading/bad segments) with empty state, 17 tests                                                                                    | Verified                                 |
+| Dashboard renderPredictions extracted to module              | `frontend/js/predictions.js` — systemic risk badge + prediction cards with conditional timer/evidence/action sections, 26 tests                                                                                  | Verified                                 |
 | Alert rules and Grafana panels documented                    | `docs/API.md` Metrics section — two tables documenting alert rules and rate-limit Grafana panels                                                                                                                 | Verified                                 |
 | Grafana dashboard JSON validation test exists                | `backend/tests/test_grafana_dashboard.py` — 18 tests validating panel IDs, grid positions, required fields, and Prometheus metric name conventions                                                               | Verified                                 |
 | Unauthenticated public LLM fallbacks are disabled by default | `settings.LLM_ENABLE_PUBLIC_FALLBACKS` defaults to `False` (disabled through `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false`); tests verify disabled fallbacks do not issue unauthenticated Pollinations/g4f calls | Verified                                 |
@@ -57,21 +57,23 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py`       | Passed with no output                        | Python syntax is valid for checked paths                                                                                                                           |
 | `PYTHONPATH=backend python3 architecture_validator.py`                     | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass                                                                                                                          |
 | `ruff check backend/app backend/tests backend/benchmarks scripts`          | `All checks passed!`                         | Ruff lint passes cleanly                                                                                                                                           |
-| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `196 files already formatted`                | Ruff format passes                                                                                                                                                 |
+| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `459 files already formatted`                | Ruff format passes                                                                                                                                                 |
 | `scripts/check_research_boundary.py`                                       | `VALIDATION PASSED: 107 product-kernel files` | No research imports leaking into kernel                                                                                                                            |
 | `scripts/validate_dependency_bounds.py`                                    | `Dependency validation OK: 63 prod, 112 dev` | Lockfile bounds are consistent                                                                                                                                     |
-| SQLite backend suite (no-golden/no-benchmark/no-browser/no-postgres)       | `3026 passed, 80 skipped, 0 failed`          | Full SQLite functional test suite passes — no regressions from frontend changes                                                                                    |
+| SQLite backend suite (no-golden/no-benchmark/no-browser/no-postgres)       | `3025 passed, 78 skipped, 0 failed`          | Full SQLite functional test suite passes — no regressions from frontend changes                                                                                    |
 | Staging smoke test (`scripts/staging_smoke_test.py`)                       | `🎉 ALL STAGING DRILL...FULLY PASSED!`       | Durability and state invariant checks pass                                                                                                                         |
 | Docker base image build                                                    | `Successfully built`                         | Base stage compiles correctly                                                                                                                                      |
 | `scripts/check_prod_env.py --env-file .env.production.example`             | Failed intentionally                         | Production environment validator correctly rejects placeholder values                                                                                              |
 | Grafana dashboard JSON validation test                                     | `18 passed in 0.08s`                         | Dashboard panel IDs are unique, grid positions don't overlap, all panels have required fields, Prometheus metrics use `dataforge_` prefix                          |
 | Prettier check (includes `grafana/**/*.json`)                              | `All matched files use Prettier code style!` | Grafana dashboard JSON and all frontend JS/CSS/HTML are prettier-formatted                                                                                         |
-| Frontend vitest suite                                                      | `269 passed (269) — 15 files`                | All unit tests pass — all 14 modules tested (267 tests) + dashboard.js exports verified (2 tests)                                                                  |     | Frontend Playwright e2e suite       | `25 passed (25) — 4 files` | All smoke tests pass — brand, tabs, theme toggle, Create Job nav, dashboard panels + form interaction flow + recycle bin view + results view                  |
+| Frontend vitest suite                                                      | `269 passed (269) — 15 files`                | All unit tests pass — all 14 modules tested (267 tests) + dashboard.js exports verified (2 tests)                                                                  |
+| Frontend Playwright e2e suite       | `33 passed (33) — 4 files` | All smoke tests pass — brand, tabs, theme toggle, Create Job nav, dashboard panels + form interaction flow + recycle bin view + results view                  |
 | Frontend utils.js test coverage                                            | `35 new tests across 7 describe blocks`      | attrStr, theme helpers, shortcuts modal, confirm modal, UI state persistence, jobs updated label, isTypingTarget                                                   |
 | Frontend cognition.js test coverage                                        | `20 new tests across 6 describe blocks`      | Skeleton loading, communities, schema patterns, exclusions, role similarities, basins — all render functions + XSS escaping, empty states                          |
 | Frontend analyzer.js test coverage                                         | `18 new tests across 6 describe blocks`      | State accessors, clearAnalysis, toggleAllFields, renderAnalysisInfo (3 risk levels), renderFieldList (60-char truncation), renderAcquisitionBanner (6 state types) |
 | Frontend form.js test coverage                                             | `17 new tests across 3 describe blocks`      | addField (presets, types, HTML escaping), addFilter (field options, empty schema), onFilterOpChange (distance extras add/remove)                                   |
-| Frontend jobs.js test coverage                                             | `20 new tests across 3 describe blocks`      | applyJobFilters (name/topic search, case-insensitive, status filter, combined, edge cases), updateKPIs, state accessors                                            |     | Frontend dashboard.js test coverage | `2 tests`                  | Module exports verified — refreshDashboard and switchOperatorMode are async network orchestration not meaningfully unit-testable without mocks |
+| Frontend jobs.js test coverage                                             | `20 new tests across 3 describe blocks`      | applyJobFilters (name/topic search, case-insensitive, status filter, combined, edge cases), updateKPIs, state accessors                                            |
+| Frontend dashboard.js test coverage | `2 tests`                  | Module exports verified — refreshDashboard and switchOperatorMode are async network orchestration not meaningfully unit-testable without mocks |
 
 ## Partially Verified
 
@@ -124,7 +126,7 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 
 ## Deep Research Report Audit
 
-The following is the comprehensive audit against `deep-research-report.md` checklist items:
+The following is the comprehensive audit against the research report checklist items:
 
 ### High Priority
 
@@ -138,7 +140,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Split run_job() into component phases                                   | 🔲 Deferred            | Major refactor — needs design input                                                                                                                                                                                                                                                                                                                    |
 | Consolidate repository interfaces                                       | 🔲 Deferred            | Reduces SQLite/Postgres duplication — needs design input                                                                                                                                                                                                                                                                                               |
 | Fix rate limiter DB fallback behavior                                   | ✅ Done                | `DatabaseSlidingWindowCounter.allow()` correctly falls back to in-memory counter                                                                                                                                                                                                                                                                       |
-| Preserve and harden URL safety boundary                                 | ✅ Done                | Comprehensive SSRF checks + 32 tests in `test_url_safety.py`                                                                                                                                                                                                                                                                                           |
+| Preserve and harden URL safety boundary                                 | ✅ Done                | Comprehensive SSRF checks + 20 tests in `test_url_safety.py`                                                                                                                                                                                                                                                                                           |
 | Separate experimental modules into experimental/ namespace              | ✅ Done (CI invariant) | `scripts/check_research_boundary.py` + `backend/tests/test_research_kernel_boundary_invariant.py` enforce the rule. Registry (`backend/app/research/__init__.py`) lists 81 modules. 13 invariant tests in CI.                                                                                                                                          |
 | Add CI invariant: no top-level research imports in product-kernel files | ✅ Done                | Phase R5 of `docs/REFACTOR_PLAN.md`. `recovery_handlers.py` was refactored to use lazy imports for `recovery_strategies` and `domain_runtime_policy`. Five pre-existing syntax errors in `html_utils.py`, `scraper.py`, `worker_queue.py`, `worker_queue_postgres.py`, `llm_bridge.py` were fixed at the same time so the test suite can actually run. |
 
@@ -147,7 +149,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Item                                             | Status      | Details                                                           |
 | ------------------------------------------------ | ----------- | ----------------------------------------------------------------- |
 | Replace pyflakes + .flake8 with Ruff             | ✅ Done     | `.flake8` removed, Ruff in pyproject.toml + pre-commit + CI       |
-| Add coverage thresholds                          | ✅ Done     | `fail_under = 60` in pyproject.toml (actual: 78.6%)               |
+| Add coverage thresholds                          | ✅ Done     | `fail_under = 60` in pyproject.toml (actual: 78.2%)               |
 | Add contract tests for exports and job lifecycle | ✅ Done     | 26 contract tests in `test_api_contract.py`                       |
 | Add deterministic fixture-based extraction tests | 🔲 Deferred | Additive work — existing extraction tests provide coverage        |
 | Simplify dashboard to read-only internal surface | ✅ Done     | Frontend is static/internal-only, no session handling             |
@@ -168,7 +170,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Ruff                | ✅ Configured | pyproject.toml + pre-commit + CI                                                                         |
 | Ruff formatter      | ✅ Configured | pre-commit has ruff-format                                                                               |
 | mypy                | ✅ 0 errors   | 196 source files, `Success: no issues found` (core backend modules fully type-checked) |
-| pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 78.6%                                                                         |
+| pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 78.2%                                                                         |
 | Bandit              | ✅ Running    | 0 Low/0 Medium/0 High — all findings clean                                                               |
 | pip-audit           | ✅ Running    | 0 known vulnerabilities                                                                                  |
 | Prettier            | ✅ Configured | `.prettierrc`, pre-commit hook (`mirrors-prettier`), CI `JS/CSS Format Check` step, `lint:js` npm script |
@@ -190,7 +192,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 ### GitHub Actions Status Checks
 
 - **GitHub Actions pass/fail status** must be checked directly from workflow runs.
-- **Branch HEAD (`89bba9c117a4a471732baca858282160ba952d47`)**: CI status should be verified from the latest workflow run on GitHub.
+- **Branch HEAD (`6eeadb3`)**: CI status should be verified from the latest workflow run on GitHub.
 
 ### Fresh Local Validation results (Strongest Safe Claim)
 
@@ -239,8 +241,8 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 
 ## Recent Boundary Work (Phase R1 — Research Shell Quarantine)
 
-The following work is the first completed slice of the deep-research-report's
-clean-room rebuild plan. It establishes the **research-shell boundary** so
+The following work is the first completed slice of the research-shell boundary
+establishment. It establishes the **research-shell boundary** so
 that the remaining refactors in `docs/REFACTOR_PLAN.md` can be done
 mechanically.
 
@@ -251,7 +253,7 @@ mechanically.
 | HTTP-level gate on experimental router mount                                | `backend/app/main.py`                                            | Done                |
 | Documented `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES` env var                   | `.env.example`, `.env.production.example`                        | Done                |
 | Tests: registry contract (12 cases)                                         | `backend/tests/test_research_boundary.py`                        | Done                |
-| Tests: experimental startup gate (12 cases)                                 | `backend/tests/test_experimental_gate.py`                        | Done                |
+| Tests: experimental startup gate (13 cases)                                 | `backend/tests/test_experimental_gate.py`                        | Done                |
 | Tests: main.py router mount gate (4 cases)                                  | `backend/tests/test_main_routes_gate.py`                         | Done                |
 | Tests: kernel/research boundary invariant (13 cases)                        | `backend/tests/test_research_kernel_boundary_invariant.py`       | **Done (Phase R5)** |
 | CI gate: `scripts/check_research_boundary.py` in `.github/workflows/ci.yml` | Done                                                             |
@@ -302,7 +304,7 @@ system status enhancements, and alerting.
 | Standalone healthcheck CLI                                                                       | `scripts/worker_healthcheck.py` (NEW)                                 | Done   |
 | Integrated into `run_worker.py` (skipped in `--once` mode)                                       | `scripts/run_worker.py`                                               | Done   |
 | Docker healthcheck updated to use DB-backed check                                                | `docker-compose.prod.yml`                                             | Done   |
-| Contract smoke tests (5 test cases)                                                              | `backend/tests/test_contract_smoke.py`                                | Done   |
+| Contract smoke tests (12 test cases)                                                             | `backend/tests/test_contract_smoke.py`                                | Done   |
 
 ### Repository-Backed System Status
 
@@ -354,9 +356,9 @@ Fixed 9 test breakages from the Phase C main.py refactoring:
 
 | Check                | Result                                                                     |
 | -------------------- | -------------------------------------------------------------------------- |
-| Full test suite      | 3026 passed, 80 skipped, 0 failed            |
+| Full test suite      | 3025 passed, 78 skipped, 0 failed            |
 | Contract smoke tests | 12/12 pass                                                                 |
-| Metrics tests        | 11/11 pass                                                                 |
+| Metrics tests        | 13/13 pass                                                                 |
 | Worker ID unit tests | 3/3 pass                                                                   |
 | Compilation          | Passes                                                                     |
 | Flaky heartbeat test | Fixed (was intermittently failing due to shared SQLite file between tests) |
