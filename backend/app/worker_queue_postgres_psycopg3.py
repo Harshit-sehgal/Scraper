@@ -170,17 +170,17 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
                 raise
 
     def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:
-        import app.worker_queue_postgres_psycopg3 as wqp3  # noqa: PLW0406
+        import app.worker_queue_postgres_psycopg3 as wqp3
 
         return wqp3._fetch_all(conn, sql, params)
 
     def _fetch_one(self, conn, sql: str, params=None) -> dict | None:
-        import app.worker_queue_postgres_psycopg3 as wqp3  # noqa: PLW0406
+        import app.worker_queue_postgres_psycopg3 as wqp3
 
         return wqp3._fetch_one(conn, sql, params)
 
     def _execute(self, conn, sql: str, params=None):
-        import app.worker_queue_postgres_psycopg3 as wqp3  # noqa: PLW0406
+        import app.worker_queue_postgres_psycopg3 as wqp3
 
         return wqp3._execute(conn, sql, params)
 

@@ -39,7 +39,7 @@ dev = [
     "pytest-cov>=5.0.0,<8.0.0",
     "pytest-timeout>=2.3.0",
     "PyYAML>=6.0.0,<7.0.0",
-    "ruff>=0.1.0",
+    "ruff~=0.15.0",
     "mypy>=1.0.0"
 ]
 
@@ -62,11 +62,26 @@ ignore = [
     "PLR2004",
     # Private member access — many are legitimate internal/test access patterns
     "SLF001",
+    # Variable/function naming conventions — codebase uses UPPER_CASE for local constants
+    "N806", "N802", "N811", "N813", "N817", "N818",
     # Global statements — many are intentional module-level singletons
     "PLW0603",
+    # Module-level import not at top of file
+    "PLW0406",
+    # Complexity rules — pre-existing high-complexity functions
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+    # Boolean positional arguments — API patterns
+    "FBT001", "FBT002", "FBT003",
+    # Pathlib suggestions — codebase uses os.path in many places
+    "PTH",
+    # List comprehension preference
+    "PERF401",
+    # Broad exception in specific contexts
+    "PGH003",
     # Existing ignores from original config
     "E203", "E501", "B904", "B905", "B007", "B027", "B008", "E402", "B023",
-    "TRY300", "TRY301", "TRY003", "S311", "ASYNC109", "RUF006", "TC003", "PLC0415", "UP047",
+    "TRY300", "TRY301", "TRY003", "S311", "ASYNC109", "RUF006", "TC003", "TC001", "PLC0415", "UP047",
+    "PYI036", "PYI046", "PLW2901", "S104",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -80,6 +95,7 @@ ignore = [
     "PTH",  # all pathlib rules
     "EXE001",
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",  # complexity
+    "PLR2004", "SLF001",
     "ARG001", "ARG002", "ARG005",
     "PERF401",
     "FBT001", "FBT002", "FBT003",

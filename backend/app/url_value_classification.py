@@ -15,7 +15,7 @@ import re
 # ─── Value Classification ───────────────────────────────────────────
 
 
-def _classify_value(value: str) -> str:  # noqa: C901
+def _classify_value(value: str) -> str:
     """Classify a single text value using VALUE_PATTERNS.
 
     Prioritizes specific types (currency, date, email, etc.) over generic
@@ -95,7 +95,7 @@ def _classify_value(value: str) -> str:  # noqa: C901
     return "string"
 
 
-def _value_patterns_to_field_types(patterns) -> list[dict]:  # noqa: C901, PLR0912
+def _value_patterns_to_field_types(patterns) -> list[dict]:
     """Map detected value patterns to generic field type suggestions.
 
     Returns a list of {type, confidence, example, description} dicts without

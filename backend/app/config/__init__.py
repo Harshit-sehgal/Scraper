@@ -71,32 +71,32 @@ class Settings(
     # ─── Dynamic properties (read from env vars at runtime) ─────────────
 
     @property
-    def GROQ_API_KEY(self) -> str:  # noqa: N802
+    def GROQ_API_KEY(self) -> str:
         """Groq API key for LLM calls. Read from GROQ_API_KEY env var dynamically."""
         return (os.environ.get("GROQ_API_KEY") or "").strip()
 
     @property
-    def WORKER_QUEUE(self) -> bool:  # noqa: N802
+    def WORKER_QUEUE(self) -> bool:
         """Whether worker queue mode is enabled. Read from DATAFORGE_WORKER_QUEUE env var dynamically."""
         return (os.environ.get("DATAFORGE_WORKER_QUEUE") or "").strip().lower() in ("1", "true", "yes")
 
     @property
-    def SMOKE_TEST_MODE(self) -> bool:  # noqa: N802
+    def SMOKE_TEST_MODE(self) -> bool:
         """Whether smoke test mode is enabled. Reads from DATAFORGE_SMOKE_TEST_MODE env var dynamically."""
         return (os.environ.get("DATAFORGE_SMOKE_TEST_MODE") or "").strip().lower() in ("true", "1", "yes")
 
     @property
-    def STORAGE_BACKEND(self) -> str:  # noqa: N802
+    def STORAGE_BACKEND(self) -> str:
         """Storage backend. Reads from DATAFORGE_STORAGE_BACKEND env var dynamically. Default: 'sqlite'."""
         return (os.environ.get("DATAFORGE_STORAGE_BACKEND") or "sqlite").strip().lower()
 
     @property
-    def DATABASE_URL(self) -> str:  # noqa: N802
+    def DATABASE_URL(self) -> str:
         """Database URL. Reads from DATAFORGE_DATABASE_URL env var dynamically."""
         return (os.environ.get("DATAFORGE_DATABASE_URL") or "").strip()
 
     @property
-    def PG_MIN_CONN(self) -> int:  # noqa: N802
+    def PG_MIN_CONN(self) -> int:
         """Postgres pool minimum size. Reads from DATAFORGE_PG_MIN_CONN."""
         raw = (os.environ.get("DATAFORGE_PG_MIN_CONN") or "1").strip()
         try:
@@ -106,7 +106,7 @@ class Settings(
         return max(1, min(value, 1000))
 
     @property
-    def PG_MAX_CONN(self) -> int:  # noqa: N802
+    def PG_MAX_CONN(self) -> int:
         """Postgres pool maximum size. Reads from DATAFORGE_PG_MAX_CONN."""
         raw = (os.environ.get("DATAFORGE_PG_MAX_CONN") or "10").strip()
         try:
@@ -116,27 +116,27 @@ class Settings(
         return max(1, min(value, 1000))
 
     @property
-    def QUEUE_BACKEND_DYNAMIC(self) -> str:  # noqa: N802
+    def QUEUE_BACKEND_DYNAMIC(self) -> str:
         """Queue backend (dynamic). Reads from DATAFORGE_QUEUE_BACKEND env var dynamically."""
         return (os.environ.get("DATAFORGE_QUEUE_BACKEND") or self.QUEUE_BACKEND).strip().lower()
 
     @property
-    def STATE_FILE(self) -> str:  # noqa: N802
+    def STATE_FILE(self) -> str:
         """State file path (legacy alias). Reads from DATAFORGE_STATE_FILE env var dynamically."""
         return (os.environ.get("DATAFORGE_STATE_FILE") or "").strip()
 
     @property
-    def SEMANTIC_STATE_PATH_DYNAMIC(self) -> str:  # noqa: N802
+    def SEMANTIC_STATE_PATH_DYNAMIC(self) -> str:
         """Semantic state path (dynamic). Reads from SEMANTIC_STATE_PATH env var dynamically."""
         return os.environ.get("SEMANTIC_STATE_PATH") or self.SEMANTIC_STATE_PATH
 
     @property
-    def STATE_FILE_PATH_DYNAMIC(self) -> str:  # noqa: N802
+    def STATE_FILE_PATH_DYNAMIC(self) -> str:
         """State file path (dynamic). Reads from DATAFORGE_STATE_FILE env var dynamically."""
         return os.environ.get("DATAFORGE_STATE_FILE") or self.STATE_FILE_PATH
 
     @property
-    def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:  # noqa: N802
+    def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
         """Whether to persist selector decay snapshots during tests."""
         return (os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
 

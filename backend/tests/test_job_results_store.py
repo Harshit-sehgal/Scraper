@@ -199,7 +199,7 @@ class TestLoadJobResultsFromDiskSafe:
         with gzip.open(path, "wb") as f:
             f.write(b'{"valid": 1}\n')
         # Append non-gzip bytes after the valid gzip stream
-        with open(path, "ab") as f:  # noqa: PTH123
+        with open(path, "ab") as f:
             f.write(b"NOT GZIP DATA")
 
         records, warning = load_job_results_from_disk_safe("corrupt_gzip")

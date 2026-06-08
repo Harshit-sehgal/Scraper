@@ -93,7 +93,7 @@ class SystemGovernorDashboard:
 
         Path(MAP_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(MAP_PATH, "w", encoding="utf-8") as f:  # noqa: PTH123
+        with open(MAP_PATH, "w", encoding="utf-8") as f:
             f.write("# 🗺️ DataForge Visual System & Distributed Topology Map\n\n")
             f.write(
                 f"> **Governance Layer**: Live architectural status. Last refreshed: {

@@ -22,9 +22,9 @@ FORBIDDEN_PATTERNS = [
 ]
 
 
-def check_duplicate_definitions(filepath):  # noqa: C901
+def check_duplicate_definitions(filepath):
     """Detect duplicate method or function definitions, allowing property getter/setter pairs."""
-    with open(filepath) as f:  # noqa: PTH123
+    with open(filepath) as f:
         try:
             tree = ast.parse(f.read())
         except SyntaxError as e:
@@ -58,14 +58,14 @@ def check_duplicate_definitions(filepath):  # noqa: C901
     counts = collections.Counter(functions)
     dupes = [f for f, count in counts.items() if count > 1]
     for func_name in dupes:
-        errors.append(f"Duplicate global function '{func_name}' ({filepath})")  # noqa: PERF401
+        errors.append(f"Duplicate global function '{func_name}' ({filepath})")
 
     return errors
 
 
 def check_dangling_references(filepath):
     """Detect references to symbols that no longer exist or are forbidden."""
-    KILLED_SYMBOLS = [  # noqa: N806
+    KILLED_SYMBOLS = [
         "detect_allocation_contradictions",
         "re_alloc_graph",
         "_field_contradiction_penalty",
@@ -74,7 +74,7 @@ def check_dangling_references(filepath):
     ]
 
     errors = []
-    with open(filepath) as f:  # noqa: PTH123
+    with open(filepath) as f:
         lines = f.readlines()
         for i, line in enumerate(lines, 1):
             line_clean = line.strip()
@@ -120,14 +120,14 @@ def check_dangling_references(filepath):
 def check_metric_ownership(filepath):
     """Enforce the Ontology Matrix rules."""
     # Forbidden direct storage of derived metrics
-    FORBIDDEN_FIELDS = [  # noqa: N806
+    FORBIDDEN_FIELDS = [
         "maturity",
         "field_pressure",
         "global_entropy",
     ]
 
     errors = []
-    with open(filepath) as f:  # noqa: PTH123
+    with open(filepath) as f:
         try:
             tree = ast.parse(f.read())
         except SyntaxError:
@@ -138,7 +138,7 @@ def check_metric_ownership(filepath):
         # Check for field declarations (in dataclasses)
         for node in cls.body:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id in FORBIDDEN_FIELDS:
-                errors.append(  # noqa: PERF401
+                errors.append(
                     f"Illegal direct storage of derived metric '{node.target.id}' in class '{cls.name}' ({filepath})",
                 )
 
@@ -151,7 +151,7 @@ def main():
 
     print("--- ARCHITECTURE VALIDATION START ---")  # noqa: T201
 
-    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]  # noqa: PTH118
+    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]
 
     for f in files:
         all_errors.extend(check_duplicate_definitions(f))

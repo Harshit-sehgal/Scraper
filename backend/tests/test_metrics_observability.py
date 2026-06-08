@@ -71,10 +71,10 @@ class TestExportOutcomes:
             record_export_outcome,
         )
 
-        record_export_outcome("csv", True)  # noqa: FBT003
-        record_export_outcome("csv", True)  # noqa: FBT003
-        record_export_outcome("csv", False)  # noqa: FBT003
-        record_export_outcome("excel", True)  # noqa: FBT003
+        record_export_outcome("csv", True)
+        record_export_outcome("csv", True)
+        record_export_outcome("csv", False)
+        record_export_outcome("excel", True)
         outcomes = get_export_outcomes()
         assert outcomes == {"csv": {"success": 2, "failure": 1}, "excel": {"success": 1, "failure": 0}}
 
@@ -86,9 +86,9 @@ class TestBrowserLaunchOutcomes:
             record_browser_launch,
         )
 
-        record_browser_launch(True)  # noqa: FBT003
-        record_browser_launch(False)  # noqa: FBT003
-        record_browser_launch(False)  # noqa: FBT003
+        record_browser_launch(True)
+        record_browser_launch(False)
+        record_browser_launch(False)
         outcomes = get_browser_launch_outcomes()
         assert outcomes == {"success": 1, "failure": 2}
 
@@ -159,8 +159,8 @@ class TestMetricsEndpointExposesNewGauges:
             record_export_outcome,
         )
 
-        record_export_outcome("csv", True)  # noqa: FBT003
-        record_export_outcome("csv", False)  # noqa: FBT003
+        record_export_outcome("csv", True)
+        record_export_outcome("csv", False)
         assert get_export_outcomes() == {"csv": {"success": 1, "failure": 1}}
         r = client.get("/metrics")
         if r.status_code == 200:

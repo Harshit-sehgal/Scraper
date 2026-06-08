@@ -121,7 +121,7 @@ class ReplayBuffer:
             # Write to current segment
             filepath = self._ensure_segment()
             line = json.dumps(entry, separators=(",", ":"))
-            with open(filepath, "a") as f:  # noqa: PTH123
+            with open(filepath, "a") as f:
                 f.write(line + "\n")
 
             self._current_segment_count += 1
@@ -185,7 +185,7 @@ class ReplayBuffer:
 
     # ─── Reading / Streaming ────────────────────────────────────────
 
-    def stream_from(self, start_idx: int = 0) -> Iterator[dict]:  # noqa: C901, PLR0912
+    def stream_from(self, start_idx: int = 0) -> Iterator[dict]:
         """Stream entries from start_idx onward, loading from persistent storage.
 
         Uses checkpoint index for O(log N) seek into the correct segment,
@@ -216,7 +216,7 @@ class ReplayBuffer:
             return
 
         # 3. Stream forward from checkpoint, skipping entries < start_idx
-        with open(segment_path) as f:  # noqa: PTH123
+        with open(segment_path) as f:
             f.seek(segment_offset)
             for line in f:
                 line = line.strip()  # noqa: PLW2901, RUF100
@@ -236,7 +236,7 @@ class ReplayBuffer:
             seg_path = self._base_dir / seg_name
             if not seg_path.exists():
                 continue
-            with open(seg_path) as f:  # noqa: PTH123
+            with open(seg_path) as f:
                 for line in f:
                     line = line.strip()  # noqa: PLW2901, RUF100
                     if not line:
@@ -247,7 +247,7 @@ class ReplayBuffer:
                         continue
                     yield entry
 
-    def reconstruct_state_at(self, target_idx: int) -> dict | None:  # noqa: C901
+    def reconstruct_state_at(self, target_idx: int) -> dict | None:
         """Reconstruct full state at a specific index via checkpoint + replay.
 
         Uses the nearest preceding checkpoint and applies deltas forward.
@@ -279,7 +279,7 @@ class ReplayBuffer:
         if not seg_path.exists():
             return None
 
-        with open(seg_path) as f:  # noqa: PTH123
+        with open(seg_path) as f:
             f.seek(offset)
             for line in f:
                 line = line.strip()  # noqa: PLW2901, RUF100
@@ -369,7 +369,7 @@ class ReplayBuffer:
             self._segments.append(seg_path.name)
             total_lines = 0
             # Rebuild checkpoint index by scanning this segment
-            with open(seg_path) as f:  # noqa: PTH123
+            with open(seg_path) as f:
                 while True:
                     pos = f.tell()
                     line = f.readline()
@@ -422,7 +422,7 @@ class ReplayBuffer:
         """Count non-empty lines in a segment file."""
         count = 0
         try:
-            with open(seg_path) as f:  # noqa: PTH123
+            with open(seg_path) as f:
                 for line in f:
                     if line.strip():
                         count += 1

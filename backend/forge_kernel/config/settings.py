@@ -88,15 +88,15 @@ class StorageSettings(BaseSettings):
     JOB_RESULTS_DISK_OFFLOAD_THRESHOLD: int = 1000
 
     @property
-    def STORAGE_BACKEND(self) -> str:  # noqa: N802
+    def STORAGE_BACKEND(self) -> str:
         return (os.environ.get("DATAFORGE_STORAGE_BACKEND") or "sqlite").strip().lower()
 
     @property
-    def DATABASE_URL(self) -> str:  # noqa: N802
+    def DATABASE_URL(self) -> str:
         return (os.environ.get("DATAFORGE_DATABASE_URL") or "").strip()
 
     @property
-    def QUEUE_BACKEND(self) -> str:  # noqa: N802
+    def QUEUE_BACKEND(self) -> str:
         return (os.environ.get("DATAFORGE_QUEUE_BACKEND") or "sqlite").strip().lower()
 
 
@@ -123,7 +123,7 @@ class LLMSettings(BaseSettings):
     GROQ_API_ENDPOINT: str = "https://api.groq.com/openai/v1/chat/completions"
 
     @property
-    def GROQ_API_KEY(self) -> str:  # noqa: N802
+    def GROQ_API_KEY(self) -> str:
         return (os.environ.get("GROQ_API_KEY") or "").strip()
 
 

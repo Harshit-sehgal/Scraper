@@ -33,7 +33,7 @@ else:
     # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
     class LazyEnumMeta(type):
         def __getattr__(cls, name):
-            from app.acquisition_state import AcquisitionState as impl  # noqa: N813
+            from app.acquisition_state import AcquisitionState as impl
 
             return getattr(impl, name)
 
@@ -42,13 +42,13 @@ else:
 
     class AcquisitionLineage:
         def __new__(cls, *args, **kwargs):
-            from app.acquisition_state import AcquisitionLineage as impl  # noqa: N813
+            from app.acquisition_state import AcquisitionLineage as impl
 
             return impl(*args, **kwargs)
 
     class AttemptContext:
         def __new__(cls, *args, **kwargs):
-            from app.recovery_strategies import AttemptContext as impl  # noqa: N813
+            from app.recovery_strategies import AttemptContext as impl
 
             return impl(*args, **kwargs)
 
@@ -93,7 +93,7 @@ def _acquisition_state_for_failure(failure_category: str | None) -> AcquisitionS
     return AcquisitionState.EMPTY_RESPONSE
 
 
-async def scrape_url_with_recovery(  # noqa: C901, PLR0912, PLR0913, PLR0915
+async def scrape_url_with_recovery(
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,

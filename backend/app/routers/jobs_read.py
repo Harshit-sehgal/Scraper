@@ -22,7 +22,7 @@ from app.storage_interface import get_job_repository
 logger = logging.getLogger(__name__)
 
 
-def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> None:  # noqa: C901, PLR0915
+def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> None:
     """Register all read-only job endpoints on the given router."""
 
     @router.get("/api/jobs")
@@ -93,7 +93,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             return {"jobs": summaries, "next_cursor": next_cursor}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):  # noqa: FBT002
+    async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):
         job = await run_in_threadpool(manager.get_job, job_id)
 
         results_list = []

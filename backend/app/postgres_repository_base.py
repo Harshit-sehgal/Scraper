@@ -517,7 +517,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
     backend: str = "postgres"
 
-    def __init__(self, auto_ensure_schema: bool = True) -> None:  # noqa: FBT001, FBT002
+    def __init__(self, auto_ensure_schema: bool = True) -> None:
         self._auto_ensure_schema = auto_ensure_schema
         self._schema_ensured = False
 
@@ -622,7 +622,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             )
         return summaries
 
-    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:  # noqa: FBT001, FBT002
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
         """Return a ``{status_value: count}`` mapping for all jobs.
 
         Implemented as a single ``GROUP BY status`` query so it stays
@@ -699,7 +699,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             )
         return summaries
 
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:  # noqa: C901, FBT001, FBT002, PLR0912
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         self._ensure()
         with self._conn() as conn:
             # Cross-replica recovery contract: when more than one API
@@ -787,7 +787,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     except Exception:
                         logger.debug("pg_advisory_unlock(8675309) failed; will be released at session end")
 
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:  # noqa: FBT001, FBT002
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         self._ensure()
         with self._conn() as conn:
 

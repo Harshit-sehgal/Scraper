@@ -12,18 +12,18 @@ import os
 def _app_path(rel_path: str) -> str:
     """Resolve app/ file path regardless of CWD."""
     candidates = [
-        os.path.join("backend", rel_path),  # noqa: PTH118
+        os.path.join("backend", rel_path),
         rel_path,
     ]
     for c in candidates:
-        if os.path.exists(c):  # noqa: PTH110
+        if os.path.exists(c):
             return c
     return rel_path
 
 
 def test_lifecycle_hooks_exist() -> None:
     """Every method called in the pipeline must exist on SemanticWorldState."""
-    with open(_app_path("app/semantic_pipeline.py")) as f:  # noqa: PTH123
+    with open(_app_path("app/semantic_pipeline.py")) as f:
         pipeline = f.read()
 
     # Parse all method calls on world state in the pipeline
@@ -37,10 +37,10 @@ def test_lifecycle_hooks_exist() -> None:
                 calls.add(name)
 
     world_state_methods = set()
-    ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))  # noqa: PTH120
-    for fname in os.listdir(ws_dir):  # noqa: PTH208
+    ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))
+    for fname in os.listdir(ws_dir):
         if fname.endswith(".py"):
-            with open(os.path.join(ws_dir, fname)) as f:  # noqa: PTH118, PTH123
+            with open(os.path.join(ws_dir, fname)) as f:
                 tree2 = ast.parse(f.read())
             for node in ast.walk(tree2):
                 if isinstance(node, ast.ClassDef) and (node.name == "SemanticWorldState" or "Mixin" in node.name):
@@ -55,13 +55,13 @@ def test_lifecycle_hooks_exist() -> None:
     )
 
 
-def test_no_orphan_methods() -> None:  # noqa: C901, PLR0912
+def test_no_orphan_methods() -> None:
     """All SemanticWorldState public methods should be reachable from the pipeline or scheduler."""
     methods = set()
-    ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))  # noqa: PTH120
-    for fname in os.listdir(ws_dir):  # noqa: PTH208
+    ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))
+    for fname in os.listdir(ws_dir):
         if fname.endswith(".py"):
-            with open(os.path.join(ws_dir, fname)) as f:  # noqa: PTH118, PTH123
+            with open(os.path.join(ws_dir, fname)) as f:
                 tree = ast.parse(f.read())
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef) and (node.name == "SemanticWorldState" or "Mixin" in node.name):
@@ -77,7 +77,7 @@ def test_no_orphan_methods() -> None:  # noqa: C901, PLR0912
         for fname in files:
             if not fname.endswith(".py"):
                 continue
-            with open(os.path.join(root, fname)) as f:  # noqa: PTH118, PTH123
+            with open(os.path.join(root, fname)) as f:
                 content = f.read()
             for method in list(methods):
                 # Check both method-call style .method() and property access .method
@@ -168,9 +168,9 @@ def test_no_orphan_methods() -> None:  # noqa: C901, PLR0912
     )
 
 
-def test_event_subscribers_are_defined() -> None:  # noqa: C901, PLR0912
+def test_event_subscribers_are_defined() -> None:
     """Every event type with subscribers must be dispatched somewhere."""
-    with open(_app_path("app/semantic_events.py")) as f:  # noqa: PTH123
+    with open(_app_path("app/semantic_events.py")) as f:
         events_src = f.read()
 
     # Parse event types
@@ -192,7 +192,7 @@ def test_event_subscribers_are_defined() -> None:  # noqa: C901, PLR0912
         for fname in files:
             if not fname.endswith(".py"):
                 continue
-            with open(os.path.join(root, fname)) as f:  # noqa: PTH118, PTH123
+            with open(os.path.join(root, fname)) as f:
                 content = f.read()
             for et in event_types:
                 if f"SemanticEventType.{et}" in content:
@@ -216,15 +216,15 @@ def test_no_stale_pyc() -> None:
                 # Convert __pycache__/file.cpython-312.pyc -> file.py
                 py_name = f.split(".")[0] + ".py"
                 # The source file could be in the parent directory or a sibling
-                parent = os.path.dirname(root)  # app if root is app/__pycache__  # noqa: PTH120
-                py_path = os.path.join(parent, py_name)  # noqa: PTH118
-                if not os.path.exists(py_path):  # noqa: PTH110
-                    pyc_files.append(os.path.join(root, f))  # noqa: PTH118
+                parent = os.path.dirname(root)  # app if root is app/__pycache__
+                py_path = os.path.join(parent, py_name)
+                if not os.path.exists(py_path):
+                    pyc_files.append(os.path.join(root, f))
 
     assert not pyc_files, f"Stale .pyc files: {pyc_files}. These will be loaded instead of current source."
 
 
-def test_no_dead_imports() -> None:  # noqa: C901, PLR0912
+def test_no_dead_imports() -> None:
     """Core modules should not import symbols that don't exist."""
     core_modules = [
         "semantic_world_state",
@@ -237,7 +237,7 @@ def test_no_dead_imports() -> None:  # noqa: C901, PLR0912
         path = _app_path(f"app/{mod_name}.py")
         if mod_name == "semantic_world_state":
             path = _app_path("app/semantic_world_state/core.py")
-        with open(path) as f:  # noqa: PTH123
+        with open(path) as f:
             tree = ast.parse(f.read())
 
         # Collect all imported names and their source modules
@@ -269,7 +269,7 @@ def test_no_dead_imports() -> None:  # noqa: C901, PLR0912
         dead_imports = []
         for name in imports.keys():
             if name not in used and name not in exceptions:
-                dead_imports.append(name)  # noqa: PERF401
+                dead_imports.append(name)
 
         # Dead imports in core modules are tracked but not yet enforced as hard errors
         # because some are re-exported for backward compatibility.

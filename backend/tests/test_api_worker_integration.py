@@ -250,7 +250,7 @@ class TestRealWorkerHandler:
     """Tests using the actual scripts.run_worker.scrape_job_handler."""
 
     @pytest.mark.asyncio
-    async def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:  # noqa: PLR0915
+    async def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:
         """End-to-end test using the real scrape_job_handler from scripts/run_worker.
 
         Flow:
@@ -274,7 +274,7 @@ class TestRealWorkerHandler:
         from scripts.run_worker import scrape_job_handler
 
         # ── Mock scraped records ─────────────────────────────────────────
-        async def mock_scrape_url_with_recovery(  # noqa: PLR0913
+        async def mock_scrape_url_with_recovery(
             url,
             schema_fields,
             min_record_score=0.35,

@@ -11,6 +11,12 @@ from app.transaction_context import active_transaction
 
 logger = logging.getLogger(__name__)
 
+# ─── Constants ────────────────────────────────────────────────────────
+EXCLUSION_EPSILON: float = 0.01
+"""Threshold below which exclusion values are considered negligible and pruned."""
+EXPECTED_KEY_PARTS: int = 2
+"""Expected number of parts for pipe-separated or tuple keys."""
+
 
 class InstabilityState:
     """Sole owner of the semantic field's tension / exclusion structure."""
@@ -88,7 +94,7 @@ class InstabilityState:
         clamped = max(0.0, min(1.0, value))
         target = self._staging if self._staging is not None else self._exclusions
 
-        if clamped <= 0.01:
+        if clamped <= EXCLUSION_EPSILON:
             target.pop(sk, None)
         else:
             target[sk] = clamped
@@ -105,7 +111,7 @@ class InstabilityState:
         target = self._staging if self._staging is not None else self._exclusions
         for key in list(target.keys()):
             target[key] = max(0.0, target[key] - target[key] * rate)
-            if target[key] <= 0.01:
+            if target[key] <= EXCLUSION_EPSILON:
                 del target[key]
         self._record("decay", {"rate": rate})
 
@@ -114,7 +120,7 @@ class InstabilityState:
         target = self._staging if self._staging is not None else self._exclusions
         if key in target:
             new_val = target[key] - target[key] * rate
-            if new_val <= 0.01:
+            if new_val <= EXCLUSION_EPSILON:
                 del target[key]
             else:
                 target[key] = new_val
@@ -155,7 +161,7 @@ class InstabilityState:
             if isinstance(k, str):
                 if "|" in k:
                     parts = k.split("|")
-                    if len(parts) == 2:
+                    if len(parts) == EXPECTED_KEY_PARTS:
                         sk = tuple(sorted(parts))
                         target[sk] = max(0.0, min(1.0, v))
                     continue
@@ -170,7 +176,7 @@ class InstabilityState:
                     k = ast.literal_eval(k)  # nosec  # noqa: PLW2901, RUF100
                 except (ValueError, SyntaxError):
                     continue
-            if isinstance(k, (list, tuple)) and len(k) == 2:
+            if isinstance(k, (list, tuple)) and len(k) == EXPECTED_KEY_PARTS:
                 sk = tuple(sorted(k))
                 target[sk] = max(0.0, min(1.0, v))
 
@@ -184,7 +190,7 @@ class InstabilityState:
         remote_excl = other_data.get("learned_exclusions", {})
         for key_str, r_val in remote_excl.items():
             parts = key_str.split("|")
-            if len(parts) == 2:
+            if len(parts) == EXPECTED_KEY_PARTS:
                 key = tuple(parts)
                 l_val = self.get_exclusion_by_key(key)
                 # CRDT-lite: pick the strongest exclusion signal

@@ -229,7 +229,7 @@ class TestStorageStatusEndpoint:
 class TestReadyWithMockedPostgres:
     """Tests for /ready and /storage/status when using a mocked Postgres repository."""
 
-    def _make_mock_postgres_repo(self, healthy: bool = True):  # noqa: FBT001, FBT002
+    def _make_mock_postgres_repo(self, healthy: bool = True):
         """Create a mock PostgresJobRepository-like object."""
         from unittest.mock import MagicMock
 

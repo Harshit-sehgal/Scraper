@@ -265,7 +265,7 @@ def test_worker_healthcheck_docker_compose_reference() -> None:
     compose_path = REPO_ROOT / "docker-compose.prod.yml"
     assert compose_path.exists(), f"docker-compose.prod.yml not found at {compose_path}"
 
-    with open(compose_path) as f:  # noqa: PTH123
+    with open(compose_path) as f:
         config = yaml.safe_load(f)
 
     worker = config.get("services", {}).get("worker", {})
@@ -474,7 +474,7 @@ def test_fastapi_metadata_version_consistent_with_pyproject(monkeypatch) -> None
     # Parse pyproject.toml for version
     import tomllib
 
-    with open(pyproject_path, "rb") as f:  # noqa: PTH123
+    with open(pyproject_path, "rb") as f:
         pyproject = tomllib.load(f)
 
     pyproject_version = pyproject.get("project", {}).get("version", "")

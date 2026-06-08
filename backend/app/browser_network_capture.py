@@ -200,11 +200,11 @@ def _collect_session_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     for entry in state.get("cookies", []):
         if entry.get("session_candidate"):
-            candidates.append(entry)  # noqa: PERF401
+            candidates.append(entry)
     for area_name in ("localStorage", "sessionStorage"):
         for entry in state.get("storage", {}).get(area_name, []):
             if entry.get("session_candidate"):
-                candidates.append(entry)  # noqa: PERF401
+                candidates.append(entry)
     return candidates[:_MAX_STORAGE_ENTRIES_PER_AREA]
 
 
@@ -423,7 +423,7 @@ def _evict_lru_captures() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def setup_network_capture(page) -> list[dict]:  # noqa: C901
+async def setup_network_capture(page) -> list[dict]:
     """Set up network response interception on a Playwright page.
 
     Registers a response listener that captures:
@@ -446,7 +446,7 @@ async def setup_network_capture(page) -> list[dict]:  # noqa: C901
     """
     captured: list[dict] = []
 
-    async def _on_response(response) -> None:  # noqa: C901, PLR0911, PLR0912
+    async def _on_response(response) -> None:
         """Handle a Playwright response event."""
         try:
             req = response.request
@@ -607,7 +607,7 @@ def _is_irrelevant_url(url: str) -> bool:
     return bool(path.endswith(skip_extensions))
 
 
-def _is_empty_payload(body: Any) -> bool:  # noqa: C901, PLR0911
+def _is_empty_payload(body: Any) -> bool:
     """Check if a parsed JSON body is empty or trivial."""
     if body is None:
         return True

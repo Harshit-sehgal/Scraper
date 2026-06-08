@@ -24,7 +24,7 @@ class ArchitecturalValidator:
         self.layer_map: dict[str, str] = {}
         self._parse_all_modules()
 
-    def _detect_layer(self, module_name: str) -> str:  # noqa: PLR0911
+    def _detect_layer(self, module_name: str) -> str:
         """Detect which architectural layer a module belongs to."""
         if any(x in module_name for x in ["selector", "extraction", "dom_", "xpath", "css_", "cleaning"]):
             return "Extract"
@@ -60,7 +60,7 @@ class ArchitecturalValidator:
             return "ML"
         return "Utility"
 
-    def _parse_all_modules(self) -> None:  # noqa: C901
+    def _parse_all_modules(self) -> None:
         """Parse all Python modules and extract dependencies."""
         files = list(self.app_dir.glob("*.py"))
         ws_pkg = self.app_dir / "semantic_world_state"
@@ -69,7 +69,7 @@ class ArchitecturalValidator:
 
         for py_file in sorted(files):
             try:
-                with open(py_file) as f:  # noqa: PTH123
+                with open(py_file) as f:
                     tree = ast.parse(f.read())
 
                 module_name = py_file.stem
@@ -340,7 +340,7 @@ class TestStateOwnership:
             imports = self.validator.get_imports(intel_mod)
             for imp in imports:
                 if self.validator.get_layer(imp) == "Memory":
-                    intelligence_state_access.append((intel_mod, imp))  # noqa: PERF401
+                    intelligence_state_access.append((intel_mod, imp))
 
         # This is expected - Intelligence reads from Memory
         # Just verify it's not too many (no single Intelligence module dominates)
@@ -396,7 +396,7 @@ class TestAsyncBoundaries:
         app_path = Path(__file__).resolve().parent.parent / "app"
         for py_file in app_path.glob("*.py"):
             try:
-                with open(py_file) as f:  # noqa: PTH123
+                with open(py_file) as f:
                     content = f.read()
                     # Look for async def with blocking calls
                     if "async def" in content and "requests." in content:
@@ -412,7 +412,7 @@ class TestAsyncBoundaries:
         scheduler_file = Path(__file__).resolve().parent.parent / "app" / "graph_update_scheduler.py"
 
         if scheduler_file.exists():
-            with open(scheduler_file) as f:  # noqa: PTH123
+            with open(scheduler_file) as f:
                 content = f.read()
                 # Check for update limit guard OR has try/catch pattern
                 has_limit_check = "MAX_UPDATES" in content or "max_" in content.lower()
@@ -432,7 +432,7 @@ class TestAsyncBoundaries:
         app_path = Path(__file__).resolve().parent.parent / "app"
         for py_file in app_path.glob("*.py"):
             try:
-                with open(py_file) as f:  # noqa: PTH123
+                with open(py_file) as f:
                     tree = ast.parse(f.read())
 
                     # Look for recursive callbacks

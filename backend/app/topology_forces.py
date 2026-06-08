@@ -25,7 +25,7 @@ def compute_edge_field_forces(state: "TopologyState") -> dict[tuple[str, str], d
     return forces  # type: ignore[return-value]
 
 
-def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pressure_amount: float, forces: dict) -> None:  # noqa: C901
+def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pressure_amount: float, forces: dict) -> None:
     """Redirect repulsive pressure through alternative high-affinity edge field routes."""
     # 1. Find high-affinity routes from the source region's roles
     route_targets: dict[str, float] = {}  # target_role -> weight
@@ -45,7 +45,7 @@ def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pres
     if not route_targets:
         # No alternative routes: dissipate trapped pressure as heat
         source_region.local_temperature = min(1.0, source_region.local_temperature + pressure_amount * 0.1)
-        state._record(
+        state.record(
             "redirect_repulsive_pressure_dissipate",
             {
                 "region_id": source_region.region_id,
@@ -56,7 +56,7 @@ def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pres
 
     # 2. Normalize weights and redirect pressure
     total_weight = sum(route_targets.values())
-    regs = state._get_regions()
+    regs = state.get_regions()
     redirected = 0.0
     affected_targets = []
 
@@ -71,7 +71,7 @@ def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pres
                 redirected += redirect_amount
                 affected_targets.append(target_r.region_id)
                 # Record each target mutation for MVCC tracking
-                state._record(
+                state.record(
                     "redirect_pressure_to_target",
                     {
                         "region_id": target_r.region_id,
@@ -88,7 +88,7 @@ def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pres
     remaining = pressure_amount - redirected
     if remaining > 0.01:
         source_region.local_temperature = min(1.0, source_region.local_temperature + remaining * 0.05)
-        state._record(
+        state.record(
             "redirect_repulsive_pressure_remainder",
             {
                 "region_id": source_region.region_id,
@@ -99,7 +99,7 @@ def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pres
 
 def route_contradiction(state: "TopologyState", role_a: str, role_b: str, strength: float = 0.1) -> dict:
     """Route a contradiction event through the unified edge field."""
-    forces = state._compute_edge_field_forces()
+    forces = state.compute_edge_field_forces()
     pair = tuple(sorted([role_a, role_b]))
     force = forces.get(pair, {})  # type: ignore[arg-type]
 
@@ -113,9 +113,9 @@ def route_contradiction(state: "TopologyState", role_a: str, role_b: str, streng
 
     if is_repulsive:
         # Repulsive edge: redirect pressure via the topology
-        for r in state._get_regions():
+        for r in state.get_regions():
             if role_a in r.competing_roles or role_b in r.competing_roles:
-                state._redirect_repulsive_pressure(r, strength * 0.5, forces)
+                state.redirect_repulsive_pressure(r, strength * 0.5, forces)
 
         # Strengthen the repulsive topological law
         current_law = state._topological_laws.get(pair, 0.0)

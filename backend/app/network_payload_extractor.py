@@ -71,7 +71,7 @@ class NetworkExtractionResult:
     field_coverage: float
 
 
-def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> list[RecordArrayCandidate]:  # noqa: C901
+def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> list[RecordArrayCandidate]:
     """Recursively find arrays of objects inside a JSON payload.
 
     Depth-limited to max_depth to prevent infinite recursion on
@@ -212,7 +212,7 @@ def _is_candidate_secret_heavy(candidate: RecordArrayCandidate) -> bool:
     return bool(len(first_record) > 0 and (sensitive_count >= 3 or sensitive_count / len(first_record) > 0.3))
 
 
-def _value_matches_type(value: Any, field_type: FieldType) -> bool:  # noqa: PLR0911
+def _value_matches_type(value: Any, field_type: FieldType) -> bool:
     """Check if a JSON value is compatible with the expected field type."""
     value = _extract_nested_value(value)
     if value is None:
@@ -237,7 +237,7 @@ def _value_matches_type(value: Any, field_type: FieldType) -> bool:  # noqa: PLR
     return True
 
 
-def _key_matches_field(key: str, field: SchemaField) -> float:  # noqa: C901, PLR0911
+def _key_matches_field(key: str, field: SchemaField) -> float:
     """Score how well a JSON key matches a schema field, using synonyms."""
     key_lower = key.lower().replace("_", " ").replace("-", " ")
     field_lower = field.name.lower().replace("_", " ")
@@ -270,7 +270,7 @@ def _key_matches_field(key: str, field: SchemaField) -> float:  # noqa: C901, PL
     return 0.0
 
 
-def score_record_array(candidate: RecordArrayCandidate, schema: list[SchemaField]) -> float:  # noqa: C901
+def score_record_array(candidate: RecordArrayCandidate, schema: list[SchemaField]) -> float:
     """Score a candidate record array against the requested schema."""
     if not candidate.records or not schema:
         return 0.0
@@ -323,7 +323,7 @@ def score_record_array(candidate: RecordArrayCandidate, schema: list[SchemaField
     return min(score, 100.0)
 
 
-def map_json_records_to_schema(  # noqa: C901
+def map_json_records_to_schema(
     records: list[dict],
     schema: list[SchemaField],
     source: str = "network_payload",

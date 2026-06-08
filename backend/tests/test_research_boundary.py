@@ -91,7 +91,7 @@ def test_all_research_spot_checks_are_registered() -> None:
         )
 
 
-def test_all_kernel_spot_checks_are_NOT_registered() -> None:  # noqa: N802
+def test_all_kernel_spot_checks_are_NOT_registered() -> None:
     for name in KERNEL_SPOT_CHECKS:
         assert name not in RESEARCH_MODULES, (
             f"{name!r} is a product-kernel module and must NOT be in the "

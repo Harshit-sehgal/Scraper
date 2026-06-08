@@ -1,5 +1,5 @@
 # mypy: ignore-errors
-# type: ignore  # noqa: PGH003
+# type: ignore
 import logging
 
 logger = logging.getLogger(__name__)

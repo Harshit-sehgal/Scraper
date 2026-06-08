@@ -225,7 +225,7 @@ def _detect_table_structure(soup: BeautifulSoup) -> StructureProfile | None:
     )
 
 
-def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:  # noqa: C901
+def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
     """Detect if page uses card / listings structure."""
     # Card indicators (generic, not domain-specific)
     card_selectors: list[tuple[str, dict[str, Any]]] = [
@@ -271,7 +271,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:  # 
                 if containers:
                     first_container = containers[0]
                     for h in first_container.find_all(["h1", "h2", "h3", "h4", "strong", "b"])[:5]:
-                        headers.append(h.get_text(strip=True))  # noqa: PERF401
+                        headers.append(h.get_text(strip=True))
                 best_headers = headers
 
     if max_items < 3:
@@ -379,7 +379,7 @@ def detect_value_patterns(html: str) -> ValuePatterns:
     patterns = ValuePatterns()
 
     # Common English words to exclude from 3-letter code detection
-    COMMON_3LETTER_WORDS = {  # noqa: N806
+    COMMON_3LETTER_WORDS = {
         "THE",
         "AND",
         "FOR",

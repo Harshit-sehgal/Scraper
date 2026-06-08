@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def evolve_all(state: "TopologyState", force: bool = False) -> list:  # noqa: FBT001, FBT002
+def evolve_all(state: "TopologyState", force: bool = False) -> list:
     """Evolve all basins modulated by edge field forces and multi-scale feedback."""
     forces = state._compute_edge_field_forces()
 
@@ -55,7 +55,7 @@ def evolve_all(state: "TopologyState", force: bool = False) -> list:  # noqa: FB
     return all_effects
 
 
-def propagate_all(state: "TopologyState") -> list:  # noqa: C901, PLR0912
+def propagate_all(state: "TopologyState") -> list:
     """Propagate instability through the unified edge field."""
     forces = state._compute_edge_field_forces()
     all_effects = []
@@ -115,7 +115,7 @@ def propagate_all(state: "TopologyState") -> list:  # noqa: C901, PLR0912
     return all_effects
 
 
-def redistribute_instability(state: "TopologyState", damping: float = 1.0) -> dict:  # noqa: C901, PLR0912
+def redistribute_instability(state: "TopologyState", damping: float = 1.0) -> dict:
     """Redistribute instability across regions using thermodynamic free energy gradients."""
     regs = state._get_regions()
     if len(regs) < 2:

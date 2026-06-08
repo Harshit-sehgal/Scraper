@@ -22,7 +22,7 @@ class TopologyView:
     FieldConflictRegion objects. No mutation is possible through this interface.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         regions: list[FieldConflictRegion],
         global_communities,
@@ -111,7 +111,7 @@ class TopologyView:
         edges = []
         for edge in self.get_edge_fields():
             if edge.route_strength > 0.05:
-                edges.append(  # noqa: PERF401
+                edges.append(
                     {
                         "source": edge.source,
                         "target": edge.target,

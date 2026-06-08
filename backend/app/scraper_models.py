@@ -21,7 +21,7 @@ class ScrapeAttemptResult(list):
     carrying context about how the page was fetched, extracted, and classified.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         records: list[dict],
         html: str | None = None,

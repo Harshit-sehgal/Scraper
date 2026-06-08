@@ -48,7 +48,7 @@ def check_all_fixes() -> dict:
     # 5. capture_pre_allocation_field has schema expansion
     ws_dir = Path(base_dir) / "semantic_world_state"
     content_ws = ""
-    if os.path.isdir(ws_dir):  # noqa: PTH112
+    if os.path.isdir(ws_dir):
         for root, _, files in os.walk(ws_dir):
             for fname in files:
                 if fname.endswith(".py"):

@@ -48,7 +48,7 @@ def test_no_session_storage_for_api_key() -> None:
                     continue
                 for needle in FORBIDDEN_PATTERNS:
                     if needle in raw:
-                        offenders.append(f"{js_file.relative_to(REPO_ROOT)}:{lineno}: {stripped}")  # noqa: PERF401
+                        offenders.append(f"{js_file.relative_to(REPO_ROOT)}:{lineno}: {stripped}")
     assert not offenders, (
         "Frontend JS must not persist the API key in Web Storage. "
         "Use in-memory state or a backend-issued HTTP-only cookie. "

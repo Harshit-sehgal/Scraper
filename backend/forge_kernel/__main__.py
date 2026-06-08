@@ -18,7 +18,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="DataForge Forge Kernel API server")
     parser.add_argument(
         "--host",
-        default="0.0.0.0",  # noqa: S104
+        default="0.0.0.0",
         help="Bind address (default: 0.0.0.0)",
     )
     parser.add_argument(

@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 # ─── Schema Validation Helpers ──────────────────────────────────────────
 
 
-def validate_llm_json(  # noqa: C901, PLR0911, PLR0912, PLR0913
+def validate_llm_json(
     raw: Any,
     expected_type: type = dict,
     required_keys: list[str] | None = None,
     key_types: dict[str, type | tuple[type, ...]] | None = None,
     list_item_type: type | None = None,
-    allow_extra_keys: bool = True,  # noqa: FBT001, FBT002
+    allow_extra_keys: bool = True,
 ) -> tuple[bool, str | None]:
     """Validate that an LLM JSON response matches expected structure.
 

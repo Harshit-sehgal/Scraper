@@ -94,7 +94,7 @@ class AntiBotEngine:
             self._proxy_manager = get_proxy_manager()
         return self._proxy_manager
 
-    def detect_challenges(self, html: str, headers: dict | None = None) -> float:  # noqa: C901
+    def detect_challenges(self, html: str, headers: dict | None = None) -> float:
         """Score how likely the page is a challenge or block page.
 
         Returns a score from 0.0 (clean) to 1.0 (certainly blocked).

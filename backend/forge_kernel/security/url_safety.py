@@ -25,7 +25,7 @@ def _is_safe_ip(ip_str: str) -> bool:
         return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
 
 
-def validate_public_http_url(url: str) -> None:  # noqa: C901, PLR0912
+def validate_public_http_url(url: str) -> None:
     """Raise ValueError if the URL is not a safe public HTTP(S) URL."""
     if not url:
         msg = "URL cannot be empty"
@@ -51,7 +51,7 @@ def validate_public_http_url(url: str) -> None:  # noqa: C901, PLR0912
             return
 
     # Reject explicit loopback / internal names
-    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # noqa: S104
+    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):
         msg = f"URL hostname '{hostname}' is a restricted local loopback target."
         raise ValueError(msg)
 

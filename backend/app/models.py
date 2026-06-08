@@ -85,7 +85,7 @@ class SchemaField(BaseModel):
     name: str = Field(..., description="Field name, e.g. 'company_name'", max_length=64)
     field_type: FieldType = Field(..., description="Data type for this field")
     description: str = Field("", description="Optional hint for the LLM about what this field is")
-    required: bool = Field(True, description="Whether this field is required")  # noqa: FBT003
+    required: bool = Field(True, description="Whether this field is required")
 
     @field_validator("name")
     @classmethod
@@ -187,9 +187,9 @@ class JobCreate(BaseModel):
     schema_fields: list[SchemaField] = Field(default_factory=list, max_length=50, description="Data schema to extract")
     filters: list[FilterRule] = Field(default_factory=list, max_length=100, description="Post-processing filters")
     # Advanced options
-    pagination: bool = Field(False, description="Whether to follow pagination links")  # noqa: FBT003
+    pagination: bool = Field(False, description="Whether to follow pagination links")
     max_pages: int = Field(10, ge=1, le=100, description="Max pages to follow per URL")
-    deduplicate: bool = Field(True, description="Remove duplicate records")  # noqa: FBT003
+    deduplicate: bool = Field(True, description="Remove duplicate records")
     deduplicate_field: str = Field("", description="Field to use for deduplication")
     # Selectors map from URL analysis (item_container + field selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
@@ -197,7 +197,7 @@ class JobCreate(BaseModel):
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
 
     @model_validator(mode="after")
-    def validate_mode_requirements(self):  # noqa: C901, PLR0912
+    def validate_mode_requirements(self):
         if self.mode == ScrapeMode.MANUAL:
             cleaned_urls = [u.strip() for u in self.urls if str(u or "").strip()]
             if not cleaned_urls:

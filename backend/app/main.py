@@ -104,10 +104,10 @@ def configure_static(app: FastAPI) -> None:
     if settings.ENV.lower() == "production":
         return
 
-    FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"  # noqa: N806
+    FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
     if FRONTEND_DIR.exists():
         app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-        DASHBOARD_DIR = FRONTEND_DIR / "dashboard"  # noqa: N806
+        DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
         if DASHBOARD_DIR.exists():
             app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
 

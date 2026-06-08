@@ -27,6 +27,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ─── Constants ────────────────────────────────────────────────────────
+FETCH_LATENCY_THRESHOLD_MS: float = 15000.0
+"""Fetch latency above which triggers timeout death spiral prediction."""
+ZERO_RESULT_QUALITY_THRESHOLD: float = 0.15
+"""Avg quality score below which triggers zero-result drift prediction."""
+ZERO_RESULT_SAMPLE_THRESHOLD: int = 5
+"""Minimum samples before zero-result drift prediction is made."""
+FAILURE_RATE_HIGH_THRESHOLD: float = 0.5
+"""Failure rate above which triggers sustained failure prediction."""
+FAILURE_RATE_CRITICAL_THRESHOLD: float = 0.8
+"""Failure rate above which risk level is 'critical'."""
+CASCADE_SAMPLE_THRESHOLD: int = 20
+"""Minimum sample count for considering cascade risk."""
+SELECTOR_DECAY_MIN_SAMPLES: int = 5
+"""Minimum samples before estimating selector decay timer."""
+TREND_SIGNAL_THRESHOLD: int = 2
+"""Number of declining/improving signals to determine health trend."""
+SYSTEMIC_CRITICAL_THRESHOLD: int = 3
+"""Number of critical risks to consider system-wide risk as critical."""
+SYSTEMIC_HIGH_THRESHOLD: int = 5
+"""Number of high risks to consider system-wide risk as critical."""
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Data Models
@@ -147,14 +169,14 @@ class DegradationPredictor:
     """
 
     # Risk thresholds
-    CRITICAL_HEALTH_THRESHOLD = 25
-    HIGH_HEALTH_THRESHOLD = 45
-    MEDIUM_HEALTH_THRESHOLD = 65
+    CRITICAL_HEALTH_THRESHOLD: int = 25
+    HIGH_HEALTH_THRESHOLD: int = 45
+    MEDIUM_HEALTH_THRESHOLD: int = 65
 
     def __init__(self, history_window: int = 200) -> None:
         self._history_window = history_window
 
-    def predict(self, telemetry_history: list[dict], domain_trends: dict | None = None) -> PredictionReport:  # noqa: C901
+    def predict(self, telemetry_history: list[dict], domain_trends: dict | None = None) -> PredictionReport:
         """Run full degradation prediction on telemetry data.
 
         Args:
@@ -246,7 +268,7 @@ class DegradationPredictor:
         if trend.selector_decay_accelerating:
             pred = self._build_prediction(
                 domain=domain,
-                risk_level="high" if trend.health_score < 50 else "medium",
+                risk_level="high" if trend.health_score < self.HIGH_HEALTH_THRESHOLD + 5 else "medium",
                 failure_type="selector_decay",
                 confidence=self._estimate_confidence(trend, base=0.75),
                 health_score_current=trend.health_score,
@@ -271,7 +293,7 @@ class DegradationPredictor:
         if trend.anti_bot_trend == "degrading":
             pred = self._build_prediction(
                 domain=domain,
-                risk_level="medium" if trend.health_score > 50 else "high",
+                risk_level="medium" if trend.health_score > self.HIGH_HEALTH_THRESHOLD + 5 else "high",
                 failure_type="anti_bot_block",
                 confidence=self._estimate_confidence(trend, base=0.7),
                 health_score_current=trend.health_score,
@@ -292,7 +314,7 @@ class DegradationPredictor:
             predictions.append(pred)
 
         # 4. Check for latency creep (timeout death spiral)
-        if trend.fetch_latency_trend == "degrading" and trend.avg_fetch_ms > 15000:
+        if trend.fetch_latency_trend == "degrading" and trend.avg_fetch_ms > FETCH_LATENCY_THRESHOLD_MS:
             pred = self._build_prediction(
                 domain=domain,
                 risk_level="medium",
@@ -314,10 +336,10 @@ class DegradationPredictor:
             predictions.append(pred)
 
         # 5. Check for zero-result drift (empty pages)
-        if trend.avg_quality_score < 0.15 and trend.sample_count >= 5:
+        if trend.avg_quality_score < ZERO_RESULT_QUALITY_THRESHOLD and trend.sample_count >= ZERO_RESULT_SAMPLE_THRESHOLD:
             pred = self._build_prediction(
                 domain=domain,
-                risk_level="high" if trend.health_score < 40 else "medium",
+                risk_level="high" if trend.health_score < self.HIGH_HEALTH_THRESHOLD - 5 else "medium",
                 failure_type="zero_result_drift",
                 confidence=self._estimate_confidence(trend, base=0.7),
                 health_score_current=trend.health_score,
@@ -338,13 +360,13 @@ class DegradationPredictor:
             predictions.append(pred)
 
         # 6. High failure rate with poor health
-        if trend.failure_rate > 0.5 and trend.health_score < 40:
+        if trend.failure_rate > FAILURE_RATE_HIGH_THRESHOLD and trend.health_score < self.HIGH_HEALTH_THRESHOLD - 5:
             # Check cascade risk: if this is a major domain, failures could
             # cascade
-            cascade = trend.sample_count >= 20
+            cascade = trend.sample_count >= CASCADE_SAMPLE_THRESHOLD
             pred = self._build_prediction(
                 domain=domain,
-                risk_level="critical" if trend.failure_rate > 0.8 else "high",
+                risk_level="critical" if trend.failure_rate > FAILURE_RATE_CRITICAL_THRESHOLD else "high",
                 failure_type="sustained_failure_rate",
                 confidence=self._estimate_confidence(trend, base=0.85),
                 health_score_current=trend.health_score,
@@ -414,7 +436,7 @@ class DegradationPredictor:
 
     # ── Helpers ─────────────────────────────────────────────────────
 
-    def _build_prediction(  # noqa: PLR0913
+    def _build_prediction(
         self,
         domain: str,
         risk_level: str,
@@ -425,7 +447,7 @@ class DegradationPredictor:
         evidence: list[str],
         recommended_actions: list[str],
         trend: DomainTrend,
-        cascade_risk: bool = False,  # noqa: FBT001, FBT002
+        cascade_risk: bool = False,
         cascade_risk_domains: list[str] | None = None,
     ) -> Prediction:
         return Prediction(
@@ -453,7 +475,7 @@ class DegradationPredictor:
 
     def _estimate_selector_decay_timer(self, trend: DomainTrend) -> float | None:
         """Estimate hours until selector decay causes significant extraction loss."""
-        if trend.sample_count < 5:
+        if trend.sample_count < SELECTOR_DECAY_MIN_SAMPLES:
             return None
 
         # Use recent quality trend to estimate decay rate
@@ -491,19 +513,19 @@ class DegradationPredictor:
         if trend.fetch_latency_trend == "improving":
             improving_signals += 1
 
-        if declining_signals >= 2:
+        if declining_signals >= TREND_SIGNAL_THRESHOLD:
             return "declining"
-        if improving_signals >= 2:
+        if improving_signals >= TREND_SIGNAL_THRESHOLD:
             return "improving"
         return "stable"
 
     def _compute_systemic_risk(self, report: PredictionReport) -> str:
         """Compute overall systemic risk level."""
-        if report.critical_risk_count >= 3 or report.high_risk_count >= 5:
+        if report.critical_risk_count >= SYSTEMIC_CRITICAL_THRESHOLD or report.high_risk_count >= SYSTEMIC_HIGH_THRESHOLD:
             return "critical"
-        if report.critical_risk_count >= 1 or report.high_risk_count >= 3:
+        if report.critical_risk_count >= 1 or report.high_risk_count >= SYSTEMIC_CRITICAL_THRESHOLD:
             return "high"
-        if report.high_risk_count >= 1 or report.medium_risk_count >= 5:
+        if report.high_risk_count >= 1 or report.medium_risk_count >= SYSTEMIC_HIGH_THRESHOLD:
             return "medium"
         return "low"
 

@@ -108,7 +108,7 @@ class LocalASGIClient:
 
 @pytest.mark.postgres
 @pytest.mark.asyncio
-async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, monkeypatch) -> None:  # noqa: PLR0915
+async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, monkeypatch) -> None:
     """Submits a mock session-bound URL to the public jobs REST API,
     runs the worker, and asserts the results have correct provenance and no leaked secrets.
     """

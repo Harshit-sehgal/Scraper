@@ -28,7 +28,7 @@ from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 
 # Ensure backend is on the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # noqa: PTH118, PTH120
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s | %(message)s")
 # Quiet down noisy libs
@@ -381,7 +381,7 @@ class SiteResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:  # noqa: C901, PLR0912
+async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
     """Run scrape_url against one site and return structured results."""
     start = time.time()
     try:
@@ -583,7 +583,7 @@ def save_report(results: list[SiteResult], path: str = "smoke_test_report.json")
             for r in results
         ],
     }
-    with open(path, "w") as f:  # noqa: PTH123
+    with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -591,14 +591,14 @@ def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_t
     """Compare current results with the most recent previous run, print trends."""
     import glob as _glob
 
-    os.makedirs(history_dir, exist_ok=True)  # noqa: PTH103
+    os.makedirs(history_dir, exist_ok=True)
 
-    history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)  # noqa: PTH207
+    history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)
     if not history_files:
         return
 
     try:
-        with open(history_files[0]) as f:  # noqa: PTH123
+        with open(history_files[0]) as f:
             prev = json.load(f)
     except Exception:
         return

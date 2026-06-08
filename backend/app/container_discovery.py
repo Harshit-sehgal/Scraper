@@ -36,24 +36,74 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Text density thresholds
-DENSITY_TOO_LOW = 1.0  # Less than this = basically empty
-DENSITY_SPARSE = 3.0  # Between 1 and 3 = sparse
-DENSITY_GOOD_LOW = 5.0  # Minimum for a "good" container
-DENSITY_GOOD_HIGH = 120.0  # Maximum before it's prose (article text)
+DENSITY_TOO_LOW: float = 1.0  # Less than this = basically empty
+DENSITY_SPARSE: float = 3.0  # Between 1 and 3 = sparse
+DENSITY_GOOD_LOW: float = 5.0  # Minimum for a "good" container
+DENSITY_GOOD_HIGH: float = 120.0  # Maximum before it's prose (article text)
 
 # Minimum text length for a meaningful container
-MIN_CONTAINER_TEXT_LEN = 30
+MIN_CONTAINER_TEXT_LEN: int = 30
 
 # Score weights
-WEIGHT_TEXT_DENSITY = 0.10
-WEIGHT_TEXT_LENGTH = 0.08
-WEIGHT_PATTERNS = 0.25
-WEIGHT_LABEL_VALUE = 0.10
-WEIGHT_REPEATED_STRUCTURE = 0.15
-WEIGHT_SIBLING_SIMILARITY = 0.08
-WEIGHT_ACTION_ELEMENTS = 0.08
-WEIGHT_INTERNAL_SEGMENTS = 0.10
-WEIGHT_CHILD_COUNT = 0.06
+WEIGHT_TEXT_DENSITY: float = 0.10
+WEIGHT_TEXT_LENGTH: float = 0.08
+WEIGHT_PATTERNS: float = 0.25
+WEIGHT_LABEL_VALUE: float = 0.10
+WEIGHT_REPEATED_STRUCTURE: float = 0.15
+WEIGHT_SIBLING_SIMILARITY: float = 0.08
+WEIGHT_ACTION_ELEMENTS: float = 0.08
+WEIGHT_INTERNAL_SEGMENTS: float = 0.10
+WEIGHT_CHILD_COUNT: float = 0.06
+
+# Scoring thresholds
+PATTERN_COUNT_MIN_FOR_VALUES: int = 2
+"""Minimum pattern types present to consider container as having values."""
+COMBINED_TEXT_LONG: int = 200
+"""Text length threshold for 'long' combined text."""
+COMBINED_TEXT_MEDIUM: int = 100
+"""Text length threshold for 'medium' combined text."""
+COMBINED_TEXT_HAS_DESCRIPTION: int = 80
+"""Minimum combined text length to consider container as having description."""
+DEPTH_TOO_DEEP: int = 20
+"""DOM depth threshold for 'too deep' penalty."""
+DEPTH_MODERATE: int = 15
+"""DOM depth threshold for moderate depth penalty."""
+DEPTH_TOO_SHALLOW: int = 3
+"""DOM depth threshold for 'too shallow' penalty."""
+CHILD_COUNT_IDEAL_LOW: int = 3
+"""Minimum child count for ideal child range bonus."""
+CHILD_COUNT_IDEAL_HIGH: int = 20
+"""Maximum child count for ideal child range bonus."""
+CHILD_COUNT_SMALL: int = 2
+"""Child count for small-child bonus."""
+PURE_PRICE_NO_DESC_LEN: int = 100
+"""Combined text length below which a pure-price/button container is penalized."""
+PURE_PRICE_SOME_DESC_LEN: int = 200
+"""Combined text length for moderate pure-price/button container penalty."""
+LINK_ONLY_DESC_LEN: int = 60
+"""Combined text length below which a link-only container is penalized."""
+MIN_SCORE_FOR_GOOD_CONTAINER: float = 0.3
+"""Minimum record score to consider a container as 'good'."""
+ACCEPT_RECORD_COUNT: int = 3
+"""Minimum record count to accept a container pass."""
+SIGNIFICANT_TEXT_LENGTH: int = 100
+"""Minimum HTML length to start container discovery."""
+HTML_MIN_LENGTH: int = 100
+"""Minimum HTML length to start container discovery."""
+SNIPPET_MIN_LENGTH: int = 3
+"""Minimum length for a text snippet to be considered meaningful."""
+SNIPPET_MAX_LENGTH: int = 200
+"""Maximum length for a text snippet before truncation."""
+LABEL_WORDS_MIN_LENGTH: int = 2
+"""Minimum word length for label word filtering."""
+MATCH_COUNT_FOR_GOOD: int = 3
+"""Count threshold for classifying containers as 'good'."""
+VISIBLE_TEXT_DETAIL: int = 1000
+"""Visible text length threshold for detail/single-item classification."""
+LIST_MATCH_COUNT: int = 3
+"""Count threshold for list-type container classification."""
+TABLE_MIN_ROWS: int = 3
+"""Minimum table rows for table-type classification."""
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +178,7 @@ def discover_containers(
         ContainerRanking with all containers sorted by score.
 
     """
-    if not html or len(html.strip()) < 100:
+    if not html or len(html.strip()) < HTML_MIN_LENGTH:
         return ContainerRanking(containers=[])
 
     # Collect evidence (container discovery is embedded in evidence collection)
@@ -155,7 +205,7 @@ def discover_containers(
     )
 
 
-def _refine_container_score(  # noqa: C901, PLR0912
+def _refine_container_score(
     container: CandidateContainer,
     evidence: PageEvidence,  # noqa: ARG001, RUF100
 ) -> float:
@@ -175,9 +225,9 @@ def _refine_container_score(  # noqa: C901, PLR0912
 
     # ── 2. Text length ──────────────────────────────────────────
     combined_len = len(container.combined_text)
-    if combined_len > 200:
+    if combined_len > COMBINED_TEXT_LONG:
         score += WEIGHT_TEXT_LENGTH
-    elif combined_len > 100:
+    elif combined_len > COMBINED_TEXT_MEDIUM:
         score += WEIGHT_TEXT_LENGTH * 0.6
     elif combined_len > MIN_CONTAINER_TEXT_LEN:
         score += WEIGHT_TEXT_LENGTH * 0.3
@@ -198,8 +248,8 @@ def _refine_container_score(  # noqa: C901, PLR0912
     score += min(pattern_count * (WEIGHT_PATTERNS / 3), WEIGHT_PATTERNS)
 
     # Bonus for having both descriptive text and data values
-    has_values = pattern_count >= 2
-    has_description = combined_len > 80
+    has_values = pattern_count >= PATTERN_COUNT_MIN_FOR_VALUES
+    has_description = combined_len > COMBINED_TEXT_HAS_DESCRIPTION
     if has_values and has_description:
         score += WEIGHT_PATTERNS * 0.3
 
@@ -224,28 +274,28 @@ def _refine_container_score(  # noqa: C901, PLR0912
     )
 
     # ── 9. Child count ──────────────────────────────────────────
-    if 3 <= container.child_count <= 20:
+    if CHILD_COUNT_IDEAL_LOW <= container.child_count <= CHILD_COUNT_IDEAL_HIGH:
         score += WEIGHT_CHILD_COUNT
-    elif 1 <= container.child_count <= 2:
+    elif 1 <= container.child_count <= CHILD_COUNT_SMALL:
         score += WEIGHT_CHILD_COUNT * 0.4
 
     # ── Penalties ───────────────────────────────────────────────
 
     # Too deep in the DOM = likely a narrow inner element
-    if container.depth > 20:
+    if container.depth > DEPTH_TOO_DEEP:
         score *= 0.7
-    elif container.depth > 15:
+    elif container.depth > DEPTH_MODERATE:
         score *= 0.85
 
     # Too shallow = likely not a container at all
-    if container.depth < 3:
+    if container.depth < DEPTH_TOO_SHALLOW:
         score *= 0.5
 
     # Pure price / button container with almost no text = narrow box
     if (container.has_price or container.has_button) and not container.has_organization:
-        if combined_len < 100:
+        if combined_len < PURE_PRICE_NO_DESC_LEN:
             score *= 0.4
-        elif combined_len < 200:
+        elif combined_len < PURE_PRICE_SOME_DESC_LEN:
             score *= 0.7
 
     # Container with only a link / button and no descriptive text
@@ -254,7 +304,7 @@ def _refine_container_score(  # noqa: C901, PLR0912
         and not container.has_price
         and not container.has_date
         and not container.has_organization
-        and combined_len < 60
+        and combined_len < LINK_ONLY_DESC_LEN
     ):
         score *= 0.3
 
@@ -266,7 +316,7 @@ def _refine_container_score(  # noqa: C901, PLR0912
 # ---------------------------------------------------------------------------
 
 
-async def multi_pass_container_extraction(  # noqa: PLR0913
+async def multi_pass_container_extraction(
     html: str,
     schema_fields: list,
     url: str = "",
@@ -322,7 +372,7 @@ async def multi_pass_container_extraction(  # noqa: PLR0913
             all_records.extend(result.records)
 
             # If quality is good and we have enough records, stop here
-            if avg_q >= min_quality and result.record_count >= 3:
+            if avg_q >= min_quality and result.record_count >= ACCEPT_RECORD_COUNT:
                 best_selector = container.selector
                 logger.info(
                     "[ContainerDiscovery] Accepting pass %d (%s): quality=%.2f count=%d",
@@ -468,7 +518,7 @@ def _extract_record_from_element(
         return any(start < ue and end > us for us, ue in used_spans)
 
     # Process fields in order: typed fields first, string / org last
-    _TYPED_PRIORITY: dict = {  # noqa: N806
+    _TYPED_PRIORITY: dict = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
@@ -511,7 +561,7 @@ def _extract_record_from_element(
     return record
 
 
-def _collect_all_pattern_matches(  # noqa: C901, PLR0912
+def _collect_all_pattern_matches(
     full_text: str,
 ) -> dict:
     """Pass 1: Collect ALL pattern matches from the text, organized by type.
@@ -643,7 +693,7 @@ def _collect_all_pattern_matches(  # noqa: C901, PLR0912
     return matches
 
 
-def _extract_field_value_stateful(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
+def _extract_field_value_stateful(
     field_type,
     field_name: str,
     field_desc: str,
@@ -693,7 +743,7 @@ def _extract_field_value_stateful(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR
                 if any(nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms", "copyright"]):
                     used_snippet_indices.add(i)
                     continue
-                if len(snippet) >= 3:
+                if len(snippet) >= SNIPPET_MIN_LENGTH:
                     used_snippet_indices.add(i)
                     return snippet.strip()
         return None
@@ -763,13 +813,14 @@ def _extract_field_value_stateful(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR
     if field_type == FieldType.STRING:
         # Try to find text matching field name or description
         label_words = set(field_name.split("_") + field_desc.split()[:3])
-        label_words = {w for w in label_words if len(w) > 2}
+        label_words = {w for w in label_words if len(w) > LABEL_WORDS_MIN_LENGTH}
 
         for i, snippet in enumerate(snippets):
             if i in used_snippet_indices:
                 continue
             s_lower = snippet.lower()
-            if any(w in s_lower for w in label_words) and len(snippet) >= 3 and len(snippet) <= 200:
+            label_match = any(w in s_lower for w in label_words)
+            if label_match and len(snippet) >= SNIPPET_MIN_LENGTH and len(snippet) <= SNIPPET_MAX_LENGTH:
                 used_snippet_indices.add(i)
                 return snippet.strip()
 

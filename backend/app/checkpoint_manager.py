@@ -47,7 +47,7 @@ class CheckpointManager:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump(state_dict, f, indent=2)
-            os.replace(tmp_path, filepath)  # noqa: PTH105
+            os.replace(tmp_path, filepath)
             tmp_path = None  # ownership transferred via rename
             logger.info("Created checkpoint: %s", filename)
             return str(filepath)
@@ -56,9 +56,9 @@ class CheckpointManager:
             with contextlib.suppress(OSError):
                 if fd is not None:
                     os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):  # noqa: PTH110
+            if tmp_path is not None and os.path.exists(tmp_path):
                 with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)  # noqa: PTH108
+                    os.unlink(tmp_path)
             raise
 
     def load_checkpoint(self, filepath: str) -> None:
@@ -68,7 +68,7 @@ class CheckpointManager:
             msg = f"Checkpoint path {filepath} is outside base directory"
             raise ValueError(msg)
         try:
-            with open(resolved) as f:  # noqa: PTH123
+            with open(resolved) as f:
                 state_dict = json.load(f)
             get_world_state().from_dict(state_dict)
             logger.info("Restored from checkpoint: %s", filepath)
@@ -80,7 +80,7 @@ class CheckpointManager:
         """List all available checkpoints."""
         checkpoints = []
         for f in self.base_dir.glob("checkpoint_*.json"):
-            checkpoints.append({"filename": f.name, "path": str(f), "mtime": f.stat().st_mtime})  # noqa: PERF401
+            checkpoints.append({"filename": f.name, "path": str(f), "mtime": f.stat().st_mtime})
         return sorted(checkpoints, key=lambda x: x["mtime"], reverse=True)
 
     def get_latest_checkpoint(self) -> str | None:

@@ -27,6 +27,22 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# ─── Constants ────────────────────────────────────────────────────────
+MAX_FRAGILE_CLASSES: int = 3
+"""Maximum number of classes before a selector is considered fragile."""
+HIGH_SPECIFICITY_THRESHOLD: float = 0.6
+"""Specificity score above this indicates a highly specific selector."""
+HIGH_STABILITY_THRESHOLD: float = 0.6
+"""Stability score above this indicates a stable selector."""
+KEEP_QUALITY_THRESHOLD: float = 0.7
+"""Predicted quality at or above this recommends keeping the selector."""
+IMPROVE_QUALITY_THRESHOLD: float = 0.4
+"""Predicted quality at or above this recommends improving the selector."""
+MUTATION_LIMIT: int = 3
+"""Maximum number of suggested selector mutations."""
+MAX_HISTORY_LENGTH: int = 100
+"""Maximum optimization history entries per domain."""
+
 
 @dataclass
 class SelectorFeatures:
@@ -108,7 +124,7 @@ class SelectorFeatureExtractor:
             stability -= 0.6  # Very unstable
         if uses_wildcard:
             stability -= 0.4
-        if class_count > 3:
+        if class_count > MAX_FRAGILE_CLASSES:
             stability -= 0.2  # Too many classes suggests fragility
         if descendant_depth_val := (selector.count(" ") + selector.count(">")):
             stability -= descendant_depth_val * 0.1
@@ -168,7 +184,7 @@ class SelectorQualityPredictor:
         # Confidence calibration
         self.confidence_boost = 0.6  # Base confidence for predictions
 
-    def predict(self, features: SelectorFeatures) -> SelectorPrediction:  # noqa: C901, PLR0912
+    def predict(self, features: SelectorFeatures) -> SelectorPrediction:
         """Predict quality of a selector.
 
         Args:
@@ -208,15 +224,15 @@ class SelectorQualityPredictor:
 
         # Confidence depends on feature consistency
         confidence = self.confidence_boost
-        if features.specificity_score > 0.6:
+        if features.specificity_score > HIGH_SPECIFICITY_THRESHOLD:
             confidence += 0.15
-        if features.stability_score > 0.6:
+        if features.stability_score > HIGH_STABILITY_THRESHOLD:
             confidence += 0.15
 
         # Recommendation
-        if predicted_quality >= 0.7:
+        if predicted_quality >= KEEP_QUALITY_THRESHOLD:
             recommendation = "keep"
-        elif predicted_quality >= 0.4:
+        elif predicted_quality >= IMPROVE_QUALITY_THRESHOLD:
             recommendation = "improve"
         else:
             recommendation = "replace"
@@ -281,7 +297,7 @@ class SelectorQualityPredictor:
                 mutations.append(id_part[0])
 
         # Mutation 4: Add parent context for uniqueness
-        if "#" not in selector and len(mutations) < 3:
+        if "#" not in selector and len(mutations) < MUTATION_LIMIT:
             # Suggest adding a parent context
             mutations.append(f"body {selector}")
 
@@ -390,8 +406,8 @@ class SelectorOptimizationEngine:
         if domain not in self.optimization_history:
             self.optimization_history[domain] = []
         self.optimization_history[domain].append(report)
-        if len(self.optimization_history[domain]) > 100:
-            self.optimization_history[domain] = self.optimization_history[domain][-50:]
+        if len(self.optimization_history[domain]) > MAX_HISTORY_LENGTH:
+            self.optimization_history[domain] = self.optimization_history[domain][-MAX_HISTORY_LENGTH // 2 :]
 
         return report
 

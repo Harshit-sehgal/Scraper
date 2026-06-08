@@ -26,14 +26,14 @@ class DesyncReport:
         "subsystem_divergence",
     )
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         node_a: str,
         node_b: str,
         causal_relation: str,
         divergence_score: float,
         subsystem_divergence: dict[str, float],
-        critical: bool,  # noqa: FBT001
+        critical: bool,
         epoch_gap: int = 0,
         recommended_action: str = "none",
     ) -> None:
@@ -373,7 +373,7 @@ class SnapshotDesyncDetector:
 
         return diff_sum / diff_count if diff_count > 0 else 0.0
 
-    def _recommend_action(self, causal_relation: str, divergence: float, epoch_gap: int, critical: bool) -> str:  # noqa: FBT001
+    def _recommend_action(self, causal_relation: str, divergence: float, epoch_gap: int, critical: bool) -> str:
         """Recommend an action based on divergence analysis."""
         if not critical:
             return "none"

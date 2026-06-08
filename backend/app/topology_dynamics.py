@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 # ─── Meso Clusters ──────────────────────────────────────────────────────
 
 
-def compute_meso_clusters(state: TopologyState) -> None:  # noqa: C901, PLR0915
+def compute_meso_clusters(state: TopologyState) -> None:
     """Compute meso-scale clusters from current field regions.
 
     Meso clusters group regions that share competing roles, forming
@@ -31,12 +31,12 @@ def compute_meso_clusters(state: TopologyState) -> None:  # noqa: C901, PLR0915
     LAW: Meso clustering is derived from topology itself, not from
     any external partitioning scheme.
     """
-    regs = state._get_regions()
+    regs = state.get_regions()
     clusters = []
     assigned: set[int] = set()
 
     # Retrieve previous clusters to carry forward their dynamic properties
-    prev_clusters = state._get_struct("meso_clusters")
+    prev_clusters = state.get_struct("meso_clusters")
     prev_map = {}
     for pc in prev_clusters:
         rid_tuple = tuple(sorted(pc.get("region_ids", [])))
@@ -124,14 +124,14 @@ def compute_meso_clusters(state: TopologyState) -> None:  # noqa: C901, PLR0915
             },
         )
 
-    state._set_struct("meso_clusters", clusters)
-    state._record("compute_meso_clusters", {"count": len(clusters)})
+    state.set_struct("meso_clusters", clusters)
+    state.record("compute_meso_clusters", {"count": len(clusters)})
 
 
 # ─── Macro Continents ───────────────────────────────────────────────────
 
 
-def compute_macro_continents(state: TopologyState) -> None:  # noqa: PLR0915
+def compute_macro_continents(state: TopologyState) -> None:
     """Compute macro-scale semantic continents from meso clusters.
 
     Macro continents group related meso clusters into the largest scale of
@@ -141,13 +141,13 @@ def compute_macro_continents(state: TopologyState) -> None:  # noqa: PLR0915
     LAW: Macro organization emerges from meso cluster interaction,
     not from global partitioning. Continents are field-derived.
     """
-    clusters = state._get_struct("meso_clusters")
+    clusters = state.get_struct("meso_clusters")
     if not clusters:
-        state._set_struct("macro_continents", [])
-        state._record("compute_macro_continents", {"count": 0})
+        state.set_struct("macro_continents", [])
+        state.record("compute_macro_continents", {"count": 0})
         return
 
-    prev_continents = state._get_struct("macro_continents")
+    prev_continents = state.get_struct("macro_continents")
     prev_map = {}
     for pc in prev_continents:
         cid_tuple = tuple(sorted(pc.get("meso_cluster_ids", [])))
@@ -221,8 +221,8 @@ def compute_macro_continents(state: TopologyState) -> None:  # noqa: PLR0915
             },
         )
 
-    state._set_struct("macro_continents", continents)
-    state._record("compute_macro_continents", {"count": len(continents)})
+    state.set_struct("macro_continents", continents)
+    state.record("compute_macro_continents", {"count": len(continents)})
 
 
 def compute_macro_from_meso(state: TopologyState) -> dict:
@@ -231,9 +231,9 @@ def compute_macro_from_meso(state: TopologyState) -> dict:
     Returns dict with avg_convergence, avg_instability, fragmentation,
     cluster_diversity, and pressure.
     """
-    clusters = state._get_struct("meso_clusters")
+    clusters = state.get_struct("meso_clusters")
     if not clusters:
-        regs = state._get_regions()
+        regs = state.get_regions()
         if not regs:
             return {
                 "avg_convergence": 0.5,
@@ -281,17 +281,17 @@ def compute_macro_from_meso(state: TopologyState) -> dict:
 # ─── Multi-Scale Evolution ──────────────────────────────────────────────
 
 
-def evolve_meso_clusters(state: TopologyState) -> int:  # noqa: C901, PLR0912
+def evolve_meso_clusters(state: TopologyState) -> int:
     """Evolve meso clusters — apply cluster-level feedback to constituent regions."""
-    clusters = state._get_struct("meso_clusters")
+    clusters = state.get_struct("meso_clusters")
     if not clusters:
         return 0
 
-    regs = state._get_regions()
+    regs = state.get_regions()
     reg_map = {r.region_id: r for r in regs}
     affected = 0
 
-    continents = state._get_struct("macro_continents")
+    continents = state.get_struct("macro_continents")
     macro_pressure_map = {}
     for cont in continents:
         for cid in cont.get("meso_cluster_ids", []):
@@ -340,7 +340,7 @@ def evolve_meso_clusters(state: TopologyState) -> int:  # noqa: C901, PLR0912
             affected += 1
 
     if affected:
-        state._record("evolve_meso_clusters", {"affected_regions": affected, "cluster_count": len(clusters)})
+        state.record("evolve_meso_clusters", {"affected_regions": affected, "cluster_count": len(clusters)})
     return affected
 
 
@@ -350,11 +350,11 @@ def evolve_macro_continents(state: TopologyState) -> int:
     LAW: Macro governance is emergent from meso cluster dynamics,
     not procedural orchestration. Continents do not override; they modulate.
     """
-    continents = state._get_struct("macro_continents")
+    continents = state.get_struct("macro_continents")
     if not continents:
         return 0
 
-    clusters = state._get_struct("meso_clusters")
+    clusters = state.get_struct("meso_clusters")
     cluster_map = {c["cluster_id"]: c for c in clusters}
     affected = 0
 
@@ -395,7 +395,7 @@ def evolve_macro_continents(state: TopologyState) -> int:
     compute_macro_continents(state)
 
     if affected:
-        state._record("evolve_macro_continents", {"affected_clusters": affected, "continent_count": len(continents)})
+        state.record("evolve_macro_continents", {"affected_clusters": affected, "continent_count": len(continents)})
     return affected
 
 
@@ -430,8 +430,8 @@ def cross_scale_pressure_flow(state: TopologyState) -> None:
     if macro_affected > 0:
         compute_meso_clusters(state)
 
-    state._last_pressure_flow_time = now
-    state._record(
+    state.last_pressure_flow_time = now
+    state.record(
         "cross_scale_pressure_flow",
         {
             "meso_feedback": meso_affected,

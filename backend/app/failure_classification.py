@@ -271,7 +271,7 @@ RECOVERY_STRATEGIES: dict[FailureCategory, dict] = {
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def classify_failure(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
+def classify_failure(
     telemetry: dict | None = None,
     html: str | None = None,
     extraction_result: dict | None = None,
@@ -667,7 +667,7 @@ def update_domain_with_failure(
     )
 
 
-def translate_exception_to_friendly_message(error: Exception | str) -> str:  # noqa: PLR0911
+def translate_exception_to_friendly_message(error: Exception | str) -> str:
     """Translate low-level connection, timeout, and rendering exceptions into human-friendly operator descriptions."""
     err_text = str(error).lower()
 

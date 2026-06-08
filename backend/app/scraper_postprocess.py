@@ -73,7 +73,7 @@ def _build_acquisition_lineage_from_result(
     }
 
 
-async def run_post_extraction_processing(  # noqa: PLR0913
+async def run_post_extraction_processing(
     url: str,
     html: str,
     schema_fields: list[SchemaField],

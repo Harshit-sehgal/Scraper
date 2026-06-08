@@ -21,7 +21,7 @@ def clean_db(monkeypatch):
     # Use an isolated temporary database path so this test never collides
     # with other test processes writing to the shared crawl_frontier.db.
     tmp_dir = tempfile.mkdtemp(prefix="crawl_frontier_test_")
-    db_path = os.path.join(tmp_dir, "crawl_frontier.db")  # noqa: PTH118
+    db_path = os.path.join(tmp_dir, "crawl_frontier.db")
 
     # Patch _init_db and _load_from_db to override the db_path before
     # they access it. This avoids the instance-attribute-shadows-class-
@@ -47,9 +47,9 @@ def clean_db(monkeypatch):
     crawl_policy._policy_engine = None
     # Clean up the temp directory
     try:
-        for f in os.listdir(tmp_dir):  # noqa: PTH208
-            os.remove(os.path.join(tmp_dir, f))  # noqa: PTH107, PTH118
-        os.rmdir(tmp_dir)  # noqa: PTH106
+        for f in os.listdir(tmp_dir):
+            os.remove(os.path.join(tmp_dir, f))
+        os.rmdir(tmp_dir)
     except Exception:  # noqa: RUF100, S110
         pass
 

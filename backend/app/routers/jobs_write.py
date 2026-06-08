@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs_write_routes(  # noqa: C901, PLR0915
+def register_jobs_write_routes(
     router: APIRouter,
     manager: JobStoreManager,
     schedule_task_fn: Callable,
@@ -112,7 +112,7 @@ def register_jobs_write_routes(  # noqa: C901, PLR0915
         return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
     @router.post("/api/jobs")
-    async def create_job(  # noqa: C901, PLR0912
+    async def create_job(
         job_data: JobCreate,
         request: Request,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -347,7 +347,7 @@ def register_jobs_write_routes(  # noqa: C901, PLR0915
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
     @router.post("/api/jobs/{job_id}/reclean")
-    async def reclean_job(  # noqa: C901, PLR0912, PLR0915
+    async def reclean_job(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):

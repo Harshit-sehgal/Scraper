@@ -77,7 +77,7 @@ class SchemaField(BaseModel):
     name: str = Field(..., description="Field name, e.g. 'company_name'", max_length=64)
     field_type: FieldType = Field(..., description="Data type for this field")
     description: str = Field("", description="Optional hint about what this field is")
-    required: bool = Field(True, description="Whether this field is required")  # noqa: FBT003
+    required: bool = Field(True, description="Whether this field is required")
 
     @field_validator("name")
     @classmethod

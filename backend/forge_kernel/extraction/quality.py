@@ -11,7 +11,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def score_record_quality(record: dict[str, Any], schema_fields: list[dict[str, Any]]) -> float:  # noqa: C901, PLR0912
+def score_record_quality(record: dict[str, Any], schema_fields: list[dict[str, Any]]) -> float:
     """Score a single record's quality based on field completeness and content.
 
     Returns a score between 0.0 and 1.0.

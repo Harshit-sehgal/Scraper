@@ -114,11 +114,11 @@ def _app_path(rel_path: str) -> str:
     import os
 
     candidates = [
-        os.path.join("backend", rel_path),  # noqa: PTH118
+        os.path.join("backend", rel_path),
         rel_path,
     ]
     for c in candidates:
-        if os.path.exists(c):  # noqa: PTH110
+        if os.path.exists(c):
             return c
     return rel_path
 
@@ -126,7 +126,7 @@ def _app_path(rel_path: str) -> str:
 def test_mutation_apis_have_rw_separation() -> None:
     """API classes must have separate read/write sections."""
     for name in ["topology_api", "energy_api", "instability_api"]:
-        with open(_app_path(f"app/{name}.py")) as f:  # noqa: PTH123
+        with open(_app_path(f"app/{name}.py")) as f:
             content = f.read()
         assert "Query Operations" in content, f"{name} missing Query section"
         assert "Mutation Operations" in content, f"{name} missing Mutation section"

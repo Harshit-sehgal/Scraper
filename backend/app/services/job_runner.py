@@ -60,7 +60,7 @@ def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persis
         _log_persist_executor.submit(persist_fn)
 
 
-async def run_job(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
+async def run_job(
     job_id: str,
     jobs_store: dict,
     persist_state_fn,
@@ -83,7 +83,7 @@ async def run_job(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
         except (AttributeError, ImportError, RuntimeError):
             return False
 
-    async def _persist_job_state(critical: bool = False) -> None:  # noqa: FBT001, FBT002
+    async def _persist_job_state(critical: bool = False) -> None:
         if critical and persist_state_single_critical_fn:
             await run_in_threadpool(persist_state_single_critical_fn)
         elif persist_state_single_fn:
@@ -245,7 +245,7 @@ async def run_job(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
             async with job_lock:
                 warnings.append(msg)
 
-        async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool, dict]:  # noqa: C901, PLR0912, PLR0915
+        async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool, dict]:
             if job.cancel_requested or await _cancel_requested_from_db():
                 job.cancel_requested = True
                 return idx, [], False, {}

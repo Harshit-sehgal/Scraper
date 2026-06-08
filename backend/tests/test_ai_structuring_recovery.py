@@ -60,7 +60,7 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch) -> None:
 
     calls: list[str] = []
 
-    async def fake_openai_json(endpoint, payload, headers=None, timeout=45, max_attempts=2, backoff_seconds=0.8):  # noqa: PLR0913
+    async def fake_openai_json(endpoint, payload, headers=None, timeout=45, max_attempts=2, backoff_seconds=0.8):
         model = payload.get("model")
         calls.append(model)
         if model == "primary-model":

@@ -127,7 +127,7 @@ class RoleTransitionDetector:
         prob = self._ws.get_transition_prob(type_a, type_b)
         return TransitionScore(probability=prob, type_pair=f"{type_a}→{type_b}")
 
-    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:  # noqa: FBT001
+    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:
         """Observe whether a transition was a role boundary or entity continuation."""
         self._ws.observe_transition(type_a, type_b, is_role_boundary)
 
@@ -164,7 +164,7 @@ class CohesionModel:
     def split_attempts(self) -> dict[tuple[str, str], float]:
         return get_world_state().cohesion_split_attempts  # type: ignore[no-any-return]
 
-    def record(self, type_a: str, type_b: str, did_merge: bool, success: bool) -> None:  # noqa: FBT001
+    def record(self, type_a: str, type_b: str, did_merge: bool, success: bool) -> None:
         """Record whether a merge or split decision was successful."""
         pair = (type_a, type_b)
         ws = get_world_state()
@@ -339,7 +339,7 @@ class SemanticBoundaryEngine:
         """Import learned memory from persistence."""
         get_world_state().from_dict(state)
 
-    def decide_merge(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> bool:  # noqa: PLR0913
+    def decide_merge(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> bool:
         score = self.score_pair(type_a, type_b, value_a, value_b, position_a, position_b)
         return score.should_merge()
 
@@ -361,7 +361,7 @@ class SemanticBoundaryEngine:
         ws.update_recent_decision_metadata(recent, coherence, threshold)
 
 
-def group_adjacent_entities(records: list) -> list:  # noqa: C901, PLR0912, PLR0915
+def group_adjacent_entities(records: list) -> list:
     """Merge consecutive segmented values that form multi-token entities."""
     if not records:
         return records
@@ -485,7 +485,7 @@ def reset_boundary_engine() -> None:
     _boundary_engine = None
 
 
-def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str, pos_a: int = 0, pos_b: int = 0) -> bool:  # noqa: PLR0913
+def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str, pos_a: int = 0, pos_b: int = 0) -> bool:
     engine = get_boundary_engine()
     return engine.decide_merge(type_a, type_b, value_a, value_b, pos_a, pos_b)
 
