@@ -168,7 +168,7 @@ class SelectorQualityPredictor:
         # Confidence calibration
         self.confidence_boost = 0.6  # Base confidence for predictions
 
-    def predict(self, features: SelectorFeatures) -> SelectorPrediction:
+    def predict(self, features: SelectorFeatures) -> SelectorPrediction:  # noqa: C901, PLR0912
         """Predict quality of a selector.
 
         Args:

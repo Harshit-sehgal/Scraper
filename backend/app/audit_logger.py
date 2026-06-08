@@ -86,7 +86,7 @@ def _get_audit_logger() -> logging.Logger:
 class AuditEvent:
     """Structured audit event with consistent fields."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         event_type: str,
         actor: str,
@@ -151,7 +151,7 @@ def log_auth_event(
     _get_audit_logger().info(event.to_log_line())
 
 
-def log_rbac_event(
+def log_rbac_event(  # noqa: PLR0913
     actor: str,
     action: str,
     resource: str,
@@ -342,7 +342,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
                     if parsed:
                         yield parsed
 
-        with open(log_path, encoding="utf-8") as f:
+        with open(log_path, encoding="utf-8") as f:  # noqa: PTH123
             recent = deque(_parse_lines(f), maxlen=count)
             events = list(recent)
     except OSError as e:

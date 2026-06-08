@@ -140,7 +140,7 @@ def strip_metadata(records: list | None) -> list:
     return cleaned
 
 
-def filter_noise_records(records: list[dict] | None) -> list[dict]:
+def filter_noise_records(records: list[dict] | None) -> list[dict]:  # noqa: C901, PLR0912, PLR0915
     """Filter out likely noise records using graph-based relational density."""
     if not records:
         return []
@@ -155,7 +155,7 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
     be = get_boundary_engine()
 
     # Entity-relevant types (types that indicate a real data record)
-    ENTITY_TYPES = {
+    ENTITY_TYPES = {  # noqa: N806
         "organization",
         "price",
         "date",
@@ -297,7 +297,7 @@ def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn:
     return warnings
 
 
-def run_pipeline(
+def run_pipeline(  # noqa: C901, PLR0912, PLR0915
     records: list | None,
     schema_fields: list[str],
 ) -> list:

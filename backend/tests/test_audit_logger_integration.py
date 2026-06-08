@@ -63,7 +63,7 @@ def _read_audit_log(log_dir: Path) -> list[dict]:
     if not log_path.exists():
         return []
     events = []
-    with open(log_path) as f:
+    with open(log_path) as f:  # noqa: PTH123
         for line in f:
             line = line.strip()  # noqa: PLW2901, RUF100
             if not line or "[AUDIT]" not in line:
@@ -80,7 +80,7 @@ def _read_audit_log(log_dir: Path) -> list[dict]:
 
 
 class TestAuthFailureLogging:
-    def test_invalid_api_key_logs_auth_failure(self, client, _setup_log_dir) -> None:
+    def test_invalid_api_key_logs_auth_failure(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Invalid API key should log an auth failure event."""
         response = client.get("/api/jobs", headers={"X-API-Key": "invalid_key"})
         assert response.status_code == 403
@@ -92,7 +92,7 @@ class TestAuthFailureLogging:
         assert failure_events[0]["event_type"] == "auth"
         assert failure_events[0]["action"] == "api_key_auth"
 
-    def test_missing_api_key_logs_auth_failure(self, client, _setup_log_dir) -> None:
+    def test_missing_api_key_logs_auth_failure(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Missing API key header should log an auth failure event."""
         response = client.get("/api/jobs")
         assert response.status_code == 403
@@ -101,7 +101,7 @@ class TestAuthFailureLogging:
         failure_events = [e for e in events if e["outcome"] == "failure"]
         assert len(failure_events) >= 1
 
-    def test_invalid_bearer_token_logs_auth_failure(self, client, _setup_log_dir) -> None:
+    def test_invalid_bearer_token_logs_auth_failure(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Invalid Bearer token should log an auth failure event."""
         response = client.get(
             "/api/jobs",
@@ -113,7 +113,7 @@ class TestAuthFailureLogging:
         failure_events = [e for e in events if e["outcome"] == "failure"]
         assert len(failure_events) >= 1
 
-    def test_auth_failure_has_details(self, client, _setup_log_dir) -> None:
+    def test_auth_failure_has_details(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Auth failure events should include method and path details."""
         client.post("/api/jobs", headers={"X-API-Key": "bad"})
 
@@ -124,7 +124,7 @@ class TestAuthFailureLogging:
         assert "method" in details
         assert details.get("has_bearer") is not None
 
-    def test_multiple_failures_all_logged(self, client, _setup_log_dir) -> None:
+    def test_multiple_failures_all_logged(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Multiple consecutive auth failures should each be logged."""
         for _ in range(3):
             client.get("/api/jobs", headers={"X-API-Key": "bad"})
@@ -138,7 +138,7 @@ class TestAuthFailureLogging:
 
 
 class TestAuthSuccessLogging:
-    def test_get_request_does_not_log_success(self, client, _setup_log_dir) -> None:
+    def test_get_request_does_not_log_success(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """GET requests with valid key should NOT log success (noise reduction)."""
         response = client.get("/api/jobs", headers={"X-API-Key": "test_user_key"})
         assert response.status_code == 200
@@ -147,7 +147,7 @@ class TestAuthSuccessLogging:
         success_events = [e for e in events if e["outcome"] == "success"]
         assert len(success_events) == 0
 
-    def test_post_request_logs_auth_success(self, client, _setup_log_dir) -> None:
+    def test_post_request_logs_auth_success(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """POST requests with valid key should log auth success."""
         response = client.post(
             "/api/discover",
@@ -162,7 +162,7 @@ class TestAuthSuccessLogging:
         assert len(success_events) >= 1
         assert success_events[0]["event_type"] == "auth"
 
-    def test_admin_key_logs_correct_role(self, client, _setup_log_dir) -> None:
+    def test_admin_key_logs_correct_role(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Admin key used in POST should log 'admin' role."""
         response = client.post(
             "/api/discover",
@@ -177,7 +177,7 @@ class TestAuthSuccessLogging:
         role = success_events[0].get("details", {}).get("role")
         assert role == "admin", f"Expected admin role, got {role}"
 
-    def test_operator_key_logs_correct_role(self, client, _setup_log_dir) -> None:
+    def test_operator_key_logs_correct_role(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Operator key used in POST should log 'operator' role."""
         response = client.post(
             "/api/discover",
@@ -197,7 +197,7 @@ class TestAuthSuccessLogging:
 
 
 class TestPublicRouteDoesNotLog:
-    def test_public_route_no_auth_no_log(self, client, _setup_log_dir) -> None:
+    def test_public_route_no_auth_no_log(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Public routes (outside /api/) should not trigger audit logging."""
         response = client.get("/health")
         assert response.status_code == 200
@@ -205,7 +205,7 @@ class TestPublicRouteDoesNotLog:
         events = _read_audit_log(_setup_log_dir)
         assert len(events) == 0, f"Expected no audit events for public routes, got {len(events)}"
 
-    def test_public_route_with_key_no_extra_log(self, client, _setup_log_dir) -> None:
+    def test_public_route_with_key_no_extra_log(self, client, _setup_log_dir) -> None:  # noqa: PT019
         """Public routes should not log even if a valid key is provided."""
         response = client.get("/health", headers={"X-API-Key": "test_user_key"})
         assert response.status_code == 200

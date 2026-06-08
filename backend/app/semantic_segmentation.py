@@ -405,7 +405,7 @@ def _extract_by_pattern(text: str) -> list[CandidateIR]:
     return candidates
 
 
-def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> dict[SemanticType, float]:
+def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> dict[SemanticType, float]:  # noqa: C901
     """Build a distribution of possible types for a candidate.
 
     Example: "PAR" could be code(0.7) or text(0.3).
@@ -549,7 +549,7 @@ def _extract_by_whitespace(text: str, existing_spans: set[tuple[int, int]]) -> l
     return candidates
 
 
-def _classify_fallback(text: str) -> SemanticType:
+def _classify_fallback(text: str) -> SemanticType:  # noqa: C901, PLR0911, PLR0912
     """Classify a text segment when no strong pattern match exists.
 
     Uses fullmatch to avoid substring-based misclassification.
@@ -720,7 +720,7 @@ def score_relationships(candidates: list[CandidateIR]) -> list[RelationshipIR]:
     return relationships
 
 
-def _infer_relationship_type(a: CandidateIR, b: CandidateIR) -> tuple[str, float, list[str]]:
+def _infer_relationship_type(a: CandidateIR, b: CandidateIR) -> tuple[str, float, list[str]]:  # noqa: PLR0911
     """Infer what kind of relationship exists between two adjacent candidates."""
     evidence = [f"{a.primary_type}+{b.primary_type}"]
 
@@ -1131,7 +1131,7 @@ def resolve_overlaps(tokens: list[SemanticToken]) -> list[SemanticToken]:
     return [t for idx, t in enumerate(sorted_tokens) if idx not in suppressed]
 
 
-def is_likely_noise_field(name: str, value: str) -> tuple[bool, float, list[str]]:
+def is_likely_noise_field(name: str, value: str) -> tuple[bool, float, list[str]]:  # noqa: PLR0911
     """Check if a field value is likely noise, using semantic analysis.
 
     Field-type-aware: for name / text fields, plain text is expected.

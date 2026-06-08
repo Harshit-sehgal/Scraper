@@ -61,7 +61,7 @@ def _is_trusted_proxy(client_host: str) -> bool:
     return any(peer in net for net in _TRUSTED_PROXY_NETWORKS)
 
 
-class RateLimitExceeded(Exception):
+class RateLimitExceeded(Exception):  # noqa: N818
     """Raised when a client exceeds their rate limit."""
 
 
@@ -104,7 +104,7 @@ def _get_effective_route_limits(method: str | None = None) -> dict[str, tuple[in
     return limits
 
 
-def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
+def _parse_rate_limit(limit_str: str) -> tuple[int, float]:  # noqa: PLR0911
     """Parse a rate limit string like '100 / minute' into (max_requests, window_seconds).
 
     Supported formats: N / second, N / minute, N / hour. Whitespace around
@@ -406,7 +406,9 @@ class DatabaseSlidingWindowCounter:
 
                 with _conn() as conn:
                     row = _fetch_one(
-                        conn, "SELECT 1 AS alive FROM rate_limits WHERE key = %s AND timestamp > %s LIMIT 1", (self.key, cutoff)
+                        conn,
+                        "SELECT 1 AS alive FROM rate_limits WHERE key = %s AND timestamp > %s LIMIT 1",
+                        (self.key, cutoff),
                     )
                     return row is None
             except Exception as e:
@@ -562,7 +564,7 @@ class RateLimiterMiddleware:
     def __init__(
         self,
         global_limit: str = "",
-        per_ip: bool = True,
+        per_ip: bool = True,  # noqa: FBT001, FBT002
         per_ip_limit: str = "",
         cleanup_interval: int = 300,
     ) -> None:
@@ -646,7 +648,10 @@ class RateLimiterMiddleware:
     # ── Counter lifecycle ──────────────────────────────────────────────
 
     def _get_or_create_counter(
-        self, key: str, max_req: int, window_sec: float
+        self,
+        key: str,
+        max_req: int,
+        window_sec: float,
     ) -> SlidingWindowCounter | DatabaseSlidingWindowCounter:
         """Get an existing counter or create a new one.
 
@@ -697,7 +702,10 @@ class RateLimiterMiddleware:
     # ── Rate-limit response builder ───────────────────────────────────
 
     def _build_429_response(
-        self, counter: SlidingWindowCounter | DatabaseSlidingWindowCounter, client_ip: str, path: str
+        self,
+        counter: SlidingWindowCounter | DatabaseSlidingWindowCounter,
+        client_ip: str,
+        path: str,
     ) -> JSONResponse:
         """Build a 429 Too Many Requests response with standard headers."""
         logger.warning(

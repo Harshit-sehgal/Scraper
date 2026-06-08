@@ -94,7 +94,7 @@ class ActionState:
             },
         )
 
-    def log_execution(self, action_id: str, success: bool, details: dict | None = None) -> None:
+    def log_execution(self, action_id: str, success: bool, details: dict | None = None) -> None:  # noqa: FBT001
         """Record the outcome of an action execution."""
         actions = self._get_struct("active_actions")
         if action_id in actions:

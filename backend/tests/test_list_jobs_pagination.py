@@ -20,7 +20,7 @@ def client():
     os.environ.setdefault("DATAFORGE_STORAGE_BACKEND", "sqlite")
     os.environ.setdefault("PYTHONPATH", "backend")
     # Make sure the backend root is on sys.path.
-    backend = os.path.join(os.getcwd(), "backend")
+    backend = os.path.join(os.getcwd(), "backend")  # noqa: PTH109, PTH118
     if backend not in sys.path:
         sys.path.insert(0, backend)
     # Reload main to pick up the env vars set in this fixture.

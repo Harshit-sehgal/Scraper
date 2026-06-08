@@ -118,7 +118,7 @@ class DomainStrategyState:
     def record_attempt(
         self,
         strategy: FetchStrategy,
-        success: bool,
+        success: bool,  # noqa: FBT001
         time_ms: float,
         quality: float = 0.0,
         failure_reason: str | None = None,
@@ -206,11 +206,11 @@ class StrategyEvolutionEngine:
             self.domain_states[domain] = DomainStrategyState(domain)
         return self.domain_states[domain]
 
-    def record_fetch_attempt(
+    def record_fetch_attempt(  # noqa: PLR0913
         self,
         domain: str,
         strategy: FetchStrategy | str,
-        success: bool,
+        success: bool,  # noqa: FBT001
         time_ms: float,
         quality: float = 0.0,
         failure_reason: str | None = None,
@@ -246,7 +246,7 @@ class StrategyEvolutionEngine:
         state = self._get_or_create_state(domain)
         state.record_attempt(strategy, success, time_ms, quality, failure_reason)
 
-    def recommend_strategy(self, domain: str) -> StrategyRecommendation:
+    def recommend_strategy(self, domain: str) -> StrategyRecommendation:  # noqa: C901, PLR0911
         """Recommend a fetch strategy for a domain."""
         import random
 

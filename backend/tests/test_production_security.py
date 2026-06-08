@@ -12,7 +12,7 @@ async def test_production_security_enforcement_wildcard_cors(monkeypatch) -> Non
 
     app = FastAPI()
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as exc:  # noqa: PT011
         async with lifespan(app):
             pass
     assert "CORS_ORIGINS contains wildcard" in str(exc.value)
@@ -26,7 +26,7 @@ async def test_production_security_enforcement_empty_api_key(monkeypatch) -> Non
 
     app = FastAPI()
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as exc:  # noqa: PT011
         async with lifespan(app):
             pass
     assert "API_KEY is empty or not configured" in str(exc.value)

@@ -265,7 +265,7 @@ def test_worker_healthcheck_docker_compose_reference() -> None:
     compose_path = REPO_ROOT / "docker-compose.prod.yml"
     assert compose_path.exists(), f"docker-compose.prod.yml not found at {compose_path}"
 
-    with open(compose_path) as f:
+    with open(compose_path) as f:  # noqa: PTH123
         config = yaml.safe_load(f)
 
     worker = config.get("services", {}).get("worker", {})
@@ -392,7 +392,7 @@ def test_worker_heartbeat_expires_after_ttl(monkeypatch) -> None:
     # Manually write an old heartbeat to simulate expiry
     import datetime
 
-    old_time = (datetime.datetime.now() - datetime.timedelta(hours=1)).isoformat()
+    old_time = (datetime.datetime.now() - datetime.timedelta(hours=1)).isoformat()  # noqa: DTZ005
     # Direct DB manipulation
     if getattr(repo, "backend", "") == "sqlite":
         from app.job_store import _DB_LOCK, _get_connection
@@ -474,7 +474,7 @@ def test_fastapi_metadata_version_consistent_with_pyproject(monkeypatch) -> None
     # Parse pyproject.toml for version
     import tomllib
 
-    with open(pyproject_path, "rb") as f:
+    with open(pyproject_path, "rb") as f:  # noqa: PTH123
         pyproject = tomllib.load(f)
 
     pyproject_version = pyproject.get("project", {}).get("version", "")

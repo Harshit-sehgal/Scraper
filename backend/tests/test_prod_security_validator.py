@@ -11,7 +11,7 @@ from app.utils.prod_security_validator import validate_production_credentials
 class MockSettings:
     """Mock Settings class for Pydantic-like settings objects."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         env: str = "development",
         api_key: str = "",

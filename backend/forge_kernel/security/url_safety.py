@@ -25,7 +25,7 @@ def _is_safe_ip(ip_str: str) -> bool:
         return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
 
 
-def validate_public_http_url(url: str) -> None:
+def validate_public_http_url(url: str) -> None:  # noqa: C901, PLR0912
     """Raise ValueError if the URL is not a safe public HTTP(S) URL."""
     if not url:
         msg = "URL cannot be empty"

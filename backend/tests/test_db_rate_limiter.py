@@ -83,7 +83,7 @@ def test_rate_limiter_middleware_db_backed_selection() -> None:
     middleware = RateLimiterMiddleware(global_limit="5 / minute", per_ip=True)
 
     # We patch settings.RATE_LIMIT_DB_BACKED to True
-    with patch("app.config.settings.RATE_LIMIT_DB_BACKED", True):
+    with patch("app.config.settings.RATE_LIMIT_DB_BACKED", True):  # noqa: FBT003
         # Create a counter via _get_or_create_counter (which checks DB_BACKED)
         counter = middleware._get_or_create_counter("_test_key", 5, 60.0)
         assert isinstance(counter, DatabaseSlidingWindowCounter)
@@ -95,7 +95,7 @@ def test_rate_limiter_middleware_in_memory_selection() -> None:
 
     middleware = RateLimiterMiddleware(global_limit="5 / minute", per_ip=True)
 
-    with patch("app.config.settings.RATE_LIMIT_DB_BACKED", False):
+    with patch("app.config.settings.RATE_LIMIT_DB_BACKED", False):  # noqa: FBT003
         counter = middleware._get_or_create_counter("_test_key_inmem", 5, 60.0)
         assert isinstance(counter, SlidingWindowCounter)
 

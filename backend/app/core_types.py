@@ -47,7 +47,7 @@ class FieldConflictRegion:
         if not self.region_id:
             self.region_id = str(uuid.uuid4())[:8]
 
-    def evolve(self, force: bool = False):
+    def evolve(self, force: bool = False):  # noqa: FBT001, FBT002
         """Evolve basin state (Instability, Convergence, Persistence).
 
         LAW 5: No fixed evolution cadence. Basins evolve based on field

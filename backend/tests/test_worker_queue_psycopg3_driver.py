@@ -10,7 +10,7 @@ psycopg 3-specific code paths without needing a running Postgres server.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Self
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -31,10 +31,10 @@ class FakePsycopg3Cursor:
         self._description = description
         self._rows: list[tuple] = []
 
-    def __enter__(self) -> FakePsycopg3Cursor:
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         return None
 
     @property
@@ -210,9 +210,10 @@ def test_conn_context_rolls_back_on_exception(
     fresh_module._pool = pool
     # Stub metrics so we don't depend on the global collector.
     monkeypatch.setattr("app.metrics_collector.record_error", lambda *_a, **_k: None)
-    with pytest.raises(RuntimeError, match="boom"):
+    with pytest.raises(RuntimeError, match="boom"):  # noqa: PT012
         with fresh_module._conn():
-            raise RuntimeError("boom")
+            msg = "boom"
+            raise RuntimeError(msg)
     assert fake.committed is False
     assert fake.rolled_back is True
 
@@ -227,12 +228,14 @@ def test_conn_context_swallows_metrics_failure(
     fresh_module._pool = pool
 
     def boom(*_a: Any, **_k: Any) -> None:
-        raise RuntimeError("metrics broken")
+        msg = "metrics broken"
+        raise RuntimeError(msg)
 
     monkeypatch.setattr("app.metrics_collector.record_error", boom)
-    with pytest.raises(RuntimeError, match="original"):
+    with pytest.raises(RuntimeError, match="original"):  # noqa: PT012
         with fresh_module._conn():
-            raise RuntimeError("original")
+            msg = "original"
+            raise RuntimeError(msg)
 
 
 def test_close_pool_is_idempotent(fresh_module: Any) -> None:

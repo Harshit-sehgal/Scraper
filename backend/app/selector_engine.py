@@ -78,13 +78,13 @@ def build_selector_field_metadata(
     return meta
 
 
-def _collect_child_text_nodes(node) -> list[str]:
+def _collect_child_text_nodes(node) -> list[str]:  # noqa: C901
     """Extract individual text chunks from all leaf-level descendant elements.
 
     Also extracts direct text content (text nodes not inside child elements).
     """
     texts: list[str] = []
-    for el in node.find_all(True):
+    for el in node.find_all(True):  # noqa: FBT003
         if el.name in (
             "script",
             "style",
@@ -104,7 +104,7 @@ def _collect_child_text_nodes(node) -> list[str]:
             continue
         children = [
             c
-            for c in el.find_all(True, recursive=False)
+            for c in el.find_all(True, recursive=False)  # noqa: FBT003
             if c.name
             not in (
                 "script",
@@ -173,7 +173,7 @@ def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     return None
 
 
-def _extract_field_by_pattern(
+def _extract_field_by_pattern(  # noqa: C901, PLR0911, PLR0912, PLR0915
     node,
     sel_entry,
     field_name: str = "",
@@ -247,7 +247,7 @@ def _extract_field_by_pattern(
             for pat in patterns:
                 for match in re_mod.finditer(pat, full_text, re_mod.IGNORECASE):
                     if not _is_span_used(match.start(), match.end()):
-                        all_matches.append(match)
+                        all_matches.append(match)  # noqa: PERF401
             if not all_matches:
                 ancestor = node.parent
                 for _ in range(3):
@@ -258,7 +258,7 @@ def _extract_field_by_pattern(
                         for pat in patterns:
                             for match in re_mod.finditer(pat, anc_text, re_mod.IGNORECASE):
                                 if not _is_span_used(match.start(), match.end()):
-                                    all_matches.append(match)
+                                    all_matches.append(match)  # noqa: PERF401
                     if all_matches:
                         break
                     ancestor = ancestor.parent if hasattr(ancestor, "parent") else None
@@ -331,7 +331,7 @@ def _extract_field_by_pattern(
     return None
 
 
-def _classify_text_value(text: str) -> str:
+def _classify_text_value(text: str) -> str:  # noqa: PLR0911
     """Classify a text value into a semantic category."""
     import re as _re
 
@@ -423,7 +423,7 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
     return text_val  # type: ignore[no-any-return]
 
 
-def extract_raw_from_selectors(
+def extract_raw_from_selectors(  # noqa: C901
     html: str,
     selectors_map: dict,
     base_url: str = "",  # noqa: ARG001, RUF100
@@ -445,7 +445,7 @@ def extract_raw_from_selectors(
         # Sort fields: typed fields with regex patterns first, then LOCATION / CODE, then STRING / None last.
         # This prevents STRING fields from greedily consuming children that
         # typed fields should match.
-        _TYPED_ORDER: dict = {}
+        _TYPED_ORDER: dict = {}  # noqa: N806
         for ftype in (
             FieldType.CURRENCY,
             FieldType.EMAIL,
@@ -502,12 +502,12 @@ def extract_raw_from_selectors(
     return raw_records
 
 
-def apply_selectors(
+def apply_selectors(  # noqa: PLR0913
     html: str,
     selectors_map: dict,
     schema_fields: list[SchemaField],
     base_url: str = "",
-    return_field_quality: bool = False,
+    return_field_quality: bool = False,  # noqa: FBT001, FBT002
     user_intent: str = "",
 ) -> list[dict] | tuple[list[dict], dict]:
     """Extract all selector-map fields, align to user schema, then score records."""
@@ -572,7 +572,7 @@ def apply_selectors(
     return results
 
 
-def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:
+def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:  # noqa: C901, PLR0912, PLR0915
     """Fallback extraction path when selector generation fails.
 
     Dispatches extraction logic purely by FieldType — no field-name matching.
@@ -657,7 +657,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
             elif ft == FieldType.CURRENCY:
                 price_node = container.find(
-                    True,
+                    True,  # noqa: FBT003
                     class_=re.compile(r"price|amount|cost|amt|fare|mrp|discount|total|sale|offer", re.IGNORECASE),
                 )
                 if price_node:
@@ -668,7 +668,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.PERCENTAGE:
-                pct_node = container.find(True, class_=re.compile(r"percent|discount|saving|off|tax|vat", re.IGNORECASE))
+                pct_node = container.find(True, class_=re.compile(r"percent|discount|saving|off|tax|vat", re.IGNORECASE))  # noqa: FBT003
                 if pct_node:
                     val = pct_node.get_text()
                 else:
@@ -677,7 +677,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.RATING:
-                rating_node = container.find(True, class_=re.compile(r"rating|stars|score|review", re.IGNORECASE))
+                rating_node = container.find(True, class_=re.compile(r"rating|stars|score|review", re.IGNORECASE))  # noqa: FBT003
                 if rating_node:
                     val = rating_node.get_text()
                 else:
@@ -686,7 +686,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.BOOLEAN:
-                bool_node = container.find(True, class_=re.compile(r"stock|available|status|active", re.IGNORECASE))
+                bool_node = container.find(True, class_=re.compile(r"stock|available|status|active", re.IGNORECASE))  # noqa: FBT003
                 if bool_node:
                     val = bool_node.get_text()
                 else:
@@ -696,7 +696,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
             elif ft == FieldType.CODE:
                 code_node = container.find(
-                    True,
+                    True,  # noqa: FBT003
                     class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.IGNORECASE),
                 )
                 if code_node:
@@ -708,7 +708,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
             elif ft == FieldType.LOCATION:
                 loc_node = container.find(
-                    True,
+                    True,  # noqa: FBT003
                     class_=re.compile(r"origin|destination|city|location|airport|from|to|station", re.IGNORECASE),
                 )
                 if loc_node:
@@ -719,7 +719,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT):
-                num_node = container.find(True, class_=re.compile(r"number|count|amount|value|qty|quantity", re.IGNORECASE))
+                num_node = container.find(True, class_=re.compile(r"number|count|amount|value|qty|quantity", re.IGNORECASE))  # noqa: FBT003
                 if num_node:
                     val = num_node.get_text()
                 else:

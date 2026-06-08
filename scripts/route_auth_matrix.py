@@ -86,7 +86,7 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
         return ("operator", "require_role([operator])", "")
 
     if path.startswith("/api/"):
-        mutation_note = "Mutation route lacks explicit require_role guard." if method not in {"GET"} else ""
+        mutation_note = "Mutation route lacks explicit require_role guard." if method != "GET" else ""
         return ("authenticated-user", "global /api/* API-key middleware", mutation_note)
 
     return ("public", "no API route auth", "Dashboard/static/probe route; review before public exposure.")

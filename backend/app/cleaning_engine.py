@@ -36,7 +36,7 @@ def _extract_list_from_json(data: Any) -> list[dict] | None:
     return None
 
 
-async def ai_clean_and_align_records(
+async def ai_clean_and_align_records(  # noqa: C901, PLR0912, PLR0915
     records: list[dict],
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,

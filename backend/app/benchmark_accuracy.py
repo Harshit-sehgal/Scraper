@@ -30,7 +30,7 @@ class AccuracyMetrics:
         return asdict(self)
 
 
-def calculate_extraction_accuracy(
+def calculate_extraction_accuracy(  # noqa: C901, PLR0912
     extracted: list[dict[str, Any]],
     expected: list[dict[str, Any]],
     domain: str = "unknown",

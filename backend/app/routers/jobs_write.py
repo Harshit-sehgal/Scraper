@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs_write_routes(
+def register_jobs_write_routes(  # noqa: C901, PLR0915
     router: APIRouter,
     manager: JobStoreManager,
     schedule_task_fn: Callable,
@@ -112,7 +112,7 @@ def register_jobs_write_routes(
         return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
     @router.post("/api/jobs")
-    async def create_job(
+    async def create_job(  # noqa: C901, PLR0912
         job_data: JobCreate,
         request: Request,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -347,7 +347,7 @@ def register_jobs_write_routes(
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
     @router.post("/api/jobs/{job_id}/reclean")
-    async def reclean_job(
+    async def reclean_job(  # noqa: C901, PLR0912, PLR0915
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
@@ -560,7 +560,14 @@ def register_jobs_write_routes(
         # If you need strict cross-store consistency, wrap both steps in
         # a single ``with manager.lock:`` and accept the throughput cost.
         repo = get_job_repository()
-        await run_in_threadpool(repo.move_to_recycle_bin, job_id)
+        try:
+            await run_in_threadpool(repo.move_to_recycle_bin, job_id)
+        except Exception:
+            logger.exception("Failed to move job %s to recycle bin in repository", job_id)
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to move job to recycle bin. The job remains in the active store.",
+            )
         with manager.lock:
             if job_id in manager.jobs_store:
                 manager.recycle_bin_store[job_id] = manager.jobs_store.pop(job_id)
@@ -622,9 +629,18 @@ def register_jobs_write_routes(
         with manager.lock:
             if job_id not in manager.recycle_bin_store:
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
-        repo = get_job_repository()
-        await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
-        with manager.lock:
+            # Hold the lock across both the DB call and the in-memory update
+            # to prevent a concurrent hard_delete from deleting the job between
+            # the DB restore and the in-memory move.
+            repo = get_job_repository()
+            try:
+                await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
+            except Exception as e:
+                logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to restore job: {e}",
+                ) from e
             if job_id in manager.recycle_bin_store:
                 manager.jobs_store[job_id] = manager.recycle_bin_store.pop(job_id)
         return {"message": "Job restored"}
@@ -639,14 +655,23 @@ def register_jobs_write_routes(
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
             job = manager.recycle_bin_store.get(job_id)
             file_path = job.results_file_path if job else None
+        # Do DB hard_delete FIRST so that a file-deletion failure does not
+        # orphan a DB record. If the DB call fails, the file is never touched.
+        repo = get_job_repository()
+        try:
+            await run_in_threadpool(repo.hard_delete, job_id)
+        except Exception as e:
+            logger.exception("Failed to hard-delete job %s from repository", job_id)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to permanently delete job: {e}",
+            ) from e
+        with manager.lock:
+            manager.recycle_bin_store.pop(job_id, None)
         if file_path:
             from app.utils.job_results_store import delete_job_results_from_disk
 
             await run_in_threadpool(delete_job_results_from_disk, job_id, file_path)
-        repo = get_job_repository()
-        await run_in_threadpool(repo.hard_delete, job_id)
-        with manager.lock:
-            manager.recycle_bin_store.pop(job_id, None)
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
@@ -658,13 +683,15 @@ def register_jobs_write_routes(
         with manager.lock:
             snapshot = list(manager.recycle_bin_store.items())
             count = len(snapshot)
+        # Do DB hard-deletes FIRST so that a file-deletion failure does not
+        # orphan DB records. Then clean up files after DB succeeds.
+        repo = get_job_repository()
+        for jid, _ in snapshot:
+            await run_in_threadpool(repo.hard_delete, jid)
         for jid, job in snapshot:
             file_path = job.results_file_path if job else None
             if file_path:
                 await run_in_threadpool(delete_job_results_from_disk, jid, file_path)
-        repo = get_job_repository()
-        for jid, _ in snapshot:
-            await run_in_threadpool(repo.hard_delete, jid)
         with manager.lock:
             for jid, _ in snapshot:
                 manager.recycle_bin_store.pop(jid, None)

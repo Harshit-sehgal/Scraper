@@ -370,7 +370,7 @@ class DatasetIR:
         self.structural_memory[sig] = self.structural_memory.get(sig, 0) + 1
 
 
-def create_token(
+def create_token(  # noqa: PLR0913
     raw: str,
     span_start: int,
     span_end: int,

@@ -9,7 +9,7 @@ def reset() -> None:
     reset_desync_detector()
 
 
-def make_snapshot(node_id="node_a", clock=None, topology=None, manifold=None, energy=None, instability=None, history=None):
+def make_snapshot(node_id="node_a", clock=None, topology=None, manifold=None, energy=None, instability=None, history=None):  # noqa: PLR0913
     """Helper to create a minimal world state snapshot."""
     return {
         "node_id": node_id,

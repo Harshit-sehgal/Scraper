@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Standalone regex extraction test — no Playwright, no g4f, just BS4."""
 
 import re
@@ -8,7 +7,7 @@ from bs4 import BeautifulSoup
 
 
 def main() -> None:
-    with open(Path(__file__).parent / "test_page.html") as f:
+    with open(Path(__file__).parent / "test_page.html") as f:  # noqa: PTH123
         html = f.read()
 
     soup = BeautifulSoup(html, "html.parser")

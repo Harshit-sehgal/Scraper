@@ -63,7 +63,7 @@ class DomainIntelligenceRegistry:
     def _load(self) -> None:
         if self.path.exists():
             try:
-                with open(self.path) as f:
+                with open(self.path) as f:  # noqa: PTH123
                     data = json.load(f)
                     for domain, metrics in data.items():
                         self._registry[domain] = DomainIntelligence(domain, metrics)
@@ -80,16 +80,16 @@ class DomainIntelligenceRegistry:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
-            os.replace(tmp_path, self.path)
+            os.replace(tmp_path, self.path)  # noqa: PTH105
             tmp_path = None  # ownership transferred via rename
         except Exception:
             logger.exception("Failed to save domain intelligence")
             with contextlib.suppress(OSError):
                 if fd is not None:
                     os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):
+            if tmp_path is not None and os.path.exists(tmp_path):  # noqa: PTH110
                 with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)
+                    os.unlink(tmp_path)  # noqa: PTH108
 
     def get_intelligence(self, url: str) -> DomainIntelligence:
         """Get or create intelligence for a domain."""

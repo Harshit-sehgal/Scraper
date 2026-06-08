@@ -37,7 +37,7 @@ class TestSchemaVersion4:
             conn = _get_connection()
             try:
                 rows = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('job_results', 'job_events')"
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('job_results', 'job_events')",
                 ).fetchall()
             finally:
                 conn.close()

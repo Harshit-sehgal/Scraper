@@ -22,9 +22,9 @@ FORBIDDEN_PATTERNS = [
 ]
 
 
-def check_duplicate_definitions(filepath):
+def check_duplicate_definitions(filepath):  # noqa: C901
     """Detect duplicate method or function definitions, allowing property getter/setter pairs."""
-    with open(filepath) as f:
+    with open(filepath) as f:  # noqa: PTH123
         try:
             tree = ast.parse(f.read())
         except SyntaxError as e:
@@ -58,14 +58,14 @@ def check_duplicate_definitions(filepath):
     counts = collections.Counter(functions)
     dupes = [f for f, count in counts.items() if count > 1]
     for func_name in dupes:
-        errors.append(f"Duplicate global function '{func_name}' ({filepath})")
+        errors.append(f"Duplicate global function '{func_name}' ({filepath})")  # noqa: PERF401
 
     return errors
 
 
 def check_dangling_references(filepath):
     """Detect references to symbols that no longer exist or are forbidden."""
-    KILLED_SYMBOLS = [
+    KILLED_SYMBOLS = [  # noqa: N806
         "detect_allocation_contradictions",
         "re_alloc_graph",
         "_field_contradiction_penalty",
@@ -74,7 +74,7 @@ def check_dangling_references(filepath):
     ]
 
     errors = []
-    with open(filepath) as f:
+    with open(filepath) as f:  # noqa: PTH123
         lines = f.readlines()
         for i, line in enumerate(lines, 1):
             line_clean = line.strip()
@@ -103,7 +103,7 @@ def check_dangling_references(filepath):
                     or re.search(r"\bclass\s+" + re.escape(sym) + r"\b", line_code)
                     or re.search(r"\bfrom\s+\S+\s+import\s+.*\b" + re.escape(sym) + r"\b", line_code)
                     or re.search(r"\bimport\s+\S*\." + re.escape(sym) + r"\b", line_code)
-                    or re.search(r"\bimport\s+" + re.escape(sym) + r"\b", line_code)
+                    or re.search(r"\bimport\s+" + re.escape(sym) + r"\b", line_code),
                 )
                 if is_definition:
                     continue
@@ -120,14 +120,14 @@ def check_dangling_references(filepath):
 def check_metric_ownership(filepath):
     """Enforce the Ontology Matrix rules."""
     # Forbidden direct storage of derived metrics
-    FORBIDDEN_FIELDS = [
+    FORBIDDEN_FIELDS = [  # noqa: N806
         "maturity",
         "field_pressure",
         "global_entropy",
     ]
 
     errors = []
-    with open(filepath) as f:
+    with open(filepath) as f:  # noqa: PTH123
         try:
             tree = ast.parse(f.read())
         except SyntaxError:
@@ -138,7 +138,7 @@ def check_metric_ownership(filepath):
         # Check for field declarations (in dataclasses)
         for node in cls.body:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id in FORBIDDEN_FIELDS:
-                errors.append(
+                errors.append(  # noqa: PERF401
                     f"Illegal direct storage of derived metric '{node.target.id}' in class '{cls.name}' ({filepath})",
                 )
 
@@ -149,9 +149,9 @@ def main():
     backend_dir = "backend/app"
     all_errors = []
 
-    print("--- ARCHITECTURE VALIDATION START ---")
+    print("--- ARCHITECTURE VALIDATION START ---")  # noqa: T201
 
-    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]
+    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]  # noqa: PTH118
 
     for f in files:
         all_errors.extend(check_duplicate_definitions(f))
@@ -159,12 +159,12 @@ def main():
         all_errors.extend(check_metric_ownership(f))
 
     if all_errors:
-        print(f"\nVALIDATION FAILED: {len(all_errors)} violations found.")
+        print(f"\nVALIDATION FAILED: {len(all_errors)} violations found.")  # noqa: T201
         for err in all_errors:
-            print(f"  [VIOLATION] {err}")
+            print(f"  [VIOLATION] {err}")  # noqa: T201
         sys.exit(1)
     else:
-        print("\nVALIDATION PASSED: Architecture is lawful.")
+        print("\nVALIDATION PASSED: Architecture is lawful.")  # noqa: T201
         sys.exit(0)
 
 

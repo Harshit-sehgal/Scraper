@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # ─── Community Detection ────────────────────────────────────────────────
 
 
-def detect_communities(state: "TopologyState") -> None:
+def detect_communities(state: "TopologyState") -> None:  # noqa: C901, PLR0912
     """Flood-fill communities from cohesion + field regions."""
     graph: dict[str, set[str]] = {}
     cohesion = state._get_struct("neighborhood_cohesion")
@@ -50,7 +50,7 @@ def detect_communities(state: "TopologyState") -> None:
             component.add(cur)
             for neighbor in graph.get(cur, set()):
                 if neighbor not in seen:
-                    stack.append(neighbor)
+                    stack.append(neighbor)  # noqa: PERF401
         if component:
             communities.append(component)
     state._set_struct("communities", communities)
@@ -133,7 +133,7 @@ def clear_impossible_neighborhoods(state: "TopologyState") -> None:
 def self_prune_regions(
     state: "TopologyState",
     instability_threshold: float = 0.9,
-    community_required: bool = True,
+    community_required: bool = True,  # noqa: FBT001, FBT002
 ) -> int:
     """Autonomous topology pruning (Phase 62).
 

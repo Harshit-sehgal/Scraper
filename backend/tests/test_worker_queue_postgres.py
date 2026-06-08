@@ -981,7 +981,8 @@ class TestPostgresQueueMocked:
         import app.worker_queue_postgres as wqp
 
         def failing_fetch_all(conn, sql, *args):
-            raise Exception("Query failed")
+            msg = "Query failed"
+            raise Exception(msg)
 
         monkeypatch.setattr(wqp, "_fetch_all", failing_fetch_all)
 

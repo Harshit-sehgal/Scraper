@@ -23,7 +23,7 @@ def get_job_results_path(job_id: str) -> Path:
     return get_results_dir() / f"results_{job_id}.jsonl.gz"
 
 
-def _resolve_results_path(job_id: str, file_path: str | None = None) -> Path:
+def _resolve_results_path(job_id: str, file_path: str | None = None) -> Path:  # noqa: C901, PLR0911, PLR0912
     import tempfile
     from unittest.mock import Mock
 

@@ -207,7 +207,7 @@ async def discover_selectors(
     return selectors or {}
 
 
-def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) -> dict | None:
+def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) -> dict | None:  # noqa: C901, PLR0912, PLR0915
     """Discover container and field selectors by analyzing repeating DOM patterns.
 
     Falls back to structural DOM analysis when the LLM cannot produce CSS selectors.
@@ -223,7 +223,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
     import re as _re
 
     element_classes: list[tuple[Any, str, str]] = []
-    for el in body.find_all(True):
+    for el in body.find_all(True):  # noqa: FBT003
         classes = el.get("class")
         if not classes:
             continue
@@ -247,7 +247,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
             continue
         siblings = [
             c
-            for c in parent.find_all(True, recursive=False)
+            for c in parent.find_all(True, recursive=False)  # noqa: FBT003
             if c.name
             not in (
                 "script",
@@ -270,7 +270,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
         parent_css = _build_css_for_element(parent)
         if not parent_css:
             continue
-        if len(parent.find_all(True)) > 0:
+        if len(parent.find_all(True)) > 0:  # noqa: FBT003
             parent_page_matches = len(soup.select(parent_css))
             if parent_page_matches < 2:
                 continue
@@ -359,7 +359,7 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
     return min(max(score, 0.0), 1.0)
 
 
-def _discover_direct_repeating_elements(soup) -> list[dict]:
+def _discover_direct_repeating_elements(soup) -> list[dict]:  # noqa: C901
     """Find elements that repeat with the same class across the page.
 
     When multiple elements share the same class and have meaningful data,
@@ -370,7 +370,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
     candidates: list[dict] = []
     class_el_map: dict[str, list] = {}
 
-    for el in soup.find_all(True):
+    for el in soup.find_all(True):  # noqa: FBT003
         if el.name in (
             "script",
             "style",
@@ -441,10 +441,10 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
         return candidates
     import re as _re
 
-    for parent in body.find_all(True):
+    for parent in body.find_all(True):  # noqa: FBT003
         children = [
             c
-            for c in parent.find_all(True, recursive=False)
+            for c in parent.find_all(True, recursive=False)  # noqa: FBT003
             if c.name
             not in (
                 "script",
@@ -572,7 +572,7 @@ def _infer_field_selectors_from_container(container_sel: str, html: str, schema_
             field_map[fname] = ""
             continue
 
-        elements = first_item.find_all(True)
+        elements = first_item.find_all(True)  # noqa: FBT003
         for el in elements:
             txt = el.get_text(separator=" ", strip=True)
             if not txt:

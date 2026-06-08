@@ -111,7 +111,7 @@ class TestBuildSelectorPrompt:
         snippet = "<div>data</div>"
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
         motifs = [{"field": "name", "selector": "h2.title", "confidence": 0.9}]
-        with patch("app.selector_discovery.MotifFeedbackEngine") as MockEngine:
+        with patch("app.selector_discovery.MotifFeedbackEngine") as MockEngine:  # noqa: N806
             mock_instance = MockEngine.return_value
             mock_instance.build_motif_context.return_value = "\nMotif hint: use h2.title\n"
             prompt = build_selector_prompt(snippet, schema, solidified_motifs=motifs)

@@ -155,7 +155,7 @@ def discover_containers(
     )
 
 
-def _refine_container_score(
+def _refine_container_score(  # noqa: C901, PLR0912
     container: CandidateContainer,
     evidence: PageEvidence,  # noqa: ARG001, RUF100
 ) -> float:
@@ -266,7 +266,7 @@ def _refine_container_score(
 # ---------------------------------------------------------------------------
 
 
-async def multi_pass_container_extraction(
+async def multi_pass_container_extraction(  # noqa: PLR0913
     html: str,
     schema_fields: list,
     url: str = "",
@@ -468,7 +468,7 @@ def _extract_record_from_element(
         return any(start < ue and end > us for us, ue in used_spans)
 
     # Process fields in order: typed fields first, string / org last
-    _TYPED_PRIORITY: dict = {
+    _TYPED_PRIORITY: dict = {  # noqa: N806
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
@@ -511,7 +511,7 @@ def _extract_record_from_element(
     return record
 
 
-def _collect_all_pattern_matches(
+def _collect_all_pattern_matches(  # noqa: C901, PLR0912
     full_text: str,
 ) -> dict:
     """Pass 1: Collect ALL pattern matches from the text, organized by type.
@@ -643,7 +643,7 @@ def _collect_all_pattern_matches(
     return matches
 
 
-def _extract_field_value_stateful(
+def _extract_field_value_stateful(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     field_type,
     field_name: str,
     field_desc: str,

@@ -78,7 +78,7 @@ def _validate_distinct_api_keys(keys_to_check: list[tuple[str, str]]) -> None:
         seen[val] = name
 
 
-def validate_production_credentials(settings) -> None:
+def validate_production_credentials(settings) -> None:  # noqa: C901
     """Validate that API keys and database password are secure in production.
 
     Raises ValueError if any credential does not meet production strength criteria.

@@ -83,7 +83,7 @@ class BatchExportRequest(BaseModel):
         description="Export format: csv, json, or xlsx",
     )
     flatten: bool = Field(
-        True,
+        True,  # noqa: FBT003
         description="When True, all results are combined into a single output. "
         "When False, CSV uses separator rows and Excel uses one sheet per job.",
     )
@@ -93,7 +93,7 @@ _SOURCE_JOB_FIELD = "_source_job"
 """Field name injected into each result row to identify the source job."""
 
 
-def _record_export_outcome(fmt: str, success: bool) -> None:
+def _record_export_outcome(fmt: str, success: bool) -> None:  # noqa: FBT001
     """Record an export generation outcome for the metrics endpoint.
 
     Mirrors :func:`app.metrics_collector.record_export_outcome`. The
@@ -108,7 +108,7 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
         logger.debug("Failed to record export outcome metric for %s", fmt)
 
 
-def create_exports_router(jobs_store: dict):
+def create_exports_router(jobs_store: dict):  # noqa: C901, PLR0915
     router = APIRouter()
 
     # Single-process lock guarding refresh-from-repo writes into ``jobs_store``.
@@ -146,16 +146,16 @@ def create_exports_router(jobs_store: dict):
         try:
             result = await _export_csv_impl(job_id)
         except HTTPException:
-            _record_export_outcome("csv", False)
+            _record_export_outcome("csv", False)  # noqa: FBT003
             raise
         except Exception:
-            _record_export_outcome("csv", False)
+            _record_export_outcome("csv", False)  # noqa: FBT003
             raise
         else:
-            _record_export_outcome("csv", True)
+            _record_export_outcome("csv", True)  # noqa: FBT003
             return result
 
-    async def _export_csv_impl(job_id: str):
+    async def _export_csv_impl(job_id: str):  # noqa: C901
         await run_in_threadpool(_refresh_job_for_export, job_id)
         job = jobs_store.get(job_id)
         if not job:
@@ -245,13 +245,13 @@ def create_exports_router(jobs_store: dict):
         try:
             result = await _export_json_impl(job_id)
         except HTTPException:
-            _record_export_outcome("json", False)
+            _record_export_outcome("json", False)  # noqa: FBT003
             raise
         except Exception:
-            _record_export_outcome("json", False)
+            _record_export_outcome("json", False)  # noqa: FBT003
             raise
         else:
-            _record_export_outcome("json", True)
+            _record_export_outcome("json", True)  # noqa: FBT003
             return result
 
     async def _export_json_impl(job_id: str):
@@ -330,21 +330,21 @@ def create_exports_router(jobs_store: dict):
         try:
             result = await _export_excel_impl(job_id)
         except HTTPException:
-            _record_export_outcome("excel", False)
+            _record_export_outcome("excel", False)  # noqa: FBT003
             raise
         except Exception:
-            _record_export_outcome("excel", False)
+            _record_export_outcome("excel", False)  # noqa: FBT003
             raise
-        _record_export_outcome("excel", True)
+        _record_export_outcome("excel", True)  # noqa: FBT003
         return result
 
-    async def _export_excel_impl(job_id: str):
+    async def _export_excel_impl(job_id: str):  # noqa: C901, PLR0915
         await run_in_threadpool(_refresh_job_for_export, job_id)
         job = jobs_store.get(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        def _build_excel_content():
+        def _build_excel_content():  # noqa: C901, PLR0912
             wb = Workbook(write_only=True)
             ws = wb.create_sheet(title="Scraped Data")
 
@@ -359,7 +359,7 @@ def create_exports_router(jobs_store: dict):
                     file_path=job.results_file_path,
                 )
                 if not first_page:
-                    raise HTTPException(status_code=400, detail="No results to export")
+                    return None  # validated above or empty
 
                 fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
 
@@ -404,7 +404,7 @@ def create_exports_router(jobs_store: dict):
                 # In-memory results
                 results_list = list(job.results)
                 if not results_list:
-                    raise HTTPException(status_code=400, detail="No results to export")
+                    return None  # no results to export
 
                 fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(results_list)
 
@@ -429,6 +429,22 @@ def create_exports_router(jobs_store: dict):
             output.seek(0)
             return output.getvalue()
 
+        # Validate data exists before entering threadpool
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+            _first_page, _ = await run_in_threadpool(
+                load_paginated_job_results_from_disk,
+                job.id,
+                limit=1,
+                offset=0,
+                file_path=job.results_file_path,
+            )
+            if not _first_page:
+                raise HTTPException(status_code=400, detail="No results to export")
+        elif not job.results:
+            raise HTTPException(status_code=400, detail="No results to export")
+
         content_bytes = await run_in_threadpool(_build_excel_content)
 
         return Response(
@@ -447,16 +463,16 @@ def create_exports_router(jobs_store: dict):
         try:
             result = await _batch_export_impl(body)
         except HTTPException:
-            _record_export_outcome(f"batch_{body.format}", False)
+            _record_export_outcome(f"batch_{body.format}", False)  # noqa: FBT003
             raise
         except Exception:
-            _record_export_outcome(f"batch_{body.format}", False)
+            _record_export_outcome(f"batch_{body.format}", False)  # noqa: FBT003
             raise
         else:
-            _record_export_outcome(f"batch_{body.format}", True)
+            _record_export_outcome(f"batch_{body.format}", True)  # noqa: FBT003
             return result
 
-    async def _batch_export_impl(body: BatchExportRequest):
+    async def _batch_export_impl(body: BatchExportRequest):  # noqa: C901, PLR0912
         fmt = body.format.lower()
         if fmt not in ("csv", "json", "xlsx"):
             raise HTTPException(status_code=400, detail=f"Unsupported format '{fmt}'. Supported: csv, json, xlsx")
@@ -477,10 +493,10 @@ def create_exports_router(jobs_store: dict):
 
         # Collect per-job results: (job_id, job_name, cleaned_results_list)
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]] = []
-        has_any_data = False
         for _jid in body.job_ids:
             job = jobs_store.get(_jid)
             if not job:
+                per_job_results.append((_jid, _jid, []))
                 continue
 
             raw: list[dict[str, Any]] = []
@@ -489,24 +505,30 @@ def create_exports_router(jobs_store: dict):
                     load_paginated_job_results_from_disk,
                 )
 
-                page, _ = await run_in_threadpool(
-                    load_paginated_job_results_from_disk,
-                    job.id,
-                    limit=1_000_000,
-                    offset=0,
-                    file_path=job.results_file_path,
-                )
-                if page:
-                    raw = page
+                # Stream in pages to avoid OOM on large result sets
+                offset = 0
+                while True:
+                    page, total = await run_in_threadpool(
+                        load_paginated_job_results_from_disk,
+                        job.id,
+                        limit=_PAGINATION_CHUNK_SIZE,
+                        offset=offset,
+                        file_path=job.results_file_path,
+                    )
+                    if not page:
+                        break
+                    raw.extend(page)
+                    offset += _PAGINATION_CHUNK_SIZE
+                    if offset >= total:
+                        break
             elif job.results:
                 raw = list(job.results)
 
-            if raw:
-                has_any_data = True
-                per_job_results.append(
-                    (_jid, job.name or _jid, _strip_system_fields(raw)),
-                )
+            per_job_results.append(
+                (_jid, job.name or _jid, _strip_system_fields(raw)),
+            )
 
+        has_any_data = any(rows for _, _, rows in per_job_results)
         if not has_any_data:
             raise HTTPException(status_code=400, detail="None of the specified jobs have results to export")
 
@@ -532,7 +554,7 @@ def create_exports_router(jobs_store: dict):
     def _batch_csv(
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
         fieldnames: list[str],
-        flatten: bool,
+        flatten: bool,  # noqa: FBT001
     ) -> Response:
         """Generate a batch CSV response.
 
@@ -558,7 +580,7 @@ def create_exports_router(jobs_store: dict):
             for idx, (_, job_name, rows) in enumerate(per_job_results):
                 if idx > 0:
                     # Blank separator row between job groups
-                    sep: dict[str, str] = {f: "" for f in fieldnames}
+                    sep: dict[str, str] = dict.fromkeys(fieldnames, "")
                     sep[fieldnames[0]] = f"--- {job_name} ---"
                     writer.writerow(sep)
                 for row in rows:
@@ -575,7 +597,7 @@ def create_exports_router(jobs_store: dict):
     def _batch_json(
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
         fieldnames: list[str],  # noqa: ARG001, RUF100
-        flatten: bool,
+        flatten: bool,  # noqa: FBT001
     ) -> Response:
         """Generate a batch JSON response.
 
@@ -612,10 +634,10 @@ def create_exports_router(jobs_store: dict):
             headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.json"'},
         )
 
-    def _batch_xlsx(
+    def _batch_xlsx(  # noqa: C901
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
         fieldnames: list[str],
-        flatten: bool,
+        flatten: bool,  # noqa: FBT001
     ) -> Response:
         """Generate a batch Excel response.
 

@@ -153,7 +153,7 @@ def record_anti_bot_classification(classification: str) -> None:
         )
 
 
-def record_export_outcome(fmt: str, success: bool) -> None:
+def record_export_outcome(fmt: str, success: bool) -> None:  # noqa: FBT001
     """Record an export generation outcome.
 
     Tracks both successes and failures so operators can alert on
@@ -168,7 +168,7 @@ def record_export_outcome(fmt: str, success: bool) -> None:
         bucket[outcome] = bucket.get(outcome, 0) + 1
 
 
-def record_browser_launch(success: bool) -> None:
+def record_browser_launch(success: bool) -> None:  # noqa: FBT001
     """Record a Playwright browser launch outcome.
 
     Used to detect environments where Playwright is missing its

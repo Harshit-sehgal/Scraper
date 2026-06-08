@@ -20,12 +20,12 @@ def env_file():
         f.write("# Test .env\n")
         f.flush()
         yield Path(f.name)
-    os.unlink(f.name)
+    os.unlink(f.name)  # noqa: PTH108
 
 
-def _write_env(path: Path, vars: dict[str, str]) -> None:
+def _write_env(path: Path, vars: dict[str, str]) -> None:  # noqa: A002
     """Write variables to an env file."""
-    with open(path, "w") as f:
+    with open(path, "w") as f:  # noqa: PTH123
         f.writelines(f'{key}="{value}"\n' for key, value in vars.items())
 
 
@@ -62,7 +62,7 @@ class TestCheckProdEnvCore:
             assert env["DATAFORGE_ENV"] == "production"
             assert "comment" not in env
         finally:
-            os.unlink(f.name)
+            os.unlink(f.name)  # noqa: PTH108
 
     def test_load_env_file_handles_missing_file(self) -> None:
         """load_env_file should return empty dict for missing file."""
@@ -662,7 +662,8 @@ class TestCheckQueueDriverCompatibility:
 
         def fake_import(name, *args, **kwargs):
             if name == "psycopg2" or name.startswith("psycopg2."):
-                raise ImportError("psycopg2 simulated not installed")
+                msg = "psycopg2 simulated not installed"
+                raise ImportError(msg)
             return original_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "__import__", fake_import)

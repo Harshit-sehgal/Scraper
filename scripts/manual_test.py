@@ -408,7 +408,7 @@ def run_test_job(mode: str = "manual"):
 # ─── List Jobs ─────────────────────────────────────────────────────────────
 
 
-def list_jobs(limit: int = 10):  # noqa: ARG001
+def list_jobs(limit: int = 10):
     """List recent scraping jobs."""
     _print_header("RECENT JOBS")
     data = api_get("/api/system/status")

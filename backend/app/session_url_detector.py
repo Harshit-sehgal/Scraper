@@ -91,7 +91,7 @@ def _looks_like_opaque_path_token(segment: str) -> bool:
     return False
 
 
-def detect_session_params(url: str) -> dict:
+def detect_session_params(url: str) -> dict:  # noqa: C901, PLR0912
     """Detect ephemeral / session-bound parameters in a URL.
 
     Scans the URL's query string for parameters that are likely to be

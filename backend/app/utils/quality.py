@@ -39,7 +39,7 @@ def safe_score(value: Any) -> float:
         return 0.0
 
 
-def _value_quality(field: SchemaField, value) -> float:
+def _value_quality(field: SchemaField, value) -> float:  # noqa: C901, PLR0912, PLR0915
     """Measure the semantic quality of a specific field value."""
     if value is None:
         return 0.0
@@ -186,7 +186,7 @@ def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> floa
     return round(clamp01(final_confidence), 3)
 
 
-def build_quality_report(
+def build_quality_report(  # noqa: PLR0913
     raw_results: list[dict],
     post_filter_count: int,
     post_radius_count: int,

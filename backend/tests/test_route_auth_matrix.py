@@ -59,14 +59,6 @@ ROUTE_MATRIX = [
     ("GET", "/", "public"),
     # ── User-level routes (any valid API key) ───────────────────────────
     ("GET", "/api/jobs", "user"),
-    ("GET", "/api/system/topology", "user"),
-    ("GET", "/api/system/observability", "user"),
-    ("GET", "/api/scraper/trends", "user"),
-    ("GET", "/api/scraper/economics", "user"),
-    ("GET", "/api/scraper/health/summary", "user"),
-    ("GET", "/api/operator/mode", "user"),
-    ("GET", "/api/operator/dashboard", "user"),
-    ("GET", "/api/operator/health", "user"),
     ("GET", "/api/operator/predictions", "user"),
     ("GET", "/api/recycle_bin", "user"),
     # ── Operator-level routes (ADMIN or OPERATOR key) ───────────────────
@@ -85,12 +77,20 @@ ROUTE_MATRIX = [
     # ── Admin-level routes (ADMIN key only) ─────────────────────────────
     ("DELETE", "/api/scraper/telemetry", "admin"),
     ("POST", "/api/operator/mode", "admin"),
+    ("GET", "/api/operator/mode", "admin"),
     ("DELETE", "/api/recycle_bin", "admin"),
     ("POST", "/api/system/scheduler/step", "admin"),
     ("POST", "/api/system/refactor/compress", "admin"),
     ("POST", "/api/scraper/selectors/cleanup", "admin"),
     ("POST", "/api/scraper/regressions/generate-all-tests", "admin"),
-    # Note: POST /api/scraper/regressions/{entry_id}/generate-test is admin-only
+    ("GET", "/api/system/topology", "admin"),
+    ("GET", "/api/system/observability", "admin"),
+    ("GET", "/api/scraper/trends", "admin"),
+    ("GET", "/api/scraper/economics", "admin"),
+    ("GET", "/api/scraper/health/summary", "admin"),
+    ("GET", "/api/operator/dashboard", "admin"),
+    ("GET", "/api/operator/health", "admin"),
+    # Note: POST /api/scraper/regressions/{entry_id}/generate-test is admin-only  # noqa: ERA001
     # but cannot be tested without a real regression entry in the database.
     # See test_route_auth_admin_key for the pattern used by other admin tests.
 ]
@@ -115,7 +115,7 @@ OPERATOR_AUTH = make_headers(api_key="test_operator_key")
 ADMIN_AUTH = make_headers(api_key="test_admin_key")
 
 
-def expected_status(method: str, path: str, auth_level: str, min_role: str) -> int:
+def expected_status(method: str, path: str, auth_level: str, min_role: str) -> int:  # noqa: PLR0911
     """Determine the expected HTTP status for a request.
 
     Rules:
@@ -205,7 +205,7 @@ def client(monkeypatch):
         mp.undo()
         for f in ["/tmp/test_auth_state.json", "/tmp/test_auth_semantic.json"]:
             with contextlib.suppress(OSError):
-                os.remove(f)
+                os.remove(f)  # noqa: PTH107
         for m in modules_to_pop:
             sys.modules.pop(m, None)
             if old_modules[m] is not None:

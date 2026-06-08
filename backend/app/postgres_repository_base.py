@@ -326,7 +326,7 @@ def _migrate_worker_heartbeats_v6(conn) -> None:
                     started_at TEXT NOT NULL DEFAULT '',
                     PRIMARY KEY (worker_id, pid)
                 )
-                """
+                """,
             )
             # Carry the most recent row per (worker_id, pid) forward.
             # DISTINCT ON is the cleanest Postgres-only way to do this
@@ -342,7 +342,7 @@ def _migrate_worker_heartbeats_v6(conn) -> None:
                     FROM worker_heartbeats_v5_backup
                     ORDER BY worker_id, pid, last_heartbeat DESC
                 ) latest
-                """
+                """,
             )
             cur.execute("DROP TABLE worker_heartbeats_v5_backup")
         except Exception:  # nosec B110
@@ -479,21 +479,24 @@ def _fetch_all(conn, sql: str, params=None) -> list[dict]:
     """Module-level wrapper delegating to the current driver's _fetch_all."""
     fn = _driver_fetch_all
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
+        msg = "Postgres driver not initialised — call _set_driver_functions first"
+        raise RuntimeError(msg)
     return fn(conn, sql, params)
 
 
 def _fetch_one(conn, sql: str, params=None) -> dict | None:
     fn = _driver_fetch_one
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
+        msg = "Postgres driver not initialised — call _set_driver_functions first"
+        raise RuntimeError(msg)
     return fn(conn, sql, params)
 
 
 def execute(conn, sql: str, params=None):
     fn = _driver_execute
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
+        msg = "Postgres driver not initialised — call _set_driver_functions first"
+        raise RuntimeError(msg)
     return fn(conn, sql, params)
 
 
@@ -514,7 +517,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
     backend: str = "postgres"
 
-    def __init__(self, auto_ensure_schema: bool = True) -> None:
+    def __init__(self, auto_ensure_schema: bool = True) -> None:  # noqa: FBT001, FBT002
         self._auto_ensure_schema = auto_ensure_schema
         self._schema_ensured = False
 
@@ -619,7 +622,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             )
         return summaries
 
-    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:  # noqa: FBT001, FBT002
         """Return a ``{status_value: count}`` mapping for all jobs.
 
         Implemented as a single ``GROUP BY status`` query so it stays
@@ -696,7 +699,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             )
         return summaries
 
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:  # noqa: C901, FBT001, FBT002, PLR0912
         self._ensure()
         with self._conn() as conn:
             # Cross-replica recovery contract: when more than one API
@@ -784,7 +787,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     except Exception:
                         logger.debug("pg_advisory_unlock(8675309) failed; will be released at session end")
 
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:  # noqa: FBT001, FBT002
         self._ensure()
         with self._conn() as conn:
 

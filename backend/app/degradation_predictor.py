@@ -154,7 +154,7 @@ class DegradationPredictor:
     def __init__(self, history_window: int = 200) -> None:
         self._history_window = history_window
 
-    def predict(self, telemetry_history: list[dict], domain_trends: dict | None = None) -> PredictionReport:
+    def predict(self, telemetry_history: list[dict], domain_trends: dict | None = None) -> PredictionReport:  # noqa: C901
         """Run full degradation prediction on telemetry data.
 
         Args:
@@ -414,7 +414,7 @@ class DegradationPredictor:
 
     # ── Helpers ─────────────────────────────────────────────────────
 
-    def _build_prediction(
+    def _build_prediction(  # noqa: PLR0913
         self,
         domain: str,
         risk_level: str,
@@ -425,7 +425,7 @@ class DegradationPredictor:
         evidence: list[str],
         recommended_actions: list[str],
         trend: DomainTrend,
-        cascade_risk: bool = False,
+        cascade_risk: bool = False,  # noqa: FBT001, FBT002
         cascade_risk_domains: list[str] | None = None,
     ) -> Prediction:
         return Prediction(

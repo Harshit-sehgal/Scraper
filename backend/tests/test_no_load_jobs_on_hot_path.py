@@ -41,7 +41,7 @@ def _walk_async_functions(tree: ast.Module) -> list[ast.AsyncFunctionDef]:
     out: list[ast.AsyncFunctionDef] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.AsyncFunctionDef):
-            out.append(node)
+            out.append(node)  # noqa: PERF401
     return out
 
 

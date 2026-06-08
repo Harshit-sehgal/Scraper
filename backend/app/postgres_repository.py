@@ -85,7 +85,7 @@ class PostgresJobRepository(PostgresRepositoryBase):
 
     backend = "postgres"
 
-    def __init__(self, auto_ensure_schema: bool = True) -> None:
+    def __init__(self, auto_ensure_schema: bool = True) -> None:  # noqa: FBT001, FBT002
         super().__init__(auto_ensure_schema=auto_ensure_schema)
 
     @contextmanager

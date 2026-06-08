@@ -87,7 +87,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
 }
 
 
-def classify_zero_result(
+def classify_zero_result(  # noqa: PLR0911, PLR0913
     acquisition_lineage: dict | None = None,  # noqa: ARG001, RUF100
     session_detection: dict | None = None,
     empty_check: dict | None = None,

@@ -452,20 +452,40 @@ class TestInferRelationshipType:
 
     def test_date_range(self) -> None:
         d1 = CandidateIR(
-            raw="2025-01-01", cleaned="2025-01-01", span_start=0, span_end=10, position=0, primary_type=SemanticType.DATE
+            raw="2025-01-01",
+            cleaned="2025-01-01",
+            span_start=0,
+            span_end=10,
+            position=0,
+            primary_type=SemanticType.DATE,
         )
         d2 = CandidateIR(
-            raw="2025-01-15", cleaned="2025-01-15", span_start=11, span_end=21, position=11, primary_type=SemanticType.DATE
+            raw="2025-01-15",
+            cleaned="2025-01-15",
+            span_start=11,
+            span_end=21,
+            position=11,
+            primary_type=SemanticType.DATE,
         )
         rel_type, _, _ = _infer_relationship_type(d1, d2)
         assert rel_type == "date_range"
 
     def test_same_type_group(self) -> None:
         o1 = CandidateIR(
-            raw="Google", cleaned="Google", span_start=0, span_end=6, position=0, primary_type=SemanticType.ORGANIZATION
+            raw="Google",
+            cleaned="Google",
+            span_start=0,
+            span_end=6,
+            position=0,
+            primary_type=SemanticType.ORGANIZATION,
         )
         o2 = CandidateIR(
-            raw="Apple", cleaned="Apple", span_start=7, span_end=12, position=7, primary_type=SemanticType.ORGANIZATION
+            raw="Apple",
+            cleaned="Apple",
+            span_start=7,
+            span_end=12,
+            position=7,
+            primary_type=SemanticType.ORGANIZATION,
         )
         rel_type, _, _ = _infer_relationship_type(o1, o2)
         assert rel_type == "same_type_group"
@@ -626,7 +646,7 @@ class TestIsLikelyNoise:
     def test_high_text_ratio_noise(self) -> None:
         # Text with mostly prose and few typed values
         result, _, _ = is_likely_noise(
-            "hello world this is a very long descriptive text that doesn't have much structured data in it at all"
+            "hello world this is a very long descriptive text that doesn't have much structured data in it at all",
         )
         assert isinstance(result, bool)
 
@@ -795,14 +815,22 @@ class TestResolveOverlaps:
     def test_non_overlapping_tokens_both_kept(self) -> None:
         price = SemanticToken(raw="$100", normalized="100", span=Span(0, 4), position=0, primary_type=SemanticType.PRICE)
         date = SemanticToken(
-            raw="2025-01-01", normalized="2025-01-01", span=Span(10, 20), position=10, primary_type=SemanticType.DATE
+            raw="2025-01-01",
+            normalized="2025-01-01",
+            span=Span(10, 20),
+            position=10,
+            primary_type=SemanticType.DATE,
         )
         result = resolve_overlaps([price, date])
         assert len(result) == 2
 
     def test_lexical_containment_suppresses_number(self) -> None:
         org = SemanticToken(
-            raw="Organization", normalized="organization", span=Span(0, 12), position=0, primary_type=SemanticType.ORGANIZATION
+            raw="Organization",
+            normalized="organization",
+            span=Span(0, 12),
+            position=0,
+            primary_type=SemanticType.ORGANIZATION,
         )
         # "org" is a strict substring of "Organization"
         text = SemanticToken(raw="org", normalized="org", span=Span(5, 8), position=0, primary_type=SemanticType.TEXT)

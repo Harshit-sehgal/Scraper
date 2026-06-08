@@ -94,7 +94,7 @@ else:
 
     class MotifFeedbackEngine:
         def __new__(cls, *args, **kwargs):
-            from app.motif_feedback import MotifFeedbackEngine as impl
+            from app.motif_feedback import MotifFeedbackEngine as impl  # noqa: N813
 
             return impl(*args, **kwargs)
 
@@ -107,7 +107,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-async def analyze_url_for_fields(
+async def analyze_url_for_fields(  # noqa: C901, PLR0912, PLR0915
     url: str,
     search_params: dict[str, str] | None = None,
     acquisition_mode: str = "standard",
@@ -153,7 +153,12 @@ async def analyze_url_for_fields(
     """
     import httpx
 
-    from app.acquisition_mode import AcquisitionConfig, AcquisitionMode, escalate_mode, should_escalate  # research-shell, lazy
+    from app.acquisition_mode import (  # research-shell, lazy
+        AcquisitionConfig,
+        AcquisitionMode,
+        escalate_mode,
+        should_escalate,
+    )
     from app.html_utils import fetch_page_content as _fetch_page_content
     from app.scrape_telemetry import detect_anti_bot
     from app.strategy_evolution import FetchStrategy  # research-shell, lazy
@@ -489,7 +494,7 @@ async def analyze_url_for_fields(
     # If LLM returned no fields, use pattern analysis as fallback
     if not suggested_fields:
         for hint in _value_patterns_to_field_types(patterns):
-            suggested_fields.append(
+            suggested_fields.append(  # noqa: PERF401
                 {
                     "name": hint["type"],
                     "type": hint["type"],

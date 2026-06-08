@@ -313,7 +313,7 @@ class TestLlmJson:
                 patch("app.llm_bridge._call_openai_compatible_json") as mock_call,
                 patch("app.llm_bridge.settings.GROQ_API_ENDPOINT", "http://groq"),
                 patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
-                patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
+                patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),  # noqa: FBT003
             ):
                 # Groq fails, Pollinations succeeds
                 mock_call.side_effect = [
@@ -343,7 +343,7 @@ class TestLlmJson:
             patch.dict(os.environ, {}, clear=True),
             patch("app.llm_bridge._call_openai_compatible_json") as mock_json,
             patch("app.llm_bridge.asyncio.to_thread") as mock_thread,
-            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", False),
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", False),  # noqa: FBT003
         ):
             result = await llm_json([{"role": "user", "content": "hi"}])
             assert result == {}
@@ -370,7 +370,7 @@ class TestLlmJsonFast:
             patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("fail")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
             patch("app.llm_bridge._record_llm_degradation"),
-            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),  # noqa: FBT003
         ):
             result = await llm_json_fast([{"role": "user", "content": "hi"}])
             assert result == {}
@@ -396,7 +396,7 @@ class TestLlmText:
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
             patch("app.llm_bridge.asyncio.to_thread", side_effect=Exception("g4f fail")),
             patch("app.llm_bridge._record_llm_degradation"),
-            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),  # noqa: FBT003
         ):
             result = await llm_text([{"role": "user", "content": "hi"}])
             assert result == ""
@@ -453,7 +453,7 @@ class TestSubstratePluginManager:
             raise ValueError(msg)
 
         mgr.register_handler("failing", handler)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError):  # noqa: PT011
             mgr.call_tool("failing")
         assert mgr._execution_history[0]["status"] == "error"
 

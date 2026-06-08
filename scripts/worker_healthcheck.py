@@ -49,7 +49,7 @@ if os.path.exists(_ENV_FILE):
                 _k, _v = _line.split("=", 1)
                 _k = _k.strip()
                 _v = _v.strip().strip("\"'")
-                if _k.startswith("DATAFORGE_") or _k.startswith("GROQ_"):
+                if _k.startswith(("DATAFORGE_", "GROQ_")):
                     os.environ.setdefault(_k, _v)
 
 

@@ -32,7 +32,7 @@ class EventJournal:
         self._checkpoints: dict[int, dict] = {}  # event_idx -> full_snapshot
         self._current_idx = 0
 
-    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: dict | None = None) -> None:
+    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: dict | None = None) -> None:  # noqa: C901
         """Record a mutation event using delta-encoding (Phase 57).
 
         Also persists to the large-scale ReplayBuffer for streaming replay

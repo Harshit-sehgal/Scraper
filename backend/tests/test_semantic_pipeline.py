@@ -361,7 +361,7 @@ def test_boundary_engine_history() -> None:
 
     e = get_boundary_engine()
     n = len(e.decision_history)
-    e.record_decision(MergeDecision("org", "org", "X", "Y", True, 0.9, True))
+    e.record_decision(MergeDecision("org", "org", "X", "Y", True, 0.9, True))  # noqa: FBT003
     assert len(e.decision_history) == n + 1
 
 
@@ -372,8 +372,8 @@ def test_cohesion_model_records() -> None:
     e = get_boundary_engine()
     m = e.cohesion_model
     assert m.merge_success_rate("org", "org") == 0.5
-    m.record("org", "org", True, True)
-    m.record("org", "org", True, True)
+    m.record("org", "org", True, True)  # noqa: FBT003
+    m.record("org", "org", True, True)  # noqa: FBT003
     assert m.merge_success_rate("org", "org") == 1.0
 
 
@@ -384,8 +384,8 @@ def test_cohesion_model_bias() -> None:
     e = get_boundary_engine()
     m = e.cohesion_model
     assert m.get_cohesion_bias("price", "price") == 0.0
-    m.record("price", "price", False, True)
-    m.record("price", "price", False, True)
+    m.record("price", "price", False, True)  # noqa: FBT003
+    m.record("price", "price", False, True)  # noqa: FBT003
     assert m.get_cohesion_bias("price", "price") < 0
 
 

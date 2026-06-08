@@ -128,14 +128,14 @@ async def _check_crawl_policy(url: str) -> ScrapeAttemptResult | None:
 # ─── Internal helper: try profile-based extraction ───────────────────
 
 
-async def _try_profile_extraction(
+async def _try_profile_extraction(  # noqa: PLR0913
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float,
     user_intent: str,
     selectors_map: dict | None,  # noqa: ARG001, RUF100
     attempt_ctx: AttemptContext | None,  # noqa: ARG001, RUF100
-    skip_profiles: bool = False,
+    skip_profiles: bool = False,  # noqa: FBT001, FBT002
 ) -> tuple[ScrapeAttemptResult | None, dict | None, str | None]:
     """Try profile-based extraction as the first extraction strategy.
 
@@ -266,14 +266,14 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
 # ─── Internal helper: zero-result classification ─────────────────────
 
 
-async def _classify_and_capture_zero_result(
+async def _classify_and_capture_zero_result(  # noqa: PLR0913
     url: str,
     html: str,
     fetch_method: str,
     anti_bot_score: float,
     schema_fields: list[SchemaField],
     ext_result: Any,
-    is_failure_page: bool,
+    is_failure_page: bool,  # noqa: FBT001
     classification: Any | None,
     start_time: float,  # noqa: ARG001, RUF100
 ) -> tuple[Any | None, str | None, list[str]]:
@@ -375,7 +375,7 @@ async def _classify_and_capture_zero_result(
 # ─── Internal helper: build fetch response on failure ─────────────────
 
 
-def _build_fetch_failure_result(
+def _build_fetch_failure_result(  # noqa: PLR0913
     url: str,
     fetch_method: str,
     classification: Any | None,
@@ -395,7 +395,10 @@ def _build_fetch_failure_result(
         provenance_builder.add_error(f"Classified: {classification.category.value}")
 
     telemetry.record(
-        url=url, error=str(e), fetch_ms=fetch_ms, failure_category=classification.category.value if classification else None
+        url=url,
+        error=str(e),
+        fetch_ms=fetch_ms,
+        failure_category=classification.category.value if classification else None,
     )
 
     get_crawl_policy().record_result(url, success=False)
@@ -423,7 +426,7 @@ def _build_fetch_failure_result(
 # ─── Main entry points ────────────────────────────────────────────────
 
 
-async def scrape_url_attempt(
+async def scrape_url_attempt(  # noqa: PLR0913
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,
@@ -501,7 +504,7 @@ async def scrape_url_attempt(
     return result
 
 
-async def scrape_url(
+async def scrape_url(  # noqa: C901, PLR0912, PLR0913, PLR0915
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,
@@ -612,7 +615,11 @@ async def scrape_url(
     except Exception as e:
         fetch_ms = (time.time() - fetch_start) * 1000
         strategy_engine.record_fetch_attempt(
-            intel.domain, recommended_strategy, success=False, time_ms=fetch_ms, failure_reason=type(e).__name__
+            intel.domain,
+            recommended_strategy,
+            success=False,
+            time_ms=fetch_ms,
+            failure_reason=type(e).__name__,
         )
         classification = classify_failure(error_message=str(e), fetch_method=fetch_method)
         get_regression_capture().maybe_capture(

@@ -110,7 +110,7 @@ This can help with relative selector selection (e.g., if you find the price, the
 """
 
     @staticmethod
-    def extract_motifs_from_results(
+    def extract_motifs_from_results(  # noqa: C901, PLR0912
         results: list[dict[str, Any]],
         schema_fields: list[SchemaField],
         min_cooccurrence: int = 2,

@@ -151,7 +151,7 @@ class DomainHealthMonitor:
         self._alert_cooldown_seconds = 300  # Min 5 minutes between alerts per domain
         self.alert_callback = alert_callback
 
-    def record_attempt(self, url: str, success: bool, failure_category: str | None = None) -> None:
+    def record_attempt(self, url: str, success: bool, failure_category: str | None = None) -> None:  # noqa: FBT001
         """Record a scrape attempt for a domain.
 
         Args:

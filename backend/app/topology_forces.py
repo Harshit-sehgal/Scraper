@@ -25,7 +25,7 @@ def compute_edge_field_forces(state: "TopologyState") -> dict[tuple[str, str], d
     return forces  # type: ignore[return-value]
 
 
-def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pressure_amount: float, forces: dict) -> None:
+def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pressure_amount: float, forces: dict) -> None:  # noqa: C901
     """Redirect repulsive pressure through alternative high-affinity edge field routes."""
     # 1. Find high-affinity routes from the source region's roles
     route_targets: dict[str, float] = {}  # target_role -> weight

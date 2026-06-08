@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Comprehensive Benchmark Corpus Suite for DataForge Scraper.
 
 Validates the extraction engine across:
@@ -33,7 +32,7 @@ from app.models import FieldType, SchemaField
 from app.scraper import ScrapeAttemptResult, scrape_url
 
 # Ensure backend is in the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # noqa: PTH118, PTH120
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +42,10 @@ logger = logging.getLogger(__name__)
 class _BenchmarkCorpusHandler(http.server.BaseHTTPRequestHandler):
     """Local HTTP Server simulating static, dynamic, bad HTML, and failure page categories."""
 
-    def log_message(self, format, *args) -> None:
+    def log_message(self, format, *args) -> None:  # noqa: A002
         pass  # silence server logs during tests
 
-    def do_GET(self) -> None:
+    def do_GET(self) -> None:  # noqa: C901, PLR0912
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)

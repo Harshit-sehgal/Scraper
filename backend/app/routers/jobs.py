@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from app.models import Job
 
 
-def create_jobs_router(
+def create_jobs_router(  # noqa: PLR0913
     jobs_store: dict[str, Job],
     recycle_bin_store: dict[str, Job],
     persist_state_fn: Callable | None = None,  # noqa: ARG001, RUF100

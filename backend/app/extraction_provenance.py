@@ -156,7 +156,7 @@ class ProvenanceBuilder:
     def set_records_count(self, count: int) -> None:
         self._records_count = count
 
-    def set_memory_hit(self, hit: bool) -> None:
+    def set_memory_hit(self, hit: bool) -> None:  # noqa: FBT001
         self._memory_hit = hit
 
     def add_fallback_step(self, step: str) -> None:
@@ -166,7 +166,7 @@ class ProvenanceBuilder:
     def add_error(self, error: str) -> None:
         self._errors.append(error)
 
-    def add_field_provenance(
+    def add_field_provenance(  # noqa: PLR0913
         self,
         record_idx: int,
         field_name: str,
@@ -174,7 +174,7 @@ class ProvenanceBuilder:
         method: str = "unknown",
         selector: str | None = None,
         confidence: float = 0.0,
-        transformed: bool = False,
+        transformed: bool = False,  # noqa: FBT001, FBT002
         source_snippet: str | None = None,
         extraction_time_ms: float = 0.0,
         llm_hint: str | None = None,

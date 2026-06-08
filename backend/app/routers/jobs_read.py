@@ -15,13 +15,14 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from starlette.concurrency import run_in_threadpool
 
+from app.models import JobStatus
 from app.routers.jobs_state import JobStoreManager, is_worker_mode
 from app.storage_interface import get_job_repository
 
 logger = logging.getLogger(__name__)
 
 
-def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> None:
+def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> None:  # noqa: C901, PLR0915
     """Register all read-only job endpoints on the given router."""
 
     @router.get("/api/jobs")
@@ -53,7 +54,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     for s in summaries:
                         if s["id"] in manager.jobs_store:
                             cached = manager.jobs_store[s["id"]]
-                            cached.status = s["status"]  # type: ignore[assignment]
+                            cached.status = JobStatus(s["status"])
                             cached.completed_at = s["completed_at"]  # type: ignore[assignment]
                     stale_ids = [jid for jid in manager.jobs_store if jid not in summary_ids]
                     for jid in stale_ids:
@@ -92,7 +93,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             return {"jobs": summaries, "next_cursor": next_cursor}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):
+    async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):  # noqa: FBT002
         job = await run_in_threadpool(manager.get_job, job_id)
 
         results_list = []

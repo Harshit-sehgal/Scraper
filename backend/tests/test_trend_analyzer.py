@@ -86,7 +86,7 @@ def _multi_domain_history() -> list[dict]:
     events = []
     # Healthy domain (10 events)
     for _ in range(10):
-        events.append(
+        events.append(  # noqa: PERF401
             _make_telemetry(
                 url="https://good.example.com/page",
                 selector_hit_rate=0.95,
@@ -96,7 +96,7 @@ def _multi_domain_history() -> list[dict]:
         )
     # Mediocre domain (6 events with some failures)
     for i in range(6):
-        events.append(
+        events.append(  # noqa: PERF401
             _make_telemetry(
                 url="https://ok.example.com/page",
                 selector_hit_rate=0.6 if i < 3 else 0.3,
@@ -109,7 +109,7 @@ def _multi_domain_history() -> list[dict]:
         )
     # Bad domain (8 events, all failing with zero quality)
     for i in range(8):
-        events.append(
+        events.append(  # noqa: PERF401
             _make_telemetry(
                 url="https://bad.example.com/page",
                 selector_hit_rate=0.0,
@@ -556,7 +556,7 @@ class TestEconomicTrackerCostAnalysis:
         ]
         report = tracker.analyze(history)
         summary = report.cost_by_domain["components.example.com"]
-        # Expected: 5 * 0.01 (LLM) + 3 * 0.005 (browser) + 0.001 (network)
+        # Expected: 5 * 0.01 (LLM) + 3 * 0.005 (browser) + 0.001 (network)  # noqa: ERA001
         expected = 5 * 0.01 + 3 * 0.005 + 0.001
         assert summary.cost_breakdown["llm"] == pytest.approx(0.05, 0.01)
         assert summary.cost_breakdown["browser"] == pytest.approx(0.015, 0.01)

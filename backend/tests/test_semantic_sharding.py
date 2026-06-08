@@ -18,7 +18,7 @@ def test_manifold_sharding() -> None:
     ws._manifold.set_manifold_vector("r3", [0.1] * 16)
     ws._manifold.set_manifold_vector("r4", [0.1] * 16)
 
-    # Communities: {r1, r2} and {r3, r4}
+    # Communities: {r1, r2} and {r3, r4}  # noqa: ERA001
     communities = [{"r1", "r2"}, {"r3", "r4"}]
     ws._manifold.shard_manifold(communities)
 

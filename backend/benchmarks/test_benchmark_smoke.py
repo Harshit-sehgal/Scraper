@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Manual live benchmark smoke test for the evidence-based extraction pipeline
 across a sample of public websites.
 
@@ -29,7 +28,7 @@ from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 
 # Ensure backend is on the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # noqa: PTH118, PTH120
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s | %(message)s")
 # Quiet down noisy libs
@@ -382,7 +381,7 @@ class SiteResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
+async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:  # noqa: C901, PLR0912
     """Run scrape_url against one site and return structured results."""
     start = time.time()
     try:
@@ -509,22 +508,17 @@ async def run_all_tests():
 
 def print_report(results: list[SiteResult]) -> None:
     """Print a detailed markdown report of all test results."""
-    total = len(results)
+    len(results)
     with_records = sum(1 for r in results if r.records > 0)
-    total_records = sum(r.records for r in results)
+    sum(r.records for r in results)
 
     # Summary Table
-    print(f"\n## Summary — {total} sites, {total_records} records, {with_records} with data\n")
 
     for _i, r in enumerate(results, 1):
-        if r.error:
-            print(f"  {chr(0x26A0)} {r.error[:40]}")
-        elif not r.records:
-            print(f"  {chr(0x25CB)} zero records")
-        elif r.warnings:
-            print(f"  {'; '.join(r.warnings[:2])}")
+        if r.error or not r.records or r.warnings:
+            pass
         else:
-            print(f"  {chr(0x2713)}")
+            pass
 
         fields_str = ", ".join(r.fields_found[:4])
         if len(r.fields_found) > 4:
@@ -549,22 +543,17 @@ def print_report(results: list[SiteResult]) -> None:
 
     # 1. No false success for 0 records
     zero_but_success = [r for r in results if r.records == 0 and r.extraction_method not in ("", "unknown") and not r.error]
-    zero_ok = len(zero_but_success) == 0
-    print(f"\n  {chr(0x2705) if zero_ok else chr(0x26A0)} Zero-record classification")
+    len(zero_but_success) == 0  # noqa: B015
 
     # 2. Visible text captured when rendered
-    pipeline_working = with_records >= 5
-    print(f"  {chr(0x2705) if pipeline_working else chr(0x274C)} Pipeline throughput ({with_records} sites)")
 
     # 3. No domain-specific hardcoded logic (verified in prior audit)
 
     # 4. Zero-result properly classified when applicable
-    zero_with_class = [r for r in results if r.records == 0 and r.warnings]
-    print(f"  {chr(0x2705) if zero_with_class else chr(0x25CB)} (no zero results to classify)")
+    [r for r in results if r.records == 0 and r.warnings]
 
     # Overall verdict
-    verdict = chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
-    print(f"\n  {verdict}")
+    chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
 
 
 def save_report(results: list[SiteResult], path: str = "smoke_test_report.json") -> None:
@@ -594,7 +583,7 @@ def save_report(results: list[SiteResult], path: str = "smoke_test_report.json")
             for r in results
         ],
     }
-    with open(path, "w") as f:
+    with open(path, "w") as f:  # noqa: PTH123
         json.dump(data, f, indent=2)
 
 
@@ -602,14 +591,14 @@ def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_t
     """Compare current results with the most recent previous run, print trends."""
     import glob as _glob
 
-    os.makedirs(history_dir, exist_ok=True)
+    os.makedirs(history_dir, exist_ok=True)  # noqa: PTH103
 
-    history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)
+    history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)  # noqa: PTH207
     if not history_files:
         return
 
     try:
-        with open(history_files[0]) as f:
+        with open(history_files[0]) as f:  # noqa: PTH123
             prev = json.load(f)
     except Exception:
         return

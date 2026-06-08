@@ -49,7 +49,7 @@ class AcquisitionTelemetryCollector:
         self._recovery_successes: int = 0
         self._session_bound_count: int = 0
 
-    def record(
+    def record(  # noqa: PLR0913
         self,
         url: str,
         state: AcquisitionState,
@@ -57,7 +57,7 @@ class AcquisitionTelemetryCollector:
         final_url: str = "",
         canonical_url: str = "",
         fetch_method: str = "",
-        session_bound: bool = False,
+        session_bound: bool = False,  # noqa: FBT001, FBT002
         ephemeral_params: list[str] | None = None,
         recovery_method: str | None = None,
         recovered_url: str | None = None,

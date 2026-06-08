@@ -237,7 +237,7 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
 
     sorted_blocks = sorted(blocks, key=lambda b: b.y_position)
 
-    Y_TOLERANCE: float = 30.0
+    Y_TOLERANCE: float = 30.0  # noqa: N806
     cards: list[VisualCard] = []
     current: list[VisibleTextBlock] = []
     last_y = -Y_TOLERANCE - 1
@@ -257,7 +257,7 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
     return CardGroupingResult(cards=cards, card_count=len(cards), has_repeated_structure=has_repeat, cluster_signature=sig)
 
 
-def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:
+def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:  # noqa: C901, PLR0912
     """Group by DOM parent path when bounding boxes are unavailable."""
     if not blocks:
         return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
@@ -276,7 +276,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
     # Second pass: split oversized groups (likely merged cards) by
     # detecting repeated pattern boundaries within the same prefix
     cards: list[VisualCard] = []
-    for _, group in groups.items():
+    for group in groups.values():
         # A good card has 3 - 12 blocks. If a group fits, keep it.
         if len(group) <= 12:
             if _is_meaningful_card(group):
@@ -291,7 +291,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
                 sub_groups[sub_prefix] = []
             sub_groups[sub_prefix].append(block)
 
-        for _, sub_group in sub_groups.items():
+        for sub_group in sub_groups.values():
             # If still too large, split by depth 5
             if len(sub_group) > 12:
                 finer_groups: dict[str, list[VisibleTextBlock]] = {}
@@ -300,7 +300,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
                     if fine_prefix not in finer_groups:
                         finer_groups[fine_prefix] = []
                     finer_groups[fine_prefix].append(block)
-                for _, fine_group in finer_groups.items():
+                for fine_group in finer_groups.values():
                     if _is_meaningful_card(fine_group):
                         cards.append(_build_card(fine_group, len(cards)))
             elif _is_meaningful_card(sub_group):
@@ -315,7 +315,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
             if prefix not in broader:
                 broader[prefix] = []
             broader[prefix].append(block)
-        for _, group in broader.items():
+        for group in broader.values():
             if len(group) > 12:
                 # Still too large — don't force merge everything
                 continue
@@ -504,7 +504,7 @@ def _extract_record_from_card(
         return any(start < ue and end > us for us, ue in used_spans)
 
     # Priority sort: typed fields first, string / org last
-    _TYPED_PRIORITY: dict = {
+    _TYPED_PRIORITY: dict = {  # noqa: N806
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
@@ -544,7 +544,7 @@ def _extract_record_from_card(
     return record
 
 
-def _collect_card_pattern_matches(
+def _collect_card_pattern_matches(  # noqa: C901, PLR0912
     full_text: str,
 ) -> dict:
     """Pass 1: Collect ALL pattern matches from card text, organized by type."""
@@ -665,7 +665,7 @@ def _collect_card_pattern_matches(
     return matches
 
 
-def _extract_card_field_stateful(
+def _extract_card_field_stateful(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     field_type,
     field_name: str,
     field_desc: str,

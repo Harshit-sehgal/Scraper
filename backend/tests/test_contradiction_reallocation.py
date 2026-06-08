@@ -92,7 +92,7 @@ def test_contradiction_pressure_triggers_restructuring() -> None:
     ws.clear()
 
     # Seed high field_pressure by setting its underlying components
-    # field_pressure = (norm_energy + entropy + exclusion_norm) / 3
+    # field_pressure = (norm_energy + entropy + exclusion_norm) / 3  # noqa: ERA001
     # For 0.6: (0.6 + 0.6 + 0.6) / 3
     ws._energy.set_energy(6.0)
     ws._energy.set_entropy(0.6)

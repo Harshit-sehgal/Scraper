@@ -163,7 +163,7 @@ def topology_from_dict(state: "TopologyState", data: dict) -> None:
 # ─── Merge / Reconciliation ─────────────────────────────────────────────
 
 
-def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5) -> None:
+def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5) -> None:  # noqa: C901, PLR0912
     """Merge remote topology state into local (Phase 32 / 60)."""
     from app.core_types import FieldConflictRegion
     from app.topology_state_types import parse_topology_key

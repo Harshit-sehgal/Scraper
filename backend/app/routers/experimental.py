@@ -126,7 +126,9 @@ def _require_admin_key(request: Request) -> None:
 
 
 @router.get("/api/system/topology")
-async def system_topology():
+async def system_topology(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Exposes the raw state of the experimental semantic world model."""
     from app.semantic_world_state import get_world_state
 
@@ -159,7 +161,9 @@ async def system_topology():
 
 
 @router.get("/api/system/crystalline")
-async def system_crystalline():
+async def system_crystalline(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Returns the synthesized high-integrity knowledge units."""
     from app.semantic_world_state import get_world_state
 
@@ -171,7 +175,9 @@ async def system_crystalline():
 
 
 @router.get("/api/system/export/knowledge")
-async def export_knowledge():
+async def export_knowledge(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Export the synthesized knowledge manifold as a portable schema."""
     from app.semantic_world_state import get_world_state
 
@@ -240,7 +246,11 @@ async def merge_knowledge(
 
 
 @router.get("/api/system/search")
-async def system_search(query: str, limit: int = 5):
+async def system_search(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    query: str,
+    limit: int = 5,
+):
     """Perform topological search on crystalline records."""
     from app.semantic_world_state import get_world_state
 
@@ -250,7 +260,9 @@ async def system_search(query: str, limit: int = 5):
 
 
 @router.get("/api/system/observability")
-async def system_observability():
+async def system_observability(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Exposes real-time telemetry and activity heatmaps."""
     from app.semantic_world_state import get_world_state
 
@@ -273,7 +285,9 @@ async def system_observability():
 
 
 @router.get("/api/system/domain-policy")
-async def system_domain_policy():
+async def system_domain_policy(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Return the current domain runtime policy summaries."""
     from app.domain_runtime_policy import get_domain_runtime_policy
 
@@ -292,7 +306,9 @@ async def system_domain_policy():
 
 
 @router.get("/api/system/acquisition/telemetry")
-async def acquisition_telemetry():
+async def acquisition_telemetry(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Exposes acquisition telemetry: state distribution, recovery rates, recent events."""
     from app.acquisition_telemetry import get_acquisition_telemetry
 
@@ -305,7 +321,10 @@ async def acquisition_telemetry():
 
 
 @router.get("/api/system/history/topology")
-async def system_topology_history(limit: int = 20):
+async def system_topology_history(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    limit: int = 20,
+):
     """Returns a timeline of historical topology states for replay."""
     from app.event_journal import get_journal
 
@@ -347,7 +366,9 @@ async def process_cognitive_tasks(_role: Annotated[UserRole, Depends(require_rol
 
 
 @router.get("/api/system/agency")
-async def system_agency():
+async def system_agency(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Returns the state of automated agency and tools."""
     from app.llm_bridge import get_plugin_manager
     from app.semantic_world_state import get_world_state
@@ -368,7 +389,9 @@ async def system_agency():
 
 
 @router.get("/api/system/replay/status")
-async def system_replay_status():
+async def system_replay_status(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Returns the status of the large-scale persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
 
@@ -382,7 +405,10 @@ async def system_replay_status():
 
 
 @router.get("/api/system/replay/chain")
-async def system_replay_chains(limit: int = 20):
+async def system_replay_chains(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    limit: int = 20,
+):
     """Returns causal chains reconstructed from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
 
@@ -396,7 +422,11 @@ async def system_replay_chains(limit: int = 20):
 
 
 @router.get("/api/system/replay/events")
-async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
+async def system_replay_events(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    start_idx: int = 0,
+    end_idx: int = -1,
+):
     """Returns a range of events from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
 
@@ -437,7 +467,10 @@ async def trigger_manifold_compression(_role: Annotated[UserRole, Depends(requir
 
 
 @router.get("/api/scraper/trends")
-async def get_extraction_trends(window: Annotated[int, Query(ge=10, le=500)] = 100):
+async def get_extraction_trends(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    window: Annotated[int, Query(ge=10, le=500)] = 100,
+):
     """Analyze scrape telemetry for degradation patterns, domain health trends,
     and actionable alerts.
 
@@ -493,7 +526,7 @@ async def get_domain_trend(
     try:
         telemetry_history = get_scrape_telemetry().get_recent(window)
 
-        from app.trend_analyzer import TrendAnalyzer as TA
+        from app.trend_analyzer import TrendAnalyzer as TA  # noqa: N817
 
         domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
 
@@ -535,7 +568,10 @@ async def get_domain_trend(
 
 
 @router.get("/api/scraper/economics")
-async def get_extraction_economics(window: Annotated[int, Query(ge=10, le=1000)] = 200):
+async def get_extraction_economics(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    window: Annotated[int, Query(ge=10, le=1000)] = 200,
+):
     """Return extraction cost and efficiency analysis.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.trend_analyzer.EconomicTracker``.
@@ -576,7 +612,9 @@ async def get_extraction_economics(window: Annotated[int, Query(ge=10, le=1000)]
 
 
 @router.get("/api/scraper/health/domains")
-async def get_all_domains_health():
+async def get_all_domains_health(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Get health status for all monitored domains.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.domain_health_alerts``.
@@ -600,7 +638,10 @@ async def get_all_domains_health():
 
 
 @router.get("/api/scraper/health/domain/{domain}")
-async def get_domain_health(domain: str):
+async def get_domain_health(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    domain: str,
+):
     """Get detailed health status for a specific domain.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.domain_health_alerts``.
@@ -624,7 +665,9 @@ async def get_domain_health(domain: str):
 
 
 @router.get("/api/scraper/health/summary")
-async def get_system_health_summary():
+async def get_system_health_summary(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Get system-wide health summary.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.domain_health_alerts``.
@@ -669,7 +712,9 @@ async def get_system_health_summary():
 
 
 @router.get("/api/operator/mode")
-async def get_current_mode():
+async def get_current_mode(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Get the current operator mode and its configuration.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.visualization``.
@@ -734,7 +779,9 @@ async def set_operator_mode(
 
 
 @router.get("/api/operator/dashboard")
-async def get_system_dashboard():
+async def get_system_dashboard(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Get the complete system governance dashboard.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.visualization`` and
@@ -898,7 +945,9 @@ async def get_domain_prediction(
 
 
 @router.get("/api/operator/health")
-async def get_operator_health_summary():
+async def get_operator_health_summary(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Get a lightweight system health overview for the dashboard.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.domain_health_alerts``
@@ -1006,7 +1055,11 @@ async def optimize_domain_selectors(
 
 
 @router.get("/api/scraper/ml/optimize/domain/{domain}/history")
-async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1, le=100)] = 10):
+async def get_optimization_history(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    domain: str,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+):
     """Get historical optimization reports for a domain.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.selector_ml_optimizer``.
@@ -1058,7 +1111,10 @@ async def record_selector_learning(
 
 
 @router.get("/api/scraper/strategy/recommend/{domain}")
-async def recommend_fetch_strategy(domain: str):
+async def recommend_fetch_strategy(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    domain: str,
+):
     """Get recommended fetch strategy for a domain.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.strategy_evolution``.
@@ -1083,10 +1139,10 @@ async def recommend_fetch_strategy(domain: str):
 
 
 @router.post("/api/scraper/strategy/record")
-async def record_strategy_attempt(
+async def record_strategy_attempt(  # noqa: PLR0913
     domain: str,
     strategy: str,
-    success: bool,
+    success: bool,  # noqa: FBT001
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
     time_ms: Annotated[float, Query(ge=0)] = 0,
     quality: Annotated[float, Query(ge=0, le=1)] = 0.5,
@@ -1122,7 +1178,10 @@ async def record_strategy_attempt(
 
 
 @router.get("/api/scraper/strategy/domain/{domain}")
-async def get_domain_strategy_analysis(domain: str):
+async def get_domain_strategy_analysis(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
+    domain: str,
+):
     """Get detailed strategy analysis for a domain.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.strategy_evolution``.
@@ -1138,7 +1197,9 @@ async def get_domain_strategy_analysis(domain: str):
 
 
 @router.get("/api/scraper/strategy/report")
-async def get_all_strategies_report():
+async def get_all_strategies_report(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
+):
     """Get strategy performance report for all domains.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.strategy_evolution``.

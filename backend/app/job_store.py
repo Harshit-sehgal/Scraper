@@ -231,7 +231,7 @@ def _row_to_job(row: dict) -> Job | None:
         return None
 
 
-def _run_migrations(conn: sqlite3.Connection) -> None:
+def _run_migrations(conn: sqlite3.Connection) -> None:  # noqa: C901, PLR0912, PLR0915
     conn.execute("""
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER PRIMARY KEY
@@ -554,7 +554,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                         FROM worker_heartbeats_v5_backup
                     ) latest
                     WHERE rn = 1
-                    """
+                    """,
                 )
             except Exception:
                 # Roll back to the v5 state: drop the half-built v6
@@ -586,7 +586,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     )
 
 
-def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
+def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:  # noqa: C901, FBT001, FBT002
     """Load jobs and recycle bin from SQLite.
 
     Args:
@@ -646,7 +646,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
             conn.close()
 
 
-def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], prune_missing: bool = False) -> None:
+def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], prune_missing: bool = False) -> None:  # noqa: FBT001, FBT002
     """Persist all jobs and recycle bin to SQLite transactionally.
 
     Args:
@@ -1081,7 +1081,7 @@ def get_storage_health() -> dict:
     }
 
 
-def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:
+def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:  # noqa: FBT001, FBT002
     """Return a ``{status_value: count}`` mapping for all jobs.
 
     This is a single ``GROUP BY status`` query and is O(distinct statuses)

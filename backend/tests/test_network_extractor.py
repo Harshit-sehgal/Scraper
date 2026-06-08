@@ -48,8 +48,8 @@ class TestExtractFromNetwork:
                     "name": "Test Product",
                     "description": "A great product",
                     "offers": {"price": "29.99", "priceCurrency": "USD"},
-                }
-            ]
+                },
+            ],
         }
         result = extract_from_network(data, sample_schema)
         assert len(result) > 0
@@ -68,7 +68,7 @@ class TestExtractFromNetwork:
             "jsonld": [
                 {"@type": "Product", "name": "A", "description": "Desc A"},
                 {"@type": "Product", "name": "B", "description": "Desc B"},
-            ]
+            ],
         }
         result = extract_from_network(data, sample_schema)
         assert len(result) == 2
@@ -204,8 +204,8 @@ class TestExtractFromNestedJson:
                 "products": [
                     {"name": "Nested Product", "price": 25},
                     {"name": "Nested Product 2", "price": 35},
-                ]
-            }
+                ],
+            },
         }
         result = _extract_from_nested_json(data, sample_schema)
         assert len(result) > 0
@@ -358,7 +358,7 @@ class TestFlattenJsonKeys:
     def test_handles_string_lists(self):
         result = _flatten_json_keys({"tags": ["a", "b", "c"]})
         assert "tags" in result
-        assert ", ".join(["a", "b", "c"]) in result.values()
+        assert "a, b, c" in result.values()
 
 
 class TestFindValueForField:
