@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 import time
+
+logger = logging.getLogger(__name__)
 from typing import TYPE_CHECKING, Any
 
 from app.transaction_context import active_transaction
@@ -184,11 +186,11 @@ class ObservabilityState:
             tid_str = str(trace_id)
             log_msg += f" (trace: {tid_str})"
         if severity == "critical":
-            logging.getLogger(__name__).critical(log_msg)
+            logger.critical(log_msg)
         elif severity == "warning":
-            logging.getLogger(__name__).warning(log_msg)
+            logger.warning(log_msg)
         else:
-            logging.getLogger(__name__).info(log_msg)
+            logger.info(log_msg)
 
     def pulse_heatmap(self, region_id: str, intensity: float) -> None:
         """Increase activity score for a specific region."""
@@ -647,7 +649,7 @@ class ObservabilityState:
         if profile["total_estimated_bytes"] < max_bytes:
             return False
 
-        logging.warning(
+        logger.warning(
             "RESOURCE SHEDDING TRIGGERED: Substrate memory [%d] exceeds threshold [%d]",
             profile["total_estimated_bytes"],
             max_bytes,

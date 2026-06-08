@@ -89,7 +89,7 @@ def _live_routes(include_experimental: bool) -> set[tuple[str, str]]:
     # lint stays stable. ``--include-experimental`` is the explicit
     # opt-in for maintainers who want a complete view.
     env["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true" if include_experimental else "false"
-    proc = subprocess.run(  # noqa: S603
+    proc = subprocess.run(
         [sys.executable, "-c", code],
         check=False,
         capture_output=True,

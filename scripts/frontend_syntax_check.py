@@ -40,7 +40,7 @@ def main() -> int:
         return 0
     failures: list[tuple[Path, str]] = []
     for path in files:
-        proc = subprocess.run(  # noqa: S603
+        proc = subprocess.run(
             ["node", "--check", str(path)],  # noqa: S607
             check=False,
             capture_output=True,

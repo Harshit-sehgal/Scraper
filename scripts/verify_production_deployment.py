@@ -30,7 +30,7 @@ if BACKEND_DIR not in sys.path:
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec B603 — hardcoded command vectors (docker, curl, ls)  # noqa: S603
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec B603 — hardcoded command vectors (docker, curl, ls)
         return res.returncode, res.stdout.strip() or res.stderr.strip()
     except Exception as e:
         return -1, str(e)

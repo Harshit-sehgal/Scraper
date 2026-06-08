@@ -532,6 +532,7 @@ class TestExtractWithProfilePlaywright:
         def make_route(resource_type):
             route = MagicMock()
             route.request.resource_type = resource_type
+            route.request.url = "https://example.com/asset"
             route.abort = abort_mock
             route.continue_ = continue_mock
             return route

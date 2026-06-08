@@ -28,19 +28,19 @@ export function renderTelemetry(data) {
         <div class="dash-metrics-grid">
             <div class="dash-metric">
                 <span class="dash-metric-label">Recent Scrapes</span>
-                <span class="dash-metric-val">${data.recent_scrapes ?? 0}</span>
+                <span class="dash-metric-val">${Number(data.recent_scrapes) || 0}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label" style="color:var(--success)">Successes</span>
-                <span class="dash-metric-val" style="color:var(--success)">${data.recent_successes ?? 0}</span>
+                <span class="dash-metric-val" style="color:var(--success)">${Number(data.recent_successes) || 0}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label" style="color:var(--danger)">Failures</span>
-                <span class="dash-metric-val" style="color:var(--danger)">${data.recent_failures ?? 0}</span>
+                <span class="dash-metric-val" style="color:var(--danger)">${Number(data.recent_failures) || 0}</span>
             </div>
             <div class="dash-metric">
                 <span class="dash-metric-label">Success Rate</span>
-                <span class="dash-metric-val">${data.success_rate != null ? `${(data.success_rate * 100).toFixed(0)}%` : "—"}</span>
+                <span class="dash-metric-val">${data.success_rate != null ? `${(Number(data.success_rate) * 100).toFixed(0)}%` : "—"}</span>
             </div>
         </div>
     `;
