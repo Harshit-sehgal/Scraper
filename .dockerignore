@@ -72,6 +72,7 @@ backend/data/
 
 # ─── Node / Frontend (built assets only) ───────────────────────────────────
 frontend/node_modules/
+node_modules/
 frontend/package-lock.json
 frontend/yarn.lock
 frontend/.next/

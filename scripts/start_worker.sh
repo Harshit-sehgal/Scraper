@@ -11,7 +11,7 @@ export PYTHONPATH="${PYTHONPATH:-$ROOT_DIR/backend}"
 cd "$ROOT_DIR"
 
 if [[ "${DATAFORGE_ENV:-}" == "production" ]]; then
-    "$PYTHON_BIN" scripts/check_prod_env.py --env-file "${DATAFORGE_ENV_FILE:-.env}"
+    "$PYTHON_BIN" scripts/check_prod_env.py --env-file "${DATAFORGE_ENV_FILE:-.env.production}"
 fi
 
 exec "$PYTHON_BIN" scripts/run_worker.py
