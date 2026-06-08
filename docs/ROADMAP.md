@@ -88,7 +88,7 @@ after the deep-research remediation pass (2026-06).
 ### W6 — Observability (Prometheus + Grafana + Alerts) — done in this pass
 
 - **Status:** Grafana dashboard (`grafana/dashboards/dataforge_overview.json`)
-  covers 22 panels across 8 KPI stats, 10 timeseries graphs, and 4 pie charts.
+  covers 28 panels across KPI stats, timeseries graphs, and pie charts.
   All 14 supported Prometheus metrics are surfaced: system health,
   request latency, memory, LLM usage, anti-bot classifications (9 platforms),
   extraction methods, browser launches, export outcomes, SSRF rejects by
@@ -105,7 +105,7 @@ after the deep-research remediation pass (2026-06).
 - **Next:** raise Postgres backend coverage floors from 24% to 40% in
   the next minor release. Tighten CSP to enforce mode once the dashboard
   shows zero violations for at least one release cycle.
-- **Done in this pass:** 22-panel Grafana dashboard, 14 Prometheus alert
+- **Done in this pass:** 28-panel Grafana dashboard, 14 Prometheus alert
   rules, Alertmanager config + docker-compose integration, Severity-based
   routing + inhibition, metrics collectors + call-site wiring, metric
   tests (21 + 10 tests), CSP report-only middleware.
@@ -204,7 +204,7 @@ after the deep-research remediation pass (2026-06).
 
 - **Status:** global `fail_under=60`; per-module floors enforced by
   `check_coverage_floors.py`; coverage report uploaded as a CI artifact.
-  Global coverage after the remediation pass: **78.2%**. Per-module floors:
+  Global coverage after the remediation pass: **78.6%**. Per-module floors:
   `url_safety` 60, `storage_interface` 70, `routers/jobs` 70,
   `routers/exports` 60, `lifespan` 40, `psycopg3_repository` 24,
   `postgres_repository` 24.

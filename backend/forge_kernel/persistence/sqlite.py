@@ -125,6 +125,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.close()
 
     def hard_delete(self, job_id: str) -> bool:
+        _get_store()
         from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:

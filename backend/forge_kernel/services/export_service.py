@@ -81,10 +81,10 @@ class ExportService:
         """Generate an export in the specified format."""
         if fmt == "csv":
             content = self.to_csv(records, field_names)
-            return ExportArtifact(format="csv", row_count=len(records), generated_at="", content=content)
+            return ExportArtifact(format="csv", row_count=len(records), generated_at="", byte_size=len(content))
         if fmt == "json":
             content = self.to_json(records)
-            return ExportArtifact(format="json", row_count=len(records), generated_at="", content=content)
+            return ExportArtifact(format="json", row_count=len(records), generated_at="", byte_size=len(content))
         if fmt == "xlsx":
             xlsx_content = self.to_xlsx(records, field_names)
             if xlsx_content is None:

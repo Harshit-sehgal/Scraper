@@ -68,6 +68,7 @@ def _detect_search_form(html: str) -> dict:
 
     best_form = None
     best_fields: list[dict] = []
+    best_search_inputs: list[dict] = []
     best_form_score = 0
 
     for form in forms:
@@ -138,6 +139,7 @@ def _detect_search_form(html: str) -> dict:
             best_form_score = form_score
             best_form = form
             best_fields = fields
+            best_search_inputs = search_inputs
 
     if best_form is None or best_form_score < 3:
         return {
@@ -159,7 +161,7 @@ def _detect_search_form(html: str) -> dict:
         "action": action.strip(),
         "method": method,
         "fields": best_fields,
-        "search_fields": search_inputs,
+        "search_fields": best_search_inputs,
     }
 
 

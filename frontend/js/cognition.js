@@ -154,8 +154,8 @@ export function renderExclusions(exclusions) {
       .map(
         (e) => `
             <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
-                <span style="font-weight:600; color:var(--text-main);">${esc(e.roles.join(" ↔ "))}</span>
-                <span style="color:var(--text-muted);">Strength: ${e.strength.toFixed(3)}</span>
+                <span style="font-weight:600; color:var(--text-main);">${esc((e.roles || []).join(" ↔ "))}</span>
+                <span style="color:var(--text-muted);">Strength: ${Number(e.strength || 0).toFixed(3)}</span>
             </div>
         `,
       )
@@ -179,7 +179,7 @@ export function renderRoleSimilarities(compats) {
           (c) => `
                 <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
                     <span style="font-weight:600; color:var(--text-main);">${esc(c.role)} <span style="color:var(--text-muted); font-weight:400;">≈</span> ${esc(c.type)}</span>
-                    <span style="color:var(--text-muted);">Score: ${c.score.toFixed(3)}</span>
+                    <span style="color:var(--text-muted);">Score: ${Number(c.score || 0).toFixed(3)}</span>
                 </div>
             `,
         )
@@ -200,10 +200,10 @@ export function renderBasins(basins) {
         (b) => `
             <div style="padding: 0.5rem; border-bottom: 1px solid var(--border);">
                 <div style="font-weight:600; color:var(--text-main); margin-bottom:0.25rem;">Token: "${esc(b.token)}"</div>
-                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.25rem;">Clash: ${esc(b.competing_roles.join(", "))}</div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.25rem;">Clash: ${esc((b.competing_roles || []).join(", "))}</div>
                 <div style="font-size:0.85rem; color:var(--text-muted); display:flex; gap:1rem;">
-                    <span>Instability: ${b.instability.toFixed(3)}</span>
-                    <span>Energy: ${b.local_energy.toFixed(3)}</span>
+                    <span>Instability: ${Number(b.instability || 0).toFixed(3)}</span>
+                    <span>Energy: ${Number(b.local_energy || 0).toFixed(3)}</span>
                 </div>
             </div>
         `,

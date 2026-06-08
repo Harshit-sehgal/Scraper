@@ -337,8 +337,8 @@ async def discover_urls(
             # 1. High entropy (disorder) rewards domain novelty (Exploration)
             if global_entropy > 0.7:
                 # Roughly check if domain is novel (not in top results yet)
-                domain = _extract_domain(url)
-                if domain not in [r[2].get("source_domain") for r in ranked[:5]]:
+                result_domain = _extract_domain(url)
+                if result_domain not in [r[2].get("source_domain") for r in ranked[:5]]:
                     score += 0.2
 
             # 2. High pressure (stress) rewards high-trust markers

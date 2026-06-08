@@ -61,9 +61,9 @@ export function renderPredictions(data) {
                         <span>Health: <strong>${p.health_score_current?.toFixed(0) || "?"}/100</strong></span>
                     </div>
                     ${
-                      p.estimated_time_to_failure_hours
+                      p.estimated_time_to_failure_hours != null
                         ? `
-                        <div class="dash-prediction-timer">\u23F1 ~${p.estimated_time_to_failure_hours.toFixed(0)}h to failure</div>
+                        <div class="dash-prediction-timer">\u23F1 ~${Number(p.estimated_time_to_failure_hours).toFixed(0)}h to failure</div>
                     `
                         : ""
                     }

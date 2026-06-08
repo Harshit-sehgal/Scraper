@@ -147,7 +147,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Item                                             | Status      | Details                                                           |
 | ------------------------------------------------ | ----------- | ----------------------------------------------------------------- |
 | Replace pyflakes + .flake8 with Ruff             | ✅ Done     | `.flake8` removed, Ruff in pyproject.toml + pre-commit + CI       |
-| Add coverage thresholds                          | ✅ Done     | `fail_under = 60` in pyproject.toml (actual: 75.3%)               |
+| Add coverage thresholds                          | ✅ Done     | `fail_under = 60` in pyproject.toml (actual: 78.6%)               |
 | Add contract tests for exports and job lifecycle | ✅ Done     | 26 contract tests in `test_api_contract.py`                       |
 | Add deterministic fixture-based extraction tests | 🔲 Deferred | Additive work — existing extraction tests provide coverage        |
 | Simplify dashboard to read-only internal surface | ✅ Done     | Frontend is static/internal-only, no session handling             |
@@ -168,7 +168,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Ruff                | ✅ Configured | pyproject.toml + pre-commit + CI                                                                         |
 | Ruff formatter      | ✅ Configured | pre-commit has ruff-format                                                                               |
 | mypy                | ✅ 0 errors   | 196 source files, `Success: no issues found` (core backend modules fully type-checked) |
-| pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 75.3%                                                                         |
+| pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 78.6%                                                                         |
 | Bandit              | ✅ Running    | 0 Low/0 Medium/0 High — all findings clean                                                               |
 | pip-audit           | ✅ Running    | 0 known vulnerabilities                                                                                  |
 | Prettier            | ✅ Configured | `.prettierrc`, pre-commit hook (`mirrors-prettier`), CI `JS/CSS Format Check` step, `lint:js` npm script |
@@ -235,8 +235,7 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 6. Clean runtime artifacts before every commit.
 7. Set up the CI workflow to auto-commit the regenerated route table when it changes on main.
 8. Add automated Grafana dashboard integration tests to validate panel queries against the Prometheus endpoint.
-9. Add frontend vitest unit tests for the `renderRateLimits` function in the operations dashboard.
-10. Run the Grafana dashboard JSON validation test in CI to prevent regressions on dashboard edits.
+9. Run the Grafana dashboard JSON validation test in CI to prevent regressions on dashboard edits.
 
 ## Recent Boundary Work (Phase R1 — Research Shell Quarantine)
 

@@ -106,7 +106,7 @@ def test_persist_state_single(monkeypatch) -> None:
             id="persist-single-123",
             name="Single Persist Test",
             status=JobStatus.RUNNING,
-            url="https://example.com",
+            urls=["https://example.com"],
             schema_fields=[],
             filters=[],
             progress_current=5,

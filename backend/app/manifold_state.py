@@ -220,7 +220,7 @@ class ManifoldState:
             manifold[role] = [0.5] * 16
 
         existing = list(manifold[role])
-        new_v = [0.0] * len(existing)
+        new_v = list(existing)
 
         for i in range(min(len(existing), len(other_vector))):
             new_v[i] = existing[i] * alpha + other_vector[i] * beta
