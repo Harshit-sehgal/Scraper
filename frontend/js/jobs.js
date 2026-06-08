@@ -193,7 +193,7 @@ async function pollJob(id) {
 
         if (["completed", "degraded", "empty_result", "failed", "canceled"].includes(j.status)) {
           const { viewResults } = await import("./results.js");
-          viewResults(id);
+          viewResults(id).catch(() => {});
         }
       }
     }

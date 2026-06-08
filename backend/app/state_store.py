@@ -19,6 +19,8 @@ from threading import Lock
 
 from app.models import Job, JobStatus
 
+logger = logging.getLogger(__name__)
+
 _STATE_LOCK = Lock()
 _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 _DEFAULT_STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
@@ -62,15 +64,15 @@ def _try_load_from(path: Path) -> dict | None:
         payload = json.loads(raw)
         if _validate_payload(payload):
             return payload  # type: ignore[no-any-return]
-        logging.error("State file %s failed structural validation", path)
+        logger.error("State file %s failed structural validation", path)
     except FileNotFoundError:
-        logging.warning("State file not found: %s", path)
+        logger.warning("State file not found: %s", path)
     except json.JSONDecodeError:
-        logging.exception("State file %s contains invalid JSON", path)
+        logger.exception("State file %s contains invalid JSON", path)
     except PermissionError:
-        logging.exception("Permission denied reading state file: %s", path)
+        logger.exception("Permission denied reading state file: %s", path)
     except OSError:
-        logging.exception("OS error reading state file %s", path)
+        logger.exception("OS error reading state file %s", path)
     return None
 
 
@@ -86,12 +88,12 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
 
     # Fall back to backup if primary is corrupt
     if payload is None and backup_path.exists():
-        logging.warning("Primary state file corrupt, falling back to backup: %s", backup_path)
+        logger.warning("Primary state file corrupt, falling back to backup: %s", backup_path)
         payload = _try_load_from(backup_path)
 
     # Still nothing — return empty state
     if payload is None:
-        logging.error("All state file sources failed; returning empty state")
+        logger.error("All state file sources failed; returning empty state")
         return {}, {}, None
 
     jobs_store: dict[str, Job] = {}
@@ -102,14 +104,14 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
             job = Job.model_validate(raw)
             jobs_store[job.id] = job
         except (ValueError, TypeError):
-            logging.exception("Skipping invalid job entry during state load")
+            logger.exception("Skipping invalid job entry during state load")
 
     for raw in payload.get("recycle_bin", []):
         try:
             job = Job.model_validate(raw)
             recycle_bin_store[job.id] = job
         except (ValueError, TypeError):
-            logging.exception("Skipping invalid recycle-bin entry during state load")
+            logger.exception("Skipping invalid recycle-bin entry during state load")
 
     # Jobs that were in-progress during shutdown are marked failed on recovery.
     for job in jobs_store.values():
@@ -153,7 +155,7 @@ def _write_state_to_disk(path: Path, payload: dict) -> None:
                 return
         except Exception as e:
             if attempt < _SAVE_RETRIES:
-                logging.warning(
+                logger.warning(
                     "State save attempt %d/%d failed for %s: %s",
                     attempt,
                     _SAVE_RETRIES,
@@ -161,7 +163,7 @@ def _write_state_to_disk(path: Path, payload: dict) -> None:
                     e,
                 )
             else:
-                logging.exception(
+                logger.exception(
                     "Failed to persist state after %d attempts to %s",
                     _SAVE_RETRIES,
                     path,
@@ -180,7 +182,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
         ws = get_world_state()
         world_state_data = ws.to_dict()
     except Exception:
-        logging.exception("Failed to serialize semantic world state")
+        logger.exception("Failed to serialize semantic world state")
 
     payload = {
         "saved_at": _now_iso(),

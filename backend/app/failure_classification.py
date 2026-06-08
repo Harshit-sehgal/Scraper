@@ -516,7 +516,7 @@ def _build_classification(
             FailureCategory.RATE_LIMITED,
         ):
             record_anti_bot_classification(category.value)
-    except (ImportError, AttributeError, TypeError, ValueError):
+    except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
         # Never let observability break classification.
         pass
 

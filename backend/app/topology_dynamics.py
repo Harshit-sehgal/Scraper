@@ -240,7 +240,7 @@ def compute_macro_from_meso(state: TopologyState) -> dict:
                 "avg_instability": 0.5,
                 "fragmentation": 0.0,
                 "cluster_diversity": 0.0,
-                "macro_pressure": 0.3,
+                "pressure": 0.3,
             }
         return {
             "avg_convergence": sum(r.local_convergence for r in regs) / len(regs),
@@ -257,7 +257,7 @@ def compute_macro_from_meso(state: TopologyState) -> dict:
             "avg_instability": 0.5,
             "fragmentation": 0.0,
             "cluster_diversity": 0.0,
-            "macro_pressure": 0.3,
+            "pressure": 0.3,
         }
 
     weighted_convergence = sum(c["avg_convergence"] * c["size"] for c in clusters) / total_size

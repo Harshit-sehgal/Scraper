@@ -197,6 +197,11 @@ class StrategyEvolutionEngine:
     def _get_or_create_state(self, domain: str) -> DomainStrategyState:
         """Get or create state for a domain."""
         if domain not in self.domain_states:
+            # Evict oldest domains when registry grows too large
+            if len(self.domain_states) > 500:
+                oldest = sorted(self.domain_states.keys())[:250]
+                for k in oldest:
+                    self.domain_states.pop(k, None)
             self.domain_states[domain] = DomainStrategyState(domain)
         return self.domain_states[domain]
 

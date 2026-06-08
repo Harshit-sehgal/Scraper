@@ -188,12 +188,13 @@ class BrowserPool:
             # Phase 80: Advanced Stealth Evasion
             if settings.PLAYWRIGHT_STEALTH or is_stealth:
                 # Basic stealth
-                _nav_langs = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
+                _nav_langs_raw = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
+                _nav_langs_js = "[" + ", ".join(f"'{lang.strip()}'" for lang in _nav_langs_raw) + "]"
                 stealth_js = f"""
                 Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
                 window.chrome = {{ runtime: {{}} }};
                 Object.defineProperty(navigator, 'plugins', {{get: () => [1, 2, 3, 4, 5]}});
-                Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs}}});
+                Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs_js}}});
                 """
                 await context.add_init_script(stealth_js)
 

@@ -102,6 +102,11 @@ class ImmunityLayer:
         """Lower trust score for a specific data source."""
         current = self._quarantined_sources.get(source, 1.0)
         self._quarantined_sources[source] = max(0.0, current - penalty)
+        # Evict sources with zero trust when registry grows too large
+        if len(self._quarantined_sources) > 500:
+            expired = [k for k, v in self._quarantined_sources.items() if v <= 0.0]
+            for k in expired:
+                self._quarantined_sources.pop(k, None)
 
 
 _immune_system: ImmunityLayer | None = None

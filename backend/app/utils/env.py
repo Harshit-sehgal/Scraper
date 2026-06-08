@@ -1,6 +1,8 @@
 import logging
 import os
 
+logger = logging.getLogger(__name__)
+
 
 def env_int(name: str, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
     raw = (os.getenv(name) or "").strip()
@@ -10,7 +12,7 @@ def env_int(name: str, default: int, minimum: int | None = None, maximum: int | 
         try:
             value = int(raw)
         except Exception:
-            logging.exception("Failed to parse env var %s", name)
+            logger.exception("Failed to parse env var %s", name)
             value = default
 
     if minimum is not None:

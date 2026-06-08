@@ -8,7 +8,7 @@ psycopg2-specific connection pool, the four driver helpers
 
 The public ``get_postgres_worker_queue()`` factory lives here for
 backward compatibility. It selects the right driver (psycopg2 or psycopg 3)
-based on ``DATAFORGE_PG_DRIVER`` (or ``settings.PG_DRIVER``).
+based on ``DATAFORGE_PG_DRIVER``.
 
 The psycopg2 import is intentionally deferred so the module can be
 imported in psycopg2-blocked environments (e.g. production images that
@@ -232,8 +232,7 @@ _queue_lock = threading.Lock()
 def get_postgres_worker_queue():
     """Get or create the global PostgresWorkerQueue instance.
 
-    Selects the driver based on ``DATAFORGE_PG_DRIVER`` (or
-    ``settings.PG_DRIVER``). Default is psycopg2.
+    Selects the driver based on ``DATAFORGE_PG_DRIVER``. Default is psycopg2.
     """
     global _queue_instance
     if _queue_instance is None:

@@ -110,6 +110,8 @@ class ChaosSimulator:
             impact_metrics["error"] = str(e)
 
         self.failure_history.append(impact_metrics)
+        if len(self.failure_history) > 200:
+            self.failure_history = self.failure_history[-100:]
         return impact_metrics
 
     async def _wait_for_recovery(self, failure_mode: FailureMode, timeout: float = 60.0) -> bool:  # noqa: ASYNC109

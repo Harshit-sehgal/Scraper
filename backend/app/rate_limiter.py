@@ -107,7 +107,10 @@ def _get_effective_route_limits(method: str | None = None) -> dict[str, tuple[in
 def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
     """Parse a rate limit string like '100 / minute' into (max_requests, window_seconds).
 
-    Supported formats: N / second, N / minute, N / hour.
+    Supported formats: N / second, N / minute, N / hour. Whitespace around
+    the ``/`` separator is tolerated so ``"100 / minute"`` parses the same
+    as ``"100/minute"`` — the function is the single point of truth for
+    translating the human-readable config string into a windowed counter.
     Returns (max_requests, window_seconds), or (0, 0) if invalid.
     """
     if not limit_str or not isinstance(limit_str, str):
@@ -119,11 +122,11 @@ def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
         return 0, 0
 
     try:
-        max_requests = int(parts[0])
+        max_requests = int(parts[0].strip())
     except ValueError:
         return 0, 0
 
-    unit = parts[1]
+    unit = parts[1].strip()
     if unit in ("second", "seconds", "s"):
         return max_requests, 1.0
     if unit in ("minute", "minutes", "m"):
@@ -374,7 +377,7 @@ class DatabaseSlidingWindowCounter:
                             "SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = ?",
                             (self.key,),
                         ).fetchone()
-                        min_ts = row["min_ts"] if row and row[0] is not None else None
+                        min_ts = row["min_ts"] if row and row.get("min_ts") is not None else None
                         if min_ts is None:
                             return 0.0
                         return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
@@ -718,7 +721,7 @@ class RateLimiterMiddleware:
             response.headers["X-RateLimit-Limit"] = str(counter.max_requests)
             response.headers["X-RateLimit-Remaining"] = str(counter.remaining())
             response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError):  # nosec B110
             pass
 
     # ── Main middleware dispatch ───────────────────────────────────────

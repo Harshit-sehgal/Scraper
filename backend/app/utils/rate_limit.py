@@ -136,6 +136,12 @@ def mark_rate_limited(
 
     _RATE_LIMIT_STATE[domain_or_type] = now + cooldown
 
+    # Evict expired entries when the dict grows too large
+    if len(_RATE_LIMIT_STATE) > 1000:
+        expired = [k for k, v in _RATE_LIMIT_STATE.items() if v < now]
+        for k in expired:
+            _RATE_LIMIT_STATE.pop(k, None)
+
 
 def reset_rate_limit_state(domain_or_type: str | None = None) -> None:
     """Clear rate-limit cooldown state for a domain (or all domains)."""

@@ -45,10 +45,11 @@ def get_database_url() -> str:
     url = settings.DATABASE_URL
     if url:
         return url
-    env = settings.ENV.strip().lower()
-    if env == "development":
-        return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
-    msg = "DATAFORGE_DATABASE_URL is required in non-development environments."
+    msg = (
+        "DATAFORGE_DATABASE_URL is required. "
+        "Set it in your .env file or environment. "
+        "Example: postgresql://user:password@localhost:5432/dataforge"
+    )
     raise RuntimeError(msg)
 
 

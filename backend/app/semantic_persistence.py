@@ -7,6 +7,7 @@ Unifies:
 3. Learning count (experience manifold)
 """
 
+import contextlib
 import fcntl
 import json
 import logging
@@ -74,6 +75,8 @@ def load_semantic_state() -> None:
 def save_semantic_state() -> None:
     path = get_canonical_cache_path()
     lock_fd = _acquire_lock()
+    fd: int | None = None
+    tmp_path: str | None = None
     try:
         import app.semantic_world_state
 
@@ -81,11 +84,23 @@ def save_semantic_state() -> None:
         full_state = ws.to_dict()
         full_state["version"] = "3.0"
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
+        import tempfile
+
+        fd, tmp_path = tempfile.mkstemp(dir=Path(path).parent, suffix=".tmp")
+        with os.fdopen(fd, "w") as f:
+            fd = None  # ownership transferred to fdopen context manager
             json.dump(full_state, f, indent=2)
+        os.replace(tmp_path, path)
+        tmp_path = None  # ownership transferred via rename
         logging.getLogger(__name__).info("Saved unified semantic state to %s", path)
     except Exception:
         logging.getLogger(__name__).exception("Failed to save semantic state")
+        with contextlib.suppress(OSError):
+            if fd is not None:
+                os.close(fd)
+        if tmp_path is not None and os.path.exists(tmp_path):
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
     finally:
         _release_lock(lock_fd)
 

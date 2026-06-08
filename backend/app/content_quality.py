@@ -131,7 +131,7 @@ def _assess_content_quality(html: str, profile) -> dict:
                 continue
             try:
                 # Build a rough CSS selector from the pattern
-                css_sel = pattern.replace(".", ".")
+                css_sel = pattern
                 matching = soup.select(css_sel)
                 content_count = sum(1 for m in matching if len(m.get_text(strip=True)) > 20)
                 data_container_count = max(data_container_count, content_count)

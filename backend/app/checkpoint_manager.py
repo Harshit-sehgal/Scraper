@@ -1,5 +1,7 @@
+import contextlib
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -26,13 +28,27 @@ class CheckpointManager:
         filename = f"checkpoint_{label}_{timestamp}.json"
         filepath = self.base_dir / filename
 
+        fd: int | None = None
+        tmp_path: str | None = None
         try:
-            with open(filepath, "w") as f:
+            import tempfile
+
+            fd, tmp_path = tempfile.mkstemp(dir=self.base_dir, suffix=".tmp")
+            with os.fdopen(fd, "w") as f:
+                fd = None  # ownership transferred to fdopen context manager
                 json.dump(state_dict, f, indent=2)
+            os.replace(tmp_path, filepath)
+            tmp_path = None  # ownership transferred via rename
             logging.getLogger(__name__).info("Created checkpoint: %s", filename)
             return str(filepath)
         except Exception:
             logging.getLogger(__name__).exception("Failed to create checkpoint")
+            with contextlib.suppress(OSError):
+                if fd is not None:
+                    os.close(fd)
+            if tmp_path is not None and os.path.exists(tmp_path):
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_path)
             raise
 
     def load_checkpoint(self, filepath: str) -> None:

@@ -17,7 +17,9 @@ LAW: Selectors decay predictably. The system must anticipate failure before it h
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
@@ -72,14 +74,28 @@ class SelectorDecayPredictor:
         import json
         from pathlib import Path
 
+        fd: int | None = None
+        tmp_path: str | None = None
         try:
+            import tempfile
+
             path = self._get_snapshots_path()
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
-            with open(path, "w") as f:
+            fd, tmp_path = tempfile.mkstemp(dir=Path(path).parent, suffix=".tmp")
+            with os.fdopen(fd, "w") as f:
+                fd = None  # ownership transferred to fdopen context manager
                 json.dump(data, f)
+            os.replace(tmp_path, path)
+            tmp_path = None  # ownership transferred via rename
         except Exception:
             logger.exception("Failed to persist selector decay snapshots")
+            with contextlib.suppress(OSError):
+                if fd is not None:
+                    os.close(fd)
+            if tmp_path is not None and os.path.exists(tmp_path):
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_path)
 
     def _load(self) -> None:
         import json

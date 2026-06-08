@@ -535,7 +535,7 @@ async def scrape_url(
 
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
-    from app.llm_bridge import get_llm_call_count, reset_llm_call_count
+    from app.llm_bridge import reset_llm_call_count
 
     reset_llm_call_count()
     start_time = time.time()
@@ -640,7 +640,7 @@ async def scrape_url(
             record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
         else:
             record_anti_bot_classification("ok")
-    except (ImportError, AttributeError, TypeError, ValueError):
+    except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
         pass
 
     soup_for_density = BeautifulSoup(html, "html.parser")
@@ -747,9 +747,6 @@ async def scrape_url(
         classification=classification,
         start_time=start_time,
     )
-
-    llm_calls = get_llm_call_count()
-    estimated_cost = (llm_calls * settings.COST_PER_LLM_CALL) + (fetch_ms / 1000.0 * settings.COST_PER_FETCH_MS)
 
     res_warnings = list(result_warnings)
     if not results and zero_result_failure_class:
