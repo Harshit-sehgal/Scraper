@@ -76,7 +76,7 @@ async def _call_openai_compatible_json(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
-    timeout: int | None = None,  # noqa: ASYNC109
+    timeout: int | None = None,
     max_attempts: int | None = None,
     backoff_seconds: float | None = None,
 ):
@@ -124,7 +124,7 @@ async def _call_openai_compatible_text(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
-    timeout: int | None = None,  # noqa: ASYNC109
+    timeout: int | None = None,
     max_attempts: int | None = None,
     backoff_seconds: float | None = None,
 ) -> str:
@@ -194,7 +194,7 @@ def _public_llm_fallbacks_enabled() -> bool:
     return bool(settings.LLM_ENABLE_PUBLIC_FALLBACKS)
 
 
-async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):  # noqa: ASYNC109
+async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     try:
         from app.metrics_collector import record_llm_call
 
@@ -260,7 +260,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if not res.choices:
                     msg = "Empty choices in LLM response"
-                    raise ValueError(msg)  # noqa: TRY301
+                    raise ValueError(msg)
                 return res.choices[0].message.content.strip()
 
             content = await asyncio.to_thread(_run_g4f_json)
@@ -276,7 +276,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
     return {}
 
 
-async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):  # noqa: ASYNC109
+async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     try:
         from app.metrics_collector import record_llm_call
@@ -334,7 +334,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     return {}
 
 
-async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:  # noqa: ASYNC109
+async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
     try:
         from app.metrics_collector import record_llm_call
 
@@ -397,13 +397,13 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if not res.choices:
                     msg = "Empty choices in LLM response"
-                    raise ValueError(msg)  # noqa: TRY301
+                    raise ValueError(msg)
                 return (res.choices[0].message.content or "").strip()
 
             result = await asyncio.to_thread(_run_g4f_text)
             if result is None:
                 return ""
-            return result  # type: ignore[no-any-return]  # noqa: TRY300
+            return result  # type: ignore[no-any-return]
         except Exception:
             logger.exception("g4f text fallback failed")
         return ""
@@ -519,7 +519,7 @@ class SubstratePluginManager:
                 policy = get_policy_engine(ws=self.ws)
                 if not policy.can_dispatch_action(handler_name, self.ws.get_system_pressure()):
                     msg = f"Action [{handler_name}] blocked by substrate policy"
-                    raise PermissionError(msg)  # noqa: TRY301
+                    raise PermissionError(msg)
 
             # Actual execution
             result = handler(**kwargs)
@@ -527,7 +527,7 @@ class SubstratePluginManager:
             self._execution_history.append({"handler": handler_name, "status": "success", "result_type": str(type(result))})
             if len(self._execution_history) > self._max_history:
                 self._execution_history = self._execution_history[-self._max_history // 2 :]
-            return result  # noqa: TRY300
+            return result
 
         except Exception as e:
             self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})
@@ -542,6 +542,7 @@ class SubstratePluginManager:
 
 _manager: SubstratePluginManager | None = None
 _call_count = 0
+_call_count_lock = __import__("threading").Lock()
 
 
 def get_llm_call_count() -> int:
@@ -550,12 +551,14 @@ def get_llm_call_count() -> int:
 
 def reset_llm_call_count() -> None:
     global _call_count
-    _call_count = 0
+    with _call_count_lock:
+        _call_count = 0
 
 
 def _record_call() -> None:
     global _call_count
-    _call_count = _call_count + 1
+    with _call_count_lock:
+        _call_count += 1
 
 
 def get_plugin_manager(ws: Any = None) -> SubstratePluginManager:

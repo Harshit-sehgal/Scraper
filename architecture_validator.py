@@ -24,7 +24,7 @@ FORBIDDEN_PATTERNS = [
 
 def check_duplicate_definitions(filepath):
     """Detect duplicate method or function definitions, allowing property getter/setter pairs."""
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         try:
             tree = ast.parse(f.read())
         except SyntaxError as e:
@@ -74,7 +74,7 @@ def check_dangling_references(filepath):
     ]
 
     errors = []
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         lines = f.readlines()
         for i, line in enumerate(lines, 1):
             line_clean = line.strip()
@@ -127,7 +127,7 @@ def check_metric_ownership(filepath):
     ]
 
     errors = []
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         try:
             tree = ast.parse(f.read())
         except SyntaxError:

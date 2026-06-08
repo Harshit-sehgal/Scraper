@@ -107,7 +107,7 @@ def _check(condition: bool, message: str) -> None:
     """Runtime check for the drill script. Used instead of ``assert`` so the
     script keeps working when run with ``python -O`` (which strips asserts)."""
     if not condition:
-        raise SystemExit(f"DRILL CHECK FAILED: {message}")  # noqa: TRY003
+        raise SystemExit(f"DRILL CHECK FAILED: {message}")
 
 
 def run_drill():
@@ -199,7 +199,7 @@ def run_drill():
     print("\n[Step 7] Confirming the interrupted job transitioned to FAILED...")
     interrupted_job = loaded_jobs.get(crash_job_id)
     if interrupted_job is None:
-        raise SystemExit("DRILL CHECK FAILED: Interrupted job not found after reload!")  # noqa: TRY003
+        raise SystemExit("DRILL CHECK FAILED: Interrupted job not found after reload!")
     _check(interrupted_job.status == JobStatus.FAILED, f"Interrupted job status is {interrupted_job.status}, expected FAILED!")
 
     # Verify the restart recovery message exists on the job error attribute

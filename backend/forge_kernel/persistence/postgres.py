@@ -5,6 +5,7 @@ in the clean JobRepository contract.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from forge_kernel.persistence import JobRepository
@@ -15,18 +16,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _postgres_repo = None
+_postgres_repo_lock = threading.Lock()
 
 
 def _get_pg_repo():
     global _postgres_repo
     if _postgres_repo is None:
-        try:
-            from app.postgres_repository import PostgresJobRepository as _PG
+        with _postgres_repo_lock:
+            if _postgres_repo is None:
+                try:
+                    from app.postgres_repository import PostgresJobRepository as _PG
 
-            _postgres_repo = _PG()
-        except ImportError as e:
-            msg = f"Cannot import app.postgres_repository: {e}. Install psycopg2-binary."
-            raise RuntimeError(msg) from e
+                    _postgres_repo = _PG()
+                except ImportError as e:
+                    msg = f"Cannot import app.postgres_repository: {e}. Install psycopg2-binary."
+                    raise RuntimeError(msg) from e
     return _postgres_repo
 
 

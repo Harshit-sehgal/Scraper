@@ -582,8 +582,8 @@ def allocate_semantic_roles(
 
     for _, key_fn in [
         ("primary", lambda x: -x[2]),
-        ("noisy", lambda x: -x[2] + random.random() * 0.05),  # nosec B311  # noqa: S311
-        ("random", lambda _: random.random()),  # nosec B311  # noqa: S311
+        ("noisy", lambda x: -x[2] + random.random() * 0.05),  # nosec B311
+        ("random", lambda _: random.random()),  # nosec B311
     ]:
         h = _run_allocation(graph, sorted(candidates, key=key_fn))
         hypotheses.append(h)

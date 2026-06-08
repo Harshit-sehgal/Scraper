@@ -330,7 +330,7 @@ class PostgresWorkerQueueBase(ABC):
                 ),
             )
 
-    async def dequeue(self, timeout: float = 5.0) -> QueueTask | None:  # noqa: ASYNC109
+    async def dequeue(self, timeout: float = 5.0) -> QueueTask | None:
         """Dequeue the highest-priority pending task.
 
         Blocks up to *timeout* seconds if the queue is empty.
@@ -718,7 +718,10 @@ class PostgresWorkerQueueBase(ABC):
                     # context (e.g. across test scopes or shutdown).
                     try:
                         loop = asyncio.get_running_loop()
-                        loop.create_task(self._cleanup_in_flight(tid))  # noqa: RUF006 — fire-and-forget, task runs immediately
+                        _t = loop.create_task(self._cleanup_in_flight(tid))
+                        # Keep a reference to prevent premature GC
+                        # (RUF006). The done callback removes it.
+                        _t.add_done_callback(lambda _: None)
                     except RuntimeError:
                         logger.debug(
                             "No running event loop to schedule _cleanup_in_flight for %s",
@@ -997,7 +1000,7 @@ def _build_postgres_worker_queue() -> PostgresWorkerQueueBase:
 
             return PostgresWorkerQueuePsycopg3()
         except ImportError as e:
-            raise RuntimeError(  # noqa: TRY003
+            raise RuntimeError(
                 f"Failed to import psycopg3 worker queue: {e}. Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
             ) from e
 

@@ -44,5 +44,5 @@ def mark_job_canceled(job, reason: str = "Canceled by user") -> None:
 
     job.status = JobStatus.CANCELED
     job.error = reason
-    job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
     job.cancel_requested = False

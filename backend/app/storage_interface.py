@@ -97,6 +97,7 @@ class JobRepository(ABC):
             cursor: Opaque cursor for keyset pagination. For the initial
                 cut this is treated as an ISO timestamp string; the API
                 returns ``created_at`` values that callers can pass back.
+
         """
 
     def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
@@ -114,6 +115,7 @@ class JobRepository(ABC):
             include_deleted: If True, soft-deleted rows
                 (``deleted_at IS NOT NULL``) are included. Default False
                 matches the behaviour of ``GET /api/system/status``.
+
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement count_jobs_by_status()",
@@ -141,6 +143,7 @@ class JobRepository(ABC):
             cursor: Opaque cursor for keyset pagination. Treated as an
                 ISO timestamp string; callers should pass back a
                 ``created_at`` value from a previous page.
+
         """
 
     @abstractmethod
@@ -744,7 +747,7 @@ class SQLiteJobRepository(JobRepository):
                 # Set deleted_at timestamp
                 import datetime
 
-                row_dict["deleted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                row_dict["deleted_at"] = datetime.datetime.now(datetime.UTC).isoformat()
                 # Insert into recycle_bin
                 columns = ", ".join(row_dict.keys())
                 placeholders = ", ".join("?" for _ in row_dict)
@@ -753,7 +756,7 @@ class SQLiteJobRepository(JobRepository):
                     list(row_dict.values()),
                 )
                 conn.commit()
-                return True  # noqa: TRY300
+                return True
             except Exception:
                 conn.rollback()
                 raise
@@ -788,7 +791,7 @@ class SQLiteJobRepository(JobRepository):
                     list(row_dict.values()),
                 )
                 conn.commit()
-                return True  # noqa: TRY300
+                return True
             except Exception:
                 conn.rollback()
                 raise
@@ -820,7 +823,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM job_results WHERE job_id = ?", (job_id,))
                 conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
                 conn.commit()
-                return deleted > 0  # noqa: TRY300
+                return deleted > 0
             except Exception:
                 conn.rollback()
                 raise
@@ -855,7 +858,7 @@ class SQLiteJobRepository(JobRepository):
                 col_names = [description[0] for description in cursor.description]
                 import datetime
 
-                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                now = datetime.datetime.now(datetime.UTC).isoformat()
                 for r in rows:
                     row_dict = dict(zip(col_names, r, strict=False))
                     jid = row_dict["id"]
@@ -930,7 +933,7 @@ def get_job_repository() -> JobRepository:
             # psycopg3 and psycopg2 would crash the worker on first use.
             pg_driver_env = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
             if not pg_driver_env and settings.ENV.lower() == "production":
-                raise RuntimeError(  # noqa: TRY003
+                raise RuntimeError(
                     "DATAFORGE_PG_DRIVER is not set. Production requires "
                     "DATAFORGE_PG_DRIVER=psycopg3 because the production image "
                     "installs only psycopg3 (psycopg2 is intentionally excluded). "
@@ -954,11 +957,11 @@ def get_job_repository() -> JobRepository:
                             "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL "
                             "and ensure the database is running."
                         )
-                        raise RuntimeError(msg)  # noqa: TRY301
+                        raise RuntimeError(msg)
                     repo: JobRepository = Psycopg3JobRepository()
                     _repository_instance = repo
                     logger.info("Using Psycopg3JobRepository (STORAGE_BACKEND=postgres, PG_DRIVER=psycopg3)")
-                    return repo  # noqa: TRY300
+                    return repo
                 except RuntimeError:
                     raise
                 except Exception as e:
@@ -978,13 +981,13 @@ def get_job_repository() -> JobRepository:
                         "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
                         "the database is running."
                     )
-                    raise RuntimeError(  # noqa: TRY301
+                    raise RuntimeError(
                         msg,
                     )
                 repo = PostgresJobRepository()
                 _repository_instance = repo
                 logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
-                return repo  # noqa: TRY300
+                return repo
             except RuntimeError:
                 raise
             except Exception as e:

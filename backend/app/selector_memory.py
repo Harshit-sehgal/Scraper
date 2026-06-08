@@ -19,6 +19,7 @@ import contextlib
 import json
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,7 @@ class SelectorMemory:
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._memory: dict[str, dict] = {}
+        self._lock = threading.Lock()
         self._last_cleanup: float = 0.0  # Track when we last cleaned up
         self._load()
         self._auto_cleanup()  # Clean up on initialization
@@ -258,34 +260,35 @@ class SelectorMemory:
             return
 
         now = time.time()
-        entry = self._memory.get(
-            domain,
-            {
-                "selectors": selectors,
-                "success_count": 0,
-                "failure_count": 0,
-                "first_seen": now,
-                "last_success": now,
-                "lineage": [],  # Track previous successful selector hashes
-            },
-        )
+        with self._lock:
+            entry = self._memory.get(
+                domain,
+                {
+                    "selectors": selectors,
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "first_seen": now,
+                    "last_success": now,
+                    "lineage": [],  # Track previous successful selector hashes
+                },
+            )
 
-        # Update if selectors changed or it's a new entry
-        if entry["selectors"] != selectors:
-            # Store old selector hash in lineage
-            old_hash = str(hash(json.dumps(entry["selectors"], sort_keys=True)))
-            if "lineage" not in entry:
-                entry["lineage"] = []
-            entry["lineage"].append({"hash": old_hash, "replaced_at": now, "successes": entry["success_count"]})
+            # Update if selectors changed or it's a new entry
+            if entry["selectors"] != selectors:
+                # Store old selector hash in lineage
+                old_hash = str(hash(json.dumps(entry["selectors"], sort_keys=True)))
+                if "lineage" not in entry:
+                    entry["lineage"] = []
+                entry["lineage"].append({"hash": old_hash, "replaced_at": now, "successes": entry["success_count"]})
 
-            entry["selectors"] = selectors
-            entry["failure_count"] = 0  # Reset failures on change
-            entry["last_updated"] = now
-            entry["success_count"] = 0
+                entry["selectors"] = selectors
+                entry["failure_count"] = 0  # Reset failures on change
+                entry["last_updated"] = now
+                entry["success_count"] = 0
 
-        entry["success_count"] += 1
-        entry["last_success"] = now
-        self._memory[domain] = entry
+            entry["success_count"] += 1
+            entry["last_success"] = now
+            self._memory[domain] = entry
         self._save()
 
     def record_failure(self, url: str) -> None:
@@ -294,13 +297,14 @@ class SelectorMemory:
         if not domain:
             return
 
-        entry = self._memory.get(domain)
-        if not entry:
-            return
+        with self._lock:
+            entry = self._memory.get(domain)
+            if not entry:
+                return
 
-        entry["failure_count"] = entry.get("failure_count", 0) + 1
-        entry["last_failure"] = time.time()
-        self._memory[domain] = entry
+            entry["failure_count"] = entry.get("failure_count", 0) + 1
+            entry["last_failure"] = time.time()
+            self._memory[domain] = entry
         self._save()
 
     def has_memory_for(self, url: str) -> bool:

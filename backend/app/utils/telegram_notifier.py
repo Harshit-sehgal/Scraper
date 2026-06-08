@@ -18,8 +18,8 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
 
@@ -36,7 +36,7 @@ _PLACEHOLDER_CHAT_IDS = frozenset({"", "YOUR_CHAT_ID_HERE", "your_chat_id_here"}
 # exists so tests that monkey-patch ``settings.TELEGRAM_*`` can call
 # :func:`reset_notifier` to force a fresh read on the next access.
 _NOTIFIER_LOCK = threading.Lock()
-_NOTIFIER_INSTANCE: Optional["TelegramNotifier"] = None
+_NOTIFIER_INSTANCE: TelegramNotifier | None = None
 
 
 def _env(name: str, default: str = "") -> str:
@@ -173,7 +173,7 @@ class TelegramNotifier:
         """Notify that a test suite has started."""
         if not getattr(settings, "TELEGRAM_NOTIFY_ON_TEST_START", True):
             return
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         text = f"🚀 <b>Test Suite Started</b>\n\nSuite: <code>{suite_name}</code>\nStarted: <code>{ts}</code>"
         self._fire_and_forget(text)
 
@@ -201,7 +201,7 @@ class TelegramNotifier:
             return
         emoji = "✅" if result.upper() == "PASSED" else "❌"
         total = passed + failed + skipped
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         duration_block = f"⏱ Duration: <code>{duration_seconds:.1f}s</code>\n" if duration_seconds is not None else ""
         text = (
             f"{emoji} <b>Test Suite Finished</b>\n\n"

@@ -61,12 +61,12 @@ def get_ddgs_class():
     try:
         from ddgs import DDGS as _PreferredDDGS
 
-        return _PreferredDDGS  # noqa: TRY300
+        return _PreferredDDGS
     except ImportError:
         try:
             from duckduckgo_search import DDGS as _FallbackDDGS
 
-            return _FallbackDDGS  # noqa: TRY300
+            return _FallbackDDGS
         except ImportError as exc:
             msg = "Discovery requires ddgs or duckduckgo_search. Install backend requirements first."
             raise DiscoveryDependencyError(
@@ -390,7 +390,7 @@ async def discover_urls(
                 break
 
         logger.info("Found %d real URLs.", len(results))
-        return results  # noqa: TRY300
+        return results
     except DiscoveryDependencyError:
         raise
     except Exception:

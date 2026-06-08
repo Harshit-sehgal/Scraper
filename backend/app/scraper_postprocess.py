@@ -101,6 +101,7 @@ async def run_post_extraction_processing(
 
     Returns:
         Tuple of (processed_results, warnings).
+
     """
     result_warnings: list[str] = []
 

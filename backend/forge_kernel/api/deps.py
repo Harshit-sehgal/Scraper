@@ -5,6 +5,7 @@ Provides dependency injection for the kernel's API layer.
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, Request, status
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 
 _jobs_store: dict[str, Job] = {}
 _recycle_bin_store: dict[str, Job] = {}
+_store_lock = threading.Lock()
 
 
 def get_jobs_store() -> dict[str, Job]:
@@ -29,6 +31,10 @@ def get_jobs_store() -> dict[str, Job]:
 
 def get_recycle_bin_store() -> dict[str, Job]:
     return _recycle_bin_store
+
+
+def get_store_lock() -> threading.Lock:
+    return _store_lock
 
 
 # ─── Rate limiting dependency ───────────────────────────────────────────

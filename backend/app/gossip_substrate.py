@@ -149,7 +149,7 @@ class GossipSubstrate:
         selected = []
         for _ in range(min(count, len(candidates))):
             total = sum(weights)
-            pick = random.uniform(0, total)  # nosec B311  # noqa: S311
+            pick = random.uniform(0, total)  # nosec B311
             cumsum = 0.0
             for i, w in enumerate(weights):
                 cumsum += w
@@ -206,7 +206,7 @@ class GossipSubstrate:
             self.peer_health[peer_id].last_sync = time.time()
 
             logger.debug("[Gossip] %s <-> %s: sync successful", local_node_id, peer_id)
-            return True  # noqa: TRY300
+            return True
 
         except Exception as e:
             self.peer_health[peer_id].failure_count += 1

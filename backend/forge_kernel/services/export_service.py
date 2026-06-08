@@ -81,7 +81,7 @@ class ExportService:
 
     async def export(self, fmt: str, records: list[dict], field_names: list[str] | None = None) -> ExportArtifact:
         """Generate an export in the specified format."""
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.UTC).isoformat()
         if fmt == "csv":
             content = self.to_csv(records, field_names)
             return ExportArtifact(format="csv", row_count=len(records), generated_at=now, byte_size=len(content.encode("utf-8")))

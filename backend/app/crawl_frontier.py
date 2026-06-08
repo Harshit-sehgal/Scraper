@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import heapq
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -476,10 +477,15 @@ class CrawlFrontier:
 
 # Global Singleton
 _frontier: CrawlFrontier | None = None
+_frontier_lock = threading.Lock()
 
 
 def get_crawl_frontier() -> CrawlFrontier:
     global _frontier
-    if _frontier is None:
+    if _frontier is not None:
+        return _frontier
+    with _frontier_lock:
+        if _frontier is not None:
+            return _frontier
         _frontier = CrawlFrontier()
     return _frontier

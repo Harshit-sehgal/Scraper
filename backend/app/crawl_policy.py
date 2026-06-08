@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -64,6 +65,8 @@ class CrawlPolicyEngine:
         # Async lock to prevent race conditions on domain budget reservations.
         # See the "Reserve Domain Capacity" section in check_domain().
         self._reserve_lock = asyncio.Lock()
+        # Thread lock for sync methods (record_result, get_domain_state, etc.)
+        self._thread_lock = threading.Lock()
 
     # ─── Public API ────────────────────────────────────────────────────
 
@@ -144,24 +147,25 @@ class CrawlPolicyEngine:
         if not domain:
             return
 
-        state = self._get_state(domain)
-        state.active_fetches = max(0, state.active_fetches - 1)
-        self._global_active_fetches = max(0, self._global_active_fetches - 1)
-        state.last_fetch_time = time.time()
-        state.total_fetches += 1
+        with self._thread_lock:
+            state = self._get_state(domain)
+            state.active_fetches = max(0, state.active_fetches - 1)
+            self._global_active_fetches = max(0, self._global_active_fetches - 1)
+            state.last_fetch_time = time.time()
+            state.total_fetches += 1
 
-        if success:
-            state.consecutive_failures = 0
-        else:
-            state.consecutive_failures += 1
-            if state.consecutive_failures >= self._max_retries:
-                state.cooldown_until = time.time() + self._cooldown_seconds
-                logger.warning(
-                    "Domain %s: %d consecutive failures, cooling down for %ds",
-                    domain,
-                    state.consecutive_failures,
-                    self._cooldown_seconds,
-                )
+            if success:
+                state.consecutive_failures = 0
+            else:
+                state.consecutive_failures += 1
+                if state.consecutive_failures >= self._max_retries:
+                    state.cooldown_until = time.time() + self._cooldown_seconds
+                    logger.warning(
+                        "Domain %s: %d consecutive failures, cooling down for %ds",
+                        domain,
+                        state.consecutive_failures,
+                        self._cooldown_seconds,
+                    )
 
     def get_domain_state(self, domain: str) -> dict | None:
         """Get the current state for a domain (for observability)."""
@@ -313,10 +317,13 @@ class CrawlPolicyEngine:
 # ─── Singleton Accessor ─────────────────────────────────────────────────
 
 _policy_engine: CrawlPolicyEngine | None = None
+_policy_engine_lock = threading.Lock()
 
 
 def get_crawl_policy() -> CrawlPolicyEngine:
     global _policy_engine
     if _policy_engine is None:
-        _policy_engine = CrawlPolicyEngine()
+        with _policy_engine_lock:
+            if _policy_engine is None:
+                _policy_engine = CrawlPolicyEngine()
     return _policy_engine

@@ -53,6 +53,7 @@ def create_jobs_router(
 
     Returns:
         APIRouter with all job endpoints registered.
+
     """
     manager = JobStoreManager(jobs_store, recycle_bin_store)
     router = APIRouter(tags=["jobs"])

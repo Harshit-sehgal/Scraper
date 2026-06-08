@@ -5,6 +5,7 @@ with minimal changes, wrapped in the clean JobRepository contract.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from forge_kernel.persistence import JobRepository
@@ -16,22 +17,25 @@ logger = logging.getLogger(__name__)
 
 # Lazy import of the existing SQLite store — minimal porting surface
 _job_store = None
+_job_store_lock = threading.Lock()
 
 
 def _get_store():
     global _job_store
     if _job_store is None:
-        try:
-            from app.job_store import load_state, persist_state_single, save_state
+        with _job_store_lock:
+            if _job_store is None:
+                try:
+                    from app.job_store import load_state, persist_state_single, save_state
 
-            _job_store = {
-                "load_state": load_state,
-                "save_state": save_state,
-                "persist_state_single": persist_state_single,
-            }
-        except ImportError:
-            msg = "Cannot import app.job_store — ensure PYTHONPATH includes backend/"
-            raise RuntimeError(msg) from None
+                    _job_store = {
+                        "load_state": load_state,
+                        "save_state": save_state,
+                        "persist_state_single": persist_state_single,
+                    }
+                except ImportError:
+                    msg = "Cannot import app.job_store — ensure PYTHONPATH includes backend/"
+                    raise RuntimeError(msg) from None
     return _job_store
 
 
@@ -84,7 +88,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 import datetime
 
-                row_dict["deleted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                row_dict["deleted_at"] = datetime.datetime.now(datetime.UTC).isoformat()
                 cols = ", ".join(row_dict.keys())
                 ph = ", ".join("?" for _ in row_dict)
                 conn.execute(f"INSERT OR REPLACE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_dict.values()))  # noqa: RUF100, S608

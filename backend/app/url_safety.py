@@ -28,7 +28,7 @@ def is_safe_ip(ip_str: str) -> bool:
         # Check standard unsafe ranges plus non-globally-routable ranges.
         # `is_global` rejects documentation, benchmark, and IETF-assigned
         # blocks that the other predicates do not always cover.
-        return not (  # noqa: TRY300
+        return not (
             ip.is_private
             or ip.is_loopback
             or ip.is_link_local
@@ -232,7 +232,7 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         self,
         host: str,
         port: int,
-        timeout: float | None = None,  # noqa: ASYNC109
+        timeout: float | None = None,
         local_address: str | None = None,
         socket_options: Any = None,
     ) -> httpcore.AsyncNetworkStream:
@@ -625,7 +625,7 @@ def verify_ssrf_self_check() -> dict:
             )
             return diag
 
-        return diag  # noqa: TRY300
+        return diag
     except Exception as e:
         diag["ok"] = False
         diag["reason"] = f"Self-check raised: {e}"

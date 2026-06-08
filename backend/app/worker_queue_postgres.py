@@ -246,7 +246,7 @@ def get_postgres_worker_queue():
 
                         _queue_instance = PostgresWorkerQueuePsycopg3()
                     except ImportError as e:
-                        raise RuntimeError(  # noqa: TRY003
+                        raise RuntimeError(
                             f"Failed to import psycopg3 worker queue: {e}. "
                             "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
                         ) from e

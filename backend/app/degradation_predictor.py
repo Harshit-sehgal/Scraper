@@ -16,6 +16,7 @@ recommended actions to prevent the predicted failure.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -512,11 +513,14 @@ class DegradationPredictor:
 # ═══════════════════════════════════════════════════════════════════════
 
 _predictor: DegradationPredictor | None = None
+_predictor_lock = threading.Lock()
 
 
 def get_degradation_predictor() -> DegradationPredictor:
     """Get the global degradation predictor singleton."""
     global _predictor
     if _predictor is None:
-        _predictor = DegradationPredictor()
+        with _predictor_lock:
+            if _predictor is None:
+                _predictor = DegradationPredictor()
     return _predictor

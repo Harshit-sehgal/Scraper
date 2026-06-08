@@ -89,7 +89,7 @@ class QueueTask:
         self.payload = payload or {}
         self.priority = priority
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
+        self.created_at = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
         self.started_at: str | None = None
         self.completed_at: str | None = None
         self.attempts = 0
@@ -380,7 +380,7 @@ class WorkerQueue:
 
         return task.id
 
-    async def dequeue(self, timeout: float = 5.0) -> QueueTask | None:  # noqa: ASYNC109
+    async def dequeue(self, timeout: float = 5.0) -> QueueTask | None:
         """Dequeue the highest-priority pending task.
 
         Blocks up to *timeout* seconds if the queue is empty.
@@ -422,7 +422,7 @@ class WorkerQueue:
                     },
                 )
                 task.status = TaskStatus.RUNNING
-                task.started_at = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
+                task.started_at = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
                 task.attempts += 1
 
                 conn.execute(
@@ -436,7 +436,7 @@ class WorkerQueue:
                 conn.close()
 
     def _complete_sync(self, task_id: str, result: dict | None) -> None:
-        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
+        now = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
         conn = self._conn()
         try:
             # Fetch task for history
@@ -508,7 +508,7 @@ class WorkerQueue:
                     else:
                         backoff = float(min(2 ** (attempts - 1) * 30, 3600))
 
-                    retry_at = (datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds=backoff)).strftime(
+                    retry_at = (datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=backoff)).strftime(
                         _TIMESTAMP_FORMAT
                     )
                     conn.execute(
@@ -587,7 +587,7 @@ class WorkerQueue:
         task_type: str | None = None,
     ) -> None:
         """Mark a task as failed. Retries if attempts remain."""
-        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
+        now = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
         async with self._in_flight_lock:
             await asyncio.to_thread(
                 self._fail_sync,
@@ -678,7 +678,7 @@ class WorkerQueue:
 
     async def cancel(self, task_id: str) -> bool:
         """Cancel a task. Handles both pending (SQLite) and in-flight (asyncio) tasks."""
-        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(_TIMESTAMP_FORMAT)
+        now = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
         async with self._in_flight_lock:
             # Check in-flight tasks first (running tasks)
             if task_id in self._in_flight:
@@ -792,7 +792,10 @@ class WorkerQueue:
                     # or during shutdown).
                     try:
                         loop = asyncio.get_running_loop()
-                        loop.create_task(self._cleanup_in_flight(tid))  # noqa: RUF006 — fire-and-forget, task runs immediately
+                        _t = loop.create_task(self._cleanup_in_flight(tid))
+                        # Keep a reference to prevent premature GC
+                        # (RUF006). The done callback removes it.
+                        _t.add_done_callback(lambda _: None)
                     except RuntimeError:
                         logger.debug(
                             "No running event loop to schedule _cleanup_in_flight for %s",

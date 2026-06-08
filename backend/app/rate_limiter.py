@@ -307,7 +307,7 @@ class DatabaseSlidingWindowCounter:
                         conn.execute("COMMIT")
                     finally:
                         conn.close()
-                return True  # noqa: TRY300
+                return True
             except Exception as e:
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
@@ -629,7 +629,8 @@ class RateLimiterMiddleware:
 
     def _get_limits_for_path(self, path: str, method: str = "POST") -> tuple[int, float]:
         """Resolve the effective limit for a path by merging global and
-        route-specific caps. Returns (max_requests, window_seconds)."""
+        route-specific caps. Returns (max_requests, window_seconds).
+        """
         route_key = _get_route_key(path, method)
         limits = _get_effective_route_limits(method)
         if route_key in limits:

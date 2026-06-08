@@ -20,11 +20,11 @@ from app.worker_queue_postgres_base import (
 class FakeCursor:
     """Minimal psycopg2-like cursor that records SQL and parameters."""
 
-    def __init__(self, conn: "FakeConn") -> None:
+    def __init__(self, conn: FakeConn) -> None:
         self._conn = conn
         self._result: list[tuple] | None = None
 
-    def __enter__(self) -> "FakeCursor":
+    def __enter__(self) -> FakeCursor:
         return self
 
     def __exit__(self, *exc: Any) -> None:

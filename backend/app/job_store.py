@@ -617,7 +617,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                     if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                         job.status = JobStatus.FAILED
                         job.error = "Recovered after restart while still in progress."
-                        job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                        job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
                         job.cancel_requested = False
 
                         row = _job_to_row(job)
@@ -1094,6 +1094,7 @@ def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:
     Args:
         include_deleted: If True, soft-deleted rows
             (from the recycle_bin table) are included.
+
     """
     counts: dict[str, int] = {}
     with _DB_LOCK:
@@ -1178,7 +1179,7 @@ def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
     so two workers on the same host can coexist. See the v6
     migration in :func:`_ensure_schema`.
     """
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now = datetime.datetime.now(datetime.UTC).isoformat()
     with _DB_LOCK:
         conn = _get_connection()
         try:
@@ -1236,7 +1237,7 @@ def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict:
     alive = False
     if last_heartbeat:
         try:
-            delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_heartbeat)
+            delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_heartbeat)
             alive = delta.total_seconds() < ttl_seconds
         except (ValueError, TypeError):
             alive = False
@@ -1266,7 +1267,7 @@ def get_all_worker_healths(ttl_seconds: int = 60) -> list[dict]:
         alive = False
         if last_hb:
             try:
-                delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_hb)
+                delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_hb)
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False

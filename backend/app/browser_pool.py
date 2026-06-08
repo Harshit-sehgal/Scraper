@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -41,6 +42,11 @@ class BrowserPool:
         self._recycle_event = asyncio.Event()
         self._recycle_event.set()
         self._background_tasks: set[asyncio.Task] = set()
+
+        # Thread lock for synchronous callbacks (Playwright page events) that
+        # need to update counters safely. asyncio.Lock cannot be used with
+        # regular ``with`` — it requires ``async with``.
+        self._counter_lock = threading.Lock()
 
         # Metrics
         self.startup_latency_ms: float = 0.0
@@ -159,8 +165,9 @@ class BrowserPool:
             # Register page tracking
             def register_page_tracking(ctx) -> None:
                 def on_page(page) -> None:
-                    self._active_fetches += 1
-                    self._cumulative_fetches += 1
+                    with self._counter_lock:
+                        self._active_fetches += 1
+                        self._cumulative_fetches += 1
                     logger.debug(
                         "[BrowserPool] Page created. Active: %d, Cumulative: %d",
                         self._active_fetches,
@@ -168,7 +175,8 @@ class BrowserPool:
                     )
 
                     def on_close(p) -> None:  # noqa: ARG001, RUF100
-                        self._active_fetches = max(0, self._active_fetches - 1)
+                        with self._counter_lock:
+                            self._active_fetches = max(0, self._active_fetches - 1)
                         logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
                         # Only schedule a recycle check if recycling might be
                         # needed — this avoids creating asyncio tasks (and
@@ -237,7 +245,7 @@ class BrowserPool:
         """Return a randomized browser user agent."""
         import random
 
-        return random.choice(settings.STEALTH_UA_POOL.split(","))  # nosec B311  # noqa: S311
+        return random.choice(settings.STEALTH_UA_POOL.split(","))  # nosec B311
 
     async def check_health(self) -> bool:
         """Perform a basic health check on the browser instance."""
@@ -250,7 +258,7 @@ class BrowserPool:
             page = await ctx.new_page()
             await page.close()
             await ctx.close()
-            return True  # noqa: TRY300
+            return True
         except Exception as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False
@@ -333,7 +341,10 @@ class BrowserPool:
         if not self._should_recycle() or self._recycling:
             return
 
-        self._recycling = True
+        async with self._lock:
+            if self._recycling:
+                return
+            self._recycling = True
         self._recycle_event.clear()
 
         while self._active_fetches > 0:
@@ -404,7 +415,7 @@ class BrowserPool:
 
 # Global Singleton
 _pool: BrowserPool | None = None
-_pool_lock = __import__("threading").Lock()
+_pool_lock = threading.Lock()
 
 
 def get_browser_pool() -> BrowserPool:
