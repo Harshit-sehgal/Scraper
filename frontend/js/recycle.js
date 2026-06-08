@@ -18,9 +18,9 @@ export async function refreshRecycleBin() {
     const empty = document.getElementById("empty-recycle-state");
 
     if (!jobs.length) {
-      list.innerHTML = "";
-      list.appendChild(empty);
-      empty.classList.remove("hidden");
+      if (list) list.innerHTML = "";
+      if (list && empty) list.appendChild(empty);
+      if (empty) empty.classList.remove("hidden");
       return;
     }
 

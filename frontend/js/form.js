@@ -276,7 +276,7 @@ export async function previewDiscovery() {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || "Discovery failed");
-    if (!data.urls.length) {
+    if (!data.urls?.length) {
       preview.innerHTML = '<div class="disc-loading">No URLs found. Try a different topic.</div>';
       return;
     }

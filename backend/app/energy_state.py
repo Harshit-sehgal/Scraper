@@ -503,6 +503,8 @@ class EnergyState:
                 new_val = local_val * (1.0 - alpha) + remote_val * alpha
             elif mode == "max":
                 new_val = max(local_val, remote_val)
+            else:
+                new_val = local_val
 
             self._set_val(k, new_val)
 

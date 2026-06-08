@@ -118,18 +118,18 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     if [ "${TARGET_HOST}" = "postgres" ]; then
         TARGET_HOST="localhost"
     fi
-    PORT_ARG=""
+    PORT_ARG=()
     if [ -n "${DB_PORT}" ]; then
-        PORT_ARG="-p ${DB_PORT}"
+        PORT_ARG=(-p "${DB_PORT}")
     fi
-    PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" pg_dump "${PORT_ARG}" -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}"
+    PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" pg_dump "${PORT_ARG[@]}" -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}"
 else
     # Run pg_dump inside running docker container
-    PORT_ARG=""
+    PORT_ARG=()
     if [ -n "${DB_PORT}" ]; then
-        PORT_ARG="-p ${DB_PORT}"
+        PORT_ARG=(-p "${DB_PORT}")
     fi
-    docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -t "${CONTAINER_NAME}" pg_dump "${PORT_ARG}" -U "${DB_USER}" -d "${DB_NAME}"
+    docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -t "${CONTAINER_NAME}" pg_dump "${PORT_ARG[@]}" -U "${DB_USER}" -d "${DB_NAME}"
 fi > "${BACKUP_FILE}.tmp"
 
 # Lock down permissions on the temp file *before* validating it.

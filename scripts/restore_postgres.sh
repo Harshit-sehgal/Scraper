@@ -127,19 +127,19 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     if [ "${TARGET_HOST}" = "postgres" ]; then
         TARGET_HOST="localhost"
     fi
-    PORT_ARG=""
+    PORT_ARG=()
     if [ -n "${DB_PORT}" ]; then
-        PORT_ARG="-p ${DB_PORT}"
+        PORT_ARG=(-p "${DB_PORT}")
     fi
     # Local restore
-    gunzip -c "${BACKUP_FILE}" | PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" psql ${PORT_ARG} -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}"
+    gunzip -c "${BACKUP_FILE}" | PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" psql "${PORT_ARG[@]}" -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}"
 else
     # Restore inside running docker container
-    PORT_ARG=""
+    PORT_ARG=()
     if [ -n "${DB_PORT}" ]; then
-        PORT_ARG="-p ${DB_PORT}"
+        PORT_ARG=(-p "${DB_PORT}")
     fi
-    gunzip -c "${BACKUP_FILE}" | docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -i "${CONTAINER_NAME}" psql ${PORT_ARG} -U "${DB_USER}" -d "${DB_NAME}"
+    gunzip -c "${BACKUP_FILE}" | docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -i "${CONTAINER_NAME}" psql "${PORT_ARG[@]}" -U "${DB_USER}" -d "${DB_NAME}"
 fi
 
 echo "[SUCCESS] Postgres restore completed successfully."

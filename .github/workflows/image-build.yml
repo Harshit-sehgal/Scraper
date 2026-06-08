@@ -46,6 +46,12 @@ jobs:
               echo "✅ /ready returned 200"
               break
             fi
+            if [ "$i" -eq 30 ]; then
+              echo "❌ Server failed to start within 30 seconds"
+              docker logs dataforge-smoke || true
+              docker stop dataforge-smoke || true
+              exit 1
+            fi
             sleep 1
           done
           docker stop dataforge-smoke || true

@@ -404,7 +404,8 @@
         scrubber.value = scrubber.max;
       }
 
-      document.getElementById("last-update").innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
+      const lastUpdateEl = document.getElementById("last-update");
+      if (lastUpdateEl) lastUpdateEl.innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
 
       // Keep the static "Status: UI Loaded" line in sync with the
       // current polling state. Without this, the line is misleading —
@@ -541,6 +542,7 @@
 
   function renderTopology(regions, communities, edges, mesoClusters, macroContinents) {
     const svg = document.getElementById("field-svg");
+    if (!svg) return;
     svg.innerHTML = ""; // Clear
 
     _renderTopologyInternal(regions, communities, edges, mesoClusters, macroContinents);
@@ -808,6 +810,7 @@
   function showRegionDetails(r) {
     const el = document.getElementById("region-details");
     const content = document.getElementById("region-info-content");
+    if (!el || !content) return;
     el.classList.remove("hidden");
 
     content.innerHTML = `
@@ -823,6 +826,7 @@
   function showMesoClusterDetails(cluster) {
     const el = document.getElementById("region-details");
     const content = document.getElementById("region-info-content");
+    if (!el || !content) return;
     el.classList.remove("hidden");
 
     content.innerHTML = `
@@ -868,7 +872,7 @@
 
   function updateTelemetry(events) {
     const log = document.getElementById("telemetry-log");
-    if (!events) return;
+    if (!events || !log) return;
 
     // Capture new wave events for animation
     const now = Date.now();

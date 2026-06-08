@@ -40,10 +40,12 @@ class SlidingWindowCounter:
             return RateLimitResult(allowed=False, remaining=0, reset_after=reset_after)
 
         self._requests[key].append(now)
+        oldest = min(self._requests[key]) if self._requests[key] else now
+        reset_after = max(0.0, self.window_seconds - (now - oldest))
         return RateLimitResult(
             allowed=True,
             remaining=self.max_requests - count - 1,
-            reset_after=self.window_seconds,
+            reset_after=reset_after,
         )
 
 
