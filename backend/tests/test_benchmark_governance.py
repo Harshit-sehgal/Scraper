@@ -26,7 +26,7 @@ def _run_live_benchmark(env: dict[str, str]) -> subprocess.CompletedProcess:
     full_env["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
     full_env["DATAFORGE_STATE_FILE"] = "/tmp/test_benchmark_governance_state.json"
     full_env.update(env)
-    return subprocess.run(
+    return subprocess.run(  # noqa: PLW1510
         [sys.executable, "scripts/live_benchmark.py"],
         cwd=str(REPO_ROOT),
         env=full_env,
@@ -63,10 +63,10 @@ class TestLiveBenchmarkGovernance:
             "os.environ['DATAFORGE_RUN_LIVE_BENCHMARKS'] = '1'\n"
             "asyncio.run = lambda coro: None\n"
             "sys.argv = ['live_benchmark.py', '--url', 'http://localhost:0']\n"
-            "exec(open('scripts/live_benchmark.py').read())\n"
+            "exec(open('scripts/live_benchmark.py').read())\n",
         )
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: PLW1510
                 [sys.executable, str(wrapper)],
                 cwd=str(REPO_ROOT),
                 capture_output=True,

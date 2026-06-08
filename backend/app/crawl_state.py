@@ -25,7 +25,7 @@ class CrawlStateAdapter:
         """Fetch the next batch of eligible URLs to crawl."""
         return await self._frontier.get_next_urls(count)
 
-    async def mark_completed(self, url: str, success: bool = True) -> None:
+    async def mark_completed(self, url: str, success: bool = True) -> None:  # noqa: FBT001, FBT002
         """Mark a crawl task as completed or failed and update policy budgets."""
         await self._frontier.mark_completed(url, success)
         self._policy.record_result(url, success)

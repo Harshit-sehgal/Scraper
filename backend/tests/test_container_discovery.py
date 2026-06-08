@@ -70,7 +70,7 @@ def short_html() -> str:
 def test_container_ranking_is_dataclass() -> None:
     """ContainerRanking is a dataclass with the documented fields."""
     assert is_dataclass(ContainerRanking)
-    r = ContainerRanking(
+    r: ContainerRanking = ContainerRanking(  # type: ignore[operator, call-arg]
         containers=[],
         best_selector="div.result",
         best_score=0.42,
@@ -98,7 +98,7 @@ def test_container_ranking_to_dict() -> None:
 
 def test_multi_pass_result_is_dataclass() -> None:
     assert is_dataclass(MultiPassResult)
-    m = MultiPassResult(
+    m: MultiPassResult = MultiPassResult(  # type: ignore[operator, call-arg]
         all_passed=True,
         final_records=[{"k": "v"}],
         total_records=1,
@@ -113,7 +113,7 @@ def test_multi_pass_result_is_dataclass() -> None:
 
 def test_container_extraction_result_is_dataclass() -> None:
     assert is_dataclass(ContainerExtractionResult)
-    e = ContainerExtractionResult(
+    e: ContainerExtractionResult = ContainerExtractionResult(  # type: ignore[operator, call-arg]
         selector="div.result",
         records=[{"x": 1}],
         record_count=1,

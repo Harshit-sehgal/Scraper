@@ -29,7 +29,7 @@ _JOB_KWARGS: dict[str, Any] = {
 
 
 def _make_job_json(
-    id: str,
+    id: str,  # noqa: A002
     status: str,
     result: dict | None = None,
     name: str = "test-job",
@@ -119,7 +119,7 @@ class TestLoadState:
             assert jobs["job-1"].status == JobStatus.COMPLETED
             assert recycle == {}
         finally:
-            os.unlink(fpath)
+            os.unlink(fpath)  # noqa: PTH108
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
@@ -144,7 +144,7 @@ class TestLoadState:
             assert jobs == {}
             assert "deleted-job" in recycle
         finally:
-            os.unlink(fpath)
+            os.unlink(fpath)  # noqa: PTH108
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
@@ -174,7 +174,7 @@ class TestLoadState:
             assert jobs["running-job"].status == JobStatus.FAILED
             assert jobs["completed-job"].status == JobStatus.COMPLETED
         finally:
-            os.unlink(fpath)
+            os.unlink(fpath)  # noqa: PTH108
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
@@ -193,7 +193,7 @@ class TestLoadState:
             assert jobs == {}
             assert recycle == {}
         finally:
-            os.unlink(fpath)
+            os.unlink(fpath)  # noqa: PTH108
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
@@ -221,7 +221,7 @@ class TestLoadState:
             assert "bad-job" not in jobs
             assert "good-job" in jobs
         finally:
-            os.unlink(fpath)
+            os.unlink(fpath)  # noqa: PTH108
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
@@ -235,7 +235,7 @@ class TestSaveState:
     def test_save_creates_file(self) -> None:
         """Saving state creates a valid JSON file."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            fpath = os.path.join(tmpdir, "test_state.json")
+            fpath = os.path.join(tmpdir, "test_state.json")  # noqa: PTH118
             old = os.environ.get("DATAFORGE_STATE_FILE")
             try:
                 os.environ["DATAFORGE_STATE_FILE"] = fpath
@@ -254,11 +254,11 @@ class TestSaveState:
                 import time
 
                 for _ in range(30):
-                    if os.path.exists(fpath):
+                    if os.path.exists(fpath):  # noqa: PTH110
                         break
                     time.sleep(0.1)
 
-                assert os.path.exists(fpath)
+                assert os.path.exists(fpath)  # noqa: PTH110
                 data = json.loads(Path(fpath).read_text())
                 assert "jobs" in data
                 assert "recycle_bin" in data
@@ -273,7 +273,7 @@ class TestSaveState:
     def test_save_and_reload_roundtrip(self) -> None:
         """State survives a save-then-load roundtrip."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            fpath = os.path.join(tmpdir, "roundtrip.json")
+            fpath = os.path.join(tmpdir, "roundtrip.json")  # noqa: PTH118
             old = os.environ.get("DATAFORGE_STATE_FILE")
             try:
                 os.environ["DATAFORGE_STATE_FILE"] = fpath
@@ -291,7 +291,7 @@ class TestSaveState:
                 import time
 
                 for _ in range(30):
-                    if os.path.exists(fpath):
+                    if os.path.exists(fpath):  # noqa: PTH110
                         break
                     time.sleep(0.1)
 
@@ -308,7 +308,7 @@ class TestSaveState:
     def test_save_with_recycle_bin(self) -> None:
         """Recycle bin entries are persisted."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            fpath = os.path.join(tmpdir, "recycle.json")
+            fpath = os.path.join(tmpdir, "recycle.json")  # noqa: PTH118
             old = os.environ.get("DATAFORGE_STATE_FILE")
             try:
                 os.environ["DATAFORGE_STATE_FILE"] = fpath
@@ -326,7 +326,7 @@ class TestSaveState:
                 import time
 
                 for _ in range(30):
-                    if os.path.exists(fpath):
+                    if os.path.exists(fpath):  # noqa: PTH110
                         break
                     time.sleep(0.1)
 

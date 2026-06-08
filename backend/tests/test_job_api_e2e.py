@@ -74,7 +74,7 @@ class _E2EBrowserTestHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args) -> None:
+    def log_message(self, format, *args) -> None:  # noqa: A002
         pass
 
 
@@ -108,7 +108,7 @@ class LocalASGIClient:
 
 @pytest.mark.postgres
 @pytest.mark.asyncio
-async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, monkeypatch) -> None:
+async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, monkeypatch) -> None:  # noqa: PLR0915
     """Submits a mock session-bound URL to the public jobs REST API,
     runs the worker, and asserts the results have correct provenance and no leaked secrets.
     """

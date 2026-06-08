@@ -12,7 +12,7 @@ import random
 from app.semantic_world_state import SemanticWorldState
 
 
-def test_distributed_divergence(event_count: int = 1000) -> bool:
+def test_distributed_divergence(event_count: int = 1000) -> bool:  # noqa: PT028
     # Node A: The primary evolver
     ws_a = SemanticWorldState(node_id="node_a")
     ws_a.clear()

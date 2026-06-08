@@ -33,7 +33,7 @@ class ExtractionResult:
         self,
         records: list[dict],
         method: str,
-        selector_success: bool = False,
+        selector_success: bool = False,  # noqa: FBT001, FBT002
         selectors: dict | None = None,
         network_diagnostics: list[str] | None = None,
     ) -> None:
@@ -44,7 +44,7 @@ class ExtractionResult:
         self.network_diagnostics = network_diagnostics or []
 
 
-def _merge_composite_records(
+def _merge_composite_records(  # noqa: C901
     records_list: list[list[dict]],
     schema_fields: list[SchemaField],
 ) -> list[dict]:
@@ -104,7 +104,7 @@ def _merge_composite_records(
     return result
 
 
-def _multi_pass_extraction(
+def _multi_pass_extraction(  # noqa: C901, PLR0912
     html: str,
     schema_fields: list[SchemaField],
     selectors_map: dict,
@@ -199,7 +199,7 @@ def _multi_pass_extraction(
     return _merge_composite_records(passes, schema_fields)
 
 
-async def orchestrate_extraction(
+async def orchestrate_extraction(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     url: str,
     html: str,
     schema_fields: list[SchemaField],
@@ -733,7 +733,7 @@ async def orchestrate_extraction(
     return _arbitrate_and_return(ExtractionResult(regex_results, "regex"))
 
 
-def _detect_field_swaps(
+def _detect_field_swaps(  # noqa: C901, PLR0912
     quality_map: dict[str, float],
     fields: list[SchemaField],
     extracted_values: dict[str, list] | None = None,
@@ -804,7 +804,7 @@ def _detect_field_swaps(
     return swaps
 
 
-def _check_type_compatibility(field_type: FieldType, values: list) -> float:
+def _check_type_compatibility(field_type: FieldType, values: list) -> float:  # noqa: C901, PLR0911
     """Check if values are compatible with a given FieldType.
     Returns a score from 0.0 (incompatible) to 1.0 (best observed match).
     """

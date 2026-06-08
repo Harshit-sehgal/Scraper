@@ -100,7 +100,7 @@ class JobRepository(ABC):
 
         """
 
-    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:  # noqa: FBT001, FBT002
         """Return a ``{status_value: count}`` mapping for all jobs.
 
         This is the authoritative per-status count for the system
@@ -117,8 +117,9 @@ class JobRepository(ABC):
                 matches the behaviour of ``GET /api/system/status``.
 
         """
+        msg = f"{self.__class__.__name__} must implement count_jobs_by_status()"
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement count_jobs_by_status()",
+            msg,
         )
 
     @abstractmethod
@@ -147,7 +148,7 @@ class JobRepository(ABC):
         """
 
     @abstractmethod
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:  # noqa: FBT001, FBT002
         """Load active jobs, recycled jobs, and world state in a single DB read pass.
 
         Args:
@@ -157,7 +158,7 @@ class JobRepository(ABC):
         """
 
     @abstractmethod
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:  # noqa: FBT001, FBT002
         """Atomically persist the entire state to the persistent store.
 
         Args:
@@ -215,8 +216,9 @@ class JobRepository(ABC):
         older backends that read from ``Job.results`` will not reach this
         code path because the caller falls back to ``len(job.results)`` first.
         """
+        msg = f"{self.__class__.__name__} must implement count_results()"
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement count_results()",
+            msg,
         )
 
     @abstractmethod
@@ -281,8 +283,9 @@ class JobRepository(ABC):
         ``NotImplementedError`` so missing backends fail loudly rather than
         silently dropping heartbeats.
         """
+        msg = f"{self.__class__.__name__} must implement record_worker_heartbeat()"
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement record_worker_heartbeat()",
+            msg,
         )
 
     def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
@@ -298,8 +301,9 @@ class JobRepository(ABC):
         Subclasses MUST override this — the base implementation raises
         ``NotImplementedError`` so missing backends fail loudly.
         """
+        msg = f"{self.__class__.__name__} must implement get_worker_health()"
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement get_worker_health()",
+            msg,
         )
 
     def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict]:
@@ -311,8 +315,9 @@ class JobRepository(ABC):
         Subclasses MUST override this — the base implementation raises
         ``NotImplementedError`` so missing backends fail loudly.
         """
+        msg = f"{self.__class__.__name__} must implement get_all_worker_healths()"
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement get_all_worker_healths()",
+            msg,
         )
 
     # ─── Individual repository operations (avoid full-state rewrites) ────
@@ -383,7 +388,7 @@ class SQLiteJobRepository(JobRepository):
 
         return _get_all(ttl_seconds=ttl_seconds)
 
-    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
+    def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:  # noqa: FBT001, FBT002
         from app.job_store import count_jobs_by_status as _count
 
         return _count(include_deleted=include_deleted)
@@ -570,12 +575,12 @@ class SQLiteJobRepository(JobRepository):
             )
         return summaries
 
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:  # noqa: FBT001, FBT002
         from app.job_store import load_state
 
         return load_state(recover_in_progress=recover_in_progress)
 
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:  # noqa: FBT001, FBT002
         from app.job_store import save_state
 
         save_state(jobs, recycle_bin, prune_missing=prune_missing)
@@ -710,7 +715,7 @@ class SQLiteJobRepository(JobRepository):
         ) as f:
             f.write(json.dumps(payload, ensure_ascii=False, indent=2))
             tmp_path = f.name
-        os.replace(tmp_path, str(ws_path))
+        os.replace(tmp_path, str(ws_path))  # noqa: PTH105
 
     def load_world_state(self) -> dict | None:
         """Load semantic world state from the SQLite world_state.json file."""
@@ -890,7 +895,7 @@ class SQLiteJobRepository(JobRepository):
 # ───────────────────────────────────────────────────────────────────────
 
 
-def get_job_repository() -> JobRepository:
+def get_job_repository() -> JobRepository:  # noqa: C901
     """Resolve the appropriate JobRepository based on configuration.
 
     Returns:
@@ -933,12 +938,15 @@ def get_job_repository() -> JobRepository:
             # psycopg3 and psycopg2 would crash the worker on first use.
             pg_driver_env = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
             if not pg_driver_env and settings.ENV.lower() == "production":
-                raise RuntimeError(
+                msg = (
                     "DATAFORGE_PG_DRIVER is not set. Production requires "
                     "DATAFORGE_PG_DRIVER=psycopg3 because the production image "
                     "installs only psycopg3 (psycopg2 is intentionally excluded). "
                     "Set DATAFORGE_PG_DRIVER=psycopg3 in the dataforge and worker "
                     "service environment in docker-compose.prod.yml."
+                )
+                raise RuntimeError(
+                    msg,
                 )
             pg_driver = pg_driver_env or "psycopg2"
 

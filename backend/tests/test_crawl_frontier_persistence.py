@@ -21,7 +21,7 @@ def clean_db(monkeypatch):
     # Use an isolated temporary database path so this test never collides
     # with other test processes writing to the shared crawl_frontier.db.
     tmp_dir = tempfile.mkdtemp(prefix="crawl_frontier_test_")
-    db_path = os.path.join(tmp_dir, "crawl_frontier.db")
+    db_path = os.path.join(tmp_dir, "crawl_frontier.db")  # noqa: PTH118
 
     # Patch _init_db and _load_from_db to override the db_path before
     # they access it. This avoids the instance-attribute-shadows-class-
@@ -47,9 +47,9 @@ def clean_db(monkeypatch):
     crawl_policy._policy_engine = None
     # Clean up the temp directory
     try:
-        for f in os.listdir(tmp_dir):
-            os.remove(os.path.join(tmp_dir, f))
-        os.rmdir(tmp_dir)
+        for f in os.listdir(tmp_dir):  # noqa: PTH208
+            os.remove(os.path.join(tmp_dir, f))  # noqa: PTH107, PTH118
+        os.rmdir(tmp_dir)  # noqa: PTH106
     except Exception:  # noqa: RUF100, S110
         pass
 
@@ -76,9 +76,9 @@ async def test_frontier_persistence_across_restarts() -> None:
 
     # 2. Pop the highest priority URL (priority 5 + depth 0 * 5 = 5)
     # The priorities will be:
-    # page2: 5
-    # page1: 10
-    # start: 50 + 1 * 5 = 55
+    # page2: 5  # noqa: ERA001
+    # page1: 10  # noqa: ERA001
+    # start: 50 + 1 * 5 = 55  # noqa: ERA001
     next_url = await frontier.get_next_url()
     assert next_url == "https://example.com/page2"
 

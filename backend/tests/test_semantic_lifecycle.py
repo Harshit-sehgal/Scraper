@@ -94,7 +94,7 @@ class TestTransactionContextExceptionSafety:
     def test_transaction_resets_on_exception_in_body(self) -> None:
         """Exception inside the transaction body should still reset context."""
         ws = SemanticWorldState()
-        with pytest.raises(RuntimeError, match="test error"), ws.transaction("test_exception"):
+        with pytest.raises(RuntimeError, match="test error"), ws.transaction("test_exception"):  # noqa: PT012
             assert get_active_transaction() is not None
             msg = "test error"
             raise RuntimeError(msg)
@@ -250,7 +250,7 @@ class TestBestEffortRollback:
         ws._manifold.rollback = failing_rollback
 
         try:
-            with pytest.raises(RuntimeError, match="original error"), ws.transaction("test_best_effort"):
+            with pytest.raises(RuntimeError, match="original error"), ws.transaction("test_best_effort"):  # noqa: PT012
                 msg = "original error"
                 raise RuntimeError(msg)
         finally:
@@ -293,7 +293,7 @@ class TestBestEffortRollback:
                 obj.rollback = make_failing(name)
 
         try:
-            with pytest.raises(RuntimeError, match="test all fail"), ws.transaction("test_all_fail"):
+            with pytest.raises(RuntimeError, match="test all fail"), ws.transaction("test_all_fail"):  # noqa: PT012
                 msg = "test all fail"
                 raise RuntimeError(msg)
         finally:
@@ -399,7 +399,7 @@ class TestBestEffortRollback:
                 obj.rollback = make_tracker(name)
 
         try:
-            with pytest.raises(RuntimeError, match="original body error"), ws.transaction("test_all_attempted"):
+            with pytest.raises(RuntimeError, match="original body error"), ws.transaction("test_all_attempted"):  # noqa: PT012
                 msg = "original body error"
                 raise RuntimeError(msg)
         finally:

@@ -1,5 +1,5 @@
 # mypy: ignore-errors
-# type: ignore
+# type: ignore  # noqa: PGH003
 
 from app.invariant_firewall import requires_invariants
 

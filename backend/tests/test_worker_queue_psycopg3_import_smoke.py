@@ -77,11 +77,11 @@ def _get_top_level_imports(src: str) -> list[str]:
     for node in tree.body:  # iterate only module-level statements
         if isinstance(node, ast.Import):
             for alias in node.names:
-                top_level_imports.append(f"import {alias.name}")
+                top_level_imports.append(f"import {alias.name}")  # noqa: PERF401
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             for alias in node.names:
-                top_level_imports.append(f"from {module} import {alias.name}")
+                top_level_imports.append(f"from {module} import {alias.name}")  # noqa: PERF401
     return top_level_imports
 
 

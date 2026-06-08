@@ -9,8 +9,6 @@ against the SQLite fixture used by the rest of the suite.
 
 from __future__ import annotations
 
-from collections.abc import Generator
-
 import pytest
 from app.job_store import (
     _DB_LOCK,
@@ -22,7 +20,7 @@ from app.models import Job, JobStatus
 
 
 @pytest.fixture
-def fresh_db() -> Generator[None, None, None]:
+def fresh_db() -> None:
     """Wipe the ``jobs`` and ``recycle_bin`` tables for each test.
 
     We cannot drop the tables wholesale because other tests in the
@@ -39,7 +37,6 @@ def fresh_db() -> Generator[None, None, None]:
             conn.commit()
         finally:
             conn.close()
-    yield
     # No teardown needed — the autouse ``client`` fixture (when
     # present) and ``pytest_sessionfinish`` clean up the file.
 

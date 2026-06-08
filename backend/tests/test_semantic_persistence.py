@@ -18,8 +18,8 @@ def test_persistence_round_trip() -> None:
 
     # 2. Clear initial state
     clear_semantic_state()
-    if os.path.exists(test_path):
-        os.remove(test_path)
+    if os.path.exists(test_path):  # noqa: PTH110
+        os.remove(test_path)  # noqa: PTH107
 
     reng = _get_role_engine()
     be = get_boundary_engine()
@@ -73,8 +73,8 @@ def test_persistence_round_trip() -> None:
     assert s.cohesion > 0.6
 
     # 8. Cleanup
-    if os.path.exists(test_path):
-        os.remove(test_path)
+    if os.path.exists(test_path):  # noqa: PTH110
+        os.remove(test_path)  # noqa: PTH107
 
 
 def test_persistence_affects_pipeline() -> None:
@@ -82,5 +82,5 @@ def test_persistence_affects_pipeline() -> None:
     test_path = str(Path(__file__).parent / "test_pipeline_persistence.json")
     os.environ["SEMANTIC_STATE_PATH"] = test_path
     clear_semantic_state()
-    if os.path.exists(test_path):
-        os.remove(test_path)
+    if os.path.exists(test_path):  # noqa: PTH110
+        os.remove(test_path)  # noqa: PTH107

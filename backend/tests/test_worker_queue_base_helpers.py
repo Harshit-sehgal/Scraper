@@ -7,7 +7,7 @@ to confirm the SQL flow without depending on a real Postgres server.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 import pytest
 from app.worker_queue_postgres_base import (
@@ -24,10 +24,10 @@ class FakeCursor:
         self._conn = conn
         self._result: list[tuple] | None = None
 
-    def __enter__(self) -> FakeCursor:
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         return None
 
     def execute(self, sql: str, params: Any = None) -> None:

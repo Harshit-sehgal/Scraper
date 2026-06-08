@@ -205,7 +205,7 @@ class TestSemanticPatterns:
             SemanticType.CODE,
         ):
             if stype not in SEMANTIC_PATTERNS or not SEMANTIC_PATTERNS[stype]:
-                patternless_types.append(stype)
+                patternless_types.append(stype)  # noqa: PERF401
         assert not patternless_types, f"Missing patterns for: {patternless_types}"
 
 

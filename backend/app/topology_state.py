@@ -489,7 +489,7 @@ class TopologyState:
         target_roles = set(target.competing_roles)
         for r in self._get_regions():
             if r.region_id != target.region_id and set(r.competing_roles) & target_roles:
-                result.append(view._snapshot(r))
+                result.append(view._snapshot(r))  # noqa: PERF401
         return result
 
     def get_all_tokens(self) -> list[str]:
@@ -686,7 +686,7 @@ class TopologyState:
         """Resource-aware pruning of dead semantic regions (Phase 9)."""
         return _persistence_gc(self, max_idle)
 
-    def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:
+    def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:  # noqa: FBT001, FBT002
         """Autonomous topology pruning (Phase 62). Delegates to topology_clustering."""
         return self_prune_regions(self, instability_threshold, community_required)
 
@@ -796,7 +796,7 @@ class TopologyState:
 
     # ─── Bulk Operations ───────────────────────────────────────────────
 
-    def evolve_all(self, force: bool = False):
+    def evolve_all(self, force: bool = False):  # noqa: FBT001, FBT002
         """Evolve all basins modulated by edge field forces and multi-scale feedback.
 
         Delegates to ``topology_thermodynamics.evolve_all``.

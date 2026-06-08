@@ -23,7 +23,7 @@ def _seed_job(jobs_store, job_id: str = "evt-test-1") -> Job:
             timestamp="2026-01-01T00:00:00+00:00",
             message="started",
             level="info",
-        )
+        ),
     )
     jobs_store[job_id] = job
     return job

@@ -161,7 +161,8 @@ async def main():
                 # negative timeout on the queued task (e.g. an
                 # older row in the DB with ``timeout_seconds=0``).
                 if not task.timeout_seconds or task.timeout_seconds <= 0:
-                    raise ValueError(f"task {task.id} has non-positive timeout_seconds={task.timeout_seconds!r}")
+                    msg = f"task {task.id} has non-positive timeout_seconds={task.timeout_seconds!r}"
+                    raise ValueError(msg)
                 result = await asyncio.wait_for(handler(task), timeout=task.timeout_seconds)
                 if result is False:
                     await queue.fail(task.id, "Handler returned False", retry=True)

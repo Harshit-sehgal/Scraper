@@ -213,7 +213,7 @@ class AcquisitionLineage(BaseModel):
         }
 
     @classmethod
-    def from_redirect_info(
+    def from_redirect_info(  # noqa: PLR0913
         cls,
         redirect_info: dict,
         original_url: str,

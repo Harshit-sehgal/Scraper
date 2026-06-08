@@ -195,7 +195,7 @@ def test_validate_internal_tlds() -> None:
     try:
         validate_public_http_url("http://example.com")
     except ValueError as e:
-        assert "internal TLD" not in str(e)
+        assert "internal TLD" not in str(e)  # noqa: PT017
 
 
 def test_validate_credentials_in_url() -> None:
@@ -306,7 +306,7 @@ def test_validate_redirect_to_private_ranges(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_fetch_redirect_to_private_ip(monkeypatch) -> None:
     class MockResponse:
-        def __init__(self, url, status_code, headers, is_redirect=False) -> None:
+        def __init__(self, url, status_code, headers, is_redirect=False) -> None:  # noqa: FBT002
             self.url = httpx.URL(url)
             self.status_code = status_code
             self.headers = headers
@@ -337,7 +337,7 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch) -> None:
     """Redirect to 169.254.169.254 (cloud metadata) is caught."""
 
     class MockResponse:
-        def __init__(self, url, status_code, headers, is_redirect=False) -> None:
+        def __init__(self, url, status_code, headers, is_redirect=False) -> None:  # noqa: FBT002
             self.url = httpx.URL(url)
             self.status_code = status_code
             self.headers = headers

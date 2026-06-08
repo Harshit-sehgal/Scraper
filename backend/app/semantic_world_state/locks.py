@@ -1,6 +1,6 @@
 # mypy: ignore-errors
 import threading
-from typing import Any
+from typing import Any, Self
 
 _LOCK_ACQUIRE_FAILED = "Failed to acquire NonBlockingRLock within timeout"
 
@@ -16,7 +16,7 @@ class NonBlockingRLock:
     def __init__(self) -> None:
         self._lock = threading.RLock()
 
-    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:  # noqa: FBT001, FBT002
         if blocking and timeout < 0:
             import asyncio
 
@@ -34,10 +34,10 @@ class NonBlockingRLock:
     def release(self) -> None:
         self._lock.release()
 
-    def __enter__(self) -> "NonBlockingRLock":
+    def __enter__(self) -> Self:
         if not self.acquire():
             raise RuntimeError(_LOCK_ACQUIRE_FAILED)
         return self
 
-    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
+    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:  # noqa: PYI036
         self.release()

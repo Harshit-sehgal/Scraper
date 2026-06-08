@@ -18,7 +18,7 @@ import pytest
 from app.models import FieldType, Job, JobStatus, SchemaField
 from app.zero_result_classifier import classify_zero_result
 
-FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures/pages")
+FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures/pages")  # noqa: PTH118, PTH120
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -65,23 +65,23 @@ class TestBrowserStateEvidenceCapture:
     """Verify scraper captures and correctly processes browser state."""
 
     def test_fixture_html_is_valid_page(self) -> None:
-        path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
-        assert os.path.exists(path), f"Fixture missing: {path}"
-        with open(path) as f:
+        path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")  # noqa: PTH118
+        assert os.path.exists(path), f"Fixture missing: {path}"  # noqa: PTH110
+        with open(path) as f:  # noqa: PTH123
             html = f.read()
         assert len(html) > 1000
         assert "<html" in html.lower()
 
     def test_fixture_has_recognizable_html_structure(self) -> None:
-        path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
-        with open(path) as f:
+        path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")  # noqa: PTH118
+        with open(path) as f:  # noqa: PTH123
             html = f.read()
         has_structure = any(tag in html.lower() for tag in ("<div", "<span", "<table", "<li", "<article"))
         assert has_structure, "Fixture has no recognizable HTML structure"
 
     def test_page_evidence_collector_finds_containers(self) -> None:
-        path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
-        with open(path) as f:
+        path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")  # noqa: PTH118
+        with open(path) as f:  # noqa: PTH123
             html = f.read()
         from app.page_evidence_collector import collect_page_evidence
 
@@ -390,7 +390,7 @@ class TestFakeDynamicSessionBoundWebsite:
         payload = json.loads(FAKE_NETWORK_JSON)
         extracted = []
         for item in payload["results"]:
-            extracted.append(
+            extracted.append(  # noqa: PERF401
                 {
                     "requested_field": "airline",
                     "mapped_from": item.get("carrier", ""),
@@ -457,7 +457,7 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args) -> None:
+    def log_message(self, format, *args) -> None:  # noqa: A002
         pass  # silence server logs during tests
 
 
@@ -550,7 +550,7 @@ class TestLocalSessionBoundServer:
         data = json.loads(urllib.request.urlopen(url).read())  # nosec B310 - HTTP URL to local test server, not file:// scheme
         extracted = []
         for item in data["results"]:
-            extracted.append(
+            extracted.append(  # noqa: PERF401
                 {
                     "requested_field": "airline",
                     "mapped_from": item["carrier"],

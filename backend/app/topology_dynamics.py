@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 # ─── Meso Clusters ──────────────────────────────────────────────────────
 
 
-def compute_meso_clusters(state: TopologyState) -> None:
+def compute_meso_clusters(state: TopologyState) -> None:  # noqa: C901, PLR0915
     """Compute meso-scale clusters from current field regions.
 
     Meso clusters group regions that share competing roles, forming
@@ -131,7 +131,7 @@ def compute_meso_clusters(state: TopologyState) -> None:
 # ─── Macro Continents ───────────────────────────────────────────────────
 
 
-def compute_macro_continents(state: TopologyState) -> None:
+def compute_macro_continents(state: TopologyState) -> None:  # noqa: PLR0915
     """Compute macro-scale semantic continents from meso clusters.
 
     Macro continents group related meso clusters into the largest scale of
@@ -281,7 +281,7 @@ def compute_macro_from_meso(state: TopologyState) -> dict:
 # ─── Multi-Scale Evolution ──────────────────────────────────────────────
 
 
-def evolve_meso_clusters(state: TopologyState) -> int:
+def evolve_meso_clusters(state: TopologyState) -> int:  # noqa: C901, PLR0912
     """Evolve meso clusters — apply cluster-level feedback to constituent regions."""
     clusters = state._get_struct("meso_clusters")
     if not clusters:

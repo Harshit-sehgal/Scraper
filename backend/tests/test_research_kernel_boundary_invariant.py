@@ -26,9 +26,9 @@ import sys
 # that pytest collection does not depend on the script being importable
 # (it is, but explicit is better than implicit).
 
-_REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-_SCRIPTS = os.path.join(_REPO_ROOT, "scripts")
-_APP_DIR = os.path.join(_REPO_ROOT, "backend", "app")
+_REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))  # noqa: PTH118, PTH120
+_SCRIPTS = os.path.join(_REPO_ROOT, "scripts")  # noqa: PTH118
+_APP_DIR = os.path.join(_REPO_ROOT, "backend", "app")  # noqa: PTH118
 
 
 # ─── Registry contract ─────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ def test_well_known_research_modules_are_classified() -> None:
     assert not missing, f"Expected research modules missing from registry: {missing}. Add them to app/research/__init__.py."
 
 
-def test_well_known_kernel_modules_are_NOT_classified() -> None:
+def test_well_known_kernel_modules_are_NOT_classified() -> None:  # noqa: N802
     """A sample of unambiguously product-kernel modules must NOT be research."""
     from app.research import is_research_module
 
@@ -167,12 +167,12 @@ def test_scanner_skips_research_modules_themselves() -> None:
     # scanner must skip every file under it. The registry also includes
     # the basenames 'topology_state', 'semantic_segmentation', etc.
     for path in (
-        os.path.join(_APP_DIR, "semantic_world_state", "core.py"),
-        os.path.join(_APP_DIR, "semantic_segmentation.py"),
-        os.path.join(_APP_DIR, "topology_state.py"),
-        os.path.join(_APP_DIR, "chaos_simulator.py"),
+        os.path.join(_APP_DIR, "semantic_world_state", "core.py"),  # noqa: PTH118
+        os.path.join(_APP_DIR, "semantic_segmentation.py"),  # noqa: PTH118
+        os.path.join(_APP_DIR, "topology_state.py"),  # noqa: PTH118
+        os.path.join(_APP_DIR, "chaos_simulator.py"),  # noqa: PTH118
     ):
-        assert os.path.exists(path), f"Fixture file does not exist: {path}"
+        assert os.path.exists(path), f"Fixture file does not exist: {path}"  # noqa: PTH110
         # Each of these is a research file and must not be flagged.
         if scanner._is_research_file(path):
             continue
@@ -186,8 +186,8 @@ def test_scanner_skips_research_modules_themselves() -> None:
 def test_scanner_allow_list_includes_registry() -> None:
     """The registry module itself is on the allow-list and is never flagged."""
     scanner = _scanner()
-    registry_path = os.path.join(_APP_DIR, "research", "__init__.py")
-    rel = os.path.relpath(registry_path, start=os.path.dirname(_SCRIPTS))
+    registry_path = os.path.join(_APP_DIR, "research", "__init__.py")  # noqa: PTH118
+    rel = os.path.relpath(registry_path, start=os.path.dirname(_SCRIPTS))  # noqa: PTH120
     assert rel.replace("\\", "/") in scanner.ALLOWED_BOUNDARY_FILES
     # And the scanner does not flag it.
     assert not scanner._top_level_research_imports(registry_path)
@@ -203,8 +203,8 @@ def test_scanner_detects_synthetic_violation() -> None:
 
     scanner = _scanner()
     with tempfile.TemporaryDirectory() as tmp:
-        fake_kernel = os.path.join(tmp, "fake_kernel.py")
-        with open(fake_kernel, "w", encoding="utf-8") as f:
+        fake_kernel = os.path.join(tmp, "fake_kernel.py")  # noqa: PTH118
+        with open(fake_kernel, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write("from app.semantic_world_state import get_world_state\nfrom app.scraper import scrape_url\n")
         # Patch the scanner to scan the temp directory instead of app/.
         # We do this by re-implementing the scan with a swapped root.
@@ -213,7 +213,7 @@ def test_scanner_detects_synthetic_violation() -> None:
             for fn in fns:
                 if not fn.endswith(".py"):
                     continue
-                fp = os.path.join(dp, fn)
+                fp = os.path.join(dp, fn)  # noqa: PTH118
                 if scanner._is_research_file(fp):
                     continue
                 for lineno, mod, names in scanner._top_level_research_imports(fp):
@@ -239,8 +239,8 @@ def test_scanner_handles_unparseable_file_gracefully() -> None:
 
     scanner = _scanner()
     with tempfile.TemporaryDirectory() as tmp:
-        broken = os.path.join(tmp, "broken.py")
-        with open(broken, "w", encoding="utf-8") as f:
+        broken = os.path.join(tmp, "broken.py")  # noqa: PTH118
+        with open(broken, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write("def x(:\n    pass\n")
         # Should not raise.
         result = scanner._top_level_research_imports(broken)
@@ -253,8 +253,8 @@ def test_scanner_ignores_type_checking_imports() -> None:
 
     scanner = _scanner()
     with tempfile.TemporaryDirectory() as tmp:
-        kernel_file = os.path.join(tmp, "kernel.py")
-        with open(kernel_file, "w", encoding="utf-8") as f:
+        kernel_file = os.path.join(tmp, "kernel.py")  # noqa: PTH118
+        with open(kernel_file, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write(
                 "from __future__ import annotations\n"
                 "from typing import TYPE_CHECKING\n"
@@ -262,7 +262,7 @@ def test_scanner_ignores_type_checking_imports() -> None:
                 "if TYPE_CHECKING:\n"
                 "    from app.semantic_world_state import get_world_state\n"
                 "\n"
-                "x: 'get_world_state | None' = None\n"
+                "x: 'get_world_state | None' = None\n",
             )
         violations = scanner._top_level_research_imports(kernel_file)
         assert violations == [], f"TYPE_CHECKING import was incorrectly flagged: {violations}"

@@ -59,12 +59,12 @@ class DiscoveryDependencyError(RuntimeError):
 def get_ddgs_class():
     """Resolve the preferred DuckDuckGo search client lazily."""
     try:
-        from ddgs import DDGS as _PreferredDDGS
+        from ddgs import DDGS as _PreferredDDGS  # noqa: N811
 
         return _PreferredDDGS
     except ImportError:
         try:
-            from duckduckgo_search import DDGS as _FallbackDDGS
+            from duckduckgo_search import DDGS as _FallbackDDGS  # noqa: N811
 
             return _FallbackDDGS
         except ImportError as exc:
@@ -165,7 +165,7 @@ def _has_query_signal(query: str, blob: str) -> bool:
     return hits >= required
 
 
-def _build_search_query(
+def _build_search_query(  # noqa: PLR0913
     query: str,
     location: str,
     domain: str,
@@ -254,7 +254,7 @@ def _score_result(item: dict, query: str, location: str, data_fields: list[str],
     return round(score, 3)
 
 
-async def discover_urls(
+async def discover_urls(  # noqa: C901, PLR0912, PLR0913, PLR0915
     query: str,
     domain: str = "",
     num_results: int = 10,

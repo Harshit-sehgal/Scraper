@@ -32,7 +32,7 @@ FORBIDDEN_PATTERNS = [
 
 def _is_comment_line(stripped: str) -> bool:
     s = stripped.lstrip()
-    return s.startswith("//") or s.startswith("/*") or s.startswith("*")
+    return s.startswith(("//", "/*", "*"))
 
 
 def test_no_session_storage_for_api_key() -> None:
@@ -48,7 +48,7 @@ def test_no_session_storage_for_api_key() -> None:
                     continue
                 for needle in FORBIDDEN_PATTERNS:
                     if needle in raw:
-                        offenders.append(f"{js_file.relative_to(REPO_ROOT)}:{lineno}: {stripped}")
+                        offenders.append(f"{js_file.relative_to(REPO_ROOT)}:{lineno}: {stripped}")  # noqa: PERF401
     assert not offenders, (
         "Frontend JS must not persist the API key in Web Storage. "
         "Use in-memory state or a backend-issued HTTP-only cookie. "

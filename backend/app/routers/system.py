@@ -211,7 +211,7 @@ def _compute_job_counts() -> dict:
 
 
 @router.get("/api/system/diagnostics/export")
-async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):  # noqa: B008, RUF100
+async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):  # noqa: B008, C901, PLR0912, PLR0915, RUF100
     """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
     # Regular expressions for PII sanitization
     email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -460,7 +460,7 @@ async def analyze_url(
             },
         )
 
-    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
+    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT  # noqa: N806
 
     try:
         result = await asyncio.wait_for(
@@ -532,7 +532,7 @@ def _basic_metric_line(name: str, value: float, labels: dict[str, str] | None = 
     return f"{name}{_prometheus_label_text(labels or {})} {value}"
 
 
-def _render_basic_metrics_text() -> str:
+def _render_basic_metrics_text() -> str:  # noqa: C901, PLR0912, PLR0915
     """Render a minimal Prometheus exposition if prometheus_client is unavailable."""
     from app.metrics_collector import (
         get_anti_bot_classifications,
@@ -560,10 +560,9 @@ def _render_basic_metrics_text() -> str:
         for job in jobs_store.values():
             status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
             counts[status_key] = counts.get(status_key, 0) + 1
+        lines.append(_basic_metric_line("dataforge_recycle_bin_total", len(recycle_bin_store)))
     for status, count in counts.items():
         lines.append(_basic_metric_line("dataforge_jobs_total", count, {"status": status}))
-
-    lines.append(_basic_metric_line("dataforge_recycle_bin_total", len(recycle_bin_store)))
 
     backend_ok = 1
     try:
@@ -602,8 +601,10 @@ def _render_basic_metrics_text() -> str:
             alive = 1 if wh.get("alive") else 0
             lines.append(
                 _basic_metric_line(
-                    "dataforge_worker_heartbeat_alive", alive, {"worker_id": wid, "hostname": hostname, "pid": pid}
-                )
+                    "dataforge_worker_heartbeat_alive",
+                    alive,
+                    {"worker_id": wid, "hostname": hostname, "pid": pid},
+                ),
             )
             last_hb = wh.get("last_heartbeat")
             if last_hb:
@@ -620,7 +621,7 @@ def _render_basic_metrics_text() -> str:
                     "dataforge_worker_heartbeat_age_seconds",
                     age,
                     {"worker_id": wid, "hostname": hostname, "pid": pid},
-                )
+                ),
             )
     except (AttributeError, ImportError, RuntimeError):
         logger.debug("Metrics fallback: worker heartbeat collection failed")
@@ -696,7 +697,7 @@ def _render_basic_metrics_text() -> str:
 
 
 @router.get("/metrics")
-async def metrics(request: Request):
+async def metrics(request: Request):  # noqa: C901, PLR0912, PLR0915
     """Prometheus-formatted metrics endpoint for DataForge scraper."""
     # Auth check
     if not settings.METRICS_TOKEN:

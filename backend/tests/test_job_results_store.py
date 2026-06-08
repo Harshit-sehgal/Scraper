@@ -94,13 +94,13 @@ class TestSaveJobResultsToDisk:
         """When gzip write fails, the temp file should be cleaned up."""
 
         class FailingWriter:
-            def __enter__(self_):
+            def __enter__(self_):  # noqa: N805
                 return self_
 
-            def __exit__(self_, *args):
+            def __exit__(self_, *args):  # noqa: N805
                 pass
 
-            def write(self_, _data) -> Never:
+            def write(self_, _data) -> Never:  # noqa: N805
                 msg = "Disk full"
                 raise OSError(msg)
 
@@ -199,7 +199,7 @@ class TestLoadJobResultsFromDiskSafe:
         with gzip.open(path, "wb") as f:
             f.write(b'{"valid": 1}\n')
         # Append non-gzip bytes after the valid gzip stream
-        with open(path, "ab") as f:
+        with open(path, "ab") as f:  # noqa: PTH123
             f.write(b"NOT GZIP DATA")
 
         records, warning = load_job_results_from_disk_safe("corrupt_gzip")

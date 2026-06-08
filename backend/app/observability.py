@@ -116,7 +116,8 @@ class ObservabilityState:
             self._activity_heatmap = self._staging["activity_heatmap"]
             self._drift_log = self._staging["drift_log"]
             self._telemetry_stream = deque(
-                self._staging.get("telemetry_stream", self._telemetry_stream), maxlen=settings.TELEMETRY_STREAM_MAXLEN
+                self._staging.get("telemetry_stream", self._telemetry_stream),
+                maxlen=settings.TELEMETRY_STREAM_MAXLEN,
             )
             self._staging = None
 
@@ -157,7 +158,7 @@ class ObservabilityState:
 
         self._record("emit_telemetry", {"type": event_type, "details": details, "trace_id": trace_id})
 
-    def record_degradation(
+    def record_degradation(  # noqa: PLR0913
         self,
         subsystem: str,
         severity: str,
@@ -390,7 +391,7 @@ class ObservabilityState:
         # (Threshold 8.0 prevents baseline thrashing at default 5.0)
         return e_stable and s_stable and recent_e[0] > 8.0 and recent_s[0] < 0.2
 
-    def compress_causal_history(self, threshold_age_sec: float = 3600) -> None:
+    def compress_causal_history(self, threshold_age_sec: float = 3600) -> None:  # noqa: C901
         """Compress old telemetry events into causal summaries (Phase 48).
 
         Prevents causal graph explosion while maintaining long-term traceability.
@@ -480,7 +481,7 @@ class ObservabilityState:
         peaks = []
         for i in range(1, len(values) - 1):
             if values[i] > values[i - 1] and values[i] > values[i + 1]:
-                peaks.append(i)
+                peaks.append(i)  # noqa: PERF401
         if len(peaks) < 2:
             return 0
         return (peaks[-1] - peaks[0]) // (len(peaks) - 1)
@@ -561,7 +562,7 @@ class ObservabilityState:
         all_drifts = []
         for role_drifts in snapshot.drift_log_data.values():
             if role_drifts:
-                all_drifts.append(role_drifts[-1])
+                all_drifts.append(role_drifts[-1])  # noqa: PERF401
         if all_drifts:
             mean_drift = sum(all_drifts) / len(all_drifts)
         # Penalty for high velocity

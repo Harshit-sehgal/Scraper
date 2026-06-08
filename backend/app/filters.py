@@ -77,7 +77,7 @@ def calculate_distance(point1: tuple[float, float], point2: tuple[float, float],
 # ──────────────────────────────────────────────
 
 
-def coerce_value(value: Any, field_type: FieldType):
+def coerce_value(value: Any, field_type: FieldType):  # noqa: C901, PLR0911, PLR0912
     """Coerce a raw value to its declared type.
     e.g., "18 years old" → 18 (integer), "true" → True (boolean).
     """
@@ -188,7 +188,7 @@ def _is_entity_name_field(field_name: str) -> bool:
     return any(token in low for token in ["company", "name", "studio", "firm", "agency"])
 
 
-def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> tuple[dict, list[str]]:
+def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> tuple[dict, list[str]]:  # noqa: C901, PLR0912
     """Apply strict per-field semantic cleanup and record mismatch flags."""
     cleaned = dict(record)
     mismatches: list[str] = []
@@ -262,7 +262,7 @@ def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 
     """Execute a compiled regex search with a timeout to prevent ReDoS."""
     import signal
 
-    def _alarm_handler(signum, frame):  # noqa: ARG001
+    def _alarm_handler(_signum, _frame):
         raise TimeoutError
 
     old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
@@ -276,7 +276,7 @@ def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 
         signal.signal(signal.SIGALRM, old_handler)
 
 
-async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, RUF100
+async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, C901, PLR0911, PLR0912, RUF100
     """Check if a single record passes a filter rule.
     Returns True if the record should be KEPT.
     """
@@ -384,7 +384,7 @@ def _infer_location_field_names(
 
     for field in schema_fields:
         if field.field_type == FieldType.LOCATION:
-            candidates.append(field.name)
+            candidates.append(field.name)  # noqa: PERF401
 
     for field in schema_fields:
         name_l = field.name.lower()
@@ -505,7 +505,7 @@ async def process_results(
         for record in coerced:
             results = []
             for rule in filters:
-                results.append(await apply_filter(record, rule, schema_fields))
+                results.append(await apply_filter(record, rule, schema_fields))  # noqa: PERF401
             if all(results):
                 filtered.append(record)
     else:

@@ -36,5 +36,16 @@ class TelegramNotifier:
         except Exception:
             logger.exception("Failed to send Telegram notification")
 
+    async def close(self) -> None:
+        """Close the underlying HTTP client to release sockets."""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
 
 notifier = TelegramNotifier()
+
+
+def get_telegram_notifier() -> TelegramNotifier:
+    """Return the module-level singleton notifier."""
+    return notifier

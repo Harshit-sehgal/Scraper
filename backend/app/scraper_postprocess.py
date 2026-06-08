@@ -73,7 +73,7 @@ def _build_acquisition_lineage_from_result(
     }
 
 
-async def run_post_extraction_processing(
+async def run_post_extraction_processing(  # noqa: PLR0913
     url: str,
     html: str,
     schema_fields: list[SchemaField],
@@ -183,7 +183,7 @@ async def run_post_extraction_processing(
         confidence_map=confidence_map,
         failure_category=classification.category.value if classification else None,
         extraction_method=ext_result.method,
-        motifs_generated=new_motifs if new_motifs else 0,
+        motifs_generated=new_motifs or 0,
         motifs_used=solidified_motifs_count,
     )
 

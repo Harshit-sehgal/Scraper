@@ -74,7 +74,7 @@ class QueueTask:
         "type",
     )
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         task_type: str,
         payload: dict | None = None,
@@ -354,7 +354,7 @@ class WorkerQueue:
         finally:
             conn.close()
 
-    async def enqueue(
+    async def enqueue(  # noqa: PLR0913
         self,
         task_type: str,
         payload: dict | None = None,
@@ -479,11 +479,11 @@ class WorkerQueue:
         async with self._in_flight_lock:
             await asyncio.to_thread(self._complete_sync, task_id, result)
 
-    def _fail_sync(
+    def _fail_sync(  # noqa: PLR0913
         self,
         task_id: str,
         error: str,
-        retry: bool,
+        retry: bool,  # noqa: FBT001
         retry_after: float | None,
         task_type: str | None,
         now: str,
@@ -509,7 +509,7 @@ class WorkerQueue:
                         backoff = float(min(2 ** (attempts - 1) * 30, 3600))
 
                     retry_at = (datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=backoff)).strftime(
-                        _TIMESTAMP_FORMAT
+                        _TIMESTAMP_FORMAT,
                     )
                     conn.execute(
                         "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
@@ -582,7 +582,7 @@ class WorkerQueue:
         self,
         task_id: str,
         error: str,
-        retry: bool = True,
+        retry: bool = True,  # noqa: FBT001, FBT002
         retry_after: float | None = None,
         task_type: str | None = None,
     ) -> None:
@@ -727,7 +727,7 @@ class WorkerQueue:
             finally:
                 conn.close()
 
-    async def stop(self, drain: bool = True) -> None:
+    async def stop(self, drain: bool = True) -> None:  # noqa: FBT001, FBT002
         """Stop the worker loop. Optionally drain in-flight tasks."""
         self._running = False
         if self._worker_task:
@@ -743,7 +743,7 @@ class WorkerQueue:
 
         logger.info("Worker queue stopped (drained=%s)", drain)
 
-    async def _worker_loop(self) -> None:
+    async def _worker_loop(self) -> None:  # noqa: C901
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:

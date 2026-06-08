@@ -30,7 +30,6 @@ def _driver_selection() -> str:
 def _clean_env(monkeypatch: pytest.MonkeyPatch):
     """Reset DATAFORGE_PG_DRIVER and the queue instance for each test."""
     monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)
-    yield
 
 
 def test_factory_default_driver_is_psycopg2() -> None:

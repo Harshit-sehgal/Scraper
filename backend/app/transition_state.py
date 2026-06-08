@@ -114,7 +114,7 @@ class TransitionState:
         current = self.get_prob(type_a, type_b)
         self.set_prob(type_a, type_b, current + delta)
 
-    def observe(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:
+    def observe(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:  # noqa: FBT001
         """Observe whether a transition was a role boundary or entity continuation."""
         delta = 0.05 if is_role_boundary else -0.05
         self.adjust_prob(type_a, type_b, delta)

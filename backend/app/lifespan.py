@@ -49,7 +49,7 @@ def reset_lifespan_state() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # noqa: ARG001, RUF100
+async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF100
     """Lifespan event handler for FastAPI startup / shutdown.
 
     Handles all initialization: recovery framework, domain health,
@@ -205,6 +205,17 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, RUF100
     except Exception as e:
         logger.warning("Failed to close browser pool during shutdown: %s", e)
 
+    # Close Telegram notifier HTTP client to prevent leaked sockets
+    try:
+        from app.services.notifications import get_telegram_notifier
+
+        _notifier = get_telegram_notifier()
+        if _notifier is not None:
+            await _notifier.close()
+            logger.info("Telegram notifier closed successfully")
+    except Exception as e:
+        logger.warning("Failed to close Telegram notifier during shutdown: %s", e)
+
 
 def schedule_background_task(coro):
     """Schedule a background task with error handling."""
@@ -222,7 +233,7 @@ def schedule_background_task(coro):
     return task
 
 
-def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
+def persist_single_wrapper(job_id: str, critical: bool = False) -> None:  # noqa: FBT001, FBT002
     """Persist a single job to the configured backend."""
     job = jobs_store.get(job_id)
     if job:

@@ -17,7 +17,7 @@ from app.trend_analyzer import DomainTrend
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _make_domain_trend(
+def _make_domain_trend(  # noqa: PLR0913
     domain: str = "example.com",
     health_score: float = 80.0,
     sample_count: int = 30,
@@ -27,7 +27,7 @@ def _make_domain_trend(
     quality_trend: str = "stable",
     fetch_latency_trend: str = "stable",
     anti_bot_trend: str = "stable",
-    selector_decay_accelerating: bool = False,
+    selector_decay_accelerating: bool = False,  # noqa: FBT001, FBT002
     top_failure_categories: list | None = None,
 ) -> DomainTrend:
     """Build a DomainTrend object for testing."""
@@ -46,14 +46,14 @@ def _make_domain_trend(
     )
 
 
-def _make_telemetry_event(
+def _make_telemetry_event(  # noqa: PLR0913
     url: str = "https://example.com/page",
-    success: bool = True,
+    success: bool = True,  # noqa: FBT001, FBT002
     latency_ms: float = 2000,
     quality_score: float = 0.8,
     anti_bot_score: float = 0.0,
     estimated_cost_usd: float = 0.01,
-    fallback_triggered: bool = False,
+    fallback_triggered: bool = False,  # noqa: FBT001, FBT002
     fetch_method: str = "playwright",
     failure_category: str | None = None,
 ) -> dict:
@@ -504,7 +504,7 @@ class TestDegradationPredictorIntegration:
         events = []
         # 8 healthy events
         for i in range(8):
-            events.append(
+            events.append(  # noqa: PERF401
                 _make_telemetry_event(
                     url="https://healthy.com/page",
                     success=True,
@@ -514,7 +514,7 @@ class TestDegradationPredictorIntegration:
             )
         # 12 degrading events
         for i in range(12):
-            events.append(
+            events.append(  # noqa: PERF401
                 _make_telemetry_event(
                     url="https://degrading.com/page",
                     success=(i < 6),

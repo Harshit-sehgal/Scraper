@@ -14,7 +14,7 @@ def _clean_cache_db_files(db_path: str) -> None:
     for suffix in ["", "-wal", "-shm", "-journal"]:
         path = db_path + suffix
         with contextlib.suppress(FileNotFoundError):
-            os.remove(path)
+            os.remove(path)  # noqa: PTH107
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +29,7 @@ def clean_cache_env(tmp_path):
 
 def test_geocode_cache_initialization(clean_cache_env) -> None:
     GeocodeCache(db_path=clean_cache_env)
-    assert os.path.exists(clean_cache_env)
+    assert os.path.exists(clean_cache_env)  # noqa: PTH110
 
 
 def test_geocode_cache_set_and_get(clean_cache_env) -> None:

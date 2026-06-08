@@ -52,7 +52,7 @@ def reset_role_engine() -> None:
 # Imported here for backward compatibility and local usage.
 
 
-class _SemanticMetricsProtocol(Protocol):
+class _SemanticMetricsProtocol(Protocol):  # noqa: PYI046
     """Typed interface for the metrics-like object accessed via ws.metrics.
 
     Replaces unchecked 'Any' with an explicit protocol so mypy can validate
@@ -133,7 +133,7 @@ def _name_similarity(a: str, b: str) -> float:
     return lcs / max(m, n)
 
 
-def seed_role_engine(schema_fields: list) -> None:
+def seed_role_engine(schema_fields: list) -> None:  # noqa: C901, PLR0912
     """Seed the RoleEmbeddingEngine manifold with initial priors and Manifold Transfer."""
     reng = _get_role_engine()
     ws = reng.ws
@@ -224,7 +224,7 @@ def warm_start_from_values(records: list, schema_fields: list) -> None:
             ws.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
 
-def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
+def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abstraction_gradient: float = 0.0) -> AllocationGraph:  # noqa: C901, PLR0912, PLR0915
     """Build an allocation graph from a record and desired schema roles with Hierarchical Synthesis (Phase 38)."""
     graph = AllocationGraph()
     from app.semantic_world_state import get_world_state
@@ -344,7 +344,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abst
         # tokens
         for role_name, attr_val in attractor.items():
             if role_name in graph.roles:
-                for cand_val, _ in graph.candidates.items():
+                for cand_val in graph.candidates:
                     if cand_val == attr_val:
                         # Direct match found in crystalline unit; boost
                         # compatibility
@@ -457,7 +457,7 @@ def _compute_compatibility(token: SemanticToken, role_name: str, role: SemanticR
     return max(0.0, min(1.0, learned_compat))  # type: ignore[no-any-return]
 
 
-def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
+def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:  # noqa: C901, PLR0912
     """Optimize semantic role assignment globally."""
     assigned_candidates: set[str] = set()
     filled_roles: set[str] = set()
@@ -548,10 +548,10 @@ def _compute_allocation_coherence(graph: AllocationGraph) -> float:
     return min(coherence, 1.0)
 
 
-def allocate_semantic_roles(
+def allocate_semantic_roles(  # noqa: C901
     record: SemanticRecord,
     schema_fields: list[str],
-    learn: bool = True,
+    learn: bool = True,  # noqa: FBT001, FBT002
     abstraction_gradient: float = 0.0,
 ) -> tuple[SemanticRecord, AllocationGraph]:
     """Full semantic allocation for a record with Hierarchical support."""
@@ -663,7 +663,7 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     return {"roles": {r: g.roles[r].filled_by for r in g.roles}, "coherence": coh}
 
 
-def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGraph) -> dict:
+def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGraph) -> dict:  # noqa: C901
     """Explain why a role was assigned to a candidate using topological evidence."""
     if role_name not in graph.roles:
         return {"error": f"Role {role_name} not found in graph"}

@@ -113,7 +113,7 @@ def load_env_file(path: Path) -> dict[str, str]:
 def load_effective_env(path: Path) -> dict[str, str]:
     """Load env-file values and overlay process environment variables."""
     env = load_env_file(path)
-    env.update({key: value for key, value in os.environ.items() if key.startswith("DATAFORGE_") or key.startswith("GRAFANA_")})
+    env.update({key: value for key, value in os.environ.items() if key.startswith(("DATAFORGE_", "GRAFANA_"))})
     return env
 
 
@@ -254,7 +254,7 @@ def check_pg_driver(value: str) -> bool:
             f"  [FAIL]  DATAFORGE_PG_DRIVER={value!r}. Production requires 'psycopg3' "
             "because the production image only ships the psycopg3 driver. "
             "Set DATAFORGE_PG_DRIVER=psycopg3 in .env.production.example "
-            "and in both the dataforge and worker services of docker-compose.prod.yml."
+            "and in both the dataforge and worker services of docker-compose.prod.yml.",
         )
         return False
     return True

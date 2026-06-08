@@ -1,5 +1,5 @@
 # mypy: ignore-errors
-# type: ignore
+# type: ignore  # noqa: PGH003
 import logging
 from typing import Any
 

@@ -93,7 +93,7 @@ _NUMERIC_PATTERN = re.compile(r"^\d+\.?\d*$")
 
 
 @lru_cache(maxsize=4096)
-def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType, float]:
+def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType, float]:  # noqa: C901, PLR0911, PLR0912
     """Detect semantic type of a value using regex patterns and field name hints.
 
     Results are cached with LRU (max 4096 entries) to avoid re-processing
@@ -127,7 +127,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType
     # 4. Organization / Entity context
     v_str = str(value).strip()
     v_lower = v_str.lower()
-    _UI_NOISE = {
+    _UI_NOISE = {  # noqa: N806
         "view",
         "more",
         "skip",
@@ -186,7 +186,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType
     return SemanticType.TEXT, 0.50
 
 
-def is_child_fragment(value: str, seen_values: set) -> bool:
+def is_child_fragment(value: str, seen_values: set) -> bool:  # noqa: C901
     """Check if a value is a child fragment of an already-seen larger value.
 
     Prevents over-segmentation by suppressing tokens that are physically contained
@@ -314,7 +314,7 @@ def _map_single_record(
     mapped_values = {m.mapped_value for m in field_mappings}
     for value in all_values:
         if value and value not in mapped_values and not _is_noise_value(value):
-            unmatched_values.append(value)
+            unmatched_values.append(value)  # noqa: PERF401
 
     return RecordMapping(
         original_data=record,
@@ -324,7 +324,7 @@ def _map_single_record(
     )
 
 
-def _find_best_value_for_need(
+def _find_best_value_for_need(  # noqa: C901, PLR0912
     values: list[str],
     semantic_need: str,
     headers: list[str],
@@ -435,7 +435,7 @@ def _find_best_value_for_need(
     return None
 
 
-def _detect_value_type(values: list[str], value_patterns: ValuePatterns) -> str | None:
+def _detect_value_type(values: list[str], value_patterns: ValuePatterns) -> str | None:  # noqa: C901
     """Detect what type most values in the list are."""
     if not values:
         return None

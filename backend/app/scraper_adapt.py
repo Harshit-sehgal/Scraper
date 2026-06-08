@@ -162,7 +162,7 @@ def _run_self_tuning_extraction(
         logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
 
-def run_all_adaptive_hooks(
+def run_all_adaptive_hooks(  # noqa: PLR0913
     url: str,  # noqa: ARG001, RUF100
     html: str,  # noqa: ARG001, RUF100
     domain: str,

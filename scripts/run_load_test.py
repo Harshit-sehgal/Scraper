@@ -28,7 +28,7 @@ async def send_request(client: httpx.AsyncClient, url: str) -> float:
     return elapsed if status == 200 else -1.0
 
 
-async def worker(url: str, num_requests: int, queue: asyncio.Queue, results: list):  # noqa: ARG001
+async def worker(url: str, num_requests: int, queue: asyncio.Queue, results: list):
     async with httpx.AsyncClient() as client:
         while True:
             try:

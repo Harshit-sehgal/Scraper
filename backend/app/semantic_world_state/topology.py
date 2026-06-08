@@ -1,5 +1,5 @@
 # mypy: ignore-errors
-# type: ignore
+# type: ignore  # noqa: PGH003
 import logging
 from typing import Any
 
@@ -66,7 +66,7 @@ class TopologyMixin:
             )
 
     @requires_invariants
-    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:  # noqa: ARG002, RUF100
+    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:  # noqa: ARG002, C901, FBT001, FBT002, PLR0912, PLR0915, RUF100
         """Capture pre-allocation conflict topology from tokens with Relational Recall (Phase 31)."""
         with self.transaction("pre_allocation_capture"):
             from app.failure_injector import get_injector
@@ -290,7 +290,7 @@ class TopologyMixin:
         self.emit_telemetry("governance_pulse", report)
 
     @requires_invariants
-    def evolve_macro_state(self) -> None:
+    def evolve_macro_state(self) -> None:  # noqa: C901, PLR0912, PLR0915
         with self.transaction("macro_evolution"):
             macro = self.compute_macro_from_meso()
             macro_pressure = 0.0
@@ -436,7 +436,7 @@ class TopologyMixin:
                 else:
                     self._topology.set_topological_law(key, law_val * 0.5)
 
-    def _re_seed_unstable_roles(self) -> None:
+    def _re_seed_unstable_roles(self) -> None:  # noqa: C901
         communities = self.global_communities
         if not communities:
             for (ra, rb), cohesion in self.neighborhood_cohesion.items():
@@ -543,7 +543,7 @@ class TopologyMixin:
 
         meso = []
         for cluster in view.get_meso_clusters():
-            meso.append(
+            meso.append(  # noqa: PERF401
                 {
                     "cluster_id": cluster.get("cluster_id", ""),
                     "size": cluster["size"],
@@ -573,7 +573,7 @@ class TopologyMixin:
         }
 
         for continent in macro_continents:
-            continents_list.append(
+            continents_list.append(  # noqa: PERF401
                 {
                     "continent_id": continent.get("continent_id", ""),
                     "size": continent.get("size", 0),
@@ -591,7 +591,7 @@ class TopologyMixin:
         return {"micro": micro, "meso": meso, "macro": macro}
 
     @requires_invariants
-    def observe_field_perturbation(self, output: dict, tokens: list) -> None:  # noqa: ARG002, RUF100
+    def observe_field_perturbation(self, output: dict, tokens: list) -> None:  # noqa: ARG002, C901, PLR0912, PLR0915, RUF100
         from app.instability_api import get_immune_system
 
         immune = get_immune_system(ws=self)
@@ -713,7 +713,7 @@ class TopologyMixin:
                 self._topology.append_region(new_region)
 
     @requires_invariants
-    def update_scale_coupling(self) -> int:
+    def update_scale_coupling(self) -> int:  # noqa: C901, PLR0912
         if self._topology.region_count() < 2:
             return 0
         pressure = self.metrics.field_pressure

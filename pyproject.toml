@@ -48,17 +48,45 @@ line-length = 130
 target-version = "py312"
 
 [tool.ruff.lint]
-select = [
-    "E", "F", "W", "I", "B",
-    "S", "RUF", "SIM", "TRY", "RET", "ARG", "ASYNC", "TCH",
+select = ["ALL"]
+ignore = [
+    # All docstring rules — stylistic preference for scraper codebase
+    "D",
+    # Type annotations — project uses mypy for type checking
+    "ANN",
+    # Package structure — intentional
+    "INP001",
+    # Blind except — many are intentional broad catches
+    "BLE001",
+    # Magic value comparisons — too numerous (~1700) and many are intentional
+    "PLR2004",
+    # Private member access — many are legitimate internal/test access patterns
+    "SLF001",
+    # Global statements — many are intentional module-level singletons
+    "PLW0603",
+    # Existing ignores from original config
+    "E203", "E501", "B904", "B905", "B007", "B027", "B008", "E402", "B023",
+    "TRY300", "TRY301", "TRY003", "S311", "ASYNC109", "RUF006", "TC003", "PLC0415", "UP047",
 ]
-ignore = ["E203", "E501", "B904", "B905", "B007", "B027", "B008", "E402", "B023", "TRY300", "TRY301", "TRY003", "S311", "ASYNC109", "RUF006", "TC003"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "backend/tests/*" = ["S101", "ARG001", "ARG002", "ARG005", "TRY003", "S108", "S106", "S105", "S311", "S113", "S310", "S603", "S104", "RUF059", "RUF043", "RUF012", "RUF003", "SIM117", "SIM102", "SIM118", "SIM105", "TRY300", "TRY301", "TRY002", "ASYNC240", "ASYNC230", "ASYNC109", "TC003", "TC002"]
 "backend/benchmarks/*" = ["S101", "ARG001", "ARG005", "S110", "S311"]
-"scripts/*" = ["S603"]
+"scripts/*" = [
+    "S603",
+    # CLI tools: legitimately use print() for stdout output, os.path for compat, etc.
+    "T201", "T203",
+    "PTH",  # all pathlib rules
+    "EXE001",
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",  # complexity
+    "ARG001", "ARG002", "ARG005",
+    "PERF401",
+    "FBT001", "FBT002", "FBT003",
+    "DTZ005", "DTZ006",
+    "PLW1510",
+    "PLW2901",
+]
 
 [tool.mypy]
 python_version = "3.12"

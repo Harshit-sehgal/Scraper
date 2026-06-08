@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 # ─── Content Quality Assessment ────────────────────────────────────────
 
 
-def _assess_content_quality(html: str, profile) -> dict:
+def _assess_content_quality(html: str, profile) -> dict:  # noqa: C901, PLR0912, PLR0915
     """Assess whether the fetched page contains meaningful data containers.
 
     Detects landing pages (hero banners, search forms, welcome text),
@@ -116,7 +116,7 @@ def _assess_content_quality(html: str, profile) -> dict:
         from collections import Counter as _Counter
 
         tag_class_counts: _Counter = _Counter()
-        for tag in soup.find_all(True):
+        for tag in soup.find_all(True):  # noqa: FBT003
             if tag.name in ("script", "style", "noscript", "svg", "form", "nav", "footer", "header"):
                 continue
             cls_val = tag.get("class")
@@ -190,7 +190,7 @@ def _assess_content_quality(html: str, profile) -> dict:
     }
 
 
-def _extract_container_text_values(html: str, container_selector: str) -> list[str]:
+def _extract_container_text_values(html: str, container_selector: str) -> list[str]:  # noqa: C901
     """Extract meaningful, distinct text values from the first data container.
 
     Walks the container's DOM tree collecting leaf-level text values
@@ -208,7 +208,7 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
     values = []
     seen = set()
 
-    for tag in container.find_all(True):
+    for tag in container.find_all(True):  # noqa: FBT003
         if tag.name in ("script", "style", "noscript", "svg", "form", "nav", "footer", "header"):
             continue
 
@@ -222,7 +222,7 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
         seen.add(norm)
 
         # Skip if this tag's text is entirely from a single child (not a leaf)
-        children = tag.find_all(True, recursive=False)
+        children = tag.find_all(True, recursive=False)  # noqa: FBT003
         if len(children) == 1:
             child_text = children[0].get_text(strip=True)
             if child_text and child_text == text:

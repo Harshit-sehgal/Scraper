@@ -393,7 +393,7 @@ class TestAuthAndRBAC:
         assert valid_field.name == "valid_name"
 
         # Invalid name should raise during validation
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError):  # noqa: PT011
             SchemaField(
                 name="123_invalid",  # Can't start with number
                 field_type=FieldType.STRING,

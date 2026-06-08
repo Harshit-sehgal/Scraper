@@ -38,7 +38,7 @@ def test_checkpoint_round_trip() -> None:
 
     # 2. Create checkpoint
     path = mgr.create_checkpoint(label="test_suite")
-    assert os.path.exists(path)
+    assert os.path.exists(path)  # noqa: PTH110
 
     # 3. Clear and restore
     ws.clear()
@@ -53,7 +53,7 @@ def test_checkpoint_round_trip() -> None:
     assert ws.learned_exclusions.get(("a", "b")) == 0.9
 
     # Cleanup
-    os.remove(path)
+    os.remove(path)  # noqa: PTH107
 
 
 def test_nested_transaction_causality() -> None:
@@ -91,11 +91,11 @@ def test_semantic_os_gateway() -> None:
 
     # 3. Snapshot via OS
     path = sos.save_snapshot(label="os_test")
-    assert os.path.exists(path)
+    assert os.path.exists(path)  # noqa: PTH110
 
     # 4. Restore via OS
     sos.reset_engine()
     sos.restore_snapshot(path)
     assert get_world_state().metrics.total_records_processed > 0
 
-    os.remove(path)
+    os.remove(path)  # noqa: PTH107

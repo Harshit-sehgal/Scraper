@@ -50,7 +50,13 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
 
 
 def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int) -> None:
+    # Snapshot the stores under the lock, then release before doing I/O.
+    # This avoids holding the lock during file deletes and DB writes,
+    # which would block all concurrent API reads for the entire duration.
     with _jobs_store_lock:
-        prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)
-        repo = get_job_repository()
-        repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
+        jobs_snapshot = dict(jobs_store)
+        recycle_snapshot = dict(recycle_bin_store)
+    # Now do all I/O outside the lock
+    prune_history_stores(jobs_snapshot, recycle_snapshot, max_job_history, max_recycle_bin_history)
+    repo = get_job_repository()
+    repo.save_all(jobs=jobs_snapshot, recycle_bin=recycle_snapshot)

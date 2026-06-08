@@ -62,7 +62,7 @@ class EcologyAnalyzer:
         }
 
 
-def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.4) -> None:
+def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.4) -> None:  # noqa: C901
     ws = SemanticWorldState()
     ws.clear()
     # Ensure journal capacity for long-horizon causal audits

@@ -72,7 +72,7 @@ def _load_all_profiles() -> dict[str, dict]:
 
     for fpath in sorted(profiles_dir.glob("*.json")):
         try:
-            with open(fpath) as f:
+            with open(fpath) as f:  # noqa: PTH123
                 profile = json.load(f)
             domain = profile.get("domain", "").strip().lower()
             if not domain:
@@ -157,7 +157,7 @@ def _postprocess_field(value, field_config: dict) -> str | None:
 # ── Playwright Extraction ────────────────────────────────────────────────
 
 
-async def extract_with_profile(
+async def extract_with_profile(  # noqa: C901, PLR0912, PLR0915
     url: str,
     profile: dict,
     max_wait: int | None = None,

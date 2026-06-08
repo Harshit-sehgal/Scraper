@@ -5,6 +5,7 @@ Ported from the existing app.rate_limiter with a clean interface.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -51,7 +52,7 @@ class SlidingWindowCounter:
 
 _global_limiter: SlidingWindowCounter | None = None
 _job_create_limiter: SlidingWindowCounter | None = None
-_limiter_lock = __import__("threading").Lock()
+_limiter_lock = threading.Lock()
 
 
 def _parse_rate_limit(rate_str: str) -> tuple[int, float]:

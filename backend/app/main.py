@@ -54,7 +54,6 @@ _persist_state_wrapper = persist_state_wrapper
 _run_job_wrapper = run_job_wrapper
 _schedule_background_task = schedule_background_task
 _persist_single_wrapper = persist_single_wrapper
-run_job = run_job
 
 __all__ = [
     "CONFIG",
@@ -80,8 +79,9 @@ def configure_middleware(app: FastAPI) -> None:
     # a credential-leak catastrophe (any origin can issue authenticated
     # cross-site requests). Fail closed in production.
     if "*" in settings.CORS_ORIGINS and settings.ENV.lower() == "production":
+        msg = "CORS_ORIGINS cannot contain '*' in production when allow_credentials=True"
         raise RuntimeError(
-            "CORS_ORIGINS cannot contain '*' in production when allow_credentials=True",
+            msg,
         )
     app.add_middleware(
         CORSMiddleware,
@@ -104,10 +104,10 @@ def configure_static(app: FastAPI) -> None:
     if settings.ENV.lower() == "production":
         return
 
-    FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+    FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"  # noqa: N806
     if FRONTEND_DIR.exists():
         app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-        DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
+        DASHBOARD_DIR = FRONTEND_DIR / "dashboard"  # noqa: N806
         if DASHBOARD_DIR.exists():
             app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
 

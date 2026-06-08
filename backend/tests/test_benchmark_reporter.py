@@ -26,7 +26,7 @@ def benchmark_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
 
 def test_db_initialization(benchmark_env: str) -> None:
     BenchmarkReporter(db_path=benchmark_env)
-    assert os.path.exists(benchmark_env)
+    assert os.path.exists(benchmark_env)  # noqa: PTH110
 
 
 def test_record_run(benchmark_env: str) -> None:
@@ -96,8 +96,8 @@ def test_dashboard_generation(benchmark_env: str) -> None:
 
     from app.benchmark_reporter import DASHBOARD_PATH
 
-    assert os.path.exists(DASHBOARD_PATH)
-    with open(DASHBOARD_PATH, encoding="utf-8") as f:
+    assert os.path.exists(DASHBOARD_PATH)  # noqa: PTH110
+    with open(DASHBOARD_PATH, encoding="utf-8") as f:  # noqa: PTH123
         content = f.read()
 
     assert "dashboard-run" in content

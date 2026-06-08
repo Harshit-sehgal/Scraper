@@ -66,7 +66,7 @@ class SelectorMemory:
     def _load(self) -> None:
         if self.path.exists():
             try:
-                with open(self.path) as f:
+                with open(self.path) as f:  # noqa: PTH123
                     self._memory = json.load(f)
             except (OSError, json.JSONDecodeError):
                 logger.exception("Failed to load selector memory")
@@ -82,16 +82,16 @@ class SelectorMemory:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump(self._memory, f, indent=2)
-            os.replace(tmp_path, self.path)
+            os.replace(tmp_path, self.path)  # noqa: PTH105
             tmp_path = None  # ownership transferred via rename
         except (OSError, TypeError):
             logger.exception("Failed to save selector memory")
             with contextlib.suppress(OSError):
                 if fd is not None:
                     os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):
+            if tmp_path is not None and os.path.exists(tmp_path):  # noqa: PTH110
                 with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)
+                    os.unlink(tmp_path)  # noqa: PTH108
 
     def _compute_confidence(self, entry: dict) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.
@@ -147,7 +147,7 @@ class SelectorMemory:
             reason=reason,
         )
 
-    def _auto_cleanup(self, force: bool = False) -> dict:
+    def _auto_cleanup(self, force: bool = False) -> dict:  # noqa: FBT001, FBT002
         """Auto-cleanup low-confidence selectors.
 
         Returns:

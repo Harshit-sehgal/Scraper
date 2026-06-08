@@ -183,7 +183,7 @@ def test_import_order_independence_invariant() -> None:
     # The bootstrap requires that graph_update_scheduler module is loaded
     # (it's already imported by this test file through get_scheduler import).
     from app.event_dispatcher import get_dispatcher as gd
-    from app.semantic_events import SemanticEventType as SET
+    from app.semantic_events import SemanticEventType as SET  # noqa: N817
 
     d = gd()
     subs = len(d.subscribers.get(SET.TOPOLOGY_SHIFT, []))
@@ -294,7 +294,7 @@ def test_exclusion_persistence_invariant() -> None:
         else:
             os.environ.pop("SEMANTIC_STATE_PATH", None)
         with contextlib.suppress(OSError):
-            os.remove(tmp)
+            os.remove(tmp)  # noqa: PTH107
 
 
 # ─────────────────────────────────────────────────────────────

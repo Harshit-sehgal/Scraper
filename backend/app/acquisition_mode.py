@@ -123,7 +123,7 @@ def escalate_mode(current_mode: AcquisitionMode) -> AcquisitionMode:
 def should_escalate(
     current_mode: AcquisitionMode,
     acquisition_state: str,
-    empty_response: bool = False,
+    empty_response: bool = False,  # noqa: FBT001, FBT002
 ) -> bool:
     """Determine whether acquisition should escalate to a more aggressive mode.
 

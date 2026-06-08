@@ -44,7 +44,7 @@ def test_pollinations_api() -> None:
     except Exception:
         import logging
 
-        logging.exception("Pollinations API test failed")
+        logging.exception("Pollinations API test failed")  # noqa: LOG015
 
 
 if __name__ == "__main__":

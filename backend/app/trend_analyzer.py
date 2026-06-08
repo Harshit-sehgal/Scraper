@@ -115,7 +115,7 @@ class TrendAnalyzer:
         """
         self._history_window = history_window
 
-    def analyze(self, telemetry_history: list[dict]) -> TrendReport:
+    def analyze(self, telemetry_history: list[dict]) -> TrendReport:  # noqa: C901
         """Run full trend analysis on the provided telemetry history.
 
         Args:
@@ -220,7 +220,7 @@ class TrendAnalyzer:
 
     # ── Internal Analysis ─────────────────────────────────────────────
 
-    def analyze_domain(self, domain: str, events: list[dict]) -> DomainTrend:
+    def analyze_domain(self, domain: str, events: list[dict]) -> DomainTrend:  # noqa: C901, PLR0912, PLR0915
         """Analyze telemetry events for a single domain.
 
         This is a public method — callable directly for per-domain
@@ -315,7 +315,7 @@ class TrendAnalyzer:
 
     # ── Helpers ───────────────────────────────────────────────────────
 
-    def _detect_trend(self, values: list[float], higher_is_worse: bool) -> str:
+    def _detect_trend(self, values: list[float], higher_is_worse: bool) -> str:  # noqa: FBT001
         """Detect whether a sequence of values is improving, stable, or degrading.
 
         Compares the mean of the first third to the mean of the last third.
@@ -489,7 +489,7 @@ class EconomicTracker:
         # Sort domains by cost
         sorted_domains = sorted(
             [{"domain": d, "total_cost": s.total_cost_usd} for d, s in report.cost_by_domain.items()],
-            key=lambda x: -(x["total_cost"]),  # type: ignore
+            key=lambda x: -(x["total_cost"]),  # type: ignore  # noqa: PGH003
         )
         report.most_expensive_domains = sorted_domains[:5]
         report.least_expensive_domains = sorted_domains[-5:][::-1]

@@ -25,7 +25,7 @@ def _get_pg_repo():
         with _postgres_repo_lock:
             if _postgres_repo is None:
                 try:
-                    from app.postgres_repository import PostgresJobRepository as _PG
+                    from app.postgres_repository import PostgresJobRepository as _PG  # noqa: N814
 
                     _postgres_repo = _PG()
                 except ImportError as e:

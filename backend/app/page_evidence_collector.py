@@ -149,7 +149,7 @@ STRUCTURAL_SEPARATORS = ["hr", "br", "---", "___", "···"]
 # ---------------------------------------------------------------------------
 
 
-def collect_page_evidence(
+def collect_page_evidence(  # noqa: C901, PLR0912, PLR0915
     html: str,
     url: str = "",
     network_json: list[dict] | None = None,
@@ -185,7 +185,7 @@ def collect_page_evidence(
         evidence.meta_description = str(meta_desc.get("content", ""))
 
     # ── DOM node count ───────────────────────────────────────────────
-    evidence.dom_node_count = len(soup.find_all(True))
+    evidence.dom_node_count = len(soup.find_all(True))  # noqa: FBT003
 
     # ── Collect visible text blocks ──────────────────────────────────
     text_blocks = _collect_visible_text_blocks(soup)
@@ -296,7 +296,7 @@ def _collect_visible_text_blocks(soup: BeautifulSoup) -> list[VisibleTextBlock]:
     processed_paths: set[str] = set()
 
     # Walk leaf text nodes
-    for element in soup.find_all(True):
+    for element in soup.find_all(True):  # noqa: FBT003
         # Skip non-content tags
         if element.name in ("script", "style", "noscript", "svg", "link", "meta", "head"):
             continue
@@ -352,7 +352,7 @@ def _collect_tables(soup: BeautifulSoup) -> list[dict]:
         for tr in table.find_all("tr"):
             cells = []
             for cell in tr.find_all(["td", "th"]):
-                cells.append(cell.get_text(separator=" ", strip=True)[:200])
+                cells.append(cell.get_text(separator=" ", strip=True)[:200])  # noqa: PERF401
             if cells:
                 rows.append(cells)
         if len(rows) >= 2:  # At least a header + one data row
@@ -367,7 +367,7 @@ def _collect_tables(soup: BeautifulSoup) -> list[dict]:
     return tables
 
 
-def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
+def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915
     """Extract JSON data from script tags (hydration, state, LD+JSON)."""
     hydration: dict[str, Any] = {}
 
@@ -461,7 +461,7 @@ def _truncate_large_values(obj: Any, max_depth: int = 4, max_str_len: int = 500)
     return obj
 
 
-def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContainer]:
+def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContainer]:  # noqa: C901, PLR0912
     """Discover candidate result containers from DOM structure.
 
     Looks for repeated sibling structures that might represent result cards,
@@ -565,7 +565,7 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
             all_texts.append(t_str)
 
     # Count descendants
-    descendants = element.find_all(True)
+    descendants = element.find_all(True)  # noqa: FBT003
     children = [c for c in element.children if isinstance(c, Tag)]
 
     # Detect features
@@ -596,10 +596,10 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
     # Sibling similarity: how similar is this to its siblings
     sibling_similarity = 0.0
     if len(siblings) >= 2:
-        child_tags = sorted(c.name for c in element.find_all(True))
+        child_tags = sorted(c.name for c in element.find_all(True))  # noqa: FBT003
         similar_count = 0
         for sibling in siblings[1:6]:
-            sib_tags = sorted(s.name for s in sibling.find_all(True))
+            sib_tags = sorted(s.name for s in sibling.find_all(True))  # noqa: FBT003
             if child_tags == sib_tags:
                 similar_count += 1
         sibling_similarity = similar_count / max(1, len(siblings) - 1)
@@ -643,7 +643,7 @@ def _get_depth(element: Tag) -> int:
     return depth
 
 
-def _compute_container_score(container: CandidateContainer) -> float:
+def _compute_container_score(container: CandidateContainer) -> float:  # noqa: C901
     """Compute a general container quality score.
 
     A good result container has:
@@ -726,7 +726,7 @@ def _compute_container_score(container: CandidateContainer) -> float:
     return round(min(score, 1.0), 4)
 
 
-def _classify_page_structure(evidence: PageEvidence) -> str:
+def _classify_page_structure(evidence: PageEvidence) -> str:  # noqa: PLR0911
     """Classify the overall page structure type."""
     containers = evidence.candidate_containers
     patterns = evidence.patterns

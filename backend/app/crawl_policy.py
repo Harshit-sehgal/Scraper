@@ -70,7 +70,7 @@ class CrawlPolicyEngine:
 
     # ─── Public API ────────────────────────────────────────────────────
 
-    async def check_domain(self, url: str) -> str | None:
+    async def check_domain(self, url: str) -> str | None:  # noqa: C901, PLR0911
         """Check whether a URL can be fetched under crawl policy.
 
         Returns:
@@ -141,7 +141,7 @@ class CrawlPolicyEngine:
             self._global_active_fetches += 1
             return None
 
-    def record_result(self, url: str, success: bool) -> None:
+    def record_result(self, url: str, success: bool) -> None:  # noqa: FBT001
         """Record the outcome of a fetch for a domain."""
         domain = self._extract_domain(url)
         if not domain:
@@ -239,7 +239,7 @@ class CrawlPolicyEngine:
         except Exception:
             return "/"
 
-    async def _check_robots_txt(self, domain: str) -> None:
+    async def _check_robots_txt(self, domain: str) -> None:  # noqa: C901
         """Fetch and parse robots.txt for a domain (best-effort)."""
         state = self._get_state(domain)
         state.robots_checked = True

@@ -35,7 +35,7 @@ def _capture_last_tx(ws):
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_full_multi_subsystem_replay() -> None:
+def test_full_multi_subsystem_replay() -> None:  # noqa: PLR0915
     """Execute mutations across all 10 replayable subsystems, clear,
     replay, and verify state equivalence on every subsystem.
     """
@@ -114,7 +114,7 @@ def test_full_multi_subsystem_replay() -> None:
     assert abs(ws.metrics.global_entropy - pre_entropy) < 0.001
     assert ws.metrics.total_records_processed == pre_records
 
-    # Topology (structural, not ID-based)
+    # Topology (structural, not ID-based)  # noqa: ERA001
     assert ws._topology.region_count() == pre_region_count
     view = ws._topology.get_view()
     regions = view.all_regions()

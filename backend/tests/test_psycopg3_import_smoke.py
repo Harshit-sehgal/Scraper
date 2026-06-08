@@ -68,7 +68,7 @@ def test_psycopg3_does_not_import_psycopg2_repository() -> None:
         # If any postgres_repository mention exists, it must be the
         # psycopg-agnostic base.
         pytest.fail(
-            "psycopg3_repository mentions postgres_repository in source but must only import from postgres_repository_base"
+            "psycopg3_repository mentions postgres_repository in source but must only import from postgres_repository_base",
         )
 
 

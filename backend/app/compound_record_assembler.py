@@ -98,7 +98,7 @@ SEGMENT_SEPARATORS = [
 # ---------------------------------------------------------------------------
 
 
-def detect_segments(element_text: str) -> list[dict[str, Any]]:
+def detect_segments(element_text: str) -> list[dict[str, Any]]:  # noqa: C901
     """Detect internal segments within a single element's text.
 
     Looks for repeated structural patterns: sections separated by labels,
@@ -311,7 +311,7 @@ def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> di
 # ---------------------------------------------------------------------------
 
 
-def assemble_compound_records(
+def assemble_compound_records(  # noqa: C901
     records: list[dict],
     full_texts: dict[str, str] | None = None,
 ) -> list[dict]:

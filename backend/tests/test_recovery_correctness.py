@@ -12,7 +12,7 @@ class _AllowAllCrawlPolicy:
     async def check_domain(self, url) -> None:
         return None
 
-    def record_result(self, url, success=True) -> None:
+    def record_result(self, url, success=True) -> None:  # noqa: FBT002
         return None
 
 

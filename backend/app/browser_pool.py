@@ -56,7 +56,7 @@ class BrowserPool:
         self.reused_fetches: int = 0
         self.crash_count: int = 0
 
-    async def get_context(self, domain: str, strategy: FetchStrategy | None = None) -> BrowserContext:
+    async def get_context(self, domain: str, strategy: FetchStrategy | None = None) -> BrowserContext:  # noqa: C901, PLR0912, PLR0915
         """Get or create a browser context for a specific domain."""
         await self._recycle_event.wait()
 

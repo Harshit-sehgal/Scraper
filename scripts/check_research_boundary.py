@@ -91,8 +91,7 @@ def _is_research_file(path: str) -> bool:
     base = os.path.basename(rel)
     if base == "__init__.py":
         base = os.path.basename(os.path.dirname(rel))
-    if base.endswith(".py"):
-        base = base[:-3]
+    base = base.removesuffix(".py")
     return base in RESEARCH_MODULES
 
 
@@ -142,7 +141,8 @@ def collect_violations(app_root: str) -> tuple[list[tuple[str, int, str, list[st
     Each violation is a tuple of ``(relative_path, lineno, module, names)``.
     """
     if not os.path.isdir(app_root):
-        raise FileNotFoundError(f"app root not found: {app_root}")
+        msg = f"app root not found: {app_root}"
+        raise FileNotFoundError(msg)
 
     violations: list[tuple[str, int, str, list[str]]] = []
     files_checked = 0

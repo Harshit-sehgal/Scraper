@@ -114,7 +114,7 @@ class RegressionCapture:
         registry_path: str | None = None,
         min_confidence: float = 0.5,
         min_html_length: int = 100,
-        auto_archive: bool = True,
+        auto_archive: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         if fixtures_dir is None:
             fixtures_dir = str(Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "pages")
@@ -134,7 +134,7 @@ class RegressionCapture:
 
     # ── Public API ─────────────────────────────────────────────────────
 
-    def maybe_capture(
+    def maybe_capture(  # noqa: PLR0913
         self,
         url: str,
         html: str | None,
@@ -143,7 +143,7 @@ class RegressionCapture:
         records_count: int = 0,
         schema_fields: list[str] | None = None,
         telemetry: dict | None = None,
-        force: bool = False,
+        force: bool = False,  # noqa: FBT001, FBT002
     ) -> RegressionEntry | None:
         """Evaluate and potentially capture a regression case.
 
@@ -330,7 +330,7 @@ class RegressionCapture:
         fixtures = []
         for f in self._fixtures_dir.iterdir():
             if f.suffix == ".html":
-                fixtures.append((f.stat().st_mtime, f))
+                fixtures.append((f.stat().st_mtime, f))  # noqa: PERF401
 
         # Sort by modification time (oldest first)
         fixtures.sort(key=lambda x: x[0])
@@ -482,14 +482,14 @@ class RegressionCapture:
         # Write to the tmp file first, then replace. ``os.replace`` is
         # atomic on POSIX and on Windows when the target exists, so the
         # rename either happens in full or not at all.
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write(payload)
             f.flush()
             from contextlib import suppress
 
             with suppress(OSError):
                 os.fsync(f.fileno())
-        os.replace(tmp_path, self._registry_path)
+        os.replace(tmp_path, self._registry_path)  # noqa: PTH105
 
     def _get_entry(self, entry_id: str) -> RegressionEntry | None:
         """Look up an entry by ID."""

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def extract_from_network(
+def extract_from_network(  # noqa: C901, PLR0912
     hydration_data: dict[str, Any],
     schema_fields: list,
     url: str = "",  # noqa: ARG001, RUF100
@@ -142,7 +142,7 @@ def extract_from_network(
 # ---------------------------------------------------------------------------
 
 
-def _extract_from_jsonld(
+def _extract_from_jsonld(  # noqa: C901, PLR0912
     jsonld_data: list[dict],
     schema_fields: list,
 ) -> list[dict]:
@@ -512,7 +512,7 @@ def _extract_price_from_offers(item: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _extract_from_nested_json(
+def _extract_from_nested_json(  # noqa: C901
     data: dict,
     schema_fields: list,
     max_depth: int = 6,
@@ -527,7 +527,7 @@ def _extract_from_nested_json(
 
     candidates: list[list[dict]] = []
 
-    def _walk(obj: Any, depth: int = 0) -> None:
+    def _walk(obj: Any, depth: int = 0) -> None:  # noqa: C901
         if depth > max_depth:
             return
 
@@ -539,7 +539,7 @@ def _extract_from_nested_json(
                     records = []
                     for item in value:
                         if isinstance(item, dict) and _is_record_like(item, schema_fields):
-                            records.append(item)
+                            records.append(item)  # noqa: PERF401
                     if records:
                         candidates.append(records)
                 elif isinstance(value, dict):
@@ -716,7 +716,7 @@ _ALIAS_MAP: dict[str, list[str]] = {
 }
 
 
-def _find_value_for_field(
+def _find_value_for_field(  # noqa: C901
     field_name: str,  # noqa: ARG001, RUF100
     field_lower: str,
     field_type: Any,  # noqa: ARG001, RUF100
@@ -769,7 +769,7 @@ def _find_value_for_field(
 # ---------------------------------------------------------------------------
 
 
-def _extract_from_apollo_state(
+def _extract_from_apollo_state(  # noqa: C901, PLR0912
     apollo_data: dict,
     schema_fields: list,
 ) -> list[dict]:
@@ -820,7 +820,7 @@ def _extract_from_apollo_state(
 # ---------------------------------------------------------------------------
 
 
-def _extract_records_from_payloads(
+def _extract_records_from_payloads(  # noqa: C901
     payloads: list[dict],
     schema_fields: list,
 ) -> list[dict]:

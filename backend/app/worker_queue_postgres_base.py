@@ -263,7 +263,7 @@ class PostgresWorkerQueueBase(ABC):
 
     # ─── Task lifecycle ────────────────────────────────────────────────
 
-    async def enqueue(
+    async def enqueue(  # noqa: PLR0913
         self,
         task_type: str,
         payload: dict | None = None,
@@ -298,7 +298,7 @@ class PostgresWorkerQueueBase(ABC):
 
         return task.id
 
-    def _enqueue_sync(
+    def _enqueue_sync(  # noqa: PLR0913
         self,
         task_id: str,
         task_type: str,
@@ -434,7 +434,7 @@ class PostgresWorkerQueueBase(ABC):
         self,
         task_id: str,
         error: str,
-        retry: bool = True,
+        retry: bool = True,  # noqa: FBT001, FBT002
         retry_after: float | None = None,
         task_type: str | None = None,
     ) -> None:
@@ -456,7 +456,7 @@ class PostgresWorkerQueueBase(ABC):
         self,
         task_id: str,
         error: str,
-        retry: bool = True,
+        retry: bool = True,  # noqa: FBT001, FBT002
         retry_after: float | None = None,
         task_type: str | None = None,
     ) -> None:
@@ -662,7 +662,7 @@ class PostgresWorkerQueueBase(ABC):
         except Exception:
             logger.exception("Failed to recover stuck tasks")
 
-    async def stop(self, drain: bool = True) -> None:
+    async def stop(self, drain: bool = True) -> None:  # noqa: FBT001, FBT002
         """Stop the worker loop. Optionally drain in-flight tasks."""
         self._running = False
         if self._worker_task:
@@ -675,7 +675,7 @@ class PostgresWorkerQueueBase(ABC):
 
         logger.info("Postgres worker queue stopped (drained=%s)", drain)
 
-    async def _worker_loop(self) -> None:
+    async def _worker_loop(self) -> None:  # noqa: C901
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:
@@ -1000,8 +1000,9 @@ def _build_postgres_worker_queue() -> PostgresWorkerQueueBase:
 
             return PostgresWorkerQueuePsycopg3()
         except ImportError as e:
+            msg = f"Failed to import psycopg3 worker queue: {e}. Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
             raise RuntimeError(
-                f"Failed to import psycopg3 worker queue: {e}. Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
+                msg,
             ) from e
 
     # Default: psycopg2 (legacy)  # noqa: ERA001, RUF100

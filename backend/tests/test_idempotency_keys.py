@@ -47,7 +47,8 @@ class TestIdempotencyHappyPath:
         h2 = {"X-API-Key": "test", "Idempotency-Key": "key-B"}
         a = client.post("/api/jobs", json=_create_payload("A"), headers=h1)
         b = client.post("/api/jobs", json=_create_payload("B"), headers=h2)
-        assert a.status_code == 200 and b.status_code == 200
+        assert a.status_code == 200
+        assert b.status_code == 200
         assert a.json()["job_id"] != b.json()["job_id"]
         assert a.json()["idempotent_replay"] is False
         assert b.json()["idempotent_replay"] is False

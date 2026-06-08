@@ -92,7 +92,7 @@ EMPTY_PAGE_SIGNALS: dict[str, list[re.Pattern]] = {
 }
 
 
-def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseCheck:  # noqa: ARG001, RUF100
+def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseCheck:  # noqa: ARG001, C901, PLR0912, RUF100
     """Detect if an HTTP response is effectively empty despite returning 200.
 
     Checks for various "empty but 200" conditions: blank pages, cookie walls,
