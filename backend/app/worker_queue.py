@@ -288,6 +288,7 @@ class WorkerQueue:
         self._in_flight: dict[str, asyncio.Task] = {}
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
+        self._start_lock = asyncio.Lock()
         # Semaphore gives us atomic acquire/release for the concurrency
         # budget, independent of the bookkeeping dict. The worker loop
         # acquires a permit before dequeue and releases it when the
@@ -693,18 +694,19 @@ class WorkerQueue:
 
     async def start(self) -> None:
         """Start the background worker loop with recovery of stuck tasks."""
-        if self._running:
-            return
-        # Recover any tasks that were stuck in 'running' state from a previous
-        # crash
-        self._recover_stuck_tasks()
-        self._running = True
-        self._worker_task = asyncio.create_task(self._worker_loop())
-        logger.info(
-            "Worker queue started: max_concurrency=%d, poll_interval=%.1fs",
-            self._max_concurrency,
-            self._poll_interval,
-        )
+        async with self._start_lock:
+            if self._running:
+                return
+            # Recover any tasks that were stuck in 'running' state from a previous
+            # crash
+            self._recover_stuck_tasks()
+            self._running = True
+            self._worker_task = asyncio.create_task(self._worker_loop())
+            logger.info(
+                "Worker queue started: max_concurrency=%d, poll_interval=%.1fs",
+                self._max_concurrency,
+                self._poll_interval,
+            )
 
     def _recover_stuck_tasks(self) -> None:
         """Reset any tasks stuck in 'running' state back to 'pending' for retry."""
@@ -750,11 +752,16 @@ class WorkerQueue:
                 # available we yield for a poll interval and try again —
                 # the semaphore is fair-ish and won't busy-spin.
                 acquired = False
+                acquired_sem: asyncio.Semaphore | None = None
                 try:
                     await asyncio.wait_for(
                         self._concurrency_sem.acquire(),
                         timeout=self._poll_interval,
                     )
+                    # Capture the semaphore reference immediately after acquire.
+                    # ``set_max_concurrency`` swaps ``self._concurrency_sem``
+                    # atomically; we must release the *same* semaphore we acquired.
+                    acquired_sem = self._concurrency_sem
                     acquired = True
                 except TimeoutError:
                     continue
@@ -764,20 +771,14 @@ class WorkerQueue:
                 # Dequeue a task
                 task = await self.dequeue(timeout=self._poll_interval)
                 if task is None:
-                    self._concurrency_sem.release()
+                    if acquired_sem:
+                        acquired_sem.release()
                     continue
 
                 # Dispatch
                 t = asyncio.create_task(self._execute_task(task))
 
                 task_id = task.id
-                # Capture the semaphore reference for this task's release
-                # callback. ``set_max_concurrency`` swaps
-                # ``self._concurrency_sem`` atomically; if the callback
-                # looked up the attribute on release it could end up
-                # releasing the *new* semaphore and inflating the budget
-                # beyond the configured limit.
-                acquired_sem = self._concurrency_sem
 
                 async with self._in_flight_lock:
                     self._in_flight[task_id] = t
@@ -798,7 +799,7 @@ class WorkerQueue:
                             tid,
                         )
 
-                def _release(_fut: object, tid: str = task_id, sem: asyncio.Semaphore = acquired_sem) -> None:
+                def _release(_fut: object, tid: str = task_id, sem: asyncio.Semaphore | None = acquired_sem) -> None:
                     # Release the semaphore permit exactly once when the
                     # task finishes (success, failure, or cancellation).
                     # The semaphore is the one whose permit was acquired
@@ -807,7 +808,8 @@ class WorkerQueue:
                     # would be wrong if ``set_max_concurrency`` had
                     # swapped the semaphore in the meantime.
                     try:
-                        sem.release()
+                        if sem:
+                            sem.release()
                     except ValueError:
                         # Permit already released — should not happen,
                         # but never let a callback raise.
@@ -822,8 +824,9 @@ class WorkerQueue:
                 logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callback.
-                with contextlib.suppress(ValueError):
-                    self._concurrency_sem.release()
+                if acquired_sem:
+                    with contextlib.suppress(ValueError):
+                        acquired_sem.release()
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:

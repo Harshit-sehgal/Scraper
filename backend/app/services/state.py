@@ -1,3 +1,4 @@
+from app.globals import _jobs_store_lock
 from app.storage_interface import get_job_repository
 
 
@@ -49,6 +50,7 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
 
 
 def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int) -> None:
-    prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)
-    repo = get_job_repository()
-    repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
+    with _jobs_store_lock:
+        prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)
+        repo = get_job_repository()
+        repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)

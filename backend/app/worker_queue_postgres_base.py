@@ -684,11 +684,13 @@ class PostgresWorkerQueueBase(ABC):
                 # available we yield for a poll interval and try again —
                 # the semaphore is fair-ish and won't busy-spin.
                 acquired = False
+                acquired_sem: asyncio.Semaphore | None = None
                 try:
                     await asyncio.wait_for(
                         self._concurrency_sem.acquire(),
                         timeout=self._poll_interval,
                     )
+                    acquired_sem = self._concurrency_sem
                     acquired = True
                 except TimeoutError:
                     continue
@@ -697,7 +699,8 @@ class PostgresWorkerQueueBase(ABC):
 
                 task = await self.dequeue(timeout=self._poll_interval)
                 if task is None:
-                    self._concurrency_sem.release()
+                    if acquired_sem:
+                        acquired_sem.release()
                     continue
 
                 t = asyncio.create_task(self._execute_task(task))
@@ -722,11 +725,12 @@ class PostgresWorkerQueueBase(ABC):
                             tid,
                         )
 
-                def _release(_fut: object, tid: str = task_id) -> None:
+                def _release(_fut: object, tid: str = task_id, sem: asyncio.Semaphore | None = acquired_sem) -> None:
                     # Release the semaphore permit exactly once when the
                     # task finishes (success, failure, or cancellation).
                     try:
-                        self._concurrency_sem.release()
+                        if sem:
+                            sem.release()
                     except ValueError:
                         # Permit already released — should not happen, but
                         # never let a done-callback raise.
@@ -741,10 +745,11 @@ class PostgresWorkerQueueBase(ABC):
                 logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callbacks.
-                from contextlib import suppress
+                if acquired_sem:
+                    from contextlib import suppress
 
-                with suppress(ValueError):
-                    self._concurrency_sem.release()
+                    with suppress(ValueError):
+                        acquired_sem.release()
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:

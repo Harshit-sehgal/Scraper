@@ -13,8 +13,8 @@ import { renderPredictions } from "./predictions.js";
 // ─── Refresh Dashboard ───
 
 export async function refreshDashboard() {
-  const btn = document.querySelector("#view-dashboard .btn.primary.small");
-  if (btn) btn.disabled = true;
+  const refreshBtn = document.querySelector("#view-dashboard .btn.primary.small");
+  if (refreshBtn) refreshBtn.disabled = true;
 
   try {
     const [modeRes, dashRes, healthRes, predRes, rateLimitRes] = await Promise.all([
@@ -25,11 +25,20 @@ export async function refreshDashboard() {
       apiFetch(`${API}/api/system/rate-limit-stats`).catch(() => null),
     ]);
 
-    const modeData = modeRes?.ok ? await modeRes.json() : null;
-    const dashData = dashRes?.ok ? await dashRes.json() : null;
-    const healthData = healthRes?.ok ? await healthRes.json() : null;
-    const predData = predRes?.ok ? await predRes.json() : null;
-    const rateLimitData = rateLimitRes?.ok ? await rateLimitRes.json() : null;
+    const parseJson = async (res) => {
+      try {
+        return res?.ok ? await res.json() : null;
+      } catch {
+        return null;
+      }
+    };
+    const [modeData, dashData, healthData, predData, rateLimitData] = await Promise.all([
+      parseJson(modeRes),
+      parseJson(dashRes),
+      parseJson(healthRes),
+      parseJson(predRes),
+      parseJson(rateLimitRes),
+    ]);
 
     // Mode switcher
     const modeBadge = document.getElementById("dash-current-mode");
@@ -78,7 +87,7 @@ export async function refreshDashboard() {
   } catch (e) {
     console.error("Dashboard refresh failed:", e);
   } finally {
-    if (btn) btn.disabled = false;
+    if (refreshBtn) refreshBtn.disabled = false;
   }
 }
 

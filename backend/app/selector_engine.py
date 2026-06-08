@@ -461,7 +461,9 @@ def extract_raw_from_selectors(
         _TYPED_ORDER[FieldType.STRING] = 2
         _TYPED_ORDER[None] = 2
 
-        def _field_sort_key(item):
+        _typed_order = dict(_TYPED_ORDER)
+
+        def _field_sort_key(item, _order=_typed_order):
             key, sel_entry = item
             ftype = None
             if isinstance(sel_entry, dict) and sel_entry.get("type"):
@@ -469,7 +471,7 @@ def extract_raw_from_selectors(
                     ftype = FieldType(sel_entry["type"])
             if ftype is None:
                 ftype = _infer_field_type_from_name(key)
-            return _TYPED_ORDER.get(ftype, 2)
+            return _order.get(ftype, 2)
 
         sorted_fields = sorted(field_sels.items(), key=_field_sort_key)
         for key, sel_entry in sorted_fields:

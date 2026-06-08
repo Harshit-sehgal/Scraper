@@ -124,27 +124,35 @@ export async function suggestSchemaFromIntent() {
     }
 
     const data = await res.json();
-    if (data.topic) document.getElementById("inp-topic").value = data.topic;
-    if (data.location) document.getElementById("inp-location").value = data.location;
-    if (data.origin_location) document.getElementById("inp-origin-location").value = data.origin_location;
+    const setVal = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.value = v;
+    };
+    if (data.topic) setVal("inp-topic", data.topic);
+    if (data.location) setVal("inp-location", data.location);
+    if (data.origin_location) setVal("inp-origin-location", data.origin_location);
     if (data.max_distance_km !== null && data.max_distance_km !== undefined) {
-      document.getElementById("inp-max-distance-km").value = String(data.max_distance_km);
+      setVal("inp-max-distance-km", String(data.max_distance_km));
     }
 
     if (Array.isArray(data.fields) && data.fields.length) {
       const schemaContainer = document.getElementById("schema-container");
-      schemaContainer.innerHTML = "";
-      data.fields.forEach((f) => addField(f));
+      if (schemaContainer) {
+        schemaContainer.innerHTML = "";
+        data.fields.forEach((f) => addField(f));
+      }
     }
 
     const note = document.getElementById("suggestion-note");
     const notes = (data.notes || "").trim();
-    if (notes) {
-      note.textContent = notes;
-      note.classList.remove("hidden");
-    } else {
-      note.textContent = "";
-      note.classList.add("hidden");
+    if (note) {
+      if (notes) {
+        note.textContent = notes;
+        note.classList.remove("hidden");
+      } else {
+        note.textContent = "";
+        note.classList.add("hidden");
+      }
     }
 
     setMode("auto");
@@ -310,12 +318,12 @@ export async function submitJob(e) {
   // Schema
   const schema = [];
   document.querySelectorAll(".field-row").forEach((row) => {
-    const n = row.querySelector(".sf-name").value.trim();
+    const n = row.querySelector(".sf-name")?.value?.trim() || "";
     if (n)
       schema.push({
         name: n,
-        field_type: row.querySelector(".sf-type").value,
-        description: row.querySelector(".sf-desc").value.trim(),
+        field_type: row.querySelector(".sf-type")?.value || "string",
+        description: row.querySelector(".sf-desc")?.value?.trim() || "",
         required: true,
       });
   });
@@ -422,8 +430,10 @@ export async function submitJob(e) {
   };
 
   const btn = document.getElementById("btn-submit");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Starting...';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Starting...';
+  }
 
   try {
     const res = await apiFetch(`${API}/api/jobs`, {
@@ -438,7 +448,9 @@ export async function submitJob(e) {
   } catch (err) {
     toast(`Error: ${err.message}`, "error");
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = "Start Scraping →";
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "Start Scraping →";
+    }
   }
 }

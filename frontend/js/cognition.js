@@ -110,7 +110,7 @@ export function renderCommunities(communities) {
         (c) => `
             <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
                 <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-                    ${c.map((role) => `<span class="mode-tag">${esc(role)}</span>`).join("")}
+                    ${(Array.isArray(c) ? c : []).map((role) => `<span class="mode-tag">${esc(role)}</span>`).join("")}
                 </div>
             </div>
         `,
@@ -126,13 +126,13 @@ export function renderSchemaPatterns(patterns) {
     el.innerHTML = '<div class="empty"><p>No recurring schemas learned yet</p></div>';
   } else {
     el.innerHTML = [...patterns]
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
       .map(
         (p) => `
             <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-                        ${p.roles.map((role) => `<span class="mode-tag">${esc(role)}</span>`).join("")}
+                        ${(p.roles || []).map((role) => `<span class="mode-tag">${esc(role)}</span>`).join("")}
                     </div>
                     <span style="color:var(--text-muted); font-size:0.85rem;">Count: ${p.count}</span>
                 </div>
@@ -150,7 +150,7 @@ export function renderExclusions(exclusions) {
     el.innerHTML = '<div class="empty"><p>No exclusions learned yet</p></div>';
   } else {
     el.innerHTML = [...exclusions]
-      .sort((a, b) => b.strength - a.strength)
+      .sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))
       .map(
         (e) => `
             <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
@@ -174,7 +174,7 @@ export function renderRoleSimilarities(compats) {
       el.innerHTML = '<div class="empty"><p>Manifold is cold</p></div>';
     } else {
       el.innerHTML = filtered
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         .map(
           (c) => `
                 <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
@@ -195,7 +195,7 @@ export function renderBasins(basins) {
     el.innerHTML = '<div class="empty"><p>No active conflict basins</p></div>';
   } else {
     el.innerHTML = [...basins]
-      .sort((a, b) => b.instability - a.instability)
+      .sort((a, b) => (b.instability ?? 0) - (a.instability ?? 0))
       .map(
         (b) => `
             <div style="padding: 0.5rem; border-bottom: 1px solid var(--border);">

@@ -24,6 +24,9 @@ def _get_client_ip(request: Request) -> str:
     ``X-Real-IP``. We read those headers here so audit logs reflect
     the real caller, not the proxy's loopback address.
 
+    XFF/X-Real-IP headers are only trusted when the direct client
+    is a known trusted proxy (e.g. nginx on localhost).
+
     Precedence:
     1. ``X-Forwarded-For`` first hop (the leftmost entry is the
        original client when the header is appended at each hop).
@@ -33,16 +36,18 @@ def _get_client_ip(request: Request) -> str:
 
     Returns ``"unknown"`` if none of the above yield a usable value.
     """
-    xff = request.headers.get("X-Forwarded-For")
-    if xff:
-        # The first entry in a comma-separated list is the original
-        # client; subsequent entries are intermediate proxies.
-        first = xff.split(",", 1)[0].strip()
-        if first:
-            return first
-    xri = request.headers.get("X-Real-IP")
-    if xri:
-        return xri.strip()
+    from app.rate_limiter import _is_trusted_proxy
+
+    client_host = request.client.host if request.client else ""
+    if client_host and _is_trusted_proxy(client_host):
+        xff = request.headers.get("X-Forwarded-For")
+        if xff:
+            first = xff.split(",", 1)[0].strip()
+            if first:
+                return first
+        xri = request.headers.get("X-Real-IP")
+        if xri:
+            return xri.strip()
     if request.client and request.client.host:
         return request.client.host
     return "unknown"

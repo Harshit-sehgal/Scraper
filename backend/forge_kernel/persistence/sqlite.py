@@ -61,7 +61,7 @@ class SQLiteJobRepository(JobRepository):
             conn = _get_connection()
             try:
                 row = conn.execute(
-                    "SELECT cancel_requested FROM jobs WHERE id = ? AND deleted_at IS NULL",
+                    "SELECT cancel_requested FROM jobs WHERE id = ?",
                     (job_id,),
                 ).fetchone()
                 return bool(row[0]) if row else False

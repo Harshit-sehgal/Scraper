@@ -86,15 +86,12 @@ export async function refreshJobs() {
       const empty = document.getElementById("empty-state");
       if (list && empty) {
         list.innerHTML = "";
-        const emptyState = document.getElementById("empty-state");
-        if (emptyState) {
-          list.appendChild(emptyState);
-          emptyState.classList.remove("hidden");
-          const titleEl = emptyState.querySelector(".empty-state-title");
-          const descEl = emptyState.querySelector(".empty-state-desc");
-          if (titleEl) titleEl.textContent = "Unable to connect to server";
-          if (descEl) descEl.textContent = "Check that the backend is running on " + API;
-        }
+        list.appendChild(empty);
+        empty.classList.remove("hidden");
+        const titleEl = empty.querySelector(".empty-state-title");
+        const descEl = empty.querySelector(".empty-state-desc");
+        if (titleEl) titleEl.textContent = "Unable to connect to server";
+        if (descEl) descEl.textContent = "Check that the backend is running on " + API;
       }
     }
   }
@@ -233,7 +230,7 @@ async function pollJob(id) {
       else toast(`"${truncate(j.name, 60)}" failed: ${truncate(j.error, 80)}`, "error");
     }
   } catch (e) {
-    /* ignore */
+    console.warn("pollJob error:", e);
   }
 }
 
@@ -339,10 +336,9 @@ function renderJobs(jobs) {
 
   if (!jobs.length) {
     list.innerHTML = "";
-    const emptyState = document.getElementById("empty-state");
-    if (emptyState) {
-      list.appendChild(emptyState);
-      emptyState.classList.remove("hidden");
+    if (empty) {
+      list.appendChild(empty);
+      empty.classList.remove("hidden");
     }
     return;
   }

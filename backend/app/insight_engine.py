@@ -71,4 +71,8 @@ def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) 
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(_run)
-        return future.result()
+        try:
+            return future.result(timeout=120)
+        except concurrent.futures.TimeoutError:
+            logger.warning("[InsightEngine] Schema suggestion timed out after 120s")
+            return {}

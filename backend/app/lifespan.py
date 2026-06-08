@@ -169,7 +169,12 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, RUF100
     # Cancel all background tasks
     for t in _background_tasks:
         t.cancel()
-    await asyncio.gather(*_background_tasks, return_exceptions=True)
+    if _background_tasks:
+        _done, pending = await asyncio.wait(_background_tasks, timeout=10)
+        for t in pending:
+            t.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
     _background_tasks.clear()
     logger.info("Background tasks cleaned up")
 

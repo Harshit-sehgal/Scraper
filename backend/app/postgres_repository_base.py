@@ -753,7 +753,9 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     if dirty_ids:
                         self._execute(
                             conn,
-                            "UPDATE jobs SET status = 'failed', error = 'Recovered after restart while still in progress.', completed_at = %s, cancel_requested = FALSE WHERE id = ANY(%s)",
+                            "UPDATE jobs SET status = 'failed',"
+                            " error = 'Recovered after restart while still in progress.',"
+                            " completed_at = %s, cancel_requested = FALSE WHERE id = ANY(%s)",
                             (now_iso, dirty_ids),
                         )
                         logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))

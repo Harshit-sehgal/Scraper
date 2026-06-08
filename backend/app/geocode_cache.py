@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import sqlite3
+import threading
 import time
 from pathlib import Path
 
@@ -121,13 +122,16 @@ class GeocodeCache:
 
 # Global geocode cache singleton instances
 _geocode_cache: GeocodeCache | None = None
+_geocode_cache_lock = threading.Lock()
 
 
 def get_geocode_cache() -> GeocodeCache:
     """Lazy bootstrap cache instance to support multi-node worker contexts."""
     global _geocode_cache
     if _geocode_cache is None:
-        _geocode_cache = GeocodeCache()
+        with _geocode_cache_lock:
+            if _geocode_cache is None:
+                _geocode_cache = GeocodeCache()
     return _geocode_cache
 
 

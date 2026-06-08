@@ -53,15 +53,36 @@ _global_limiter: SlidingWindowCounter | None = None
 _job_create_limiter: SlidingWindowCounter | None = None
 
 
+def _parse_rate_limit(rate_str: str) -> tuple[int, float]:
+    """Parse a rate limit string like '600/minute' into (count, window_seconds)."""
+    count_str, window = rate_str.split("/")
+    count = int(count_str.strip())
+    window_map = {
+        "second": 1.0,
+        "seconds": 1.0,
+        "minute": 60.0,
+        "minutes": 60.0,
+        "hour": 3600.0,
+        "hours": 3600.0,
+    }
+    return count, window_map.get(window.strip(), 60.0)
+
+
 def get_global_limiter() -> SlidingWindowCounter:
     global _global_limiter
     if _global_limiter is None:
-        _global_limiter = SlidingWindowCounter(max_requests=600, window_seconds=60.0)
+        from forge_kernel.config import settings
+
+        count, window = _parse_rate_limit(settings.security.RATE_LIMIT_GLOBAL)
+        _global_limiter = SlidingWindowCounter(max_requests=count, window_seconds=window)
     return _global_limiter
 
 
 def get_job_create_limiter() -> SlidingWindowCounter:
     global _job_create_limiter
     if _job_create_limiter is None:
-        _job_create_limiter = SlidingWindowCounter(max_requests=10, window_seconds=60.0)
+        from forge_kernel.config import settings
+
+        count, window = _parse_rate_limit(settings.security.RATE_LIMIT_JOB_CREATE)
+        _job_create_limiter = SlidingWindowCounter(max_requests=count, window_seconds=window)
     return _job_create_limiter

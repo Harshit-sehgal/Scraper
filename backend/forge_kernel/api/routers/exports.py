@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["exports"])
 
 _export_service = ExportService()
+
+
+def _safe_filename(name: str) -> str:
+    """Sanitize a string for use in Content-Disposition filenames."""
+    return re.sub(r"[^a-zA-Z0-9_\-.]", "_", name)[:128]
 
 
 def _get_service(
@@ -47,7 +53,7 @@ async def export_csv(
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={job_id}.csv"},
+        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(job_id)}.csv"'},
     )
 
 
@@ -67,7 +73,7 @@ async def export_json(
     return Response(
         content=json_content,
         media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename={job_id}.json"},
+        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(job_id)}.json"'},
     )
 
 
@@ -94,5 +100,5 @@ async def export_xlsx(
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={job_id}.xlsx"},
+        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(job_id)}.xlsx"'},
     )

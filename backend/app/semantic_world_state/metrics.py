@@ -103,7 +103,7 @@ class MetricsMixin:
                             {"envelope": eid, "pair": (r1, r2), "exclusion": exclusion, "type": "internal_repulsion"},
                         )
 
-        consistency_score = 1.0 - (len(contradictions) / max(len(envelopes), 1))
+        consistency_score = max(0.0, 1.0 - (len(contradictions) / max(len(envelopes), 1)))
 
         if contradictions:
             self.record_delta(

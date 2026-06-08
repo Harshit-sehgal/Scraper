@@ -412,9 +412,9 @@ class RecoveryStrategist:
             if "slow_factor" in tuned:
                 tuned["slow_factor"] = tuned["slow_factor"] * 0.7
 
-        # If domain has high failure rate, be more aggressive
+        # If domain has high failure rate, increase delay to back off
         if fail_rate > 0.5 and "delay_ms" in tuned:
-            tuned["delay_ms"] = int(tuned["delay_ms"] * 0.8)
+            tuned["delay_ms"] = int(tuned["delay_ms"] * 1.3)
 
         return tuned
 

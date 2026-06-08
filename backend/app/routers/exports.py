@@ -156,10 +156,10 @@ def create_exports_router(jobs_store: dict):
             return result
 
     async def _export_csv_impl(job_id: str):
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
         await run_in_threadpool(_refresh_job_for_export, job_id)
-        job = jobs_store[job_id]
+        job = jobs_store.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
         if job.results_on_disk:
             from app.utils.job_results_store import (
@@ -255,10 +255,10 @@ def create_exports_router(jobs_store: dict):
             return result
 
     async def _export_json_impl(job_id: str):
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
         await run_in_threadpool(_refresh_job_for_export, job_id)
-        job = jobs_store[job_id]
+        job = jobs_store.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
         if job.results_on_disk:
             from app.utils.job_results_store import (
@@ -339,10 +339,10 @@ def create_exports_router(jobs_store: dict):
         return result
 
     async def _export_excel_impl(job_id: str):
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
         await run_in_threadpool(_refresh_job_for_export, job_id)
-        job = jobs_store[job_id]
+        job = jobs_store.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
         def _build_excel_content():
             wb = Workbook(write_only=True)

@@ -69,7 +69,7 @@ export async function analyzeURL() {
     renderFieldList();
     renderAcquisitionBanner(data, url);
 
-    results.classList.remove("hidden");
+    results?.classList.remove("hidden");
     toast(`Found ${_analyzedFields.length} fields on ${url}`, "success");
   } catch (err) {
     if (error) error.classList.remove("hidden");

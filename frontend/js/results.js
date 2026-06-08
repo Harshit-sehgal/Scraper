@@ -74,6 +74,7 @@ export async function viewResults(id) {
   renderResultsSkeleton();
   try {
     const r = await apiFetch(`${API}/api/jobs/${id}`);
+    if (!r.ok) throw new Error(`Failed to load results: ${r.status}`);
     const j = await r.json();
     // Guard against stale responses: if the user has since clicked
     // another job's "View Results", ``currentJobId`` will have been
@@ -153,6 +154,10 @@ export async function viewResults(id) {
     syncResultsScrollSlider();
   } catch (e) {
     toast("Failed to load results", "error");
+    const thead = document.getElementById("res-thead");
+    const tbody = document.getElementById("res-tbody");
+    if (thead) thead.innerHTML = "";
+    if (tbody) tbody.innerHTML = '<tr><td class="empty-cell" colspan="100">Failed to load results</td></tr>';
   }
 }
 

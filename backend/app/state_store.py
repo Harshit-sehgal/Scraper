@@ -191,7 +191,10 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
         "world_state": world_state_data,
     }
 
-    _SAVE_EXECUTOR.submit(_write_state_to_disk, path, payload)
+    try:
+        _SAVE_EXECUTOR.submit(_write_state_to_disk, path, payload)
+    except RuntimeError:
+        logger.warning("State executor shut down; skipping save")
 
 
 def flush_state_writes() -> None:

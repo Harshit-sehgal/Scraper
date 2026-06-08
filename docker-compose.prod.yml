@@ -376,11 +376,15 @@ services:
     command:
       - |
         if [ -f /run/secrets/slack_webhook ]; then
-          export ALERTMANAGER_SLACK_WEBHOOK_URL="$$(cat /run/secrets/slack_webhook)"
+          ALERTMANAGER_SLACK_WEBHOOK_URL="$$(cat /run/secrets/slack_webhook)"
         else
-          export ALERTMANAGER_SLACK_WEBHOOK_URL=''
+          ALERTMANAGER_SLACK_WEBHOOK_URL=''
         fi
-        envsubst < /etc/alertmanager/alertmanager.yml.template \
+        sed -e "s|__ALERTMANAGER_SLACK_WEBHOOK_URL__|$${ALERTMANAGER_SLACK_WEBHOOK_URL}|g" \
+            -e "s|__ALERTMANAGER_SMTP_HOST__|$${ALERTMANAGER_SMTP_HOST:-}|g" \
+            -e "s|__ALERTMANAGER_EMAIL_FROM__|$${ALERTMANAGER_EMAIL_FROM:-}|g" \
+            -e "s|__ALERTMANAGER_EMAIL_TO__|$${ALERTMANAGER_EMAIL_TO:-}|g" \
+          < /etc/alertmanager/alertmanager.yml.template \
           > /tmp/alertmanager.yml
         if grep -q '__ALERTMANAGER_SMTP_HOST__\|__ALERTMANAGER_EMAIL_FROM__' /tmp/alertmanager.yml; then
           echo 'ERROR: alertmanager template substitution failed for SMTP_HOST / EMAIL_FROM' >&2

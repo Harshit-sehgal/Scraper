@@ -262,7 +262,7 @@ jobs:
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m coverage run --source=backend/app \
             -m pytest --reruns 3 --reruns-delay 10 \
-            -q backend/tests -o addopts= --tb=line --no-cov-on-fail -q
+            -q backend/tests -o addopts= --tb=line --no-cov-on-fail
           python -m coverage json -o coverage.json
           python scripts/check_coverage_floors.py coverage.json
           python -m coverage report --fail-under=60
@@ -275,7 +275,6 @@ jobs:
           name: coverage-report
           path: |
             coverage.json
-            coverage_html/
           retention-days: 30
 
   sbom:

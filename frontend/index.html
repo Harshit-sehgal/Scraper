@@ -450,12 +450,22 @@
               <span class="dash-card-title">📖 Quick Reference</span>
             </div>
             <div class="dash-card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; padding: 1rem">
-              <a href="/api/system/status" target="_blank" class="btn ghost small">System Status API</a>
-              <a href="/api/operator/health" target="_blank" class="btn ghost small">Health API</a>
-              <a href="/api/operator/dashboard" target="_blank" class="btn ghost small">Dashboard API</a>
-              <a href="/api/operator/predictions" target="_blank" class="btn ghost small">Predictions API</a>
-              <a href="/api/system/topology" target="_blank" class="btn ghost small">Topology API</a>
-              <a href="/docs" target="_blank" class="btn ghost small">API Docs</a>
+              <a href="/api/system/status" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                >System Status API</a
+              >
+              <a href="/api/operator/health" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                >Health API</a
+              >
+              <a href="/api/operator/dashboard" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                >Dashboard API</a
+              >
+              <a href="/api/operator/predictions" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                >Predictions API</a
+              >
+              <a href="/api/system/topology" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                >Topology API</a
+              >
+              <a href="/docs" target="_blank" rel="noopener noreferrer" class="btn ghost small">API Docs</a>
             </div>
           </div>
         </div>
@@ -990,7 +1000,7 @@
       <div class="shortcut-modal">
         <h2 id="apikey-modal-title">🔑 API Key</h2>
         <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
-        <form id="apikey-form" class="api-key-form" onsubmit="return false;">
+        <form id="apikey-form" class="api-key-form">
           <input
             type="password"
             id="apikey-input"

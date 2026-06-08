@@ -58,6 +58,9 @@ test-results/
 .DS_Store
 .commandcode/
 
+# Secrets directory (production credentials)
+.secrets/
+
 # AI agent auxiliary directories
 .agents/
 .codex/
