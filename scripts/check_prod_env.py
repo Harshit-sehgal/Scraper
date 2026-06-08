@@ -476,7 +476,7 @@ def check_postgres_connection(db_url: str) -> bool:
             cursor.close()
             conn.close()
             print("  [OK]    Postgres is reachable and responding.")
-            return True  # noqa: TRY300
+            return True
         except OperationalError as e:
             print(f"  [FAIL]  Could not connect to Postgres: {e}")
             print("          Ensure Postgres service is running and accessible at the configured URL.")
@@ -497,7 +497,7 @@ def check_postgres_connection(db_url: str) -> bool:
             cursor.execute("SELECT 1")
             cursor.fetchone()
         print("  [OK]    Postgres is reachable and responding.")
-        return True  # noqa: TRY300
+        return True
     except psycopg.OperationalError as e:
         print(f"  [FAIL]  Could not connect to Postgres: {e}")
         print("          Ensure Postgres service is running and accessible at the configured URL.")

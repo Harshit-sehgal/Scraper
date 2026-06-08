@@ -80,7 +80,7 @@ def configure_middleware(app: FastAPI) -> None:
     # a credential-leak catastrophe (any origin can issue authenticated
     # cross-site requests). Fail closed in production.
     if "*" in settings.CORS_ORIGINS and settings.ENV.lower() == "production":
-        raise RuntimeError(  # noqa: TRY003
+        raise RuntimeError(
             "CORS_ORIGINS cannot contain '*' in production when allow_credentials=True",
         )
     app.add_middleware(

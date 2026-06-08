@@ -565,7 +565,7 @@ def create_exports_router(jobs_store: dict):
                     writer.writerow(_flat_row(row, fieldnames))
 
         output.seek(0)
-        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
         return Response(
             content=output.getvalue(),
             media_type="text/csv",
@@ -605,7 +605,7 @@ def create_exports_router(jobs_store: dict):
             payload = {"exports": exports}
 
         json_content = json.dumps(payload, indent=2)
-        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
         return Response(
             content=json_content,
             media_type="application/json",
@@ -692,7 +692,7 @@ def create_exports_router(jobs_store: dict):
         wb.save(output)
         output.seek(0)
 
-        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
         return Response(
             content=output.getvalue(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

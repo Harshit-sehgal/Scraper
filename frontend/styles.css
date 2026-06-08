@@ -2533,3 +2533,52 @@ kbd {
     padding: 0.3rem 0.55rem;
   }
 }
+
+/* ─── Dark mode overrides for banners ─── */
+[data-theme="dark"] #result-warning.banner-warning {
+  background: #422006;
+  border-color: #a16207;
+  color: #fde047;
+}
+
+[data-theme="dark"] #lineage-summary {
+  background: #052e16;
+  border-color: #166534;
+  color: #86efac;
+}
+
+[data-theme="dark"] .acquisition-banner.recovered {
+  background: #052e16;
+  border-color: #166534;
+  color: #86efac;
+}
+
+[data-theme="dark"] .acquisition-banner.expired {
+  background: #422006;
+  border-color: #a16207;
+  color: #fde047;
+}
+
+[data-theme="dark"] .acquisition-banner.empty {
+  background: #450a0a;
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .acquisition-banner.session {
+  background: #431407;
+  border-color: #9a3412;
+  color: #fed7aa;
+}
+
+[data-theme="dark"] .acquisition-banner.direct {
+  background: #052e16;
+  border-color: #166534;
+  color: #86efac;
+}
+
+[data-theme="dark"] .banner-warning {
+  background: #422006;
+  border-color: #a16207;
+  color: #fde047;
+}

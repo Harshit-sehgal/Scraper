@@ -11,7 +11,7 @@ def test_pyflakes_clean() -> None:
     backend_dir = Path(__file__).resolve().parents[1]
 
     result = subprocess.run(
-        [str(Path(sys.executable).resolve()), "-m", "pyflakes", "app", "tests"],
+        [sys.executable, "-m", "pyflakes", "app", "tests"],
         cwd=str(backend_dir),
         text=True,
         capture_output=True,

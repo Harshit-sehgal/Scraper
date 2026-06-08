@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import secrets
+import threading
 import zipfile
 from enum import StrEnum
 from typing import Annotated
@@ -496,6 +497,7 @@ async def analyze_url(
 # ─── Prometheus /metrics ────────────────────────────────────────────────
 
 METRICS_COLLECTION_ERRORS = 0
+_METRICS_ERRORS_LOCK = threading.Lock()
 _METRICS_TOKEN_WARN_EMITTED = False
 
 
@@ -608,7 +610,7 @@ def _render_basic_metrics_text() -> str:
                 try:
                     import datetime as _dt
 
-                    age = (_dt.datetime.now(_dt.timezone.utc) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                    age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
                 except (ValueError, TypeError):
                     age = -1.0
             else:
@@ -789,7 +791,8 @@ async def metrics(request: Request):
         backend_gauge.labels(backend=backend).set(1)
     except (AttributeError, ImportError, RuntimeError):
         backend_ok = 0
-        METRICS_COLLECTION_ERRORS += 1
+        with _METRICS_ERRORS_LOCK:
+            METRICS_COLLECTION_ERRORS += 1
         logger.exception("Metrics: backend collection failed")
 
     backend_ok_gauge = Gauge(
@@ -814,7 +817,8 @@ async def metrics(request: Request):
         queue_dead_letter.set(q_status.get("dead_letter", 0))
     except (AttributeError, ImportError, RuntimeError):
         queue_ok = 0
-        METRICS_COLLECTION_ERRORS += 1
+        with _METRICS_ERRORS_LOCK:
+            METRICS_COLLECTION_ERRORS += 1
         logger.exception("Metrics: queue collection failed")
 
     queue_ok_gauge = Gauge(
@@ -873,14 +877,15 @@ async def metrics(request: Request):
                     try:
                         import datetime as _dt
 
-                        age = (_dt.datetime.now(_dt.timezone.utc) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                        age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
                     except (ValueError, TypeError):
                         age = -1.0
                 else:
                     age = -1.0
                 hb_age_gauge.labels(worker_id=wid, hostname=hostname, pid=pid).set(age)
     except (AttributeError, ImportError, RuntimeError):
-        METRICS_COLLECTION_ERRORS += 1
+        with _METRICS_ERRORS_LOCK:
+            METRICS_COLLECTION_ERRORS += 1
         logger.debug("Metrics: worker heartbeat collection failed")
 
     # Request duration histogram

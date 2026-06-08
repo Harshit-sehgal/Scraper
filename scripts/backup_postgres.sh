@@ -26,7 +26,7 @@ echo "======================================================================"
 mkdir -p "${BACKUP_DIR}"
 
 # 1. Locate configuration
-ENV_FILE=".env.production"
+ENV_FILE="${PROJECT_DIR}/.env.production"
 if [ -f "${ENV_FILE}" ]; then
     echo "[INFO] Loading configuration from '${ENV_FILE}'."
     # Export variables from file

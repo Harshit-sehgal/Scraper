@@ -184,6 +184,7 @@ def run_all_adaptive_hooks(
 
     Args:
         Returns: Number of new motifs added (0 if none or world_state unavailable).
+
     """
     new_motifs = _run_motif_feedback(results, schema_fields, world_state)
     _run_selector_decay_prediction(domain, selector_hit_rate)

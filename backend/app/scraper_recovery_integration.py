@@ -165,17 +165,17 @@ async def scrape_url_with_recovery(
             if chaos.is_failure_active(FailureMode.NETWORK_TIMEOUT):
                 logger.warning("[Chaos Simulation] Injecting NETWORK_TIMEOUT")
                 msg = "Timed out waiting for response"
-                raise Exception(msg)  # noqa: TRY002, TRY301
+                raise TimeoutError(msg)
 
             if chaos.is_failure_active(FailureMode.BROWSER_CRASH):
                 logger.warning("[Chaos Simulation] Injecting BROWSER_CRASH")
                 msg = "Browser target closed unexpectedly"
-                raise Exception(msg)  # noqa: TRY002, TRY301
+                raise ConnectionError(msg)
 
             if chaos.is_failure_active(FailureMode.ANTI_BOT_ESCALATION):
                 logger.warning("[Chaos Simulation] Injecting ANTI_BOT_ESCALATION")
                 msg = "403 Forbidden - WAF Challenge"
-                raise Exception(msg)  # noqa: TRY002, TRY301
+                raise PermissionError(msg)
 
             if chaos.is_failure_active(FailureMode.SELECTOR_POISONING):
                 logger.warning("[Chaos Simulation] Injecting SELECTOR_POISONING (zero records)")
@@ -202,12 +202,12 @@ async def scrape_url_with_recovery(
 
             if last_event and last_event.error:
                 logger.warning("Scrape attempt %d failed: %s", attempt, last_event.error)
-                raise Exception(last_event.error)  # noqa: TRY002, TRY301
+                raise RuntimeError(last_event.error)
 
             if not results and attempt < max_recovery_attempts:
                 logger.warning("Scrape attempt %d returned 0 records, triggering recovery", attempt)
                 msg = "zero_records_extracted"
-                raise Exception(msg)  # noqa: TRY002, TRY301
+                raise ValueError(msg)
 
             recovery_stats["success"] = True
             if hasattr(result, "network_diagnostics"):
@@ -260,7 +260,7 @@ async def scrape_url_with_recovery(
                 state.value if hasattr(state, "value") else str(state),
                 anti_bot_score,
             )
-            return results, recovery_stats  # noqa: TRY300
+            return results, recovery_stats
 
         except Exception as e:  # nosec B110
             last_error = e

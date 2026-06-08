@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Module-level state ───────────────────────────────────────────────────
 _logger: logging.Logger | None = None
+_audit_lock = threading.Lock()
 
 
 def _get_audit_logger() -> logging.Logger:
@@ -36,41 +38,44 @@ def _get_audit_logger() -> logging.Logger:
     global _logger
     if _logger is not None:
         return _logger
+    with _audit_lock:
+        if _logger is not None:
+            return _logger
 
-    _logger = logging.getLogger("audit")
-    _logger.setLevel(logging.INFO)
+        _logger = logging.getLogger("audit")
+        _logger.setLevel(logging.INFO)
 
-    # Prevent the audit logger from propagating to the root logger
-    _logger.propagate = False
+        # Prevent the audit logger from propagating to the root logger
+        _logger.propagate = False
 
-    # Only add handler if not already configured
-    if not _logger.handlers:
-        try:
-            from app.config import settings
+        # Only add handler if not already configured
+        if not _logger.handlers:
+            try:
+                from app.config import settings
 
-            configured_log_dir = settings.AUDIT_LOG_DIR
-        except Exception:
-            logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
-            configured_log_dir = ""
+                configured_log_dir = settings.AUDIT_LOG_DIR
+            except Exception:
+                logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
+                configured_log_dir = ""
 
-        log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / AUDIT_LOG_FILE
+            log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / AUDIT_LOG_FILE
 
-        handler = RotatingFileHandler(
-            filename=str(log_path),
-            maxBytes=AUDIT_LOG_MAX_BYTES,
-            backupCount=AUDIT_LOG_BACKUP_COUNT,
-            encoding="utf-8",
-        )
-        handler.setLevel(logging.INFO)
+            handler = RotatingFileHandler(
+                filename=str(log_path),
+                maxBytes=AUDIT_LOG_MAX_BYTES,
+                backupCount=AUDIT_LOG_BACKUP_COUNT,
+                encoding="utf-8",
+            )
+            handler.setLevel(logging.INFO)
 
-        formatter = logging.Formatter(
-            "%(asctime)s [AUDIT] %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S",
-        )
-        handler.setFormatter(formatter)
-        _logger.addHandler(handler)
+            formatter = logging.Formatter(
+                "%(asctime)s [AUDIT] %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
+            handler.setFormatter(formatter)
+            _logger.addHandler(handler)
 
     return _logger
 

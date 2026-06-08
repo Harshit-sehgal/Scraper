@@ -223,7 +223,8 @@ export function onFilterOpChange(sel) {
 
   if (isDistance) {
     row.classList.add("has-distance");
-    row.querySelector(".ff-value-group label").textContent = "Max km/mi";
+    const label = row.querySelector(".ff-value-group label");
+    if (label) label.textContent = "Max km/mi";
     const xBtn = row.querySelector(".btn-x");
     const distId = _filterCounter;
     const origin = document.createElement("div");
@@ -232,11 +233,14 @@ export function onFilterOpChange(sel) {
     const unit = document.createElement("div");
     unit.className = "form-group dist-extra";
     unit.innerHTML = `<label for="ff-unit-${distId}">Unit</label><select class="ff-unit" id="ff-unit-${distId}"><option value="km">km</option><option value="miles">miles</option></select>`;
-    row.insertBefore(origin, xBtn);
-    row.insertBefore(unit, xBtn);
+    if (xBtn) {
+      row.insertBefore(origin, xBtn);
+      row.insertBefore(unit, xBtn);
+    }
   } else {
     row.classList.remove("has-distance");
-    row.querySelector(".ff-value-group label").textContent = "Value";
+    const label = row.querySelector(".ff-value-group label");
+    if (label) label.textContent = "Value";
   }
 }
 
@@ -313,7 +317,8 @@ export async function previewDiscovery() {
 export async function submitJob(e) {
   e.preventDefault();
 
-  const name = document.getElementById("inp-name").value.trim();
+  const nameEl = document.getElementById("inp-name");
+  const name = nameEl ? nameEl.value.trim() : "";
   if (!name) {
     toast("Enter a job name", "error");
     return;
@@ -339,8 +344,8 @@ export async function submitJob(e) {
   // Filters
   const filters = [];
   document.querySelectorAll(".filter-row").forEach((row) => {
-    const f = row.querySelector(".ff-field").value;
-    const op = row.querySelector(".ff-op").value;
+    const f = row.querySelector(".ff-field")?.value;
+    const op = row.querySelector(".ff-op")?.value;
     const val = row.querySelector(".ff-value")?.value.trim() || "";
     if (f) {
       const filter = { field_name: f, operator: op, value: val };
@@ -357,17 +362,18 @@ export async function submitJob(e) {
   let topic = "",
     location = "",
     domain = "";
-  const sourcePolicy = document.getElementById("inp-source-policy").value || "official_plus_directory";
-  const intent = document.getElementById("inp-intent").value.trim();
-  const originLocation = document.getElementById("inp-origin-location").value.trim();
-  const maxDistanceRaw = parseFloat(document.getElementById("inp-max-distance-km").value);
+  const sourcePolicy = document.getElementById("inp-source-policy")?.value || "official_plus_directory";
+  const intent = document.getElementById("inp-intent")?.value?.trim() || "";
+  const originLocation = document.getElementById("inp-origin-location")?.value?.trim() || "";
+  const maxDistanceRaw = parseFloat(document.getElementById("inp-max-distance-km")?.value);
   const maxDistance = Number.isFinite(maxDistanceRaw) ? maxDistanceRaw : null;
-  const minScoreRaw = parseFloat(document.getElementById("inp-min-score").value);
+  const minScoreRaw = parseFloat(document.getElementById("inp-min-score")?.value);
   const minScore = Number.isFinite(minScoreRaw) ? Math.max(0, Math.min(1, minScoreRaw)) : 0.35;
-  const perDomainInput = parseInt(document.getElementById("inp-max-per-domain").value, 10);
+  const perDomainInput = parseInt(document.getElementById("inp-max-per-domain")?.value, 10);
   const maxPerDomain = Number.isFinite(perDomainInput) ? Math.max(1, Math.min(25, perDomainInput)) : 4;
-  document.getElementById("inp-max-per-domain").value = String(maxPerDomain);
-  let maxPages = parseInt(document.getElementById("inp-max-pages").value, 10) || 10;
+  const perDomainTarget = document.getElementById("inp-max-per-domain");
+  if (perDomainTarget) perDomainTarget.value = String(maxPerDomain);
+  let maxPages = parseInt(document.getElementById("inp-max-pages")?.value, 10) || 10;
 
   if (currentMode === "manual") {
     const urlsEl = document.getElementById("inp-urls");

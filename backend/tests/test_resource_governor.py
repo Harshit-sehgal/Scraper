@@ -66,6 +66,8 @@ def test_token_tracking_and_throttling() -> None:
 
 @pytest.mark.asyncio
 async def test_check_browser_memory_pruning(monkeypatch) -> None:
+    import asyncio
+
     class MockContext:
         def __init__(self) -> None:
             self.closed = False
@@ -81,6 +83,7 @@ async def test_check_browser_memory_pruning(monkeypatch) -> None:
                 "domain-3": MockContext(),
                 "domain-4": MockContext(),
             }
+            self._lock = asyncio.Lock()
 
     mock_pool = MockPool()
     monkeypatch.setattr("app.browser_pool.get_browser_pool", lambda: mock_pool)

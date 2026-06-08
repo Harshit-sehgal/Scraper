@@ -21,6 +21,7 @@ Telemetry helps choose what works best per domain.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
@@ -286,11 +287,11 @@ class StrategyEvolutionEngine:
         # Exploration vs exploitation is only useful after the cold-start safe
         # path has gathered enough samples. Exploring before that can choose a
         # non-browser fetch for JavaScript-backed pages and miss network data.
-        if random.random() < self.exploration_probability:  # nosec B311  # noqa: S311
+        if random.random() < self.exploration_probability:  # nosec B311
             # Randomly pick a strategy we haven't failed too much on
             untried = [s for s in FetchStrategy if state.strategies[s].failure_count < 3]
             if untried:
-                selected = random.choice(untried)  # nosec B311  # noqa: S311
+                selected = random.choice(untried)  # nosec B311
                 return StrategyRecommendation(
                     recommended_strategy=selected,
                     alternatives=[FetchStrategy.PLAYWRIGHT_FULL],
@@ -508,11 +509,14 @@ class StrategyEvolutionEngine:
 
 # Global singleton
 _evolution_engine: StrategyEvolutionEngine | None = None
+_evolution_engine_lock = threading.Lock()
 
 
 def get_strategy_evolution_engine() -> StrategyEvolutionEngine:
     """Get the global strategy evolution engine."""
     global _evolution_engine
     if _evolution_engine is None:
-        _evolution_engine = StrategyEvolutionEngine()
+        with _evolution_engine_lock:
+            if _evolution_engine is None:
+                _evolution_engine = StrategyEvolutionEngine()
     return _evolution_engine

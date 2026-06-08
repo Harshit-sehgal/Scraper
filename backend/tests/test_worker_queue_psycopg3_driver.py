@@ -26,12 +26,12 @@ class FakeColumn:
 class FakePsycopg3Cursor:
     """Minimal psycopg 3 cursor that records SQL and parameters."""
 
-    def __init__(self, conn: "FakePsycopg3Conn", description: list | None = None) -> None:
+    def __init__(self, conn: FakePsycopg3Conn, description: list | None = None) -> None:
         self._conn = conn
         self._description = description
         self._rows: list[tuple] = []
 
-    def __enter__(self) -> "FakePsycopg3Cursor":
+    def __enter__(self) -> FakePsycopg3Cursor:
         return self
 
     def __exit__(self, *exc: Any) -> None:

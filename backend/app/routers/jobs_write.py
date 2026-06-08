@@ -65,6 +65,7 @@ def register_jobs_write_routes(
         manager: Thread-safe store manager for jobs and recycle bin.
         schedule_task_fn: Callable to schedule a background task (fires-and-forgets a coroutine).
         run_job_coro_fn: Callable that returns a coroutine to run a job by ID.
+
     """
 
     @router.post("/api/discover")
@@ -374,7 +375,7 @@ def register_jobs_write_routes(
         if not job.schema_fields:
             raise HTTPException(status_code=400, detail="Job has no schema fields for re-cleaning")
 
-        started = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        started = datetime.datetime.now(datetime.UTC).isoformat()
         before_records = len(results_list)
         working_rows = [dict(r) for r in results_list]
         reclean_warnings: list[str] = []
@@ -412,7 +413,6 @@ def register_jobs_write_routes(
                     f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
             except Exception:
-                logger.exception("Re-clean failed")
                 cleaned_rows = working_rows
                 reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
                 logger.exception("Job %s: Re-clean failed", job_id)
@@ -442,10 +442,10 @@ def register_jobs_write_routes(
             job.results = normalize_job_results(filtered_results, job.schema_fields)
             job.total_records = total
             job.filtered_records = filtered_count
-            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
             job.status = JobStatus.COMPLETED
 
-            scraped_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            scraped_at = datetime.datetime.now(datetime.UTC).isoformat()
             for row in job.results:
                 row["scraped_at"] = scraped_at
 

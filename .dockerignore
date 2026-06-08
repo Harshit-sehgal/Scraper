@@ -13,6 +13,8 @@
 # ─── Local Environment ─────────────────────────────────────────────────────
 .env
 .env.*.local
+.env.production
+.secrets/
 *.pem
 *.key
 

@@ -233,7 +233,7 @@ def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> b
         try:
             path.unlink()
             logger.info("Successfully deleted results file from disk for job %s", job_id)
-            return True  # noqa: TRY300
+            return True
         except Exception:
             logger.exception("Failed to delete results file from disk for job %s", job_id)
     return False

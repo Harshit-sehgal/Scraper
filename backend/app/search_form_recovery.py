@@ -363,7 +363,7 @@ async def _try_form_search_recovery(
                 redirects_followed += 1
                 if redirects_followed > max_redirects:
                     msg = f"Too many redirects (max {max_redirects})"
-                    raise ValueError(msg)  # noqa: TRY301
+                    raise ValueError(msg)
 
                 redirect_target = resp.headers.get("location", "")
                 if not redirect_target:

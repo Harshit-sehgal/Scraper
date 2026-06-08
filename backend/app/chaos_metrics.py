@@ -59,7 +59,7 @@ class ChaosTestSuite:
                 "success_rate": scenario.expected_success_rate,
                 "errors": [],
             }
-            return result  # noqa: TRY300
+            return result
 
         except Exception as e:
             self.logger.exception("Error running scenario %s", scenario.name)

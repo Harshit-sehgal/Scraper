@@ -61,7 +61,7 @@ class JobService:
         job.cancel_requested = True
         if job.status in (JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING):
             job.status = JobStatus.CANCELED
-            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
         self._persist()
         return job
 
@@ -77,7 +77,9 @@ class JobService:
         repo = get_job_repository()
         self._jobs.pop(job_id, None)
         self._recycle_bin.pop(job_id, None)
-        return repo.hard_delete(job_id)
+        result = repo.hard_delete(job_id)
+        self._persist()
+        return result
 
     def restore(self, job_id: str) -> Job | None:
         job = self._recycle_bin.pop(job_id, None)
@@ -97,12 +99,12 @@ class JobService:
 
         if job.cancel_requested:
             job.status = JobStatus.CANCELED
-            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
             self._persist()
             return
 
         job.status = JobStatus.RUNNING
-        job.started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        job.started_at = datetime.datetime.now(datetime.UTC).isoformat()
         job.progress_total = len(job.urls) + 2
         job.progress_current = 0
         self._persist()
@@ -113,7 +115,7 @@ class JobService:
         for idx, url in enumerate(job.urls):
             if job.cancel_requested:
                 job.status = JobStatus.CANCELED
-                job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
                 self._persist()
                 return
 
@@ -161,7 +163,7 @@ class JobService:
         else:
             job.status = JobStatus.COMPLETED
 
-        job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
         job.progress_current = job.progress_total
         self._persist()
 

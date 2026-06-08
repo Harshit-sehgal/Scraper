@@ -122,7 +122,7 @@ async def run_job(
     }
     started_at = time.monotonic()
     if not job.started_at:
-        job.started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        job.started_at = datetime.datetime.now(datetime.UTC).isoformat()
 
     if job.cancel_requested or await _cancel_requested_from_db():
         job.cancel_requested = True
@@ -186,7 +186,7 @@ async def run_job(
                     return
                 job.status = JobStatus.FAILED
                 job.error = "Could not discover any URLs for this topic"
-                job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
                 _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_job_state_fn)
                 await _persist_job_state(critical=True)
                 return
@@ -375,7 +375,7 @@ async def run_job(
                     async with job_lock:
                         pass  # serialise against concurrent progress updates
                     await _mark_completed()
-                    return idx, results, True, url_meta  # noqa: TRY300
+                    return idx, results, True, url_meta
                 except asyncio.CancelledError:
                     policy.record_failure(url, failure_type="canceled")
                     await _safe_log(f"Canceled scrape for {url}", level="warning")
@@ -601,7 +601,7 @@ async def run_job(
         )
 
         # Add scraped_at timestamp to each record
-        scraped_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        scraped_at = datetime.datetime.now(datetime.UTC).isoformat()
         for record in job.results:
             record["scraped_at"] = scraped_at
 
@@ -696,7 +696,7 @@ async def run_job(
             job.status = JobStatus.COMPLETED
             job.error = ""
         job.cancel_requested = False
-        job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
         job.progress_current = job.progress_total
         save_semantic_state()
         # Contextual completion log message — use critical persistence for
@@ -724,7 +724,7 @@ async def run_job(
         else:
             job.status = JobStatus.FAILED
             job.error = str(e)
-            job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
             _add_job_log(job, f"Job failed: {e!s}", level="error")
             logger.exception("Job %s: Failed (%s)", job_id, type(e).__name__)
         await _persist_job_state(critical=True)

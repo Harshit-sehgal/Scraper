@@ -27,6 +27,13 @@ export function attrStr(s) {
 export function toast(msg, type = "info", duration = 3000) {
   const c = document.getElementById("toasts");
   if (!c) return;
+
+  // Limit visible toasts to prevent DOM bloat
+  const MAX_TOASTS = 5;
+  while (c.children.length >= MAX_TOASTS) {
+    c.firstChild.remove();
+  }
+
   const t = document.createElement("div");
   t.className = `toast ${type}`;
 

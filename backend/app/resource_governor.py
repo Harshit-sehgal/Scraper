@@ -50,34 +50,35 @@ class ResourceGovernor:
         pool = get_browser_pool()
 
         # Simple simulated RSS page memory tracking
-        num_contexts = len(pool._contexts)
-        estimated_memory_mb = num_contexts * 150.0  # Assumes ~150MB per running context
+        async with pool._lock:
+            num_contexts = len(pool._contexts)
+            estimated_memory_mb = num_contexts * 150.0  # Assumes ~150MB per running context
 
-        pruned = 0
-        if estimated_memory_mb > self.budgets.max_browser_memory_mb:
-            logger.warning(
-                "[Governor] Browser memory limit exceeded: %.2fMB > %.2fMB. Pruning stale contexts.",
-                estimated_memory_mb,
-                self.budgets.max_browser_memory_mb,
-            )
-            # Prune / close half of active contexts
-            to_prune = num_contexts // 2
-            keys = list(pool._contexts.keys())
-            for i in range(min(to_prune, len(keys))):
-                key = keys[i]
-                ctx = pool._contexts.pop(key, None)
-                if ctx:
-                    try:
-                        await ctx.close()
-                    except Exception as e:
-                        logger.debug("Failed to close context during prune: %s", e)
-                    pruned += 1
+            pruned = 0
+            if estimated_memory_mb > self.budgets.max_browser_memory_mb:
+                logger.warning(
+                    "[Governor] Browser memory limit exceeded: %.2fMB > %.2fMB. Pruning stale contexts.",
+                    estimated_memory_mb,
+                    self.budgets.max_browser_memory_mb,
+                )
+                # Prune / close half of active contexts
+                to_prune = num_contexts // 2
+                keys = list(pool._contexts.keys())
+                for i in range(min(to_prune, len(keys))):
+                    key = keys[i]
+                    ctx = pool._contexts.pop(key, None)
+                    if ctx:
+                        try:
+                            await ctx.close()
+                        except Exception as e:
+                            logger.debug("Failed to close context during prune: %s", e)
+                        pruned += 1
 
-            self.metrics["browser_prunes"] += pruned
-            estimated_memory_mb = len(pool._contexts) * 150.0
+                self.metrics["browser_prunes"] += pruned
+                estimated_memory_mb = len(pool._contexts) * 150.0
 
         return {
-            "num_contexts": len(pool._contexts),
+            "num_contexts": num_contexts,
             "estimated_memory_mb": estimated_memory_mb,
             "pruned": pruned,
         }

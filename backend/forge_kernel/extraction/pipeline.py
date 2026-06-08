@@ -35,7 +35,7 @@ class ExtractionPipeline:
     """Deterministic staged extraction pipeline."""
 
     def __init__(self) -> None:
-        self._attempts: list[ExtractionAttempt] = []
+        pass
 
     async def run(
         self,
@@ -53,7 +53,7 @@ class ExtractionPipeline:
         from forge_kernel.extraction.fetch import fetch_page_content
 
         # Stage 1: Fetch
-        self._attempts = []
+        attempts: list[ExtractionAttempt] = []
         fetch_result = await fetch_page_content(url, use_browser=False)
         if fetch_result.error:
             logger.warning("Fetch failed for %s: %s", url, fetch_result.error)
@@ -64,7 +64,7 @@ class ExtractionPipeline:
             return PipelineResult(
                 records=[],
                 quality_report={"total_records": 0, "completeness_score": 0.0},
-                attempts=self._attempts,
+                attempts=attempts,
                 warnings=[f"Failed to fetch {url}: {fetch_result.error or 'empty response'}"],
                 failure={"stage": "fetch", "error": fetch_result.error or "empty response"},
             )
@@ -144,7 +144,7 @@ class ExtractionPipeline:
                     ),
                 )
 
-            self._attempts.append(
+            attempts.append(
                 ExtractionAttempt(
                     url=url,
                     strategy="orchestrated",
@@ -159,13 +159,13 @@ class ExtractionPipeline:
             return PipelineResult(
                 records=records,
                 quality_report=quality_report,
-                attempts=self._attempts,
+                attempts=attempts,
             )
 
         except Exception as e:
             logger.exception("Extraction failed for %s", url)
             duration = (time.monotonic() - start) * 1000
-            self._attempts.append(
+            attempts.append(
                 ExtractionAttempt(
                     url=url,
                     strategy="orchestrated",
@@ -177,7 +177,7 @@ class ExtractionPipeline:
             return PipelineResult(
                 records=[],
                 quality_report={"total_records": 0, "completeness_score": 0.0},
-                attempts=self._attempts,
+                attempts=attempts,
                 warnings=[f"Extraction failed for {url}: {e}"],
                 failure={"stage": "extraction", "error": str(e)},
             )

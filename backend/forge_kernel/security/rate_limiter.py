@@ -51,6 +51,7 @@ class SlidingWindowCounter:
 
 _global_limiter: SlidingWindowCounter | None = None
 _job_create_limiter: SlidingWindowCounter | None = None
+_limiter_lock = __import__("threading").Lock()
 
 
 def _parse_rate_limit(rate_str: str) -> tuple[int, float]:
@@ -71,18 +72,22 @@ def _parse_rate_limit(rate_str: str) -> tuple[int, float]:
 def get_global_limiter() -> SlidingWindowCounter:
     global _global_limiter
     if _global_limiter is None:
-        from forge_kernel.config import settings
+        with _limiter_lock:
+            if _global_limiter is None:
+                from forge_kernel.config import settings
 
-        count, window = _parse_rate_limit(settings.security.RATE_LIMIT_GLOBAL)
-        _global_limiter = SlidingWindowCounter(max_requests=count, window_seconds=window)
+                count, window = _parse_rate_limit(settings.security.RATE_LIMIT_GLOBAL)
+                _global_limiter = SlidingWindowCounter(max_requests=count, window_seconds=window)
     return _global_limiter
 
 
 def get_job_create_limiter() -> SlidingWindowCounter:
     global _job_create_limiter
     if _job_create_limiter is None:
-        from forge_kernel.config import settings
+        with _limiter_lock:
+            if _job_create_limiter is None:
+                from forge_kernel.config import settings
 
-        count, window = _parse_rate_limit(settings.security.RATE_LIMIT_JOB_CREATE)
-        _job_create_limiter = SlidingWindowCounter(max_requests=count, window_seconds=window)
+                count, window = _parse_rate_limit(settings.security.RATE_LIMIT_JOB_CREATE)
+                _job_create_limiter = SlidingWindowCounter(max_requests=count, window_seconds=window)
     return _job_create_limiter

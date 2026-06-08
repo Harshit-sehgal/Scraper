@@ -152,7 +152,7 @@ def job_to_row(job: Job) -> dict:
         "started_at": job.started_at if job.started_at is not None else "",
         "results_on_disk": job.results_on_disk,
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
-        "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "updated_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "deleted_at": None,
     }
 
@@ -479,21 +479,21 @@ def _fetch_all(conn, sql: str, params=None) -> list[dict]:
     """Module-level wrapper delegating to the current driver's _fetch_all."""
     fn = _driver_fetch_all
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")  # noqa: TRY003
+        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
     return fn(conn, sql, params)
 
 
 def _fetch_one(conn, sql: str, params=None) -> dict | None:
     fn = _driver_fetch_one
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")  # noqa: TRY003
+        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
     return fn(conn, sql, params)
 
 
 def execute(conn, sql: str, params=None):
     fn = _driver_execute
     if fn is None:
-        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")  # noqa: TRY003
+        raise RuntimeError("Postgres driver not initialised — call _set_driver_functions first")
     return fn(conn, sql, params)
 
 
@@ -741,7 +741,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                         jobs_store[job.id] = job
 
                 if recover_in_progress:
-                    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    now_iso = datetime.datetime.now(datetime.UTC).isoformat()
                     dirty_ids = []
                     for job in list(jobs_store.values()):
                         if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
@@ -819,7 +819,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
             for job in recycle_bin.values():
                 row = job_to_row(job)
-                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                now_iso = datetime.datetime.now(datetime.UTC).isoformat()
                 row["deleted_at"] = now_iso
                 cols = ", ".join(row.keys())
                 ph = ", ".join("%s" for _ in row)
@@ -1010,7 +1010,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             row = self._fetch_one(conn, "SELECT * FROM jobs WHERE id = %s AND deleted_at IS NULL", (job_id,))
             if not row:
                 return False
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            now = datetime.datetime.now(datetime.UTC).isoformat()
             self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, job_id))
             cols_to_copy = [k for k in row if k != "deleted_at"]
             insert_cols = ", ".join(cols_to_copy)
@@ -1062,7 +1062,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 (list(terminal_statuses), older_than) if older_than else (list(terminal_statuses),),
             )
             for row in rows:
-                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                now = datetime.datetime.now(datetime.UTC).isoformat()
                 self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, row["id"]))
                 cols = [k for k in row if k != "deleted_at"]
                 col_list = ", ".join(cols)
@@ -1089,7 +1089,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
     def save_world_state(self, payload: dict) -> None:
         self._ensure()
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.UTC).isoformat()
         payload_json = json.dumps(payload, ensure_ascii=False)
         with self._conn() as conn:
             self._execute(
@@ -1103,7 +1103,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
 
     def record_worker_heartbeat(self, worker_id: str, hostname: str, pid: int) -> None:
         self._ensure()
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now = datetime.datetime.now(datetime.UTC).isoformat()
         with self._conn() as conn:
             # The composite primary key (worker_id, pid) — see schema v6 —
             # lets two workers on the same host coexist. The v5 schema
@@ -1153,7 +1153,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         alive = False
         if last_heartbeat:
             try:
-                delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_heartbeat)
+                delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_heartbeat)
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False
@@ -1176,7 +1176,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             alive = False
             if last_hb:
                 try:
-                    delta = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(last_hb)
+                    delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_hb)
                     alive = delta.total_seconds() < ttl_seconds
                 except (ValueError, TypeError):
                     alive = False

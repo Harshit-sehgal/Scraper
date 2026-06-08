@@ -240,7 +240,8 @@ class TransactionalPriorityQueue:
 
     def mark_completed(self, entry: PriorityQueueEntry) -> None:  # noqa: ARG002, RUF100
         """Increment completed counter (for metrics, entry already popped)."""
-        self._completed_count += 1
+        with self._lock:
+            self._completed_count += 1
 
     def size(self) -> int:
         """Return the current queue size (excluding lazily-deleted entries)."""

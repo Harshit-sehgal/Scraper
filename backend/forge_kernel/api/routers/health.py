@@ -31,7 +31,6 @@ async def ready():
         repo = get_job_repository()
         backend = getattr(repo, "backend", "sqlite")
 
-        # Simple health check via load
         repo.load_all()
     except Exception as e:
         content = {"status": "not_ready"}

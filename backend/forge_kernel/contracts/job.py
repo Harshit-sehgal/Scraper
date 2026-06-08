@@ -116,7 +116,7 @@ class JobStatus(StrEnum):
 class LogEntry(BaseModel):
     """A single log entry for a job."""
 
-    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
     message: str
     level: str = "info"
 
@@ -147,7 +147,7 @@ class Job(BaseModel):
     search_params: dict[str, str] | None = Field(default=None)
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
     started_at: str | None = None
     completed_at: str | None = None
     total_records: int = 0

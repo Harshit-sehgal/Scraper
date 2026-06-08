@@ -31,7 +31,7 @@ from __future__ import annotations
 import ast
 import os
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
@@ -142,7 +142,7 @@ def collect_violations(app_root: str) -> tuple[list[tuple[str, int, str, list[st
     Each violation is a tuple of ``(relative_path, lineno, module, names)``.
     """
     if not os.path.isdir(app_root):
-        raise FileNotFoundError(f"app root not found: {app_root}")  # noqa: TRY003
+        raise FileNotFoundError(f"app root not found: {app_root}")
 
     violations: list[tuple[str, int, str, list[str]]] = []
     files_checked = 0
