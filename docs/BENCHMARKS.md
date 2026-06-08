@@ -28,7 +28,7 @@ Files exist:
 - `backend/tests/golden_dataset/expected/quotes_toscrape.json`
 - `backend/tests/golden_dataset/expected/scrapethissite_simple.json`
 
-The golden test computes record-level F1 when expected output exists and now enforces modest per-site thresholds from `sites.json`. The current live command completed with `7 passed, 1 skipped in 42.74s`: books `F1=0.650`, quotes `F1=1.000`, countries `F1=0.680`, example `F1=1.000`, and `httpbin_html` was successfully and gracefully skipped due to a transient external `503 Service Temporarily Unavailable` server error. This shows the inherent fragility of live external web scraping tests and serves as regression evidence, not proof of broad real-world extraction accuracy.
+The golden test computes record-level F1 when expected output exists and now enforces modest per-site thresholds from `sites.json`. Previous live results: books `F1=0.650`, quotes `F1=1.000`, countries `F1=0.680`, example `F1=1.000`. Scores may vary with site changes; rerun `pytest backend/tests/golden_dataset/ -v` for fresh numbers.
 
 ## Benchmark Classification
 

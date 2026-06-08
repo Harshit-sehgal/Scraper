@@ -103,20 +103,23 @@ async def _fetch_with_browser(url: str) -> FetchResult:
                 viewport={"width": settings.browser.BROWSER_VIEWPORT_WIDTH, "height": settings.browser.BROWSER_VIEWPORT_HEIGHT},
                 user_agent=settings.http.USER_AGENT,
             )
-            page = await ctx.new_page()
-            resp = await page.goto(url, wait_until="networkidle", timeout=settings.browser.PLAYWRIGHT_TIMEOUT)
-            html = await page.content()
-            final_url = page.url
+            try:
+                page = await ctx.new_page()
+                resp = await page.goto(url, wait_until="networkidle", timeout=settings.browser.PLAYWRIGHT_TIMEOUT)
+                html = await page.content()
+                final_url = page.url
 
-            duration = (time.monotonic() - start) * 1000
-            return FetchResult(
-                html=html,
-                url=url,
-                final_url=final_url,
-                status_code=resp.status if resp else 0,
-                strategy=FetchStrategy.BROWSER,
-                duration_ms=duration,
-            )
+                duration = (time.monotonic() - start) * 1000
+                return FetchResult(
+                    html=html,
+                    url=url,
+                    final_url=final_url,
+                    status_code=resp.status if resp else 0,
+                    strategy=FetchStrategy.BROWSER,
+                    duration_ms=duration,
+                )
+            finally:
+                await ctx.close()
     except Exception as e:
         duration = (time.monotonic() - start) * 1000
         logger.warning("Browser fetch failed for %s: %s", url, e)

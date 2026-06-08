@@ -50,7 +50,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 - Passing local tests does not prove production readiness in the target environment.
 - Browser tests prove local Playwright behavior, not broad anti-bot bypass.
 - Postgres tests prove local repository/queue behavior, not production failover, scheduling, or backups.
-- Postgres and Playwright browser tests were freshly run and validated 100% passing in this session, and Golden Dataset tests were verified (with 7/8 passing and httpbin.org skipped under expected 503 error). Docker image build and production Compose stack operations are documented historically.
+- Postgres and Playwright browser tests were validated in prior sessions; rerun `pytest backend/tests/ -v --ignore=backend/tests/unit -k postgres` and `npx playwright test` for fresh counts. Golden Dataset tests were verified (with 7/8 passing and httpbin.org skipped under expected 503 error). Docker image build and production Compose stack operations are documented historically.
 - Route-auth tests verify registration and boundaries, but do not replace a security review or penetration test.
 
 ## Manual Tests

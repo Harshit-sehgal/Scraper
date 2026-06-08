@@ -84,7 +84,7 @@ Goal: stop carrying redundant data on the `jobs` row.
 
 Steps:
 
-1. Bump schema to v5.
+1. ~~Bump schema to v5.~~ *(Already completed — current version is v6.)*
 2. Migration drops `jobs.results` and `jobs.logs` (both TEXT).
 3. Migrate any code path that still reads `Job.results` /
    `Job.logs` directly to the new readers.
@@ -98,7 +98,7 @@ Goal: take advantage of Postgres-native JSON indexing.
 
 Steps:
 
-1. Bump schema to v6.
+1. ~~Bump schema to v6.~~ *(Already completed — current version is v6.)*
 2. Convert `urls`, `schema_fields`, `filters`, `warnings`,
    `quality_report`, `selectors_map`, `search_params` to `JSONB`.
 3. Add GIN indexes for the columns that drive summary queries.

@@ -2,22 +2,22 @@
 
 **Last refreshed:** 2026-06-08
 **Scope:** Major modules/packages, not every helper file
-**Observed count:** `152` Python files under `backend/app`
+**Observed count:** `196` Python files under `backend/app`
 
 Classification values: Core, Stable supporting, Experimental, Test-only, Deprecated, Candidate for removal, Unknown.
 
 | Module or package | Classification | Purpose | Evidence of use | Tests | Risk | Recommendation |
 | --- | --- | --- | --- | --- | --- | --- |
 | `app.main` | Core | FastAPI app, middleware, routes, static mounts | API entry point | Safe suite, route matrix | Production routing unvalidated | Keep |
-| `app.routers.jobs` | Core | Job lifecycle API | Registered in app | API tests | Auth errors affect core product | Keep |
+| `app.routers.jobs`, `app.routers.jobs_read`, `app.routers.jobs_write`, `app.routers.jobs_state` | Core | Job lifecycle API (monolith + split modules) | Registered in app | API tests | Auth errors affect core product | Keep |
 | `app.routers.exports` | Core | CSV/JSON/Excel exports | Registered in app | Export/API tests | Large export behavior unvalidated | Keep |
 | `app.routers.scraper` | Core | Scraper telemetry/config/diagnostics routes | Registered in app | Safe suite, route matrix | Many experimental subroutes | Keep, label experimental endpoints |
-| `app.routers.operator` | Stable supporting | Operator dashboard/control routes | Registered in app | Route matrix | Admin/operator exposure risk | Keep |
+| `app.routers.operator` | Stable supporting | Operator dashboard/control routes (reserved — all former routes moved to `app.routers.experimental`) | Registered in app | Route matrix | Admin/operator exposure risk | Keep, currently empty |
 | `app.scraper` | Core | Scrape orchestration | Used by jobs and tests | Safe/browser tests | Large file and many experimental hooks | Keep, refactor later |
-| `app.browser`, `app.browser_pool` | Core | Playwright browser lifecycle | Used by scraper | Browser suite and container Chromium smoke | Broad website behavior unvalidated | Keep |
+| `app.browser_pool` | Core | Playwright browser lifecycle | Used by scraper | Browser suite and container Chromium smoke | Broad website behavior unvalidated | Keep |
 | `app.extraction_orchestrator` | Core | Schema/selector/network/text fallback extraction | Used by scraper | Safe/browser tests | Accuracy unproven | Keep |
 | `app.selector_engine`, `app.network_extractor`, `app.container_discovery`, `app.rendered_visible_text_extractor` | Core | Extraction helpers | Imported by orchestrator/tests | Safe suite | Varies by site structure | Keep |
-| `app.schema_*`, `app.models` | Core | Job/schema/data models | Broad imports | Safe suite | Contract changes are high-impact | Keep |
+| `app.models` | Core | Job/schema/data models | Broad imports | Safe suite | Contract changes are high-impact | Keep |
 | `app.job_store`, `app.storage_interface` | Core | SQLite storage and backend factory | Used by app/tests | Safe suite | Local state artifacts if paths misconfigured | Keep |
 | `app.postgres_repository` | Core | Postgres storage backend | Optional tests | Postgres tests passed in prior sessions; Compose smoke/basic dump-restore | Production migrations/failover unvalidated | Keep |
 | `app.worker_queue`, `app.worker_queue_postgres` | Core | Local/Postgres queue behavior | Worker scripts/tests | Safe, Postgres, and Compose smoke | Multi-job/failure behavior in target deployment unvalidated | Keep |
@@ -27,7 +27,7 @@ Classification values: Core, Stable supporting, Experimental, Test-only, Depreca
 | `app.utils.prod_security_validator` | Stable supporting | Production secret/env checks | Startup/scripts/tests | Prod-security tests | Does not prove runtime security | Keep |
 | `app.metrics_collector`, `app.scrape_telemetry` | Stable supporting | Metrics and diagnostics | Main/router imports | Safe suite and local Prometheus scrape | Target exposure/routing unvalidated | Keep |
 | `app.audit_logger` | Stable supporting | Audit event logging | Security flows/tests | Safe suite | Log retention/rotation unvalidated | Keep |
-| `app.selector_profiles`, `app.selector_memory`, `app.selector_decay` | Experimental | Selector reuse/profile adaptation | Scraper imports/tests | Partial | May be overclaimed as self-learning | Keep isolated |
+| `app.selector_memory` | Experimental | Selector memory with confidence scoring and auto-cleanup | Scraper imports/tests | Partial | May be overclaimed as self-learning | Keep isolated |
 | `app.strategy_evolution` | Experimental | Strategy recommendation | Scraper imports/tests | Unit plus browser regression | Random exploration can affect extraction path | Keep; cold-start bug fixed |
 | `app.semantic_world_state/*` | Experimental | Semantic state model | Imported by system routes/scraper | Mixed | Research-like surface | Keep labeled experimental |
 | `app.topology*`, `app.federation*`, `app.gossip*`, `app.vector_clock*` | Experimental | Topology/federation state | System routes/tests | Mixed | Not distributed consensus evidence | Keep labeled experimental |

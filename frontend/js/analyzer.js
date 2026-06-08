@@ -27,9 +27,9 @@ export async function analyzeURL() {
   const results = document.getElementById("analyze-results");
   const error = document.getElementById("analyze-error");
 
-  results.classList.add("hidden");
-  error.classList.add("hidden");
-  btn.disabled = true;
+  results?.classList.add("hidden");
+  error?.classList.add("hidden");
+  if (btn) btn.disabled = true;
   if (btnText) btnText.textContent = "Analyzing...";
   if (spinner) spinner.classList.remove("hidden");
 
@@ -85,7 +85,7 @@ export async function analyzeURL() {
     }
   } finally {
     clearTimeout(timeoutId);
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
     if (btnText) btnText.textContent = "Analyze URL";
     if (spinner) spinner.classList.add("hidden");
   }
@@ -114,7 +114,8 @@ export function renderAnalysisInfo(data) {
     antibotEl.innerHTML = `🛡️ Anti-bot: <span style="color:${color};font-weight:700;">${riskLabel}</span> (${(score * 100).toFixed(0)}%)`;
   }
   if (fetchTimeEl) {
-    fetchTimeEl.textContent = `⏱️ ${(data.fetch_time_ms / 1000).toFixed(1)}s`;
+    const ms = data.fetch_time_ms;
+    fetchTimeEl.textContent = ms != null ? `\u23F1 ${(ms / 1000).toFixed(1)}s` : "\u23F1 ?s";
   }
 }
 

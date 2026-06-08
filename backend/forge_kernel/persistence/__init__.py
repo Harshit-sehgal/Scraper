@@ -97,7 +97,7 @@ def job_to_row(job: Job) -> dict[str, Any]:
     d["acquisition_mode"] = job.acquisition_mode
     d["schema_fields"] = json.dumps([sf.model_dump() for sf in job.schema_fields])
     d["filters"] = json.dumps([fr.model_dump() for fr in job.filters])
-    d["results"] = json.dumps(job.results)
+    d["results"] = json.dumps(job.results, default=str)
     d["logs"] = json.dumps([log.model_dump() for log in job.logs])
     d["quality_report"] = json.dumps(job.quality_report)
     discovered = job.discovered_urls if hasattr(job, "discovered_urls") else []

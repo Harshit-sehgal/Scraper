@@ -8,7 +8,7 @@ This project is not public deployment ready. Do not claim this project is produc
 | Gate | Status | Evidence | Next action |
 | --- | --- | --- | --- |
 | Secrets | In progress | `.env.production.example` intentionally fails placeholder validation | Generate real uncommitted secrets |
-| Environment validation | Validated locally | `.env.production.example` fails as expected; generated ignored `.env` passed validation; combined route/security/CORS tests `183 passed in 1.83s` | Run against real target `.env` |
+| Environment validation | Validated locally | `.env.production.example` fails as expected; generated ignored `.env` passed validation; combined route/security/CORS tests `203 passed in 14.17s` | Run against real target `.env` |
 | Docker build | Validated locally | Image builds successfully locally; not freshly rerun in this session | Rebuild in CI/target environment |
 | Compose config | Validated locally | `bash scripts/smoke_prod_stack.sh` ran Compose config/startup with a temporary ignored `.env` | Keep temp env out of source and repeat in target |
 | Compose startup | Validated locally | Backend, worker, Postgres, Nginx, Prometheus, and Grafana started and became healthy locally | Repeat in target environment |

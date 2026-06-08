@@ -28,9 +28,9 @@ This route list was generated from the FastAPI app during the audit. Production 
 | POST | `/api/jobs/{job_id}/backfill-metadata` | Operator or admin |
 | DELETE | `/api/jobs/{job_id}` | Admin |
 | DELETE | `/api/jobs/cleanup/terminal` | Admin |
-| GET | `/api/jobs/{job_id}/export/csv` | Authenticated user |
-| GET | `/api/jobs/{job_id}/export/json` | Authenticated user |
-| GET | `/api/jobs/{job_id}/export/excel` | Authenticated user |
+| GET | `/api/jobs/{job_id}/export/csv` | Operator or admin |
+| GET | `/api/jobs/{job_id}/export/json` | Operator or admin |
+| GET | `/api/jobs/{job_id}/export/excel` | Operator or admin |
 
 ## Recycle Bin Routes
 

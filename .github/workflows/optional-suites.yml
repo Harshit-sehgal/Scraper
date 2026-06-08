@@ -52,10 +52,10 @@ jobs:
           DATAFORGE_DOTENV_PATH=/dev/null \
           python3 -m pytest -q backend/tests --run-postgres -o addopts= \
           --tb=short --timeout=300 --reruns 3 --reruns-delay 10 2>&1 | tee /tmp/postgres_results.txt
-          PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
-          FAILED=$(grep "failed" /tmp/postgres_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
-          echo "Postgres: $PASSED passed, $FAILED failed"
-          if [ "$FAILED" -gt 2 ]; then exit 1; fi
+          PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}' || echo "0")
+          FAILED=$(grep "failed" /tmp/postgres_results.txt | grep -o "[0-9]* failed" | awk '{print $1}' || echo "0")
+          echo "Postgres: ${PASSED:-0} passed, ${FAILED:-0} failed"
+          if [ "${FAILED:-0}" -gt 2 ]; then exit 1; fi
 
   browser-e2e:
     name: Browser E2E (Playwright)

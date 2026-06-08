@@ -434,9 +434,7 @@ export async function submitJob(e) {
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Failed");
     toast("Job started", "success");
     const { switchView } = await import("./views.js");
-    const { refreshJobs } = await import("./jobs.js");
     switchView("jobs");
-    refreshJobs();
   } catch (err) {
     toast(`Error: ${err.message}`, "error");
   } finally {

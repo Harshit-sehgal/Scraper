@@ -143,8 +143,7 @@ Backward-compatible `__getattr__` re-exports in `chaos_simulator.py` ensure all 
 ## Deferred — Core Product Refactors
 
 The following files are intentionally excluded from the immediate experimental
-refactoring plan, but are identified by the deep-research-report.md as
-candidates for larger structural refactoring. These are **core product paths**
+refactoring plan but are candidates for larger structural refactoring. These are **core product paths**
 that require design input before implementation.
 
 | File | Lines | Issue | Effort |
@@ -171,7 +170,7 @@ app/routers/            →  Already separated — clean factory wiring
 ```
 
 **Result:** `main.py` reduced from ~450 to 205 lines. Backward-compatible
-re-exports kept for tests and scripts. All 3026+ tests pass.
+re-exports kept for tests and scripts. All 3025+ tests pass.
 
 **Lessons learned:** Import path changes from the refactoring required fixing
 9 pre-existing test breakages (monkeypatch sites referencing old import paths,
@@ -253,7 +252,7 @@ feature flags so core versus experimental is obvious in the file tree.
 |----------|--------|--------|-------------|
 | 1 | `topology_state.py` → 3 extracted modules | Medium | Has test coverage |
 | 2 | `chaos_simulator.py` → 2 extracted modules | ✅ Complete — 989 lines across 3 modules, 5/5 tests pass |
-| 3 | `main.py` → app factory | ✅ Completed — 205 lines, 3026+ tests pass |
+| 3 | `main.py` → app factory | ✅ Completed — 205 lines, 3025+ tests pass |
 | 4 | `run_job()` → lifecycle phases | High | Requires scraper.py split first |
 | 5 | `scraper.py` → focused modules | High | Largest module, most complex |
 | 6 | Repo consolidation (SQLite/Postgres) | High | Depends on stable API contracts |
@@ -279,8 +278,8 @@ feature flags so core versus experimental is obvious in the file tree.
 
 ## Research Shell Boundary (Status: Boundary Established — Quarantine Enforced)
 
-This is the first completed item from the deep-research-report's
-"Highest priority" list: "Freeze product scope and ban research sprawl
+This is the first completed item from the research-shell boundary
+establishment: "Freeze product scope and ban research sprawl
 from v1". The boundary is now a hard, machine-checkable gate enforced
 by a CI invariant, and the legacy product-kernel files have been
 brought into compliance.
@@ -344,7 +343,7 @@ brought into compliance.
   research, 17 well-known product-kernel modules are NOT, prefix
   stripping works, the family summary is complete and sorted, and
   the registry is immutable.
-- `backend/tests/test_experimental_gate.py` (12 cases) — every
+- `backend/tests/test_experimental_gate.py` (13 cases) — every
   public function in `experimental_startup` is verified to be a
   no-op when the gate is off.
 - `backend/tests/test_main_routes_gate.py` (4 cases) — verify

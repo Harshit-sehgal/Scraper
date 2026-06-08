@@ -3,7 +3,7 @@
 **Last refreshed:** 2026-06-08
 **Current truth source:** `../PROJECT_STATUS.md`
 
-DataForge supports local SQLite storage and Postgres repository/queue code. Local SQLite tests pass in the safe backend suite (3026 passed, 80 skipped). Postgres repository and queue tests passed locally with Docker/testcontainers in prior sessions.
+DataForge supports local SQLite storage and Postgres repository/queue code. Local SQLite tests pass in the safe backend suite (3025 passed, 78 skipped). Postgres repository and queue tests passed locally with Docker/testcontainers in prior sessions.
 
 This does not prove production readiness. A local Compose smoke verified Docker build, startup, worker processing, Nginx route blocking, internal metrics scraping, and container Chromium launch, but target deployment, backups, restore, load, and failure testing remain unvalidated.
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Scraper Benchmark Runner
 #
 # Two modes:
@@ -13,7 +13,7 @@
 #      custom URL via -- --url=…). These hit real websites and are NOT
 #      suitable for normal CI; the workflow file only enables them on
 #      manual dispatch with the "live-benchmarks" input.
-set -e
+set -euo pipefail
 
 echo "=== DataForge Scraper: Benchmark Runner ==="
 
