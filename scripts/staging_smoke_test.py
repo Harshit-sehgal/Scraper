@@ -1,3 +1,4 @@
+import atexit
 import os
 import shutil
 import sys
@@ -10,6 +11,13 @@ sys.path.insert(0, str(backend_dir))
 
 # Configure temporary state database file path
 temp_db_dir = tempfile.mkdtemp()
+
+
+def _cleanup_temp_db():
+    shutil.rmtree(temp_db_dir, ignore_errors=True)
+
+
+atexit.register(_cleanup_temp_db)
 temp_state_file = Path(temp_db_dir) / "staging_jobs_state.json"
 
 os.environ["STATE_FILE_PATH"] = str(temp_state_file)
@@ -289,5 +297,3 @@ if __name__ == "__main__":
         # of ``app.config.settings`` in the same process doesn't
         # silently inherit the dev bypass.
         settings.ALLOW_INSECURE_DEV_AUTH = _PREV_ALLOW_INSECURE_DEV_AUTH
-        # Cleanup temp directory
-        shutil.rmtree(temp_db_dir)

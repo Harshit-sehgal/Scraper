@@ -930,6 +930,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 )
                 return str(row["job_id"]) if row else None
         except Exception:
+            logger.debug("idempotency key lookup failed for %s", idem_key, exc_info=True)
             return None
 
     def lookup_idempotency_fingerprint(self, idem_key: str) -> str | None:
@@ -945,6 +946,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 )
                 return str(row["request_fingerprint"]) if row else None
         except Exception:
+            logger.debug("idempotency fingerprint lookup failed for %s", idem_key, exc_info=True)
             return None
 
     def record_idempotency_key(self, idem_key: str, job_id: str, request_fingerprint: str) -> None:

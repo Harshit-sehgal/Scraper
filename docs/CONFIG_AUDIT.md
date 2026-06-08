@@ -1,16 +1,16 @@
 # Config And Environment Variable Audit
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Status:** Centralized config exists; scattered env reads are limited and documented
 
 ## Config Source Of Truth
 
-- `backend/app/config.py`
+- `backend/app/config/__init__.py` (pydantic-settings with domain-specific mixins in `config/`)
 - Uses `pydantic-settings` with `DATAFORGE_` prefix for most application settings.
 - `DATAFORGE_DOTENV_PATH` now controls both `app.__init__` dotenv loading and the Pydantic settings env file, so `DATAFORGE_DOTENV_PATH=/dev/null` prevents local root `.env` bleed during validation.
 - Runtime startup validation is in `backend/app/utils/prod_security_validator.py` and `scripts/check_prod_env.py`.
 
-## Direct Env Reads Observed Outside `config.py`
+## Direct Env Reads Observed Outside `config/`
 
 | File | Env usage | Classification |
 | --- | --- | --- |
@@ -21,7 +21,7 @@
 | `scripts/manual_test.py` | `DATAFORGE_API_BASE` | Manual script |
 | `scripts/staging_smoke_test.py` | `STATE_FILE_PATH` test override | Smoke script |
 
-## Dynamic Env Reads In `config.py`
+## Dynamic Env Reads In `config/`
 
 These are intentionally dynamic for testability/runtime overrides: `GROQ_API_KEY`, `DATAFORGE_WORKER_QUEUE`, `DATAFORGE_SMOKE_TEST_MODE`, `DATAFORGE_STORAGE_BACKEND`, `DATAFORGE_DATABASE_URL`, `DATAFORGE_QUEUE_BACKEND`, `DATAFORGE_STATE_FILE`, semantic state path aliases, and test selector persistence flags.
 

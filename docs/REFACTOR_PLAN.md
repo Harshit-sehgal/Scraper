@@ -1,6 +1,6 @@
 # Refactoring Plan — Large Experimental Modules
 
-**Date:** 2026-06-07
+**Date:** 2026-06-08
 **Status:** Phase C — Workers & System Observability (complete); main.py app factory refactored (complete); Research Shell Boundary enforced (complete). Phase 1 (topology_state.py) partially complete.
 
 ## Motivation
@@ -14,9 +14,9 @@ Current sizes (lines of Python, excluding blank lines/comments):
 
 | File | Lines | Primary risk |
 |------|-------|-------------|
-| `backend/app/topology_state.py` | ~~1624~~ **942** | God object: topology state + logic + persistence |
-| `backend/app/semantic_segmentation.py` | 1221 | Mixed responsibilities: parsing, scoring, extraction |
-| `backend/app/chaos_simulator.py` | ~~1004~~ **176** | ✅ Extracted — orchestrator only (scenarios/metrics separated) |
+| `backend/app/topology_state.py` | ~~1624~~ **885** | God object: topology state + logic + persistence |
+| `backend/app/semantic_segmentation.py` | 1210 | Mixed responsibilities: parsing, scoring, extraction |
+| `backend/app/chaos_simulator.py` | ~~1004~~ **178** | ✅ Extracted — orchestrator only (scenarios/metrics separated) |
 
 ---
 
@@ -69,11 +69,11 @@ topology_persistence.py     →  Serialization/deserialization (~100 lines)
 | Persistence | ✅ Previously extracted | — | `topology_persistence.py` |
 | Core data models | ⬜ Remaining | ~200 est. | `topology_state_types.py` (partial) |
 
-**Net result:** `topology_state.py` reduced from 1624 → **839 lines** (~48% reduction).
+**Net result:** `topology_state.py` reduced from 1624 → **885 lines** (~45% reduction).
 
 ---
 
-## 2. `semantic_segmentation.py` (1221 lines)
+## 2. `semantic_segmentation.py` (1210 lines)
 
 ### Current responsibilities
 - HTML parsing and DOM tree analysis
@@ -112,7 +112,7 @@ dom_segment_spatial.py          →  Spatial relationship analysis (~200 lines)
 ## 3. `chaos_simulator.py` — ✅ ALREADY EXTRACTED
 
 The 1004-line monolith has already been split into 3 focused modules:
-- **`chaos_simulator.py`** (176 lines) — Core orchestrator (`ChaosSimulator` class, `get_chaos_simulator` factory)
+- **`chaos_simulator.py`** (178 lines) — Core orchestrator (`ChaosSimulator` class, `get_chaos_simulator` factory)
 - **`chaos_scenarios.py`** (538 lines) — Core types (`FailureMode`, `SeverityLevel`, `FailureScenario`, `FailureScenarios`)
 - **`chaos_metrics.py`** (273 lines) — Test suite runner (`ChaosTestSuite`, `OperationalPlaybooks`, `run_chaos_test`)
 
@@ -149,12 +149,12 @@ that require design input before implementation.
 
 | File | Lines | Issue | Effort |
 |------|-------|-------|--------|
-| `backend/app/main.py` | ~182 | ✅ Completed — app factory refactored. `create_app()` composes middleware/static/routes/lifespan | Medium |
+| `backend/app/main.py` | ~205 | ✅ Completed — app factory refactored. `create_app()` composes middleware/static/routes/lifespan | Medium |
 | `backend/app/scraper.py` | ~800 | Single file handles fetch, orchestration, post-processing, and diagnostics | High |
-| `backend/app/services/job_runner.py` | ~600 | `run_job()` monolithic — combines discovery, per-url execution, aggregation, finalization | High |
-| `backend/app/extraction_orchestrator.py` | ~500 | Multi-layer extraction cascade is correct but implementation is a monolith | Medium |
+| `backend/app/services/job_runner.py` | ~730 | `run_job()` monolithic — combines discovery, per-url execution, aggregation, finalization | High |
+| `backend/app/extraction_orchestrator.py` | ~870 | Multi-layer extraction cascade is correct but implementation is a monolith | Medium |
 | `backend/app/job_store.py` + `postgres_repository.py` | ~1500 combined | SQLite and Postgres persistence duplicate model transforms | High |
-| `backend/app/worker_queue.py` + `worker_queue_postgres.py` | ~800 combined | Queue implementations duplicate logic | Medium |
+| `backend/app/worker_queue.py` + `worker_queue_postgres.py` | ~1370 combined | Queue implementations duplicate logic | Medium |
 
 ### 4. Rebuild main.py into thin app factory — ✅ COMPLETE
 
@@ -163,15 +163,15 @@ components (middleware, routers, lifecycle) can be tested in isolation.
 
 **Completed structure:**
 ```
-main.py               →  create_app() factory (~182 lines)
+main.py               →  create_app() factory (~205 lines)
                            Composes: configure_middleware, configure_static,
                            configure_routes, configure_lifespan
 app/lifespan.py        →  Startup/shutdown lifecycle hooks
 app/routers/            →  Already separated — clean factory wiring
 ```
 
-**Result:** `main.py` reduced from ~450 to 182 lines. Backward-compatible
-re-exports kept for tests and scripts. All 2800+ tests pass.
+**Result:** `main.py` reduced from ~450 to 205 lines. Backward-compatible
+re-exports kept for tests and scripts. All 3026+ tests pass.
 
 **Lessons learned:** Import path changes from the refactoring required fixing
 9 pre-existing test breakages (monkeypatch sites referencing old import paths,
@@ -252,8 +252,8 @@ feature flags so core versus experimental is obvious in the file tree.
 | Priority | Module | Effort | Dependencies |
 |----------|--------|--------|-------------|
 | 1 | `topology_state.py` → 3 extracted modules | Medium | Has test coverage |
-| 2 | `chaos_simulator.py` → 2 extracted modules | ✅ Complete — 987 lines across 3 modules, 5/5 tests pass |
-| 3 | `main.py` → app factory | ✅ Completed — 182 lines, 2800+ tests pass |
+| 2 | `chaos_simulator.py` → 2 extracted modules | ✅ Complete — 989 lines across 3 modules, 5/5 tests pass |
+| 3 | `main.py` → app factory | ✅ Completed — 205 lines, 3026+ tests pass |
 | 4 | `run_job()` → lifecycle phases | High | Requires scraper.py split first |
 | 5 | `scraper.py` → focused modules | High | Largest module, most complex |
 | 6 | Repo consolidation (SQLite/Postgres) | High | Depends on stable API contracts |
@@ -376,7 +376,7 @@ With the default `ENABLE_EXPERIMENTAL_ROUTES=False`:
 
 This is the prerequisite for everything else in this plan: the
 remaining refactors (splitting `scraper.py`, `extraction_orchestrator.py`,
-`config.py`, the worker queues, the postgres repository, etc.) are
+`config/`, the worker queues, the postgres repository, etc.) are
 mechanical once you can confidently say "this module is product
 kernel, that module is research" without tracing every import by hand.
 

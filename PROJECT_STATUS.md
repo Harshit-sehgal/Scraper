@@ -57,16 +57,16 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py`       | Passed with no output                        | Python syntax is valid for checked paths                                                                                                                           |
 | `PYTHONPATH=backend python3 architecture_validator.py`                     | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass                                                                                                                          |
 | `ruff check backend/app backend/tests backend/benchmarks scripts`          | `All checks passed!`                         | Ruff lint passes cleanly                                                                                                                                           |
-| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `453 files already formatted`                | Ruff format passes                                                                                                                                                 |
-| `scripts/check_research_boundary.py`                                       | `VALIDATION PASSED: 85 product-kernel files` | No research imports leaking into kernel                                                                                                                            |
+| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `196 files already formatted`                | Ruff format passes                                                                                                                                                 |
+| `scripts/check_research_boundary.py`                                       | `VALIDATION PASSED: 107 product-kernel files` | No research imports leaking into kernel                                                                                                                            |
 | `scripts/validate_dependency_bounds.py`                                    | `Dependency validation OK: 63 prod, 112 dev` | Lockfile bounds are consistent                                                                                                                                     |
-| SQLite backend suite (no-golden/no-benchmark/no-browser/no-postgres)       | `2995 passed, 78 skipped, 0 failed`          | Full SQLite functional test suite passes — no regressions from frontend changes                                                                                    |
+| SQLite backend suite (no-golden/no-benchmark/no-browser/no-postgres)       | `3026 passed, 80 skipped, 0 failed`          | Full SQLite functional test suite passes — no regressions from frontend changes                                                                                    |
 | Staging smoke test (`scripts/staging_smoke_test.py`)                       | `🎉 ALL STAGING DRILL...FULLY PASSED!`       | Durability and state invariant checks pass                                                                                                                         |
 | Docker base image build                                                    | `Successfully built`                         | Base stage compiles correctly                                                                                                                                      |
 | `scripts/check_prod_env.py --env-file .env.production.example`             | Failed intentionally                         | Production environment validator correctly rejects placeholder values                                                                                              |
 | Grafana dashboard JSON validation test                                     | `18 passed in 0.08s`                         | Dashboard panel IDs are unique, grid positions don't overlap, all panels have required fields, Prometheus metrics use `dataforge_` prefix                          |
 | Prettier check (includes `grafana/**/*.json`)                              | `All matched files use Prettier code style!` | Grafana dashboard JSON and all frontend JS/CSS/HTML are prettier-formatted                                                                                         |
-| Frontend vitest suite                                                      | `269 passed (269) — 15 files`                | All unit tests pass — all 14 modules tested (267 tests) + dashboard.js exports verified (2 tests)                                                                  |     | Frontend Playwright e2e suite       | `25 passed (25) — 3 files` | All smoke tests pass — brand, tabs, theme toggle, Create Job nav, dashboard panels + form interaction flow + recycle bin view                  |
+| Frontend vitest suite                                                      | `269 passed (269) — 15 files`                | All unit tests pass — all 14 modules tested (267 tests) + dashboard.js exports verified (2 tests)                                                                  |     | Frontend Playwright e2e suite       | `25 passed (25) — 4 files` | All smoke tests pass — brand, tabs, theme toggle, Create Job nav, dashboard panels + form interaction flow + recycle bin view + results view                  |
 | Frontend utils.js test coverage                                            | `35 new tests across 7 describe blocks`      | attrStr, theme helpers, shortcuts modal, confirm modal, UI state persistence, jobs updated label, isTypingTarget                                                   |
 | Frontend cognition.js test coverage                                        | `20 new tests across 6 describe blocks`      | Skeleton loading, communities, schema patterns, exclusions, role similarities, basins — all render functions + XSS escaping, empty states                          |
 | Frontend analyzer.js test coverage                                         | `18 new tests across 6 describe blocks`      | State accessors, clearAnalysis, toggleAllFields, renderAnalysisInfo (3 risk levels), renderFieldList (60-char truncation), renderAcquisitionBanner (6 state types) |
@@ -133,7 +133,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Add root LICENSE and THIRD_PARTY_NOTICES.md                             | ✅ Done                | MIT license + vendor asset notices exist                                                                                                                                                                                                                                                                                                               |
 | Introduce pyproject.toml and unify tool config                          | ✅ Done                | Ruff, mypy, pytest, coverage all configured                                                                                                                                                                                                                                                                                                            |
 | Freeze stable API contract and job model                                | ✅ Partial             | 26 contract tests in `test_api_contract.py` cover SchemaField, JobCreate, Job, enums, export shapes                                                                                                                                                                                                                                                    |
-| Rebuild main.py into thin app factory + router registration             | ✅ Done                | `main.py` is now 182 lines: `create_app()` composes `configure_middleware` / `configure_static` / `configure_routes` / `configure_lifespan`. Backward-compatible re-exports kept for tests and scripts.                                                                                                                                                |
+| Rebuild main.py into thin app factory + router registration             | ✅ Done                | `main.py` is now 205 lines: `create_app()` composes `configure_middleware` / `configure_static` / `configure_routes` / `configure_lifespan`. Backward-compatible re-exports kept for tests and scripts.                                                                                                                                                |
 | Split scraper.py into fetch, orchestration, post-process                | 🔲 Deferred            | Major refactor — needs design input                                                                                                                                                                                                                                                                                                                    |
 | Split run_job() into component phases                                   | 🔲 Deferred            | Major refactor — needs design input                                                                                                                                                                                                                                                                                                                    |
 | Consolidate repository interfaces                                       | 🔲 Deferred            | Reduces SQLite/Postgres duplication — needs design input                                                                                                                                                                                                                                                                                               |
@@ -167,7 +167,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | ------------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
 | Ruff                | ✅ Configured | pyproject.toml + pre-commit + CI                                                                         |
 | Ruff formatter      | ✅ Configured | pre-commit has ruff-format                                                                               |
-| mypy                | ✅ 0 errors   | 349 source files, `Success: no issues found` (core backend modules unignored and fully type-checked)     |
+| mypy                | ✅ 0 errors   | 196 source files, `Success: no issues found` (core backend modules fully type-checked) |
 | pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 75.3%                                                                         |
 | Bandit              | ✅ Running    | 0 Low/0 Medium/0 High — all findings clean                                                               |
 | pip-audit           | ✅ Running    | 0 known vulnerabilities                                                                                  |
@@ -184,20 +184,17 @@ The following is the comprehensive audit against `deep-research-report.md` check
 - **TLS/real domain** is unvalidated.
 - **Dashboard** remains internal-only.
 - **Session/localStorage/public browser hardening** still needs review.
-- **Rate limiting** is single-process/in-memory (not validated in distributed HA/multi-process setups).
+- **Rate limiting** defaults to single-process/in-memory; database-backed mode exists but distributed HA/multi-process production deployment is unvalidated.
 - **Failover, real load testing, alert delivery, disaster recovery, and incident response** remains unvalidated.
 
 ### GitHub Actions Status Checks
 
 - **GitHub Actions pass/fail status** must be checked directly from workflow runs.
-- **Commit inspected (`3d1c2600ded60b2f347334e99c7dfd031bef1205`)** has no workflow runs registered on GitHub; its CI pass status is therefore **unconfirmed**.
-- **Branch HEAD (`08e7bf688d6d6262193d19f7a7713edc07ebfaec`)**:
-  - **CI Workflow**: Passed (Run ID: `26824524929`, Completed: `2026-06-02T13:56:05Z`). All mandatory gates (syntax check, architecture validator, SQLite benchmark smoke, route auth matrix, production environment placeholder failure check) and advisory linting (pyflakes, mypy) succeeded.
-  - **Validate Production Readiness Workflow**: Previously failed at orchestration-level with 0 jobs scheduled, caused by a syntax error on line 409 where `if: failure() && env.SLACK_WEBHOOK != ''` referenced the job-level `env` block prior to runner initialization. **Resolved** — the workflow has been refactored and no longer contains this condition.
+- **Branch HEAD (`89bba9c117a4a471732baca858282160ba952d47`)**: CI status should be verified from the latest workflow run on GitHub.
 
 ### Fresh Local Validation results (Strongest Safe Claim)
 
-- **Full Suite (SQLite, Postgres, Playwright, route-auth, and settings check)**: Verified passing (100% clean).
+- **Full Suite (SQLite, route-auth, architecture, lint, type-check)**: Verified passing (100% clean).
 
 ### Generated runtime artifacts on disk (gitignored)
 
@@ -358,7 +355,7 @@ Fixed 9 test breakages from the Phase C main.py refactoring:
 
 | Check                | Result                                                                     |
 | -------------------- | -------------------------------------------------------------------------- |
-| Full test suite      | 2829 passed, 5 failed (pre-existing operator tests), 96 skipped            |
+| Full test suite      | 3026 passed, 80 skipped, 0 failed            |
 | Contract smoke tests | 12/12 pass                                                                 |
 | Metrics tests        | 11/11 pass                                                                 |
 | Worker ID unit tests | 3/3 pass                                                                   |

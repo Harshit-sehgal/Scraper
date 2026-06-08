@@ -105,7 +105,7 @@ def _close_pool() -> None:
 
 def _db_conn():
     """Acquire a connection from the psycopg2 pool (context manager)."""
-    psycopg2, _, _ = _require_psycopg2()
+    _require_psycopg2()  # ensure psycopg2 is importable
     from app.metrics_collector import record_error
 
     pool = _get_pool()
@@ -122,7 +122,6 @@ def _db_conn():
         raise
     finally:
         pool.putconn(conn)
-    _ = psycopg2  # keep the symbol referenced (helps pyflakes / static analysers)
 
 
 def _db_fetch_all(conn, sql: str, params=None) -> list[dict]:

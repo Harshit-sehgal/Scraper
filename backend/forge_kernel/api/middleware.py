@@ -31,13 +31,22 @@ class BodySizeMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > MAX_BODY_SIZE:
-            from fastapi.responses import JSONResponse
+        if content_length:
+            try:
+                if int(content_length) > MAX_BODY_SIZE:
+                    from fastapi.responses import JSONResponse
 
-            return JSONResponse(
-                status_code=413,
-                content={"detail": f"Request body exceeds maximum allowed size of {MAX_BODY_SIZE} bytes"},
-            )
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": f"Request body exceeds maximum allowed size of {MAX_BODY_SIZE} bytes"},
+                    )
+            except ValueError:
+                from fastapi.responses import JSONResponse
+
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header"},
+                )
         return await call_next(request)
 
 

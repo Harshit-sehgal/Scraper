@@ -36,14 +36,14 @@ def _extract_json_payload(text: str | None):
         try:
             return json.loads(candidate)
         except json.JSONDecodeError:
-            logging.getLogger(__name__).debug("_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate))
+            logger.debug("_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate))
 
     match = re.search(r"\{[\s\S]*?\}", raw)
     if match:
         try:
             return json.loads(match.group(0))
         except json.JSONDecodeError:
-            logging.getLogger(__name__).debug(
+            logger.debug(
                 "_extract_json_payload: object JSON parse failed for match of len %d",
                 len(match.group(0)),
             )
@@ -53,7 +53,7 @@ def _extract_json_payload(text: str | None):
         try:
             return json.loads(match.group(0))
         except json.JSONDecodeError:
-            logging.getLogger(__name__).debug(
+            logger.debug(
                 "_extract_json_payload: array JSON parse failed for match of len %d",
                 len(match.group(0)),
             )
@@ -186,7 +186,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
         ws.record_degradation(subsystem=subsystem, severity=severity, cause=cause)
     except Exception as e:
         # Fallback to debug logging if world state is unavailable
-        logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
+        logger.debug("Telemetry skipped (WS unavailable): %s", e)
 
 
 def _public_llm_fallbacks_enabled() -> bool:
@@ -485,7 +485,7 @@ class SubstratePluginManager:
             # PRUNE DIMENSION (Geometric Refactoring)
             # In a real system, we'd rebuild the manifold.
             # Here we emit telemetry and log success.
-            logging.getLogger(__name__).info(
+            logger.info(
                 "REFACTOR: Compressed manifold from %s to %s (Pruned Dim %s with var %.4f)",
                 dim,
                 dim - 1,
@@ -499,7 +499,7 @@ class SubstratePluginManager:
     def register_handler(self, name: str, handler: Callable) -> None:
         """Register a python function as a substrate action handler (Phase 43)."""
         self._handlers[name] = handler
-        logging.getLogger(__name__).info("PLUGIN: Registered handler [%s]", name)
+        logger.info("PLUGIN: Registered handler [%s]", name)
 
     def call_tool(self, handler_name: str, **kwargs) -> Any:
         """Execute a registered handler with optional sandboxing."""
@@ -509,7 +509,7 @@ class SubstratePluginManager:
             raise ValueError(msg)
 
         # ─── Execution Boundary ───
-        logging.getLogger(__name__).info("TOOL CALL: Executing [%s] with %s", handler_name, kwargs)
+        logger.info("TOOL CALL: Executing [%s] with %s", handler_name, kwargs)
 
         try:
             # Check for budget / policy if ws is available
@@ -533,7 +533,7 @@ class SubstratePluginManager:
             self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})
             if len(self._execution_history) > self._max_history:
                 self._execution_history = self._execution_history[-self._max_history // 2 :]
-            logging.getLogger(__name__).exception("TOOL FAIL: [%s]", handler_name)
+            logger.exception("TOOL FAIL: [%s]", handler_name)
             raise
 
     def get_available_tools(self) -> list[str]:

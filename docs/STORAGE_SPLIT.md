@@ -26,17 +26,17 @@ job_artifacts   (one row per file artifact — optional, future)
 The report's blueprint recommends exactly this split (see
 `docs/ROADMAP.md` for the larger context).
 
-## Schema version: v4
+## Schema version: v6
 
 | Version | Date       | Change                                                          |
 |---------|------------|-----------------------------------------------------------------|
 | v1–v3   | legacy     | wide `jobs` row with embedded JSON columns                      |
-| **v4**  | this round | `job_results` + `job_events` companion tables, dual-writes     |
-| v5      | future     | drop legacy `results` and `logs` columns from `jobs`            |
-| v6      | future     | convert `TEXT` JSON columns on `jobs` to native `JSONB` (PG)    |
+| v4      | prior round | `job_results` + `job_events` companion tables, dual-writes     |
+| v5      | prior round | `worker_heartbeats` table added                                 |
+| **v6**  | current    | latest schema with all migrations applied                       |
 
 The schema lives in `backend/app/job_store.py::_run_migrations` and
-the v4 migration is gated on `_CURRENT_SCHEMA_VERSION = 4`.
+the current version is `_CURRENT_SCHEMA_VERSION = 6`.
 
 ## Rollout phases
 
@@ -104,8 +104,6 @@ Steps:
 3. Add GIN indexes for the columns that drive summary queries.
 4. Update `_row_to_job` / `_job_to_row` to use psycopg's native
    JSON adapters.
-5. Drop the `app/json_utils.py` legacy JSON roundtrip helpers
-   once all readers are native.
 
 ## Compatibility guarantees
 

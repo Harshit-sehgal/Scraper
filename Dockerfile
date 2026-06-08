@@ -78,7 +78,7 @@ USER dataforge
 # just that the process answers TCP). Status check guards against the
 # app returning 5xx once it has accepted the connection.
 HEALTHCHECK --interval=15s --timeout=6s --start-period=10s --retries=3 \
-    CMD python -c "import http.client,sys; c=http.client.HTTPConnection('localhost', 8000, timeout=4); c.request('GET', '/ready'); r=c.getresponse(); sys.exit(0 if 200 <= r.status < 500 else 1)" || exit 1
+    CMD python -c "import http.client,sys; c=http.client.HTTPConnection('localhost', 8000, timeout=4); c.request('GET', '/ready'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)" || exit 1
 
 EXPOSE 8000
 

@@ -5,6 +5,10 @@ Real-world Validation Script — books.toscrape.com (Sandbox)
 import asyncio
 import json
 import logging
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
 from app.benchmark_accuracy import calculate_extraction_accuracy
 from app.models import FieldType, SchemaField

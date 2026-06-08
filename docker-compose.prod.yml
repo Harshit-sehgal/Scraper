@@ -31,7 +31,7 @@ services:
     expose:
       - "8000"
     env_file:
-      - .env
+      - .env.production
     environment:
       - DATAFORGE_ENV=production
       - DATAFORGE_STORAGE_BACKEND=postgres
@@ -90,7 +90,7 @@ services:
     container_name: dataforge-worker
     command: ["/app/scripts/start_worker.sh"]
     env_file:
-      - .env
+      - .env.production
     environment:
       - DATAFORGE_ENV=production
       - DATAFORGE_STORAGE_BACKEND=postgres
@@ -268,7 +268,7 @@ services:
     expose:
       - "9090"
     env_file:
-      - .env
+      - .env.production
     environment:
       - DATAFORGE_METRICS_TOKEN=${DATAFORGE_METRICS_TOKEN:?DATAFORGE_METRICS_TOKEN is required}
     volumes:
@@ -352,7 +352,7 @@ services:
     expose:
       - "9093"
     env_file:
-      - .env
+      - .env.production
     environment:
       - ALERTMANAGER_SMTP_HOST=${ALERTMANAGER_SMTP_HOST:-}
       - ALERTMANAGER_SMTP_USER=${ALERTMANAGER_SMTP_USER:-}

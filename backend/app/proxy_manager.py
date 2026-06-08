@@ -185,11 +185,14 @@ class ProxyManager:
 
 # Global singleton
 _proxy_manager: ProxyManager | None = None
+_proxy_manager_lock = __import__("threading").Lock()
 
 
 def get_proxy_manager() -> ProxyManager:
     """Get or create the global proxy manager instance."""
     global _proxy_manager
     if _proxy_manager is None:
-        _proxy_manager = ProxyManager()
+        with _proxy_manager_lock:
+            if _proxy_manager is None:
+                _proxy_manager = ProxyManager()
     return _proxy_manager

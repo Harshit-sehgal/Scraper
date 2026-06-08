@@ -244,7 +244,7 @@ def register_jobs_write_routes(
                             "Inline fallback is disabled in production. "
                             "Check that the worker queue is running and healthy."
                         ),
-                    ) from None
+                    ) from e
                 logger.warning(
                     "Failed to enqueue job %s to worker queue, falling back to inline: %s",
                     job.id,
@@ -287,6 +287,7 @@ def register_jobs_write_routes(
             if job.status == JobStatus.PENDING:
                 mark_job_canceled(job, "Canceled before execution.")
 
+        cancel_task_success = True
         if settings.WORKER_QUEUE:
             try:
                 from app.worker_queue import get_worker_queue
@@ -294,6 +295,7 @@ def register_jobs_write_routes(
                 queue = get_worker_queue()
                 await queue.cancel(job_id)
             except Exception as e:
+                cancel_task_success = False
                 logger.warning(
                     "Failed to cancel queued task for job %s: %s",
                     job_id,
@@ -305,7 +307,7 @@ def register_jobs_write_routes(
             "job_id": job.id,
             "status": job.status.value,
             "cancel_requested": True,
-            "cancel_queued_task": True,
+            "cancel_queued_task": cancel_task_success,
             "message": "Cancellation requested",
         }
 
@@ -410,10 +412,10 @@ def register_jobs_write_routes(
                     f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
             except Exception:
-                logging.exception("Re-clean failed")
+                logger.exception("Re-clean failed")
                 cleaned_rows = working_rows
                 reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
-                logging.exception("Job %s: Re-clean failed", job_id)
+                logger.exception("Job %s: Re-clean failed", job_id)
 
             filtered_results, total, filtered_count, type_integrity_report = await process_results(
                 cleaned_rows,
@@ -508,7 +510,7 @@ def register_jobs_write_routes(
             job.quality_report = quality
             await save_job(job)
         except Exception as e:
-            logging.getLogger(__name__).exception(
+            logger.exception(
                 "Job %s: Reclean failed irrecoverably, restoring previous status %s",
                 job_id,
                 previous_status.value if hasattr(previous_status, "value") else previous_status,
@@ -518,7 +520,7 @@ def register_jobs_write_routes(
             try:
                 await save_job(job)
             except Exception:
-                logging.getLogger(__name__).exception(
+                logger.exception(
                     "Job %s: Failed to persist job state after reclean rollback",
                     job_id,
                 )

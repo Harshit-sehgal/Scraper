@@ -2,7 +2,7 @@
    DataForge — Job Form
    ═══════════════════════════════════════════ */
 
-import { esc, toast } from "./utils.js";
+import { esc, attrStr, toast } from "./utils.js";
 import { API, apiFetch } from "./api.js";
 import { currentMode, setMode } from "./views.js";
 
@@ -16,27 +16,39 @@ let _filterCounter = 0;
 export async function initForm() {
   _fieldCounter = 0;
   _filterCounter = 0;
-  document.getElementById("inp-name").value = "";
-  document.getElementById("inp-intent").value = "";
-  document.getElementById("inp-topic").value = "";
-  document.getElementById("inp-location").value = "";
-  document.getElementById("inp-domain").value = "";
-  document.getElementById("inp-origin-location").value = "";
-  document.getElementById("inp-max-distance-km").value = "";
-  document.getElementById("inp-discover-pages").value = "12";
-  document.getElementById("inp-max-per-domain").value = "4";
-  document.getElementById("inp-urls").value = "";
-  document.getElementById("inp-max-pages").value = "10";
-  document.getElementById("inp-min-score").value = "0.35";
-  document.getElementById("inp-source-policy").value = "official_plus_directory";
-  document.getElementById("schema-container").innerHTML = "";
-  document.getElementById("filters-container").innerHTML = "";
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.value = v;
+  };
+  const setHtml = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = v;
+  };
+  setVal("inp-name", "");
+  setVal("inp-intent", "");
+  setVal("inp-topic", "");
+  setVal("inp-location", "");
+  setVal("inp-domain", "");
+  setVal("inp-origin-location", "");
+  setVal("inp-max-distance-km", "");
+  setVal("inp-discover-pages", "12");
+  setVal("inp-max-per-domain", "4");
+  setVal("inp-urls", "");
+  setVal("inp-max-pages", "10");
+  setVal("inp-min-score", "0.35");
+  setVal("inp-source-policy", "official_plus_directory");
+  setHtml("schema-container", "");
+  setHtml("filters-container", "");
   const preview = document.getElementById("discovery-preview");
-  preview.innerHTML = "";
-  preview.classList.add("hidden");
+  if (preview) {
+    preview.innerHTML = "";
+    preview.classList.add("hidden");
+  }
   const note = document.getElementById("suggestion-note");
-  note.textContent = "";
-  note.classList.add("hidden");
+  if (note) {
+    note.textContent = "";
+    note.classList.add("hidden");
+  }
   setMode("manual");
   const { clearAnalysis } = await import("./analyzer.js");
   clearAnalysis();
@@ -50,8 +62,8 @@ export function addField(preset = null) {
   const row = document.createElement("div");
   row.className = "field-row";
   const p = preset || {};
-  const name = esc(p.name || "");
-  const desc = esc(p.description || "");
+  const name = attrStr(p.name || "");
+  const desc = attrStr(p.description || "");
   const selectedType = p.field_type || "string";
   const fid = _fieldCounter++;
   row.innerHTML = `
@@ -88,15 +100,18 @@ export function addField(preset = null) {
 // ─── Suggest Schema from Intent ───
 
 export async function suggestSchemaFromIntent() {
-  const intent = document.getElementById("inp-intent").value.trim();
+  const intentEl = document.getElementById("inp-intent");
+  const intent = intentEl ? intentEl.value.trim() : "";
   if (!intent) {
     toast("Describe your data goal first", "error");
     return;
   }
 
   const btn = document.getElementById("btn-suggest-schema");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Suggesting...';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Suggesting...';
+  }
 
   try {
     const res = await apiFetch(`${API}/api/schema/suggest`, {
@@ -137,8 +152,10 @@ export async function suggestSchemaFromIntent() {
   } catch (err) {
     toast(`Suggestion error: ${err.message}`, "error");
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Suggest topic + schema from intent";
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Suggest topic + schema from intent";
+    }
   }
 }
 
@@ -149,7 +166,7 @@ export function addFilter() {
   const fieldOptions = Array.from(document.querySelectorAll(".sf-name"))
     .map((i) => i.value)
     .filter((v) => v)
-    .map((v) => `<option value="${esc(v)}">${esc(v)}</option>`)
+    .map((v) => `<option value="${attrStr(v)}">${esc(v)}</option>`)
     .join("");
 
   const fid = _filterCounter++;
@@ -397,9 +414,9 @@ export async function submitJob(e) {
     schema_fields: schema,
     filters,
     selectors_map: selectorsMap,
-    deduplicate: document.getElementById("chk-dedup").checked,
-    deduplicate_field: document.getElementById("inp-dedup-field").value.trim(),
-    pagination: document.getElementById("chk-pagination").checked,
+    deduplicate: document.getElementById("chk-dedup")?.checked ?? false,
+    deduplicate_field: document.getElementById("inp-dedup-field")?.value?.trim() ?? "",
+    pagination: document.getElementById("chk-pagination")?.checked ?? false,
     max_pages: maxPages,
     min_record_score: minScore,
   };
@@ -415,7 +432,6 @@ export async function submitJob(e) {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Failed");
-    await res.json();
     toast("Job started", "success");
     const { switchView } = await import("./views.js");
     const { refreshJobs } = await import("./jobs.js");

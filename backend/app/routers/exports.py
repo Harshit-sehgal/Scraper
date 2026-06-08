@@ -144,7 +144,7 @@ def create_exports_router(jobs_store: dict):
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
-            return await _export_csv_impl(job_id)
+            result = await _export_csv_impl(job_id)
         except HTTPException:
             _record_export_outcome("csv", False)
             raise
@@ -153,7 +153,7 @@ def create_exports_router(jobs_store: dict):
             raise
         else:
             _record_export_outcome("csv", True)
-            return None
+            return result
 
     async def _export_csv_impl(job_id: str):
         if job_id not in jobs_store:
@@ -243,7 +243,7 @@ def create_exports_router(jobs_store: dict):
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
-            return await _export_json_impl(job_id)
+            result = await _export_json_impl(job_id)
         except HTTPException:
             _record_export_outcome("json", False)
             raise
@@ -252,7 +252,7 @@ def create_exports_router(jobs_store: dict):
             raise
         else:
             _record_export_outcome("json", True)
-            return None
+            return result
 
     async def _export_json_impl(job_id: str):
         if job_id not in jobs_store:
@@ -445,7 +445,7 @@ def create_exports_router(jobs_store: dict):
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
-            return await _batch_export_impl(body)
+            result = await _batch_export_impl(body)
         except HTTPException:
             _record_export_outcome(f"batch_{body.format}", False)
             raise
@@ -454,7 +454,7 @@ def create_exports_router(jobs_store: dict):
             raise
         else:
             _record_export_outcome(f"batch_{body.format}", True)
-            return None
+            return result
 
     async def _batch_export_impl(body: BatchExportRequest):
         fmt = body.format.lower()

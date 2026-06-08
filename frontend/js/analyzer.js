@@ -14,6 +14,7 @@ let _selectorsMap = null;
 
 export async function analyzeURL() {
   const urlInput = document.getElementById("inp-analyze-url");
+  if (!urlInput) return;
   const url = urlInput.value.trim();
   if (!url) {
     toast("Enter a URL to analyze", "error");
@@ -21,7 +22,7 @@ export async function analyzeURL() {
   }
 
   const btn = document.getElementById("btn-analyze-url");
-  const btnText = btn.querySelector(".analyze-btn-text");
+  const btnText = btn?.querySelector(".analyze-btn-text");
   const spinner = document.getElementById("analyze-spinner");
   const results = document.getElementById("analyze-results");
   const error = document.getElementById("analyze-error");
@@ -71,13 +72,15 @@ export async function analyzeURL() {
     results.classList.remove("hidden");
     toast(`Found ${_analyzedFields.length} fields on ${url}`, "success");
   } catch (err) {
-    error.classList.remove("hidden");
+    if (error) error.classList.remove("hidden");
+    const errorText = document.getElementById("analyze-error-text");
     if (err.name === "AbortError") {
-      document.getElementById("analyze-error-text").textContent =
-        "Analysis timed out — the page may be too slow or protected by anti-bot measures. Try a different source URL.";
+      if (errorText)
+        errorText.textContent =
+          "Analysis timed out — the page may be too slow or protected by anti-bot measures. Try a different source URL.";
       toast("Analysis timed out", "error");
     } else {
-      document.getElementById("analyze-error-text").textContent = err.message || "Failed to analyze URL";
+      if (errorText) errorText.textContent = err.message || "Failed to analyze URL";
       toast(`Analysis error: ${err.message}`, "error");
     }
   } finally {
@@ -123,6 +126,7 @@ export function renderFieldList(fields) {
   const items = fields ?? _analyzedFields;
 
   if (fieldCount) fieldCount.textContent = String(items.length);
+  if (!fieldList) return;
 
   if (!items.length) {
     fieldList.innerHTML = '<div class="empty"><p>No data fields detected on this page</p></div>';
@@ -235,7 +239,7 @@ export async function applyAnalyzedFields() {
   }
 
   const schemaContainer = document.getElementById("schema-container");
-  schemaContainer.innerHTML = "";
+  if (schemaContainer) schemaContainer.innerHTML = "";
 
   const { addField } = await import("./form.js");
   selected.forEach((f) => {
@@ -267,9 +271,12 @@ export async function applyAnalyzedFields() {
 export function clearAnalysis() {
   _analyzedFields = [];
   _selectorsMap = null;
-  document.getElementById("analyze-results").classList.add("hidden");
-  document.getElementById("analyze-error").classList.add("hidden");
-  document.getElementById("inp-analyze-url").value = "";
+  const results = document.getElementById("analyze-results");
+  if (results) results.classList.add("hidden");
+  const error = document.getElementById("analyze-error");
+  if (error) error.classList.add("hidden");
+  const urlInput = document.getElementById("inp-analyze-url");
+  if (urlInput) urlInput.value = "";
 }
 
 // ─── Expose selectors map for form submission ───

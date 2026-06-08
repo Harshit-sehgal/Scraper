@@ -329,7 +329,8 @@ class DatabaseSlidingWindowCounter:
                     row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
                     count = row["count"] if row else 0
                     return max(0, self.max_requests - count)
-            except Exception:
+            except Exception as e:
+                logger.warning("Postgres rate limiter remaining() failed: %s", e)
                 return self._fallback_counter.remaining()
         else:
             try:
@@ -344,7 +345,8 @@ class DatabaseSlidingWindowCounter:
                         return max(0, self.max_requests - count)
                     finally:
                         conn.close()
-            except Exception:
+            except Exception as e:
+                logger.warning("SQLite rate limiter remaining() failed: %s", e)
                 return self._fallback_counter.remaining()
 
     def reset_in(self) -> float:
@@ -364,7 +366,8 @@ class DatabaseSlidingWindowCounter:
                     if min_ts is None:
                         return 0.0
                     return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
-            except Exception:
+            except Exception as e:
+                logger.warning("Postgres rate limiter reset_in() failed: %s", e)
                 return self._fallback_counter.reset_in()
         else:
             try:
@@ -383,7 +386,8 @@ class DatabaseSlidingWindowCounter:
                         return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
                     finally:
                         conn.close()
-            except Exception:
+            except Exception as e:
+                logger.warning("SQLite rate limiter reset_in() failed: %s", e)
                 return self._fallback_counter.reset_in()
 
     def is_expired(self) -> bool:
@@ -405,7 +409,8 @@ class DatabaseSlidingWindowCounter:
                         conn, "SELECT 1 AS alive FROM rate_limits WHERE key = %s AND timestamp > %s LIMIT 1", (self.key, cutoff)
                     )
                     return row is None
-            except Exception:
+            except Exception as e:
+                logger.warning("Postgres rate limiter is_expired() failed: %s", e)
                 return True
         else:
             try:
@@ -421,7 +426,8 @@ class DatabaseSlidingWindowCounter:
                         return row is None
                     finally:
                         conn.close()
-            except Exception:
+            except Exception as e:
+                logger.warning("SQLite rate limiter is_expired() failed: %s", e)
                 return True
 
     @staticmethod

@@ -251,6 +251,7 @@ async def extract_with_profile(
                 try:
                     count = await container_locator.count()
                 except Exception:
+                    logger.debug("container_locator.count() failed, defaulting to 0", exc_info=True)
                     count = 0
                 if count > 0 and count == prev_count:
                     stable_polls += 1

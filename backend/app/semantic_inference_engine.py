@@ -17,6 +17,8 @@ from app.semantic_ir import (
 )
 from app.semantic_world_state import get_world_state
 
+logger = logging.getLogger(__name__)
+
 
 class RoleEmbeddingEngine:
     """Learns role embeddings from global field dynamics and stable motifs."""
@@ -506,7 +508,7 @@ class RoleEmbeddingEngine:
         # it indicates a crowded manifold (Semantic Collision).
         if certainty < 0.2 and self.dimension < 64:
             new_dim = self.dimension + 8
-            logging.getLogger(__name__).info("DIMENSIONALITY INDUCTION: Expanding manifold resolution to %s.", new_dim)
+            logger.info("DIMENSIONALITY INDUCTION: Expanding manifold resolution to %s.", new_dim)
             self.ws.expand_dimensions(new_dim)
 
     def save_cache(self) -> dict:

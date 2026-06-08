@@ -24,6 +24,9 @@ AUDIT_LOG_FILE = "audit.log"
 AUDIT_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 AUDIT_LOG_BACKUP_COUNT = 5
 
+# ─── Module-level logger ──────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
+
 # ─── Module-level state ───────────────────────────────────────────────────
 _logger: logging.Logger | None = None
 
@@ -47,6 +50,7 @@ def _get_audit_logger() -> logging.Logger:
 
             configured_log_dir = settings.AUDIT_LOG_DIR
         except Exception:
+            logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
             configured_log_dir = ""
 
         log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
@@ -302,6 +306,7 @@ def get_audit_log_path() -> Path:
 
         configured_log_dir = settings.AUDIT_LOG_DIR
     except Exception:
+        logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
         configured_log_dir = ""
     return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
 
@@ -336,7 +341,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
             recent = deque(_parse_lines(f), maxlen=count)
             events = list(recent)
     except OSError as e:
-        logging.getLogger(__name__).warning("Failed to read audit log: %s", e)
+        logger.warning("Failed to read audit log: %s", e)
         return []
 
     return list(reversed(events[-count:]))

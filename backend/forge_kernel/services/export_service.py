@@ -57,8 +57,9 @@ class ExportService:
             ws = wb.active
 
         if not records:
-            wb.save(io.BytesIO())
-            return io.BytesIO().getvalue()
+            output = io.BytesIO()
+            wb.save(output)
+            return output.getvalue()
 
         if not field_names:
             field_names = list(records[0].keys())
@@ -79,11 +80,11 @@ class ExportService:
     async def export(self, fmt: str, records: list[dict], field_names: list[str] | None = None) -> ExportArtifact:
         """Generate an export in the specified format."""
         if fmt == "csv":
-            self.to_csv(records, field_names)
-            return ExportArtifact(format="csv", row_count=len(records), generated_at="")
+            content = self.to_csv(records, field_names)
+            return ExportArtifact(format="csv", row_count=len(records), generated_at="", content=content)
         if fmt == "json":
-            self.to_json(records)
-            return ExportArtifact(format="json", row_count=len(records), generated_at="")
+            content = self.to_json(records)
+            return ExportArtifact(format="json", row_count=len(records), generated_at="", content=content)
         if fmt == "xlsx":
             xlsx_content = self.to_xlsx(records, field_names)
             if xlsx_content is None:

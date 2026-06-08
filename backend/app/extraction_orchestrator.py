@@ -868,5 +868,4 @@ def _align_selectors(selectors: dict, swaps: dict) -> dict:
             new_sels[current_field] = field_sels[target_field]
             new_sels[target_field] = field_sels[current_field]
 
-    selectors["fields"] = new_sels
-    return selectors
+    return {**selectors, "fields": new_sels}

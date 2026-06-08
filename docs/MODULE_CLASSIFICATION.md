@@ -1,8 +1,8 @@
 # Module Classification
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Scope:** Major modules/packages, not every helper file
-**Observed count:** `151` Python files under `backend/app`
+**Observed count:** `152` Python files under `backend/app`
 
 Classification values: Core, Stable supporting, Experimental, Test-only, Deprecated, Candidate for removal, Unknown.
 
@@ -16,16 +16,16 @@ Classification values: Core, Stable supporting, Experimental, Test-only, Depreca
 | `app.scraper` | Core | Scrape orchestration | Used by jobs and tests | Safe/browser tests | Large file and many experimental hooks | Keep, refactor later |
 | `app.browser`, `app.browser_pool` | Core | Playwright browser lifecycle | Used by scraper | Browser suite and container Chromium smoke | Broad website behavior unvalidated | Keep |
 | `app.extraction_orchestrator` | Core | Schema/selector/network/text fallback extraction | Used by scraper | Safe/browser tests | Accuracy unproven | Keep |
-| `app.extractors/*` | Core | Extraction helpers | Imported by orchestrator/tests | Safe suite | Varies by site structure | Keep |
+| `app.selector_engine`, `app.network_extractor`, `app.container_discovery`, `app.rendered_visible_text_extractor` | Core | Extraction helpers | Imported by orchestrator/tests | Safe suite | Varies by site structure | Keep |
 | `app.schema_*`, `app.models` | Core | Job/schema/data models | Broad imports | Safe suite | Contract changes are high-impact | Keep |
 | `app.job_store`, `app.storage_interface` | Core | SQLite storage and backend factory | Used by app/tests | Safe suite | Local state artifacts if paths misconfigured | Keep |
-| `app.postgres_repository` | Core | Postgres storage backend | Optional tests | Postgres `1907 passed, 28 skipped` (freshly run) and Compose smoke/basic dump-restore | Production migrations/failover unvalidated | Keep |
+| `app.postgres_repository` | Core | Postgres storage backend | Optional tests | Postgres tests passed in prior sessions; Compose smoke/basic dump-restore | Production migrations/failover unvalidated | Keep |
 | `app.worker_queue`, `app.worker_queue_postgres` | Core | Local/Postgres queue behavior | Worker scripts/tests | Safe, Postgres, and Compose smoke | Multi-job/failure behavior in target deployment unvalidated | Keep |
 | `app.utils.rbac` | Core supporting | API key roles and dependencies | Used by routes/main | Route-auth tests | Dev mode permissive without keys | Keep |
 | `app.url_safety` | Core supporting | SSRF-oriented URL checks | Used by scraper/API | Security tests | DNS/egress controls need deployment support | Keep |
-| `app.rate_limiter` | Stable supporting | In-memory rate limiting | Middleware/tests | Safe suite | Single-process only | Keep, document limit |
+| `app.rate_limiter` | Stable supporting | Rate limiting (in-memory or database-backed) | Middleware/tests | Safe suite | Single-process default, DB-backed in production | Keep |
 | `app.utils.prod_security_validator` | Stable supporting | Production secret/env checks | Startup/scripts/tests | Prod-security tests | Does not prove runtime security | Keep |
-| `app.metrics`, `app.telemetry`, `app.diagnostics` | Stable supporting | Metrics and diagnostics | Main/router imports | Safe suite and local Prometheus scrape | Target exposure/routing unvalidated | Keep |
+| `app.metrics_collector`, `app.scrape_telemetry` | Stable supporting | Metrics and diagnostics | Main/router imports | Safe suite and local Prometheus scrape | Target exposure/routing unvalidated | Keep |
 | `app.audit_logger` | Stable supporting | Audit event logging | Security flows/tests | Safe suite | Log retention/rotation unvalidated | Keep |
 | `app.selector_profiles`, `app.selector_memory`, `app.selector_decay` | Experimental | Selector reuse/profile adaptation | Scraper imports/tests | Partial | May be overclaimed as self-learning | Keep isolated |
 | `app.strategy_evolution` | Experimental | Strategy recommendation | Scraper imports/tests | Unit plus browser regression | Random exploration can affect extraction path | Keep; cold-start bug fixed |

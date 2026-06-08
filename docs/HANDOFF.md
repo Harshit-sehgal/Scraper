@@ -1,6 +1,6 @@
 # Handoff
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Current truth source:** `PROJECT_STATUS.md`
 
 DataForge Scraper is a pre-production FastAPI + Playwright extraction platform. Current local validation covers SQLite backend tests, route-auth, production-secret validation, benchmark smoke, syntax/architecture checks, Postgres integration tests, browser e2e tests, and golden dataset target extraction. Do not claim public production-ready, universal scraper, anti-bot immune, fully autonomous, fully self-healing, or guaranteed-accuracy as the evidence does not support them.

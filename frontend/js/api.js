@@ -118,10 +118,12 @@ function saveKeyFromModal() {
   } else {
     setApiKey(key);
     toast("API key set", "success");
-    import("./jobs.js").then((m) => {
-      m.refreshSystemStatus();
-      m.refreshJobs();
-    });
+    import("./jobs.js")
+      .then((m) => {
+        m.refreshSystemStatus();
+        m.refreshJobs();
+      })
+      .catch((e) => console.warn("Failed to refresh after API key set:", e));
   }
 
   closeKeyModal();
@@ -159,19 +161,15 @@ export async function apiFetch(url, options = {}) {
       headers["X-Admin-Key"] = adminKey;
     }
   }
-  try {
-    const res = await fetch(url, { ...rest, headers });
-    if (res.status === 403 && !admin) {
-      const now = Date.now();
-      if (now - lastApi403 > 15000 && !isKeyModalVisible()) {
-        lastApi403 = now;
-        showApiKeyPrompt();
-      }
+  const res = await fetch(url, { ...rest, headers });
+  if (res.status === 403 && !admin) {
+    const now = Date.now();
+    if (now - lastApi403 > 15000 && !isKeyModalVisible()) {
+      lastApi403 = now;
+      showApiKeyPrompt();
     }
-    return res;
-  } catch (err) {
-    throw err;
   }
+  return res;
 }
 
 export { getApiKey, setApiKey, isKeyModalVisible, closeKeyModal, saveKeyFromModal, clearApiKey };

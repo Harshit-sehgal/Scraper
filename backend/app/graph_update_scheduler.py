@@ -15,6 +15,8 @@ from typing import Any
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
 
+logger = logging.getLogger(__name__)
+
 
 def get_world_state():
     import app.semantic_world_state
@@ -66,7 +68,7 @@ class GlobalCognitiveScheduler:
     def schedule(self, task_id: str, priority: TaskPriority, handler: Callable, *args: Any, **kwargs: Any) -> None:
         task = CognitiveTask(task_id, priority, handler, args, kwargs)
         heapq.heappush(self._task_queue, task)
-        logging.getLogger(__name__).debug("TASK SCHEDULED: [%s] Priority: %s", task_id, priority.name)
+        logger.debug("TASK SCHEDULED: [%s] Priority: %s", task_id, priority.name)
 
     def step(self, budget_ms: float = 100.0) -> int:
         if self._is_paused:
@@ -105,7 +107,7 @@ class GlobalCognitiveScheduler:
                 self._execution_stats["tasks_completed"] += 1
                 self._execution_stats["priority_counts"][task.priority.name] += 1
             except Exception as e:
-                logging.getLogger(__name__).exception("TASK FAILED: [%s]", task.task_id)
+                logger.exception("TASK FAILED: [%s]", task.task_id)
                 # Record degradation telemetry (best-effort)
                 try:
                     if hasattr(self, "ws") and self.ws is not None:
@@ -204,7 +206,7 @@ class GraphUpdateScheduler:
             ws._scheduler.schedule(task_id, priority, handler, *args, **kwargs)
         else:
             # Fallback for bootstrap / tests
-            logging.getLogger(__name__).warning("No active scheduler for task %s", task_id)
+            logger.warning("No active scheduler for task %s", task_id)
 
 
 _scheduler: Any = None

@@ -210,7 +210,7 @@ def schedule_background_task(coro):
             t.result()
         except asyncio.CancelledError:
             pass  # nosec B110
-        except (AttributeError, ImportError):
+        except Exception:
             logger.exception("Background task failed")
 
     task.add_done_callback(_handle_task_result)

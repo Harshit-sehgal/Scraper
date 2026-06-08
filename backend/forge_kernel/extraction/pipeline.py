@@ -53,6 +53,7 @@ class ExtractionPipeline:
         from forge_kernel.extraction.fetch import fetch_page_content
 
         # Stage 1: Fetch
+        self._attempts = []
         fetch_result = await fetch_page_content(url, use_browser=False)
         if fetch_result.error:
             logger.warning("Fetch failed for %s: %s", url, fetch_result.error)

@@ -1,6 +1,6 @@
 # Setup
 
-**Last refreshed:** 2026-06-04
+**Last refreshed:** 2026-06-08
 
 ## Local Python Setup
 

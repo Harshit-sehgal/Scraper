@@ -16,6 +16,8 @@ from pathlib import Path
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 _STATE_LOCK_PATH: str | None = None
 
 
@@ -65,9 +67,9 @@ def load_semantic_state() -> None:
 
         ws = app.semantic_world_state.get_world_state()
         ws.from_dict(full_state)
-        logging.getLogger(__name__).info("Loaded unified semantic state from %s", path)
+        logger.info("Loaded unified semantic state from %s", path)
     except Exception:
-        logging.getLogger(__name__).exception("Failed to load semantic state")
+        logger.exception("Failed to load semantic state")
     finally:
         _release_lock(lock_fd)
 
@@ -92,9 +94,9 @@ def save_semantic_state() -> None:
             json.dump(full_state, f, indent=2)
         os.replace(tmp_path, path)
         tmp_path = None  # ownership transferred via rename
-        logging.getLogger(__name__).info("Saved unified semantic state to %s", path)
+        logger.info("Saved unified semantic state to %s", path)
     except Exception:
-        logging.getLogger(__name__).exception("Failed to save semantic state")
+        logger.exception("Failed to save semantic state")
         with contextlib.suppress(OSError):
             if fd is not None:
                 os.close(fd)

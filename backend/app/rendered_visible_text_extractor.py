@@ -132,6 +132,7 @@ async def capture_bounding_boxes(page) -> list[dict]:
         }""")
         return boxes if isinstance(boxes, list) else []
     except Exception:
+        logger.debug("page.evaluate() for bounding boxes failed", exc_info=True)
         return []
 
 

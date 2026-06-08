@@ -4,6 +4,7 @@
 
 import {
   esc,
+  attrStr,
   toast,
   setEngineStatus,
   setJobsUpdatedAt,
@@ -85,12 +86,15 @@ export async function refreshJobs() {
       const empty = document.getElementById("empty-state");
       if (list && empty) {
         list.innerHTML = "";
-        list.appendChild(empty);
-        empty.classList.remove("hidden");
-        const titleEl = empty.querySelector(".empty-state-title");
-        const descEl = empty.querySelector(".empty-state-desc");
-        if (titleEl) titleEl.textContent = "Unable to connect to server";
-        if (descEl) descEl.textContent = "Check that the backend is running on " + API;
+        const emptyState = document.getElementById("empty-state");
+        if (emptyState) {
+          list.appendChild(emptyState);
+          emptyState.classList.remove("hidden");
+          const titleEl = emptyState.querySelector(".empty-state-title");
+          const descEl = emptyState.querySelector(".empty-state-desc");
+          if (titleEl) titleEl.textContent = "Unable to connect to server";
+          if (descEl) descEl.textContent = "Check that the backend is running on " + API;
+        }
       }
     }
   }
@@ -175,7 +179,7 @@ async function pollJob(id) {
       const { currentJobId } = await import("./results.js");
       if (currentJobId === id) {
         const logsPanel = document.getElementById("logs-panel");
-        if (Array.isArray(j.logs) && j.logs.length) {
+        if (logsPanel && Array.isArray(j.logs) && j.logs.length) {
           logsPanel.classList.remove("hidden");
           const { renderLogs } = await import("./results.js");
           renderLogs(j.logs);
@@ -183,12 +187,14 @@ async function pollJob(id) {
 
         const resProgWrap = document.getElementById("res-progress-wrap");
         if (j.progress_total > 0) {
-          resProgWrap.classList.remove("hidden");
+          if (resProgWrap) resProgWrap.classList.remove("hidden");
           const pct = Math.round((j.progress_current / j.progress_total) * 100);
-          document.getElementById("res-progress-bar").style.width = `${pct}%`;
-          document.getElementById("res-progress-text").textContent = `${pct}%`;
+          const bar = document.getElementById("res-progress-bar");
+          if (bar) bar.style.width = `${pct}%`;
+          const progressText = document.getElementById("res-progress-text");
+          if (progressText) progressText.textContent = `${pct}%`;
         } else {
-          resProgWrap.classList.add("hidden");
+          if (resProgWrap) resProgWrap.classList.add("hidden");
         }
 
         if (["completed", "degraded", "empty_result", "failed", "canceled"].includes(j.status)) {
@@ -310,24 +316,34 @@ export function onJobsFilterChanged() {
 // ─── Rendering ───
 
 export function updateKPIs(jobs) {
-  document.getElementById("kpi-total").textContent = jobs.length;
-  document.getElementById("kpi-running").textContent = jobs.filter(
-    (j) => j.status === "running" || j.status === "discovering" || j.status === "pending",
-  ).length;
-  document.getElementById("kpi-done").textContent = jobs.filter((j) =>
-    ["completed", "degraded", "empty_result", "canceled"].includes(j.status),
-  ).length;
-  document.getElementById("kpi-records").textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
+  const total = document.getElementById("kpi-total");
+  if (total) total.textContent = jobs.length;
+  const running = document.getElementById("kpi-running");
+  if (running)
+    running.textContent = jobs.filter(
+      (j) => j.status === "running" || j.status === "discovering" || j.status === "pending",
+    ).length;
+  const done = document.getElementById("kpi-done");
+  if (done)
+    done.textContent = jobs.filter((j) =>
+      ["completed", "degraded", "empty_result", "canceled"].includes(j.status),
+    ).length;
+  const records = document.getElementById("kpi-records");
+  if (records) records.textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
 }
 
 function renderJobs(jobs) {
   const list = document.getElementById("jobs-list");
   const empty = document.getElementById("empty-state");
+  if (!list) return;
 
   if (!jobs.length) {
     list.innerHTML = "";
-    list.appendChild(empty);
-    empty.classList.remove("hidden");
+    const emptyState = document.getElementById("empty-state");
+    if (emptyState) {
+      list.appendChild(emptyState);
+      emptyState.classList.remove("hidden");
+    }
     return;
   }
 
@@ -347,11 +363,11 @@ function renderJobs(jobs) {
               : "";
 
       return `
-            <div class="job-row${highlightClass ? " " + highlightClass : ""}" data-id="${esc(j.id)}">
+            <div class="job-row${highlightClass ? " " + highlightClass : ""}" data-id="${attrStr(j.id)}">
                 <div class="job-name-col">
                     <div class="job-name">
                         ${esc(j.name)}
-                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${esc(j.id)}" title="Copy job ID">📋</button>
+                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${attrStr(j.id)}" title="Copy job ID">📋</button>
                         <span class="mode-tag">${j.mode === "auto" ? "auto" : "manual"}</span>
                     </div>
                     ${
@@ -366,12 +382,12 @@ function renderJobs(jobs) {
                     }
                 </div>
                 <div class="job-urls">${Array.isArray(j.urls) ? j.urls.length : 0} URL${(Array.isArray(j.urls) ? j.urls.length : 0) !== 1 ? "s" : ""}</div>
-                <div><span class="badge ${esc(j.status)}">${esc(j.status)}</span></div>
+                <div><span class="badge ${attrStr(j.status)}">${esc(j.status)}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "—"}</div>
                 <div class="job-actions">
-                    ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${esc(j.id)}">View</button>` : ""}
-                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${esc(j.id)}">Cancel</button>` : ""}
-                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${esc(j.id)}">✕</button>
+                    ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${attrStr(j.id)}">View</button>` : ""}
+                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${attrStr(j.id)}">Cancel</button>` : ""}
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}">✕</button>
                 </div>
             </div>
         `;

@@ -610,13 +610,20 @@ async def fetch_page_content(
 
         err_msg = str(e).lower()
         is_antibot = False
-        from app.scrape_telemetry import detect_anti_bot
+        try:
+            from app.scrape_telemetry import detect_anti_bot
 
-        if (html_content and detect_anti_bot(html_content) > 0.5) or any(
-            marker in err_msg
-            for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
-        ):
-            is_antibot = True
+            if (html_content and detect_anti_bot(html_content) > 0.5) or any(
+                marker in err_msg
+                for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
+            ):
+                is_antibot = True
+        except Exception:  # nosec B110
+            # If detect_anti_bot itself fails, rely on keyword matching only
+            is_antibot = any(
+                marker in err_msg
+                for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
+            )
 
         if is_antibot:
             logger.exception(

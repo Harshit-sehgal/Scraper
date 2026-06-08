@@ -111,9 +111,13 @@ class ObservabilityState:
     def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
+            from app.config import settings
+
             self._activity_heatmap = self._staging["activity_heatmap"]
             self._drift_log = self._staging["drift_log"]
-            self._telemetry_stream = deque(self._staging.get("telemetry_stream", self._telemetry_stream), maxlen=1000)
+            self._telemetry_stream = deque(
+                self._staging.get("telemetry_stream", self._telemetry_stream), maxlen=settings.TELEMETRY_STREAM_MAXLEN
+            )
             self._staging = None
 
     def rollback(self) -> None:
@@ -524,6 +528,7 @@ class ObservabilityState:
             try:
                 return len(json.dumps(d, sort_keys=True, default=str))
             except Exception:
+                logger.debug("estimate_dict failed for %s", type(d).__name__, exc_info=True)
                 return 0
 
         telemetry_size = len(json.dumps(list(snapshot.telemetry_stream), sort_keys=True, default=str))
