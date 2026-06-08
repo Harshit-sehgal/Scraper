@@ -2,7 +2,7 @@
    DataForge — Recycle Bin
    ═══════════════════════════════════════════ */
 
-import { esc, toast, showConfirm } from "./utils.js";
+import { esc, attrStr, toast, showConfirm } from "./utils.js";
 import { API, apiFetch } from "./api.js";
 
 // ─── Refresh ───
@@ -31,11 +31,11 @@ export async function refreshRecycleBin() {
                 <div class="job-name recycle-name">
                     ${esc(j.name)}
                 </div>
-                <div><span class="badge ${esc(j.status)}">${esc(j.status)}</span></div>
+                <div><span class="badge ${attrStr(j.status)}">${esc(j.status)}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "—"}</div>
                 <div class="job-actions">
-                    <button class="btn ghost small" data-action="restore-job" data-id="${esc(j.id)}">Restore</button>
-                    <button class="btn danger-ghost small" data-action="hard-delete-job" data-id="${esc(j.id)}">Delete Forever</button>
+                    <button class="btn ghost small" data-action="restore-job" data-id="${attrStr(j.id)}">Restore</button>
+                    <button class="btn danger-ghost small" data-action="hard-delete-job" data-id="${attrStr(j.id)}">Delete Forever</button>
                 </div>
             </div>
         `,

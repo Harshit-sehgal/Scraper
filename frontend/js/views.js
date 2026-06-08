@@ -32,7 +32,8 @@ export function switchView(name) {
     t.classList.remove("active");
     t.setAttribute("aria-selected", "false");
   });
-  document.getElementById(`view-${name}`).classList.add("active");
+  const viewEl = document.getElementById(`view-${name}`);
+  if (viewEl) viewEl.classList.add("active");
 
   const tabMap = {
     jobs: "tab-jobs",
@@ -63,8 +64,10 @@ export function setMode(mode) {
   document.querySelectorAll("#mode-toggle .toggle").forEach((t) => {
     t.classList.toggle("active", t.dataset.mode === mode);
   });
-  document.getElementById("section-manual").classList.toggle("hidden", mode !== "manual");
-  document.getElementById("section-auto").classList.toggle("hidden", mode !== "auto");
+  const manualSection = document.getElementById("section-manual");
+  if (manualSection) manualSection.classList.toggle("hidden", mode !== "manual");
+  const autoSection = document.getElementById("section-auto");
+  if (autoSection) autoSection.classList.toggle("hidden", mode !== "auto");
 }
 
 // ─── Global Keyboard Handler ───

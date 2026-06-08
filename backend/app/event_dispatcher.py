@@ -9,6 +9,8 @@ from collections.abc import Callable
 
 from app.semantic_events import SemanticEvent, SemanticEventType
 
+logger = logging.getLogger(__name__)
+
 
 class EventDispatcher:
     """Central hub for semantic event propagation.
@@ -31,7 +33,7 @@ class EventDispatcher:
     def dispatch(self, event: SemanticEvent) -> None:
         """Propagate an event to all interested subscribers."""
         event.timestamp = time.time()
-        logging.getLogger(__name__).debug(
+        logger.debug(
             "[SEMANTIC EVENT] %s from %s (instability=%.3f)",
             event.event_type.value,
             event.source,
@@ -42,7 +44,7 @@ class EventDispatcher:
             try:
                 callback(event)
             except Exception as e:
-                logging.getLogger(__name__).exception("Error in event callback")
+                logger.exception("Error in event callback")
                 # Record degradation telemetry (best-effort)
                 try:
                     from app.semantic_world_state import get_world_state

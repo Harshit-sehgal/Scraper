@@ -720,6 +720,7 @@ class SQLiteJobRepository(JobRepository):
             try:
                 return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
             except Exception:
+                logger.debug("Failed to parse world_state.json", exc_info=True)
                 return None
         return None
 

@@ -51,7 +51,7 @@ def _dependency_roles(route: Any) -> list[str]:
                 role_values = []
                 for role in value:
                     role_value = getattr(role, "value", None)
-                    if role_value in {"admin", "operator", "user"}:
+                    if role_value in {"admin", "operator", "viewer"}:
                         role_values.append(role_value)
                 if role_values:
                     roles.extend(role_values)

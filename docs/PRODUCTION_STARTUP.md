@@ -1,6 +1,6 @@
 # Production Startup
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-08
 **Status:** Local production-like startup smoke passed on 2026-06-01; target production remains unvalidated
 
 Use `docs/PRODUCTION.md` and `docs/PRODUCTION_READINESS.md` as the current production references. This file remains as a short startup sequence to avoid duplicating stale operational claims.
@@ -21,7 +21,7 @@ python3 scripts/check_prod_env.py --env-file .env
 docker build -f Dockerfile -t dataforge:local .
 ```
 
-Current audit result: local smoke built `dataforge:local` image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9`.
+Current audit result: local smoke built `dataforge:local` image successfully.
 
 5. Validate compose syntax:
 

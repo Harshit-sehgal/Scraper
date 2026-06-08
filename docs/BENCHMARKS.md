@@ -1,6 +1,6 @@
 # Benchmarks
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Status:** Benchmark tooling exists; real-world extraction accuracy is not proven
 
 ## Current Verified Benchmark Command
@@ -12,7 +12,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 Result:
 
 ```text
-1 passed, 1 skipped in 0.26s
+1 passed, 2 skipped
 ```
 
 This is an offline smoke/config test. It does not run live extraction and does not prove accuracy.

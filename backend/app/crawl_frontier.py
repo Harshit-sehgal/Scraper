@@ -358,8 +358,9 @@ class CrawlFrontier:
                     logger.exception("Failed to update failed count in SQLite")
 
                 # Retry logic: if not too many failures, put back in queue with
-                # lower priority
-                if count < settings.CRAWL_MAX_RETRIES_PER_DOMAIN:
+                # lower priority. Guard against duplicate heap entries by checking
+                # _pending (re-inserted URLs are added to _pending below).
+                if count < settings.CRAWL_MAX_RETRIES_PER_DOMAIN and url not in self._pending:
                     item = CrawlItem(priority=100 + (count * 20), url=url, depth=0)
                     heapq.heappush(self._queue, item)
                     self._pending.add(url)

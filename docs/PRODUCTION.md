@@ -1,6 +1,6 @@
 # Production
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Status:** Deployment files exist; local production-like Compose smoke passed on 2026-06-01; target production is not validated
 
 The repository includes production deployment files. A local Compose smoke passed on 2026-06-01 with a temporary ignored `.env`. Production readiness still requires validation in the target environment with real secrets, TLS, monitoring operations, backups, load testing, failover checks, and incident procedures.
@@ -24,11 +24,11 @@ The repository includes production deployment files. A local Compose smoke passe
 | Gate | Evidence | Status |
 | --- | --- | --- |
 | Production env placeholder rejection | `.env.production.example` intentionally fails validation, including placeholder metrics token | Validated |
-| Docker image build | `bash scripts/smoke_prod_stack.sh` built image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9` | Validated locally |
+| Docker image build | Image builds successfully locally | Validated locally |
 | Full Compose startup | Local smoke started backend, worker, Postgres, Nginx, Prometheus, and Grafana with a temporary ignored `.env` | Validated locally |
 | Nginx routing | `/health` 200, `/ready` 200, `/app/` 200, `/docs`/`/redoc`/`/openapi.json`/`/metrics` 404 | Validated locally |
 | Containerized browser extraction | Container Chromium printed `chromium 148.0.7778.96`; one deterministic smoke-page job completed with 4 records | Validated locally |
-| Prometheus/Grafana runtime behavior | Prometheus config loaded 5 alert rules and targets `dataforge`/`prometheus` were `up`; Grafana `/api/health` returned database `ok`; login/dashboards were not checked | Partially validated locally |
+| Prometheus/Grafana runtime behavior | Prometheus config loaded alert rules and targets were `up`; Grafana `/api/health` returned database `ok`; login/dashboards were not checked | Partially validated locally |
 
 ## Required Env Validation
 

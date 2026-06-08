@@ -640,7 +640,7 @@ async def scrape_url(
             record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
         else:
             record_anti_bot_classification("ok")
-    except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
+    except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError):  # nosec B110
         pass
 
     soup_for_density = BeautifulSoup(html, "html.parser")
@@ -726,7 +726,7 @@ async def scrape_url(
         provenance_builder=provenance_builder,
         classification=classification,
         domain=intel.domain,
-        new_motifs=[],
+        new_motifs=new_motifs,
         solidified_motifs_count=solidified_motifs_count,
         anti_bot_score=anti_bot,
         js_render_delay=js_render_delay,

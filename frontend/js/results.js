@@ -2,7 +2,7 @@
    DataForge — Results Viewing & Export
    ═══════════════════════════════════════════ */
 
-import { esc, toast, showConfirm } from "./utils.js";
+import { esc, attrStr, toast, showConfirm } from "./utils.js";
 import { API, apiFetch } from "./api.js";
 import { switchView } from "./views.js";
 
@@ -104,18 +104,20 @@ export async function viewResults(id) {
     renderLineageSummary(j);
 
     const exportGrp = document.getElementById("export-group");
-    if (exportGrp) exportGrp.style.display = j.results.length ? "flex" : "none";
+    if (exportGrp) exportGrp.style.display = Array.isArray(j.results) && j.results.length ? "flex" : "none";
     const tableWrap = document.querySelector("#view-results .table-wrap");
     if (tableWrap) tableWrap.scrollLeft = 0;
 
     // AI Insight
     const aiPanel = document.getElementById("ai-insight-panel");
-    if (j.analysis) {
-      aiPanel.classList.remove("hidden");
-      const aiText = document.getElementById("ai-insight-text");
-      if (aiText) aiText.textContent = j.analysis;
-    } else {
-      aiPanel.classList.add("hidden");
+    if (aiPanel) {
+      if (j.analysis) {
+        aiPanel.classList.remove("hidden");
+        const aiText = document.getElementById("ai-insight-text");
+        if (aiText) aiText.textContent = j.analysis;
+      } else {
+        aiPanel.classList.add("hidden");
+      }
     }
 
     // Logs
@@ -189,7 +191,7 @@ function renderQualityPanel(j) {
   const qualityPanel = document.getElementById("quality-panel");
   const qualityText = document.getElementById("quality-text");
   if (j.quality_report && typeof j.quality_report === "object") {
-    qualityPanel.classList.remove("hidden");
+    if (qualityPanel) qualityPanel.classList.remove("hidden");
     const qr = j.quality_report;
     const radius = qr.radius || {};
     const integrity = qr.type_integrity || {};
@@ -202,10 +204,11 @@ function renderQualityPanel(j) {
       ? `Radius kept ${radius.kept}/${(radius.kept || 0) + (radius.dropped || 0)} records`
       : `Radius not applied (${radius.reason || "not configured"})`;
     const noiseRemoved = (aiStruct.noise_rows_removed || 0) + ((reclean.ai_structuring || {}).noise_rows_removed || 0);
-    qualityText.textContent = `Overall: ${overall} | Average score: ${qr.avg_record_score || 0} | Final avg: ${qr.avg_final_record_score || 0} | Below threshold: ${qr.records_below_threshold || 0}. Type mismatches: ${integrity.total_type_mismatches || 0} across ${integrity.records_with_type_mismatch || 0} records. Sources: official ${sourceBreakdown.official || 0}, directory ${sourceBreakdown.directory || 0}, social ${sourceBreakdown.social || 0}. Source-level AI mapping: ${sourceAI.records_ai_structured || 0}/${sourceAI.records_processed || 0} rows. AI structuring: ${aiStruct.ai_chunks || 0}/${aiStruct.total_chunks || 0} chunks. Noise rows removed: ${noiseRemoved}. ${radiusPart}. Re-clean: ${reclean.applied ? `${reclean.before_records || 0} -> ${reclean.after_records || 0}` : "not run"}.`;
+    if (qualityText)
+      qualityText.textContent = `Overall: ${overall} | Average score: ${qr.avg_record_score || 0} | Final avg: ${qr.avg_final_record_score || 0} | Below threshold: ${qr.records_below_threshold || 0}. Type mismatches: ${integrity.total_type_mismatches || 0} across ${integrity.records_with_type_mismatch || 0} records. Sources: official ${sourceBreakdown.official || 0}, directory ${sourceBreakdown.directory || 0}, social ${sourceBreakdown.social || 0}. Source-level AI mapping: ${sourceAI.records_ai_structured || 0}/${sourceAI.records_processed || 0} rows. AI structuring: ${aiStruct.ai_chunks || 0}/${aiStruct.total_chunks || 0} chunks. Noise rows removed: ${noiseRemoved}. ${radiusPart}. Re-clean: ${reclean.applied ? `${reclean.before_records || 0} -> ${reclean.after_records || 0}` : "not run"}.`;
   } else {
-    qualityPanel.classList.add("hidden");
-    qualityText.textContent = "";
+    if (qualityPanel) qualityPanel.classList.add("hidden");
+    if (qualityText) qualityText.textContent = "";
   }
 }
 
@@ -230,7 +233,7 @@ export function renderLogs(logs) {
       return `
             <div class="log-entry">
                 <span class="log-time">[${time}]</span>
-                <span class="log-msg ${esc(log.level || "info")}">${esc(log.message)}</span>
+                <span class="log-msg ${attrStr(log.level || "info")}">${esc(log.message)}</span>
             </div>
         `;
     })
@@ -320,7 +323,7 @@ export function renderTable(results, emptyMessage = "No results") {
           if (Array.isArray(v)) v = v.join(", ");
           if (v === null || v === undefined || v === "{}" || v === "") v = "—";
           const text = String(v);
-          return `<td data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;
+          return `<td data-raw="${attrStr(text)}" title="${attrStr(text)}">${esc(text)}</td>`;
         })
         .join("")}</tr>`;
     })
@@ -440,7 +443,7 @@ async function downloadExport(url, filename) {
     a.href = dlUrl;
     a.download = filename;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(dlUrl), 100);
+    setTimeout(() => URL.revokeObjectURL(dlUrl), 5000);
   } catch (e) {
     toast(`Export error: ${e.message}`, "error");
   }

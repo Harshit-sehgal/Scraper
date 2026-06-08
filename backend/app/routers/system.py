@@ -256,25 +256,26 @@ async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_r
         return val
 
     # 1. anonymized_state.json
-    anonymized_jobs = {}
-    for j_id, job in jobs_store.items():
-        if hasattr(job, "model_dump"):
-            job_dict = job.model_dump()
-        elif hasattr(job, "dict"):
-            job_dict = job.dict()
-        else:
-            job_dict = dict(job)
-        anonymized_jobs[j_id] = sanitize_value(job_dict)
+    with _jobs_store_lock:
+        anonymized_jobs = {}
+        for j_id, job in jobs_store.items():
+            if hasattr(job, "model_dump"):
+                job_dict = job.model_dump()
+            elif hasattr(job, "dict"):
+                job_dict = job.dict()
+            else:
+                job_dict = dict(job)
+            anonymized_jobs[j_id] = sanitize_value(job_dict)
 
-    anonymized_recycle = {}
-    for j_id, job in recycle_bin_store.items():
-        if hasattr(job, "model_dump"):
-            job_dict = job.model_dump()
-        elif hasattr(job, "dict"):
-            job_dict = job.dict()
-        else:
-            job_dict = dict(job)
-        anonymized_recycle[j_id] = sanitize_value(job_dict)
+        anonymized_recycle = {}
+        for j_id, job in recycle_bin_store.items():
+            if hasattr(job, "model_dump"):
+                job_dict = job.model_dump()
+            elif hasattr(job, "dict"):
+                job_dict = job.dict()
+            else:
+                job_dict = dict(job)
+            anonymized_recycle[j_id] = sanitize_value(job_dict)
 
     anonymized_state = {"jobs": anonymized_jobs, "recycle_bin": anonymized_recycle}
 
@@ -758,7 +759,9 @@ async def metrics(request: Request):
     from app.models import JobStatus
 
     counts = {s.value: 0 for s in JobStatus}
-    for job in jobs_store.values():
+    with _jobs_store_lock:
+        snapshot = list(jobs_store.values())
+    for job in snapshot:
         status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
         counts[status_key] = counts.get(status_key, 0) + 1
 
@@ -768,7 +771,8 @@ async def metrics(request: Request):
 
     # Recycle bin count
     recycle_gauge = Gauge("dataforge_recycle_bin_total", "Total jobs in recycle bin", registry=registry)
-    recycle_gauge.set(len(recycle_bin_store))
+    with _jobs_store_lock:
+        recycle_gauge.set(len(recycle_bin_store))
 
     # Runtime limits
     for key, val in config_view().items():

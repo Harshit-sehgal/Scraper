@@ -134,7 +134,7 @@ class BrowserPool:
                 }
             else:
                 context_options = {
-                    "user_agent": self._get_random_ua() if is_stealth else settings.USER_AGENT,
+                    "user_agent": settings.USER_AGENT,
                     "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
                     "device_scale_factor": 1.0 if not is_stealth else 2.0,
                     "is_mobile": False,
@@ -404,10 +404,13 @@ class BrowserPool:
 
 # Global Singleton
 _pool: BrowserPool | None = None
+_pool_lock = __import__("threading").Lock()
 
 
 def get_browser_pool() -> BrowserPool:
     global _pool
     if _pool is None:
-        _pool = BrowserPool()
+        with _pool_lock:
+            if _pool is None:
+                _pool = BrowserPool()
     return _pool

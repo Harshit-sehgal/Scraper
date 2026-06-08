@@ -5,6 +5,7 @@ Ported from the existing async_utils, html_utils, and browser_pool.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -94,6 +95,7 @@ async def _fetch_with_browser(url: str) -> FetchResult:
         return await _fetch_with_httpx(url)
 
     start = time.monotonic()
+    browser = None
     try:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=settings.browser.PLAYWRIGHT_HEADLESS)
@@ -105,7 +107,6 @@ async def _fetch_with_browser(url: str) -> FetchResult:
             resp = await page.goto(url, wait_until="networkidle", timeout=settings.browser.PLAYWRIGHT_TIMEOUT)
             html = await page.content()
             final_url = page.url
-            await browser.close()
 
             duration = (time.monotonic() - start) * 1000
             return FetchResult(
@@ -120,3 +121,7 @@ async def _fetch_with_browser(url: str) -> FetchResult:
         duration = (time.monotonic() - start) * 1000
         logger.warning("Browser fetch failed for %s: %s", url, e)
         return FetchResult(html="", url=url, error=str(e), status_code=0, duration_ms=duration, strategy=FetchStrategy.BROWSER)
+    finally:
+        if browser:
+            with contextlib.suppress(Exception):
+                await browser.close()

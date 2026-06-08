@@ -41,10 +41,10 @@ def score_record_quality(record: dict[str, Any], schema_fields: list[dict[str, A
             elif length > 4:
                 score += 0.2
             score = min(1.0, score)
-        elif isinstance(value, (int, float)):
-            score = 0.8
         elif isinstance(value, bool):
             score = 0.6
+        elif isinstance(value, (int, float)):
+            score = 0.8
         elif isinstance(value, list):
             score = 0.5 if len(value) > 0 else 0.0
         else:

@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-**Last updated:** 2026-06-01
+**Last updated:** 2026-06-08
 **Status:** Pre-production candidate validation steps
 
 Use this checklist to validate DataForge Scraper in your target environment before public production deployment.
@@ -451,7 +451,7 @@ curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" http://localhost:3000/api/
 # Check alert rules loaded
 curl -s http://localhost:9090/api/v1/rules | jq '.data | length'
 
-# Expected: 5 (from prometheus_alerts.yml)
+# Expected: 14 (from prometheus_alerts.yml)
 ```
 
 **Evidence to save:** Screenshot of Grafana showing metrics

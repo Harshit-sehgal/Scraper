@@ -98,6 +98,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.close()
 
     def restore_from_recycle_bin(self, job_id: str) -> bool:
+        _get_store()  # use local lazy loader
         from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
@@ -129,9 +130,9 @@ class SQLiteJobRepository(JobRepository):
         with _DB_LOCK:
             conn = _get_connection()
             try:
-                conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+                jobs_cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 cursor = conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
-                deleted = cursor.rowcount
+                deleted = cursor.rowcount or jobs_cursor.rowcount
                 conn.commit()
             except Exception:
                 conn.rollback()

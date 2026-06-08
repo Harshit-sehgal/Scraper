@@ -1,6 +1,6 @@
 # Code Quality Standards
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 
 This document defines expected quality checks. It is not proof that every lint/type/coverage check currently passes. Only fresh command output should be used as evidence.
 
@@ -8,13 +8,8 @@ This document defines expected quality checks. It is not proof that every lint/t
 
 For the latest verified syntax, lint, type checking (mypy), and pytest collection/passing results across all test groups and environments, see [PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
-## Results from Prior Refresh (not re-run in this session)
-
-- Local Compose smoke built image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9` *(archived)*.
-
 ## Not Verified In This Snapshot
 
-- `flake8`
 - coverage percentage
 - target-environment Docker/Compose startup
 

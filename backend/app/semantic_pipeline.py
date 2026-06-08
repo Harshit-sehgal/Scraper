@@ -44,6 +44,8 @@ from app.semantic_mapper import detect_semantic_type, is_child_fragment
 from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records, sem_type_str
 from app.semantic_world_state import get_world_state
 
+logger = logging.getLogger(__name__)
+
 get_scheduler()
 
 
@@ -168,7 +170,7 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
     for record in records:
         all_text = " ".join(str(v) for v in record.values() if v and isinstance(v, str))
         if not all_text:
-            logging.getLogger(__name__).debug("Filtered: empty text")
+            logger.debug("Filtered: empty text")
             continue
 
         # Quick navigation / meta check
@@ -184,7 +186,7 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
             "home about contact",
         ]
         if any(p in lower for p in nav_phrases):
-            logging.getLogger(__name__).debug("Filtered: nav phrase in '%s'", lower[:50])
+            logger.debug("Filtered: nav phrase in '%s'", lower[:50])
             continue
 
         from app.semantic_segmentation import extract_candidate_values
@@ -192,7 +194,7 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
         cands = extract_candidate_values(all_text)
 
         if len(cands) == 0:
-            logging.getLogger(__name__).debug("Filtered: no candidates in '%s'", all_text[:50])
+            logger.debug("Filtered: no candidates in '%s'", all_text[:50])
             continue
 
         # Refine candidates: prefer specific types over generic 'text' or 'number'
@@ -224,7 +226,7 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
             if sem_type_str(pt) == "organization":
                 filtered.append(record)
             else:
-                logging.getLogger(__name__).debug("Filtered: single non-org cand %s", cands[0].primary_type)
+                logger.debug("Filtered: single non-org cand %s", cands[0].primary_type)
             continue
 
         # Calculate Relational Density Score
@@ -268,9 +270,9 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
                 state.increment_records()
                 filtered.append(record)
             else:
-                logging.getLogger(__name__).debug("Filtered: core_count=1 but low relative density %f", normalized_density)
+                logger.debug("Filtered: core_count=1 but low relative density %f", normalized_density)
         else:
-            logging.getLogger(__name__).debug("Filtered: core_count=0, density %f", normalized_density)
+            logger.debug("Filtered: core_count=0, density %f", normalized_density)
 
     return filtered
 

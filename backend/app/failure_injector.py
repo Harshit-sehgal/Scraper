@@ -2,6 +2,8 @@ import logging
 import os
 import random
 
+logger = logging.getLogger(__name__)
+
 
 class FailureInjector:
     """Utility for stress testing state safety via failure injection.
@@ -17,7 +19,7 @@ class FailureInjector:
     def inject(self, label: str = "anonymous") -> None:
         """Randomly raise an exception if failure injection is active."""
         if self.active and random.random() < self.probability:  # nosec B311  # noqa: S311
-            logging.getLogger(__name__).warning("FAILURE INJECTED: %s", label)
+            logger.warning("FAILURE INJECTED: %s", label)
             msg = f"Simulated failure in {label}"
             raise RuntimeError(msg)
 
@@ -40,7 +42,7 @@ def set_injection_probability(p: float) -> None:
     """
     env = (os.environ.get("DATAFORGE_ENV") or "").strip().lower()
     if p > 0 and env == "production":
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Refusing to enable failure injection in production "
             "(requested probability=%s). Failure injection is a test-only "
             "utility; leaving probability at 0.",

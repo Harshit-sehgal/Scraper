@@ -14,14 +14,11 @@ from typing import TYPE_CHECKING
 
 from app.postgres_repository_base import (
     PostgresRepositoryBase,
-    _columns_sql,
     get_database_url,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-_ = (_columns_sql,)
 
 logger = logging.getLogger(__name__)
 

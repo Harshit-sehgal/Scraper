@@ -17,6 +17,8 @@ from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
+logger = logging.getLogger(__name__)
+
 
 class MotifState:
     """Sole owner of the semantic field's motif structures."""
@@ -235,7 +237,7 @@ class MotifState:
         import ast
 
         if len(key) > self.MAX_MOTIF_KEY_LENGTH:
-            logging.getLogger(__name__).warning("Motif key too long (%d chars), falling back to split", len(key))
+            logger.warning("Motif key too long (%d chars), falling back to split", len(key))
             return tuple(key.split(", "))
 
         try:
@@ -243,7 +245,7 @@ class MotifState:
             if isinstance(parsed, tuple):
                 return parsed
         except (ValueError, SyntaxError):
-            logging.getLogger(__name__).debug("Fallback parsing motif key: %s", key)
+            logger.debug("Fallback parsing motif key: %s", key)
         return tuple(key.split(", "))
 
     def clear(self) -> None:

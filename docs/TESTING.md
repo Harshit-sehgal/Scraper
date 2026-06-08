@@ -1,6 +1,6 @@
 # Testing
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Status:** Current local testing truth
 
 Use explicit environment variables so local `.env` files do not change results.

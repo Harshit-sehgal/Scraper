@@ -40,7 +40,7 @@
     const key = getDashboardApiKey();
     if (key && url.includes("/api/")) headers["X-API-Key"] = key;
     try {
-      const res = await fetch(url, { ...options, headers });
+      let res = await fetch(url, { ...options, headers });
       // Auto-prompt on 403: API key may be missing or invalid
       if (res.status === 403) {
         const now = Date.now();
@@ -49,6 +49,9 @@
           const newKey = await promptForApiKey();
           if (newKey !== null) {
             setDashboardApiKey(newKey);
+            // Retry with the new key
+            const retryHeaders = { ...(options.headers || {}), "X-API-Key": newKey };
+            res = await fetch(url, { ...options, headers: retryHeaders });
           }
         }
       }
@@ -157,11 +160,6 @@
   let pollTimer = null;
 
   let energyChart, communityChart, driftChart;
-  let historyData = {
-    energy: [],
-    entropy: [],
-    labels: [],
-  };
 
   let topologyHistory = [];
   let isLiveMode = true;
@@ -188,6 +186,10 @@
     const energyCtx = document.getElementById("energy-chart");
     const driftCtx = document.getElementById("drift-chart");
     const communityCtx = document.getElementById("community-chart");
+
+    if (energyChart) energyChart.destroy();
+    if (driftChart) driftChart.destroy();
+    if (communityChart) communityChart.destroy();
 
     energyChart = new Chart(energyCtx, {
       type: "line",
@@ -290,135 +292,142 @@
     };
   }
 
+  let _updating = false;
   async function updateLoop() {
-    // Use allSettled so individual failures don't crash the whole update
-    const results = await Promise.allSettled([
-      dashboardApiFetch(`${API_SYSTEM}/topology`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SYSTEM}/observability`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SYSTEM}/history/topology`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SCRAPER}/stats`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SCRAPER}/browser`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SCRAPER}/memory/stats`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SYSTEM}/acquisition/telemetry`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      dashboardApiFetch(`${API_SERVER}/api/system/status`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-    ]);
+    if (_updating) return;
+    _updating = true;
+    try {
+      // Use allSettled so individual failures don't crash the whole update
+      const results = await Promise.allSettled([
+        dashboardApiFetch(`${API_SYSTEM}/topology`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SYSTEM}/observability`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SYSTEM}/history/topology`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SCRAPER}/stats`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SCRAPER}/browser`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SCRAPER}/memory/stats`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SYSTEM}/acquisition/telemetry`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        dashboardApiFetch(`${API_SERVER}/api/system/status`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+      ]);
 
-    const [
-      topologyResult,
-      observabilityResult,
-      historyResult,
-      scraperStatsResult,
-      browserStatsResult,
-      memoryStatsResult,
-      acqTelemetryResult,
-      systemStatusResult,
-    ] = results;
+      const [
+        topologyResult,
+        observabilityResult,
+        historyResult,
+        scraperStatsResult,
+        browserStatsResult,
+        memoryStatsResult,
+        acqTelemetryResult,
+        systemStatusResult,
+      ] = results;
 
-    // Check for rate limiting or other failures
-    const anyFailed = results.some((r) => r.status === "rejected");
-    if (anyFailed) {
-      failedPolls++;
-      // Exponential backoff — double interval up to MAX_INTERVAL
-      currentInterval = Math.min(UPDATE_INTERVAL * Math.pow(2, failedPolls), MAX_INTERVAL);
-      console.warn(`Dashboard poll #${failedPolls} partial failure, backing off to ${currentInterval}ms`);
+      // Check for rate limiting or other failures
+      const anyFailed = results.some((r) => r.status === "rejected");
+      if (anyFailed) {
+        failedPolls++;
+        // Exponential backoff — double interval up to MAX_INTERVAL
+        currentInterval = Math.min(UPDATE_INTERVAL * Math.pow(2, failedPolls), MAX_INTERVAL);
+        console.warn(`Dashboard poll #${failedPolls} partial failure, backing off to ${currentInterval}ms`);
 
-      document.getElementById("status-badge").innerText = "DEGRADED";
-      document.getElementById("status-badge").className =
-        "px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-800 rounded-full text-xs font-bold";
-    } else {
-      // Reset backoff on success
-      failedPolls = 0;
-      currentInterval = UPDATE_INTERVAL;
-      document.getElementById("status-badge").innerText = "POLLING VIEW";
-      document.getElementById("status-badge").className =
-        "px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse";
-    }
-
-    // Extract values safely — use empty objects for failed fetches
-    const topology = topologyResult.status === "fulfilled" ? topologyResult.value : {};
-    const observability =
-      observabilityResult.status === "fulfilled" ? observabilityResult.value : { health_index: null, telemetry: [] };
-    const history = historyResult.status === "fulfilled" ? historyResult.value : { history: [] };
-    const scraperStats = scraperStatsResult.status === "fulfilled" ? scraperStatsResult.value : null;
-    const browserStats = browserStatsResult.status === "fulfilled" ? browserStatsResult.value : null;
-    const memoryStats = memoryStatsResult.status === "fulfilled" ? memoryStatsResult.value : null;
-    const acqTelemetry = acqTelemetryResult.status === "fulfilled" ? acqTelemetryResult.value : null;
-    const systemStatus = systemStatusResult.status === "fulfilled" ? systemStatusResult.value : null;
-
-    // Update Timeline
-    topologyHistory = history.history || [];
-    const scrubber = document.getElementById("timeline-scrubber");
-    scrubber.max = Math.max(0, topologyHistory.length - 1);
-
-    if (isLiveMode && topologyResult.status === "fulfilled") {
-      updateMetrics(
-        topology.metrics || {},
-        observability.health_index,
-        topology.meso_clusters || [],
-        topology.macro_continents || [],
-        scraperStats,
-        browserStats,
-        memoryStats,
-        acqTelemetry,
-        systemStatus,
-      );
-      renderTopology(
-        topology.field_regions || [],
-        topology.global_communities || [],
-        topology.topology_edges || [],
-        topology.meso_clusters || [],
-        topology.macro_continents || [],
-      );
-      updateTelemetry(observability.telemetry || []);
-      updateCharts(topology.metrics || {}, topology.global_communities || [], topology.drift_logs || {});
-      scrubber.value = scrubber.max;
-    }
-
-    document.getElementById("last-update").innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
-
-    // Keep the static "Status: UI Loaded" line in sync with the
-    // current polling state. Without this, the line is misleading —
-    // it claims the UI is in its initial "loaded" state long after
-    // the first successful poll.
-    const statusLine = document.getElementById("dash-status-line");
-    if (statusLine) {
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed === 0) {
-        statusLine.innerText = "Status: Live";
-      } else if (failed < results.length) {
-        statusLine.innerText = `Status: Degraded (${failed} of ${results.length} feeds)`;
+        document.getElementById("status-badge").innerText = "DEGRADED";
+        document.getElementById("status-badge").className =
+          "px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-800 rounded-full text-xs font-bold";
       } else {
-        statusLine.innerText = "Status: Offline";
+        // Reset backoff on success
+        failedPolls = 0;
+        currentInterval = UPDATE_INTERVAL;
+        document.getElementById("status-badge").innerText = "POLLING VIEW";
+        document.getElementById("status-badge").className =
+          "px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse";
       }
-    }
 
-    // Reschedule with backoff
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = setTimeout(updateLoop, currentInterval);
+      // Extract values safely — use empty objects for failed fetches
+      const topology = topologyResult.status === "fulfilled" ? topologyResult.value : {};
+      const observability =
+        observabilityResult.status === "fulfilled" ? observabilityResult.value : { health_index: null, telemetry: [] };
+      const history = historyResult.status === "fulfilled" ? historyResult.value : { history: [] };
+      const scraperStats = scraperStatsResult.status === "fulfilled" ? scraperStatsResult.value : null;
+      const browserStats = browserStatsResult.status === "fulfilled" ? browserStatsResult.value : null;
+      const memoryStats = memoryStatsResult.status === "fulfilled" ? memoryStatsResult.value : null;
+      const acqTelemetry = acqTelemetryResult.status === "fulfilled" ? acqTelemetryResult.value : null;
+      const systemStatus = systemStatusResult.status === "fulfilled" ? systemStatusResult.value : null;
+
+      // Update Timeline
+      topologyHistory = history.history || [];
+      const scrubber = document.getElementById("timeline-scrubber");
+      if (scrubber) scrubber.max = Math.max(0, topologyHistory.length - 1);
+
+      if (isLiveMode && topologyResult.status === "fulfilled") {
+        updateMetrics(
+          topology.metrics || {},
+          observability.health_index,
+          topology.meso_clusters || [],
+          topology.macro_continents || [],
+          scraperStats,
+          browserStats,
+          memoryStats,
+          acqTelemetry,
+          systemStatus,
+        );
+        renderTopology(
+          topology.field_regions || [],
+          topology.global_communities || [],
+          topology.topology_edges || [],
+          topology.meso_clusters || [],
+          topology.macro_continents || [],
+        );
+        updateTelemetry(observability.telemetry || []);
+        updateCharts(topology.metrics || {}, topology.global_communities || [], topology.drift_logs || {});
+        scrubber.value = scrubber.max;
+      }
+
+      document.getElementById("last-update").innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
+
+      // Keep the static "Status: UI Loaded" line in sync with the
+      // current polling state. Without this, the line is misleading —
+      // it claims the UI is in its initial "loaded" state long after
+      // the first successful poll.
+      const statusLine = document.getElementById("dash-status-line");
+      if (statusLine) {
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed === 0) {
+          statusLine.innerText = "Status: Live";
+        } else if (failed < results.length) {
+          statusLine.innerText = `Status: Degraded (${failed} of ${results.length} feeds)`;
+        } else {
+          statusLine.innerText = "Status: Offline";
+        }
+      }
+
+      // Reschedule with backoff
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = setTimeout(updateLoop, currentInterval);
+    } finally {
+      _updating = false;
+    }
   }
 
   function updateMetrics(
@@ -864,7 +873,7 @@
     // Capture new wave events for animation
     const now = Date.now();
     events.forEach((e) => {
-      if (e.type === "wave_absorption" && now - e.timestamp * 1000 < UPDATE_INTERVAL * 2) {
+      if (e.type === "wave_absorption" && e.details && now - e.timestamp * 1000 < UPDATE_INTERVAL * 2) {
         if (!activeWaves.some((w) => w.id === e.details.region_id && Math.abs(w.time - e.timestamp) < 0.1)) {
           activeWaves.push({
             id: e.details.region_id,

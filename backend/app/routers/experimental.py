@@ -476,9 +476,9 @@ async def get_extraction_trends(window: Annotated[int, Query(ge=10, le=500)] = 1
                 for d, t in report.domain_trends.items()
             },
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get extraction trends")
-        raise HTTPException(status_code=500, detail="Failed to analyze extraction trends") from None
+        raise HTTPException(status_code=500, detail="Failed to analyze extraction trends") from e
 
 
 @router.get("/api/scraper/trends/{domain}")
@@ -526,9 +526,9 @@ async def get_domain_trend(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get trend for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to get domain trend") from None
+        raise HTTPException(status_code=500, detail="Failed to get domain trend") from e
 
 
 # ─── Economic Tracking & Cost Analysis ────────────────────────────────
@@ -684,9 +684,9 @@ async def get_current_mode():
             "available_modes": [m.value for m in OperatorMode],
             "settings": governance_summary,
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get operator mode")
-        raise HTTPException(status_code=500, detail="Failed to get operator mode") from None
+        raise HTTPException(status_code=500, detail="Failed to get operator mode") from e
 
 
 @router.post("/api/operator/mode")
@@ -725,9 +725,9 @@ async def set_operator_mode(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to set operator mode")
-        raise HTTPException(status_code=500, detail="Failed to switch operator mode") from None
+        raise HTTPException(status_code=500, detail="Failed to switch operator mode") from e
 
 
 # ─── System Governance Dashboard ──────────────────────────────────────
@@ -784,9 +784,9 @@ async def get_system_dashboard():
                 "queue_sheds": governance.get("resources", {}).get("metrics", {}).get("queue_sheds", 0),
             },
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get operator system dashboard")
-        raise HTTPException(status_code=500, detail="Failed to load dashboard") from None
+        raise HTTPException(status_code=500, detail="Failed to load dashboard") from e
 
 
 # ─── Degradation Prediction Endpoints ─────────────────────────────────
@@ -840,9 +840,9 @@ async def get_degradation_predictions(
             result["summary"]["total_filtered"] = len(result["predictions"])
 
         return result  # noqa: TRY300
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get degradation predictions")
-        raise HTTPException(status_code=500, detail="Failed to get degradation predictions") from None
+        raise HTTPException(status_code=500, detail="Failed to get degradation predictions") from e
 
 
 @router.get("/api/operator/predictions/{domain}")
@@ -889,9 +889,9 @@ async def get_domain_prediction(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get prediction for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to predict for domain") from None
+        raise HTTPException(status_code=500, detail="Failed to predict for domain") from e
 
 
 # ─── Operator Health Overview (research-backed) ───────────────────────
@@ -1000,9 +1000,9 @@ async def optimize_domain_selectors(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to optimize selectors for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Selector optimization failed") from None
+        raise HTTPException(status_code=500, detail="Selector optimization failed") from e
 
 
 @router.get("/api/scraper/ml/optimize/domain/{domain}/history")
@@ -1022,9 +1022,9 @@ async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1
             "count": len(history),
             "history": history,
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get optimization history for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to get optimization history") from None
+        raise HTTPException(status_code=500, detail="Failed to get optimization history") from e
 
 
 @router.post("/api/scraper/ml/learn")
@@ -1049,9 +1049,9 @@ async def record_selector_learning(
             "domain": domain,
             "quality": quality,
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed selector learning for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Selector learning failed") from None
+        raise HTTPException(status_code=500, detail="Selector learning failed") from e
 
 
 # ─── Strategy Evolution Endpoints ─────────────────────────────────────
@@ -1077,9 +1077,9 @@ async def recommend_fetch_strategy(domain: str):
             "confidence": round(recommendation.confidence, 3),
             "estimated_success_rate": round(recommendation.estimated_success_rate, 3),
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to recommend strategy for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to recommend strategy") from None
+        raise HTTPException(status_code=500, detail="Failed to recommend strategy") from e
 
 
 @router.post("/api/scraper/strategy/record")
@@ -1116,9 +1116,9 @@ async def record_strategy_attempt(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to record strategy attempt for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to record strategy attempt") from None
+        raise HTTPException(status_code=500, detail="Failed to record strategy attempt") from e
 
 
 @router.get("/api/scraper/strategy/domain/{domain}")
@@ -1132,9 +1132,9 @@ async def get_domain_strategy_analysis(domain: str):
 
         engine = get_strategy_evolution_engine()
         return await run_in_threadpool(engine.get_domain_strategy_report, domain)
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get strategy analysis for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to get domain strategy report") from None
+        raise HTTPException(status_code=500, detail="Failed to get domain strategy report") from e
 
 
 @router.get("/api/scraper/strategy/report")
@@ -1148,9 +1148,9 @@ async def get_all_strategies_report():
 
         engine = get_strategy_evolution_engine()
         return await run_in_threadpool(engine.get_all_domains_strategy_report)
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to get all strategies report")
-        raise HTTPException(status_code=500, detail="Failed to get all strategy reports") from None
+        raise HTTPException(status_code=500, detail="Failed to get all strategy reports") from e
 
 
 @router.post("/api/scraper/strategy/evolve/{domain}")
@@ -1183,6 +1183,6 @@ async def evolve_domain_strategy(
             "new_strategy": new_strategy.value,
             "status": "evolved",
         }
-    except Exception:
+    except Exception as e:
         logger.exception("Failed manual strategy evolution for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Strategy evolution failed") from None
+        raise HTTPException(status_code=500, detail="Strategy evolution failed") from e

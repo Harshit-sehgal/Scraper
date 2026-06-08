@@ -10,6 +10,8 @@ from collections.abc import Callable
 from app.checkpoint_manager import get_checkpoint_manager
 from app.semantic_world_state import get_world_state
 
+logger = logging.getLogger(__name__)
+
 
 class SemanticOS:
     """The official gateway to the semantic cognitive substrate."""
@@ -152,7 +154,7 @@ class SemanticOS:
                     # Reward successful interpretation by pulling role toward
                     # action anchor
                     self.ws.blend_manifold_vector(role, target_vec, alpha=0.9, beta=0.1)
-                    logging.getLogger(__name__).info("FEEDBACK REINFORCED: Role [%s] rewarded by Action [%s]", role, action_id)
+                    logger.info("FEEDBACK REINFORCED: Role [%s] rewarded by Action [%s]", role, action_id)
 
     # ─── Hierarchical Synthesis (Phase 38) ───────────────────────────────
 

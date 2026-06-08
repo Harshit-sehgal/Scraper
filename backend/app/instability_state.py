@@ -9,6 +9,8 @@ from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
+logger = logging.getLogger(__name__)
+
 
 class InstabilityState:
     """Sole owner of the semantic field's tension / exclusion structure."""
@@ -159,7 +161,7 @@ class InstabilityState:
                     continue
 
                 if len(k) > self.MAX_KEY_LENGTH:
-                    logging.getLogger(__name__).warning("Skipping overly long key (%d chars)", len(k))
+                    logger.warning("Skipping overly long key (%d chars)", len(k))
                     continue
 
                 import ast

@@ -1,3 +1,4 @@
+import asyncio
 import ipaddress
 import logging
 import socket
@@ -403,7 +404,7 @@ class _UrlValidatingAsyncTransport(httpx.AsyncBaseTransport):
                 # We deliberately do NOT call validate_public_http_url here
                 # because that raises ValueError on smoke-test allowlist
                 # bypass; we want a transport-layer hard fail.
-                infos = socket.getaddrinfo(host, None)
+                infos = await asyncio.get_event_loop().getaddrinfo(host, None)
                 for _family, _type, _proto, _canonname, sockaddr in infos:
                     if not is_safe_ip(str(sockaddr[0])):
                         msg = f"Transport rejected unsafe destination IP for host {host}"

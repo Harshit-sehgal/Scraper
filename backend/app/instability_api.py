@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+logger = logging.getLogger(__name__)
+
 
 def get_world_state() -> SemanticWorldState:
     import app.semantic_world_state
@@ -73,7 +75,7 @@ class ImmunityLayer:
 
         # 1. Source Trust
         if trust < 0.2:
-            logging.getLogger(__name__).warning("IMMUNITY: Blocked perturbation from untrusted source [%s]", source)
+            logger.warning("IMMUNITY: Blocked perturbation from untrusted source [%s]", source)
             return False
 
         # 2. Regional Integrity
@@ -83,7 +85,7 @@ class ImmunityLayer:
             if (level > 0 or self.ws.is_role_anchored(role)) and self.ws.metrics.global_energy > 7.0:
                 # System is too hot to allow mutation of high-level
                 # concepts
-                logging.getLogger(__name__).info(
+                logger.info(
                     "IMMUNITY: Shielded high-integrity role [%s] from mutation (Energy too high)",
                     role,
                 )
@@ -92,7 +94,7 @@ class ImmunityLayer:
         # 3. Adversarial Pressure Detection (Phase 42)
         # Check if this source is repeatedly causing high energy spikes
         if self.ws.metrics.global_energy > 5.0 and trust < 0.6:
-            logging.getLogger(__name__).warning("IMMUNITY: Quarantining source [%s] for contributing to field fever.", source)
+            logger.warning("IMMUNITY: Quarantining source [%s] for contributing to field fever.", source)
             self.quarantine_source(source, penalty=0.2)
             return False
 

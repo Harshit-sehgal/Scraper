@@ -20,11 +20,6 @@
 
 set -euo pipefail
 
-# Ensure the prod stack is torn down on script exit — success OR failure.
-# Without this, a failed smoke test leaves containers running and the
-# next developer/CI run collides with a half-up stack.
-trap '"${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml down' EXIT
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -38,6 +33,11 @@ elif command -v docker-compose &> /dev/null; then
 else
     DOCKER_COMPOSE=("docker" "compose")
 fi
+
+# Ensure the prod stack is torn down on script exit — success OR failure.
+# Without this, a failed smoke test leaves containers running and the
+# next developer/CI run collides with a half-up stack.
+trap '"${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml down' EXIT
 
 # Colors
 GREEN='\033[0;32m'
@@ -297,9 +297,9 @@ if [ -n "$JOB_ID" ]; then
     fi
 fi
 
-# ───── Step 9: Check worker logs ──────────────────────────────────────────
+# ───── Step 10: Check worker logs ──────────────────────────────────────────
 echo ""
-echo "─── Step 9: Worker logs (last 20 lines) ──────────────────────────────"
+echo "─── Step 10: Worker logs (last 20 lines) ──────────────────────────────"
 
 "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
 

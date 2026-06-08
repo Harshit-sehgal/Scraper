@@ -1,6 +1,6 @@
 # Route Authorization Matrix
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-08
 **Status:** Generated from the registered FastAPI app
 
 Generate the matrix:
@@ -12,10 +12,10 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 ## Current Generated Summary
 
 ```text
-81 route entries
-47 authenticated-user routes
-15 operator-or-admin routes
-11 admin routes
+50 route entries
+6 authenticated-user routes
+26 operator-or-admin routes
+10 admin routes
 4 development-docs routes
 3 public routes
 1 metrics-token-if-configured route

@@ -48,6 +48,7 @@ class SlidingWindowCounter:
 
 
 _global_limiter: SlidingWindowCounter | None = None
+_job_create_limiter: SlidingWindowCounter | None = None
 
 
 def get_global_limiter() -> SlidingWindowCounter:
@@ -58,4 +59,7 @@ def get_global_limiter() -> SlidingWindowCounter:
 
 
 def get_job_create_limiter() -> SlidingWindowCounter:
-    return SlidingWindowCounter(max_requests=10, window_seconds=60.0)
+    global _job_create_limiter
+    if _job_create_limiter is None:
+        _job_create_limiter = SlidingWindowCounter(max_requests=10, window_seconds=60.0)
+    return _job_create_limiter

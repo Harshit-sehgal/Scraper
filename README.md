@@ -32,7 +32,7 @@ Status: pre-production candidate.
 | Gate | Status |
 |------|--------|
 | Ruff lint | ✅ 0 errors |
-| Mypy | ✅ 0 errors (349 files, `--check-untyped-defs`) |
+| Mypy | ✅ 0 errors (196 source files) |
 | Tests (SQLite) | Run tests dynamically using `pytest` (see docs/TESTING.md) |
 | Compile | ✅ Clean |
 

@@ -72,7 +72,7 @@ def get_job_repository() -> JobRepository:
             _repository_instance = PostgresJobRepository()
         except Exception as e:
             msg = f"Failed to create PostgresJobRepository: {e}"
-            raise RuntimeError(msg) from None
+            raise RuntimeError(msg) from e
         else:
             return _repository_instance
 

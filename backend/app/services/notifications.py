@@ -14,6 +14,12 @@ class TelegramNotifier:
         self.token = settings.TELEGRAM_BOT_TOKEN
         self.chat_id = settings.TELEGRAM_CHAT_ID
         self.enabled = settings.TELEGRAM_ENABLED
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient()
+        return self._client
 
     async def send_message(self, text: str) -> None:
         """Send a simple text message to the connected chat."""
@@ -24,9 +30,9 @@ class TelegramNotifier:
         payload = {"chat_id": self.chat_id, "text": text, "parse_mode": "Markdown"}
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
+            client = self._get_client()
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
         except Exception:
             logger.exception("Failed to send Telegram notification")
 

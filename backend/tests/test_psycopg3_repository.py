@@ -117,10 +117,12 @@ class TestPsycopg3RepositoryContract:
 
     def test_schema_columns_match_psycopg2(self) -> None:
         """The CREATE TABLE column list is reused from psycopg2 — verify."""
-        from app.postgres_repository_base import _columns_sql as base_columns_sql
-        from app.psycopg3_repository import _columns_sql as psycopg3_columns_sql
+        from app.postgres_repository import PostgresJobRepository
+        from app.postgres_repository_base import PostgresRepositoryBase
+        from app.psycopg3_repository import Psycopg3JobRepository
 
-        assert base_columns_sql() == psycopg3_columns_sql()
+        assert issubclass(PostgresJobRepository, PostgresRepositoryBase)
+        assert issubclass(Psycopg3JobRepository, PostgresRepositoryBase)
 
 
 class TestFactorySelectsPsycopg3:

@@ -85,7 +85,7 @@ async def run_post_extraction_processing(
     provenance_builder: ProvenanceBuilder,
     classification: Any | None,
     domain: str,
-    new_motifs: list,
+    new_motifs: int,
     solidified_motifs_count: int,
     anti_bot_score: float,
     js_render_delay: float,
@@ -182,7 +182,7 @@ async def run_post_extraction_processing(
         confidence_map=confidence_map,
         failure_category=classification.category.value if classification else None,
         extraction_method=ext_result.method,
-        motifs_generated=len(new_motifs) if new_motifs else 0,
+        motifs_generated=new_motifs if new_motifs else 0,
         motifs_used=solidified_motifs_count,
     )
 

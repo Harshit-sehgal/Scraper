@@ -79,7 +79,7 @@ after the deep-research remediation pass (2026-06).
   Optional lanes (`postgres-tests.yml`, `browser-e2e.yml`, `golden-dataset.yml`,
   `optional-suites.yml`) run on schedule / manual dispatch.
   Coverage report + route-inventory are uploaded as artifacts. Docs lint
-  enforces 59 route families against `docs/API.md`.
+  enforces 50 route families against `docs/API.md`.
 - **Next:** enable required status checks; wire the image-build lane to GHCR
   with provenance attestation.
 - **Done in this pass:** image-build lane, coverage + route-inventory
@@ -94,17 +94,18 @@ after the deep-research remediation pass (2026-06).
   extraction methods, browser launches, export outcomes, SSRF rejects by
   reason, CSP violations by directive, repo query latency quantiles, and
   queue depth. Prometheus alert rules (`prometheus_alerts.yml`) define
-  12 alert rules: 3 critical (API down, DB errors, browser failures),
-  8 warning (queue backlog, job failures, latency, anti-bot blocks, export
+  14 alert rules: 3 critical (API down, DB errors, browser failures),
+  9 warning (queue backlog, job failures, latency, anti-bot blocks, export
   failures, SSRF blocks, repo latency degradation, extraction method
-  anomaly), and 1 info (CSP violation rate). Alertmanager
+  anomaly, rate limit blocks), and 2 info (CSP violation rate, worker
+  heartbeat stale). Alertmanager
   (`alertmanager.yml`) routes alerts by severity to email and Slack with
   3 inhibition rules and rate-limiting varying by severity (1h critical,
   4h warning, 24h info). See W14 for Alertmanager details.
 - **Next:** raise Postgres backend coverage floors from 24% to 40% in
   the next minor release. Tighten CSP to enforce mode once the dashboard
   shows zero violations for at least one release cycle.
-- **Done in this pass:** 22-panel Grafana dashboard, 12 Prometheus alert
+- **Done in this pass:** 22-panel Grafana dashboard, 14 Prometheus alert
   rules, Alertmanager config + docker-compose integration, Severity-based
   routing + inhibition, metrics collectors + call-site wiring, metric
   tests (21 + 10 tests), CSP report-only middleware.
@@ -153,7 +154,7 @@ after the deep-research remediation pass (2026-06).
 
 ### W9 — Docs drift — done in this pass
 
-- **Status:** `docs_lint.py` tracks 8 `/api/*` prefix families (59 routes
+- **Status:** `docs_lint.py` tracks 8 `/api/*` prefix families (50 routes
   match). `scripts/route_inventory.py` regenerates the route table by
   introspecting the live FastAPI app. `docs/API.md` covers all route families
   (jobs, recycle_bin, discover, schema, url, scraper, operator, system).
@@ -163,7 +164,7 @@ after the deep-research remediation pass (2026-06).
 
 ### W10 — Test strategy — done in this pass
 
-- **Status:** 2891 tests pass, 87 skipped (fast lane). The optional
+- **Status:** 3026 tests pass, 80 skipped (fast lane). The optional
   postgres / browser / golden-dataset lanes are opt-in.
 - **Status details:**
   1. **Repository parity tests** — `test_repository_parity.py` provides
@@ -229,11 +230,11 @@ after the deep-research remediation pass (2026-06).
 
 - **Status:** Full Alertmanager configuration (`alertmanager.yml`) deployed
   as a Docker Compose service (`prom/alertmanager:v0.27.0`) in the production
-  stack. Routes alerts from the 12 Prometheus rules by severity:
+  stack. Routes alerts from the 14 Prometheus rules by severity:
   - **Critical** (3 rules): email + Slack (`#alerts-critical`), repeats
     every 1h, `continue: true` for redundant email delivery
-  - **Warning** (8 rules): Slack only (`#alerts-warning`), repeats every 4h
-  - **Info** (1 rule): Slack only (`#alerts-info`), repeats every 24h,
+  - **Warning** (9 rules): Slack only (`#alerts-warning`), repeats every 4h
+  - **Info** (2 rules): Slack only (`#alerts-info`), repeats every 24h,
     `send_resolved: false`
   3 inhibition rules suppress symptomatic alerts when root causes fire
   (API down → all warnings, DB errors → repo latency, critical →
@@ -255,7 +256,7 @@ after the deep-research remediation pass (2026-06).
   project: modern color notation (`rgb(0 0 0 / 0.35)`), relaxed selector
   patterns (dotted class names like `.gap-0.5`), no blocking specificity
   or single-line declaration checks. Runs in `lint-type-checks` CI job
-  with npm caching. The 2,312-line `frontend/styles.css` passes with
+  with npm caching. The 2,533-line `frontend/styles.css` passes with
   0 errors after auto-fixing color notation to modern and removing a
   duplicate `.shortcut-hint` selector.
 - **Next:** add Prettier or dprint for JS formatting parity.
