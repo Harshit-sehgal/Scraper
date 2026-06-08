@@ -328,7 +328,7 @@ jobs:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
-            🔔 CI Workflow Status: ${{ (needs.ci-gates-fast.result == 'success' && needs.ci-gates-benchmarks.result == 'success' && needs.lint-type-checks.result == 'success') && '✅ Passed' || '❌ Failed' }}
+            🔔 CI Workflow Status: ${{ (needs.ci-gates-fast.result == 'success' && needs.ci-gates-benchmarks.result == 'success' && needs.lint-type-checks.result == 'success' && needs.sbom.result == 'success') && '✅ Passed' || '❌ Failed' }}
 
             Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
