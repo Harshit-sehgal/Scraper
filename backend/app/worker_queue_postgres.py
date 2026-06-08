@@ -125,14 +125,14 @@ def _db_conn():
 
 
 def _db_fetch_all(conn, sql: str, params=None) -> list[dict]:
-    _, _, RealDictCursor = _require_psycopg2()  # noqa: N806
+    _, _, RealDictCursor = _require_psycopg2()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, params or ())
         return [dict(r) for r in cur.fetchall()]
 
 
 def _db_fetch_one(conn, sql: str, params=None) -> dict | None:
-    _, _, RealDictCursor = _require_psycopg2()  # noqa: N806
+    _, _, RealDictCursor = _require_psycopg2()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, params or ())
         row = cur.fetchone()
@@ -197,23 +197,23 @@ class PostgresWorkerQueue(PostgresWorkerQueueBase):
     @contextmanager
     def _conn(self):
         """Acquire a connection from the psycopg2 pool (context manager)."""
-        import app.worker_queue_postgres as wqp  # noqa: PLW0406
+        import app.worker_queue_postgres as wqp
 
         with wqp._conn() as conn:
             yield conn
 
     def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:
-        import app.worker_queue_postgres as wqp  # noqa: PLW0406
+        import app.worker_queue_postgres as wqp
 
         return wqp._fetch_all(conn, sql, params)
 
     def _fetch_one(self, conn, sql: str, params=None) -> dict | None:
-        import app.worker_queue_postgres as wqp  # noqa: PLW0406
+        import app.worker_queue_postgres as wqp
 
         return wqp._fetch_one(conn, sql, params)
 
     def _execute(self, conn, sql: str, params=None):
-        import app.worker_queue_postgres as wqp  # noqa: PLW0406
+        import app.worker_queue_postgres as wqp
 
         return wqp._execute(conn, sql, params)
 

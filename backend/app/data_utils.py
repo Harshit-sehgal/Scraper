@@ -135,7 +135,7 @@ def _schema_type_alignment_bonus(profile_type: str | None, schema_field: SchemaF
     return 0.0
 
 
-def _alignment_score(  # noqa: C901
+def _alignment_score(
     profile_key: str,
     schema_field: SchemaField,
     profile_field_cfg: dict | None = None,
@@ -192,7 +192,7 @@ def _alignment_score(  # noqa: C901
     return score
 
 
-def align_extracted_keys_to_schema(  # noqa: C901, PLR0912
+def align_extracted_keys_to_schema(
     raw_records: list[dict],
     schema_fields: list[SchemaField],
     selector_field_defs: dict | None = None,

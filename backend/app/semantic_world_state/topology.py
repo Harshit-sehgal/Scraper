@@ -1,5 +1,5 @@
 # mypy: ignore-errors
-# type: ignore  # noqa: PGH003
+# type: ignore
 import logging
 from typing import Any
 
@@ -290,7 +290,7 @@ class TopologyMixin:
         self.emit_telemetry("governance_pulse", report)
 
     @requires_invariants
-    def evolve_macro_state(self) -> None:  # noqa: C901, PLR0912, PLR0915
+    def evolve_macro_state(self) -> None:
         with self.transaction("macro_evolution"):
             macro = self.compute_macro_from_meso()
             macro_pressure = 0.0
@@ -436,7 +436,7 @@ class TopologyMixin:
                 else:
                     self._topology.set_topological_law(key, law_val * 0.5)
 
-    def _re_seed_unstable_roles(self) -> None:  # noqa: C901
+    def _re_seed_unstable_roles(self) -> None:
         communities = self.global_communities
         if not communities:
             for (ra, rb), cohesion in self.neighborhood_cohesion.items():
@@ -543,7 +543,7 @@ class TopologyMixin:
 
         meso = []
         for cluster in view.get_meso_clusters():
-            meso.append(  # noqa: PERF401
+            meso.append(
                 {
                     "cluster_id": cluster.get("cluster_id", ""),
                     "size": cluster["size"],
@@ -573,7 +573,7 @@ class TopologyMixin:
         }
 
         for continent in macro_continents:
-            continents_list.append(  # noqa: PERF401
+            continents_list.append(
                 {
                     "continent_id": continent.get("continent_id", ""),
                     "size": continent.get("size", 0),
@@ -713,7 +713,7 @@ class TopologyMixin:
                 self._topology.append_region(new_region)
 
     @requires_invariants
-    def update_scale_coupling(self) -> int:  # noqa: C901, PLR0912
+    def update_scale_coupling(self) -> int:
         if self._topology.region_count() < 2:
             return 0
         pressure = self.metrics.field_pressure

@@ -123,7 +123,7 @@ class SelfTuningController:
         # Re-tune after every observation
         self._tune(domain)
 
-    def _tune(self, domain: str) -> None:  # noqa: C901
+    def _tune(self, domain: str) -> None:
         """Adjust tuning parameters based on recent telemetry.
 
         Adjusts:

@@ -107,8 +107,8 @@ class TestCoerceValue:
         assert coerce_value(None, FieldType.FLOAT) is None
 
     def test_coerce_boolean(self) -> None:
-        assert coerce_value(True, FieldType.BOOLEAN) is True  # noqa: FBT003
-        assert coerce_value(False, FieldType.BOOLEAN) is False  # noqa: FBT003
+        assert coerce_value(True, FieldType.BOOLEAN) is True
+        assert coerce_value(False, FieldType.BOOLEAN) is False
         assert coerce_value("true", FieldType.BOOLEAN) is True
         assert coerce_value("yes", FieldType.BOOLEAN) is True
         assert coerce_value("1", FieldType.BOOLEAN) is True

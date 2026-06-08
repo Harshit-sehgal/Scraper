@@ -42,7 +42,7 @@ class TestRealProfileLoading:
                     "name": {"selector": ".title", "type": "text"},
                 },
             }
-            with open(Path(tmpdir) / "test_site.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "test_site.json", "w") as f:
                 json.dump(profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -60,7 +60,7 @@ class TestRealProfileLoading:
                 "item_container": "div.card",
                 "fields": {},
             }
-            with open(Path(tmpdir) / "bad.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "bad.json", "w") as f:
                 json.dump(bad_profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -72,7 +72,7 @@ class TestRealProfileLoading:
     def test_load_handles_invalid_json(self) -> None:
         """Invalid JSON file should be logged and skipped."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with open(Path(tmpdir) / "corrupt.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "corrupt.json", "w") as f:
                 f.write("this is not json")
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -93,7 +93,7 @@ class TestRealProfileLoading:
         with tempfile.TemporaryDirectory() as tmpdir:
             for i, domain in enumerate(["site-a.com", "site-b.com", "site-c.com"]):
                 profile = {"domain": domain, "fields": {"f1": {"selector": ".s1"}}}
-                with open(Path(tmpdir) / f"site_{i}.json", "w") as f:  # noqa: PTH123
+                with open(Path(tmpdir) / f"site_{i}.json", "w") as f:
                     json.dump(profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -118,7 +118,7 @@ class TestMatchDomainWithProfiles:
         """Exact domain match returns the profile."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
-            with open(Path(tmpdir) / "example.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "example.json", "w") as f:
                 json.dump(profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -131,7 +131,7 @@ class TestMatchDomainWithProfiles:
         """Subdomain match works (domain in hostname)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
-            with open(Path(tmpdir) / "example.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "example.json", "w") as f:
                 json.dump(profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -144,7 +144,7 @@ class TestMatchDomainWithProfiles:
         """URL not matching any domain returns None."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
-            with open(Path(tmpdir) / "example.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "example.json", "w") as f:
                 json.dump(profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):
@@ -156,7 +156,7 @@ class TestMatchDomainWithProfiles:
         """Invalid URL returns None (urlparse gives empty hostname)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
-            with open(Path(tmpdir) / "example.json", "w") as f:  # noqa: PTH123
+            with open(Path(tmpdir) / "example.json", "w") as f:
                 json.dump(profile, f)
 
             with patch("app.selector_profiles.loader._PROFILES_DIR", Path(tmpdir)):

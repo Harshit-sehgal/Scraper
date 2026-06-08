@@ -155,7 +155,7 @@ class FederationManager:
             delta_log=delta_log,
         )
 
-    def merge_remote_state(self, remote: ShardStateSnapshot) -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915
+    def merge_remote_state(self, remote: ShardStateSnapshot) -> dict[str, Any]:
         """Merge remote state snapshot into the local world state using absolute laws."""
         self.register_node(remote.node_id, remote.shard_id)
         self.last_sync_timestamps[remote.node_id] = remote.timestamp

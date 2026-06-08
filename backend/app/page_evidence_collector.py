@@ -149,7 +149,7 @@ STRUCTURAL_SEPARATORS = ["hr", "br", "---", "___", "···"]
 # ---------------------------------------------------------------------------
 
 
-def collect_page_evidence(  # noqa: C901, PLR0912, PLR0915
+def collect_page_evidence(
     html: str,
     url: str = "",
     network_json: list[dict] | None = None,
@@ -168,7 +168,8 @@ def collect_page_evidence(  # noqa: C901, PLR0912, PLR0915
     """
     evidence = PageEvidence(url=url, html_length=len(html))
 
-    if not html or len(html.strip()) < 50:
+    MIN_HTML_LENGTH: int = 50
+    if not html or len(html.strip()) < MIN_HTML_LENGTH:
         return evidence
 
     soup = BeautifulSoup(html, "html.parser")
@@ -185,7 +186,7 @@ def collect_page_evidence(  # noqa: C901, PLR0912, PLR0915
         evidence.meta_description = str(meta_desc.get("content", ""))
 
     # ── DOM node count ───────────────────────────────────────────────
-    evidence.dom_node_count = len(soup.find_all(True))  # noqa: FBT003
+    evidence.dom_node_count = len(soup.find_all(True))
 
     # ── Collect visible text blocks ──────────────────────────────────
     text_blocks = _collect_visible_text_blocks(soup)
@@ -296,13 +297,14 @@ def _collect_visible_text_blocks(soup: BeautifulSoup) -> list[VisibleTextBlock]:
     processed_paths: set[str] = set()
 
     # Walk leaf text nodes
-    for element in soup.find_all(True):  # noqa: FBT003
+    for element in soup.find_all(True):
         # Skip non-content tags
         if element.name in ("script", "style", "noscript", "svg", "link", "meta", "head"):
             continue
 
         text = element.get_text(separator=" ", strip=True)
-        if not text or len(text) < 3:
+        MIN_TEXT_LENGTH: int = 3
+        if not text or len(text) < MIN_TEXT_LENGTH:
             continue
 
         # Build parent path
@@ -310,7 +312,8 @@ def _collect_visible_text_blocks(soup: BeautifulSoup) -> list[VisibleTextBlock]:
         parent: Any = element
         while parent and parent.name:
             path_parts.append(parent.name)
-            if len(path_parts) >= 6:
+            MAX_PATH_DEPTH: int = 6
+            if len(path_parts) >= MAX_PATH_DEPTH:
                 break
             parent = parent.parent
         parent_path = "/".join(reversed(path_parts))
@@ -352,10 +355,11 @@ def _collect_tables(soup: BeautifulSoup) -> list[dict]:
         for tr in table.find_all("tr"):
             cells = []
             for cell in tr.find_all(["td", "th"]):
-                cells.append(cell.get_text(separator=" ", strip=True)[:200])  # noqa: PERF401
+                cells.append(cell.get_text(separator=" ", strip=True)[:200])
             if cells:
                 rows.append(cells)
-        if len(rows) >= 2:  # At least a header + one data row
+        TABLE_MIN_DATA_ROWS: int = 2
+        if len(rows) >= TABLE_MIN_DATA_ROWS:  # At least a header + one data row
             tables.append(
                 {
                     "row_count": len(rows),
@@ -367,7 +371,7 @@ def _collect_tables(soup: BeautifulSoup) -> list[dict]:
     return tables
 
 
-def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915
+def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
     """Extract JSON data from script tags (hydration, state, LD+JSON)."""
     hydration: dict[str, Any] = {}
 
@@ -461,7 +465,7 @@ def _truncate_large_values(obj: Any, max_depth: int = 4, max_str_len: int = 500)
     return obj
 
 
-def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContainer]:  # noqa: C901, PLR0912
+def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContainer]:
     """Discover candidate result containers from DOM structure.
 
     Looks for repeated sibling structures that might represent result cards,
@@ -474,13 +478,15 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
     for parent_tag in ["div", "li", "tr", "section", "article", "ul", "ol", "tbody"]:
         for parent in soup.find_all(parent_tag):
             children = [c for c in parent.children if isinstance(c, Tag)]
-            if len(children) < 2:
+            MIN_CHILDREN_FOR_CONTAINER: int = 2
+            if len(children) < MIN_CHILDREN_FOR_CONTAINER:
                 continue
 
             # Check if children have similar structure
             child_tags = [c.name for c in children]
             unique_tags = set(child_tags)
-            if len(unique_tags) == 1 and len(children) >= 2:
+            SAME_TAG_MIN_CHILDREN: int = 2
+            if len(unique_tags) == 1 and len(children) >= SAME_TAG_MIN_CHILDREN:
                 # Same tag repeated — likely a container
                 for child in children[:10]:
                     sel = _build_container_selector(child)
@@ -490,7 +496,8 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
                         containers.append(container)
 
             # Also check for mixed tags but similar class patterns
-            if len(unique_tags) <= 2 and len(children) >= 3:
+            MIXED_TAG_MIN_CHILDREN: int = 3
+            if len(unique_tags) <= 2 and len(children) >= MIXED_TAG_MIN_CHILDREN:
                 class_sets = []
                 for c in children:
                     cls_val = c.get("class")
@@ -502,7 +509,8 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
                         cls = ""
                     class_sets.append(cls)
                 unique_classes = set(class_sets)
-                if len(unique_classes) <= 2 and len(unique_classes) < len(children):
+                MAX_UNIQUE_CLASSES: int = 2
+                if len(unique_classes) <= MAX_UNIQUE_CLASSES and len(unique_classes) < len(children):
                     # Same classes repeated — likely cards
                     for child in children[:10]:
                         sel = _build_container_selector(child)
@@ -514,7 +522,8 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
     # Strategy 2: Table rows
     for table in soup.find_all("table"):
         rows = table.find_all("tr")
-        if len(rows) >= 3:
+        TABLE_MIN_ROWS: int = 3
+        if len(rows) >= TABLE_MIN_ROWS:
             sel = _build_container_selector(rows[1]) if len(rows) > 1 else ""
             if sel and sel not in seen_selectors:
                 seen_selectors.add(sel)
@@ -524,7 +533,8 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
     # Strategy 3: List items
     for list_tag in soup.find_all(["ul", "ol"]):
         items = list_tag.find_all("li", recursive=False)
-        if len(items) >= 3:
+        MIN_LIST_ITEMS: int = 3
+        if len(items) >= MIN_LIST_ITEMS:
             sel = _build_container_selector(items[0])
             if sel and sel not in seen_selectors:
                 seen_selectors.add(sel)
@@ -565,7 +575,7 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
             all_texts.append(t_str)
 
     # Count descendants
-    descendants = element.find_all(True)  # noqa: FBT003
+    descendants = element.find_all(True)
     children = [c for c in element.children if isinstance(c, Tag)]
 
     # Detect features
@@ -574,7 +584,8 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
     has_time = bool(re.search(r"\d{1,2}:\d{2}\s*(?:am|pm)?", text, re.IGNORECASE))
     has_currency = bool(re.search(r"[\$\€\£\¥\₹]", text))
     # 3-letter codes with enough context
-    has_location = bool(re.search(r"\b[A-Z]{3}\b", text) and len(text) > 20)
+    LOCATION_MIN_TEXT_LENGTH: int = 20
+    has_location = bool(re.search(r"\b[A-Z]{3}\b", text) and len(text) > LOCATION_MIN_TEXT_LENGTH)
     has_organization = bool(re.search(r"(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|hospital|university|school)\b", text, re.IGNORECASE))
     has_contact = bool(re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+|\+?\d{7,}", text))
     has_link = bool(element.find("a"))
@@ -595,11 +606,12 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
 
     # Sibling similarity: how similar is this to its siblings
     sibling_similarity = 0.0
-    if len(siblings) >= 2:
-        child_tags = sorted(c.name for c in element.find_all(True))  # noqa: FBT003
+    SIBLING_SIMILARITY_MIN: int = 2
+    if len(siblings) >= SIBLING_SIMILARITY_MIN:
+        child_tags = sorted(c.name for c in element.find_all(True))
         similar_count = 0
         for sibling in siblings[1:6]:
-            sib_tags = sorted(s.name for s in sibling.find_all(True))  # noqa: FBT003
+            sib_tags = sorted(s.name for s in sibling.find_all(True))
             if child_tags == sib_tags:
                 similar_count += 1
         sibling_similarity = similar_count / max(1, len(siblings) - 1)
@@ -643,7 +655,7 @@ def _get_depth(element: Tag) -> int:
     return depth
 
 
-def _compute_container_score(container: CandidateContainer) -> float:  # noqa: C901
+def _compute_container_score(container: CandidateContainer) -> float:
     """Compute a general container quality score.
 
     A good result container has:
@@ -657,16 +669,20 @@ def _compute_container_score(container: CandidateContainer) -> float:  # noqa: C
     score = 0.0
 
     # Text density: too low = empty, too high = prose
-    if 2.0 <= container.text_density <= 150.0:
+    DENSITY_MODERATE: float = 2.0
+    DENSITY_HIGH: float = 150.0
+    if DENSITY_MODERATE <= container.text_density <= DENSITY_HIGH:
         score += 0.15
-    elif container.text_density > 0 and container.text_density < 2.0:
+    elif container.text_density > 0 and container.text_density < DENSITY_MODERATE:
         score += 0.05  # sparse but has content
 
     # Has meaningful content (not just a single word)
     combined_len = len(container.combined_text)
-    if combined_len > 50:
+    COMBINED_TEXT_GOOD: int = 50
+    COMBINED_TEXT_BASIC: int = 20
+    if combined_len > COMBINED_TEXT_GOOD:
         score += 0.10
-    elif combined_len > 20:
+    elif combined_len > COMBINED_TEXT_BASIC:
         score += 0.05
 
     # Pattern presence
@@ -705,13 +721,17 @@ def _compute_container_score(container: CandidateContainer) -> float:  # noqa: C
     score += min(container.internal_segment_count * 0.10, 0.20)
 
     # Depth penalty (too deep = unlikely container)
-    if container.depth > 15:
+    CONTAINER_DEPTH_TOO_DEEP: int = 15
+    CONTAINER_DEPTH_TOO_SHALLOW: int = 3
+    if container.depth > CONTAINER_DEPTH_TOO_DEEP:
         score *= 0.8
-    elif container.depth < 3:
+    elif container.depth < CONTAINER_DEPTH_TOO_SHALLOW:
         score *= 0.6  # too shallow = likely not a real container
 
     # Child count: too few = no structure, too many = too broad
-    if 2 <= container.child_count <= 15:
+    CHILD_MIN: int = 2
+    CHILD_MAX: int = 15
+    if CHILD_MIN <= container.child_count <= CHILD_MAX:
         score += 0.05
 
     # Penalty for being a pure price / button container (no descriptive text)
@@ -726,18 +746,20 @@ def _compute_container_score(container: CandidateContainer) -> float:  # noqa: C
     return round(min(score, 1.0), 4)
 
 
-def _classify_page_structure(evidence: PageEvidence) -> str:  # noqa: PLR0911
+def _classify_page_structure(evidence: PageEvidence) -> str:
     """Classify the overall page structure type."""
     containers = evidence.candidate_containers
     patterns = evidence.patterns
     tables = evidence.tables
 
     # Table-based
-    if tables and tables[0].get("row_count", 0) >= 3:
+    TABLE_ROW_MIN: int = 3
+    if tables and tables[0].get("row_count", 0) >= TABLE_ROW_MIN:
         return "table"
 
     # Card-based (repeated containers with rich content)
-    good_containers = [c for c in containers if c.record_score > 0.3]
+    SCORE_GOOD_THRESHOLD: float = 0.3
+    good_containers = [c for c in containers if c.record_score > SCORE_GOOD_THRESHOLD]
     if len(good_containers) >= 3:
         return "cards"
 
@@ -747,15 +769,17 @@ def _classify_page_structure(evidence: PageEvidence) -> str:  # noqa: PLR0911
 
     # List
     list_containers = [c for c in containers if c.tag in ("li", "item")]
-    if len(list_containers) >= 3:
+    LIST_CONTAINER_MIN: int = 3
+    if len(list_containers) >= LIST_CONTAINER_MIN:
         return "list"
 
     # Detail page
-    if len(containers) <= 2 and evidence.visible_text_length > 1000:
+    VISIBLE_TEXT_LONG: int = 1000
+    if len(containers) <= 2 and evidence.visible_text_length > VISIBLE_TEXT_LONG:
         return "detail"
 
     # Single item
-    if len(containers) <= 2 and evidence.visible_text_length < 1000:
+    if len(containers) <= 2 and evidence.visible_text_length < VISIBLE_TEXT_LONG:
         return "single_item"
 
     return "unknown"
@@ -763,8 +787,9 @@ def _classify_page_structure(evidence: PageEvidence) -> str:  # noqa: PLR0911
 
 def _estimate_record_count(evidence: PageEvidence) -> int:
     """Estimate how many records this page likely contains."""
+    SCORE_GOOD_THRESHOLD: float = 0.3
     if evidence.page_structure == "cards":
-        return len([c for c in evidence.candidate_containers if c.record_score > 0.3])
+        return len([c for c in evidence.candidate_containers if c.record_score > SCORE_GOOD_THRESHOLD])
     if evidence.page_structure == "table":
         if evidence.tables:
             return max(t.get("row_count", 0) - 1 for t in evidence.tables)  # type: ignore[no-any-return]

@@ -35,7 +35,7 @@ def _capture_last_tx(ws):
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_full_multi_subsystem_replay() -> None:  # noqa: PLR0915
+def test_full_multi_subsystem_replay() -> None:
     """Execute mutations across all 10 replayable subsystems, clear,
     replay, and verify state equivalence on every subsystem.
     """

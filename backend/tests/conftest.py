@@ -87,7 +87,7 @@ def pytest_collection_modifyitems(config, items) -> None:
             item.add_marker(skip_browser)
 
 
-def pytest_sessionfinish(session, exitstatus) -> None:  # noqa: C901
+def pytest_sessionfinish(session, exitstatus) -> None:
     """Drain background state writes so pytest exits cleanly after direct module tests."""
     try:
         from app.state_store import flush_state_writes
@@ -383,7 +383,7 @@ class LocalASGIClient:
 
 
 @pytest.fixture
-def client(monkeypatch):  # noqa: PLR0915
+def client(monkeypatch):
     async def fake_run_job(job_id: str, **kwargs) -> None:
         # Keep jobs in pending state unless a test explicitly changes them.
         await asyncio.sleep(0.01)

@@ -94,7 +94,7 @@ else:
 
     class MotifFeedbackEngine:
         def __new__(cls, *args, **kwargs):
-            from app.motif_feedback import MotifFeedbackEngine as impl  # noqa: N813
+            from app.motif_feedback import MotifFeedbackEngine as impl
 
             return impl(*args, **kwargs)
 
@@ -107,7 +107,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-async def analyze_url_for_fields(  # noqa: C901, PLR0912, PLR0915
+async def analyze_url_for_fields(
     url: str,
     search_params: dict[str, str] | None = None,
     acquisition_mode: str = "standard",
@@ -494,7 +494,7 @@ async def analyze_url_for_fields(  # noqa: C901, PLR0912, PLR0915
     # If LLM returned no fields, use pattern analysis as fallback
     if not suggested_fields:
         for hint in _value_patterns_to_field_types(patterns):
-            suggested_fields.append(  # noqa: PERF401
+            suggested_fields.append(
                 {
                     "name": hint["type"],
                     "type": hint["type"],

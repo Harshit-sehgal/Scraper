@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # ─── Search Form Detection ──────────────────────────────────────────────
 
 
-def _detect_search_form(html: str) -> dict:  # noqa: C901, PLR0912, PLR0915
+def _detect_search_form(html: str) -> dict:
     """Detect search forms on a page and extract their field structure.
 
     Scans the page HTML for forms that look like search / query forms
@@ -44,7 +44,7 @@ def _detect_search_form(html: str) -> dict:  # noqa: C901, PLR0912, PLR0915
     soup = BeautifulSoup(html, "html.parser")
     forms = soup.find_all("form")
 
-    SEARCH_FIELD_NAMES: set[str] = {  # noqa: N806
+    SEARCH_FIELD_NAMES: set[str] = {
         "from",
         "to",
         "source",
@@ -58,7 +58,7 @@ def _detect_search_form(html: str) -> dict:  # noqa: C901, PLR0912, PLR0915
         "q",
         "keyword",
     }
-    SEARCH_PLACEHOLDER_PATTERNS: list[str] = [  # noqa: N806
+    SEARCH_PLACEHOLDER_PATTERNS: list[str] = [
         r"from|to",
         r"location|place",
         r"date|when",
@@ -180,7 +180,7 @@ def _build_absolute_url(base_url: str, action: str) -> str:
     return urljoin(base_url.rstrip("/") + "/", action.lstrip("/"))
 
 
-def _map_search_params_to_fields(  # noqa: C901
+def _map_search_params_to_fields(
     search_params: dict[str, str],
     form_fields: list[dict],
 ) -> dict[str, str]:
@@ -257,7 +257,7 @@ def _map_search_params_to_fields(  # noqa: C901
     return mapped
 
 
-async def _try_form_search_recovery(  # noqa: C901, PLR0911
+async def _try_form_search_recovery(
     landing_page_html: str,
     landing_page_url: str,
     search_params: dict[str, str],

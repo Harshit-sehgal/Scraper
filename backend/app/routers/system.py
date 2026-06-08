@@ -460,7 +460,7 @@ async def analyze_url(
             },
         )
 
-    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT  # noqa: N806
+    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
 
     try:
         result = await asyncio.wait_for(
@@ -532,7 +532,7 @@ def _basic_metric_line(name: str, value: float, labels: dict[str, str] | None = 
     return f"{name}{_prometheus_label_text(labels or {})} {value}"
 
 
-def _render_basic_metrics_text() -> str:  # noqa: C901, PLR0912, PLR0915
+def _render_basic_metrics_text() -> str:
     """Render a minimal Prometheus exposition if prometheus_client is unavailable."""
     from app.metrics_collector import (
         get_anti_bot_classifications,
@@ -697,7 +697,7 @@ def _render_basic_metrics_text() -> str:  # noqa: C901, PLR0912, PLR0915
 
 
 @router.get("/metrics")
-async def metrics(request: Request):  # noqa: C901, PLR0912, PLR0915
+async def metrics(request: Request):
     """Prometheus-formatted metrics endpoint for DataForge scraper."""
     # Auth check
     if not settings.METRICS_TOKEN:

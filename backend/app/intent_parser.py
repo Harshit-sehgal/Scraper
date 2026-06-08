@@ -189,7 +189,7 @@ def _determine_optional_needs(semantic_needs: dict, required_needs: list) -> lis
 
     for need in semantic_needs:
         if need not in required_needs:
-            optional.append(need)  # noqa: PERF401
+            optional.append(need)
 
     return optional
 

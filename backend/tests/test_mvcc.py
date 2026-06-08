@@ -28,7 +28,7 @@ def test_mvcc_conflict_detection(ws) -> None:
 
     results = []
 
-    def run_tx_A() -> None:  # noqa: N802
+    def run_tx_A() -> None:
         try:
             with ws.transaction("tx_A"):
                 # 2. Transaction A starts and reads the region (populates read_set/base_versions)
@@ -47,7 +47,7 @@ def test_mvcc_conflict_detection(ws) -> None:
         except Exception as e:
             results.append(f"A_ERROR: {e}")
 
-    def run_tx_B() -> None:  # noqa: N802
+    def run_tx_B() -> None:
         try:
             time.sleep(0.1)  # Start B after A has read
             with ws.transaction("tx_B"):

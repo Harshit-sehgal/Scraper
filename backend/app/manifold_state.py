@@ -164,7 +164,7 @@ class ManifoldState:
             {"role": role, "vector": vector, "displacement": displacement if "displacement" in locals() else 0.0},
         )
 
-    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:  # noqa: FBT001, FBT002
+    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:
         """Apply a delta array to a role's manifold vector with drift tracking (Phase 63)."""
         if self.is_role_anchored(role):
             return

@@ -140,7 +140,7 @@ def _is_empty_value(value) -> bool:
     return False
 
 
-def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool:  # noqa: C901, PLR0911, PLR0912
+def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool:
     """Determine if a record is noise using semantic density and structural analysis."""
     from app.semantic_segmentation import is_likely_noise_field, segment_single_text  # research-shell, lazy
 
@@ -240,7 +240,7 @@ def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
     if node.name == "a":
         hrefs.append(node.get("href") or "")
     for a in node.find_all("a"):
-        hrefs.append(a.get("href") or "")  # noqa: PERF401
+        hrefs.append(a.get("href") or "")
 
     for href in hrefs:
         if href.lower().startswith("mailto:"):
@@ -259,13 +259,13 @@ def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
     return _valid_email(text), _valid_phone(text)
 
 
-def _enrich_record_contacts(  # noqa: PLR0913
+def _enrich_record_contacts(
     record: dict,
     schema_fields: list[SchemaField],
     node,
     page_email: str | None = None,
     page_phone: str | None = None,
-    allow_page_fallback: bool = False,  # noqa: FBT001, FBT002
+    allow_page_fallback: bool = False,
 ) -> dict:
     """Try to find missing contact info within a specific DOM node or page context."""
     email_field = next((f for f in schema_fields if f.field_type == FieldType.EMAIL), None)
@@ -325,14 +325,14 @@ def _boost_contacts_with_page_html(
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
 
-async def fetch_page_content(  # noqa: C901, PLR0912, PLR0913, PLR0915
+async def fetch_page_content(
     url: str,
     preferred_method: str | None = None,
     timeout_ms: int | None = None,
     hydration_wait_ms: int | None = None,
-    skip_networkidle: bool = False,  # noqa: FBT001, FBT002
+    skip_networkidle: bool = False,
     scroll_attempts: int | None = None,
-    anti_bot_stealth: bool = False,  # noqa: FBT001, FBT002
+    anti_bot_stealth: bool = False,
     extra_headers: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
     """Load a URL in a pooled headless browser context or via plain HTTP.
@@ -647,7 +647,7 @@ async def fetch_page_content(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 await page.close()
 
 
-async def _fetch_with_httpx(  # noqa: C901, PLR0912, PLR0915
+async def _fetch_with_httpx(
     url: str,
     strategy: FetchStrategy | None = None,
     extra_headers: dict[str, str] | None = None,
@@ -779,7 +779,7 @@ def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     for tag in soup(["script", "style", "noscript", "svg", "iframe", "form"]):
         tag.decompose()
 
-    for tag in soup.find_all(True):  # noqa: FBT003
+    for tag in soup.find_all(True):
         attrs_to_keep = ["class", "id", "href", "itemprop"]
         tag.attrs = {k: v for k, v in tag.attrs.items() if k in attrs_to_keep}
 
@@ -819,7 +819,7 @@ def _valid_phone(text: str) -> str | None:
     return cleaned[0] if cleaned else None
 
 
-def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):  # noqa: C901, PLR0911
+def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
     """Apply type-specific sanitization to extracted values."""
     if value is None:
         return None

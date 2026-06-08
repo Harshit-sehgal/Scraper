@@ -40,7 +40,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     No subsystem may maintain isolated semantic truth.
     """
 
-    def __init__(self, node_id: str | None = None) -> None:  # noqa: PLR0915
+    def __init__(self, node_id: str | None = None) -> None:
         import uuid
 
         from app.abstraction_state import AbstractionState
@@ -216,7 +216,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     # ─── Transaction Manager (MVCC & Thread Safety) ──────────────────────
 
     @contextmanager
-    def transaction(self, label: str = "anonymous", trace_id: str | None = None) -> Any:  # noqa: C901, PLR0912, PLR0915
+    def transaction(self, label: str = "anonymous", trace_id: str | None = None) -> Any:
         """Context manager for atomic state transactions. Supports true concurrency with MVCC."""
         # 1. Nested Transaction Check
         if active_transaction.get() is not None:
@@ -355,7 +355,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         finally:
             active_transaction.reset(token)
 
-    def replay_transaction(self, tx: dict) -> None:  # noqa: C901, PLR0912
+    def replay_transaction(self, tx: dict) -> None:
         """Replay a transaction by executing its recorded entries."""
         label = tx.get("label", "replayed")
         self._replaying = True
@@ -698,7 +698,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._manifold.shard_manifold(self._topology.global_communities)
         return self._topology.shard_topology()
 
-    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:  # noqa: FBT001, FBT002
+    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:
         self._manifold.apply_force_to_manifold(role, deltas, clamp)
 
     def anchor_role(self, role: str) -> None:
@@ -786,7 +786,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def register_action(self, action_id: str, target_vec: list, handler_name: str, threshold: float = 0.3) -> None:
         self._action.register_action(action_id, target_vec, handler_name, threshold)
 
-    def log_action_execution(self, action_id: str, success: bool, details: dict | None = None) -> None:  # noqa: FBT001
+    def log_action_execution(self, action_id: str, success: bool, details: dict | None = None) -> None:
         self._action.log_execution(action_id, success, details)
 
     def get_action(self, action_id: str) -> dict | None:
@@ -808,7 +808,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def get_transition_prob(self, type_a: str, type_b: str) -> float:
         return self._transition.get_prob(type_a, type_b)
 
-    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:  # noqa: FBT001
+    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:
         self._transition.observe(type_a, type_b, is_role_boundary)
 
     def get_high_transition_types(self, threshold: float = 0.6) -> list:
@@ -1048,7 +1048,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Dynamic Abstraction & Agency ─────────────────────────────────────
 
-    def dispatch_actions(self) -> int:  # noqa: C901
+    def dispatch_actions(self) -> int:
         triggered = 0
         active_actions = self._action.active_actions
         if not active_actions:

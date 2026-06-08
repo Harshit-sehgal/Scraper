@@ -36,7 +36,7 @@ class FetchResult:
     anti_bot_score: float = 0.0
 
 
-async def fetch_page_content(url: str, use_browser: bool = False) -> FetchResult:  # noqa: FBT001, FBT002
+async def fetch_page_content(url: str, use_browser: bool = False) -> FetchResult:
     """Fetch page content via HTTP or Playwright browser.
 
     Args:

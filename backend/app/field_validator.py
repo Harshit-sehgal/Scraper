@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
 
 
-def validate_world_state(ws: SemanticWorldState) -> list:  # noqa: C901, PLR0912
+def validate_world_state(ws: SemanticWorldState) -> list:
     """Validate world state integrity. Returns list of issues found (empty = clean)."""
     issues = []
     view = ws.get_topology_view()

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # ─── SQLite DB helper functions for threadpool-safe execution ─────────
 
 
-def _db_insert_queue(db_path: str, priority: int, url: str, depth: int, source_url: str | None, added_at: float) -> None:  # noqa: PLR0913
+def _db_insert_queue(db_path: str, priority: int, url: str, depth: int, source_url: str | None, added_at: float) -> None:
     import sqlite3
 
     with sqlite3.connect(db_path) as conn:
@@ -214,7 +214,7 @@ class CrawlFrontier:
             logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
             return True
 
-    async def get_next_url(self) -> str | None:  # noqa: C901, PLR0912, PLR0915
+    async def get_next_url(self) -> str | None:
         """Get the next URL available for crawling, respecting policy."""
         tried: list[CrawlItem] = []
         max_retries = 1000  # safety valve: prevent unbounded queue scan
@@ -333,7 +333,7 @@ class CrawlFrontier:
                         logger.exception("Failed to restore tried URLs")
         return None
 
-    async def mark_completed(self, url: str, success: bool = True) -> None:  # noqa: FBT001, FBT002
+    async def mark_completed(self, url: str, success: bool = True) -> None:
         """Mark a URL as completed or failed."""
         async with self._lock:
             if url in self._pending:

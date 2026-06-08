@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 
 def main() -> None:
-    with open(Path(__file__).parent / "test_page.html") as f:  # noqa: PTH123
+    with open(Path(__file__).parent / "test_page.html") as f:
         html = f.read()
 
     soup = BeautifulSoup(html, "html.parser")

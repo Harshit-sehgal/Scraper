@@ -526,7 +526,7 @@ async def get_domain_trend(
     try:
         telemetry_history = get_scrape_telemetry().get_recent(window)
 
-        from app.trend_analyzer import TrendAnalyzer as TA  # noqa: N817
+        from app.trend_analyzer import TrendAnalyzer as TA
 
         domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
 
@@ -1139,10 +1139,10 @@ async def recommend_fetch_strategy(
 
 
 @router.post("/api/scraper/strategy/record")
-async def record_strategy_attempt(  # noqa: PLR0913
+async def record_strategy_attempt(
     domain: str,
     strategy: str,
-    success: bool,  # noqa: FBT001
+    success: bool,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
     time_ms: Annotated[float, Query(ge=0)] = 0,
     quality: Annotated[float, Query(ge=0, le=1)] = 0.5,

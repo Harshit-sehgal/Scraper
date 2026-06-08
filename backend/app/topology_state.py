@@ -378,6 +378,64 @@ class TopologyState:
         """Assign every region to a shard based on community membership (Phase 53). Delegates to topology_clustering."""
         return shard_topology_regions(self)
 
+    # ─── Public Accessors (used by topology_*.py extracted modules) ─────
+
+    def get_regions(self) -> list[FieldConflictRegion]:
+        """Public accessor — returns raw region list for topology modules."""
+        return self._get_regions()
+
+    def set_regions(self, regions: list[FieldConflictRegion]) -> None:
+        """Public accessor — sets raw region list for topology modules."""
+        self._set_regions(regions)
+
+    def get_struct(self, key: str):
+        """Public accessor — gets a topology structure by key for topology modules."""
+        return self._get_struct(key)
+
+    def set_struct(self, key: str, val) -> None:
+        """Public accessor — sets a topology structure by key for topology modules."""
+        self._set_struct(key, val)
+
+    def record(self, action: str, details: dict) -> None:
+        """Public accessor — records a topology mutation event."""
+        self._record(action, details)
+
+    @property
+    def topology_epoch(self) -> int:
+        """Public accessor — current topology epoch."""
+        return self._topology_epoch
+
+    @topology_epoch.setter
+    def topology_epoch(self, value: int) -> None:
+        self._topology_epoch = value
+
+    @property
+    def tombstones(self) -> set[str]:
+        """Public accessor — deleted region IDs."""
+        return self._tombstones
+
+    @tombstones.setter
+    def tombstones(self, value: set[str]) -> None:
+        self._tombstones = value
+
+    @property
+    def structural_change(self) -> bool:
+        """Public accessor — whether topology has structural changes."""
+        return self._structural_change
+
+    @structural_change.setter
+    def structural_change(self, value: bool) -> None:
+        self._structural_change = value
+
+    @property
+    def last_pressure_flow_time(self) -> float:
+        """Public accessor — last cross-scale pressure flow timestamp."""
+        return self._last_pressure_flow_time
+
+    @last_pressure_flow_time.setter
+    def last_pressure_flow_time(self, value: float) -> None:
+        self._last_pressure_flow_time = value
+
     def _get_regions(self) -> list[FieldConflictRegion]:
         return self._staging["regions"] if self._staging is not None else self._regions
 
@@ -489,7 +547,7 @@ class TopologyState:
         target_roles = set(target.competing_roles)
         for r in self._get_regions():
             if r.region_id != target.region_id and set(r.competing_roles) & target_roles:
-                result.append(view._snapshot(r))  # noqa: PERF401
+                result.append(view._snapshot(r))
         return result
 
     def get_all_tokens(self) -> list[str]:
@@ -686,7 +744,7 @@ class TopologyState:
         """Resource-aware pruning of dead semantic regions (Phase 9)."""
         return _persistence_gc(self, max_idle)
 
-    def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:  # noqa: FBT001, FBT002
+    def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:
         """Autonomous topology pruning (Phase 62). Delegates to topology_clustering."""
         return self_prune_regions(self, instability_threshold, community_required)
 
@@ -773,6 +831,20 @@ class TopologyState:
 
     # ─── Edge Field Forces ──────────────────────────────────────────
 
+    def compute_edge_field_forces(self) -> dict[tuple[str, str], dict[str, float]]:
+        """Compute force vectors from the unified edge field for each role pair.
+
+        Public accessor — delegates to ``topology_forces.compute_edge_field_forces``.
+        """
+        return self._compute_edge_field_forces()
+
+    def redirect_repulsive_pressure(self, source_region, pressure_amount: float, forces: dict):
+        """Redirect repulsive pressure through alternative high-affinity edge field routes.
+
+        Public accessor — delegates to ``topology_forces.redirect_repulsive_pressure``.
+        """
+        return self._redirect_repulsive_pressure(source_region, pressure_amount, forces)
+
     def _compute_edge_field_forces(self) -> dict[tuple[str, str], dict[str, float]]:
         """Compute force vectors from the unified edge field for each role pair.
 
@@ -796,7 +868,7 @@ class TopologyState:
 
     # ─── Bulk Operations ───────────────────────────────────────────────
 
-    def evolve_all(self, force: bool = False):  # noqa: FBT001, FBT002
+    def evolve_all(self, force: bool = False):
         """Evolve all basins modulated by edge field forces and multi-scale feedback.
 
         Delegates to ``topology_thermodynamics.evolve_all``.

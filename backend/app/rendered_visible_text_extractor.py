@@ -237,7 +237,7 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
 
     sorted_blocks = sorted(blocks, key=lambda b: b.y_position)
 
-    Y_TOLERANCE: float = 30.0  # noqa: N806
+    Y_TOLERANCE: float = 30.0
     cards: list[VisualCard] = []
     current: list[VisibleTextBlock] = []
     last_y = -Y_TOLERANCE - 1
@@ -257,7 +257,7 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
     return CardGroupingResult(cards=cards, card_count=len(cards), has_repeated_structure=has_repeat, cluster_signature=sig)
 
 
-def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:  # noqa: C901, PLR0912
+def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:
     """Group by DOM parent path when bounding boxes are unavailable."""
     if not blocks:
         return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
@@ -504,7 +504,7 @@ def _extract_record_from_card(
         return any(start < ue and end > us for us, ue in used_spans)
 
     # Priority sort: typed fields first, string / org last
-    _TYPED_PRIORITY: dict = {  # noqa: N806
+    _TYPED_PRIORITY: dict = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
@@ -544,7 +544,7 @@ def _extract_record_from_card(
     return record
 
 
-def _collect_card_pattern_matches(  # noqa: C901, PLR0912
+def _collect_card_pattern_matches(
     full_text: str,
 ) -> dict:
     """Pass 1: Collect ALL pattern matches from card text, organized by type."""
@@ -665,7 +665,7 @@ def _collect_card_pattern_matches(  # noqa: C901, PLR0912
     return matches
 
 
-def _extract_card_field_stateful(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
+def _extract_card_field_stateful(
     field_type,
     field_name: str,
     field_desc: str,

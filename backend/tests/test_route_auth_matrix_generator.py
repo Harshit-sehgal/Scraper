@@ -89,7 +89,7 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
     # entry is a (method, path) pair that has a documented reason for being
     # open (e.g. browser-generated reports). The reason is enforced by the
     # body-size middleware (5 MB cap) and the global /api/* rate limiter.
-    UNAUTHENTICATED_MUTATIONS = {  # noqa: N806
+    UNAUTHENTICATED_MUTATIONS = {
         ("POST", "/api/system/csp-violations"),  # browser CSP report, no key
     }
 

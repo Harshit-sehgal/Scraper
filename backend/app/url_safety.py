@@ -71,7 +71,7 @@ def _normalize_ip_literal(hostname: str) -> str | None:
     return socket.inet_ntoa(packed)
 
 
-def validate_public_http_url(url: str) -> None:  # noqa: C901, PLR0912, PLR0915
+def validate_public_http_url(url: str) -> None:
     """Raise ValueError if the URL resolves to or points to a private / internal network target.
 
     Allows configured internal hosts via settings.ALLOWED_INTERNAL_HOSTS (e.g. 'nginx' for compose tests).
@@ -113,7 +113,7 @@ def validate_public_http_url(url: str) -> None:  # noqa: C901, PLR0912, PLR0915
             return
 
     # 2. Reject explicit loopback / internal names
-    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # noqa: S104 — rejecting 0.0.0.0, not binding to it  # nosec B104 — rejecting 0.0.0.0, not binding to it
+    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104
         msg = f"URL hostname '{hostname}' is a restricted local loopback target."
         _record_ssrf_reject("loopback_name")
         raise ValueError(msg)
@@ -543,7 +543,7 @@ def get_safe_client(**kwargs: Any) -> httpx.Client:
 # ───────────────────────────────────────────────────────────────────────
 
 
-def verify_ssrf_self_check() -> dict:  # noqa: PLR0911
+def verify_ssrf_self_check() -> dict:
     """Confirm that the SSRF-safe transport factory still enforces the
     safety path against the currently-installed ``httpx`` / ``httpcore``
     versions.

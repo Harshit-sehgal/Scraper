@@ -128,14 +128,14 @@ async def _check_crawl_policy(url: str) -> ScrapeAttemptResult | None:
 # ─── Internal helper: try profile-based extraction ───────────────────
 
 
-async def _try_profile_extraction(  # noqa: PLR0913
+async def _try_profile_extraction(
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float,
     user_intent: str,
     selectors_map: dict | None,  # noqa: ARG001, RUF100
     attempt_ctx: AttemptContext | None,  # noqa: ARG001, RUF100
-    skip_profiles: bool = False,  # noqa: FBT001, FBT002
+    skip_profiles: bool = False,
 ) -> tuple[ScrapeAttemptResult | None, dict | None, str | None]:
     """Try profile-based extraction as the first extraction strategy.
 
@@ -266,14 +266,14 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
 # ─── Internal helper: zero-result classification ─────────────────────
 
 
-async def _classify_and_capture_zero_result(  # noqa: PLR0913
+async def _classify_and_capture_zero_result(
     url: str,
     html: str,
     fetch_method: str,
     anti_bot_score: float,
     schema_fields: list[SchemaField],
     ext_result: Any,
-    is_failure_page: bool,  # noqa: FBT001
+    is_failure_page: bool,
     classification: Any | None,
     start_time: float,  # noqa: ARG001, RUF100
 ) -> tuple[Any | None, str | None, list[str]]:
@@ -375,7 +375,7 @@ async def _classify_and_capture_zero_result(  # noqa: PLR0913
 # ─── Internal helper: build fetch response on failure ─────────────────
 
 
-def _build_fetch_failure_result(  # noqa: PLR0913
+def _build_fetch_failure_result(
     url: str,
     fetch_method: str,
     classification: Any | None,
@@ -426,7 +426,7 @@ def _build_fetch_failure_result(  # noqa: PLR0913
 # ─── Main entry points ────────────────────────────────────────────────
 
 
-async def scrape_url_attempt(  # noqa: PLR0913
+async def scrape_url_attempt(
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,
@@ -504,7 +504,7 @@ async def scrape_url_attempt(  # noqa: PLR0913
     return result
 
 
-async def scrape_url(  # noqa: C901, PLR0912, PLR0913, PLR0915
+async def scrape_url(
     url: str,
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,

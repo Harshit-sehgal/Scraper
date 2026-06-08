@@ -86,16 +86,16 @@ class SelectorDecayPredictor:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump(data, f)
-            os.replace(tmp_path, path)  # noqa: PTH105
+            os.replace(tmp_path, path)
             tmp_path = None  # ownership transferred via rename
         except Exception:
             logger.exception("Failed to persist selector decay snapshots")
             with contextlib.suppress(OSError):
                 if fd is not None:
                     os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):  # noqa: PTH110
+            if tmp_path is not None and os.path.exists(tmp_path):
                 with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)  # noqa: PTH108
+                    os.unlink(tmp_path)
 
     def _load(self) -> None:
         import json
@@ -110,7 +110,7 @@ class SelectorDecayPredictor:
         path = self._get_snapshots_path()
         if Path(path).exists():
             try:
-                with open(path) as f:  # noqa: PTH123
+                with open(path) as f:
                     data = json.load(f)
                 self._confidence_snapshots.clear()
                 for domain, snapshots in data.items():

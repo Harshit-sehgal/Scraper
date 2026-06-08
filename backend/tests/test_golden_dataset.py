@@ -32,7 +32,7 @@ def load_sites() -> list[dict]:
     """
     if not SITES_FILE.exists():
         return []
-    with open(SITES_FILE) as f:  # noqa: PTH123
+    with open(SITES_FILE) as f:
         data = json.load(f)
     return data.get("sites", [])
 
@@ -42,14 +42,14 @@ def load_expected(site_id: str) -> list[dict] | None:
     expected_path = EXPECTED_DIR / f"{site_id}.json"
     if not expected_path.exists():
         return None
-    with open(expected_path) as f:  # noqa: PTH123
+    with open(expected_path) as f:
         return json.load(f)
 
 
 # ── F1 Scoring (matches benchmark_accuracy.py logic) ──────────────────────
 
 
-def compute_f1(  # noqa: C901
+def compute_f1(
     extracted: list[dict],
     expected: list[dict],
     key_fields: list[str] | None = None,
@@ -122,7 +122,7 @@ def compute_f1(  # noqa: C901
 @pytest.mark.golden_dataset
 @pytest.mark.parametrize("site_def", load_sites(), ids=lambda s: s["id"])
 @pytest.mark.asyncio
-async def test_golden_dataset_site(site_def, monkeypatch) -> None:  # noqa: C901, PLR0912
+async def test_golden_dataset_site(site_def, monkeypatch) -> None:
     """Run extraction against a golden dataset site and compare to expected.
 
     This live test verifies the site is reachable, extraction produces enough

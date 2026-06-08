@@ -31,7 +31,7 @@ def emit_field_wave(state: "TopologyState", source_region_id: str, intensity: fl
     )
 
 
-def process_field_wave(state: "TopologyState", source_region_id: str, intensity: float) -> None:  # noqa: C901
+def process_field_wave(state: "TopologyState", source_region_id: str, intensity: float) -> None:
     """Reactive handling of a field wave by neighboring regions."""
     source = state.get_region(source_region_id)
     if not source:

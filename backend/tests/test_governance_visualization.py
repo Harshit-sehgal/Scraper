@@ -13,14 +13,14 @@ from app.visualization import MAP_PATH, OperatorMode, SystemGovernorDashboard
 @pytest.fixture(autouse=True)
 def clean_gov_env():
     # Remove existing files if any
-    if os.path.exists(MAP_PATH):  # noqa: PTH110
+    if os.path.exists(MAP_PATH):
         with contextlib.suppress(Exception):
-            os.remove(MAP_PATH)  # noqa: PTH107
+            os.remove(MAP_PATH)
     yield
     # Cleanup files after test run
-    if os.path.exists(MAP_PATH):  # noqa: PTH110
+    if os.path.exists(MAP_PATH):
         with contextlib.suppress(Exception):
-            os.remove(MAP_PATH)  # noqa: PTH107
+            os.remove(MAP_PATH)
 
 
 def test_operator_mode_adjustments() -> None:
@@ -43,9 +43,9 @@ def test_system_map_generation() -> None:
 
     # Generate map
     dashboard.generate_system_map()
-    assert os.path.exists(MAP_PATH)  # noqa: PTH110
+    assert os.path.exists(MAP_PATH)
 
-    with open(MAP_PATH, encoding="utf-8") as f:  # noqa: PTH123
+    with open(MAP_PATH, encoding="utf-8") as f:
         content = f.read()
 
     assert "DataForge Visual System" in content

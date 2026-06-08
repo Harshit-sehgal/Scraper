@@ -20,7 +20,7 @@ def _sync_mock_context() -> MagicMock:
     return ctx
 
 
-def _sync_browser_mock(is_connected: bool = True) -> MagicMock:  # noqa: FBT001, FBT002
+def _sync_browser_mock(is_connected: bool = True) -> MagicMock:
     """Create a browser mock where ``is_connected`` is a sync method.
 
     ``AsyncMock`` would make ``is_connected()`` return an unawaited coroutine.
@@ -210,14 +210,14 @@ class TestGetContext:
 
         with (
             patch("app.browser_pool.async_playwright") as mock_async_pw,
-            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),  # noqa: FBT003
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
             patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
             patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
             patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),  # noqa: FBT003
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
             patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
         ):
             mock_pw = AsyncMock()
@@ -248,14 +248,14 @@ class TestGetContext:
 
         with (
             patch("app.browser_pool.async_playwright") as mock_async_pw,
-            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),  # noqa: FBT003
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
             patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
             patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
             patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),  # noqa: FBT003
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
             patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
         ):
             from app.strategy_evolution import FetchStrategy
@@ -277,8 +277,8 @@ class TestGetContext:
 
         with (
             patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),  # noqa: FBT003
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
         ):
             from app.strategy_evolution import FetchStrategy
 
@@ -307,8 +307,8 @@ class TestGetContext:
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
             patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
             patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),  # noqa: FBT003
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
         ):
             from app.strategy_evolution import FetchStrategy
 
@@ -323,7 +323,7 @@ class TestGetContext:
         pool = BrowserPool()
         with (
             patch("app.browser_pool.async_playwright") as mock_async_pw,
-            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),  # noqa: FBT003
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
         ):
             mock_pw = AsyncMock()
             mock_pw.chromium.launch.side_effect = Exception("Launch failed")
@@ -448,9 +448,9 @@ class TestStealthContext:
         pool._playwright = MagicMock()
 
         with (
-            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),  # noqa: FBT003
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", True),  # noqa: FBT003
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", True),
             patch("app.browser_pool.settings.STEALTH_NAVIGATOR_LANGUAGES", "en-US,en"),
             patch("app.browser_pool.settings.STEALTH_HARDWARE_CONCURRENCY", 4),
             patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
@@ -483,14 +483,14 @@ class TestProxyContext:
         mock_proxy.get_proxy_for_playwright.return_value = {"server": "http://proxy:8080"}
 
         with (
-            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),  # noqa: FBT003
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
             patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
             patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
             patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", True),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),  # noqa: FBT003
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", True),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
             patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
             patch("app.proxy_manager.get_proxy_manager", return_value=mock_proxy),
         ):
@@ -525,14 +525,14 @@ class TestBrowserReconnection:
 
         with (
             patch("app.browser_pool.async_playwright") as mock_async_pw,
-            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),  # noqa: FBT003
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
             patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
             patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
             patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
             patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
-            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),  # noqa: FBT003
-            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),  # noqa: FBT003
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
             patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
         ):
             mock_pw = AsyncMock()

@@ -27,7 +27,7 @@ def manager(monkeypatch: pytest.MonkeyPatch) -> ProxyManager:
 class TestInit:
     def test_parses_proxy_list(self) -> None:
         with (
-            patch("app.config.settings.PROXY_ROTATION_ENABLED", True),  # noqa: FBT003
+            patch("app.config.settings.PROXY_ROTATION_ENABLED", True),
             patch("app.config.settings.PROXY_LIST", "http://proxy1:8080,http://proxy2:8080,http://proxy3:8080"),
         ):
             pm = ProxyManager()
@@ -36,14 +36,14 @@ class TestInit:
 
     def test_disabled_when_empty_list(self) -> None:
         with (
-            patch("app.config.settings.PROXY_ROTATION_ENABLED", True),  # noqa: FBT003
+            patch("app.config.settings.PROXY_ROTATION_ENABLED", True),
             patch("app.config.settings.PROXY_LIST", ""),
         ):
             pm = ProxyManager()
             assert pm.enabled is False
 
     def test_disabled_when_rotation_off(self) -> None:
-        with patch("app.config.settings.PROXY_ROTATION_ENABLED", False):  # noqa: FBT003
+        with patch("app.config.settings.PROXY_ROTATION_ENABLED", False):
             pm = ProxyManager()
             assert pm.enabled is False
 

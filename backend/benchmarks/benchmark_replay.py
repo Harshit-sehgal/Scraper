@@ -12,7 +12,7 @@ import time
 from app.semantic_world_state import SemanticWorldState
 
 
-def _check(condition: bool, message: str) -> None:  # noqa: FBT001
+def _check(condition: bool, message: str) -> None:
     """Runtime invariant check. Used instead of ``assert`` so the benchmark
     keeps working when run with ``python -O`` (which strips asserts).
     """

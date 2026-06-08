@@ -9,8 +9,8 @@ def test_layer7_semantic_memory() -> None:
     schema = ["company_name", "price"]
 
     os.environ["SEMANTIC_STATE_PATH"] = "/tmp/test_semantic_state.json"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
-    if os.path.exists("/tmp/test_semantic_state.json"):  # nosec B108 - hardcoded /tmp path is a test fixture, not production code  # noqa: PTH110
-        os.remove("/tmp/test_semantic_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code  # noqa: PTH107
+    if os.path.exists("/tmp/test_semantic_state.json"):  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+        os.remove("/tmp/test_semantic_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 
     run_pipeline(records, schema)
 
@@ -22,7 +22,7 @@ def test_layer7_semantic_memory() -> None:
 
     save_semantic_state()
 
-    assert os.path.exists("/tmp/test_semantic_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code  # noqa: PTH110
+    assert os.path.exists("/tmp/test_semantic_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 
     # Reset engine and load
     clear_semantic_state(clear_file=False)

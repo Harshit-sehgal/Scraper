@@ -61,7 +61,7 @@ def _is_trusted_proxy(client_host: str) -> bool:
     return any(peer in net for net in _TRUSTED_PROXY_NETWORKS)
 
 
-class RateLimitExceeded(Exception):  # noqa: N818
+class RateLimitExceeded(Exception):
     """Raised when a client exceeds their rate limit."""
 
 
@@ -104,7 +104,7 @@ def _get_effective_route_limits(method: str | None = None) -> dict[str, tuple[in
     return limits
 
 
-def _parse_rate_limit(limit_str: str) -> tuple[int, float]:  # noqa: PLR0911
+def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
     """Parse a rate limit string like '100 / minute' into (max_requests, window_seconds).
 
     Supported formats: N / second, N / minute, N / hour. Whitespace around
@@ -564,7 +564,7 @@ class RateLimiterMiddleware:
     def __init__(
         self,
         global_limit: str = "",
-        per_ip: bool = True,  # noqa: FBT001, FBT002
+        per_ip: bool = True,
         per_ip_limit: str = "",
         cleanup_interval: int = 300,
     ) -> None:

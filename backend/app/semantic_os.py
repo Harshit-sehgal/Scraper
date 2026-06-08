@@ -142,7 +142,7 @@ class SemanticOS:
         """Manually trigger registered dispatchers."""
         return self.ws.dispatch_actions()
 
-    def report_outcome(self, action_id: str, success: bool, details: dict | None = None) -> None:  # noqa: FBT001
+    def report_outcome(self, action_id: str, success: bool, details: dict | None = None) -> None:
         """Feed action outcomes back into the manifold (Feedback Loop)."""
         with self.ws.transaction(f"action_outcome:{action_id}"):
             self.ws.log_action_execution(action_id, success, details)

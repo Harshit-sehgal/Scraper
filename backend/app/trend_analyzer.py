@@ -24,6 +24,30 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+# ─── Constants ────────────────────────────────────────────────────────
+DEGRADING_HEALTH_THRESHOLD: int = 40
+"""Health score below which a domain is considered degrading."""
+IMPROVING_HEALTH_THRESHOLD: int = 80
+"""Health score at or above which a domain is considered improving."""
+MIN_CONFIDENT_SAMPLES: int = 3
+"""Minimum sample count for confident domain categorization."""
+MIN_STABLE_SAMPLES: int = 2
+"""Minimum sample count to categorize a domain as stable."""
+MIN_DECAY_SIGNALS: int = 4
+"""Minimum number of selector decay signals to detect acceleration."""
+MIN_TREND_VALUES: int = 3
+"""Minimum number of data points to detect a meaningful trend."""
+MODERATE_SAMPLE_THRESHOLD: int = 6
+"""Sample count threshold for moderate-confidence signals."""
+LOW_QUALITY_THRESHOLD: float = 0.1
+"""Selector hit rate below which quality is considered poor."""
+COST_EFFICIENCY_EXCELLENT: float = 0.01
+"""Cost per record threshold for 'excellent' rating."""
+COST_EFFICIENCY_GOOD: float = 0.03
+"""Cost per record threshold for 'good' rating."""
+COST_EFFICIENCY_FAIR: float = 0.10
+"""Cost per record threshold for 'fair' rating."""
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Data Models
@@ -115,7 +139,7 @@ class TrendAnalyzer:
         """
         self._history_window = history_window
 
-    def analyze(self, telemetry_history: list[dict]) -> TrendReport:  # noqa: C901
+    def analyze(self, telemetry_history: list[dict]) -> TrendReport:
         """Run full trend analysis on the provided telemetry history.
 
         Args:
@@ -155,11 +179,11 @@ class TrendAnalyzer:
             global_costs.append(trend.avg_cost_usd)
 
             # Categorize domain trajectory
-            if trend.health_score < 40:
+            if trend.health_score < DEGRADING_HEALTH_THRESHOLD:
                 report.degrading_domains.append(domain)
-            elif trend.health_score >= 80 and trend.sample_count >= 3:
+            elif trend.health_score >= IMPROVING_HEALTH_THRESHOLD and trend.sample_count >= MIN_CONFIDENT_SAMPLES:
                 report.improving_domains.append(domain)
-            elif trend.sample_count >= 2:
+            elif trend.sample_count >= MIN_STABLE_SAMPLES:
                 report.stable_domains.append(domain)
             else:
                 report.unseen_domains.append(domain)
@@ -190,7 +214,7 @@ class TrendAnalyzer:
 
         # Alerts for accelerating selector decay
         for domain, trend in report.domain_trends.items():
-            if trend.selector_decay_accelerating and trend.sample_count >= 3:
+            if trend.selector_decay_accelerating and trend.sample_count >= MIN_CONFIDENT_SAMPLES:
                 report.alerts.append(
                     {
                         "severity": "medium",
@@ -202,7 +226,7 @@ class TrendAnalyzer:
 
         # Alerts for anti-bot intensification
         for domain, trend in report.domain_trends.items():
-            if trend.anti_bot_trend == "degrading" and trend.sample_count >= 3:
+            if trend.anti_bot_trend == "degrading" and trend.sample_count >= MIN_CONFIDENT_SAMPLES:
                 report.alerts.append(
                     {
                         "severity": "medium",
@@ -220,7 +244,7 @@ class TrendAnalyzer:
 
     # ── Internal Analysis ─────────────────────────────────────────────
 
-    def analyze_domain(self, domain: str, events: list[dict]) -> DomainTrend:  # noqa: C901, PLR0912, PLR0915
+    def analyze_domain(self, domain: str, events: list[dict]) -> DomainTrend:
         """Analyze telemetry events for a single domain.
 
         This is a public method — callable directly for per-domain
@@ -302,7 +326,7 @@ class TrendAnalyzer:
         trend.top_failure_categories = [{"category": cat, "count": count} for cat, count in sorted_categories]
 
         # Selector decay acceleration
-        if len(selector_decay_signals) >= 4:
+        if len(selector_decay_signals) >= MIN_DECAY_SIGNALS:
             half = len(selector_decay_signals) // 2
             recent_decay_rate = sum(selector_decay_signals[half:]) / max(half, 1)
             early_decay_rate = sum(selector_decay_signals[:half]) / max(half, 1)
@@ -315,12 +339,12 @@ class TrendAnalyzer:
 
     # ── Helpers ───────────────────────────────────────────────────────
 
-    def _detect_trend(self, values: list[float], higher_is_worse: bool) -> str:  # noqa: FBT001
+    def _detect_trend(self, values: list[float], higher_is_worse: bool) -> str:
         """Detect whether a sequence of values is improving, stable, or degrading.
 
         Compares the mean of the first third to the mean of the last third.
         """
-        if len(values) < 3:
+        if len(values) < MIN_TREND_VALUES:
             return "stable"
 
         third = max(len(values) // 3, 1)
@@ -380,13 +404,13 @@ class TrendAnalyzer:
             score -= 10
 
         # Low sample count penalty (not enough data to be confident)
-        if trend.sample_count < 3:
+        if trend.sample_count < MIN_CONFIDENT_SAMPLES:
             score -= 15
-        elif trend.sample_count < 6:
+        elif trend.sample_count < MODERATE_SAMPLE_THRESHOLD:
             score -= 5
 
         # Consistent low quality (zero or near-zero selector hit rate)
-        if trend.avg_quality_score < 0.1 and trend.sample_count >= 3:
+        if trend.avg_quality_score < LOW_QUALITY_THRESHOLD and trend.sample_count >= MIN_CONFIDENT_SAMPLES:
             score -= 10
 
         return max(0.0, min(100.0, score))
@@ -489,7 +513,7 @@ class EconomicTracker:
         # Sort domains by cost
         sorted_domains = sorted(
             [{"domain": d, "total_cost": s.total_cost_usd} for d, s in report.cost_by_domain.items()],
-            key=lambda x: -(x["total_cost"]),  # type: ignore  # noqa: PGH003
+            key=lambda x: -(x["total_cost"]),  # type: ignore
         )
         report.most_expensive_domains = sorted_domains[:5]
         report.least_expensive_domains = sorted_domains[-5:][::-1]
@@ -546,10 +570,10 @@ class EconomicTracker:
     @staticmethod
     def _rate_efficiency(cost_per_record: float) -> str:
         """Rate cost efficiency based on cost per record."""
-        if cost_per_record <= 0.01:
+        if cost_per_record <= COST_EFFICIENCY_EXCELLENT:
             return "excellent"
-        if cost_per_record <= 0.03:
+        if cost_per_record <= COST_EFFICIENCY_GOOD:
             return "good"
-        if cost_per_record <= 0.10:
+        if cost_per_record <= COST_EFFICIENCY_FAIR:
             return "fair"
         return "poor"

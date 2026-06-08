@@ -91,9 +91,23 @@ _DIGIT_PATTERN = re.compile(r"\d+")
 _NUMERIC_PATTERN = re.compile(r"^\d+\.?\d*$")
 # (quantifier pattern removed — now handled by NUMBER type detection)
 
+# ─── Constants ────────────────────────────────────────────────────────
+MIN_TITLE_CASE_WORD: int = 2
+"""Minimum word length to check title-case capitalization."""
+MIN_ENTITY_LENGTH: int = 3
+"""Minimum string length to infer an organization/entity type."""
+MAX_FRAGMENT_LENGTH: int = 5
+"""Maximum fragment length to suppress as child substring."""
+MIN_MEANINGFUL_LENGTH: int = 2
+"""Minimum length for a value to be meaningful data."""
+MAX_DATA_LENGTH: int = 300
+"""Maximum length for a value to be considered data (not noise)."""
+MAX_PATTERN_DISPLAY_LENGTH: int = 30
+"""Maximum regex pattern snippet length for evidence display."""
+
 
 @lru_cache(maxsize=4096)
-def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType, float]:  # noqa: C901, PLR0911, PLR0912
+def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType, float]:
     """Detect semantic type of a value using regex patterns and field name hints.
 
     Results are cached with LRU (max 4096 entries) to avoid re-processing
@@ -127,7 +141,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType
     # 4. Organization / Entity context
     v_str = str(value).strip()
     v_lower = v_str.lower()
-    _UI_NOISE = {  # noqa: N806
+    _UI_NOISE = {
         "view",
         "more",
         "skip",
@@ -171,22 +185,22 @@ def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType
         words = v_str.split()
         if len(words) > 1:
             # Check if it's "Title Case" (all words start with upper)
-            if all(w[0].isupper() for w in words if len(w) > 2):
+            if all(w[0].isupper() for w in words if len(w) > MIN_TITLE_CASE_WORD):
                 return SemanticType.ORGANIZATION, 0.65
             return SemanticType.TEXT, 0.50
-        if len(v_str) > 3:
+        if len(v_str) > MIN_ENTITY_LENGTH:
             return SemanticType.ORGANIZATION, 0.55
         return SemanticType.TEXT, 0.50
 
     # Product-like (brand naming: starts lowercase, has internal uppercase,
     # e.g. iPhone)
-    if v_str and len(v_str) >= 3 and v_str[0].islower() and any(c.isupper() for c in v_str[1:]):
+    if v_str and len(v_str) >= MIN_ENTITY_LENGTH and v_str[0].islower() and any(c.isupper() for c in v_str[1:]):
         return SemanticType.ORGANIZATION, 0.60
 
     return SemanticType.TEXT, 0.50
 
 
-def is_child_fragment(value: str, seen_values: set) -> bool:  # noqa: C901
+def is_child_fragment(value: str, seen_values: set) -> bool:
     """Check if a value is a child fragment of an already-seen larger value.
 
     Prevents over-segmentation by suppressing tokens that are physically contained
@@ -237,7 +251,7 @@ def is_child_fragment(value: str, seen_values: set) -> bool:  # noqa: C901
         # Strategy 2: Prefix / Suffix suppression for fragments
         if (
             (seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower))
-            and len(value_lower) < 5
+            and len(value_lower) < MAX_FRAGMENT_LENGTH
             and (value_is_digit or any(c in " /-,." for c in seen_lower.replace(value_lower, "", 1)))
             and not (value_lower.isalpha() and len(value_lower) == 1)
         ):
@@ -314,7 +328,7 @@ def _map_single_record(
     mapped_values = {m.mapped_value for m in field_mappings}
     for value in all_values:
         if value and value not in mapped_values and not _is_noise_value(value):
-            unmatched_values.append(value)  # noqa: PERF401
+            unmatched_values.append(value)
 
     return RecordMapping(
         original_data=record,
@@ -324,7 +338,7 @@ def _map_single_record(
     )
 
 
-def _find_best_value_for_need(  # noqa: C901, PLR0912
+def _find_best_value_for_need(
     values: list[str],
     semantic_need: str,
     headers: list[str],
@@ -365,7 +379,9 @@ def _find_best_value_for_need(  # noqa: C901, PLR0912
                     # pattern is a compiled regex object, convert to string for
                     # display
                     pattern_str = pattern.pattern
-                    snippet = pattern_str[:30] if len(pattern_str) > 30 else pattern_str
+                    snippet = (
+                        pattern_str[:MAX_PATTERN_DISPLAY_LENGTH] if len(pattern_str) > MAX_PATTERN_DISPLAY_LENGTH else pattern_str
+                    )
                     candidates.append(
                         FieldMapping(
                             field_name=semantic_need,
@@ -435,7 +451,7 @@ def _find_best_value_for_need(  # noqa: C901, PLR0912
     return None
 
 
-def _detect_value_type(values: list[str], value_patterns: ValuePatterns) -> str | None:  # noqa: C901
+def _detect_value_type(values: list[str], value_patterns: ValuePatterns) -> str | None:
     """Detect what type most values in the list are."""
     if not values:
         return None
@@ -525,8 +541,8 @@ def _is_noise_value(value: str | None) -> bool:
         return True
 
     # Too short to be meaningful data
-    if len(value_lower) < 2:
+    if len(value_lower) < MIN_MEANINGFUL_LENGTH:
         return True
 
     # Too long (likely not a data value)
-    return len(value_lower) > 300
+    return len(value_lower) > MAX_DATA_LENGTH

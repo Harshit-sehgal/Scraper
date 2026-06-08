@@ -16,7 +16,7 @@ class NonBlockingRLock:
     def __init__(self) -> None:
         self._lock = threading.RLock()
 
-    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:  # noqa: FBT001, FBT002
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
         if blocking and timeout < 0:
             import asyncio
 
@@ -39,5 +39,5 @@ class NonBlockingRLock:
             raise RuntimeError(_LOCK_ACQUIRE_FAILED)
         return self
 
-    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:  # noqa: PYI036
+    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         self.release()

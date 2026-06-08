@@ -14,7 +14,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures" / "pages"
 
 
 def load_fixture(name: str) -> str:
-    with open(FIXTURES_DIR / name) as f:  # noqa: PTH123
+    with open(FIXTURES_DIR / name) as f:
         return f.read()
 
 

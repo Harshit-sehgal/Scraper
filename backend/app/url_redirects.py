@@ -19,7 +19,7 @@ from __future__ import annotations
 # ─── Redirect Detection ────────────────────────────────────────────────
 
 
-def _detect_redirect(original_url: str, final_url: str) -> dict:  # noqa: PLR0911
+def _detect_redirect(original_url: str, final_url: str) -> dict:
     """Detect and classify URL redirects by comparing original vs final URL.
 
     Compares the originally requested URL against the final URL after
@@ -138,7 +138,7 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:  # noqa: PLR091
     }
 
 
-def build_redirect_info(  # noqa: PLR0913
+def build_redirect_info(
     original_url: str,
     final_url: str,
     search_recovery: dict | None = None,

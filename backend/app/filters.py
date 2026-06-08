@@ -77,7 +77,7 @@ def calculate_distance(point1: tuple[float, float], point2: tuple[float, float],
 # ──────────────────────────────────────────────
 
 
-def coerce_value(value: Any, field_type: FieldType):  # noqa: C901, PLR0911, PLR0912
+def coerce_value(value: Any, field_type: FieldType):
     """Coerce a raw value to its declared type.
     e.g., "18 years old" → 18 (integer), "true" → True (boolean).
     """
@@ -188,7 +188,7 @@ def _is_entity_name_field(field_name: str) -> bool:
     return any(token in low for token in ["company", "name", "studio", "firm", "agency"])
 
 
-def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> tuple[dict, list[str]]:  # noqa: C901, PLR0912
+def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> tuple[dict, list[str]]:
     """Apply strict per-field semantic cleanup and record mismatch flags."""
     cleaned = dict(record)
     mismatches: list[str] = []
@@ -384,7 +384,7 @@ def _infer_location_field_names(
 
     for field in schema_fields:
         if field.field_type == FieldType.LOCATION:
-            candidates.append(field.name)  # noqa: PERF401
+            candidates.append(field.name)
 
     for field in schema_fields:
         name_l = field.name.lower()
@@ -505,7 +505,7 @@ async def process_results(
         for record in coerced:
             results = []
             for rule in filters:
-                results.append(await apply_filter(record, rule, schema_fields))  # noqa: PERF401
+                results.append(await apply_filter(record, rule, schema_fields))
             if all(results):
                 filtered.append(record)
     else:

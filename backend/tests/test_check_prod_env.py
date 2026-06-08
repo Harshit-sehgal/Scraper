@@ -20,12 +20,12 @@ def env_file():
         f.write("# Test .env\n")
         f.flush()
         yield Path(f.name)
-    os.unlink(f.name)  # noqa: PTH108
+    os.unlink(f.name)
 
 
 def _write_env(path: Path, vars: dict[str, str]) -> None:  # noqa: A002
     """Write variables to an env file."""
-    with open(path, "w") as f:  # noqa: PTH123
+    with open(path, "w") as f:
         f.writelines(f'{key}="{value}"\n' for key, value in vars.items())
 
 
@@ -62,7 +62,7 @@ class TestCheckProdEnvCore:
             assert env["DATAFORGE_ENV"] == "production"
             assert "comment" not in env
         finally:
-            os.unlink(f.name)  # noqa: PTH108
+            os.unlink(f.name)
 
     def test_load_env_file_handles_missing_file(self) -> None:
         """load_env_file should return empty dict for missing file."""

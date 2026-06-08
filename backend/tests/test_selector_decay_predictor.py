@@ -204,4 +204,4 @@ class TestSelectorDecayPredictorGlobal:
         assert predictor2._confidence_snapshots["persistent.com"][0][1] == 0.88
 
         with contextlib.suppress(Exception):
-            os.remove("backend/data/selector_decay_snapshots.json")  # noqa: PTH107
+            os.remove("backend/data/selector_decay_snapshots.json")

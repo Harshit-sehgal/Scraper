@@ -233,7 +233,7 @@ def schedule_background_task(coro):
     return task
 
 
-def persist_single_wrapper(job_id: str, critical: bool = False) -> None:  # noqa: FBT001, FBT002
+def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     """Persist a single job to the configured backend."""
     job = jobs_store.get(job_id)
     if job:

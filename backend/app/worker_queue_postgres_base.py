@@ -263,7 +263,7 @@ class PostgresWorkerQueueBase(ABC):
 
     # ─── Task lifecycle ────────────────────────────────────────────────
 
-    async def enqueue(  # noqa: PLR0913
+    async def enqueue(
         self,
         task_type: str,
         payload: dict | None = None,
@@ -298,7 +298,7 @@ class PostgresWorkerQueueBase(ABC):
 
         return task.id
 
-    def _enqueue_sync(  # noqa: PLR0913
+    def _enqueue_sync(
         self,
         task_id: str,
         task_type: str,
@@ -434,7 +434,7 @@ class PostgresWorkerQueueBase(ABC):
         self,
         task_id: str,
         error: str,
-        retry: bool = True,  # noqa: FBT001, FBT002
+        retry: bool = True,
         retry_after: float | None = None,
         task_type: str | None = None,
     ) -> None:
@@ -456,7 +456,7 @@ class PostgresWorkerQueueBase(ABC):
         self,
         task_id: str,
         error: str,
-        retry: bool = True,  # noqa: FBT001, FBT002
+        retry: bool = True,
         retry_after: float | None = None,
         task_type: str | None = None,
     ) -> None:
@@ -662,7 +662,7 @@ class PostgresWorkerQueueBase(ABC):
         except Exception:
             logger.exception("Failed to recover stuck tasks")
 
-    async def stop(self, drain: bool = True) -> None:  # noqa: FBT001, FBT002
+    async def stop(self, drain: bool = True) -> None:
         """Stop the worker loop. Optionally drain in-flight tasks."""
         self._running = False
         if self._worker_task:
@@ -675,7 +675,7 @@ class PostgresWorkerQueueBase(ABC):
 
         logger.info("Postgres worker queue stopped (drained=%s)", drain)
 
-    async def _worker_loop(self) -> None:  # noqa: C901
+    async def _worker_loop(self) -> None:
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:

@@ -20,36 +20,36 @@ if TYPE_CHECKING:
 
 def replace_all_regions(state: "TopologyState", new_regions: list) -> None:
     """Replace the entire regional manifold (Phase 50)."""
-    state._set_regions(list(new_regions))
+    state.set_regions(list(new_regions))
     if state._staging is not None:
         state._staging["structural_change"] = True
-    state._record("replace_all_regions", {"count": len(new_regions)})
+    state.record("replace_all_regions", {"count": len(new_regions)})
 
 
 def trim_topology(state: "TopologyState", max_size: int, keep_from_end: int = 0) -> None:
     """Trim regions to a maximum size, optionally keeping from the end."""
-    regs = state._get_regions()
+    regs = state.get_regions()
     if len(regs) > max_size:
         regs = regs[-keep_from_end:] if keep_from_end > 0 else regs[-max_size:]
-        state._set_regions(regs)
+        state.set_regions(regs)
         if state._staging is not None:
             state._staging["structural_change"] = True
 
 
 def filter_topology_regions(state: "TopologyState", predicate: Callable[..., bool]) -> None:
     """Filter regions using a predicate function."""
-    regs = [r for r in state._get_regions() if predicate(r)]
-    state._set_regions(regs)
+    regs = [r for r in state.get_regions() if predicate(r)]
+    state.set_regions(regs)
     if state._staging is not None:
         state._staging["structural_change"] = True
 
 
 def prune_topology(state: "TopologyState", min_instability: float = 0.02, min_energy: float = 0.5) -> int:
     """Prune regions below instability and energy thresholds."""
-    regs = state._get_regions()
+    regs = state.get_regions()
     before = len(regs)
     regs = [r for r in regs if r.instability > min_instability or r.local_energy > min_energy]
-    state._set_regions(regs)
+    state.set_regions(regs)
     if len(regs) != before and state._staging is not None:
         state._staging["structural_change"] = True
     return before - len(regs)
@@ -57,10 +57,10 @@ def prune_topology(state: "TopologyState", min_instability: float = 0.02, min_en
 
 def garbage_collect_topology(state: "TopologyState", max_idle: int = 10) -> int:
     """Resource-aware pruning of dead semantic regions (Phase 9)."""
-    regs = state._get_regions()
+    regs = state.get_regions()
     before = len(regs)
     regs = [r for r in regs if r.idle_cycles < max_idle]
-    state._set_regions(regs)
+    state.set_regions(regs)
     if len(regs) != before and state._staging is not None:
         state._staging["structural_change"] = True
     return before - len(regs)
@@ -74,7 +74,7 @@ def topology_to_dict(state: "TopologyState") -> dict:
     from dataclasses import asdict
 
     return {
-        "regions": [asdict(r) for r in state._get_regions()],
+        "regions": [asdict(r) for r in state.get_regions()],
         "communities": [list(c) for c in state.global_communities],
         "schema_patterns": {str(k): v for k, v in state.schema_patterns.items()},
         "topological_laws": {str(k): v for k, v in state.topological_laws.items()},
@@ -87,11 +87,11 @@ def topology_to_dict(state: "TopologyState") -> dict:
         "anchors": [list(a) for a in state.anchors],
         "impossible_neighborhoods": [list(n) for n in state.impossible_neighborhoods],
         "restructuring_queue": [list(r) for r in state.restructuring_queue],
-        "crystalline_atoms": list(state._get_struct("crystalline_atoms")),
-        "meso_clusters": list(state._get_struct("meso_clusters")),
-        "macro_continents": list(state._get_struct("macro_continents")),
-        "topology_epoch": state._topology_epoch,
-        "tombstones": list(state._tombstones),
+        "crystalline_atoms": list(state.get_struct("crystalline_atoms")),
+        "meso_clusters": list(state.get_struct("meso_clusters")),
+        "macro_continents": list(state.get_struct("macro_continents")),
+        "topology_epoch": state.topology_epoch,
+        "tombstones": list(state.tombstones),
     }
 
 
@@ -103,8 +103,8 @@ def topology_from_dict(state: "TopologyState", data: dict) -> None:
     state.clear()
 
     # Identity and Epoch (Phase 60)
-    state._topology_epoch = data.get("topology_epoch", 1)
-    state._tombstones = set(data.get("tombstones", []))
+    state.topology_epoch = data.get("topology_epoch", 1)
+    state.tombstones = set(data.get("tombstones", []))
 
     # Regions
     regions = []
@@ -119,10 +119,10 @@ def topology_from_dict(state: "TopologyState", data: dict) -> None:
             if k not in ["competing_roles", "token", "instability", "region_id"]:
                 setattr(r, k, v)
         regions.append(r)
-    state._set_regions(regions)
+    state.set_regions(regions)
 
     # Communities
-    state._set_struct("communities", [set(c) for c in data.get("communities", [])])
+    state.set_struct("communities", [set(c) for c in data.get("communities", [])])
 
     # Pipe-separated-key dicts or tuple keys
     for data_key, struct_key in [
@@ -148,22 +148,22 @@ def topology_from_dict(state: "TopologyState", data: dict) -> None:
                         target[tuple(k.split("|"))] = v
             else:
                 target[tuple(k)] = v
-        state._set_struct(struct_key, target)
+        state.set_struct(struct_key, target)
 
     # Simple replacements
-    state._set_struct("centrality", dict(data.get("centrality", {})))
-    state._set_struct("impossible_neighborhoods", [set(n) for n in data.get("impossible_neighborhoods", [])])
-    state._set_struct("restructuring_queue", {tuple(r) for r in data.get("restructuring_queue", [])})
-    state._set_struct("anchors", {tuple(a) for a in data.get("anchors", []) if len(a) == 2})
-    state._set_struct("crystalline_atoms", list(data.get("crystalline_atoms", [])))
-    state._set_struct("meso_clusters", list(data.get("meso_clusters", [])))
-    state._set_struct("macro_continents", list(data.get("macro_continents", [])))
+    state.set_struct("centrality", dict(data.get("centrality", {})))
+    state.set_struct("impossible_neighborhoods", [set(n) for n in data.get("impossible_neighborhoods", [])])
+    state.set_struct("restructuring_queue", {tuple(r) for r in data.get("restructuring_queue", [])})
+    state.set_struct("anchors", {tuple(a) for a in data.get("anchors", []) if len(a) == 2})
+    state.set_struct("crystalline_atoms", list(data.get("crystalline_atoms", [])))
+    state.set_struct("meso_clusters", list(data.get("meso_clusters", [])))
+    state.set_struct("macro_continents", list(data.get("macro_continents", [])))
 
 
 # ─── Merge / Reconciliation ─────────────────────────────────────────────
 
 
-def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5) -> None:  # noqa: C901, PLR0912
+def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5) -> None:
     """Merge remote topology state into local (Phase 32 / 60)."""
     from app.core_types import FieldConflictRegion
     from app.topology_state_types import parse_topology_key
@@ -172,23 +172,23 @@ def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5)
     remote_tombstones = set(other_data.get("tombstones", []))
 
     # Phase 60: Causal Reconciliation Heuristic
-    state._tombstones.update(remote_tombstones)
+    state.tombstones.update(remote_tombstones)
 
-    state._topology_epoch = max(state._topology_epoch, remote_epoch)
+    state.topology_epoch = max(state.topology_epoch, remote_epoch)
 
-    if remote_epoch >= state._topology_epoch:
-        regs = state._get_regions()
+    if remote_epoch >= state.topology_epoch:
+        regs = state.get_regions()
         new_regs = [r for r in regs if r.region_id not in remote_tombstones]
         if len(new_regs) < len(regs):
-            state._set_regions(new_regs)
-            state._structural_change = True
+            state.set_regions(new_regs)
+            state.structural_change = True
 
     remote_regions = other_data.get("regions", [])
-    local_ids = {r.region_id: r for r in state._get_regions()}
+    local_ids = {r.region_id: r for r in state.get_regions()}
 
     for r_data in remote_regions:
         rid = r_data.get("region_id")
-        if rid in state._tombstones:
+        if rid in state.tombstones:
             continue
 
         if rid in local_ids:
@@ -231,7 +231,7 @@ def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5)
         if len(a) == 2:
             state.record_anchor(tuple(a))
 
-    state._record("merge", {"remote_regions": len(remote_regions)})
+    state.record("merge", {"remote_regions": len(remote_regions)})
 
 
 # ─── Clearing ───────────────────────────────────────────────────────────
@@ -281,4 +281,4 @@ def clear_topology_regions(state: "TopologyState") -> None:
         state._staging["regions"].clear()
     else:
         state._regions.clear()
-    state._record("clear_regions", {})
+    state.record("clear_regions", {})

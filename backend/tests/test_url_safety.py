@@ -306,7 +306,7 @@ def test_validate_redirect_to_private_ranges(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_fetch_redirect_to_private_ip(monkeypatch) -> None:
     class MockResponse:
-        def __init__(self, url, status_code, headers, is_redirect=False) -> None:  # noqa: FBT002
+        def __init__(self, url, status_code, headers, is_redirect=False) -> None:
             self.url = httpx.URL(url)
             self.status_code = status_code
             self.headers = headers
@@ -337,7 +337,7 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch) -> None:
     """Redirect to 169.254.169.254 (cloud metadata) is caught."""
 
     class MockResponse:
-        def __init__(self, url, status_code, headers, is_redirect=False) -> None:  # noqa: FBT002
+        def __init__(self, url, status_code, headers, is_redirect=False) -> None:
             self.url = httpx.URL(url)
             self.status_code = status_code
             self.headers = headers

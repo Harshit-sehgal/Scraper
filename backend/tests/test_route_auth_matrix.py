@@ -115,7 +115,7 @@ OPERATOR_AUTH = make_headers(api_key="test_operator_key")
 ADMIN_AUTH = make_headers(api_key="test_admin_key")
 
 
-def expected_status(method: str, path: str, auth_level: str, min_role: str) -> int:  # noqa: PLR0911
+def expected_status(method: str, path: str, auth_level: str, min_role: str) -> int:
     """Determine the expected HTTP status for a request.
 
     Rules:
@@ -205,7 +205,7 @@ def client(monkeypatch):
         mp.undo()
         for f in ["/tmp/test_auth_state.json", "/tmp/test_auth_semantic.json"]:
             with contextlib.suppress(OSError):
-                os.remove(f)  # noqa: PTH107
+                os.remove(f)
         for m in modules_to_pop:
             sys.modules.pop(m, None)
             if old_modules[m] is not None:

@@ -226,7 +226,7 @@ class RoleEmbeddingEngine:
         role: str,
         token_type: SemanticType,
         _token_raw: str,
-        success: bool,  # noqa: FBT001
+        success: bool,
         delta: float = 0.05,
         coherence: float = 1.0,
     ) -> None:
@@ -351,7 +351,7 @@ class RoleEmbeddingEngine:
 
         self.detect_dimensionality_need()
 
-    def _relax_roles(self, roles: list[str], manifold_full: dict, base_rate: float) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _relax_roles(self, roles: list[str], manifold_full: dict, base_rate: float) -> None:
         """Internal helper for localized relaxation of a subset of roles."""
         # 1. Filter out anchored roles
         roles = [r for r in roles if not self.ws.is_role_anchored(r)]
@@ -443,7 +443,7 @@ class RoleEmbeddingEngine:
                         force = diff * strength * 0.1 * base_rate
                         role_vec[k] = max(0.0, min(1.0, role_vec[k] + force))
 
-    def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool) -> None:  # noqa: FBT001
+    def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool) -> None:
         key = assignment_a + assignment_b
         self.ws.increment_co_occurrence(key, 1 if success else -1)
 

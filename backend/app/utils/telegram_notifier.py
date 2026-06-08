@@ -187,7 +187,7 @@ class TelegramNotifier:
         text = f"❌ <b>Test Failure</b>\n\nTest: <code>{test_name}</code>\n\nError:\n<pre><code>{error}</code></pre>"
         self._fire_and_forget(text)
 
-    def notify_test_end(  # noqa: PLR0913
+    def notify_test_end(
         self,
         suite_name: str,
         result: str,

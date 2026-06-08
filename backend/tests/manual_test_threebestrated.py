@@ -77,7 +77,7 @@ async def scrape_threebest() -> None:
                 seen.add(b["company_name"])
                 unique_designers.append(b)
 
-        with open(  # noqa: PTH123
+        with open(
             "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv",
             "w",
             newline="",

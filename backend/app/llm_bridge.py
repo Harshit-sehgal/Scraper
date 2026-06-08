@@ -72,7 +72,7 @@ def _should_retry_http_error(error: Exception) -> bool:
     return any(token in text for token in ["429", "timed out", "connection", "temporary"])
 
 
-async def _call_openai_compatible_json(  # noqa: C901, PLR0913
+async def _call_openai_compatible_json(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
@@ -120,7 +120,7 @@ async def _call_openai_compatible_json(  # noqa: C901, PLR0913
     return None
 
 
-async def _call_openai_compatible_text(  # noqa: C901, PLR0913
+async def _call_openai_compatible_text(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
@@ -194,7 +194,7 @@ def _public_llm_fallbacks_enabled() -> bool:
     return bool(settings.LLM_ENABLE_PUBLIC_FALLBACKS)
 
 
-async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):  # noqa: C901, PLR0912
+async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     try:
         from app.metrics_collector import record_llm_call
 
@@ -276,7 +276,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
     return {}
 
 
-async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):  # noqa: C901
+async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     try:
         from app.metrics_collector import record_llm_call
@@ -334,7 +334,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     return {}
 
 
-async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:  # noqa: C901
+async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
     try:
         from app.metrics_collector import record_llm_call
 

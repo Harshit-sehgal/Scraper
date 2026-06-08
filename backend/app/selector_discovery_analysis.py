@@ -21,6 +21,34 @@ from app.page_profiler import detect_page_structure, detect_value_patterns
 if TYPE_CHECKING:
     from app.models import SchemaField
 
+# ─── Constants ────────────────────────────────────────────────────────
+# Magic-value thresholds extracted for PLR2004 compliance
+MIN_DATA_TEXT_LENGTH: int = 20
+"""Minimum text length to consider an element as containing meaningful data."""
+MIN_REPEATING_COUNT: int = 3
+"""Minimum number of repetitions to infer a structural pattern."""
+MIN_SIBLING_COUNT: int = 2
+"""Minimum number of same-class siblings to consider as repeating structure."""
+MIN_PAGE_MATCHES: int = 2
+"""Minimum CSS selector matches on the page to infer a pattern."""
+MIN_DATA_SIGNALS: int = 2
+"""Minimum data signals (price, date) to identify data-containing containers."""
+MIN_SHORT_TEXT_LENGTH: int = 15
+"""Threshold for considering text 'short' in noise scoring."""
+MAX_EMPTY_RATIO: float = 0.3
+"""Maximum allowed ratio of empty/short elements in a container candidate."""
+UI_NOISE_THRESHOLD: float = 0.6
+"""Score above which a container candidate is considered UI chrome vs data."""
+MIN_AVG_TEXT_LENGTH: float = 50.0
+"""Minimum average text length to consider a container as data-rich."""
+MIN_CHILDREN_COUNT: int = 2
+"""Minimum child elements needed for fallback parent-child discovery."""
+MAX_UNIQUE_TAGS: int = 3
+"""Maximum allowed unique child-tag types before structure is too varied."""
+MIN_NON_EMPTY: int = 2
+"""Minimum non-empty children needed for fallback discovery."""
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -207,7 +235,7 @@ async def discover_selectors(
     return selectors or {}
 
 
-def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) -> dict | None:  # noqa: C901, PLR0912, PLR0915
+def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) -> dict | None:
     """Discover container and field selectors by analyzing repeating DOM patterns.
 
     Falls back to structural DOM analysis when the LLM cannot produce CSS selectors.
@@ -223,7 +251,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
     import re as _re
 
     element_classes: list[tuple[Any, str, str]] = []
-    for el in body.find_all(True):  # noqa: FBT003
+    for el in body.find_all(True):
         classes = el.get("class")
         if not classes:
             continue
@@ -231,12 +259,12 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
         if not css:
             continue
         text = el.get_text(separator=" ", strip=True)
-        if len(text) < 20:
+        if len(text) < MIN_DATA_TEXT_LENGTH:
             continue
         element_classes.append((el, css, text))
 
     css_counts = Counter(css for _, css, _ in element_classes)
-    repeating_css = {css for css, count in css_counts.items() if count >= 3}
+    repeating_css = {css for css, count in css_counts.items() if count >= MIN_REPEATING_COUNT}
 
     candidates: list[dict] = []
     for el, css, text in element_classes:
@@ -247,7 +275,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
             continue
         siblings = [
             c
-            for c in parent.find_all(True, recursive=False)  # noqa: FBT003
+            for c in parent.find_all(True, recursive=False)
             if c.name
             not in (
                 "script",
@@ -265,14 +293,14 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
             )
         ]
         same_class_count = sum(1 for c in siblings if " ".join(c.get("class", [])) == " ".join(el.get("class", [])))
-        if same_class_count < 2:
+        if same_class_count < MIN_SIBLING_COUNT:
             continue
         parent_css = _build_css_for_element(parent)
         if not parent_css:
             continue
-        if len(parent.find_all(True)) > 0:  # noqa: FBT003
+        if len(parent.find_all(True)) > 0:
             parent_page_matches = len(soup.select(parent_css))
-            if parent_page_matches < 2:
+            if parent_page_matches < MIN_PAGE_MATCHES:
                 continue
         data_signal_count = sum(
             1
@@ -280,7 +308,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
             for t in [c.get_text(separator=" ", strip=True)]
             if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
         )
-        if data_signal_count < 2:
+        if data_signal_count < MIN_DATA_SIGNALS:
             continue
         candidates.append(
             {
@@ -334,7 +362,7 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
     n = len(texts)
     link_ratio = sum(1 for el in elements if el.name == "a") / max(n, 1)
     form_ratio = sum(1 for el in elements if el.name in ("input", "select", "button", "textarea")) / max(n, 1)
-    short_text_ratio = sum(1 for t in texts if len(t) < 15) / max(n, 1)
+    short_text_ratio = sum(1 for t in texts if len(t) < MIN_SHORT_TEXT_LENGTH) / max(n, 1)
     price_or_date_ratio = sum(1 for t in texts if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)) / max(n, 1)
     low_diversity = 1.0 if len({t[:20] for t in texts}) < max(n * 0.3, 2) else 0.0
     near_chrome = 0
@@ -359,7 +387,7 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
     return min(max(score, 0.0), 1.0)
 
 
-def _discover_direct_repeating_elements(soup) -> list[dict]:  # noqa: C901
+def _discover_direct_repeating_elements(soup) -> list[dict]:
     """Find elements that repeat with the same class across the page.
 
     When multiple elements share the same class and have meaningful data,
@@ -370,7 +398,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:  # noqa: C901
     candidates: list[dict] = []
     class_el_map: dict[str, list] = {}
 
-    for el in soup.find_all(True):  # noqa: FBT003
+    for el in soup.find_all(True):
         if el.name in (
             "script",
             "style",
@@ -399,26 +427,26 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:  # noqa: C901
         class_el_map[css].append(el)
 
     for css, elements in class_el_map.items():
-        if len(elements) < 3:
+        if len(elements) < MIN_REPEATING_COUNT:
             continue
         texts = [el.get_text(separator=" ", strip=True) for el in elements]
-        non_empty = [t for t in texts if len(t) > 20]
-        if len(non_empty) < 3:
+        non_empty = [t for t in texts if len(t) > MIN_DATA_TEXT_LENGTH]
+        if len(non_empty) < MIN_REPEATING_COUNT:
             continue
         empty_ratio = (len(texts) - len(non_empty)) / max(len(texts), 1)
-        if empty_ratio > 0.3:
+        if empty_ratio > MAX_EMPTY_RATIO:
             continue
         avg_text_len = sum(len(t) for t in texts) / max(len(texts), 1)
         data_signals = sum(1 for t in non_empty if _re.search(r"[\$£€¥₹]\s*\d+", t))
         date_signals = sum(1 for t in non_empty if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t))
         text_diversity = len({t[:40] for t in non_empty})
         ui_noise_score = _compute_ui_noise_score(elements, non_empty)
-        if ui_noise_score > 0.6:
+        if ui_noise_score > UI_NOISE_THRESHOLD:
             continue
-        if data_signals + date_signals < 2:
+        if data_signals + date_signals < MIN_DATA_SIGNALS:
             continue
         score = len(elements) * 0.5 + data_signals * 2 + date_signals * 2 + avg_text_len * 0.05 + text_diversity * 2
-        if avg_text_len < 50:
+        if avg_text_len < MIN_AVG_TEXT_LENGTH:
             continue
         candidates.append(
             {
@@ -441,10 +469,10 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
         return candidates
     import re as _re
 
-    for parent in body.find_all(True):  # noqa: FBT003
+    for parent in body.find_all(True):
         children = [
             c
-            for c in parent.find_all(True, recursive=False)  # noqa: FBT003
+            for c in parent.find_all(True, recursive=False)
             if c.name
             not in (
                 "script",
@@ -462,11 +490,11 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
                 "footer",
             )
         ]
-        if len(children) < 2:
+        if len(children) < MIN_CHILDREN_COUNT:
             continue
 
         child_tags = [c.name for c in children]
-        if len(set(child_tags)) > 3:
+        if len(set(child_tags)) > MAX_UNIQUE_TAGS:
             continue
 
         child_classes = [" ".join(c.get("class", [])) for c in children]
@@ -474,14 +502,14 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
             continue
 
         child_texts = [c.get_text(separator=" ", strip=True) for c in children]
-        non_empty = [t for t in child_texts if len(t) > 20]
-        if len(non_empty) < 2:
+        non_empty = [t for t in child_texts if len(t) > MIN_DATA_TEXT_LENGTH]
+        if len(non_empty) < MIN_NON_EMPTY:
             continue
 
         data_signals = sum(
             1 for t in non_empty if _re.search(r"[\$£€¥₹]\s*\d", t) or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
         )
-        if data_signals < 2:
+        if data_signals < MIN_DATA_SIGNALS:
             continue
         diversity = len({t[:30] for t in non_empty})
         score = len(children) + (data_signals * 2) + diversity
@@ -572,7 +600,7 @@ def _infer_field_selectors_from_container(container_sel: str, html: str, schema_
             field_map[fname] = ""
             continue
 
-        elements = first_item.find_all(True)  # noqa: FBT003
+        elements = first_item.find_all(True)
         for el in elements:
             txt = el.get_text(separator=" ", strip=True)
             if not txt:

@@ -35,7 +35,7 @@ def get_canonical_cache_path() -> str:
 
 def _acquire_lock():
     path = _get_lock_path()
-    if os.path.dirname(path):  # noqa: PTH120
+    if os.path.dirname(path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
     try:
@@ -61,7 +61,7 @@ def load_semantic_state() -> None:
 
     lock_fd = _acquire_lock()
     try:
-        with open(path) as f:  # noqa: PTH123
+        with open(path) as f:
             full_state = json.load(f)
         import app.semantic_world_state
 
@@ -92,7 +92,7 @@ def save_semantic_state() -> None:
         with os.fdopen(fd, "w") as f:
             fd = None  # ownership transferred to fdopen context manager
             json.dump(full_state, f, indent=2)
-        os.replace(tmp_path, path)  # noqa: PTH105
+        os.replace(tmp_path, path)
         tmp_path = None  # ownership transferred via rename
         logger.info("Saved unified semantic state to %s", path)
     except Exception:
@@ -100,14 +100,14 @@ def save_semantic_state() -> None:
         with contextlib.suppress(OSError):
             if fd is not None:
                 os.close(fd)
-        if tmp_path is not None and os.path.exists(tmp_path):  # noqa: PTH110
+        if tmp_path is not None and os.path.exists(tmp_path):
             with contextlib.suppress(OSError):
-                os.unlink(tmp_path)  # noqa: PTH108
+                os.unlink(tmp_path)
     finally:
         _release_lock(lock_fd)
 
 
-def clear_semantic_state(clear_file: bool = True) -> None:  # noqa: FBT001, FBT002
+def clear_semantic_state(clear_file: bool = True) -> None:
     """Reset all learned semantic state."""
     if clear_file:
         path = get_canonical_cache_path()

@@ -32,7 +32,7 @@ GRID_COLUMNS = 24  # Grafana uses a 24-column grid
 @pytest.fixture(scope="module")
 def dashboard() -> dict:
     """Load and parse the Grafana dashboard JSON once per module."""
-    with open(DASHBOARD_PATH, encoding="utf-8") as f:  # noqa: PTH123
+    with open(DASHBOARD_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 

@@ -436,7 +436,7 @@ class RecoveryExecutor:
         """
         self.action_handlers[action] = handler
 
-    async def execute(  # noqa: C901
+    async def execute(
         self,
         plan: RecoveryPlan,
         context: dict[str, Any],

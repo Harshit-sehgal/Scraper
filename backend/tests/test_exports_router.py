@@ -24,7 +24,7 @@ def _make_job(
     name: str = "test-job",
     results: list[dict[str, Any]] | None = None,
     schema_fields: list[SchemaField] | None = None,
-    results_on_disk: bool = False,  # noqa: FBT001, FBT002
+    results_on_disk: bool = False,
 ) -> Job:
     return Job(
         id=job_id,
