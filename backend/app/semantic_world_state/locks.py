@@ -2,6 +2,8 @@
 import threading
 from typing import Any
 
+_LOCK_ACQUIRE_FAILED = "Failed to acquire NonBlockingRLock within timeout"
+
 
 class NonBlockingRLock:
     """An async-friendly reentrant lock wrapper.
@@ -32,8 +34,10 @@ class NonBlockingRLock:
     def release(self) -> None:
         self._lock.release()
 
-    def __enter__(self) -> bool:
-        return self.acquire()
+    def __enter__(self) -> "NonBlockingRLock":
+        if not self.acquire():
+            raise RuntimeError(_LOCK_ACQUIRE_FAILED)
+        return self
 
     def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         self.release()

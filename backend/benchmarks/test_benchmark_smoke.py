@@ -509,21 +509,22 @@ async def run_all_tests():
 
 def print_report(results: list[SiteResult]) -> None:
     """Print a detailed markdown report of all test results."""
-    len(results)
+    total = len(results)
     with_records = sum(1 for r in results if r.records > 0)
-    sum(r.records for r in results)
+    total_records = sum(r.records for r in results)
 
     # Summary Table
+    print(f"\n## Summary — {total} sites, {total_records} records, {with_records} with data\n")
 
     for _i, r in enumerate(results, 1):
         if r.error:
-            f"{chr(0x26A0)} {r.error[:40]}"
+            print(f"  {chr(0x26A0)} {r.error[:40]}")
         elif not r.records:
-            f"{chr(0x25CB)} zero records"
+            print(f"  {chr(0x25CB)} zero records")
         elif r.warnings:
-            "; ".join(r.warnings[:2])
+            print(f"  {'; '.join(r.warnings[:2])}")
         else:
-            chr(0x2713)
+            print(f"  {chr(0x2713)}")
 
         fields_str = ", ".join(r.fields_found[:4])
         if len(r.fields_found) > 4:
@@ -532,10 +533,10 @@ def print_report(results: list[SiteResult]) -> None:
     # Detailed per-site results
 
     for _i, r in enumerate(results, 1):
-        ", ".join(r.fields_found) if r.fields_found else "*none*"
+        _fields_display = ", ".join(r.fields_found) if r.fields_found else "*none*"
 
         if r.sample:
-            {k: v for k, v in r.sample.items() if not k.startswith("_")}
+            _sample_display = {k: v for k, v in r.sample.items() if not k.startswith("_")}
 
         if r.warnings:
             for _w in r.warnings:
@@ -549,20 +550,21 @@ def print_report(results: list[SiteResult]) -> None:
     # 1. No false success for 0 records
     zero_but_success = [r for r in results if r.records == 0 and r.extraction_method not in ("", "unknown") and not r.error]
     zero_ok = len(zero_but_success) == 0
-    chr(0x2705) if zero_ok else chr(0x26A0)
+    print(f"\n  {chr(0x2705) if zero_ok else chr(0x26A0)} Zero-record classification")
 
     # 2. Visible text captured when rendered
     pipeline_working = with_records >= 5
-    chr(0x2705) if pipeline_working else chr(0x274C)
+    print(f"  {chr(0x2705) if pipeline_working else chr(0x274C)} Pipeline throughput ({with_records} sites)")
 
     # 3. No domain-specific hardcoded logic (verified in prior audit)
 
     # 4. Zero-result properly classified when applicable
     zero_with_class = [r for r in results if r.records == 0 and r.warnings]
-    chr(0x2705) if zero_with_class else chr(0x25CB) + " (no zero results to classify)"
+    print(f"  {chr(0x2705) if zero_with_class else chr(0x25CB)} (no zero results to classify)")
 
     # Overall verdict
-    chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
+    verdict = chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
+    print(f"\n  {verdict}")
 
 
 def save_report(results: list[SiteResult], path: str = "smoke_test_report.json") -> None:

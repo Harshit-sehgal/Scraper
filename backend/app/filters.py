@@ -258,6 +258,24 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
 # ──────────────────────────────────────────────
 
 
+def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 2.0) -> bool:
+    """Execute a compiled regex search with a timeout to prevent ReDoS."""
+    import signal
+
+    def _alarm_handler(signum, frame):  # noqa: ARG001
+        raise TimeoutError
+
+    old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(int(timeout))
+    try:
+        return bool(compiled.search(text))
+    except TimeoutError:
+        return False
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+
 async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, RUF100
     """Check if a single record passes a filter rule.
     Returns True if the record should be KEPT.
@@ -299,13 +317,13 @@ async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[Schem
             if rule.operator == FilterOperator.LESS_EQUAL:
                 return num_val <= num_compare
 
-        # Regex matching — validate pattern before executing to prevent ReDoS
+        # Regex matching — validate pattern and add timeout to prevent ReDoS
         if rule.operator == FilterOperator.MATCHES_REGEX:
             try:
                 compiled = re.compile(compare_value, re.IGNORECASE)
             except re.error:
                 return False
-            return bool(compiled.search(str(value)))
+            return _safe_regex_search(compiled, str(value))
 
         # String comparisons
         str_val = str(value).lower()

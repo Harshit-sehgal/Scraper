@@ -149,6 +149,7 @@ async def _try_profile_extraction(
     function falls through (returns ``None`` for the result).
     """
     matched_profile = None
+    profile_results = None
     if skip_profiles:
         logger.info("[Recovery] force_llm_discovery set — skipping profile-based extraction")
         matched_profile = None
@@ -562,7 +563,7 @@ async def scrape_url(
 
     # ── Step 2: Try profile-based extraction ──────────────────────
     skip_profiles = bool(attempt_ctx and attempt_ctx.force_llm_discovery)
-    profile_result, matched_profile, profile_fetch_method = await _try_profile_extraction(
+    profile_result, _matched_profile, _profile_fetch_method = await _try_profile_extraction(
         url,
         schema_fields,
         min_record_score,
@@ -609,7 +610,7 @@ async def scrape_url(
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
     except Exception as e:
-        fetch_ms = (time.time() - start_time) * 1000
+        fetch_ms = (time.time() - fetch_start) * 1000
         strategy_engine.record_fetch_attempt(
             intel.domain, recommended_strategy, success=False, time_ms=fetch_ms, failure_reason=type(e).__name__
         )
@@ -762,7 +763,7 @@ async def scrape_url(
             final_url=url,
             fetch_method=fetch_method,
             telemetry=telemetry,
-            extraction_method=ext_result.method if "ext_result" in locals() else None,
+            extraction_method=ext_result.method,
             zero_result_classification=zero_classification,
             anti_bot_score=anti_bot,
             recommended_next_action=recommended_next_action,
@@ -777,7 +778,7 @@ async def scrape_url(
         final_url=url,
         fetch_method=fetch_method,
         telemetry=telemetry,
-        extraction_method=ext_result.method if "ext_result" in locals() else None,
+        extraction_method=ext_result.method,
         zero_result_classification=zero_classification,
         anti_bot_score=anti_bot,
         data_evidence_score=data_evidence_score,

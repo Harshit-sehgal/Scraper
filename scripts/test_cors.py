@@ -65,7 +65,7 @@ def main():
         ("content-security-policy", None, "Content Security Policy"),
     ]
 
-    for h_name, expected, desc in security_headers:
+    for h_name, _expected, desc in security_headers:
         val = headers.get(h_name)
         if val:
             print(f"  - Header: {h_name:25} Value: {val[:45]}... [OK] ({desc})")

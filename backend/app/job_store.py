@@ -1011,6 +1011,7 @@ def get_storage_health() -> dict:
     - expected_version: latest schema version
     - error: error message if any check fails
     """
+    conn = None
     try:
         conn = _get_connection()
         conn.row_factory = sqlite3.Row
@@ -1033,57 +1034,51 @@ def get_storage_health() -> dict:
                 companion_ok = False
                 companion_missing = companion
                 break
-        conn.close()
+    finally:
+        if conn:
+            conn.close()
 
-        if schema_version == 0:
-            return {
-                "ok": False,
-                "error": "Schema version table is empty or missing",
-                "schema_version": 0,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
-            }
-        if schema_version < _CURRENT_SCHEMA_VERSION:
-            return {
-                "ok": False,
-                "error": f"Schema version {schema_version} is older than expected {_CURRENT_SCHEMA_VERSION}",
-                "schema_version": schema_version,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
-            }
-        if not jobs_ok:
-            return {
-                "ok": False,
-                "error": "jobs table is missing",
-                "schema_version": schema_version,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
-            }
-        if not recycle_ok:
-            return {
-                "ok": False,
-                "error": "recycle_bin table is missing",
-                "schema_version": schema_version,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
-            }
-        if not companion_ok:
-            return {
-                "ok": False,
-                "error": f"{companion_missing} table is missing",
-                "schema_version": schema_version,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
-            }
-
-        return {  # noqa: TRY300
-            "ok": True,
-            "schema_version": schema_version,
-            "expected_version": _CURRENT_SCHEMA_VERSION,
-        }
-    except Exception as e:
-        logger.exception("Storage health check failed")
+    if schema_version == 0:
         return {
             "ok": False,
-            "error": str(e),
+            "error": "Schema version table is empty or missing",
             "schema_version": 0,
             "expected_version": _CURRENT_SCHEMA_VERSION,
         }
+    if schema_version < _CURRENT_SCHEMA_VERSION:
+        return {
+            "ok": False,
+            "error": f"Schema version {schema_version} is older than expected {_CURRENT_SCHEMA_VERSION}",
+            "schema_version": schema_version,
+            "expected_version": _CURRENT_SCHEMA_VERSION,
+        }
+    if not jobs_ok:
+        return {
+            "ok": False,
+            "error": "jobs table is missing",
+            "schema_version": schema_version,
+            "expected_version": _CURRENT_SCHEMA_VERSION,
+        }
+    if not recycle_ok:
+        return {
+            "ok": False,
+            "error": "recycle_bin table is missing",
+            "schema_version": schema_version,
+            "expected_version": _CURRENT_SCHEMA_VERSION,
+        }
+    if not companion_ok:
+        return {
+            "ok": False,
+            "error": f"{companion_missing} table is missing",
+            "schema_version": schema_version,
+            "expected_version": _CURRENT_SCHEMA_VERSION,
+        }
+
+    return {
+        "ok": True,
+        "schema_version": schema_version,
+        "expected_version": _CURRENT_SCHEMA_VERSION,
+    }
 
 
 def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:
@@ -1134,6 +1129,7 @@ def get_storage_status() -> dict:
         wal_mode: Whether WAL journaling is active
 
     """
+    conn = None
     try:
         conn = _get_connection()
         conn.row_factory = sqlite3.Row
@@ -1142,7 +1138,6 @@ def get_storage_status() -> dict:
         job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
         recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
         wal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
-        conn.close()
         db_path = _get_db_path()
         return {
             "backend": "sqlite",
@@ -1163,6 +1158,9 @@ def get_storage_status() -> dict:
             "recycle_bin_count": -1,
             "wal_mode": "unknown",
         }
+    finally:
+        if conn:
+            conn.close()
 
 
 # ─── Worker heartbeat ───────────────────────────────────────────────────

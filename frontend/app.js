@@ -101,6 +101,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ── API Key Modal: Enter saves, Escape cancels ──
+  const apikeyForm = document.getElementById("apikey-form");
+  if (apikeyForm) {
+    apikeyForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      saveKeyFromModal();
+    });
+  }
   const apikeyInput = document.getElementById("apikey-input");
   if (apikeyInput) {
     apikeyInput.addEventListener("keydown", (e) => {
@@ -171,7 +178,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     ? String(uiState.view)
     : "jobs";
   switchView(initialView);
-  refreshJobs();
 
   // ── Polling intervals ──
   const refreshInterval =
@@ -227,19 +233,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       case "remove-filter":
         btn.closest(".filter-row")?.remove();
         break;
-      case "toggle-field": {
-        const index = btn.getAttribute("data-index");
-        if (index !== null) {
-          const items = document.querySelectorAll(".analyze-field-item");
-          const checkboxes = document.querySelectorAll(".analyze-field-checkbox");
-          const idx = parseInt(index, 10);
-          if (!isNaN(idx) && checkboxes[idx]) {
-            checkboxes[idx].checked = !checkboxes[idx].checked;
-            if (items[idx]) items[idx].classList.toggle("selected", checkboxes[idx].checked);
-          }
-        }
-        break;
-      }
       case "toast-info": {
         const msg = btn.getAttribute("data-message");
         if (msg) toast(msg, "info");

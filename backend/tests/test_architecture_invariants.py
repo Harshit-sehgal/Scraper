@@ -266,12 +266,20 @@ def test_no_dead_imports() -> None:
 
         # Check imports that don't appear in used names
         exceptions = {"Dict", "List", "Tuple", "Set", "Callable", "Optional", "Any"}
+        dead_imports = []
         for name, src_module in imports.items():
-            if name not in used and name not in exceptions and hasattr(__import__(src_module), name):
-                # Verify the symbol actually exists in the source module
-                pass  # This is a heuristic, not a hard error
+            if name not in used and name not in exceptions:
+                dead_imports.append(name)
 
-    # If we got here, no dead imports found at the heuristic level
+        # Dead imports in core modules are tracked but not yet enforced as hard errors
+        # because some are re-exported for backward compatibility.
+        # If this list grows, investigate and remove genuinely unused imports.
+        if dead_imports:
+            # Log but don't fail — this is a heuristic guard
+            import warnings
+
+            warnings.warn(f"{mod_name}: potentially unused imports: {dead_imports}", stacklevel=1)
+
     # Verify at least some imports were checked (no-empty heuristic guard)
     assert isinstance(imports, dict), "imports should be a dict"
 

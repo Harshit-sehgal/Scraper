@@ -79,15 +79,23 @@ jobs:
           python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level warning &>/tmp/server-e2e.log &
           SERVER_PID=$!
 
-          # Wait for the server to be ready
+          # Wait for the server to be ready (max 15s)
+          READY=false
           for i in $(seq 1 15); do
             CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/ 2>/dev/null || echo "000")
             if [ "$CODE" != "000" ]; then
               echo "Server ready (HTTP $CODE)"
+              READY=true
               break
             fi
             sleep 1
           done
+          if [ "$READY" = false ]; then
+            echo "Server failed to start within 15s"
+            cat /tmp/server-e2e.log 2>/dev/null || true
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
 
           # Run the frontend Playwright smoke tests
           npx playwright test --config frontend/playwright.config.mjs --reporter=list 2>&1

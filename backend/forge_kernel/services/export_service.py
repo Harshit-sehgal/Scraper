@@ -28,6 +28,14 @@ except ImportError:  # pragma: no cover - optional dependency
 class ExportService:
     """Service for generating export artifacts from job results."""
 
+    _DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+    def _safe_cell(self, value: Any) -> Any:
+        """Neutralize formula-injection prefixes in cell values."""
+        if isinstance(value, str) and value.startswith(self._DANGEROUS_PREFIXES):
+            return "'" + value
+        return value
+
     def to_csv(self, records: list[dict[str, Any]], field_names: list[str] | None = None) -> str:
         """Convert records to CSV string."""
         if not records:
@@ -40,7 +48,7 @@ class ExportService:
         writer = csv.DictWriter(output, fieldnames=field_names, extrasaction="ignore")
         writer.writeheader()
         for rec in records:
-            writer.writerow(rec)
+            writer.writerow({k: self._safe_cell(v) for k, v in rec.items()})
         return output.getvalue()
 
     def to_json(self, records: list[dict[str, Any]]) -> str:
@@ -51,11 +59,8 @@ class ExportService:
         """Convert records to XLSX bytes. Returns None if openpyxl is not installed."""
         if not HAS_OPENPYXL or openpyxl is None:
             return None
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        if ws is None:
-            wb.create_sheet()
-            ws = wb.active
+        wb = openpyxl.Workbook(write_only=True)
+        ws = wb.create_sheet(title="Data")
 
         if not records:
             output = io.BytesIO()
@@ -65,13 +70,9 @@ class ExportService:
         if not field_names:
             field_names = list(records[0].keys())
 
-        # Header row
-        if ws is not None:
-            ws.append(field_names)
-
-            # Data rows
-            for rec in records:
-                ws.append([rec.get(f, "") for f in field_names])
+        ws.append(field_names)
+        for rec in records:
+            ws.append([self._safe_cell(rec.get(f, "")) for f in field_names])
 
         output = io.BytesIO()
         wb.save(output)

@@ -92,7 +92,7 @@
             <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:1.5rem; min-width:320px; max-width:90vw; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
                 <h3 style="margin:0 0 0.5rem; font-size:0.95rem; color:#f1f5f9;">API Key Required</h3>
                 <p style="margin:0 0 1rem; font-size:0.8rem; color:#94a3b8;">Enter your DataForge API key (session only, held in memory).</p>
-                <input type="password" id="dash-apikey-input" value="${(current || "").replace(/"/g, "&quot;")}" autocomplete="off" spellcheck="false"
+                <input type="password" id="dash-apikey-input" value="${escapeHtml(current || "")}" autocomplete="off" spellcheck="false"
                     style="width:100%; padding:0.5rem; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#e2e8f0; font-family:monospace; font-size:0.85rem; box-sizing:border-box;" />
                 <div id="dash-apikey-error" style="color:#f87171; font-size:0.75rem; margin-top:0.4rem; display:none;"></div>
                 <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
@@ -201,6 +201,8 @@
     if (driftChart) driftChart.destroy();
     if (communityChart) communityChart.destroy();
 
+    if (!energyCtx || !driftCtx || !communityCtx) return;
+
     energyChart = new Chart(energyCtx, {
       type: "line",
       data: {
@@ -271,35 +273,38 @@
     const scrubber = document.getElementById("timeline-scrubber");
     const liveBtn = document.getElementById("live-mode-btn");
 
-    scrubber.oninput = (e) => {
-      isLiveMode = false;
-      liveBtn.classList.remove("bg-green-500/10", "text-green-500", "border-green-500");
-      liveBtn.classList.add("bg-gray-800", "text-gray-500", "border-gray-700");
-      liveBtn.innerText = "REPLAY";
+    if (scrubber) {
+      scrubber.oninput = (e) => {
+        isLiveMode = false;
+        if (liveBtn) {
+          liveBtn.classList.remove("bg-green-500/10", "text-green-500", "border-green-500");
+          liveBtn.classList.add("bg-gray-800", "text-gray-500", "border-gray-700");
+          liveBtn.innerText = "REPLAY";
+        }
 
-      currentReplayIdx = parseInt(e.target.value, 10);
-      if (topologyHistory[currentReplayIdx]) {
-        const topology = topologyHistory[currentReplayIdx].topology || {};
-        // Use the same field names as the live render path so a snapshot
-        // captured during live mode can be replayed without field
-        // name mismatches (regions vs field_regions, etc.).
-        renderTopology(
-          topology.field_regions || [],
-          topology.global_communities || [],
-          [], // Hide edges in replay for now
-          topology.meso_clusters || [],
-          topology.macro_continents || [],
-        );
-      }
-    };
+        currentReplayIdx = parseInt(e.target.value, 10);
+        if (topologyHistory[currentReplayIdx]) {
+          const topology = topologyHistory[currentReplayIdx].topology || {};
+          renderTopology(
+            topology.field_regions || [],
+            topology.global_communities || [],
+            [],
+            topology.meso_clusters || [],
+            topology.macro_continents || [],
+          );
+        }
+      };
+    }
 
-    liveBtn.onclick = () => {
-      isLiveMode = true;
-      liveBtn.className =
-        "px-2 py-0.5 border border-green-500 text-[8px] rounded text-green-500 font-bold bg-green-500/10";
-      liveBtn.innerText = "LIVE";
-      updateLoop(); // Trigger immediate update
-    };
+    if (liveBtn) {
+      liveBtn.onclick = () => {
+        isLiveMode = true;
+        liveBtn.className =
+          "px-2 py-0.5 border border-green-500 text-[8px] rounded text-green-500 font-bold bg-green-500/10";
+        liveBtn.innerText = "LIVE";
+        updateLoop();
+      };
+    }
   }
 
   let _updating = false;
@@ -559,6 +564,7 @@
 
   function _renderTopologyInternal(regions, communities, edges, mesoClusters, macroContinents) {
     const svg = document.getElementById("field-svg");
+    if (!svg) return;
     if (!regions || regions.length === 0) {
       const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
       text.setAttribute("x", "50%");

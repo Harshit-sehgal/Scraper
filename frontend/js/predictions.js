@@ -50,7 +50,7 @@ export function renderPredictions(data) {
             <div class="dash-prediction">
                 <div class="dash-prediction-header">
                     <span class="dash-prediction-domain">${esc(p.domain)}</span>
-                    <span class="dash-prediction-risk" style="color:${color}; background:${color}18;">
+                    <span class="dash-prediction-risk" style="color:${color}; background:color-mix(in srgb, ${color} 12%, transparent);">
                         ${esc(String(p.risk_level || "").toUpperCase())}
                     </span>
                 </div>

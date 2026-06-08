@@ -79,6 +79,48 @@ async def create_job(
     return _job_detail(created)
 
 
+# ─── Recycle bin (must come before /{job_id} to avoid route shadowing) ──
+
+
+@router.get("/recycle/list")
+async def list_recycle(
+    service: Annotated[JobService, Depends(_get_service)],
+    _: Annotated[str, Depends(require_viewer)],
+):
+    """List recycled jobs."""
+    jobs = service.list_recycle()
+    return {
+        "jobs": [_job_summary(j) for j in sorted(jobs, key=lambda x: x.created_at, reverse=True)],
+        "total": len(jobs),
+    }
+
+
+@router.post("/recycle/{job_id}/restore")
+async def restore_job(
+    job_id: str,
+    service: Annotated[JobService, Depends(_get_service)],
+    _: Annotated[str, Depends(require_operator)],
+):
+    """Restore a job from the recycle bin."""
+    job = service.restore(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found in recycle bin")
+    return _job_detail(job)
+
+
+@router.delete("/recycle/{job_id}")
+async def hard_delete_job(
+    job_id: str,
+    service: Annotated[JobService, Depends(_get_service)],
+    _: Annotated[str, Depends(require_operator)],
+):
+    """Permanently delete a job from the recycle bin."""
+    success = service.hard_delete(job_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"status": "permanently_deleted", "id": job_id}
+
+
 @router.get("/{job_id}")
 async def get_job(
     job_id: str,
@@ -129,48 +171,6 @@ async def delete_job(
     if not success:
         raise HTTPException(status_code=404, detail="Job not found")
     return {"status": "deleted", "id": job_id}
-
-
-# ─── Recycle bin ────────────────────────────────────────────────────────
-
-
-@router.get("/recycle/list")
-async def list_recycle(
-    service: Annotated[JobService, Depends(_get_service)],
-    _: Annotated[str, Depends(require_viewer)],
-):
-    """List recycled jobs."""
-    jobs = service.list_recycle()
-    return {
-        "jobs": [_job_summary(j) for j in sorted(jobs, key=lambda x: x.created_at, reverse=True)],
-        "total": len(jobs),
-    }
-
-
-@router.post("/recycle/{job_id}/restore")
-async def restore_job(
-    job_id: str,
-    service: Annotated[JobService, Depends(_get_service)],
-    _: Annotated[str, Depends(require_operator)],
-):
-    """Restore a job from the recycle bin."""
-    job = service.restore(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found in recycle bin")
-    return _job_detail(job)
-
-
-@router.delete("/recycle/{job_id}")
-async def hard_delete_job(
-    job_id: str,
-    service: Annotated[JobService, Depends(_get_service)],
-    _: Annotated[str, Depends(require_operator)],
-):
-    """Permanently delete a job from the recycle bin."""
-    success = service.hard_delete(job_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return {"status": "permanently_deleted", "id": job_id}
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────

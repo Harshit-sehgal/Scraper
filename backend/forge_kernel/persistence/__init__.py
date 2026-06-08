@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
@@ -50,6 +51,7 @@ class JobRepository(ABC):
 
 # Lazy import of repository resolver to avoid circular imports
 _repository_instance: JobRepository | None = None
+_repo_lock = threading.Lock()
 
 
 def get_job_repository() -> JobRepository:
@@ -58,28 +60,32 @@ def get_job_repository() -> JobRepository:
     if _repository_instance is not None:
         return _repository_instance
 
-    from forge_kernel.config import settings
-
-    backend = settings.storage.STORAGE_BACKEND
-    if backend == "postgres":
-        database_url = settings.storage.DATABASE_URL
-        if not database_url:
-            msg = "Postgres backend requires DATAFORGE_DATABASE_URL"
-            raise RuntimeError(msg)
-        try:
-            from forge_kernel.persistence.postgres import PostgresJobRepository
-
-            _repository_instance = PostgresJobRepository()
-        except Exception as e:
-            msg = f"Failed to create PostgresJobRepository: {e}"
-            raise RuntimeError(msg) from e
-        else:
+    with _repo_lock:
+        if _repository_instance is not None:
             return _repository_instance
 
-    from forge_kernel.persistence.sqlite import SQLiteJobRepository
+        from forge_kernel.config import settings
 
-    _repository_instance = SQLiteJobRepository()
-    return _repository_instance
+        backend = settings.storage.STORAGE_BACKEND
+        if backend == "postgres":
+            database_url = settings.storage.DATABASE_URL
+            if not database_url:
+                msg = "Postgres backend requires DATAFORGE_DATABASE_URL"
+                raise RuntimeError(msg)
+            try:
+                from forge_kernel.persistence.postgres import PostgresJobRepository
+
+                _repository_instance = PostgresJobRepository()
+            except Exception as e:
+                msg = f"Failed to create PostgresJobRepository: {e}"
+                raise RuntimeError(msg) from e
+            else:
+                return _repository_instance
+
+        from forge_kernel.persistence.sqlite import SQLiteJobRepository
+
+        _repository_instance = SQLiteJobRepository()
+        return _repository_instance
 
 
 def reset_repository() -> None:
