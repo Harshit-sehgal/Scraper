@@ -26,10 +26,15 @@
     if (el) el.className = val;
   }
 
-  // ─── API key management (shared with main dashboard) ───────────────────
+  // ─── Session-based auth (G2) + fallback API key management ────────────
+  // On page load we check for an existing session cookie. If present, all
+  // requests authenticate via the cookie (no JS key storage needed).
+  // If not, we fall back to the legacy in-memory API key pattern.
   // SECURITY: API key is held in memory only — never in sessionStorage /
   // localStorage. Page reload clears the key; the user re-enters it.
   let _dashboardApiKey = "";
+  let _dashboardSessionChecked = false;
+  let _dashboardSessionOk = false;
 
   function getDashboardApiKey() {
     return _dashboardApiKey;
@@ -43,14 +48,50 @@
     _dashboardApiKey = "";
   }
 
+  async function checkDashboardSession() {
+    if (_dashboardSessionChecked) return _dashboardSessionOk;
+    _dashboardSessionChecked = true;
+    try {
+      const res = await fetch("/api/session/me", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        _dashboardSessionOk = data.authenticated === true;
+      }
+    } catch {
+      // Network error — fall through to legacy key prompt
+    }
+    return _dashboardSessionOk;
+  }
+
+  async function dashboardLoginSession(apiKey) {
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "X-API-Key": apiKey },
+        credentials: "include",
+      });
+      if (res.ok) {
+        _dashboardSessionOk = true;
+        _dashboardApiKey = ""; // clear JS copy — cookie handles auth now
+        return true;
+      }
+    } catch {
+      // Network error
+    }
+    return false;
+  }
+
   let dashboardApiLast403 = 0;
 
   async function dashboardApiFetch(url, options = {}) {
     const headers = { ...(options.headers || {}) };
-    const key = getDashboardApiKey();
-    if (key && url.includes("/api/")) headers["X-API-Key"] = key;
+    // For session-authenticated clients, cookie is sent automatically.
+    if (!_dashboardSessionOk) {
+      const key = getDashboardApiKey();
+      if (key && url.includes("/api/")) headers["X-API-Key"] = key;
+    }
     try {
-      let res = await fetch(url, { ...options, headers });
+      let res = await fetch(url, { ...options, headers, credentials: "include" });
       // Auto-prompt on 403: API key may be missing or invalid
       if (res.status === 403) {
         const now = Date.now();
@@ -58,10 +99,16 @@
           dashboardApiLast403 = now;
           const newKey = await promptForApiKey();
           if (newKey !== null) {
-            setDashboardApiKey(newKey);
-            // Retry with the new key
-            const retryHeaders = { ...(options.headers || {}), "X-API-Key": newKey };
-            res = await fetch(url, { ...options, headers: retryHeaders });
+            // Try session login first (G2), fall back to legacy key
+            const sessionOk = await dashboardLoginSession(newKey);
+            if (sessionOk) {
+              // Retry with cookie (no extra headers needed)
+              res = await fetch(url, { ...options, credentials: "include" });
+            } else {
+              setDashboardApiKey(newKey);
+              const retryHeaders = { ...(options.headers || {}), "X-API-Key": newKey };
+              res = await fetch(url, { ...options, headers: retryHeaders });
+            }
           }
         }
       }
@@ -264,6 +311,8 @@
 
   // Initialize Dashboard
   async function init() {
+    // G2: Try session auth first — if cookie exists, no key prompt needed.
+    await checkDashboardSession();
     initCharts();
     setupControls();
     updateLoop(); // start the loop (self-rescheduling with backoff)

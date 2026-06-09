@@ -20,17 +20,31 @@ export const API = (() => {
   return "http://127.0.0.1:8000";
 })();
 
-// ─── API Key Management ────────────────────────────────────────────────────
+// ─── Session-based Auth ──────────────────────────────────────────────────
+// G2: Browser clients now authenticate via an HTTP-only session cookie.
+// On app load we try GET /api/session/me — if the cookie is valid the
+// app authenticates silently. If not, the user enters an API key which
+// is exchanged for a session cookie via POST /api/session (the raw key
+// is never stored in JS memory beyond the exchange call).
+//
+// The session cookie is HTTP-only, SameSite=strict, and (in production)
+// Secure.  It is automatically sent by the browser on every fetch() to
+// the same origin, so we no longer need to attach X-API-Key headers.
+//
+// Direct API key auth via X-API-Key header is still supported for
+// non-browser clients (curl, scripts, integrations).
+
+let _sessionChecked = false;
+let _isSessionAuthenticated = false;
+let _sessionRole = "";
+
+// ─── Legacy API Key Management (kept for backward compat and
+//      non-browser / programmatic usage) ───────────────────────────────
 // SECURITY: The API key is held ONLY in JavaScript memory for the lifetime
 // of the current page. It is NEVER persisted to sessionStorage, localStorage,
 // or any other durable browser storage. A page reload will require the user
 // to re-enter the key. This protects the key from any same-origin XSS that
-// succeeds in exfiltrating storage but is not running in this page's context.
-//
-// Future hardening: replace this with a backend-issued, HTTP-only,
-// Secure, SameSite=strict session cookie minted by /api/session after
-// validating X-API-Key. That removes the need for browser-side key
-// storage entirely.
+// succeeds in exfilitrating storage but is not running in this page's context.
 let _apiKey = "";
 
 function getApiKey() {
@@ -55,6 +69,73 @@ export function getAdminKey() {
 
 export function setAdminKey(key) {
   _adminKey = (key || "").trim();
+}
+
+// ─── Session Check (called on app init) ───
+
+export async function checkSession() {
+  if (_sessionChecked) return _isSessionAuthenticated;
+  _sessionChecked = true;
+  try {
+    const res = await fetch(`${API}/api/session/me`, { credentials: "include" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.authenticated) {
+        _isSessionAuthenticated = true;
+        _sessionRole = data.role || "";
+        return true;
+      }
+    }
+  } catch {
+    // Network error — ignore, will fall through to key prompt
+  }
+  return false;
+}
+
+export function isSessionAuthenticated() {
+  return _isSessionAuthenticated;
+}
+
+export function getSessionRole() {
+  return _sessionRole;
+}
+
+// ─── Session Login (exchange API key for cookie) ───
+
+export async function loginWithApiKey(apiKey) {
+  try {
+    const res = await fetch(`${API}/api/session`, {
+      method: "POST",
+      headers: { "X-API-Key": apiKey },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      _isSessionAuthenticated = true;
+      _sessionRole = data.role || "";
+      // The cookie is now set — clear the JS-memory key
+      _apiKey = "";
+      return true;
+    }
+  } catch {
+    // Network error
+  }
+  return false;
+}
+
+// ─── Session Logout ───
+
+export async function logoutSession() {
+  try {
+    await fetch(`${API}/api/session`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+  } catch {
+    // Ignore network errors during logout
+  }
+  _isSessionAuthenticated = false;
+  _sessionRole = "";
 }
 
 // ─── Modal Key Management ───
@@ -116,14 +197,28 @@ function saveKeyFromModal() {
     setAdminKey(key);
     toast("Admin key set for this session", "success");
   } else {
-    setApiKey(key);
-    toast("API key set", "success");
-    import("./jobs.js")
-      .then((m) => {
-        m.refreshSystemStatus();
-        m.refreshJobs();
-      })
-      .catch((e) => console.warn("Failed to refresh after API key set:", e));
+    // G2: Exchange API key for session cookie
+    loginWithApiKey(key).then((ok) => {
+      if (ok) {
+        toast("Authenticated via session", "success");
+        import("./jobs.js")
+          .then((m) => {
+            m.refreshSystemStatus();
+            m.refreshJobs();
+          })
+          .catch((e) => console.warn("Failed to refresh after auth:", e));
+      } else {
+        // Fall back to legacy in-memory API key storage
+        setApiKey(key);
+        toast("API key set (legacy mode)", "success");
+        import("./jobs.js")
+          .then((m) => {
+            m.refreshSystemStatus();
+            m.refreshJobs();
+          })
+          .catch((e) => console.warn("Failed to refresh after API key set:", e));
+      }
+    });
   }
 
   closeKeyModal();
@@ -151,17 +246,22 @@ let lastApi403 = 0;
 export async function apiFetch(url, options = {}) {
   const { admin, ...rest } = options;
   const headers = { ...(rest.headers || {}) };
-  const key = getApiKey();
-  if (key && (url.startsWith(API + "/api/") || url.startsWith("/api/"))) {
-    headers["X-API-Key"] = key;
-  }
+  // For session-authenticated clients, the cookie is sent automatically.
+  // Only attach X-API-Key for non-session (legacy) mode, or for admin ops
+  // that need X-Admin-Key.
   if (admin) {
     const adminKey = getAdminKey();
     if (adminKey) {
       headers["X-Admin-Key"] = adminKey;
     }
+  } else if (!_isSessionAuthenticated) {
+    // Legacy mode: attach API key if we have one
+    const key = getApiKey();
+    if (key && (url.startsWith(API + "/api/") || url.startsWith("/api/"))) {
+      headers["X-API-Key"] = key;
+    }
   }
-  const res = await fetch(url, { ...rest, headers });
+  const res = await fetch(url, { ...rest, headers, credentials: "include" });
   if (res.status === 403 && !admin) {
     const now = Date.now();
     if (now - lastApi403 > 15000 && !isKeyModalVisible()) {

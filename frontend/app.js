@@ -52,10 +52,14 @@ import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
 import { refreshRecycleBin, restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
 import { cancelJob, deleteJob, clearTerminalJobs } from "./js/jobs.js";
 import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel } from "./js/results.js";
-import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, isKeyModalVisible } from "./js/api.js";
+import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, isKeyModalVisible, checkSession } from "./js/api.js";
 import { setMode } from "./js/views.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  // G2: Try session auth first — if the browser already has a valid
+  // session cookie, no API key prompt is needed.
+  await checkSession();
+
   const uiState = readUIState();
 
   // Restore search/status filters

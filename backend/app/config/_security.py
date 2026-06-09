@@ -34,6 +34,12 @@ class SecuritySettings(BaseSettings):
     CSP_REPORT_ONLY: bool = True
     """Attach a report-only Content-Security-Policy header to every response."""
 
+    # ─── Session Auth ───────────────────────────────────────────────────
+    SESSION_SECRET: str = ""
+    """Secret key for signing session cookies. Must be unique per deployment."""
+    SESSION_MAX_AGE: int = 86400
+    """Session cookie max age in seconds (default 24h)."""
+
     # ─── Metrics ───────────────────────────────────────────────────────
     METRICS_ENABLE_HISTOGRAMS: bool = True
     """Enable request duration and operation latency histograms in /metrics output."""
