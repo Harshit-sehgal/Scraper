@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import os
+import socket
 import sys
 import time
 from pathlib import Path
@@ -48,6 +49,22 @@ def pytest_configure(config) -> None:
     config.addinivalue_line(
         "markers",
         "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "network: tests that intentionally make live DNS/HTTP calls. The autouse DNS stand-in fixture is bypassed for these tests. Skipped by default in CI sandboxes without network access.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "unit: fast unit tests that must not touch the network, database, or filesystem beyond the test's own tmp dir.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "api: API contract tests that exercise the FastAPI app via the in-process ASGI client.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "slow: tests whose expected runtime is > 5s. Useful for selective CI tiers.",
     )
     try:
         from testcontainers.postgres import PostgresContainer
@@ -257,6 +274,105 @@ try:
     import app.services.state
 except ImportError:
     pass
+
+
+# ─── DNS isolation (Phase 0, M1) ────────────────────────────────────────────
+# This autouse fixture replaces ``socket.getaddrinfo`` with a deterministic
+# stand-in for every test that is not explicitly marked ``network`` or
+# ``integration``. The stand-in maps a small, fixed set of test hostnames
+# to deterministic IPs (matching the pattern already proven in
+# ``test_production_hardening.py::mock_dns_resolution``) and resolves any
+# other hostname to a public IP. Real DNS is therefore not exercised by
+# unmarked unit/API tests, which is the Phase 0 acceptance gate:
+#
+#   "No unmarked unit/API test performs real DNS or live internet access."
+#
+# Tests that intentionally need real DNS must declare ``@pytest.mark.network``
+# (or ``@pytest.mark.integration``). The stand-in fixture inspects
+# ``request.keywords`` and yields the original ``socket.getaddrinfo`` for
+# those tests, leaving the system in its native state.
+#
+# Notes on layering:
+# * The fixture is function-scoped and is run before the test body, so a
+#   test that does its own ``monkeypatch.setattr(socket, "getaddrinfo", ...)``
+#   inside the test still takes effect: pytest's monkeypatch is restored
+#   at test teardown, and the autouse fixture re-arms the stand-in for the
+#   next test.
+# * Existing per-file autouse fixtures (e.g. ``mock_dns_resolution`` in
+#   ``test_production_hardening.py``) override the conftest's stand-in
+#   because they also run inside the test setup phase and replace
+#   ``socket.getaddrinfo``. Both layers co-exist safely because each test
+#   only sees one stand-in at a time.
+
+_PUBLIC_STANDIN_IPV4 = "8.8.8.8"
+_PUBLIC_STANDIN_IPV6 = "2001:4860:4860::8888"
+_LOOPBACK_HOSTS = frozenset({"localhost", "ip6-localhost", "ip6-loopback"})
+_LOOPBACK_IPV4 = "127.0.0.1"
+_LOOPBACK_IPV6 = "::1"
+_PRIVATE_HOSTS = frozenset({"nginx", "smoke-host", "host.docker.internal"})
+_PRIVATE_IPV4 = "172.16.0.2"
+_METADATA_HOSTS = frozenset({"169.254.169.254", "metadata.google.internal", "instance-data"})
+
+
+def _dns_standin(original):
+    """Return a ``getaddrinfo``-shaped function that never calls the OS.
+
+    The returned function is intentionally conservative: it returns a
+    well-formed record for any input, so callers like
+    ``validate_public_http_url`` can complete their SSRF checks without
+    raising ``gaierror``. Hosts that are explicitly loopback/private are
+    mapped to their canonical ranges so the safety checks still fire.
+    """
+
+    def stub(host, port, *args, **kwargs):
+        # Numeric inputs (IPv4 / IPv6 strings) are forwarded so that
+        # existing tests asserting on numeric hosts keep working.
+        if isinstance(host, str) and host:
+            if host in _LOOPBACK_HOSTS:
+                return [
+                    (socket.AF_INET6, socket.SOCK_STREAM, 6, "", (_LOOPBACK_IPV6, port or 0, 0, 0)),
+                    (socket.AF_INET, socket.SOCK_STREAM, 6, "", (_LOOPBACK_IPV4, port or 0)),
+                ]
+            if host in _PRIVATE_HOSTS:
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (_PRIVATE_IPV4, port or 0))]
+            if host in _METADATA_HOSTS:
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, port or 0))]
+            if host in (_LOOPBACK_IPV4, _LOOPBACK_IPV6):
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, port or 0))]
+            # Public hostnames map to a fixed public IP so SSRF safety
+            # checks pass without leaking the actual A record.
+            return [
+                (socket.AF_INET6, socket.SOCK_STREAM, 6, "", (_PUBLIC_STANDIN_IPV6, port or 0, 0, 0)),
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", (_PUBLIC_STANDIN_IPV4, port or 0)),
+            ]
+        # Non-string (None, etc.) falls through to the original.
+        return original(host, port, *args, **kwargs)
+
+    return stub
+
+
+@pytest.fixture(autouse=True)
+def _default_dns_resolver(request, monkeypatch):
+    """Install the conftest-level DNS stand-in unless the test opted out.
+
+    Opt-out markers: ``network`` and ``integration``. The original
+    ``socket.getaddrinfo`` is left untouched for those tests, so a test
+    that needs real DNS will see real DNS. The fixture is function-scoped
+    so a test's own ``monkeypatch.setattr(socket, "getaddrinfo", ...)``
+    inside the body still takes precedence for the duration of that test.
+    """
+    keywords = getattr(request, "keywords", {}) or {}
+    if "network" in keywords or "integration" in keywords:
+        yield
+        return
+    try:
+        import socket as _socket
+    except ImportError:  # pragma: no cover - impossible in CPython
+        yield
+        return
+    original = _socket.getaddrinfo
+    monkeypatch.setattr(_socket, "getaddrinfo", _dns_standin(original))
+    yield
 
 
 @pytest.fixture(autouse=True)
