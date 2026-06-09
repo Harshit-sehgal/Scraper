@@ -59,19 +59,26 @@ def _dependency_roles(route: Any) -> list[str]:
 
 
 def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str, str]:
+    from app.config import settings as _cfg
+
+    is_prod = _cfg.ENV.lower() == "production"
+
     if path == "/metrics":
-        return (
-            "metrics-token-if-configured",
-            "settings.METRICS_TOKEN check in endpoint",
-            "Public if DATAFORGE_METRICS_TOKEN is empty; should be private in production.",
-        )
+        has_token = bool(_cfg.METRICS_TOKEN)
+        if is_prod and has_token:
+            notes = "Protected by DATAFORGE_METRICS_TOKEN in production."
+        elif is_prod and not has_token:
+            notes = "WARNING: public in production! Set DATAFORGE_METRICS_TOKEN."
+        else:
+            notes = "Metrics token check active in production only."
+        return ("metrics-token-if-configured", "settings.METRICS_TOKEN check in endpoint", notes)
 
     if path in {"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"}:
-        return (
-            "development-docs",
-            "FastAPI docs route plus production settings/proxy",
-            "Must be disabled or blocked in production.",
-        )
+        if is_prod:
+            notes = "DANGER: should be disabled or blocked via reverse proxy in production."
+        else:
+            notes = "Development-only route; must be disabled in production."
+        return ("development-docs", "FastAPI docs route plus production settings/proxy", notes)
 
     if roles == ["admin"]:
         notes = ""

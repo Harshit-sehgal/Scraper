@@ -2582,3 +2582,11 @@ kbd {
   border-color: #a16207;
   color: #fde047;
 }
+
+/* ─── Experimental feature gating ─── */
+[data-experimental="true"] {
+  display: none !important;
+}
+[data-experimental="true"].visible {
+  display: revert !important;
+}

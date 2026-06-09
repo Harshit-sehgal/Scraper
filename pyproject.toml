@@ -7,6 +7,10 @@ authors = [
 ]
 license = { text = "MIT" }
 requires-python = ">=3.12"
+# ─── Dependencies ──────────────────────────────────────────────────────────
+# MUST be kept in sync with backend/requirements.in.
+# Run: pip-compile --generate-hashes --output-file=requirements.lock.txt requirements.in
+# =============================================================================
 dependencies = [
     "fastapi>=0.110.0,<1.0.0",
     "uvicorn[standard]>=0.27.0,<1.0.0",
@@ -19,6 +23,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0,<5.0.0",
     "lxml>=5.0.0,<7.0.0",
     "duckduckgo_search>=5.0.0,<9.0.0",
+    "ddgs>=9.0.0,<10.0.0",
     "pandas>=2.0.0,<4.0.0",
     "openpyxl>=3.1.0,<4.0.0",
     "numpy>=1.24.0,<3.0.0",
@@ -32,15 +37,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# ─── Dev dependencies ────────────────────────────────────────────────────
+# MUST be kept in sync with backend/requirements-dev.in.
+# Run: pip-compile --generate-hashes --output-file=requirements-dev.lock.txt \
+#                  --extra=dev requirements.in
 dev = [
     "pytest>=8.0.0,<10.0.0",
     "pytest-asyncio>=0.23.0,<2.0.0",
     "testcontainers[postgres]>=4.0.0,<5.0.0",
     "pytest-cov>=5.0.0,<8.0.0",
     "pytest-timeout>=2.3.0",
+    "pytest-xdist>=3.0.0,<4.0.0",
+    "pytest-rerunfailures>=15.0.0,<20.0.0",
+    "psycopg2-binary>=2.9.0,<3.0.0",
     "PyYAML>=6.0.0,<7.0.0",
     "ruff~=0.15.0",
-    "mypy>=1.0.0"
+    "mypy>=1.0.0",
+    "pyflakes>=3.2.0",
+    "bandit>=1.7.0",
+    "pip-audit>=2.7.0",
+    "pip-tools>=7.4.0"
 ]
 
 [tool.ruff]

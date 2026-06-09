@@ -311,6 +311,120 @@ def _node_tooling() -> CheckResult:
     )
 
 
+def _ruff_available() -> CheckResult:
+    """Check that ruff is installed and importable."""
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "ruff", "--version"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        ok = proc.returncode == 0
+        detail = proc.stdout.strip().splitlines()[0] if ok else f"exit={proc.returncode}"
+    except FileNotFoundError:
+        ok = False
+        detail = "ruff not found"
+    except subprocess.TimeoutExpired:
+        ok = False
+        detail = "timeout"
+    return CheckResult(
+        name="ruff",
+        required=True,
+        ok=ok,
+        detail=detail,
+        hint="Install ruff: pip install ruff",
+    )
+
+
+def _mypy_available() -> CheckResult:
+    """Check that mypy is installed and importable."""
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "mypy", "--version"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        ok = proc.returncode == 0
+        detail = proc.stdout.strip().splitlines()[0] if ok else f"exit={proc.returncode}"
+    except FileNotFoundError:
+        ok = False
+        detail = "mypy not found"
+    except subprocess.TimeoutExpired:
+        ok = False
+        detail = "timeout"
+    return CheckResult(
+        name="mypy",
+        required=True,
+        ok=ok,
+        detail=detail,
+        hint="Install mypy: pip install mypy",
+    )
+
+
+def _bandit_available() -> CheckResult:
+    """Check that bandit is installed and importable."""
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "bandit", "--version"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        ok = proc.returncode == 0
+        detail = proc.stdout.strip().splitlines()[0] if ok else f"exit={proc.returncode}"
+    except FileNotFoundError:
+        ok = False
+        detail = "bandit not found"
+    except subprocess.TimeoutExpired:
+        ok = False
+        detail = "timeout"
+    return CheckResult(
+        name="bandit",
+        required=True,
+        ok=ok,
+        detail=detail,
+        hint="Install bandit: pip install bandit",
+    )
+
+
+def _frontend_syntax() -> CheckResult:
+    """Check that the frontend syntax validation script runs without error."""
+    script = REPO_ROOT / "scripts" / "frontend_syntax_check.py"
+    if not script.exists():
+        return CheckResult(
+            name="frontend_syntax",
+            required=True,
+            ok=False,
+            detail="scripts/frontend_syntax_check.py missing",
+            hint="Restore the frontend syntax check script.",
+        )
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        ok = proc.returncode == 0
+        detail = (proc.stdout.strip().splitlines() or [""])[-1] if ok else f"exit={proc.returncode}"
+    except subprocess.TimeoutExpired:
+        ok = False
+        detail = "timeout after 30s"
+    return CheckResult(
+        name="frontend_syntax",
+        required=True,
+        ok=ok,
+        detail=detail,
+        hint="Run python scripts/frontend_syntax_check.py for full output.",
+    )
+
+
 CHECKS = [
     _python_version,
     _pyproject_present,
@@ -321,6 +435,10 @@ CHECKS = [
     lambda: _binary("make", required=False, hint="`make` is the recommended task runner."),
     _env_example_present,
     _node_tooling,
+    _ruff_available,
+    _mypy_available,
+    _bandit_available,
+    _frontend_syntax,
     _playwright_browsers,
     _global_pytest_timeout,
     _dns_standin_is_wired,

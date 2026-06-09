@@ -44,5 +44,8 @@ bandit>=1.7.0
 # ─── Dependency & SBOM tools ───────────────────────────────────────────────
 pip-audit>=2.7.0
 
+# ─── YAML / Config (used by scripts and testing) ────────────────────────────
+PyYAML>=6.0.0,<7.0.0
+
 # ─── Lock tooling ──────────────────────────────────────────────────────────
 pip-tools>=7.4.0

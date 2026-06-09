@@ -151,6 +151,44 @@ prod-down: ## Stop production stack
 prod-logs: ## Tail production logs
 	$(DCF) logs -f
 
+# ─── Docker Smoke ─────────────────────────────────────────────────────────
+
+docker-smoke: ## Verify production image builds and /ready responds
+	@echo "=== Docker Smoke Test ==="
+	@echo "Building production image..."
+	docker build --target production -t dataforge:smoke-test .
+	@echo "Build complete."
+	@echo "Starting smoke container..."
+	@docker rm -f dataforge-smoke 2>/dev/null || true
+	docker run -d --name dataforge-smoke \
+		-e DATAFORGE_ENV=production \
+		-e DATAFORGE_STORAGE_BACKEND=sqlite \
+		-e DATAFORGE_SMOKE_TEST_MODE=true \
+		-e DATAFORGE_ALLOWED_INTERNAL_HOSTS=localhost,127.0.0.1 \
+		-p 8001:8000 \
+		dataforge:smoke-test
+	@echo ""
+	@echo "Waiting for /ready endpoint..."
+	@sleep 5
+	@for i in 1 2 3 4 5; do \
+		status=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/ready 2>/dev/null || echo "000"); \
+		if [ "$$status" = "200" ]; then \
+			echo "SMOKE PASS: /ready returned 200"; \
+			docker rm -f dataforge-smoke > /dev/null 2>&1; \
+			docker image rm dataforge:smoke-test > /dev/null 2>&1 || true; \
+			exit 0; \
+		fi; \
+		echo "Waiting... (attempt $$i, status=$$status)"; \
+		sleep 3; \
+	done; \
+	echo "SMOKE FAIL: /ready did not return 200 within timeout"; \
+	docker logs dataforge-smoke --tail 20 2>/dev/null || true; \
+	docker rm -f dataforge-smoke > /dev/null 2>&1; \
+	docker image rm dataforge:smoke-test > /dev/null 2>&1 || true; \
+	exit 1
+
+.PHONY: docker-smoke
+
 # ─── Cleanup ────────────────────────────────────────────────────────────────
 
 clean: ## Remove containers, volumes, and dangling images
