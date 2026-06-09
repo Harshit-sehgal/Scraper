@@ -37,7 +37,7 @@ Acceptance gate:
 | # | Item | Status | Evidence | Commit |
 |---|------|--------|----------|--------|
 | 0.1 | `make doctor` + `scripts/doctor.py` (Python, tools, env, browser) | ✅ | 3 doctor tests pass, all required checks pass | `f4d3a12` |
-| 0.2 | Global pytest-timeout in `pyproject.toml` (per-test + per-file) | pending | — | — |
+| 0.2 | Global pytest-timeout in `pyproject.toml` (per-test + per-file) | ✅ | `--timeout=30` in addopts; 4 characterization tests pass | this commit |
 | 0.3 | Missing test markers added (`unit`, `api`, `network`, `slow`) | ✅ | Markers registered in `pyproject.toml` + `conftest.py` | this commit |
 | 0.4 | `conftest.py` autouse: block live DNS in unmarked tests (M1) | ✅ | 3 dns_isolation tests pass, 20 url_safety tests pass in 0.14s (was hanging) | this commit |
 | 0.5 | Refactor `app/url_safety.py` to accept injected DNS resolver | pending | — | — |

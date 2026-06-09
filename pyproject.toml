@@ -122,7 +122,10 @@ plugins = ["pydantic.mypy"]
 testpaths = ["backend/tests", "backend/benchmarks"]
 python_files = ["test_*.py"]
 asyncio_default_fixture_loop_scope = "module"
-addopts = "-q"
+# Global per-test timeout. Hangs in unit/API tests will fail fast instead
+# of stalling CI. Tests that legitimately need longer must declare
+# ``@pytest.mark.timeout(N)`` (overrides this default) or be marked ``slow``.
+addopts = "-q --timeout=30"
 markers = [
     "integration: marks tests as integration/optional (live API calls). Skipped by default.",
     "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
