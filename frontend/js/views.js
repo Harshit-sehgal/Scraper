@@ -26,6 +26,10 @@ export function setCurrentMode(mode) {
 // ─── View / Tab Switching ───
 
 export function switchView(name) {
+  // H2: Programmatic guard — redirect cognition to jobs when experimental is off
+  if (name === "cognition" && window.DATAFORGE_EXPERIMENTAL !== true) {
+    name = "jobs";
+  }
   currentView = name;
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((t) => {
@@ -87,6 +91,10 @@ export function onGlobalKeydown(e) {
 
   // Number keys 1-5: switch between tabs (only when not typing)
   if (!typing && e.key >= "1" && e.key <= "5") {
+    // H2: Guard keyboard shortcut for cognition tab
+    if (e.key === "4" && window.DATAFORGE_EXPERIMENTAL !== true) {
+      return;
+    }
     e.preventDefault();
     const viewName = TAB_KEYS[e.key];
     if (viewName) {

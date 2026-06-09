@@ -181,12 +181,12 @@ def create_app() -> FastAPI:
     _openapi_url = None if settings.ENV.lower() == "production" else "/openapi.json"
 
     app_instance = FastAPI(
-        title="DataForge — General-Purpose Web Scraper",
+        title="DataForge — Structured Data Extraction API",
         description=(
             "Web extraction backend for supported accessible pages. "
             "Supports manual, discovery, and AI-assisted extraction modes "
-            "with optional browser rendering, anti-bot detection, and "
-            "content-quality scoring. See `docs/API.md` for the full "
+            "with optional browser rendering, content-quality scoring, and "
+            "responsible rate-limiting. See `docs/API.md` for the full "
             "endpoint reference."
         ),
         version="0.1.0",

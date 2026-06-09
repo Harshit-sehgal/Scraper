@@ -346,7 +346,7 @@ async def fetch_page_content(
         hydration_wait_ms: Override the hydration wait / delay after load (ms).
         skip_networkidle: If True, use domcontentloaded instead of networkidle.
         scroll_attempts: Override the number of scroll attempts.
-        anti_bot_stealth: If True, enable extra stealth measures.
+        anti_bot_stealth: If True, enable extra fingerprint randomization.
         extra_headers: Extra HTTP headers to inject.
 
     Returns:

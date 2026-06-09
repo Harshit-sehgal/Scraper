@@ -32,7 +32,7 @@ DataForge Scraper is a configurable extraction platform, not an all-powerful scr
 
 ## Ethical And Legal Boundary
 
-Use this project only on websites where scraping is allowed or authorized. Respect robots.txt, terms of service, rate limits, access controls, and applicable law. Do not use it to scrape private, sensitive, or restricted data without permission. Anti-bot detection should support responsible failure handling, not abusive bypassing.
+Use this project only on websites where scraping is allowed or authorized. Respect robots.txt, terms of service, rate limits, access controls, and applicable law. Do not use it to scrape private, sensitive, or restricted data without permission. Anti-bot detection exists to identify blocked pages gracefully, not to circumvent website protections.
 
 ## Banned Claims
 

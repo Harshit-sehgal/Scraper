@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 
 
 class BrowserSettings(BaseSettings):
-    """Browser, Playwright, and stealth-evasion settings."""
+    """Browser, Playwright, and fingerprint-management settings."""
 
     # ─── Browser / Playwright ──────────────────────────────────────────
     PLAYWRIGHT_TIMEOUT: int = 45000
@@ -56,7 +56,7 @@ class BrowserSettings(BaseSettings):
     MAX_SCROLL_ATTEMPTS: int = 3
     """Maximum number of sequential scrolls for infinite-scroll pages."""
     PLAYWRIGHT_STEALTH: bool = True
-    """Enable basic stealth evasions for anti-bot resilience."""
+    """Enable basic fingerprint randomization for reducing bot detection risk."""
     DOM_STABILIZATION_INTERVAL: int = 200
     """Ms between DOM change checks."""
     DOM_STABILIZATION_MIN_STABLE_CHECKS: int = 5

@@ -26,6 +26,10 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 - `/` is a root status endpoint.
 - `/health` is a liveness endpoint.
 - `/ready` is a readiness endpoint; production responses should stay minimal.
+- `/api/system/csp-violations` is intentionally public. Browsers send CSP violation
+  reports via `POST` and cannot carry API keys or auth headers. This endpoint
+  is body-size-capped (5MB) and rate-limited but deliberately unauthenticated.
+  See `backend/app/middlewares.py` lines 136-137.
 
 Static dashboard mounts at `/app` and `/dashboard` are internal surfaces and should not be treated as public-product endpoints.
 
