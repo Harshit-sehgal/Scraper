@@ -27,10 +27,18 @@ Goal: make the repo safe for coding agents and humans.
 
 Acceptance gate:
 
-- [ ] `pytest backend/tests/test_api_regressions.py -vv -x` completes quickly
-- [ ] Full `pytest --collect-only` passes
-- [ ] No unmarked unit/API test performs real DNS or live internet access
-- [ ] Stable route docs match route inventory with experimental routes disabled
+- [x] `pytest backend/tests/test_api_regressions.py -vv -x` completes quickly
+- [x] Full `pytest --collect-only` passes
+- [x] No unmarked unit/API test performs real DNS or live internet access
+- [x] Stable route docs match route inventory with experimental routes disabled
+
+Evidence (2026-06-09):
+
+- `pytest --collect-only -q` → 3122 tests collected, exit 0.
+- `pytest backend/tests/test_api_regressions.py -vv` → 49 passed in 8.32s.
+- `pytest backend/tests/test_url_safety.py -v` → 20 passed in 0.14s (was hanging on real DNS).
+- `pytest backend/tests/test_dns_isolation.py -v` → 3 passed; conftest autouse DNS stand-in is wired up.
+- `make api-docs` → writes `docs/API_STABLE.md` (42 routes), `docs/API_EXPERIMENTAL.md` (77), `docs/API_EXPERIMENTAL_DIFF.md` (35).
 
 ### Phase 0 work items
 
@@ -41,7 +49,7 @@ Acceptance gate:
 | 0.3 | Missing test markers added (`unit`, `api`, `network`, `slow`) | ✅ | Markers registered in `pyproject.toml` + `conftest.py` | this commit |
 | 0.4 | `conftest.py` autouse: block live DNS in unmarked tests (M1) | ✅ | 3 dns_isolation tests pass, 20 url_safety tests pass in 0.14s (was hanging) | this commit |
 | 0.5 | Refactor `app/url_safety.py` to accept injected DNS resolver | pending | — | — |
-| 0.6 | `make doctor` validates the new invariants | pending | — | — |
+| 0.6 | `make doctor` validates the new invariants | ✅ | 8/8 required checks pass: pytest_timeout_default, dns_standin, route_inventory_split | this commit |
 | 0.7 | Stable vs experimental API doc split (C1) | ✅ | 5 split tests pass; 42 stable routes, 77 experimental, 35 in diff | this commit |
 | 0.8 | Generated current-status doc (replaces stale `CODE_REVIEW_BUGS.md`) (C3) | pending | — | — |
 

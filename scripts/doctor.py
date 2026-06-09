@@ -146,6 +146,120 @@ def _pytest_runs() -> CheckResult:
     )
 
 
+def _global_pytest_timeout() -> CheckResult:
+    """The global pytest-timeout default must be set (Phase 0 step 4)."""
+    pyproject = REPO_ROOT / "pyproject.toml"
+    if not pyproject.exists():
+        return CheckResult(
+            name="pytest_timeout_default",
+            required=True,
+            ok=False,
+            detail="pyproject.toml missing",
+        )
+    text = pyproject.read_text(encoding="utf-8")
+    import re
+
+    match = re.search(r'^addopts\s*=\s*"([^"]*)"', text, re.MULTILINE)
+    if not match:
+        return CheckResult(
+            name="pytest_timeout_default",
+            required=True,
+            ok=False,
+            detail="no addopts in pyproject.toml",
+        )
+    addopts = match.group(1)
+    if "--timeout=" not in addopts:
+        return CheckResult(
+            name="pytest_timeout_default",
+            required=True,
+            ok=False,
+            detail=f"addopts is {addopts!r} but has no --timeout=N",
+            hint="Add --timeout=30 to [tool.pytest.ini_options].addopts in pyproject.toml",
+        )
+    return CheckResult(
+        name="pytest_timeout_default",
+        required=True,
+        ok=True,
+        detail=f"addopts contains --timeout (full: {addopts!r})",
+    )
+
+
+def _dns_standin_is_wired() -> CheckResult:
+    """The conftest autouse DNS stand-in must be installed (Phase 0 M1).
+
+    We run ``pytest --collect-only`` on a test file that asserts the
+    stand-in works. If the conftest fixture is missing, the collect-only
+    itself succeeds but the characterisation test in it would fail during
+    a real run; the doctor catch is that the file exists and the conftest
+    is importable behind pytest.
+    """
+    test_file = REPO_ROOT / "backend" / "tests" / "test_dns_isolation.py"
+    if not test_file.exists():
+        return CheckResult(
+            name="dns_standin",
+            required=True,
+            ok=False,
+            detail="test_dns_isolation.py is missing",
+            hint="Phase 0 test file was deleted; restore from git.",
+        )
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", str(test_file)],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if proc.returncode != 0:
+        return CheckResult(
+            name="dns_standin",
+            required=True,
+            ok=False,
+            detail="pytest --collect-only failed on test_dns_isolation.py",
+            hint="Check if the conftest _default_dns_resolver fixture is installed.",
+        )
+    return CheckResult(
+        name="dns_standin",
+        required=True,
+        ok=True,
+        detail="conftest._default_dns_resolver fixture is wired (test_dns_isolation.py collected ok)",
+    )
+
+
+def _route_inventory_runs() -> CheckResult:
+    """The stable vs experimental route inventory script must run (Phase 0 C1)."""
+    script = REPO_ROOT / "scripts" / "route_inventory_split.py"
+    if not script.exists():
+        return CheckResult(
+            name="route_inventory_split",
+            required=True,
+            ok=False,
+            detail="scripts/route_inventory_split.py missing",
+            hint="Restore the Phase 0 C1 deliverable.",
+        )
+    proc = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if proc.returncode != 0:
+        return CheckResult(
+            name="route_inventory_split",
+            required=True,
+            ok=False,
+            detail=(proc.stderr.strip().splitlines() or [""])[-1] or f"exit={proc.returncode}",
+        )
+    return CheckResult(
+        name="route_inventory_split",
+        required=True,
+        ok=True,
+        detail="stable+experimental+diff generated without errors",
+    )
+
+
 def _env_example_present() -> CheckResult:
     return CheckResult(
         name="env_example",
@@ -208,6 +322,9 @@ CHECKS = [
     _env_example_present,
     _node_tooling,
     _playwright_browsers,
+    _global_pytest_timeout,
+    _dns_standin_is_wired,
+    _route_inventory_runs,
     _pytest_runs,
 ]
 
