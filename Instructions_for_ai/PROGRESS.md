@@ -42,7 +42,7 @@ Acceptance gate:
 | 0.4 | `conftest.py` autouse: block live DNS in unmarked tests (M1) | ✅ | 3 dns_isolation tests pass, 20 url_safety tests pass in 0.14s (was hanging) | this commit |
 | 0.5 | Refactor `app/url_safety.py` to accept injected DNS resolver | pending | — | — |
 | 0.6 | `make doctor` validates the new invariants | pending | — | — |
-| 0.7 | Stable vs experimental API doc split (C1) | pending | — | — |
+| 0.7 | Stable vs experimental API doc split (C1) | ✅ | 5 split tests pass; 42 stable routes, 77 experimental, 35 in diff | this commit |
 | 0.8 | Generated current-status doc (replaces stale `CODE_REVIEW_BUGS.md`) (C3) | pending | — | — |
 
 ## Phase 1 — close P0 blockers (Month 1)

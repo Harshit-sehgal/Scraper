@@ -27,7 +27,7 @@ DC := docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 
-.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate doctor
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate doctor api-docs api-docs-check
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -128,6 +128,15 @@ doctor: ## Run the repository health check (Python, venv, lockfiles, Playwright,
 
 doctor-json: ## Emit doctor output as JSON for CI consumption
 	python3 scripts/doctor.py --json
+
+# ─── API docs split (Phase 0, C1) ───────────────────────────────────────────
+
+api-docs: ## Regenerate stable vs experimental API inventory docs
+	python3 scripts/route_inventory_split.py --write
+
+api-docs-check: ## Diff-check stable API inventory without writing
+	python3 scripts/route_inventory_split.py > /dev/null
+
 
 	bash scripts/verify_all.sh
 
