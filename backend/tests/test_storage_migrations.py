@@ -54,14 +54,10 @@ def test_sqlite_schema_has_all_expected_columns(monkeypatch, tmp_db):
     jobs_expected = all_expected - excluded_from_jobs
 
     missing_from_jobs = jobs_expected - jobs_cols
-    assert not missing_from_jobs, (
-        f"Columns in _JOBS_COLUMNS_SQL absent from jobs: {missing_from_jobs}"
-    )
+    assert not missing_from_jobs, f"Columns in _JOBS_COLUMNS_SQL absent from jobs: {missing_from_jobs}"
 
     # deleted_at must exist on recycle_bin
-    assert "deleted_at" in recycle_cols, (
-        "deleted_at is listed in _JOBS_COLUMNS_SQL but missing from recycle_bin"
-    )
+    assert "deleted_at" in recycle_cols, "deleted_at is listed in _JOBS_COLUMNS_SQL but missing from recycle_bin"
 
 
 # ── Test 2: create_tables / _run_migrations is idempotent ──────────────────
@@ -180,10 +176,13 @@ def test_load_state_handles_missing_columns_gracefully(monkeypatch, tmp_db):
             started_at TEXT DEFAULT ''
         )
     """)
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO jobs (id, name, status, urls, schema_fields, results, logs, warnings, estimated_cost_usd)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, ("old-schema-job", "Old Schema Job", "completed", "[]", "[]", "[]", "[]", "[]", 0.0))
+    """,
+        ("old-schema-job", "Old Schema Job", "completed", "[]", "[]", "[]", "[]", "[]", 0.0),
+    )
     conn.commit()
     conn.close()
 
@@ -231,7 +230,9 @@ def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db):
 
     # Create stub tables that _run_migrations expects at hot-path index creation
     conn = sqlite3.connect(str(tmp_db))
-    conn.execute("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, name TEXT, status TEXT DEFAULT '', created_at TEXT DEFAULT '')")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, name TEXT, status TEXT DEFAULT '', created_at TEXT DEFAULT '')",
+    )
     conn.execute("CREATE TABLE IF NOT EXISTS recycle_bin (id TEXT PRIMARY KEY, name TEXT, created_at TEXT DEFAULT '')")
     # Create a v5-style worker_heartbeats table (single PK on worker_id)
     conn.execute("""
