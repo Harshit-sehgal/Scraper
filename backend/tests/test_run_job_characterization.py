@@ -9,7 +9,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.models import JobStatus, ScrapeMode
 from app.services.job_runner import run_job
 
@@ -414,7 +413,7 @@ async def test_run_job_insight_timeout_produces_analysis():
     mock_ws.transaction.return_value.__exit__ = MagicMock(return_value=False)
 
     async def timeout_insight(*args, **kwargs):
-        raise TimeoutError()
+        raise TimeoutError
 
     with (
         patch("app.services.job_runner.load_semantic_state"),

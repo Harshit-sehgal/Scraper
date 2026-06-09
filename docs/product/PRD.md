@@ -1,15 +1,15 @@
 # DataForge Scraper — Product Requirements Document (v1)
 
-**Status:** Draft v1  
-**Author:** Generated from Phase 2 — SaaS product core definition  
-**Last updated:** 2026-06-09  
+**Status:** Draft v1
+**Author:** Generated from Phase 2 — SaaS product core definition
+**Last updated:** 2026-06-09
 
 ---
 
 ## 1. Product Positioning
 
-> A controlled web data extraction platform for teams that need repeatable 
-> extraction from accessible websites, with schema-guided jobs, quality scoring, 
+> A controlled web data extraction platform for teams that need repeatable
+> extraction from accessible websites, with schema-guided jobs, quality scoring,
 > exports, monitoring, and safe operational controls.
 
 ### What we do NOT claim
@@ -24,8 +24,8 @@
 
 ## 2. Ideal Customer Profile (ICP) — v1
 
-**Primary:** Small agencies managing repeated public-data extraction for clients.  
-**Secondary:** Growth/SEO teams needing monitored extraction from known public pages.  
+**Primary:** Small agencies managing repeated public-data extraction for clients.
+**Secondary:** Growth/SEO teams needing monitored extraction from known public pages.
 **Tertiary:** Research/data teams needing repeatable exports and quality checks.
 
 **Not targeting for v1:**
