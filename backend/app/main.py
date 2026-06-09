@@ -40,6 +40,7 @@ from app.middlewares import (
 from app.routers.exports import create_exports_router
 from app.routers.health import router as health_router
 from app.routers.jobs import create_jobs_router
+from app.routers.session import router as session_router
 from app.routers.operator import router as operator_router
 from app.routers.scraper import router as scraper_router
 from app.routers.system import router as system_router
@@ -142,6 +143,7 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(operator_router)
     app.include_router(system_router)
     app.include_router(health_router)
+    app.include_router(session_router)
 
     # Experimental / research routes — gated on the same flag that gates
     # the import-time subsystem initialization. Including this router

@@ -135,6 +135,11 @@ async def api_key_middleware(request: Request, call_next):
         # and body-size-capped by the other middlewares.
         if request.url.path == "/api/system/csp-violations":
             return await call_next(request)
+        # Session management endpoints are exempt from API key middleware.
+        # They use their own auth logic (exchanging key for cookie, or
+        # returning session state from the cookie itself).
+        if request.url.path in ("/api/session", "/api/session/me"):
+            return await call_next(request)
         # Use exact-match / prefix-match on the docs / openapi paths.
         # Substring matching (e.g. ``"/docs" in path``) would falsely
         # exempt any path containing those letters, including a
@@ -166,6 +171,16 @@ async def api_key_middleware(request: Request, call_next):
                 matched_role = "operator"
             elif settings.API_KEY and (_is_match(api_key, settings.API_KEY) or _is_match(bearer_token, settings.API_KEY)):
                 matched_role = "user"
+
+            # Fall back to session cookie check if no API key matched.
+            # This allows browser clients to authenticate via HTTP-only
+            # session cookie after the initial key exchange (G2).
+            if not matched_role:
+                from app.auth.session import get_session_role
+
+                session_role = get_session_role(request)
+                if session_role:
+                    matched_role = session_role
 
             if not matched_role:
                 log_auth_event(
