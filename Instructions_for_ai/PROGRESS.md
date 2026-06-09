@@ -54,6 +54,25 @@ Evidence (2026-06-09):
 | 0.9 | Fix missing `prune_history_stores` in state.py (test regression) | ✅ | All 28 api_regression tests pass; function wraps `_compute_prunable_ids` | this session |
 | 0.10 | Fix executor lifecycle: `_log_persist_executor` now owns shutdown (B4) | ✅ | Lazy init + `shutdown_log_persist_executor()` called from lifespan shutdown | this session |
 
+## Phase 2 — SaaS product core (Month 2)
+
+After P0/P1 blockers closed, define the exact sellable product.
+
+Acceptance gate:
+
+- [x] One-page PRD exists in `docs/product/PRD.md`.
+- [x] Pricing metrics map directly to technical usage counters (page fetches).
+- [x] Marketing copy does not overclaim (explicit "what we do NOT claim" section).
+
+### Phase 2 work items
+
+| # | Item | Status | Evidence | Commit |
+|---|------|--------|----------|--------|
+| 2.1 | Product Requirements Document (ICP, use cases, pricing, plans, journeys) | ✅ | `docs/product/PRD.md` — 8 sections, 4 pricing tiers, 3 user journeys, feature tier table, stable vs experimental policy | this commit |
+| 2.2 | Pricing metric defined and mapped to technical counters | ✅ | Page fetches per month; maps to existing scrape_telemetry counters | this commit |
+| 2.3 | Unsupported claims documented | ✅ | Explicit "what we do NOT claim" and "Unsupported scenarios" sections | this commit |
+| 2.4 | v1 acceptance criteria defined | ✅ | 9-item checklist for v1 launch gate | this commit |
+
 ## Phase 0 → Phase 1 item reclassification
 
 0.5 (Inject DNS resolver into url_safety.py) is moved to Phase 1 as item 1.5. The conftest-level autouse fixture already handles the test isolation requirement; the deeper production-oriented refactor belongs alongside the other dependency-injection (1.1) and async-safety (1.4) work.
@@ -85,6 +104,7 @@ Evidence (2026-06-09):
 | D1 | Idempotency fingerprint incomplete | ✅ | New ``canonical_request_fingerprint()`` hashes full ``JobCreate`` model via SHA-256 of stable JSON; fingerprints now include schema fields, filters, selectors, search params, pagination, dedup settings | this session |
 | C4 | Env copy docs conflict with Compose file | ✅ | ``docs/PRODUCTION_STARTUP.md`` now references ``.env.production`` (consistent with Compose, scripts, and deployment docs) instead of ``.env`` | this session |
 | G1 | Production startup gate (secrets/CORS/storage) | ✅ | ``validate_production_credentials()`` in ``prod_security_validator.py`` enhanced with CORS origin validation (rejects wildcard, invalid URLs) and storage backend check (requires postgres); 88 tests pass across security, env, and API regression suites | this session |
+| M4 | pyproject dev deps out of sync with requirements-dev.in | ✅ | Synced `pyproject.toml` adds `ddgs` to prod deps, expands dev group with `pytest-xdist`, `pytest-rerunfailures`, `psycopg2-binary`, `pyflakes`, `bandit`, `pip-audit`, `pip-tools`; added `PyYAML` to `requirements-dev.in`; sync comment headers added to both sections; 108 tests pass | this session |
 
 ## Phase 0 starting snapshot (2026-06-09)
 
