@@ -2,6 +2,7 @@ import asyncio
 import ipaddress
 import logging
 import socket
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
 
@@ -16,6 +17,43 @@ logger = logging.getLogger(__name__)
 # web service ports; an attacker cannot use the proxy to reach internal
 # services listening on SSH, Redis, Memcached, Postgres, etc.
 _ALLOWED_HTTP_PORTS: frozenset[int] = frozenset({80, 443, 8080, 8443})
+
+
+# ── Injectable DNS resolver ───────────────────────────────────────────
+# Allow tests to inject a fake resolver so they never depend on real DNS.
+# The resolver signature is ``(host: str) -> list[str]`` returning
+# IP-address strings.  Production uses the default (``socket.getaddrinfo``).
+def _default_resolver(hostname: str) -> list[str]:
+    """Default DNS resolver — delegates to :func:`socket.getaddrinfo`."""
+    addrs = socket.getaddrinfo(hostname, None)
+    return [str(addr[4][0]) for addr in addrs]
+
+
+_resolver: Callable[[str], list[str]] | None = None
+"""Injectable resolver override.  ``None`` means use :func:`_default_resolver`."""
+
+
+def set_dns_resolver(resolver: Callable[[str], list[str]] | None) -> None:
+    """Override the DNS resolver used by URL safety checks.
+
+    Parameters
+    ----------
+    resolver : callable or None
+        A callable ``(host: str) -> list[str]`` that returns resolved IP
+        addresses for the given hostname.  Pass ``None`` to reset to the
+        default (``socket.getaddrinfo``).
+
+    Tests should call this (via ``monkeypatch``) to inject a fake resolver
+    that never hits real DNS, enabling deterministic, offline URL-safety
+    assertions.
+    """
+    global _resolver
+    _resolver = resolver
+
+
+def _get_resolver() -> Callable[[str], list[str]]:
+    """Return the active resolver — override if set, else default."""
+    return _resolver if _resolver is not None else _default_resolver
 
 
 def is_safe_ip(ip_str: str) -> bool:
@@ -152,26 +190,10 @@ def validate_public_http_url(url: str) -> None:
             _record_ssrf_reject("internal_tld")
             raise ValueError(msg)
 
-    # 6. Try DNS resolution to check resolved IPs.
-    try:
-        addrs = socket.getaddrinfo(hostname, None)
-        for addr in addrs:
-            ip = str(addr[4][0])
-            if not is_safe_ip(ip):
-                msg = f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
-                _record_ssrf_reject("dns_resolves_to_restricted")
-                raise ValueError(
-                    msg,
-                )
-    except (socket.gaierror, OSError) as e:
-        is_production = settings.ENV.lower() in ("production", "staging")
-        if is_production and not settings.SMOKE_TEST_MODE:
-            msg = f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
-            _record_ssrf_reject("dns_failure_prod")
-            raise ValueError(
-                msg,
-            ) from e
-        logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)
+    # Design note: DNS-based SSRF protection is handled by the transport
+    # layer which resolves DNS asynchronously via loop.getaddrinfo().
+    # We intentionally do NOT resolve DNS here to avoid blocking the
+    # event loop when this function is called from async request handlers.
 
 
 def _record_ssrf_reject(reason: str) -> None:

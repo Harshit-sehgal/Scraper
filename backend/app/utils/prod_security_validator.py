@@ -173,4 +173,28 @@ def validate_production_credentials(settings) -> None:
                 msg,
             )
 
+    # 3. CORS Origins Validation — must not contain wildcard
+    cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
+    valid_cors = True
+    for origin in cors_origins:
+        if origin == "*":
+            msg = (
+                "Production check failed: CORS_ORIGINS contains wildcard '*'. "
+                "In production, CORS must be locked down to trusted domains."
+            )
+            raise ValueError(msg)
+        if not isinstance(origin, str) or not origin.startswith(("http://", "https://")):
+            msg = (
+                "Production check failed: CORS_ORIGINS contains invalid origin "
+                f"{origin!r}. Each origin must be a URL starting with http:// or https://."
+            )
+            raise ValueError(msg)
+
+    # 4. Storage backend validation — production requires postgres
+    # (when worker queue mode is enabled, which is the production default)
+    storage_backend = settings.STORAGE_BACKEND
+    if storage_backend != "postgres":
+        msg = f"Production check failed: STORAGE_BACKEND={storage_backend!r}. Production requires 'postgres' storage backend."
+        raise ValueError(msg)
+
     logger.info("Production security credential validation: ALL PASS")

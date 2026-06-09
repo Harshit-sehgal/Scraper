@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import ipaddress
 import logging
-import socket
 from urllib.parse import urlparse
 
 from forge_kernel.config import settings
@@ -77,16 +76,7 @@ def validate_public_http_url(url: str) -> None:
             msg = f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted."
             raise ValueError(msg)
 
-    # DNS resolution check
-    try:
-        addrs = socket.getaddrinfo(hostname, None)
-        for addr in addrs:
-            ip = str(addr[4][0])
-            if not _is_safe_ip(ip):
-                msg = f"URL hostname '{hostname}' resolves to restricted IP {ip}."
-                raise ValueError(msg)
-    except (socket.gaierror, OSError) as e:
-        if sec.ENV.lower() in ("production", "staging"):
-            msg = f"URL hostname '{hostname}' could not be resolved — rejected for security."
-            raise ValueError(msg) from e
-        logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)
+    # DNS-based SSRF protection is handled by the transport layer
+    # (SafeAsyncNetworkBackend.connect_tcp), which resolves DNS asynchronously
+    # via loop.getaddrinfo(). We intentionally do NOT resolve DNS here to
+    # avoid blocking the event loop when called from async request handlers.

@@ -520,10 +520,26 @@ def client(monkeypatch):
     from app.services import state as _app_services_state_mod
 
     monkeypatch.setattr(_app_services_state_mod, "persist_state", lambda **kwargs: None)
+    # Swap runtime deps so route handlers see the fake implementations
+    # instead of the real job runner/scheduler. This is the A1 fix:
+    # routes reference ``app.runtime_deps.schedule_task_fn`` and
+    # ``app.runtime_deps.run_job_coro_fn`` at call time, not captured
+    # closures, so the swap is effective immediately.
+    import app.runtime_deps as _runtime_deps_mod
+
+    monkeypatch.setattr(
+        _runtime_deps_mod,
+        "schedule_task_fn",
+        lambda coro: fake_schedule_background_task(coro),
+    )
+    monkeypatch.setattr(
+        _runtime_deps_mod,
+        "run_job_coro_fn",
+        fake_run_job,
+    )
+    # Also keep the old monkeypatches for backward compat with code that
+    # imports these directly from app.main.
     monkeypatch.setattr(main_mod, "run_job", fake_run_job)
-    # Also patch lifespan.run_job because run_job_wrapper imports run_job at
-    # module level from app.services.job_runner, not from app.main. Without
-    # this patch, running the coroutine would trigger real job execution.
     monkeypatch.setattr("app.lifespan.run_job", fake_run_job)
     monkeypatch.setattr(main_mod, "_schedule_background_task", fake_schedule_background_task)
 

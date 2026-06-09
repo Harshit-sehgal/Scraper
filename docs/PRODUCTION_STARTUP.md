@@ -7,12 +7,12 @@ Use `docs/PRODUCTION.md` and `docs/PRODUCTION_READINESS.md` as the current produ
 
 ## Required Sequence
 
-1. Create a real uncommitted `.env` from `.env.production.example`.
+1. Create a real uncommitted `.env.production` from `.env.production.example`.
 2. Replace every placeholder with strong unique values.
 3. Run:
 
 ```bash
-python3 scripts/check_prod_env.py --env-file .env
+python3 scripts/check_prod_env.py --env-file .env.production
 ```
 
 4. Build the image:

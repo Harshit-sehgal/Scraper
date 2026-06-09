@@ -47,17 +47,43 @@ def run_pipeline(*args, **kwargs):
     return impl(*args, **kwargs)
 
 
-_log_persist_executor = ThreadPoolExecutor(max_workers=1)
+_log_persist_executor: ThreadPoolExecutor | None = None
+"""Dedicated executor for fire-and-forget log persistence.
+
+Initialised lazily by :func:`_get_log_persist_executor` so module import
+is side-effect-free.  Call :func:`shutdown_log_persist_executor` during
+application lifespan shutdown to release the thread.
+"""
+
+
+def _get_log_persist_executor() -> ThreadPoolExecutor:
+    global _log_persist_executor
+    if _log_persist_executor is None:
+        _log_persist_executor = ThreadPoolExecutor(max_workers=1)
+    return _log_persist_executor
+
+
+def shutdown_log_persist_executor() -> None:
+    """Shut down the log persistence executor, if it was ever created.
+
+    Called from the FastAPI lifespan shutdown handler to release the
+    dedicated thread.  Idempotent — safe to call multiple times.
+    """
+    global _log_persist_executor
+    if _log_persist_executor is not None:
+        _log_persist_executor.shutdown(wait=True)
+        _log_persist_executor = None
 
 
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None) -> None:
     from app.models import LogEntry
 
     job.logs.append(LogEntry(message=message, level=level))
+    executor = _get_log_persist_executor()
     if persist_single_fn:
-        _log_persist_executor.submit(persist_single_fn)
+        executor.submit(persist_single_fn)
     elif persist_fn:
-        _log_persist_executor.submit(persist_fn)
+        executor.submit(persist_fn)
 
 
 async def run_job(

@@ -75,65 +75,47 @@ def test_validate_public_http_url_port_allowlist(monkeypatch) -> None:
             validate_public_http_url(f"http://google.com:{port}/path")
 
 
-def test_validate_public_http_url_dns_resolution(monkeypatch) -> None:
+def test_validate_public_http_url_no_dns_resolution(monkeypatch) -> None:
+    """validate_public_http_url no longer performs DNS resolution (M2 fix).
+
+    DNS-based SSRF protection is now handled entirely by the transport layer
+    (SafeAsyncNetworkBackend.connect_tcp and _UrlValidatingAsyncTransport),
+    which resolve DNS asynchronously via loop.getaddrinfo().
+    """
     monkeypatch.setattr(settings, "ENV", "production")
 
-    # Mock socket.getaddrinfo to resolve safe-dns.com to 8.8.8.8
-    def mock_getaddrinfo_safe(host, port, *args, **kwargs):
-        if host == "safe-dns.com":
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 80))]
-        raise socket.gaierror(-2, "Name or service not known")
-
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_safe)
-
-    # Should pass since it resolves to public IP
+    # Hostnames that would resolve to private IPs via DNS now pass through
+    # validate_public_http_url (no DNS resolution). The transport layer
+    # catches them instead.
     validate_public_http_url("http://safe-dns.com")
+    validate_public_http_url("http://bad-dns.com")
 
-    # Mock socket.getaddrinfo to resolve bad-dns.com to 192.168.1.1 (private IP)
-    def mock_getaddrinfo_unsafe(host, port, *args, **kwargs):
-        if host == "bad-dns.com":
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.1", 80))]
-        raise socket.gaierror(-2, "Name or service not known")
-
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_unsafe)
-
-    with pytest.raises(ValueError, match="resolves to restricted IP"):
-        validate_public_http_url("http://bad-dns.com")
-
-    # Verify DNS failure fails closed in production
-    # Mock socket.getaddrinfo to raise gaierror for unresolvable domain
+    # DNS failure no longer causes validate_public_http_url to fail-closed.
+    # That responsibility is on the transport layer.
     def mock_getaddrinfo_fail(host, port, *args, **kwargs) -> Never:
         raise socket.gaierror(-2, "Name or service not known")
 
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
 
-    with pytest.raises(ValueError, match="could not be resolved"):
-        validate_public_http_url("http://unresolvable-domain.com")
+    validate_public_http_url("http://unresolvable-domain.com")
 
 
 def test_validate_public_http_url_allowlist(monkeypatch) -> None:
+    """ALLOWED_INTERNAL_HOSTS bypass validation for internal hosts in smoke mode."""
     # Set ALLOWED_INTERNAL_HOSTS config override
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
 
-    # By default, internal hosts should be rejected in production/test unless smoke test mode is active
+    # In non-smoke mode, internal hosts are not in the allowlist bypass
     monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
-    # Mock socket.getaddrinfo to simulate unresolvable hosts for internal network names
-
-    def mock_getaddrinfo_fail(host, port, *args, **kwargs) -> Never:
-        raise socket.gaierror(-2, "Name or service not known")
-
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
-
-    # Let's mock settings.ENV to "production" so it triggers DNS fail-closed for internal hosts
     monkeypatch.setattr(settings, "ENV", "production")
 
-    with pytest.raises(ValueError, match="could not be resolved"):
-        validate_public_http_url("http://nginx/smoke/records.html")
+    # nginx is not in the loopback/cloud-metadata/internal-TLD lists,
+    # so it passes through validate_public_http_url without DNS resolution
+    validate_public_http_url("http://nginx/smoke/records.html")
 
-    # Set smoke test mode to active
+    # Set smoke test mode to active — allowlist bypass applies
     monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
 
-    # Now it should bypass validation and return successfully!
     validate_public_http_url("http://nginx/smoke/records.html")
     validate_public_http_url("https://smoke-host/index.html")
 
@@ -231,60 +213,31 @@ def test_validate_unresolved_host_in_dev(monkeypatch) -> None:
 
 
 def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch) -> None:
-    """Hostname resolving to IPv6 private address is rejected."""
-    monkeypatch.setattr(settings, "ENV", "production")
+    """validate_public_http_url no longer does DNS resolution (M2 fix).
 
-    # Use a non-internal-TLD hostname so DNS resolution kicks in
-    def mock_getaddrinfo_v6(host, port, *args, **kwargs):
-        return [
-            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fc00::1", 80, 0, 0)),
-        ]
-
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_v6)
-
-    with pytest.raises(ValueError, match="resolves to restricted IP"):
-        validate_public_http_url("http://ula-host.example.com")
-
-    def mock_getaddrinfo_v6_linklocal(host, port, *args, **kwargs):
-        return [
-            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fe80::1", 80, 0, 0)),
-        ]
-
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_v6_linklocal)
-
-    with pytest.raises(ValueError, match="resolves to restricted IP"):
-        validate_public_http_url("http://link-local-host.example.com")
-
-
-def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch) -> None:
-    """Hostname that resolves to a decimal/hex IP representation via DNS is rejected.
-
-    On Linux, decimal IPs like 2130706433 resolve to 127.0.0.1 via DNS.
-    We test this by monkeypatching getaddrinfo to simulate the resolution.
+    Hostnames that would resolve to IPv6 private addresses via DNS now
+    pass through. DNS-based SSRF protection is handled by the transport layer.
     """
     monkeypatch.setattr(settings, "ENV", "production")
 
-    # Simulate decimal IP resolution (2130706433 = 127.0.0.1)
-    def mock_getaddrinfo_decimal(host, port, *args, **kwargs):
-        if host == "2130706433":
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
-        raise socket.gaierror(-2, "Name or service not known")
+    # These hostnames pass validate_public_http_url (no DNS check).
+    # The transport layer would reject them at connect time.
+    validate_public_http_url("http://ula-host.example.com")
+    validate_public_http_url("http://link-local-host.example.com")
 
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_decimal)
 
-    with pytest.raises(ValueError, match="restricted IP"):
-        validate_public_http_url("http://2130706433/")
+def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch) -> None:
+    """validate_public_http_url no longer does DNS resolution (M2 fix).
 
-    # Simulate hex IP resolution (0x7f000001 = 127.0.0.1)
-    def mock_getaddrinfo_hex(host, port, *args, **kwargs):
-        if host == "0x7f000001":
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
-        raise socket.gaierror(-2, "Name or service not known")
+    Decimal/hex IPs that resolve to loopback via DNS now pass through
+    validate_public_http_url. The transport layer catches them instead.
+    """
+    monkeypatch.setattr(settings, "ENV", "production")
 
-    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_hex)
-
-    with pytest.raises(ValueError, match="restricted IP"):
-        validate_public_http_url("http://0x7f000001/")
+    # These pass validate_public_http_url because DNS resolution is removed.
+    # The transport layer would reject the resolved IPs at connect time.
+    validate_public_http_url("http://2130706433/")
+    validate_public_http_url("http://0x7f000001/")
 
 
 def test_validate_redirect_to_private_ranges(monkeypatch) -> None:
@@ -388,7 +341,11 @@ def test_smoke_mode_internal_tld_allowed(monkeypatch) -> None:
 
 
 def test_validate_resolved_private_ip_in_dev(monkeypatch) -> None:
-    """Hosts resolving to private IPs via DNS are rejected even in development mode."""
+    """validate_public_http_url no longer does DNS resolution (M2 fix).
+
+    Hostnames that would resolve to private IPs via DNS now pass through
+    regardless of environment. DNS-based SSRF protection is on the transport layer.
+    """
     monkeypatch.setattr(settings, "ENV", "development")
 
     def mock_getaddrinfo_unsafe(host, port, *args, **kwargs):
@@ -398,8 +355,8 @@ def test_validate_resolved_private_ip_in_dev(monkeypatch) -> None:
 
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_unsafe)
 
-    with pytest.raises(ValueError, match="resolves to restricted IP"):
-        validate_public_http_url("http://bad-dev-dns.com")
+    # Passes through — no DNS resolution in validate_public_http_url
+    validate_public_http_url("http://bad-dev-dns.com")
 
 
 @pytest.mark.asyncio

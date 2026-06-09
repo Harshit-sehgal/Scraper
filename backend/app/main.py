@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app import runtime_deps
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
 from app.lifespan import (
@@ -54,6 +55,12 @@ _persist_state_wrapper = persist_state_wrapper
 _run_job_wrapper = run_job_wrapper
 _schedule_background_task = schedule_background_task
 _persist_single_wrapper = persist_single_wrapper
+
+# Wire up runtime deps so route handlers see the real implementations.
+runtime_deps.set_deps(
+    schedule=_schedule_background_task,
+    run_job=_run_job_wrapper,
+)
 
 __all__ = [
     "CONFIG",

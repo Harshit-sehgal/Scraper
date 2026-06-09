@@ -216,6 +216,15 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
     except Exception as e:
         logger.warning("Failed to close Telegram notifier during shutdown: %s", e)
 
+    # Shut down background log-persistence executor
+    try:
+        from app.services.job_runner import shutdown_log_persist_executor
+
+        shutdown_log_persist_executor()
+        logger.info("Log persistence executor shut down")
+    except Exception as e:
+        logger.warning("Failed to shut down log persistence executor: %s", e)
+
 
 def schedule_background_task(coro):
     """Schedule a background task with error handling."""
