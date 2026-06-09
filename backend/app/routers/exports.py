@@ -491,148 +491,135 @@ def create_exports_router(jobs_store: dict):
                 detail=f"Jobs not found: {', '.join(missing)}",
             )
 
-        # Collect per-job results: (job_id, job_name, cleaned_results_list)
-        per_job_results: list[tuple[str, str, list[dict[str, Any]]]] = []
+        # Resolve job metadata (name, on_disk, file_path) without loading results.
+        job_meta: list[tuple[str, str, bool, str | None]] = []
         for _jid in body.job_ids:
             job = jobs_store.get(_jid)
             if not job:
-                per_job_results.append((_jid, _jid, []))
-                continue
+                job_meta.append((_jid, _jid, False, None))
+            else:
+                job_meta.append((_jid, job.name or _jid, bool(job.results_on_disk), job.results_file_path))
 
-            raw: list[dict[str, Any]] = []
-            if job.results_on_disk:
-                from app.utils.job_results_store import (
-                    load_paginated_job_results_from_disk,
+        # ── Streaming fieldnames discovery ──────────────────────────────
+        # Load only the first page of each job to discover the union of
+        # fieldnames.  This avoids loading all results into memory.
+        fieldnames: list[str] = []
+        seen: set[str] = set()
+        has_any_data = False
+        for jid, _jname, on_disk, fpath in job_meta:
+            if on_disk:
+                from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+                first_page, _ = await run_in_threadpool(
+                    load_paginated_job_results_from_disk, jid, limit=_PAGINATION_CHUNK_SIZE, offset=0, file_path=fpath,
                 )
+                if first_page:
+                    has_any_data = True
+                    cleaned = _strip_system_fields(first_page)
+                    for row in cleaned:
+                        for k in row:
+                            if k not in seen:
+                                seen.add(k)
+                                fieldnames.append(k)
+            else:
+                job = jobs_store.get(jid)
+                if job and job.results:
+                    has_any_data = True
+                    sample = list(job.results)[:_PAGINATION_CHUNK_SIZE]
+                    cleaned = _strip_system_fields(sample)
+                    for row in cleaned:
+                        for k in row:
+                            if k not in seen:
+                                seen.add(k)
+                                fieldnames.append(k)
 
-                # Stream in pages to avoid OOM on large result sets
-                offset = 0
-                while True:
-                    page, total = await run_in_threadpool(
-                        load_paginated_job_results_from_disk,
-                        job.id,
-                        limit=_PAGINATION_CHUNK_SIZE,
-                        offset=offset,
-                        file_path=job.results_file_path,
-                    )
-                    if not page:
-                        break
-                    raw.extend(page)
-                    offset += _PAGINATION_CHUNK_SIZE
-                    if offset >= total:
-                        break
-            elif job.results:
-                raw = list(job.results)
-
-            per_job_results.append(
-                (_jid, job.name or _jid, _strip_system_fields(raw)),
-            )
-
-        has_any_data = any(rows for _, _, rows in per_job_results)
         if not has_any_data:
             raise HTTPException(status_code=400, detail="None of the specified jobs have results to export")
 
-        # Compute the union of fieldnames across all results.
-        fieldnames: list[str] = []
-        seen: set[str] = set()
-        for _, _, rows in per_job_results:
-            for row in rows:
-                for k in row:
-                    if k not in seen:
-                        seen.add(k)
-                        fieldnames.append(k)
+        # Also discover fieldnames from subsequent pages (small overhead).
+        for jid, _jname, on_disk, fpath in job_meta:
+            if on_disk:
+                from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+                offset = _PAGINATION_CHUNK_SIZE
+                while True:
+                    page, total = await run_in_threadpool(
+                        load_paginated_job_results_from_disk, jid, limit=_PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
+                    )
+                    if not page:
+                        break
+                    cleaned = _strip_system_fields(page)
+                    for row in cleaned:
+                        for k in row:
+                            if k not in seen:
+                                seen.add(k)
+                                fieldnames.append(k)
+                    offset += _PAGINATION_CHUNK_SIZE
+                    if offset >= total:
+                        break
+
+        # ── Streaming page generator ────────────────────────────────────
+        # Yields (job_id, job_name, cleaned_page) tuples, streaming
+        # pages from disk one at a time so only one page is in memory.
+        async def _stream_pages():
+            for jid, jname, on_disk, fpath in job_meta:
+                if on_disk:
+                    from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+                    offset = 0
+                    while True:
+                        page, total = await run_in_threadpool(
+                            load_paginated_job_results_from_disk, jid, limit=_PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
+                        )
+                        if not page:
+                            break
+                        yield (jid, jname, _strip_system_fields(page))
+                        offset += _PAGINATION_CHUNK_SIZE
+                        if offset >= total:
+                            break
+                else:
+                    job = jobs_store.get(jid)
+                    if job and job.results:
+                        # Cap in-memory results to prevent OOM
+                        raw = list(job.results)[:10000]
+                        yield (jid, jname, _strip_system_fields(raw))
 
         # ── Route to format-specific handler ────────────────────────────
+        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
 
         if fmt == "csv":
-            return await run_in_threadpool(_batch_csv, per_job_results, fieldnames, body.flatten)
+            return StreamingResponse(
+                _batch_csv_stream(_stream_pages(), fieldnames, body.flatten, ts),
+                media_type="text/csv",
+                headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.csv"'},
+            )
         if fmt == "json":
-            return await run_in_threadpool(_batch_json, per_job_results, fieldnames, body.flatten)
+            return StreamingResponse(
+                _batch_json_stream(_stream_pages(), fieldnames, body.flatten, ts),
+                media_type="application/json",
+                headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.json"'},
+            )
         # fmt == "xlsx"  # noqa: ERA001, RUF100
+        # XLSX requires full workbook in memory (openpyxl limitation).
+        # Collect pages into per-job lists with a per-job cap.
+        per_job_results: list[tuple[str, str, list[dict[str, Any]]]] = []
+        current_jid: str | None = None
+        current_rows: list[dict[str, Any]] = []
+        current_name: str = ""
+        async for jid, jname, page in _stream_pages():
+            if jid != current_jid:
+                if current_jid is not None:
+                    per_job_results.append((current_jid, current_name, current_rows))
+                current_jid = jid
+                current_name = jname
+                current_rows = []
+            current_rows.extend(page)
+            # Cap per-job to prevent OOM
+            if len(current_rows) > 10000:
+                current_rows = current_rows[:10000]
+        if current_jid is not None:
+            per_job_results.append((current_jid, current_name, current_rows))
         return await run_in_threadpool(_batch_xlsx, per_job_results, fieldnames, body.flatten)
-
-    def _batch_csv(
-        per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
-        fieldnames: list[str],
-        flatten: bool,
-    ) -> Response:
-        """Generate a batch CSV response.
-
-        When *flatten* is True, all rows are combined into a single table
-        with a ``_source_job`` column. When False, separator rows
-        (``--- Job Name ---``) divide the sections and ``_source_job`` is
-        not added.
-        """
-        output = io.StringIO()
-        if flatten:
-            all_fieldnames = list(fieldnames)
-            all_fieldnames.append(_SOURCE_JOB_FIELD)
-            writer = csv.DictWriter(output, fieldnames=all_fieldnames)
-            writer.writeheader()
-            for _, job_name, rows in per_job_results:
-                for row in rows:
-                    flat = _flat_row(row, fieldnames)
-                    flat[_SOURCE_JOB_FIELD] = job_name
-                    writer.writerow(flat)
-        else:
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-            for idx, (_, job_name, rows) in enumerate(per_job_results):
-                if idx > 0:
-                    # Blank separator row between job groups
-                    sep: dict[str, str] = dict.fromkeys(fieldnames, "")
-                    sep[fieldnames[0]] = f"--- {job_name} ---"
-                    writer.writerow(sep)
-                for row in rows:
-                    writer.writerow(_flat_row(row, fieldnames))
-
-        output.seek(0)
-        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
-        return Response(
-            content=output.getvalue(),
-            media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.csv"'},
-        )
-
-    def _batch_json(
-        per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
-        fieldnames: list[str],  # noqa: ARG001, RUF100
-        flatten: bool,
-    ) -> Response:
-        """Generate a batch JSON response.
-
-        When *flatten* is True, returns a single JSON array where every
-        object has a ``_source_job`` field. When False, returns a JSON
-        object with an ``exports`` array where each entry contains
-        ``job_id``, ``job_name``, and ``results``.
-        """
-        if flatten:
-            combined: list[dict[str, Any]] = []
-            for _, job_name, rows in per_job_results:
-                for row in rows:
-                    tagged = dict(row)
-                    tagged[_SOURCE_JOB_FIELD] = job_name
-                    combined.append(tagged)
-            payload: Any = combined
-        else:
-            exports: list[dict[str, Any]] = []
-            for jid, job_name, rows in per_job_results:
-                exports.append(
-                    {
-                        "job_id": jid,
-                        "job_name": job_name,
-                        "results": rows,
-                    },
-                )
-            payload = {"exports": exports}
-
-        json_content = json.dumps(payload, indent=2)
-        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
-        return Response(
-            content=json_content,
-            media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.json"'},
-        )
 
     def _batch_xlsx(
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
@@ -720,5 +707,99 @@ def create_exports_router(jobs_store: dict):
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.xlsx"'},
         )
+
+    # ── Streaming batch generators (E1: memory-efficient) ────────────
+
+    async def _batch_csv_stream(
+        pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
+        fieldnames: list[str],
+        flatten: bool,
+        ts: str,
+    ):
+        """Yield CSV chunks as a streaming generator.
+
+        Only one page of results is in memory at a time. The header is
+        written first (from the discovered fieldnames), then each page
+        is written row-by-row.
+        """
+        output = io.StringIO()
+        writer: csv.DictWriter | None = None
+
+        if flatten:
+            all_fieldnames = list(fieldnames)
+            all_fieldnames.append(_SOURCE_JOB_FIELD)
+            writer = csv.DictWriter(output, fieldnames=all_fieldnames)
+            writer.writeheader()
+            yield output.getvalue()
+            output.truncate(0)
+            output.seek(0)
+
+            async for _jid, job_name, page in pages:
+                for row in page:
+                    flat = _flat_row(row, fieldnames)
+                    flat[_SOURCE_JOB_FIELD] = job_name
+                    writer.writerow(flat)
+                # Yield periodically to keep memory bounded
+                chunk = output.getvalue()
+                if chunk:
+                    yield chunk
+                    output.truncate(0)
+                    output.seek(0)
+        else:
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            yield output.getvalue()
+            output.truncate(0)
+            output.seek(0)
+
+            first_job = True
+            async for _jid, job_name, page in pages:
+                if not first_job:
+                    sep: dict[str, str] = dict.fromkeys(fieldnames, "")
+                    sep[fieldnames[0]] = f"--- {job_name} ---"
+                    writer.writerow(sep)
+                first_job = False
+                for row in page:
+                    writer.writerow(_flat_row(row, fieldnames))
+                chunk = output.getvalue()
+                if chunk:
+                    yield chunk
+                    output.truncate(0)
+                    output.seek(0)
+
+    async def _batch_json_stream(
+        pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
+        fieldnames: list[str],  # noqa: ARG001
+        flatten: bool,
+        ts: str,
+    ):
+        """Yield JSON chunks as a streaming generator.
+
+        For flatten mode: yields a JSON array opening, then each row as
+        a JSON object, then the closing bracket.
+        For grouped mode: yields a JSON object with an ``exports`` array.
+        """
+        if flatten:
+            yield "[\n"
+            first = True
+            async for _jid, job_name, page in pages:
+                for row in page:
+                    tagged = dict(row)
+                    tagged[_SOURCE_JOB_FIELD] = job_name
+                    if not first:
+                        yield ",\n"
+                    yield json.dumps(tagged)
+                    first = False
+            yield "\n]\n"
+        else:
+            yield '{\n  "exports": [\n'
+            first_job = True
+            async for jid, job_name, page in pages:
+                if not first_job:
+                    yield ",\n"
+                first_job = False
+                # Stream each job's results as a JSON object
+                yield f'    {json.dumps({"job_id": jid, "job_name": job_name, "results": page})}'
+            yield "\n  ]\n}\n"
 
     return router

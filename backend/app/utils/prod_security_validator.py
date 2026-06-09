@@ -90,6 +90,19 @@ def validate_production_credentials(settings) -> None:
 
     logger.info("Running %s security credential checks (hard startup gates)...", env)
 
+    # ── State model advisory ───────────────────────────────────────────
+    # In-memory dict (manager.jobs_store) is the primary source of truth
+    # for API responses; the DB is a recovery record. When Postgres is
+    # used as the persistent store, the in-memory dict can diverge from
+    # the DB. See docs/STATE_MODEL.md for details.
+    if settings.STORAGE_BACKEND == "postgres":
+        logger.warning(
+            "Postgres-backed in %s mode: in-memory job store is the primary source of truth. "
+            "The DB is a recovery record and may lag behind the in-memory state by up to a few seconds. "
+            "See docs/STATE_MODEL.md for the full state model documentation and recommendations.",
+            env,
+        )
+
     # 1. API Keys Validation
     keys_to_check = [
         ("DATAFORGE_API_KEY", settings.API_KEY),
@@ -175,7 +188,6 @@ def validate_production_credentials(settings) -> None:
 
     # 3. CORS Origins Validation — must not contain wildcard
     cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
-    valid_cors = True
     for origin in cors_origins:
         if origin == "*":
             msg = (

@@ -615,27 +615,36 @@ def register_jobs_write_routes(
         terminal.sort(key=lambda item: item[1].created_at, reverse=True)
         keep_ids = {jid for jid, _ in terminal[:keep_recent]}
 
-        removed = 0
         repo = get_job_repository()
+        cleared_ids: list[str] = []
+        failed_ids: list[str] = []
 
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
-            await run_in_threadpool(repo.move_to_recycle_bin, jid)
-            with manager.lock:
-                if jid in manager.jobs_store:
-                    manager.recycle_bin_store[jid] = manager.jobs_store.pop(jid)
-            removed += 1
+            try:
+                await run_in_threadpool(repo.move_to_recycle_bin, jid)
+                cleared_ids.append(jid)
+            except Exception:
+                logger.exception("Failed to move terminal job %s to recycle bin during cleanup", jid)
+                failed_ids.append(jid)
 
         with manager.lock:
+            for jid in cleared_ids:
+                if jid in manager.jobs_store:
+                    manager.recycle_bin_store[jid] = manager.jobs_store.pop(jid)
             remaining = len(manager.jobs_store)
 
-        return {
-            "message": f"Cleared {removed} terminal jobs",
-            "cleared": removed,
+        result: dict = {
+            "message": f"Cleared {len(cleared_ids)} terminal jobs",
+            "cleared": len(cleared_ids),
             "kept_recent": keep_recent,
             "remaining": remaining,
         }
+        if failed_ids:
+            result["failed"] = failed_ids
+            result["message"] += f" ({len(failed_ids)} failed)"
+        return result
 
     @router.post("/api/recycle_bin/{job_id}/restore")
     async def restore_job(
