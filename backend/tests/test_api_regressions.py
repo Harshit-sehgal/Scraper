@@ -10,15 +10,32 @@ from app.utils.quality import build_quality_report
 
 @pytest.fixture(autouse=True)
 def mock_ai_clean_and_align(monkeypatch) -> None:
-    async def fake_ai_clean_and_align(records, schema, **kwargs):
-        return records, {
-            "applied": False,
-            "quality_filtered_after_ai": 0,
-            "input_records": len(records),
-            "output_records": len(records),
-        }
+    """Mock the extracted AI structuring service to return records unchanged.
 
-    monkeypatch.setattr("app.services.job_runner.ai_clean_and_align_records", fake_ai_clean_and_align)
+    Previously patched ``app.services.job_runner.ai_clean_and_align_records``;
+    now patches the higher-level ``apply_global_ai_structuring`` in the
+    extracted service module (L1 strangler refactor).
+    """
+
+    async def fake_apply(records, schema_fields, ai_source_prediction, **kwargs):
+        return (
+            records,
+            {
+                "applied": False,
+                "reason": "mocked",
+                "input_records": len(records),
+                "output_records": len(records),
+                "total_chunks": 0,
+                "ai_chunks": 0,
+                "fallback_chunks": 0,
+                "model_fallback_mode": False,
+                "capped_records": 0,
+                "quality_filtered_after_ai": 0,
+            },
+            [],
+        )
+
+    monkeypatch.setattr("app.services.ai_structuring.apply_global_ai_structuring", fake_apply)
 
 
 def test_system_status_shape(client) -> None:
@@ -310,8 +327,8 @@ def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch) -> No
 
     # Mock in the routers/jobs module where it's used
     monkeypatch.setattr("app.routers.jobs_write.discover_urls", fake_discover_urls)
-    # Also mock in services/job_runner where it might be used
-    monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
+    # Also mock in the discovery module (lazily imported by services/discovery.py)
+    monkeypatch.setattr("app.discovery.discover_urls", fake_discover_urls)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
@@ -428,7 +445,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch) -> None:
     async def fake_generate_data_insight(rows) -> str:
         return "ok"
 
-    monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
+    monkeypatch.setattr("app.discovery.discover_urls", fake_discover_urls)
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
