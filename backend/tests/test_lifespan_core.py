@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+from typing import NoReturn
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,7 +16,7 @@ class TestScheduleBackgroundTask:
         """Background task completes successfully."""
         executed = False
 
-        async def dummy():
+        async def dummy() -> None:
             nonlocal executed
             executed = True
 
@@ -26,7 +28,7 @@ class TestScheduleBackgroundTask:
     async def test_handles_attribute_error(self) -> None:
         """Background task with AttributeError is caught by done callback."""
 
-        async def broken():
+        async def broken() -> NoReturn:
             msg = "missing attr"
             raise AttributeError(msg)
 
@@ -70,7 +72,7 @@ async def test_schedule_background_task_cancelled_does_not_raise() -> None:
     """CancelledError is silently handled."""
     import asyncio
 
-    async def never_completes():
+    async def never_completes() -> None:
         await asyncio.sleep(999)
 
     task = schedule_background_task(never_completes())
@@ -132,7 +134,8 @@ class TestResetLifespanState:
 @pytest.mark.asyncio
 async def test_rate_limit_prune_loop_runs_one_iteration(monkeypatch) -> None:
     """The background prune loop executes at least one prune cycle and
-    can be cancelled cleanly without raising."""
+    can be cancelled cleanly without raising.
+    """
     import asyncio
     from unittest.mock import MagicMock, patch
 
@@ -151,10 +154,8 @@ async def test_rate_limit_prune_loop_runs_one_iteration(monkeypatch) -> None:
             await asyncio.sleep(0.3)
             task.cancel()
             # Wait for cancellation to propagate.
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
 
     # prune_all should have been called at least once.
     assert mock_prune.called, "prune_all was not called during the prune loop iteration"

@@ -134,7 +134,12 @@ def test_mutation_apis_have_rw_separation() -> None:
 
 def test_field_laws_are_accessible() -> None:
     """field_laws must export all law constants."""
-    from app.field_laws import MAX_ATTRACTOR_PULL, MAX_COUPLING_TRANSFER, MAX_INSTABILITY_FLUX, PROPAGATION_DECAY_FLOOR
+    from app.field_laws import (
+        MAX_ATTRACTOR_PULL,
+        MAX_COUPLING_TRANSFER,
+        MAX_INSTABILITY_FLUX,
+        PROPAGATION_DECAY_FLOOR,
+    )
 
     assert PROPAGATION_DECAY_FLOOR == 0.3
     assert MAX_COUPLING_TRANSFER == 0.3

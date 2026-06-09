@@ -528,6 +528,7 @@ class PostgresWorkerQueueBase(ABC):
 
     async def cancel(self, task_id: str) -> bool:
         """Cancel a task. Handles both pending and in-flight tasks.
+
         Returns True if cancelled.
         """
         # Capture the in-flight task under the lock, then release the lock

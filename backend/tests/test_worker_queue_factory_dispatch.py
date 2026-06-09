@@ -27,7 +27,7 @@ def _driver_selection() -> str:
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch: pytest.MonkeyPatch):
+def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Reset DATAFORGE_PG_DRIVER and the queue instance for each test."""
     monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)
 

@@ -1,5 +1,6 @@
 """Semantic Event Dispatcher.
 ==========================
+
 Synchronous / Asynchronous propagation of semantic signals.
 """
 
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class EventDispatcher:
     """Central hub for semantic event propagation.
+
     Engines subscribe to specific event types to react to topological changes.
     """
 

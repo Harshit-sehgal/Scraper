@@ -65,7 +65,8 @@ class TestPsycopg3RepositoryContract:
     def test_get_job_returns_none_when_missing(self) -> None:
         """`get_job` should hit a real DB; here we just confirm the
         method is callable and propagates the no-connection error
-        cleanly (instead of returning the abstract sentinel)."""
+        cleanly (instead of returning the abstract sentinel).
+        """
         mod = _psycopg3_module()
         repo = mod.Psycopg3JobRepository(auto_ensure_schema=False)
         # No DB pool is open; we expect any underlying driver
@@ -131,7 +132,8 @@ class TestFactorySelectsPsycopg3:
         monkeypatch,
     ) -> None:
         """If the env var is set and a live DB exists, the resolver
-        returns ``Psycopg3JobRepository``."""
+        returns ``Psycopg3JobRepository``.
+        """
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
         monkeypatch.setenv("DATAFORGE_PG_DRIVER", "psycopg3")
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://x:y@h:5432/z")
@@ -167,7 +169,8 @@ class TestFactorySelectsPsycopg3:
     ) -> None:
         """If the operator requested psycopg3 but it isn't installed,
         the error message must be actionable (point at the install
-        command)."""
+        command).
+        """
         import sys
 
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
@@ -188,7 +191,8 @@ class TestFactorySelectsPsycopg3:
 
     def test_default_driver_is_psycopg2(self, monkeypatch) -> None:
         """When no driver is specified, the factory should keep using
-        psycopg2 (preserves existing behaviour)."""
+        psycopg2 (preserves existing behaviour).
+        """
         monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://x:y@h:5432/z")

@@ -45,6 +45,7 @@ from app.scraper_postprocess import (
     run_post_extraction_processing,
 )
 from app.selector_profiles.loader import match_profile_for_url, try_profile_extraction
+from app.utils.log_redaction import redact_url
 from app.zero_result_classifier import classify_zero_result
 
 if TYPE_CHECKING:
@@ -230,8 +231,11 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
 
             session_detect = detect_session_params(url)
             if session_detect.get("is_session_bound"):
-                logger.info("[SessionRecovery] URL %s is session-bound — checking for search form", url)
-                from app.selector_discovery import _detect_search_form, _try_form_search_recovery
+                logger.info("[SessionRecovery] URL %s is session-bound — checking for search form", redact_url(url))
+                from app.selector_discovery import (
+                    _detect_search_form,
+                    _try_form_search_recovery,
+                )
 
                 form_info = _detect_search_form(html)
                 if form_info.get("detected"):
@@ -245,9 +249,9 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                         return recovery_result["fresh_html"]
                     logger.warning("[SessionRecovery] Recovery failed: %s", recovery_result.get("error", "unknown"))
                 else:
-                    logger.info("[SessionRecovery] No search form detected on %s", url)
+                    logger.info("[SessionRecovery] No search form detected on %s", redact_url(url))
         except Exception as recovery_err:
-            logger.warning("[SessionRecovery] Recovery attempt failed for %s: %s", url, recovery_err)
+            logger.warning("[SessionRecovery] Recovery attempt failed for %s: %s", redact_url(url), recovery_err)
     elif not search_params:
         try:
             from app.session_url_detector import detect_session_params
@@ -256,7 +260,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
             if session_detect.get("is_session_bound"):
                 logger.warning(
                     "[SessionRecovery] URL %s is session-bound but no search_params provided",
-                    url,
+                    redact_url(url),
                 )
         except Exception:  # nosec B110  # noqa: RUF100, S110
             pass  # nosec B110
@@ -527,7 +531,10 @@ async def scrape_url(
 
     from app.domain_intelligence import get_domain_intelligence
     from app.recovery_strategies import AttemptContext
-    from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine  # research-shell, lazy
+    from app.strategy_evolution import (  # research-shell, lazy
+        FetchStrategy,
+        get_strategy_evolution_engine,
+    )
 
     if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContext):
         attempt_ctx = None
@@ -537,7 +544,7 @@ async def scrape_url(
         min_record_score = attempt_ctx.min_record_score_override
         logger.info("[Recovery] Using min_record_score override: %.2f", min_record_score)
 
-    logger.info("Fetching: %s", url)
+    logger.info("Fetching: %s", redact_url(url))
     telemetry = get_scrape_telemetry()
     from app.llm_bridge import reset_llm_call_count
 

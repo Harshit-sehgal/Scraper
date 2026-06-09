@@ -11,6 +11,7 @@ for the full extraction plan.
 
 import asyncio
 import logging
+from collections.abc import Callable
 
 from starlette.concurrency import run_in_threadpool
 
@@ -53,7 +54,8 @@ def _should_run_global_ai_structuring(
 
 def _build_skipped_report(all_raw_results: list[dict], _schema_fields: list) -> AiStructuringReport:
     """Return a report indicating global AI structuring was skipped
-    because per-source AI structuring was already applied."""
+    because per-source AI structuring was already applied.
+    """
     return {
         "applied": False,
         "reason": "skipped_global_ai_source_level_applied",
@@ -76,6 +78,7 @@ async def apply_global_ai_structuring(
     add_job_log,
     on_llm_call,
     min_record_score: float = 0.35,
+    cancel_check: Callable | None = None,
 ) -> tuple[list[dict], AiStructuringReport, list[str]]:
     """Apply global AI structuring to scraped records.
 
@@ -108,6 +111,11 @@ async def apply_global_ai_structuring(
     if not _should_run_global_ai_structuring(all_raw_results, schema_fields, ai_source_prediction, add_job_log):
         return all_raw_results, report, new_warnings
 
+    # Check for cancellation before starting expensive AI work
+    if cancel_check and await cancel_check():
+        add_job_log("AI structuring skipped — job canceled", level="warning")
+        return all_raw_results, report, new_warnings
+
     add_job_log(
         f"Running global AI structuring on {len(all_raw_results)} records...",
         level="info",
@@ -128,6 +136,11 @@ async def apply_global_ai_structuring(
         )
         llm_calls = get_llm_call_count()
         on_llm_call(llm_calls)
+
+        # Check for cancellation before running semantic pipeline
+        if cancel_check and await cancel_check():
+            add_job_log("AI structuring complete but semantic pipeline skipped — job canceled", level="warning")
+            return structured, report, new_warnings
 
         # Run the semantic pipeline on structured results
         from app.semantic_world_state import get_world_state

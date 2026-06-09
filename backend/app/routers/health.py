@@ -7,6 +7,7 @@ health-check concerns from the app factory.
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 from fastapi import APIRouter
@@ -19,6 +20,14 @@ from app.globals import jobs_store, recycle_bin_store
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["system"])
+
+# Strip absolute file paths from error messages to avoid leaking
+# filesystem layout through the /ready endpoint.
+_PATH_PATTERN = re.compile(r"/[\w/.\-]+")
+
+
+def _sanitise_error(msg: str) -> str:
+    return _PATH_PATTERN.sub("<path>", msg)
 
 
 def get_job_repository():
@@ -78,7 +87,7 @@ async def ready():
         if not health_info["ok"]:
             content = {"status": "not_ready"}
             if settings.ENV.lower() != "production":
-                content["error"] = health_info.get("error", "Backend unhealthy")
+                content["error"] = _sanitise_error(health_info.get("error", "Backend unhealthy"))
             return JSONResponse(
                 status_code=503,
                 content=content,
@@ -104,7 +113,7 @@ async def ready():
         record_health_check_latency(duration)
         content = {"status": "not_ready"}
         if settings.ENV.lower() != "production":
-            content["error"] = str(e)
+            content["error"] = _sanitise_error(str(e))
         return JSONResponse(
             status_code=503,
             content=content,

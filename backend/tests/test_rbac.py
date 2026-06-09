@@ -131,7 +131,8 @@ def test_api_middleware_admin_key_wins_over_user_key(client, monkeypatch) -> Non
     Bearer and a user X-API-Key header must be attributed to the admin
     role, not the user role. This is the contract that the auth
     middleware enforces by checking ``ADMIN_API_KEY`` before
-    ``API_KEY``."""
+    ``API_KEY``.
+    """
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret")
     monkeypatch.setattr(settings, "API_KEY", "user-secret")

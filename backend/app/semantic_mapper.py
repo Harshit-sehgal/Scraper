@@ -1,5 +1,6 @@
 """Layer 3: Semantic Mapper.
 =========================
+
 Universal semantic mapping that matches values to user intent by WHAT THEY ARE,
 not by WHERE THEY CAME FROM or what DOMAIN the page is from.
 

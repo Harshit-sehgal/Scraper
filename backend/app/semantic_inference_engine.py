@@ -1,5 +1,6 @@
 """Role Embedding Engine.
 =====================
+
 Learns and maintains geometric role embeddings within a topological manifold.
 Meaning is derived from similarity and stable field motifs.
 """

@@ -48,33 +48,33 @@ def _make_enabled(token: str = "123456:ABCDEFG", chat_id: str = "999") -> Telegr
 
 # ─── Configuration ─────────────────────────────────────────────────
 class TestConfiguration:
-    def test_disabled_by_default(self):
+    def test_disabled_by_default(self) -> None:
         n = TelegramNotifier()
         assert n.is_configured is False
         assert n.send_message("hi") is False
 
-    def test_enabled_but_missing_token(self, monkeypatch):
+    def test_enabled_but_missing_token(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "999")
         n = TelegramNotifier()
         assert n.is_configured is False
         assert "disabled" in n.status or "misconfigured" in n.status
 
-    def test_placeholder_token_is_rejected(self, monkeypatch):
+    def test_placeholder_token_is_rejected(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "999")
         n = TelegramNotifier()
         assert n.is_configured is False
 
-    def test_token_without_colon_is_rejected(self, monkeypatch):
+    def test_token_without_colon_is_rejected(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "notavalidtoken")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "999")
         n = TelegramNotifier()
         assert n.is_configured is False
 
-    def test_prefixed_env_vars_are_honoured(self, monkeypatch):
+    def test_prefixed_env_vars_are_honoured(self, monkeypatch) -> None:
         monkeypatch.setenv("DATAFORGE_TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("DATAFORGE_TELEGRAM_BOT_TOKEN", "123:abc")
         monkeypatch.setenv("DATAFORGE_TELEGRAM_CHAT_ID", "42")
@@ -83,7 +83,7 @@ class TestConfiguration:
         assert n.chat_id == "42"
         assert n.token == "123:abc"
 
-    def test_unprefixed_env_takes_precedence(self, monkeypatch):
+    def test_unprefixed_env_takes_precedence(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:legacy")
         monkeypatch.setenv("DATAFORGE_TELEGRAM_BOT_TOKEN", "123:prefixed")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "1")
@@ -94,19 +94,19 @@ class TestConfiguration:
 
 # ─── send_message ──────────────────────────────────────────────────
 class TestSendMessage:
-    def test_returns_false_when_not_configured(self):
+    def test_returns_false_when_not_configured(self) -> None:
         n = TelegramNotifier()
         with patch("app.utils.telegram_notifier.requests.post") as post:
             assert n.send_message("hi") is False
             post.assert_not_called()
 
-    def test_returns_false_on_empty_text(self):
+    def test_returns_false_on_empty_text(self) -> None:
         n = _make_enabled()
         with patch("app.utils.telegram_notifier.requests.post") as post:
             assert n.send_message("") is False
             post.assert_not_called()
 
-    def test_returns_true_on_2xx(self):
+    def test_returns_true_on_2xx(self) -> None:
         n = _make_enabled()
         response = MagicMock(status_code=200, text="{}")
         with patch("app.utils.telegram_notifier.requests.post", return_value=response) as post:
@@ -120,20 +120,20 @@ class TestSendMessage:
             assert payload["parse_mode"] == "HTML"
             assert payload["disable_web_page_preview"] is True
 
-    def test_returns_false_on_4xx(self):
+    def test_returns_false_on_4xx(self) -> None:
         n = _make_enabled()
         response = MagicMock(status_code=400, text='{"ok":false}')
         with patch("app.utils.telegram_notifier.requests.post", return_value=response):
             assert n.send_message("hi") is False
 
-    def test_returns_false_on_network_error(self):
+    def test_returns_false_on_network_error(self) -> None:
         import requests as _req
 
         n = _make_enabled()
         with patch("app.utils.telegram_notifier.requests.post", side_effect=_req.ConnectionError("boom")):
             assert n.send_message("hi") is False
 
-    def test_custom_api_base(self, monkeypatch):
+    def test_custom_api_base(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "1:a")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "1")
@@ -147,7 +147,7 @@ class TestSendMessage:
 
 
 # ─── High-level helpers ──────────────────────────────────────────
-def _wait_for_notifier_thread():
+def _wait_for_notifier_thread() -> None:
     """Join the daemon thread that the notifier spawns, with a small timeout."""
     for t in threading.enumerate():
         if t.name == "telegram-notifier":
@@ -161,7 +161,7 @@ def _wait_for_notifier_thread():
 
 
 class TestHighLevelHelpers:
-    def test_notify_test_failure_truncates_long_errors(self):
+    def test_notify_test_failure_truncates_long_errors(self) -> None:
         n = _make_enabled()
         long_error = "x" * 5000
         captured: dict = {}
@@ -180,7 +180,7 @@ class TestHighLevelHelpers:
         assert "…" in captured["text"]
         assert len(captured["text"]) < 1100  # well under the 5000-char input
 
-    def test_notify_test_end_builds_summary(self):
+    def test_notify_test_end_builds_summary(self) -> None:
         n = _make_enabled()
         captured: dict = {}
         response = MagicMock(status_code=200, text="{}")
@@ -206,7 +206,7 @@ class TestHighLevelHelpers:
         assert "12.5s" in body
         assert "✅" in body
 
-    def test_notify_critical_error_uses_emoji(self):
+    def test_notify_critical_error_uses_emoji(self) -> None:
         n = _make_enabled()
         captured: dict = {}
         response = MagicMock(status_code=200, text="{}")
@@ -222,7 +222,7 @@ class TestHighLevelHelpers:
         assert "🚨" in body
         assert "worker X died" in body
 
-    def test_high_level_helpers_are_silent_when_not_configured(self):
+    def test_high_level_helpers_are_silent_when_not_configured(self) -> None:
         n = TelegramNotifier()  # disabled
         # None of these should raise or call requests.post
         with patch("app.utils.telegram_notifier.requests.post") as post:
@@ -235,7 +235,7 @@ class TestHighLevelHelpers:
 
 # ─── Module-level singleton ──────────────────────────────────────
 class TestModuleSingleton:
-    def test_get_notifier_caches(self, monkeypatch):
+    def test_get_notifier_caches(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "1:a")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "1")
@@ -243,7 +243,7 @@ class TestModuleSingleton:
         b = get_notifier()
         assert a is b
 
-    def test_reset_notifier_rebuilds(self, monkeypatch):
+    def test_reset_notifier_rebuilds(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "1:a")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "1")
@@ -252,7 +252,7 @@ class TestModuleSingleton:
         b = get_notifier()
         assert a is not b
 
-    def test_notifier_module_attribute_is_built(self):
+    def test_notifier_module_attribute_is_built(self) -> None:
         # The module exposes a ``notifier`` singleton for backwards compat.
         assert isinstance(tn.notifier, TelegramNotifier)
 
@@ -271,7 +271,7 @@ class TestIsConfigured:
             (True, "9999999:xyzabcDEF", "555", True),
         ],
     )
-    def test_matrix(self, monkeypatch, enabled, token, chat_id, expected):
+    def test_matrix(self, monkeypatch, enabled, token, chat_id, expected) -> None:
         if enabled:
             monkeypatch.setenv("TELEGRAM_ENABLED", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", token)
@@ -290,7 +290,7 @@ class TestCIWorkflowAliases:
     notifier would never find the bot in CI.
     """
 
-    def test_telegram_token_maps_to_bot_token(self, monkeypatch):
+    def test_telegram_token_maps_to_bot_token(self, monkeypatch) -> None:
         monkeypatch.setenv("TELEGRAM_TOKEN", "111:right")
         monkeypatch.setenv("TELEGRAM_TO", "999")
         monkeypatch.setenv("TELEGRAM_ENABLED", "true")
@@ -299,7 +299,7 @@ class TestCIWorkflowAliases:
         assert n.token == "111:right"
         assert n.chat_id == "999"
 
-    def test_standard_name_takes_precedence(self, monkeypatch):
+    def test_standard_name_takes_precedence(self, monkeypatch) -> None:
         # If both forms are set, the standard Pydantic-settings name wins
         # so the two layers never disagree.
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "111:standard")
@@ -309,7 +309,7 @@ class TestCIWorkflowAliases:
         n = TelegramNotifier()
         assert n.token == "111:standard"
 
-    def test_dataforge_alias_still_honoured(self, monkeypatch):
+    def test_dataforge_alias_still_honoured(self, monkeypatch) -> None:
         # Backwards compatibility: the DATAFORGE_-prefixed names still
         # work as a third-tier fallback.
         monkeypatch.setenv("DATAFORGE_TELEGRAM_BOT_TOKEN", "111:df")
@@ -320,7 +320,7 @@ class TestCIWorkflowAliases:
         assert n.token == "111:df"
         assert n.chat_id == "1"
 
-    def test_ci_alias_works_with_dataforge_alias(self, monkeypatch):
+    def test_ci_alias_works_with_dataforge_alias(self, monkeypatch) -> None:
         # The CI alias and the DATAFORGE alias are different
         # namespaces, so both should be resolvable in different
         # environments.

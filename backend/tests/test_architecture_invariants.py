@@ -267,7 +267,7 @@ def test_no_dead_imports() -> None:
         # Check imports that don't appear in used names
         exceptions = {"Dict", "List", "Tuple", "Set", "Callable", "Optional", "Any"}
         dead_imports = []
-        for name in imports.keys():
+        for name in imports:
             if name not in used and name not in exceptions:
                 dead_imports.append(name)
 

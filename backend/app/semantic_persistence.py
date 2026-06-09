@@ -1,5 +1,6 @@
 """Semantic Persistence Hub.
 =========================
+
 Single orchestrator for all semantic memory and learned state.
 Unifies:
 1. Role compatibility (Role Manifold)

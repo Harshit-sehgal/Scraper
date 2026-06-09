@@ -28,7 +28,11 @@ from app.selector_memory import get_selector_memory
 if TYPE_CHECKING:
     from app.acquisition_state import AcquisitionLineage, AcquisitionState
     from app.models import SchemaField
-    from app.recovery_strategies import AttemptContext, get_recovery_executor, get_recovery_strategist
+    from app.recovery_strategies import (
+        AttemptContext,
+        get_recovery_executor,
+        get_recovery_strategist,
+    )
 else:
     # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
     class LazyEnumMeta(type):

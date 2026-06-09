@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 from app.services._job_log import log_job_message as _log
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

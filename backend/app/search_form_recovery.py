@@ -15,6 +15,8 @@ import re
 
 from bs4 import BeautifulSoup
 
+from app.utils.log_redaction import redact_url
+
 logger = logging.getLogger(__name__)
 
 
@@ -389,7 +391,7 @@ async def _try_form_search_recovery(
                     "error": f"Search form submission returned HTTP {resp.status_code}",
                 }
 
-            logger.info("[SearchRecovery] Form submitted successfully → %s (status %d)", fresh_url, resp.status_code)
+            logger.info("[SearchRecovery] Form submitted successfully → %s (status %d)", redact_url(fresh_url), resp.status_code)
 
             return {
                 "success": True,

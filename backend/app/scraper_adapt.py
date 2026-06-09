@@ -98,7 +98,9 @@ def _run_selector_decay_prediction(domain: str, selector_hit_rate: float) -> Non
     Fire-and-forget: failures are logged but never propagated.
     """
     try:
-        from app.selector_decay_predictor import get_selector_decay_predictor  # research-shell, lazy
+        from app.selector_decay_predictor import (
+            get_selector_decay_predictor,  # research-shell, lazy
+        )
 
         decay_predictor = get_selector_decay_predictor()
         decay_predictor.record_observation(domain, selector_hit_rate)
@@ -122,7 +124,9 @@ def _run_domain_evolution_modeling(domain: str, extraction_method: str, anti_bot
     Fire-and-forget: failures are logged but never propagated.
     """
     try:
-        from app.domain_evolution_model import get_domain_evolution_model  # research-shell, lazy
+        from app.domain_evolution_model import (
+            get_domain_evolution_model,  # research-shell, lazy
+        )
 
         evolution_model = get_domain_evolution_model()
         if extraction_method == "regex":
@@ -145,7 +149,9 @@ def _run_self_tuning_extraction(
     Fire-and-forget: failures are logged but never propagated.
     """
     try:
-        from app.self_tuning_extraction import get_self_tuning_controller  # research-shell, lazy
+        from app.self_tuning_extraction import (
+            get_self_tuning_controller,  # research-shell, lazy
+        )
 
         tuning_controller = get_self_tuning_controller()
         tuning_controller.record_telemetry(

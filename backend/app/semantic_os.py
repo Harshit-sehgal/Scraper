@@ -1,5 +1,6 @@
 """Semantic OS — Official Engine Interface.
 ======================================
+
 The production-hardened API for interacting with the Semantic Field Dynamics.
 Provides high-level orchestration, state governance, and topological search.
 """

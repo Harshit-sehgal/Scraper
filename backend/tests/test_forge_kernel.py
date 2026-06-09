@@ -17,7 +17,13 @@ from forge_kernel.config.settings import (
     SecuritySettings,
     StorageSettings,
 )
-from forge_kernel.contracts.job import FieldType, Job, JobStatus, SchemaField, ScrapeMode
+from forge_kernel.contracts.job import (
+    FieldType,
+    Job,
+    JobStatus,
+    SchemaField,
+    ScrapeMode,
+)
 from forge_kernel.services.job_service import JobService
 
 # ─────────────────────────────────────────────────────────────────────

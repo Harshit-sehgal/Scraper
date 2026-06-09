@@ -113,7 +113,10 @@ class TestDomainPolicyEndpoint:
     @pytest.mark.asyncio
     async def test_domain_policy_includes_domain_keys(self) -> None:
         """After recording failures, the endpoint should include that domain."""
-        from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+        from app.domain_runtime_policy import (
+            get_domain_runtime_policy,
+            reset_domain_runtime_policy,
+        )
 
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
@@ -125,7 +128,10 @@ class TestDomainPolicyEndpoint:
     @pytest.mark.asyncio
     async def test_domain_policy_includes_recommended_action(self) -> None:
         """Each domain entry should include a recommended_action."""
-        from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+        from app.domain_runtime_policy import (
+            get_domain_runtime_policy,
+            reset_domain_runtime_policy,
+        )
 
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()

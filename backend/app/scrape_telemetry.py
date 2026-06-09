@@ -109,8 +109,11 @@ class ScrapeTelemetryCollector:
             from app.domain_intelligence import get_domain_intelligence
 
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
-        except Exception:  # nosec B110  # noqa: RUF100, S110
-            pass  # nosec B110
+        except Exception:
+            logger.exception(
+                "Failed to update domain intelligence for %s (telemetry not lost)",
+                url,
+            )
 
         # Emit to semantic world state observability if available
         try:
@@ -140,8 +143,11 @@ class ScrapeTelemetryCollector:
                     "retries": telemetry.retry_count,
                 },
             )
-        except Exception:  # nosec B110  # noqa: RUF100, S110
-            pass  # nosec B110
+        except Exception:
+            logger.exception(
+                "Failed to emit scrape telemetry to world state for %s (telemetry not lost)",
+                url,
+            )
 
         return telemetry
 

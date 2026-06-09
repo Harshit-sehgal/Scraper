@@ -142,7 +142,10 @@ def _is_empty_value(value) -> bool:
 
 def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool:
     """Determine if a record is noise using semantic density and structural analysis."""
-    from app.semantic_segmentation import is_likely_noise_field, segment_single_text  # research-shell, lazy
+    from app.semantic_segmentation import (  # research-shell, lazy
+        is_likely_noise_field,
+        segment_single_text,
+    )
 
     all_values = []
     for value in record.values():

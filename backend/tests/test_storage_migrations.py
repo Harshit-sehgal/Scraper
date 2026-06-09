@@ -30,10 +30,11 @@ def tmp_db(tmp_path):
 # ── Test 1: schema has all expected columns ────────────────────────────────
 
 
-def test_sqlite_schema_has_all_expected_columns(monkeypatch, tmp_db):
+def test_sqlite_schema_has_all_expected_columns(monkeypatch, tmp_db) -> None:
     """The ``jobs`` table should contain every column listed in _JOBS_COLUMNS_SQL,
     except for columns that are exclusive to ``recycle_bin`` (``deleted_at``)
-    or not yet wired into the DDL (``updated_at``)."""
+    or not yet wired into the DDL (``updated_at``).
+    """
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
     conn = _get_connection()
@@ -63,7 +64,7 @@ def test_sqlite_schema_has_all_expected_columns(monkeypatch, tmp_db):
 # ── Test 2: create_tables / _run_migrations is idempotent ──────────────────
 
 
-def test_run_migrations_is_idempotent(monkeypatch, tmp_db):
+def test_run_migrations_is_idempotent(monkeypatch, tmp_db) -> None:
     """Calling _run_migrations twice on the same connection must not error."""
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
@@ -86,7 +87,7 @@ def test_run_migrations_is_idempotent(monkeypatch, tmp_db):
 # ── Test 3: job save/load round-trip ────────────────────────────────────────
 
 
-def test_job_save_and_load_round_trip(monkeypatch, tmp_db):
+def test_job_save_and_load_round_trip(monkeypatch, tmp_db) -> None:
     """A job saved via save_state should be fully recoverable via load_state."""
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
@@ -98,7 +99,7 @@ def test_job_save_and_load_round_trip(monkeypatch, tmp_db):
     )
     save_state({job.id: job}, {})
 
-    jobs, recycle, _ = load_state(recover_in_progress=False)
+    jobs, _recycle, _ = load_state(recover_in_progress=False)
 
     assert "rt-001" in jobs
     loaded = jobs["rt-001"]
@@ -111,9 +112,10 @@ def test_job_save_and_load_round_trip(monkeypatch, tmp_db):
 # ── Test 4: missing columns handled gracefully (simulated old schema) ───────
 
 
-def test_load_state_handles_missing_columns_gracefully(monkeypatch, tmp_db):
+def test_load_state_handles_missing_columns_gracefully(monkeypatch, tmp_db) -> None:
     """If the database was created by an older version that lacked newer columns,
-    load_state should still succeed (using column defaults from _row_to_job)."""
+    load_state should still succeed (using column defaults from _row_to_job).
+    """
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
     # First, create a full schema via normal migrations
@@ -187,7 +189,7 @@ def test_load_state_handles_missing_columns_gracefully(monkeypatch, tmp_db):
     conn.close()
 
     # load_state must not crash — _row_to_job supplies defaults for missing columns
-    jobs, recycle, _ = load_state(recover_in_progress=False)
+    jobs, _recycle, _ = load_state(recover_in_progress=False)
     assert "old-schema-job" in jobs
     assert jobs["old-schema-job"].name == "Old Schema Job"
 
@@ -195,7 +197,7 @@ def test_load_state_handles_missing_columns_gracefully(monkeypatch, tmp_db):
 # ── Test 5: load_all returns empty dicts on fresh database ──────────────────
 
 
-def test_load_state_returns_empty_on_fresh_database(monkeypatch, tmp_db):
+def test_load_state_returns_empty_on_fresh_database(monkeypatch, tmp_db) -> None:
     """A brand-new database (just migrated) should yield empty dicts and None world state."""
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
@@ -209,7 +211,7 @@ def test_load_state_returns_empty_on_fresh_database(monkeypatch, tmp_db):
 # ── Bonus: schema version matches expected constant ─────────────────────────
 
 
-def test_schema_version_matches_current_constant(monkeypatch, tmp_db):
+def test_schema_version_matches_current_constant(monkeypatch, tmp_db) -> None:
     """After migrations the schema_version row should equal _CURRENT_SCHEMA_VERSION."""
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
@@ -224,7 +226,7 @@ def test_schema_version_matches_current_constant(monkeypatch, tmp_db):
 # ── Bonus: companion tables exist after migration ───────────────────────────
 
 
-def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db):
+def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db) -> None:
     """Migration from v5 to v6 should rebuild worker_heartbeats with composite PK."""
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 
@@ -266,9 +268,9 @@ def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db):
     conn.row_factory = sqlite3.Row
     _run_migrations(conn)
 
-    # Verify schema_version is now 6
+    # Verify schema_version matches _CURRENT_SCHEMA_VERSION
     ver_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-    assert ver_row[0] == 6, f"Expected schema version 6, got {ver_row[0]}"
+    assert ver_row[0] == _CURRENT_SCHEMA_VERSION, f"Expected schema version {_CURRENT_SCHEMA_VERSION}, got {ver_row[0]}"
 
     # Verify worker_heartbeats has composite PK (worker_id, pid)
     table_info = conn.execute("PRAGMA table_info(worker_heartbeats)").fetchall()
@@ -286,7 +288,7 @@ def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db):
     assert rows[1]["pid"] == 2001
 
 
-def test_multi_instance_state_visibility_via_sqlite(monkeypatch, tmp_db):
+def test_multi_instance_state_visibility_via_sqlite(monkeypatch, tmp_db) -> None:
     """Simulate two independent app instances sharing the same SQLite DB.
 
     Instance A saves a job, Instance B loads it — proving cross-instance
@@ -306,7 +308,7 @@ def test_multi_instance_state_visibility_via_sqlite(monkeypatch, tmp_db):
     save_state({job_a.id: job_a}, {})
 
     # ── Instance B: load from the same DB file ─────────────────────────
-    jobs_b, recycle_b, _ = load_state(recover_in_progress=False)
+    jobs_b, _recycle_b, _ = load_state(recover_in_progress=False)
 
     assert "multi-instance-001" in jobs_b, "Instance B should see Instance A's job"
     loaded = jobs_b["multi-instance-001"]
@@ -342,7 +344,7 @@ def test_multi_instance_state_visibility_via_sqlite(monkeypatch, tmp_db):
     assert recycle_b2["multi-instance-002"].name == "Recycled Job"
 
 
-def test_companion_tables_created_by_migrations(monkeypatch, tmp_db):
+def test_companion_tables_created_by_migrations(monkeypatch, tmp_db) -> None:
     """v4+ migrations should create the job_results and job_events tables."""
     monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
 

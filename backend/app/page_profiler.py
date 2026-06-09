@@ -1,5 +1,6 @@
 """Layer 2: Page Profiler.
 ======================
+
 Universal page structure detection that works for ANY data type.
 
 Core principle: Detect structure and value patterns, not domain-specific features.

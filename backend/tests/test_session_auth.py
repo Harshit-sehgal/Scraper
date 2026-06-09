@@ -10,7 +10,7 @@ Verifies that the session cookie exchange flow works correctly:
 from app.config import settings
 
 
-def _set_api_key(monkeypatch, key="test-key", admin_key=""):
+def _set_api_key(monkeypatch, key="test-key", admin_key="") -> None:
     """Helper to configure API keys for session auth tests."""
     monkeypatch.setattr(settings, "API_KEY", key)
     monkeypatch.setattr(settings, "ADMIN_API_KEY", admin_key)

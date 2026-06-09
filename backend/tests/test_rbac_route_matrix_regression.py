@@ -112,7 +112,8 @@ def test_user_key_can_read_user_routes(authed_client) -> None:
 def test_csp_violations_endpoint_is_unauthenticated(authed_client) -> None:
     """Browsers cannot carry API keys, so the CSP violation endpoint
     must be reachable without authentication. The middleware should
-    exempt ``/api/system/csp-violations`` from API-key enforcement."""
+    exempt ``/api/system/csp-violations`` from API-key enforcement.
+    """
     r = authed_client.post(
         "/api/system/csp-violations",
         json={"csp-report": {"violated-directive": "script-src 'self'"}},
@@ -122,7 +123,8 @@ def test_csp_violations_endpoint_is_unauthenticated(authed_client) -> None:
 
 def test_csp_violations_endpoint_works_with_user_key(authed_client) -> None:
     """The CSP endpoint should still work even with a user key sent —
-    the middleware should ignore the key, not reject it."""
+    the middleware should ignore the key, not reject it.
+    """
     r = authed_client.post(
         "/api/system/csp-violations",
         headers=_hdr("user"),

@@ -155,7 +155,8 @@ class TestGridPositions:
 
     def _rects_overlap(self, a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
         """Two rectangles (x1,y1,x2,y2) overlap if neither is fully to the
-        left, right, above, or below the other."""
+        left, right, above, or below the other.
+        """
         return a[0] < b[2] and a[2] > b[0] and a[1] < b[3] and a[3] > b[1]
 
     def test_all_panels_have_gridpos(self, dashboard: dict) -> None:

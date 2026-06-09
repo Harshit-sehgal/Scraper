@@ -26,7 +26,7 @@ class TestCSPReportOnlyHeader:
         assert r.status_code in (200, 401, 403, 503)
         if r.status_code == 200:
             header = "content-security-policy-report-only"
-            assert header in {k.lower() for k in r.headers.keys()}, dict(r.headers)
+            assert header in {k.lower() for k in r.headers}, dict(r.headers)
             value = r.headers.get(header) or r.headers.get(header.title())
             assert "default-src 'self'" in value
             assert "report-uri /api/system/csp-violations" in value
@@ -36,14 +36,14 @@ class TestCSPReportOnlyHeader:
         # 200 (no auth) or 401/403 (with auth); both should carry the header.
         assert r.status_code in (200, 401, 403)
         header = "content-security-policy-report-only"
-        assert header in {k.lower() for k in r.headers.keys()}, dict(r.headers)
+        assert header in {k.lower() for k in r.headers}, dict(r.headers)
 
     def test_metrics_response_carries_csp_header(self, client) -> None:
         r = client.get("/metrics")
         # /metrics is unauthenticated by default; should carry the header.
         assert r.status_code in (200, 401, 403)
         header = "content-security-policy-report-only"
-        assert header in {k.lower() for k in r.headers.keys()}, dict(r.headers)
+        assert header in {k.lower() for k in r.headers}, dict(r.headers)
 
 
 class TestCSPViolationsEndpoint:
@@ -134,7 +134,7 @@ class TestCSPReportOnlyToggle:
 
             request = Request(scope, receive)
             response = await csp_report_only_middleware(request, call_next)
-            assert "content-security-policy-report-only" not in {k.lower() for k in response.headers.keys()}
+            assert "content-security-policy-report-only" not in {k.lower() for k in response.headers}
         finally:
             monkeypatch.setattr(settings, "CSP_REPORT_ONLY", original)
 

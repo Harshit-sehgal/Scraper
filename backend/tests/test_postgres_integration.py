@@ -366,7 +366,12 @@ class TestPostgresSchemaRepairIntegration:
         Then: recycle_bin table is created, schema upgraded to version 2.
         """
         import psycopg2
-        from app.postgres_repository import PostgresJobRepository, _close_pool, _conn, _fetch_one
+        from app.postgres_repository import (
+            PostgresJobRepository,
+            _close_pool,
+            _conn,
+            _fetch_one,
+        )
         from app.storage_interface import reset_repository
 
         dsn = os.environ["DATAFORGE_DATABASE_URL"]

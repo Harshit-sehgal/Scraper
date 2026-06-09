@@ -1,5 +1,6 @@
 """Auto-Discovery Engine: Given a topic / query, automatically finds the best
 web pages to scrape by searching the web and ranking results.
+
 Uses free search via DuckDuckGo.
 """
 
@@ -266,6 +267,7 @@ async def discover_urls(
     max_per_domain: int = 4,
 ) -> list[dict]:
     """Auto-discover the best URLs to scrape for a given query.
+
     Uses DDG search and lightweight ranking to prioritize high-signal pages.
     """
     data_fields = data_fields or []

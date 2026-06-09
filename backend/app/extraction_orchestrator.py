@@ -15,7 +15,10 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
-from app.container_discovery import classify_container_failure, multi_pass_container_extraction
+from app.container_discovery import (
+    classify_container_failure,
+    multi_pass_container_extraction,
+)
 from app.extraction_provenance import ExtractionMethod, ProvenanceBuilder
 from app.models import FieldType, SchemaField
 from app.network_extractor import extract_from_network
@@ -288,7 +291,10 @@ async def orchestrate_extraction(
             pass  # nosec B110
 
     # Extract network results
-    from app.network_payload_extractor import arbitrate_sources, extract_from_network_payloads
+    from app.network_payload_extractor import (
+        arbitrate_sources,
+        extract_from_network_payloads,
+    )
 
     network_result = extract_from_network_payloads(bodies, schema_fields)
 
@@ -806,6 +812,7 @@ def _detect_field_swaps(
 
 def _check_type_compatibility(field_type: FieldType, values: list) -> float:
     """Check if values are compatible with a given FieldType.
+
     Returns a score from 0.0 (incompatible) to 1.0 (best observed match).
     """
     import re

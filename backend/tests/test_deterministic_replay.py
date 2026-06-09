@@ -292,7 +292,7 @@ def test_all_replayable_subsystems_record() -> None:
     }
 
     with ws.transaction("all_subsystems"):
-        for _name, fn in subsystems.items():
+        for fn in subsystems.values():
             fn()
 
     tx = _capture_last_tx(ws)

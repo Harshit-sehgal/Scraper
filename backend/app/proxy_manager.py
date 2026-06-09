@@ -13,6 +13,7 @@ import logging
 from collections import defaultdict
 
 from app.config import settings
+from app.utils.log_redaction import mask_proxy_url
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class ProxyManager:
 
         # Rotate if threshold exceeded
         if self._failure_counts[proxy] >= settings.PROXY_ROTATION_FAILURE_THRESHOLD:
-            logger.warning("Proxy %s reached %d failures, rotating", proxy, self._failure_counts[proxy])
+            logger.warning("Proxy %s reached %d failures, rotating", mask_proxy_url(proxy), self._failure_counts[proxy])
             self.rotate(domain=domain)
             self._failure_counts[proxy] = 0
 
@@ -96,7 +97,7 @@ class ProxyManager:
         current = self.current_proxy
         if domain and current:
             self._proxy_blocked_domains[current].add(domain)
-            logger.debug("Proxy %s blocked for domain %s", current, domain)
+            logger.debug("Proxy %s blocked for domain %s", mask_proxy_url(current), domain)
 
         # Find next proxy that isn't blocked for this domain
         starting_index = self._current_index
@@ -118,7 +119,7 @@ class ProxyManager:
                 break
 
         new_proxy = self._proxy_list[self._current_index]
-        logger.debug("Rotated to proxy: %s", new_proxy)
+        logger.debug("Rotated to proxy: %s", mask_proxy_url(new_proxy))
         return new_proxy
 
     def reset_consecutive_failures(self) -> None:

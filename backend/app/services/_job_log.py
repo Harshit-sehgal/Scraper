@@ -14,8 +14,10 @@ Usage::
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def log_job_message(job: Any, message: str, level: str = "info", persist_fn: Callable | None = None) -> None:
@@ -26,6 +28,7 @@ def log_job_message(job: Any, message: str, level: str = "info", persist_fn: Cal
         message: The log message text.
         level: Log level (``info``, ``warning``, ``error``).
         persist_fn: Optional zero-arg callable to persist state after logging.
+
     """
     from app.models import LogEntry
 

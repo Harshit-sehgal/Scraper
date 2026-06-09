@@ -6,7 +6,11 @@ import time
 
 import pytest
 from app.crawl_policy import get_crawl_policy
-from app.federation_manager import FederationManager, ShardStateSnapshot, _decode_motif_key
+from app.federation_manager import (
+    FederationManager,
+    ShardStateSnapshot,
+    _decode_motif_key,
+)
 from app.semantic_world_state import get_world_state
 
 

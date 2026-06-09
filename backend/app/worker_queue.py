@@ -727,6 +727,52 @@ class WorkerQueue:
             finally:
                 conn.close()
 
+    async def _check_and_recover_stuck_tasks(self) -> None:
+        """Periodically check for tasks stuck in 'running' state for too long.
+
+        Tasks that exceed 2x their timeout are reset to 'pending' for retry.
+        This handles cases where the worker process didn't fully crash but
+        a task is hung (e.g., blocked IO, network stall).
+        """
+        try:
+            with _DB_LOCK:
+                conn = self._conn()
+                try:
+                    # Find tasks that have been running for more than 2x their timeout
+                    stuck_tasks = conn.execute(
+                        """SELECT id, type, timeout_seconds, started_at
+                           FROM tasks
+                           WHERE status = 'running'
+                             AND started_at IS NOT NULL""",
+                    ).fetchall()
+
+                    now = datetime.datetime.now(tz=datetime.UTC)
+                    recovered = 0
+                    for row in stuck_tasks:
+                        task_id = row["id"]
+                        timeout_secs = row["timeout_seconds"] or 300  # Default 5 min
+                        started_at_str = row["started_at"]
+                        try:
+                            started_at = datetime.datetime.fromisoformat(started_at_str)
+                            elapsed = (now - started_at).total_seconds()
+                            # If running for more than 2x timeout, it's stuck
+                            if elapsed > timeout_secs * 2:
+                                conn.execute(
+                                    "UPDATE tasks SET status = 'pending', started_at = NULL, last_error = ? WHERE id = ?",
+                                    (f"Stuck for {elapsed:.0f}s (timeout={timeout_secs}s)", task_id),
+                                )
+                                recovered += 1
+                        except (ValueError, TypeError):
+                            continue
+
+                    if recovered > 0:
+                        conn.commit()
+                        logger.warning("Recovered %d stuck task(s) during periodic check", recovered)
+                finally:
+                    conn.close()
+        except Exception:
+            logger.debug("Periodic stuck-task check failed", exc_info=True)
+
     async def stop(self, drain: bool = True) -> None:
         """Stop the worker loop. Optionally drain in-flight tasks."""
         self._running = False
@@ -745,8 +791,16 @@ class WorkerQueue:
 
     async def _worker_loop(self) -> None:
         """Main worker loop: dequeue and dispatch tasks."""
+        last_stuck_check = time.monotonic()
+        STUCK_CHECK_INTERVAL = 60.0  # Check for stuck tasks every 60 seconds
         while self._running:
             try:
+                # Periodic stuck-task detection
+                now = time.monotonic()
+                if now - last_stuck_check >= STUCK_CHECK_INTERVAL:
+                    last_stuck_check = now
+                    await self._check_and_recover_stuck_tasks()
+
                 # Acquire a concurrency permit *before* dequeue so the
                 # budget is reserved atomically. If the permit is not
                 # available we yield for a poll interval and try again —
@@ -869,7 +923,10 @@ class WorkerQueue:
                         )
                     # Mark in-memory rate-limit state for the domain /
                     # task-type
-                    from app.utils.rate_limit import get_cooldown_seconds, mark_rate_limited
+                    from app.utils.rate_limit import (
+                        get_cooldown_seconds,
+                        mark_rate_limited,
+                    )
 
                     mark_rate_limited(task.type, retry_after=retry_after)
                     cooldown = get_cooldown_seconds(task.type)

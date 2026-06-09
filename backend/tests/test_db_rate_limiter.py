@@ -1,6 +1,10 @@
 import time
 
-from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware, SlidingWindowCounter
+from app.rate_limiter import (
+    DatabaseSlidingWindowCounter,
+    RateLimiterMiddleware,
+    SlidingWindowCounter,
+)
 
 
 def _cleanup_rate_limit_key(key: str) -> None:
@@ -170,7 +174,8 @@ def test_prune_all_safe_before_initialization() -> None:
 
 def test_db_counter_is_expired() -> None:
     """Verify that DatabaseSlidingWindowCounter.is_expired() returns True for
-    a counter with no recent entries and False after activity."""
+    a counter with no recent entries and False after activity.
+    """
     test_key = _generate_test_key()
     _cleanup_rate_limit_key(test_key)
     counter = DatabaseSlidingWindowCounter(max_requests=5, window_seconds=2.0, key=test_key)

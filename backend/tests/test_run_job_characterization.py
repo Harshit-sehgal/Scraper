@@ -6,6 +6,7 @@ as the monolithic version.
 
 from __future__ import annotations
 
+from typing import NoReturn
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -61,12 +62,12 @@ def _make_job(
     return job
 
 
-def _noop_persist():
+def _noop_persist() -> None:
     pass
 
 
 @pytest.mark.asyncio
-async def test_run_job_cancel_before_execution():
+async def test_run_job_cancel_before_execution() -> None:
     """Job with cancel_requested=True is marked canceled immediately."""
     jobs_store = {}
     job = _make_job(cancel_requested=True)
@@ -90,7 +91,7 @@ async def test_run_job_cancel_before_execution():
 
 
 @pytest.mark.asyncio
-async def test_run_job_manual_mode_no_urls():
+async def test_run_job_manual_mode_no_urls() -> None:
     """Manual mode job with empty URLs ends with EMPTY_RESULT."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=[])
@@ -112,7 +113,7 @@ async def test_run_job_manual_mode_no_urls():
 
 
 @pytest.mark.asyncio
-async def test_run_job_auto_mode_discovery_failure():
+async def test_run_job_auto_mode_discovery_failure() -> None:
     """Auto mode with no discovered URLs fails gracefully."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.AUTO, urls=[])
@@ -139,7 +140,7 @@ async def test_run_job_auto_mode_discovery_failure():
 
 
 @pytest.mark.asyncio
-async def test_run_job_manual_mode_scrape_success():
+async def test_run_job_manual_mode_scrape_success() -> None:
     """Manual mode job with URLs completes successfully (mocked scrape)."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=["https://example.com"])
@@ -187,7 +188,7 @@ async def test_run_job_manual_mode_scrape_success():
 
 
 @pytest.mark.asyncio
-async def test_run_job_scrape_exception_empty_result():
+async def test_run_job_scrape_exception_empty_result() -> None:
     """Exception inside _scrape_single_url produces EMPTY_RESULT (caught internally)."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=["https://example.com"])
@@ -231,14 +232,14 @@ async def test_run_job_scrape_exception_empty_result():
 
 
 @pytest.mark.asyncio
-async def test_run_job_persist_called_on_empty():
+async def test_run_job_persist_called_on_empty() -> None:
     """Persist functions are called during job completion with empty URLs."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=[])
     jobs_store[job.id] = job
     called = {"fn": False}
 
-    def track():
+    def track() -> None:
         called["fn"] = True
 
     await run_job(
@@ -258,7 +259,7 @@ async def test_run_job_persist_called_on_empty():
 
 
 @pytest.mark.asyncio
-async def test_run_job_degraded_when_partial_urls_succeed():
+async def test_run_job_degraded_when_partial_urls_succeed() -> None:
     """Job is DEGRADED when some but not all URLs produce results."""
     jobs_store = {}
     job = _make_job(
@@ -318,7 +319,7 @@ async def test_run_job_degraded_when_partial_urls_succeed():
 
 
 @pytest.mark.asyncio
-async def test_run_job_all_urls_blocked_by_domain_policy():
+async def test_run_job_all_urls_blocked_by_domain_policy() -> None:
     """All URLs blocked by domain policy results in EMPTY_RESULT."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=["https://cooldown.example"])
@@ -355,7 +356,7 @@ async def test_run_job_all_urls_blocked_by_domain_policy():
 
 
 @pytest.mark.asyncio
-async def test_run_job_empty_results_no_ai_struct():
+async def test_run_job_empty_results_no_ai_struct() -> None:
     """Empty raw results skip AI structuring phase cleanly."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=["https://example.com"])
@@ -399,7 +400,7 @@ async def test_run_job_empty_results_no_ai_struct():
 
 
 @pytest.mark.asyncio
-async def test_run_job_insight_timeout_produces_analysis():
+async def test_run_job_insight_timeout_produces_analysis() -> None:
     """Insight timeout produces a fallback analysis message."""
     jobs_store = {}
     job = _make_job(mode=ScrapeMode.MANUAL, urls=["https://example.com"])
@@ -412,7 +413,7 @@ async def test_run_job_insight_timeout_produces_analysis():
     mock_ws.transaction.return_value.__enter__ = MagicMock()
     mock_ws.transaction.return_value.__exit__ = MagicMock(return_value=False)
 
-    async def timeout_insight(*args, **kwargs):
+    async def timeout_insight(*args, **kwargs) -> NoReturn:
         raise TimeoutError
 
     with (

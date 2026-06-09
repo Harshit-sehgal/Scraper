@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from forge_kernel.api.deps import (
     get_jobs_store,
     get_recycle_bin_store,
+    require_admin,
     require_operator,
     require_viewer,
 )
@@ -112,9 +113,9 @@ async def restore_job(
 async def hard_delete_job(
     job_id: str,
     service: Annotated[JobService, Depends(_get_service)],
-    _: Annotated[str, Depends(require_operator)],
+    _: Annotated[str, Depends(require_admin)],
 ):
-    """Permanently delete a job from the recycle bin."""
+    """Permanently delete a job from the recycle bin. Requires Admin role."""
     success = service.hard_delete(job_id)
     if not success:
         raise HTTPException(status_code=404, detail="Job not found")

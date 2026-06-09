@@ -67,6 +67,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   // session cookie, no API key prompt is needed.
   await checkSession();
 
+  // Fetch experimental feature flag from the public root endpoint
+  // and reveal experimental UI elements when enabled.
+  fetch("/")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.experimental_enabled) {
+        document.body.dataset.experimental = "true";
+        document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
+          el.classList.add("visible");
+        });
+      }
+    })
+    .catch(() => {});
+
   const uiState = readUIState();
 
   // Restore search/status filters
@@ -194,27 +208,52 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   switchView(initialView);
 
-  // ── Polling intervals ──
+  // ── Polling intervals (recursive setTimeout to prevent overlapping calls) ──
   const refreshInterval =
     typeof window.DATAFORGE_REFRESH_INTERVAL === "number" ? window.DATAFORGE_REFRESH_INTERVAL : 10000;
   const statusInterval =
     typeof window.DATAFORGE_STATUS_INTERVAL === "number" ? window.DATAFORGE_STATUS_INTERVAL : 10000;
-  setInterval(() => {
-    setEnginePolling(true);
-    Promise.resolve(refreshJobs()).finally(() => setEnginePolling(false));
-    updateJobsLastUpdatedLabel();
-  }, refreshInterval);
-  setInterval(refreshSystemStatus, statusInterval);
+  const scheduleJobsRefresh = () => {
+    setTimeout(async () => {
+      setEnginePolling(true);
+      try {
+        await refreshJobs();
+      } finally {
+        setEnginePolling(false);
+        updateJobsLastUpdatedLabel();
+        scheduleJobsRefresh();
+      }
+    }, refreshInterval);
+  };
+  const scheduleStatusRefresh = () => {
+    setTimeout(async () => {
+      try {
+        await refreshSystemStatus();
+      } finally {
+        scheduleStatusRefresh();
+      }
+    }, statusInterval);
+  };
+  const scheduleDashboardRefresh = () => {
+    setTimeout(async () => {
+      const { currentView } = window.__DATAFORGE_VIEW || {};
+      if (currentView === "dashboard") {
+        try {
+          await refreshDashboard();
+        } catch {
+          // dashboard refresh failed silently
+        }
+      }
+      scheduleDashboardRefresh();
+    }, 30000);
+  };
+  scheduleJobsRefresh();
+  scheduleStatusRefresh();
+  scheduleDashboardRefresh();
 
   // Engine connection check
   window.addEventListener("online", () => setEnginePolling(true));
   window.addEventListener("offline", () => setEnginePolling(false));
-
-  // Dashboard polling (every 30s)
-  setInterval(() => {
-    const { currentView } = window.__DATAFORGE_VIEW || {};
-    if (currentView === "dashboard") refreshDashboard();
-  }, 30000);
 
   // ── Central event delegation for all data-action elements ──
   document.addEventListener("click", (e) => {

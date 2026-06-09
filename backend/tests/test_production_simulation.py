@@ -320,7 +320,11 @@ class TestMetricsCollection:
 
     def test_request_latency_recording(self) -> None:
         """Request latencies should be recorded and aggregated."""
-        from app.metrics_collector import get_request_latencies, record_request_latency, reset_for_testing
+        from app.metrics_collector import (
+            get_request_latencies,
+            record_request_latency,
+            reset_for_testing,
+        )
 
         reset_for_testing()
 
@@ -353,7 +357,11 @@ class TestMetricsCollection:
 
     def test_llm_call_counting(self) -> None:
         """LLM calls should be counted for cost and usage tracking."""
-        from app.metrics_collector import get_llm_calls, record_llm_call, reset_for_testing
+        from app.metrics_collector import (
+            get_llm_calls,
+            record_llm_call,
+            reset_for_testing,
+        )
 
         reset_for_testing()
 

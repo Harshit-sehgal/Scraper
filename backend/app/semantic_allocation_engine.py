@@ -1,5 +1,6 @@
 """Global Semantic Allocation Engine.
 ====================================
+
 Replaces local field matching with global graph-based semantic allocation.
 
 The engine stops asking:

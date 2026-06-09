@@ -185,6 +185,7 @@ async def run_job(
             add_job_log=lambda msg, level="info": _add_job_log(job, msg, level=level, persist_fn=persist_job_state_fn),
             on_llm_call=lambda count: setattr(job, "total_llm_calls", job.total_llm_calls + count),
             min_record_score=job.min_record_score or 0.35,
+            cancel_check=_cancel_requested_from_db,
         )
         warnings.extend(struct_warnings)
 

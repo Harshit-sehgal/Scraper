@@ -95,7 +95,8 @@ def test_postgres_repository_base_is_psycopg_agnostic() -> None:
 def test_postgres_row_codec_helpers_exposed_from_base() -> None:
     """The row-codec helpers (job_to_row, row_to_job, _fetch_all, etc.) should
     be importable from postgres_repository_base, not from the psycopg2-only
-    postgres_repository module."""
+    postgres_repository module.
+    """
     from app.postgres_repository_base import (
         _fetch_all,
         _fetch_one,

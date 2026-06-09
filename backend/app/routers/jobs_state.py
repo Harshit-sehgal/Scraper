@@ -13,7 +13,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import threading
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -24,6 +23,8 @@ from app.globals import _jobs_store_lock
 from app.storage_interface import get_job_repository
 
 if TYPE_CHECKING:
+    import threading
+
     from app.models import Job, JobCreate
 
 logger = logging.getLogger(__name__)
