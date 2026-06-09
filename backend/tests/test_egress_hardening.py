@@ -140,8 +140,8 @@ class TestLinkLocalBlocking:
 
     @pytest.mark.parametrize(
         "ip",
-        ["fe80::1", "fe80::dead:beef", "fe80::1"],
-        ids=["fe80::1", "fe80::dead:beef", "fe80::1-dup"],
+        ["fe80::1", "fe80::dead:beef"],
+        ids=["fe80::1", "fe80::dead:beef"],
     )
     def test_ipv6_link_local(self, ip: str) -> None:
         assert is_safe_ip(ip) is False
@@ -239,15 +239,26 @@ class TestInternalTlds:
 class TestNonStandardPortsBlocked:
     """Non-HTTP ports are rejected when smoke-test mode is OFF."""
 
+    @pytest.mark.usefixtures("_no_smoke_mode")
     @pytest.mark.parametrize(
         "port",
         [22, 23, 25, 53, 110, 143, 3306, 5432, 6379, 9200, 11211, 27017],
         ids=[
-            "ssh", "telnet", "smtp", "dns", "pop3", "imap",
-            "mysql", "postgres", "redis", "elasticsearch", "memcached", "mongodb",
+            "ssh",
+            "telnet",
+            "smtp",
+            "dns",
+            "pop3",
+            "imap",
+            "mysql",
+            "postgres",
+            "redis",
+            "elasticsearch",
+            "memcached",
+            "mongodb",
         ],
     )
-    def test_disallowed_ports(self, port: int, _no_smoke_mode) -> None:
+    def test_disallowed_ports(self, port: int) -> None:
         with pytest.raises(ValueError, match="not in the allowed list"):
             validate_public_http_url(f"http://example.com:{port}/")
 
@@ -258,12 +269,13 @@ class TestNonStandardPortsBlocked:
 class TestStandardPortsAllowed:
     """Standard HTTP/HTTPS ports are allowed."""
 
+    @pytest.mark.usefixtures("_no_smoke_mode")
     @pytest.mark.parametrize(
         "port",
         [80, 443, 8080, 8443],
         ids=["http", "https", "alt-http", "alt-https"],
     )
-    def test_allowed_ports(self, port: int, _no_smoke_mode) -> None:
+    def test_allowed_ports(self, port: int) -> None:
         validate_public_http_url(f"http://example.com:{port}/path")
 
 

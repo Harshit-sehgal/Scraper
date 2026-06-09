@@ -82,11 +82,5 @@ def set_deps(
     to restore both defaults.
     """
     global schedule_task_fn, run_job_coro_fn
-    if schedule is not None:
-        schedule_task_fn = schedule
-    else:
-        schedule_task_fn = _default_schedule_task
-    if run_job is not None:
-        run_job_coro_fn = run_job
-    else:
-        run_job_coro_fn = _default_run_job
+    schedule_task_fn = schedule if schedule is not None else _default_schedule_task
+    run_job_coro_fn = run_job if run_job is not None else _default_run_job

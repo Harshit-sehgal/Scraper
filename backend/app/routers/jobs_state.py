@@ -42,7 +42,7 @@ def canonical_request_fingerprint(job_data: JobCreate) -> str:
 
     The fingerprint is a hex-encoded SHA-256 hash of a stable JSON
     representation of the request payload with sorted keys. Fields that
-    are metadata (``Idempotency-Key`` header, HTTP‐level annotations) or
+    are metadata (``Idempotency-Key`` header, HTTP-level annotations) or
     ephemeral (``urls`` that were cleaned by the validator) are excluded.
     """
     # Build a canonical dict from the validated request, excluding fields

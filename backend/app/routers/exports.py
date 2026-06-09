@@ -511,7 +511,11 @@ def create_exports_router(jobs_store: dict):
                 from app.utils.job_results_store import load_paginated_job_results_from_disk
 
                 first_page, _ = await run_in_threadpool(
-                    load_paginated_job_results_from_disk, jid, limit=_PAGINATION_CHUNK_SIZE, offset=0, file_path=fpath,
+                    load_paginated_job_results_from_disk,
+                    jid,
+                    limit=_PAGINATION_CHUNK_SIZE,
+                    offset=0,
+                    file_path=fpath,
                 )
                 if first_page:
                     has_any_data = True
@@ -544,7 +548,11 @@ def create_exports_router(jobs_store: dict):
                 offset = _PAGINATION_CHUNK_SIZE
                 while True:
                     page, total = await run_in_threadpool(
-                        load_paginated_job_results_from_disk, jid, limit=_PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
+                        load_paginated_job_results_from_disk,
+                        jid,
+                        limit=_PAGINATION_CHUNK_SIZE,
+                        offset=offset,
+                        file_path=fpath,
                     )
                     if not page:
                         break
@@ -569,7 +577,11 @@ def create_exports_router(jobs_store: dict):
                     offset = 0
                     while True:
                         page, total = await run_in_threadpool(
-                            load_paginated_job_results_from_disk, jid, limit=_PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
+                            load_paginated_job_results_from_disk,
+                            jid,
+                            limit=_PAGINATION_CHUNK_SIZE,
+                            offset=offset,
+                            file_path=fpath,
                         )
                         if not page:
                             break
@@ -714,7 +726,7 @@ def create_exports_router(jobs_store: dict):
         pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
         fieldnames: list[str],
         flatten: bool,
-        ts: str,
+        _ts: str,
     ):
         """Yield CSV chunks as a streaming generator.
 
@@ -771,7 +783,7 @@ def create_exports_router(jobs_store: dict):
         pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
         fieldnames: list[str],  # noqa: ARG001
         flatten: bool,
-        ts: str,
+        _ts: str,
     ):
         """Yield JSON chunks as a streaming generator.
 
@@ -799,7 +811,7 @@ def create_exports_router(jobs_store: dict):
                     yield ",\n"
                 first_job = False
                 # Stream each job's results as a JSON object
-                yield f'    {json.dumps({"job_id": jid, "job_name": job_name, "results": page})}'
+                yield f"    {json.dumps({'job_id': jid, 'job_name': job_name, 'results': page})}"
             yield "\n  ]\n}\n"
 
     return router
