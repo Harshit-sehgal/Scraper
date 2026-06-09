@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-09 15:57:12 UTC
+**Generated:** 2026-06-09 21:09:04 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -121,10 +121,18 @@ For the diff between stable and experimental, see
 | POST | `/api/system/refactor/compress` |
 | POST | `/api/system/scheduler/step` |
 
+## Session/Auth Routes
+
+| Method | Path |
+| --- | --- |
+| DELETE | `/api/session` |
+| GET | `/api/session/me` |
+| POST | `/api/session` |
+
 ## Export Routes
 
 | Method | Path |
 | --- | --- |
 | POST | `/api/exports/batch` |
 
-**Total routes:** 77
+**Total routes:** 80

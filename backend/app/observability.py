@@ -8,19 +8,18 @@ from __future__ import annotations
 
 import logging
 import time
-
-logger = logging.getLogger(__name__)
+from collections import deque
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from app.transaction_context import active_transaction
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from app.semantic_world_state import SemanticWorldState
-
-from collections import deque
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

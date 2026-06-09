@@ -29,7 +29,7 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 async def create_session(
     response: Response,
     request: Request,
-    api_key: Annotated[str | None, API_KEY_HEADER] = None,
+    _api_key: Annotated[str | None, API_KEY_HEADER] = None,
 ):
     """Create a session cookie by exchanging a valid API key.
 

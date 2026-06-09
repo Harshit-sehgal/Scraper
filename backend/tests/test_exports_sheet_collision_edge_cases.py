@@ -129,8 +129,8 @@ async def test_batch_xlsx_combined_named_job_with_flatten(build_client) -> None:
             json={"job_ids": ["user-combined", "other"], "format": "xlsx", "flatten": True},
         )
         assert resp.status_code == 200
-        # 1 sheet (the flatten target) — not 2, because flatten=True.
-        _assert_valid_xlsx(resp.content, expected_sheet_count=1)
+        # 2 sheets (E2 Summary + flatten target)
+        _assert_valid_xlsx(resp.content, expected_sheet_count=2)
     finally:
         await bc.client.aclose()
 
@@ -158,8 +158,8 @@ async def test_batch_xlsx_job_named_sheet(build_client) -> None:
             json={"job_ids": ["sheet"], "format": "xlsx", "flatten": False},
         )
         assert resp.status_code == 200
-        # 1 sheet: the per-job branch renames "Sheet" to e.g. "Sheet (2)".
-        _assert_valid_xlsx(resp.content, expected_sheet_count=1)
+        # 2 sheets: E2 Summary + per-job branch renames "Sheet" to e.g. "Sheet (2)".
+        _assert_valid_xlsx(resp.content, expected_sheet_count=2)
         wb = load_workbook(io.BytesIO(resp.content), read_only=True)
         try:
             assert wb.sheetnames[0] != "Sheet", f"Sheet name should be disambiguated, got {wb.sheetnames[0]!r}"
@@ -186,7 +186,7 @@ async def test_batch_xlsx_31_char_job_name(build_client) -> None:
             json={"job_ids": ["long"], "format": "xlsx", "flatten": False},
         )
         assert resp.status_code == 200
-        _assert_valid_xlsx(resp.content, expected_sheet_count=1)
+        _assert_valid_xlsx(resp.content, expected_sheet_count=2)
     finally:
         await bc.client.aclose()
 
@@ -213,11 +213,11 @@ async def test_batch_xlsx_31_char_names_collision_avoided(build_client) -> None:
             json={"job_ids": ["first", "second"], "format": "xlsx", "flatten": False},
         )
         assert resp.status_code == 200
-        _assert_valid_xlsx(resp.content, expected_sheet_count=2)
+        _assert_valid_xlsx(resp.content, expected_sheet_count=3)
         wb = load_workbook(io.BytesIO(resp.content), read_only=True)
         try:
             names = wb.sheetnames
-            assert len(set(names)) == 2, f"Sheet names must be unique, got {names!r}"
+            assert len(set(names)) == 3, f"Sheet names must be unique, got {names!r}"
         finally:
             wb.close()
     finally:
@@ -248,6 +248,6 @@ async def test_batch_xlsx_whitespace_only_job_name(build_client) -> None:
             json={"job_ids": ["ws"], "format": "xlsx", "flatten": False},
         )
         assert resp.status_code == 200
-        _assert_valid_xlsx(resp.content, expected_sheet_count=1)
+        _assert_valid_xlsx(resp.content, expected_sheet_count=2)
     finally:
         await bc.client.aclose()

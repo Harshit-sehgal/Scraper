@@ -40,9 +40,9 @@ from app.middlewares import (
 from app.routers.exports import create_exports_router
 from app.routers.health import router as health_router
 from app.routers.jobs import create_jobs_router
-from app.routers.session import router as session_router
 from app.routers.operator import router as operator_router
 from app.routers.scraper import router as scraper_router
+from app.routers.session import router as session_router
 from app.routers.system import router as system_router
 from app.services.job_runner import run_job
 from app.storage_interface import get_job_repository

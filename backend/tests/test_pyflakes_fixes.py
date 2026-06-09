@@ -10,7 +10,7 @@ def test_pyflakes_clean() -> None:
     # Resolve the absolute path to the backend directory dynamically
     backend_dir = Path(__file__).resolve().parents[1]
 
-    result = subprocess.run(  # noqa: PLW1510
+    result = subprocess.run(
         [sys.executable, "-m", "pyflakes", "app", "tests"],
         cwd=str(backend_dir),
         text=True,

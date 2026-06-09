@@ -35,7 +35,9 @@ async def run_insight_phase(
         _log(job, "Job canceled before AI insight", level="warning", persist_fn=persist_fn)
         return
 
-    job.status = "running"  # JobStatus.RUNNING
+    from app.models import JobStatus
+
+    job.status = JobStatus.RUNNING
     _log(job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_fn)
     logger.info("Generating AI insights over %d records...", len(job.results))
     try:

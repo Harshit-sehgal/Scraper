@@ -82,6 +82,14 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/system/rate-limit-stats` | Operator or admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
 
+## Session/Auth Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| POST | `/api/session` | Authenticated user (exchanges API key for session cookie) |
+| DELETE | `/api/session` | Authenticated user (clears session cookie) |
+| GET | `/api/session/me` | Authenticated user (returns current role) |
+
 ## Batch Export
 
 `POST /api/exports/batch` — Export results from multiple jobs in a single request. Operator or admin.

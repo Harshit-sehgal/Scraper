@@ -92,6 +92,14 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
     if "operator" in roles:
         return ("operator", "require_role([operator])", "")
 
+    # Endpoints explicitly exempt from API-key middleware (browsers or
+    # self-service auth cannot carry API keys).
+    if path == "/api/system/csp-violations":
+        return ("public", "exempt from API-key middleware", "Browser-generated CSP report; no API key possible.")
+
+    if path in {"/api/session", "/api/session/me"}:
+        return ("public", "exempt from API-key middleware", "Session self-service auth; separate cookie-based flow.")
+
     if path.startswith("/api/"):
         mutation_note = "Mutation route lacks explicit require_role guard." if method != "GET" else ""
         return ("authenticated-user", "global /api/* API-key middleware", mutation_note)

@@ -8,6 +8,7 @@ ranges.  All DNS calls are mocked via ``monkeypatch`` on
 
 import socket
 
+import httpcore
 import pytest
 from app.url_safety import (
     SafeAsyncNetworkBackend,
@@ -230,7 +231,7 @@ class TestInternalTlds:
             try:
                 validate_public_http_url(f"http://{host}")
             except ValueError as e:
-                assert "internal TLD" not in str(e)  # noqa: PT017
+                assert "internal TLD" not in str(e)
 
 
 # ── 7. Non-standard ports blocked ────────────────────────────────────
@@ -317,11 +318,11 @@ class TestDnsRebindingProtection:
 
         monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("10.0.0.99"))
 
-        class FakeAsyncBackend:
-            async def connect_tcp(self, host, port, **kwargs):
+        class FakeAsyncBackend(httpcore.AsyncNetworkBackend):
+            async def connect_tcp(self, host, port, **kwargs):  # type: ignore[override]
                 return None
 
-            async def connect_unix_socket(self, path, **kwargs):
+            async def connect_unix_socket(self, path, **kwargs):  # type: ignore[override]
                 raise NotImplementedError
 
             async def sleep(self, seconds):

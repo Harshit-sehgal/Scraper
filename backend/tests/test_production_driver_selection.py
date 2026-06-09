@@ -64,7 +64,7 @@ def test_production_with_pg_driver_psycopg3_does_not_fail_on_driver(monkeypatch)
     except RuntimeError as exc:
         # If the error is about driver selection, that's a fail. Otherwise
         # (e.g. connection error), the driver-selection path succeeded.
-        assert "DATAFORGE_PG_DRIVER" not in str(exc), f"Driver-selection must not raise when DATAFORGE_PG_DRIVER=psycopg3: {exc}"  # noqa: PT017
+        assert "DATAFORGE_PG_DRIVER" not in str(exc), f"Driver-selection must not raise when DATAFORGE_PG_DRIVER=psycopg3: {exc}"
     except Exception:  # noqa: RUF100, S110
         # Connectivity errors, module-not-found for psycopg3 driver, etc. are
         # all acceptable — the point is the production gate passed.

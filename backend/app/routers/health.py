@@ -37,8 +37,13 @@ async def root():
     from app.config import settings
 
     if settings.ENV.lower() == "production":
-        return {"message": "DataForge API v2"}
-    return {"message": "DataForge API v2", "docs": "/docs", "dashboard": "/app"}
+        return {"message": "DataForge API v2", "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES}
+    return {
+        "message": "DataForge API v2",
+        "docs": "/docs",
+        "dashboard": "/app",
+        "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES,
+    }
 
 
 @router.get("/health")

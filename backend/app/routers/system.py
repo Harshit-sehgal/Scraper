@@ -124,7 +124,8 @@ async def system_status(
             # Fall back to in-memory stores (imported from app.globals)
             counts = _compute_job_counts()
             job_total = sum(counts.values())
-            recycle_count = len(recycle_bin_store)
+            with _jobs_store_lock:
+                recycle_count = len(recycle_bin_store)
             active = (
                 counts.get(JobStatus.PENDING.value, 0)
                 + counts.get(JobStatus.DISCOVERING.value, 0)

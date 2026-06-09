@@ -71,9 +71,7 @@ def test_session_delete_clears_cookie(client, monkeypatch) -> None:
     assert r2.status_code == 200
     set_cookie = r2.headers.get("set-cookie", "")
     assert "dataforge_session=" in set_cookie, "Session cookie should be in Set-Cookie"
-    assert "max-age=0" in set_cookie.lower() or "expires=thu, 01 jan 1970" in set_cookie.lower(), (
-        "Cookie should be expired"
-    )
+    assert "max-age=0" in set_cookie.lower() or "expires=thu, 01 jan 1970" in set_cookie.lower(), "Cookie should be expired"
 
     # Without a session cookie, session/me returns unauthenticated
     r3 = client.get("/api/session/me")
@@ -97,10 +95,10 @@ def test_session_cookie_authenticates_api_requests(client, monkeypatch) -> None:
 
 def test_session_expired_cookie_rejected(client, monkeypatch) -> None:
     """An expired session cookie is rejected."""
-    from app.auth.session import create_session_cookie, verify_session_cookie
-
     # Create a session that's already expired
     import app.auth.session as session_mod
+    from app.auth.session import create_session_cookie, verify_session_cookie
+
     monkeypatch.setattr(session_mod, "SESSION_MAX_AGE", -1)
     cookie = create_session_cookie("admin")
     result = verify_session_cookie(cookie)

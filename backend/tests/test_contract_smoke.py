@@ -392,7 +392,7 @@ def test_worker_heartbeat_expires_after_ttl(monkeypatch) -> None:
     # Manually write an old heartbeat to simulate expiry
     import datetime
 
-    old_time = (datetime.datetime.now() - datetime.timedelta(hours=1)).isoformat()  # noqa: DTZ005
+    old_time = (datetime.datetime.now() - datetime.timedelta(hours=1)).isoformat()
     # Direct DB manipulation
     if getattr(repo, "backend", "") == "sqlite":
         from app.job_store import _DB_LOCK, _get_connection

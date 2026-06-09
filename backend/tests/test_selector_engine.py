@@ -14,7 +14,8 @@ from app.selector_engine import (
     extract_raw_from_selectors,
     extract_with_regex,
 )
-from conftest import make_schema_field_list
+
+from .conftest import make_schema_field_list
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Table Header Detection

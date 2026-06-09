@@ -453,7 +453,7 @@ class TestSubstratePluginManager:
             raise ValueError(msg)
 
         mgr.register_handler("failing", handler)
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):
             mgr.call_tool("failing")
         assert mgr._execution_history[0]["status"] == "error"
 

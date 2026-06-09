@@ -583,7 +583,7 @@ def register_jobs_write_routes(
             raise HTTPException(
                 status_code=500,
                 detail="Failed to move job to recycle bin. The job remains in the active store.",
-            )
+            ) from None
         with manager.lock:
             if job_id in manager.jobs_store:
                 manager.recycle_bin_store[job_id] = manager.jobs_store.pop(job_id)

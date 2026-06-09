@@ -108,7 +108,7 @@ def _multi_domain_history() -> list[dict]:
             ),
         )
     # Bad domain (8 events, all failing with zero quality)
-    for i in range(8):
+    for _i in range(8):
         events.append(
             _make_telemetry(
                 url="https://bad.example.com/page",
@@ -556,7 +556,7 @@ class TestEconomicTrackerCostAnalysis:
         ]
         report = tracker.analyze(history)
         summary = report.cost_by_domain["components.example.com"]
-        # Expected: 5 * 0.01 (LLM) + 3 * 0.005 (browser) + 0.001 (network)  # noqa: ERA001
+        # Expected: 5 * 0.01 (LLM) + 3 * 0.005 (browser) + 0.001 (network)
         expected = 5 * 0.01 + 3 * 0.005 + 0.001
         assert summary.cost_breakdown["llm"] == pytest.approx(0.05, 0.01)
         assert summary.cost_breakdown["browser"] == pytest.approx(0.015, 0.01)

@@ -49,6 +49,10 @@ def _get_pool() -> pg_pool.ThreadedConnectionPool:
                     minconn=minconn,
                     maxconn=maxconn,
                     dsn=dsn,
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5,
                 )
                 logger.info(
                     "Created psycopg2 pool for %s (minconn=%d, maxconn=%d)",

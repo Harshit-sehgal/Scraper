@@ -94,13 +94,13 @@ class TestSaveJobResultsToDisk:
         """When gzip write fails, the temp file should be cleaned up."""
 
         class FailingWriter:
-            def __enter__(self_):  # noqa: N805
+            def __enter__(self_):
                 return self_
 
-            def __exit__(self_, *args):  # noqa: N805
+            def __exit__(self_, *args):
                 pass
 
-            def write(self_, _data) -> Never:  # noqa: N805
+            def write(self_, _data) -> Never:
                 msg = "Disk full"
                 raise OSError(msg)
 

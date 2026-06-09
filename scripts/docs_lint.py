@@ -39,6 +39,7 @@ TRACKED_PREFIXES: tuple[str, ...] = (
     "/api/scraper",
     "/api/operator",
     "/api/system",
+    "/api/session",
 )
 
 # Markdown pipe rows that look like:

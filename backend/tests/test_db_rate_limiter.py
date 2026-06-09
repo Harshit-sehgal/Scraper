@@ -1,6 +1,6 @@
 import time
 
-from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware
+from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware, SlidingWindowCounter
 
 
 def _cleanup_rate_limit_key(key: str) -> None:
@@ -98,9 +98,6 @@ def test_rate_limiter_middleware_in_memory_selection() -> None:
     with patch("app.config.settings.RATE_LIMIT_DB_BACKED", False):
         counter = middleware._get_or_create_counter("_test_key_inmem", 5, 60.0)
         assert isinstance(counter, SlidingWindowCounter)
-
-
-from app.rate_limiter import SlidingWindowCounter
 
 
 def test_dual_layer_keys_are_different() -> None:

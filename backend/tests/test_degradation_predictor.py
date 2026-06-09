@@ -503,7 +503,7 @@ class TestDegradationPredictorIntegration:
         """Use simulated telemetry events to drive predictions."""
         events = []
         # 8 healthy events
-        for i in range(8):
+        for _i in range(8):
             events.append(
                 _make_telemetry_event(
                     url="https://healthy.com/page",

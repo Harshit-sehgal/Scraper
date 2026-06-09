@@ -41,8 +41,8 @@ def test_governance_guardrail_enforcement() -> None:
         assert "governance_enforcement" in events
 
         # Optional: check if pressure actually dropped (if smoothing allows)
-        # new_pressure = ws.get_system_pressure()  # noqa: ERA001
-        # assert new_pressure <= pressure  # noqa: ERA001
+        # new_pressure = ws.get_system_pressure()
+        # assert new_pressure <= pressure
 
     finally:
         policy.critical_entropy_threshold = old_threshold

@@ -114,7 +114,7 @@ def test_full_multi_subsystem_replay() -> None:
     assert abs(ws.metrics.global_entropy - pre_entropy) < 0.001
     assert ws.metrics.total_records_processed == pre_records
 
-    # Topology (structural, not ID-based)  # noqa: ERA001
+    # Topology (structural, not ID-based)
     assert ws._topology.region_count() == pre_region_count
     view = ws._topology.get_view()
     regions = view.all_regions()
@@ -292,7 +292,7 @@ def test_all_replayable_subsystems_record() -> None:
     }
 
     with ws.transaction("all_subsystems"):
-        for name, fn in subsystems.items():
+        for _name, fn in subsystems.items():
             fn()
 
     tx = _capture_last_tx(ws)
