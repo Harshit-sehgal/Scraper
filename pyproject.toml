@@ -129,6 +129,10 @@ markers = [
     "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
     "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset).",
     "live_benchmark: marks tests that require live-internet access for benchmarking. Skipped by default (use --run-live-benchmark).",
+    "network: tests that intentionally make live DNS/HTTP calls. The conftest autouse DNS stand-in is bypassed. Skipped by default in CI sandboxes without network access.",
+    "unit: fast unit tests that must not touch the network, database, or filesystem beyond the test's own tmp dir.",
+    "api: API contract tests that exercise the FastAPI app via the in-process ASGI client.",
+    "slow: tests whose expected runtime is > 5s. Useful for selective CI tiers.",
     "timeout: marks tests to run with a timeout"
 ]
 
