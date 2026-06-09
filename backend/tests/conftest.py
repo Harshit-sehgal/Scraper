@@ -530,7 +530,7 @@ def client(monkeypatch):
     monkeypatch.setattr(
         _runtime_deps_mod,
         "schedule_task_fn",
-        lambda coro: fake_schedule_background_task(coro),
+        fake_schedule_background_task,
     )
     monkeypatch.setattr(
         _runtime_deps_mod,

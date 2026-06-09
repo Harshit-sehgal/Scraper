@@ -70,17 +70,17 @@ def _schedule_job(job_id: str) -> None:
 def register_jobs_write_routes(
     router: APIRouter,
     manager: JobStoreManager,
-    schedule_task_fn: Callable | None = None,
-    run_job_coro_fn: Callable | None = None,
+    _schedule_task_fn: Callable | None = None,
+    _run_job_coro_fn: Callable | None = None,
 ) -> None:
     """Register all write/mutation job endpoints on the given router.
 
     Args:
         router: The APIRouter to register routes on.
         manager: Thread-safe store manager for jobs and recycle bin.
-        schedule_task_fn: Deprecated — kept for backward compatibility.
+        _schedule_task_fn: Deprecated — kept for backward compatibility.
             Route handlers now use ``app.runtime_deps.schedule_task_fn``.
-        run_job_coro_fn: Deprecated — kept for backward compatibility.
+        _run_job_coro_fn: Deprecated — kept for backward compatibility.
             Route handlers now use ``app.runtime_deps.run_job_coro_fn``.
 
     """
