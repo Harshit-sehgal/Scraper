@@ -518,6 +518,7 @@ async def get_extraction_trends(
 async def get_domain_trend(
     domain: str,
     window: Annotated[int, Query(ge=10, le=500)] = 100,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))] = None,
 ):
     """Get detailed trend analysis for a specific domain.
 
@@ -843,6 +844,7 @@ async def get_system_dashboard(
 async def get_degradation_predictions(
     window: Annotated[int, Query(ge=10, le=500)] = 100,
     min_confidence: Annotated[float, Query(ge=0.0, le=1.0)] = 0.0,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))] = None,
 ):
     """Get degradation predictions for all domains.
 
@@ -896,6 +898,7 @@ async def get_degradation_predictions(
 async def get_domain_prediction(
     domain: str,
     window: Annotated[int, Query(ge=10, le=500)] = 100,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))] = None,
 ):
     """Get degradation predictions for a specific domain.
 

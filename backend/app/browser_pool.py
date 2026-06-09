@@ -345,7 +345,7 @@ class BrowserPool:
             if self._recycling:
                 return
             self._recycling = True
-        self._recycle_event.clear()
+            self._recycle_event.clear()
 
         while self._active_fetches > 0:
             logger.info("[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches)
@@ -357,7 +357,8 @@ class BrowserPool:
         except Exception:
             logger.exception("[BrowserPool] Hard recycle failed")
         finally:
-            self._recycling = False
+            async with self._lock:
+                self._recycling = False
             self._recycle_event.set()
 
     async def _hard_recycle(self) -> None:

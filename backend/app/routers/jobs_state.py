@@ -10,6 +10,8 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import threading
 from typing import TYPE_CHECKING
@@ -18,12 +20,75 @@ from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
+from app.globals import _jobs_store_lock
 from app.storage_interface import get_job_repository
 
 if TYPE_CHECKING:
-    from app.models import Job
+    from app.models import Job, JobCreate
 
 logger = logging.getLogger(__name__)
+
+
+# ── Idempotency fingerprint helpers ───────────────────────────────────
+
+
+def canonical_request_fingerprint(job_data: JobCreate) -> str:
+    """Build a deterministic SHA-256 fingerprint from the full validated request.
+
+    Includes all semantically meaningful fields from ``JobCreate`` so that
+    the same ``Idempotency-Key`` with differing parameters (e.g. different
+    schema fields, filters, or search parameters) produces a different
+    fingerprint and triggers a 409 Conflict.
+
+    The fingerprint is a hex-encoded SHA-256 hash of a stable JSON
+    representation of the request payload with sorted keys. Fields that
+    are metadata (``Idempotency-Key`` header, HTTP‐level annotations) or
+    ephemeral (``urls`` that were cleaned by the validator) are excluded.
+    """
+    # Build a canonical dict from the validated request, excluding fields
+    # that do not affect job semantics (urls are already cleaned by the
+    # model validator and are represented by the cleaned list).
+    canonical: dict[str, object] = {
+        "name": job_data.name,
+        "mode": job_data.mode.value,
+        "intent": job_data.intent,
+        "urls": sorted(job_data.urls) if job_data.urls else [],
+        "topic": job_data.topic,
+        "location": job_data.location,
+        "preferred_domain": job_data.preferred_domain,
+        "source_policy": job_data.source_policy.value if job_data.source_policy else None,
+        "max_per_domain": job_data.max_per_domain,
+        "origin_location": job_data.origin_location,
+        "max_distance_km": job_data.max_distance_km,
+        "schema_fields": [
+            {
+                "name": f.name,
+                "field_type": f.field_type.value,
+                "description": f.description,
+                "required": f.required,
+            }
+            for f in (job_data.schema_fields or [])
+        ],
+        "filters": [
+            {
+                "field_name": f.field_name,
+                "operator": f.operator.value,
+                "value": f.value,
+                "origin_address": f.origin_address,
+                "distance_unit": f.distance_unit,
+            }
+            for f in (job_data.filters or [])
+        ],
+        "pagination": job_data.pagination,
+        "max_pages": job_data.max_pages,
+        "deduplicate": job_data.deduplicate,
+        "deduplicate_field": job_data.deduplicate_field,
+        "selectors_map": job_data.selectors_map or {},
+        "search_params": job_data.search_params or {},
+        "min_record_score": job_data.min_record_score,
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 # ── Standalone persistence & idempotency helpers ──────────────────────
@@ -161,7 +226,10 @@ class JobStoreManager:
     ) -> None:
         self._jobs_store = jobs_store
         self._recycle_bin_store = recycle_bin_store
-        self._lock = threading.Lock()
+        # Use the project-wide lock from globals so that ALL code paths
+        # (system metrics, write routes, read routes) coordinate on the
+        # same lock when accessing jobs_store / recycle_bin_store.
+        self._lock = _jobs_store_lock
 
     # ── properties ────────────────────────────────────────────────────
 

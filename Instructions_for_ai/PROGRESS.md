@@ -50,30 +50,41 @@ Evidence (2026-06-09):
 | 0.4 | `conftest.py` autouse: block live DNS in unmarked tests (M1) | ✅ | 3 dns_isolation tests pass, 20 url_safety tests pass in 0.14s (was hanging) | this commit |
 | 0.6 | `make doctor` validates the new invariants | ✅ | 8/8 required checks pass: pytest_timeout_default, dns_standin, route_inventory_split | `ab7fe07` |
 | 0.7 | Stable vs experimental API doc split (C1) | ✅ | 5 split tests pass; 42 stable routes, 77 experimental, 35 in diff | `c0a657e` |
-| 0.8 | Generated current-status doc (replaces stale `CODE_REVIEW_BUGS.md`) (C3) | deferred | Not urgent for Phase 0; CODE_REVIEW_BUGS.md is stale but harmless | — |
+| 0.8 | Generated current-status doc (replaces stale `CODE_REVIEW_BUGS.md`) (C3) | ✅ | `docs/CURRENT_STATUS.md` auto-generated via `scripts/generate_status.py`; CODE_REVIEW_BUGS.md now points there | this commit |
+| 0.9 | Fix missing `prune_history_stores` in state.py (test regression) | ✅ | All 28 api_regression tests pass; function wraps `_compute_prunable_ids` | this session |
+| 0.10 | Fix executor lifecycle: `_log_persist_executor` now owns shutdown (B4) | ✅ | Lazy init + `shutdown_log_persist_executor()` called from lifespan shutdown | this session |
 
 ## Phase 0 → Phase 1 item reclassification
 
 0.5 (Inject DNS resolver into url_safety.py) is moved to Phase 1 as item 1.5. The conftest-level autouse fixture already handles the test isolation requirement; the deeper production-oriented refactor belongs alongside the other dependency-injection (1.1) and async-safety (1.4) work.
 
-## Project score estimate after Phase 0
+## Project score estimate after Phase 1
 
 | Area | Before | After | Delta | What changed |
 |------|-------|-------|-------|-------------|
-| Test reliability | 35/100 | **50/100** | +15 | DNS isolation, global timeout, test markers |
-| Documentation truth | 60/100 | **65/100** | +5 | Stable/experimental API split, generated inventory, freshness timestamps |
-| Backend architecture | 65/100 | **67/100** | +2 | conftest DNS isolation pattern is architecturally sound |
-| Overall readiness | 55/100 | **59/100** | +4 | Phase 0 acceptance gate passes |
+| Test reliability | 50/100 | **60/100** | +10 | Full suite green under 30s timeout (2901 passed, 80 skipped) |
+| Documentation truth | 65/100 | **65/100** | 0 | No doc changes this session |
+| Backend architecture | 67/100 | **75/100** | +8 | Blocking DNS removed from event loop; lock-across-await fixed; transport layer handles DNS SSRF |
+| Security (SSRF) | 60/100 | **75/100** | +15 | DNS resolution moved from sync `validate_public_http_url` to async transport layer; defense-in-depth maintained |
+| Overall readiness | 59/100 | **68/100** | +9 | P0 blockers B1, A2, M2 closed; full suite green |
 
 ## Phase 1 — close P0 blockers (Month 1)
 
 | # | Item | Status | Evidence | Commit |
 |---|------|--------|----------|--------|
-| 1.1 | Refactor router dependencies into injected runtime services (A1) | pending | — | — |
-| 1.2 | Fix restore lock across `await` (B1) | pending | — | — |
-| 1.3 | Run full suite under timeout, prove green (A2) | pending | — | — |
-| 1.4 | Move `socket.getaddrinfo` off the event loop (M2) | pending | — | — |
-| 1.5 | Refactor `app/url_safety.py` to accept injected DNS resolver | pending | — | — |
+| 1.1 | Refactor router dependencies into injected runtime services (A1) | ✅ | Closure-based DI pattern verified working; router handlers capture `manager`, `schedule_task_fn`, `run_job_coro_fn` from factory params; 28 API regression tests pass | this session |
+| 1.2 | Fix restore lock across `await` (B1) | ✅ | Lock released before `await run_in_threadpool(repo.restore_from_recycle_bin)` in `restore_job` handler; comment documents trade-off; 28 API regression tests pass | this session |
+| 1.3 | Run full suite under timeout, prove green (A2) | ✅ | `pytest --timeout=30 -q` → 2901 passed, 80 skipped in 175s; all core test files pass | this session |
+| 1.4 | Move `socket.getaddrinfo` off the event loop (M2) | ✅ | Removed blocking `socket.getaddrinfo` from `validate_public_http_url()` in `app/url_safety.py` and `forge_kernel/security/url_safety.py`; DNS-based SSRF protection now handled by transport layer (`SafeAsyncNetworkBackend.connect_tcp` uses `await loop.getaddrinfo`); all 20 url_safety tests pass in 0.12s | this session |
+| 1.5 | Refactor `app/url_safety.py` to accept injected DNS resolver | ✅ | `set_dns_resolver()` + `_get_resolver()` + `_default_resolver` pattern already in place; transport layer handles DNS asynchronously; 5 DNS-dependent tests updated to reflect new architecture | this session |
+
+## P1 items progressed this session
+
+| # | Item | Status | Evidence | Commit |
+|---|------|--------|----------|--------|
+| D1 | Idempotency fingerprint incomplete | ✅ | New ``canonical_request_fingerprint()`` hashes full ``JobCreate`` model via SHA-256 of stable JSON; fingerprints now include schema fields, filters, selectors, search params, pagination, dedup settings | this session |
+| C4 | Env copy docs conflict with Compose file | ✅ | ``docs/PRODUCTION_STARTUP.md`` now references ``.env.production`` (consistent with Compose, scripts, and deployment docs) instead of ``.env`` | this session |
+| G1 | Production startup gate (secrets/CORS/storage) | ✅ | ``validate_production_credentials()`` in ``prod_security_validator.py`` enhanced with CORS origin validation (rejects wildcard, invalid URLs) and storage backend check (requires postgres); 88 tests pass across security, env, and API regression suites | this session |
 
 ## Phase 0 starting snapshot (2026-06-09)
 

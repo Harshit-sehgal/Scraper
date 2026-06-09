@@ -35,6 +35,7 @@ from app.models import (
 )
 from app.routers.jobs_state import (
     JobStoreManager,
+    canonical_request_fingerprint,
     lookup_idempotency_fingerprint,
     lookup_idempotency_key,
     record_idempotency_key,
@@ -52,19 +53,35 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _schedule_job(job_id: str) -> None:
+    """Schedule a job for execution via the active runtime dependency container.
+
+    Route handlers call this instead of directly referencing closure-captured
+    functions. The actual ``schedule_task_fn`` and ``run_job_coro_fn`` are
+    resolved from ``app.runtime_deps`` at call time, which lets tests swap
+    them via :func:`app.runtime_deps.set_deps`.
+    """
+    from app.runtime_deps import run_job_coro_fn as _rjf
+    from app.runtime_deps import schedule_task_fn as _stf
+
+    _stf(_rjf(job_id))
+
+
 def register_jobs_write_routes(
     router: APIRouter,
     manager: JobStoreManager,
-    schedule_task_fn: Callable,
-    run_job_coro_fn: Callable,
+    schedule_task_fn: Callable | None = None,
+    run_job_coro_fn: Callable | None = None,
 ) -> None:
     """Register all write/mutation job endpoints on the given router.
 
     Args:
         router: The APIRouter to register routes on.
         manager: Thread-safe store manager for jobs and recycle bin.
-        schedule_task_fn: Callable to schedule a background task (fires-and-forgets a coroutine).
-        run_job_coro_fn: Callable that returns a coroutine to run a job by ID.
+        schedule_task_fn: Deprecated — kept for backward compatibility.
+            Route handlers now use ``app.runtime_deps.schedule_task_fn``.
+        run_job_coro_fn: Deprecated — kept for backward compatibility.
+            Route handlers now use ``app.runtime_deps.run_job_coro_fn``.
 
     """
 
@@ -157,10 +174,7 @@ def register_jobs_write_routes(
                     lookup_idempotency_fingerprint,
                     idem_key,
                 )
-                if (
-                    existing_fingerprint is not None
-                    and existing_fingerprint != f"{job_data.mode.value}:{job_data.name}:{','.join(manual_urls)}"
-                ):
+                if existing_fingerprint is not None and existing_fingerprint != canonical_request_fingerprint(job_data):
                     raise HTTPException(
                         status_code=409,
                         detail="Conflict: Another request with a different payload was already sent for this Idempotency-Key.",
@@ -201,11 +215,12 @@ def register_jobs_write_routes(
             deduplicate_field=job_data.deduplicate_field,
             min_record_score=job_data.min_record_score,
         )
-        manager.jobs_store[job.id] = job
+        with manager.lock:
+            manager.jobs_store[job.id] = job
         await save_job(job)
 
         if idem_key:
-            fingerprint = f"{job_data.mode.value}:{job_data.name}:{','.join(manual_urls)}"
+            fingerprint = canonical_request_fingerprint(job_data)
             await run_in_threadpool(
                 record_idempotency_key,
                 idem_key,
@@ -231,8 +246,9 @@ def register_jobs_write_routes(
                         "Failed to enqueue job %s to worker queue in production",
                         job.id,
                     )
-                    if job.id in manager.jobs_store:
-                        del manager.jobs_store[job.id]
+                    with manager.lock:
+                        if job.id in manager.jobs_store:
+                            del manager.jobs_store[job.id]
                     try:
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
@@ -251,9 +267,9 @@ def register_jobs_write_routes(
                     job.id,
                     e,
                 )
-                schedule_task_fn(run_job_coro_fn(job.id))
+                _schedule_job(job.id)
         else:
-            schedule_task_fn(run_job_coro_fn(job.id))
+            _schedule_job(job.id)
 
         return {
             "job_id": job.id,
@@ -629,18 +645,23 @@ def register_jobs_write_routes(
         with manager.lock:
             if job_id not in manager.recycle_bin_store:
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
-            # Hold the lock across both the DB call and the in-memory update
-            # to prevent a concurrent hard_delete from deleting the job between
-            # the DB restore and the in-memory move.
-            repo = get_job_repository()
-            try:
-                await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
-            except Exception as e:
-                logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to restore job: {e}",
-                ) from e
+        # Lock is released before the async DB call. This avoids holding a
+        # sync threading.Lock across an await, which would block the event
+        # loop's thread pool and risk deadlock under concurrent requests.
+        # The trade-off (previously documented in delete_job / clear_terminal):
+        # a concurrent hard_delete between the DB restore and the in-memory
+        # move could orphan a DB restored record. Hard-delete callers are
+        # designed to tolerate this (they retry or accept eventual consistency).
+        repo = get_job_repository()
+        try:
+            await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
+        except Exception as e:
+            logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to restore job: {e}",
+            ) from e
+        with manager.lock:
             if job_id in manager.recycle_bin_store:
                 manager.jobs_store[job_id] = manager.recycle_bin_store.pop(job_id)
         return {"message": "Job restored"}
@@ -682,17 +703,30 @@ def register_jobs_write_routes(
 
         with manager.lock:
             snapshot = list(manager.recycle_bin_store.items())
-            count = len(snapshot)
         # Do DB hard-deletes FIRST so that a file-deletion failure does not
-        # orphan DB records. Then clean up files after DB succeeds.
+        # orphan DB records. Handle per-job errors so one failure does not
+        # abort the remaining jobs.
         repo = get_job_repository()
+        deleted_ids: list[str] = []
+        failed_ids: list[str] = []
         for jid, _ in snapshot:
-            await run_in_threadpool(repo.hard_delete, jid)
+            try:
+                await run_in_threadpool(repo.hard_delete, jid)
+                deleted_ids.append(jid)
+            except Exception:
+                logger.exception("Failed to hard-delete job %s during recycle bin clear", jid)
+                failed_ids.append(jid)
         for jid, job in snapshot:
+            if jid not in deleted_ids:
+                continue
             file_path = job.results_file_path if job else None
             if file_path:
                 await run_in_threadpool(delete_job_results_from_disk, jid, file_path)
         with manager.lock:
-            for jid, _ in snapshot:
+            for jid in deleted_ids:
                 manager.recycle_bin_store.pop(jid, None)
-        return {"message": f"Recycle bin cleared ({count} items)", "cleared": count}
+        result: dict = {"message": f"Recycle bin cleared ({len(deleted_ids)} items)", "cleared": len(deleted_ids)}
+        if failed_ids:
+            result["failed"] = failed_ids
+            result["message"] += f" ({len(failed_ids)} failed)"
+        return result

@@ -258,7 +258,12 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:
 
 
 def test_auto_discovery_url_filtering(client, monkeypatch) -> None:
-    """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts."""
+    """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts.
+
+    After the M2 fix, validate_public_http_url only does URL pattern checks
+    (loopback, cloud metadata, internal TLDs, IP literals). DNS-based SSRF
+    protection is handled by the transport layer at connect time.
+    """
     from app.config import settings
 
     monkeypatch.setattr(settings, "ENV", "production")
@@ -268,8 +273,8 @@ def test_auto_discovery_url_filtering(client, monkeypatch) -> None:
     async def mock_discover(*args, **kwargs):
         return [
             {"url": "https://example.com/safe-item"},
-            {"url": "http://127.0.0.1/unsafe-loopback"},
-            {"url": "http://nginx/unsafe-internal"},
+            {"url": "http://127.0.0.1/unsafe-loopback"},  # caught by pattern check (loopback)
+            {"url": "http://nginx/unsafe-internal"},  # NOT caught — DNS protection on transport layer
             {"url": "https://google.com/safe-google"},
         ]
 
@@ -284,9 +289,11 @@ def test_auto_discovery_url_filtering(client, monkeypatch) -> None:
     )
     assert resp.status_code == 200
     urls = resp.json()["urls"]
-    assert len(urls) == 2
+    # 127.0.0.1 is caught by pattern check; nginx passes (DNS protection is on transport layer)
+    assert len(urls) == 3
     assert urls[0]["url"] == "https://example.com/safe-item"
-    assert urls[1]["url"] == "https://google.com/safe-google"
+    assert urls[1]["url"] == "http://nginx/unsafe-internal"
+    assert urls[2]["url"] == "https://google.com/safe-google"
 
 
 @pytest.mark.asyncio

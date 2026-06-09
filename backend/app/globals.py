@@ -30,11 +30,9 @@ recycle_bin_store: dict[str, Any] = {}
 # stores (e.g. ``/api/system/status``) and code paths that mutate them
 # (e.g. ``/api/jobs/{id}`` write routes) must acquire this lock to
 # avoid ``RuntimeError: dictionary changed size during iteration`` and
-# torn-read inconsistencies. The router-local ``JobStoreManager`` uses
-# a separate per-router ``threading.Lock`` for its own compositions; do
-# not replace that with this lock — the two guards exist at different
-# scopes (router-level state mutations vs. module-level shared state
-# reads).
+# torn-read inconsistencies.  The ``JobStoreManager`` re-uses this
+# same lock so router-level mutations and system-level reads are
+# mutually excluded on the same dicts.
 _jobs_store_lock = threading.Lock()
 
 # Legacy defaults kept only as a sanity floor; the authoritative values
