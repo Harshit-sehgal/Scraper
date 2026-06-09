@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import datetime
 import logging
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.models import JobStatus
 from app.services._job_log import log_job_message as _log
 from app.services.status_classifier import classify_job_status, job_completion_message
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

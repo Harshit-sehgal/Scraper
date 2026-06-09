@@ -93,7 +93,10 @@ class ExtractionPipeline:
                     ),
                 )
 
-            from app.extraction_provenance import ProvenanceBuilder, enrich_records_with_provenance
+            from app.extraction_provenance import (
+                ProvenanceBuilder,
+                enrich_records_with_provenance,
+            )
 
             provenance_builder = ProvenanceBuilder(url)
             warnings_list: list[str] = []

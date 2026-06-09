@@ -79,7 +79,7 @@ class TestSelfCheckDetectsBrokenInjection:
         # Simulate an upstream rename by removing the _pool attribute.
         from app.url_safety import SafeAsyncHTTPTransport as _Cls
 
-        def broken_init(self, *args, **kwargs):
+        def broken_init(self, *args, **kwargs) -> None:
             # Bypass the real init; create a bare transport-like object
             # with no _pool attribute to simulate an upstream break.
             self._pool = object()  # no _network_backend attribute

@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 from app.config import settings
+from app.utils.log_redaction import mask_proxy_url
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +337,7 @@ class AntiBotEngine:
         """Explicitly rotate to next proxy and return it."""
         if self.proxy_manager.enabled:
             new_proxy = self.proxy_manager.rotate()
-            logger.info("Rotated proxy: %s", new_proxy)
+            logger.info("Rotated proxy: %s", mask_proxy_url(new_proxy))
             return new_proxy  # type: ignore[no-any-return]
         return None
 

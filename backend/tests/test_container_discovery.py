@@ -166,7 +166,7 @@ def test_discover_containers_respects_min_score() -> None:
 
 
 def test_discover_containers_url_is_optional() -> None:
-    """url parameter is optional; both paths return valid rankings."""
+    """Url parameter is optional; both paths return valid rankings."""
     r1 = discover_containers(SAMPLE_HTML)
     r2 = discover_containers(SAMPLE_HTML, url="https://example.com")
     assert isinstance(r1, ContainerRanking)
@@ -373,7 +373,8 @@ def test_classify_failure_with_evidence_both_containers_and_patterns() -> None:
 
 def test_all_documented_failure_classes_handled() -> None:
     """Verify the function returns a valid classification for every known
-    failure_reason that the module documents."""
+    failure_reason that the module documents.
+    """
     known_reasons = [
         "no_containers_detected",
         "all_passes_empty",

@@ -980,7 +980,10 @@ def get_job_repository() -> JobRepository:
                     raise RuntimeError(msg) from e
 
             try:
-                from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
+                from app.postgres_repository import (
+                    PostgresJobRepository,
+                    verify_postgres_connectivity,
+                )
 
                 connectivity = verify_postgres_connectivity()
                 if not connectivity.get("ok"):

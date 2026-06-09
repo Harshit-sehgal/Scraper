@@ -1,11 +1,12 @@
 """Post-Processing Engine: Type coercion, Geospatial distance calculation, and Data Filtering.
+
 Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 """
 
 import asyncio
 import logging
 import re
-from typing import Any
+from typing import Any, NoReturn
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -64,6 +65,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
 
 def calculate_distance(point1: tuple[float, float], point2: tuple[float, float], unit: str = "km") -> float:
     """Calculate straight-line (geodesic) distance between two lat / lng points.
+
     Returns distance in km or miles.
     """
     dist_km = geodesic(point1, point2).kilometers
@@ -79,6 +81,7 @@ def calculate_distance(point1: tuple[float, float], point2: tuple[float, float],
 
 def coerce_value(value: Any, field_type: FieldType):
     """Coerce a raw value to its declared type.
+
     e.g., "18 years old" → 18 (integer), "true" → True (boolean).
     """
     if value is None:
@@ -262,7 +265,7 @@ def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 
     """Execute a compiled regex search with a timeout to prevent ReDoS."""
     import signal
 
-    def _alarm_handler(_signum, _frame):
+    def _alarm_handler(_signum, _frame) -> NoReturn:
         raise TimeoutError
 
     old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
@@ -278,6 +281,7 @@ def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 
 
 async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, C901, PLR0911, PLR0912, RUF100
     """Check if a single record passes a filter rule.
+
     Returns True if the record should be KEPT.
     """
     value = record.get(rule.field_name)
@@ -420,6 +424,7 @@ async def apply_location_radius(
     preferred_location_field: str = "",
 ) -> tuple[list[dict], dict]:
     """Filter records to those within the given km radius from origin_address.
+
     Adds distance_km field to kept records when distance can be computed.
     """
     report = {
@@ -490,6 +495,7 @@ async def process_results(
     filters: list[FilterRule],
 ) -> tuple[list[dict], int, int, dict]:
     """Full post-processing pipeline:
+
     1. Coerce types
     2. Apply all filters
     3. Return (filtered_results, total_count, filtered_count).

@@ -5,7 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.scrape_telemetry import coerce_confidence_score, coerce_finite_float, get_scrape_telemetry
+from app.scrape_telemetry import (
+    coerce_confidence_score,
+    coerce_finite_float,
+    get_scrape_telemetry,
+)
 
 logger = logging.getLogger(__name__)
 

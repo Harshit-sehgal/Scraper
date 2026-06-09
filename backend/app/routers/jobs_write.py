@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
 
+from app.audit_logger import log_admin_action, log_job_event
 from app.config import settings
 from app.discovery import (
     DiscoveryDependencyError,
@@ -45,7 +46,7 @@ from app.scraper import ai_clean_and_align_records
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from app.utils.rbac import UserRole, require_role
+from app.utils.rbac import UserRole, get_current_user, require_role
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -124,7 +125,9 @@ def register_jobs_write_routes(
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         """Infer topic + schema fields from plain-language user intent."""
-        from app.insight_engine import suggest_schema_from_intent  # research-shell, lazy
+        from app.insight_engine import (
+            suggest_schema_from_intent,  # research-shell, lazy
+        )
 
         return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
@@ -134,6 +137,8 @@ def register_jobs_write_routes(
         request: Request,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
+        # Extract user identity for data isolation
+        _role, user_id = get_current_user(request)
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -214,6 +219,7 @@ def register_jobs_write_routes(
             deduplicate=job_data.deduplicate,
             deduplicate_field=job_data.deduplicate_field,
             min_record_score=job_data.min_record_score,
+            created_by=user_id,
         )
         with manager.lock:
             manager.jobs_store[job.id] = job
@@ -587,6 +593,7 @@ def register_jobs_write_routes(
         with manager.lock:
             if job_id in manager.jobs_store:
                 manager.recycle_bin_store[job_id] = manager.jobs_store.pop(job_id)
+        log_job_event(actor="admin", action="job_recycled", job_id=job_id)
         return {"message": "Job moved to recycle bin"}
 
     @router.delete("/api/jobs/cleanup/terminal")
@@ -644,6 +651,12 @@ def register_jobs_write_routes(
         if failed_ids:
             result["failed"] = failed_ids
             result["message"] += f" ({len(failed_ids)} failed)"
+        log_admin_action(
+            actor="admin",
+            action="bulk_cleanup_terminal",
+            resource="jobs",
+            details={"cleared": len(cleared_ids), "kept_recent": keep_recent, "remaining": remaining},
+        )
         return result
 
     @router.post("/api/recycle_bin/{job_id}/restore")
@@ -702,6 +715,7 @@ def register_jobs_write_routes(
             from app.utils.job_results_store import delete_job_results_from_disk
 
             await run_in_threadpool(delete_job_results_from_disk, job_id, file_path)
+        log_job_event(actor="admin", action="job_hard_deleted", job_id=job_id)
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
@@ -738,4 +752,10 @@ def register_jobs_write_routes(
         if failed_ids:
             result["failed"] = failed_ids
             result["message"] += f" ({len(failed_ids)} failed)"
+        log_admin_action(
+            actor="admin",
+            action="clear_recycle_bin",
+            resource="recycle_bin",
+            details={"cleared": len(deleted_ids), "failed": len(failed_ids)},
+        )
         return result

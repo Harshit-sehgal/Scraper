@@ -7,7 +7,11 @@ and user message integrity.
 from __future__ import annotations
 
 import pytest
-from app.zero_result_classifier import _any_field_matches_page, _has_auth_patterns, classify_zero_result
+from app.zero_result_classifier import (
+    _any_field_matches_page,
+    _has_auth_patterns,
+    classify_zero_result,
+)
 
 VALID_FAILURE_CLASSES = {
     "session_bound_url",

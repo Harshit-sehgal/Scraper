@@ -427,7 +427,7 @@ class TestInferRelationshipType:
     def test_price_modifier(self) -> None:
         price = CandidateIR(raw="$100", cleaned="100", span_start=0, span_end=4, position=0, primary_type=SemanticType.PRICE)
         text = CandidateIR(raw="item", cleaned="item", span_start=5, span_end=9, position=5, primary_type=SemanticType.TEXT)
-        rel_type, conf, evidence = _infer_relationship_type(price, text)
+        rel_type, _conf, _evidence = _infer_relationship_type(price, text)
         assert rel_type == "value_modifier"
 
     def test_code_then_price(self) -> None:
@@ -584,7 +584,7 @@ class TestStructuralMemoryTracker:
         tracker.record([c1], 0)
         # Second record: ("code",) — different type but similar to price
         # Actually this won't be very similar since price != code
-        score, evidence = tracker.record([c2], 1)
+        score, _evidence = tracker.record([c2], 1)
         assert isinstance(score, float)
 
     def test_pattern_signature_string_based(self) -> None:
@@ -621,7 +621,7 @@ class TestComputeSemanticDensity:
 
 class TestIsLikelyNoise:
     def test_navigation_structure(self) -> None:
-        is_noise, conf, evidence = is_likely_noise("About Us | Contact | Privacy Policy")
+        is_noise, conf, _evidence = is_likely_noise("About Us | Contact | Privacy Policy")
         assert is_noise is True
         assert conf >= 0.8
 
@@ -888,7 +888,7 @@ class TestFullPipeline:
         """End-to-end: noise classification through the pipeline."""
         text = "About Us | Contact | Privacy Policy | Copyright 2025"
         # is_likely_noise should detect navigation structure
-        is_noise, conf, evidence = is_likely_noise(text)
+        is_noise, conf, _evidence = is_likely_noise(text)
         assert is_noise is True
         assert conf >= 0.8
 

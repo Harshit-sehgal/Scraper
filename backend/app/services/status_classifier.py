@@ -34,6 +34,7 @@ def classify_job_status(
         - ``COMPLETED``: All URLs produced results (or no URLs listed).
         - ``DEGRADED``: Some URLs produced results, but not all.
         - ``EMPTY_RESULT``: No URLs or no records extracted at all.
+
     """
     if has_empty_url_list or total_urls == 0:
         return (

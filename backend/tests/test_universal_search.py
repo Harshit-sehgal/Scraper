@@ -91,7 +91,11 @@ def test_topological_law_bias() -> None:
     tokens = [create_token("ITEM_X", 0, 6, 0, SemanticType.TEXT), create_token("$100", 10, 14, 10, SemanticType.PRICE)]
 
     # Seed roles
-    from app.semantic_allocation_engine import SemanticRecord, allocate_semantic_roles, seed_role_engine
+    from app.semantic_allocation_engine import (
+        SemanticRecord,
+        allocate_semantic_roles,
+        seed_role_engine,
+    )
 
     seed_role_engine(["name", "price"])
 

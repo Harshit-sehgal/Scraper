@@ -64,7 +64,7 @@ def test_stable_is_strict_subset_of_experimental() -> None:
     not, or both sets are equal), the route inventory gate is broken
     and the docs would mislead operators in production.
     """
-    stdout, stderr, _ = _run_split()
+    _stdout, stderr, _ = _run_split()
     m = re.search(r"stable=(\d+) experimental=(\d+) diff=(\d+)", stderr)
     assert m, f"could not parse counts from {stderr!r}"
     n_stable, n_full, n_diff = int(m.group(1)), int(m.group(2)), int(m.group(3))

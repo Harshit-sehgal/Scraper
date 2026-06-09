@@ -36,7 +36,7 @@ def test_default_dns_standin_resolves_loopback() -> None:
     """
     result = socket.getaddrinfo("localhost", 80)
     assert result
-    _family, _type, _proto, _canon, sockaddr = result[0]
+    _family, _type, _proto, _canon, _sockaddr = result[0]
     assert any(addr[0] == "127.0.0.1" for addr in (r[4] for r in result))
 
 
@@ -50,7 +50,7 @@ def test_default_dns_standin_handles_unknown_tld() -> None:
     """
     result = socket.getaddrinfo("definitely-not-real.invalid", 80)
     assert result, "autouse DNS standin must return at least one record"
-    family, _type, _proto, _canon, sockaddr = result[0]
+    _family, _type, _proto, _canon, sockaddr = result[0]
     assert isinstance(sockaddr, tuple)
     assert len(sockaddr) >= 2
 

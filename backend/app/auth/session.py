@@ -11,7 +11,7 @@ import base64
 import hashlib
 import hmac
 import json
-import logging
+import os
 import time
 from typing import TYPE_CHECKING
 
@@ -19,8 +19,6 @@ from app.config import settings
 
 if TYPE_CHECKING:
     from fastapi import Request, Response
-
-logger = logging.getLogger(__name__)
 
 SESSION_COOKIE = "dataforge_session"
 SESSION_MAX_AGE = 86400  # 24 hours
@@ -30,13 +28,15 @@ def _derive_secret() -> bytes:
     """Derive a deterministic signing key from the configured secret or a default.
 
     In production, operators MUST set ``DATAFORGE_SESSION_SECRET`` to a
-    unique, unpredictable value. The default fallback is derived from
-    the admin API key so that two deployments with different admin keys
-    get different signing keys — but this is NOT a substitute for an
-    explicit secret.
+    unique, unpredictable value. The fallback is derived from the admin
+    API key so that two deployments with different admin keys get different
+    signing keys. If both are unset, a random per-boot key is generated
+    (sessions invalidate on restart).
     """
-    raw = (settings.SESSION_SECRET or settings.ADMIN_API_KEY or "dataforge-insecure-dev-default").encode("utf-8")
-    return hashlib.sha256(raw).digest()
+    raw = settings.SESSION_SECRET or settings.ADMIN_API_KEY
+    if raw:
+        return hashlib.sha256(raw.encode("utf-8")).digest()
+    return hashlib.sha256(os.urandom(32)).digest()
 
 
 _SIGNING_KEY = _derive_secret()
@@ -99,7 +99,7 @@ def set_session_cookie(response: Response, role: str) -> None:
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="strict",
-        secure=settings.ENV.lower() == "production",
+        secure=True,
         path="/",
     )
 
@@ -111,7 +111,7 @@ def clear_session_cookie(response: Response) -> None:
         path="/",
         httponly=True,
         samesite="strict",
-        secure=settings.ENV.lower() == "production",
+        secure=True,
     )
 
 

@@ -18,7 +18,11 @@ def test_layer7_semantic_memory() -> None:
     assert be.motif_learner.total_records > 0
 
     # State is now saved at job level; explicitly save for this test
-    from app.semantic_persistence import clear_semantic_state, load_semantic_state, save_semantic_state
+    from app.semantic_persistence import (
+        clear_semantic_state,
+        load_semantic_state,
+        save_semantic_state,
+    )
 
     save_semantic_state()
 

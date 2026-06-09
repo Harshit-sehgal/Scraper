@@ -12,7 +12,8 @@ import pytest
 
 def test_production_without_pg_driver_fails_fast(monkeypatch) -> None:
     """In production with STORAGE_BACKEND=postgres, missing DATAFORGE_PG_DRIVER
-    must raise RuntimeError rather than silently defaulting to psycopg2."""
+    must raise RuntimeError rather than silently defaulting to psycopg2.
+    """
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
     monkeypatch.setenv("DATAFORGE_ENV", "production")
     monkeypatch.setenv(
@@ -46,7 +47,8 @@ def test_production_without_pg_driver_fails_fast(monkeypatch) -> None:
 def test_production_with_pg_driver_psycopg3_does_not_fail_on_driver(monkeypatch) -> None:
     """With DATAFORGE_PG_DRIVER=psycopg3, the production check should NOT
     raise a driver selection RuntimeError. (It may still raise a
-    connection error if Postgres is unreachable, which is acceptable.)"""
+    connection error if Postgres is unreachable, which is acceptable.).
+    """
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
     monkeypatch.setenv("DATAFORGE_ENV", "production")
     monkeypatch.setenv(
@@ -75,7 +77,8 @@ def test_production_with_pg_driver_psycopg3_does_not_fail_on_driver(monkeypatch)
 
 def test_development_without_pg_driver_uses_sqlite(monkeypatch) -> None:
     """In development without DATAFORGE_STORAGE_BACKEND=postgres, the
-    SQLite path should work and the production gate must NOT trigger."""
+    SQLite path should work and the production gate must NOT trigger.
+    """
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("DATAFORGE_ENV", "development")
     monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)

@@ -26,7 +26,11 @@ def _get_store():
         with _job_store_lock:
             if _job_store is None:
                 try:
-                    from app.job_store import load_state, persist_state_single, save_state
+                    from app.job_store import (
+                        load_state,
+                        persist_state_single,
+                        save_state,
+                    )
 
                     _job_store = {
                         "load_state": load_state,

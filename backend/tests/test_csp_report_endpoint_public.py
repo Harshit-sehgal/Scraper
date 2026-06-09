@@ -60,7 +60,8 @@ def test_csp_violation_with_admin_key(client_with_keys) -> None:
 
 def test_csp_violation_top_level_directive(client_with_keys) -> None:
     """Some browsers omit the ``csp-report`` wrapper — top-level fields
-    must also be accepted."""
+    must also be accepted.
+    """
     r = client_with_keys.post(
         "/api/system/csp-violations",
         json={"violated-directive": "img-src 'self'"},

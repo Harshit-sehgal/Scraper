@@ -1,5 +1,6 @@
 """Layer 1: Intent Parser.
 ======================
+
 Universal intent parsing that understands what the user wants,
 regardless of domain (flight, hotel, product, job, etc.)
 

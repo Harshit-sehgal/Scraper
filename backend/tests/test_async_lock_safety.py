@@ -71,7 +71,8 @@ def test_no_sync_lock_held_across_await() -> None:
 
 def test_restore_job_await_outside_lock() -> None:
     """The ``restore_job`` function must have separate lock blocks for the
-    pre-await check and the post-await update."""
+    pre-await check and the post-await update.
+    """
     source = JOBS_WRITE.read_text(encoding="utf-8")
     tree = ast.parse(source)
     for node in ast.walk(tree):

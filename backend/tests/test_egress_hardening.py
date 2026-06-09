@@ -21,7 +21,7 @@ from app.url_safety import (
 
 
 @pytest.fixture(autouse=False)
-def _no_smoke_mode(monkeypatch):
+def _no_smoke_mode(monkeypatch) -> None:
     """Ensure smoke-test mode is OFF so port allowlist is enforced."""
     monkeypatch.delenv("DATAFORGE_SMOKE_TEST_MODE", raising=False)
     monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
@@ -313,19 +313,19 @@ class TestDnsRebindingProtection:
         async def fake_getaddrinfo(host, port, *args, **kwargs):
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.99", port or 0))]
 
-        async def fake_sleep(self, seconds):
+        async def fake_sleep(self, seconds) -> None:
             pass
 
         monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("10.0.0.99"))
 
         class FakeAsyncBackend(httpcore.AsyncNetworkBackend):
-            async def connect_tcp(self, host, port, **kwargs):  # type: ignore[override]
+            async def connect_tcp(self, host, port, **kwargs) -> None:  # type: ignore[override]
                 return None
 
             async def connect_unix_socket(self, path, **kwargs):  # type: ignore[override]
                 raise NotImplementedError
 
-            async def sleep(self, seconds):
+            async def sleep(self, seconds) -> None:
                 pass
 
         backend = SafeAsyncNetworkBackend(FakeAsyncBackend())

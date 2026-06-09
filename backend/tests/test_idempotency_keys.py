@@ -148,7 +148,7 @@ class TestIdempotencyStorage:
             reset_job_store_for_tests()
 
     def test_prune_zero_days_removes_nothing(self, tmp_path, monkeypatch) -> None:
-        """prune with older_than_days=0 should remove nothing."""
+        """Prune with older_than_days=0 should remove nothing."""
         from app.config import settings
         from app.job_store import (
             lookup_idempotency_key,

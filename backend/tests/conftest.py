@@ -271,10 +271,8 @@ except ImportError as e:
 # this pre-import, the ``client`` fixture below can fail with
 # ``AttributeError: module 'app.services' has no attribute 'state'`` in
 # full-suite collection order (PR review, 2026-06).
-try:
+with contextlib.suppress(ImportError):
     import app.services.state
-except ImportError:
-    pass
 
 
 # ─── DNS isolation (Phase 0, M1) ────────────────────────────────────────────
@@ -480,7 +478,8 @@ class LocalASGIClient:
 
     async def _request(self, method: str, url: str, **kwargs):
         transport = httpx.ASGITransport(app=self.app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        cookies = kwargs.pop("cookies", None)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver", cookies=cookies) as client:
             return await client.request(method, url, **kwargs)
 
     def request(self, method: str, url: str, **kwargs):

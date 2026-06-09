@@ -1,5 +1,6 @@
 """Semantic Pipeline Orchestrator.
 ================================
+
 Clean layered pipeline that strictly orchestrates the semantic flow.
 
 Flow:
@@ -41,7 +42,11 @@ from app.semantic_ir import (
     Span,
 )
 from app.semantic_mapper import detect_semantic_type, is_child_fragment
-from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records, sem_type_str
+from app.semantic_segmentation import (
+    StructuralMemoryTracker,
+    expand_composite_records,
+    sem_type_str,
+)
 from app.semantic_world_state import get_world_state
 
 logger = logging.getLogger(__name__)

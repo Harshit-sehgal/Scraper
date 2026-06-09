@@ -13,8 +13,12 @@ from ``Settings``. These tests pin the new contract:
 
 from __future__ import annotations
 
-import pytest
+from typing import TYPE_CHECKING
+
 from app.globals import CONFIG, config_view, rebuild_config_from_settings
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class TestConfigView:

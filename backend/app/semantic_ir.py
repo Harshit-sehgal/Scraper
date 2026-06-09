@@ -1,5 +1,6 @@
 """Semantic Intermediate Representation (IR).
 ============================================
+
 Single source of truth for ALL semantic data in the extraction pipeline.
 
 ALL stages operate on IR objects, NOT raw strings.
@@ -253,6 +254,7 @@ class OwnershipEdge:
 @dataclass
 class ExclusionEdge:
     """A scored exclusion relationship between two nodes / regions.
+
     Exclusion edges propagate conflict pressure through the topology.
     Unified with RelationshipEdge via confidence / strength duality.
     """

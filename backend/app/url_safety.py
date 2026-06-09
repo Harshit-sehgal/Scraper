@@ -46,6 +46,7 @@ def set_dns_resolver(resolver: Callable[[str], list[str]] | None) -> None:
     Tests should call this (via ``monkeypatch``) to inject a fake resolver
     that never hits real DNS, enabling deterministic, offline URL-safety
     assertions.
+
     """
     global _resolver
     _resolver = resolver

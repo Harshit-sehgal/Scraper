@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws: wss:; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
     <title>DataForge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
@@ -1101,22 +1101,5 @@
          frontend/ directory. Production nginx deployments are unaffected
          (nginx has dedicated location blocks for both /app/ and root paths). -->
     <script type="module" src="app.js"></script>
-    <script>
-      // Fetch experimental feature flag from the public root endpoint
-      // and reveal experimental UI elements when enabled.
-      fetch("/")
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.experimental_enabled) {
-            document.body.dataset.experimental = "true";
-            document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
-              el.classList.add("visible");
-            });
-          }
-        })
-        .catch(() => {
-          // Network or parse error — leave experimental UI hidden.
-        });
-    </script>
   </body>
 </html>

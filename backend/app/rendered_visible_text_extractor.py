@@ -29,7 +29,11 @@ from dataclasses import field as dataclass_field
 from typing import Any
 
 from app.models import FieldType
-from app.page_evidence_collector import PageEvidence, VisibleTextBlock, collect_page_evidence
+from app.page_evidence_collector import (
+    PageEvidence,
+    VisibleTextBlock,
+    collect_page_evidence,
+)
 
 logger = logging.getLogger(__name__)
 

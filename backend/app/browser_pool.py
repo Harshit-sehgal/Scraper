@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Browser, BrowserContext, async_playwright
 
 from app.config import settings
+from app.utils.log_redaction import mask_proxy_url
 
 if TYPE_CHECKING:
     from app.strategy_evolution import FetchStrategy
@@ -158,7 +159,11 @@ class BrowserPool:
                     proxy_config = proxy_mgr.get_proxy_for_playwright()
                     if proxy_config:
                         context_options["proxy"] = proxy_config
-                        logger.debug("[BrowserPool] Creating context for %s with proxy: %s", domain, proxy_config["server"])
+                        logger.debug(
+                            "[BrowserPool] Creating context for %s with proxy: %s",
+                            domain,
+                            mask_proxy_url(proxy_config["server"]),
+                        )
 
             context = await self._browser.new_context(**context_options)
 

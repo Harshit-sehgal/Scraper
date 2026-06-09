@@ -28,7 +28,7 @@ from app.models import Job, JobStatus, SourcePolicy
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 6
+_CURRENT_SCHEMA_VERSION = 7
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -168,6 +168,7 @@ def _job_to_row(job: Job) -> dict:
         "started_at": job.started_at if job.started_at is not None else "",
         "results_on_disk": 1 if job.results_on_disk else 0,
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
+        "created_by": job.created_by or "",
     }
 
 
@@ -224,6 +225,7 @@ def _row_to_job(row: dict) -> Job | None:
                 "results_file_path": row.get("results_file_path") or None,
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
+                "created_by": row.get("created_by", ""),
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -563,11 +565,23 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 # would see ``worker_heartbeats_v5_backup`` (no
                 # current row) and try to re-run the migration,
                 # re-raising the same error.
+                logger.exception(
+                    "v5→v6 worker_heartbeats migration failed; rolling back to v5 state",
+                )
                 conn.execute("DROP TABLE worker_heartbeats")
                 conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
                 raise
             conn.execute("DROP TABLE worker_heartbeats_v5_backup")
             current = 6
+
+        if current < 7:
+            # v7: add created_by column for data isolation / multi-tenancy
+            for table_name in ["jobs", "recycle_bin"]:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                v7_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+                if "created_by" not in v7_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN created_by TEXT DEFAULT ''")
+            current = 7
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
@@ -583,6 +597,9 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at)",
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)",
     )
 
 
@@ -906,7 +923,8 @@ def count_job_events(job_id: str) -> int:
 
 
 def lookup_idempotency_key(idem_key: str) -> str | None:
-    """Return the ``job_id`` previously associated with ``idem_key``,
+    """Return the ``job_id`` previously associated with ``idem_key``.
+
     or ``None`` if the key has never been seen.
     """
     if not idem_key:
@@ -924,7 +942,8 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
 
 
 def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
-    """Return the ``request_fingerprint`` previously associated with ``idem_key``,
+    """Return the ``request_fingerprint`` previously associated with ``idem_key``.
+
     or ``None`` if the key has never been seen.
     """
     if not idem_key:
@@ -1142,7 +1161,7 @@ def get_storage_status() -> dict:
         db_path = _get_db_path()
         return {
             "backend": "sqlite",
-            "db_path": str(db_path),
+            "db_path": str(db_path.name) if hasattr(db_path, "name") else str(db_path).rsplit("/", 1)[-1],
             "schema_version": schema_version,
             "latest_schema_version": _CURRENT_SCHEMA_VERSION,
             "job_count": job_count,

@@ -349,7 +349,9 @@ def create_exports_router(jobs_store: dict):
             ws = wb.create_sheet(title="Scraped Data")
 
             if job.results_on_disk:
-                from app.utils.job_results_store import load_paginated_job_results_from_disk
+                from app.utils.job_results_store import (
+                    load_paginated_job_results_from_disk,
+                )
 
                 # Load the first page to determine headers and total count
                 first_page, total = load_paginated_job_results_from_disk(
@@ -505,7 +507,9 @@ def create_exports_router(jobs_store: dict):
         for jid, jname, on_disk, fpath in job_meta:
             entry: dict[str, Any] = {"job_id": jid, "job_name": jname, "status": "pending", "record_count": 0}
             if on_disk:
-                from app.utils.job_results_store import load_paginated_job_results_from_disk
+                from app.utils.job_results_store import (
+                    load_paginated_job_results_from_disk,
+                )
 
                 first_page, total = await run_in_threadpool(
                     load_paginated_job_results_from_disk,
@@ -544,7 +548,9 @@ def create_exports_router(jobs_store: dict):
         has_any_data = False
         for jid, _jname, on_disk, fpath in job_meta:
             if on_disk:
-                from app.utils.job_results_store import load_paginated_job_results_from_disk
+                from app.utils.job_results_store import (
+                    load_paginated_job_results_from_disk,
+                )
 
                 first_page, _ = await run_in_threadpool(
                     load_paginated_job_results_from_disk,
@@ -579,7 +585,9 @@ def create_exports_router(jobs_store: dict):
         # Also discover fieldnames from subsequent pages (small overhead).
         for jid, _jname, on_disk, fpath in job_meta:
             if on_disk:
-                from app.utils.job_results_store import load_paginated_job_results_from_disk
+                from app.utils.job_results_store import (
+                    load_paginated_job_results_from_disk,
+                )
 
                 offset = _PAGINATION_CHUNK_SIZE
                 while True:
@@ -608,7 +616,9 @@ def create_exports_router(jobs_store: dict):
         async def _stream_pages():
             for jid, jname, on_disk, fpath in job_meta:
                 if on_disk:
-                    from app.utils.job_results_store import load_paginated_job_results_from_disk
+                    from app.utils.job_results_store import (
+                        load_paginated_job_results_from_disk,
+                    )
 
                     offset = 0
                     while True:
@@ -703,7 +713,9 @@ def create_exports_router(jobs_store: dict):
             for jid, jname, on_disk, fpath in job_meta:
                 rows_yielded = 0
                 if on_disk:
-                    from app.utils.job_results_store import load_paginated_job_results_from_disk
+                    from app.utils.job_results_store import (
+                        load_paginated_job_results_from_disk,
+                    )
 
                     offset = 0
                     while rows_yielded < 10000:

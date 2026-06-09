@@ -210,10 +210,9 @@ def test_conn_context_rolls_back_on_exception(
     fresh_module._pool = pool
     # Stub metrics so we don't depend on the global collector.
     monkeypatch.setattr("app.metrics_collector.record_error", lambda *_a, **_k: None)
-    with pytest.raises(RuntimeError, match="boom"):
-        with fresh_module._conn():
-            msg = "boom"
-            raise RuntimeError(msg)
+    with pytest.raises(RuntimeError, match="boom"), fresh_module._conn():
+        msg = "boom"
+        raise RuntimeError(msg)
     assert fake.committed is False
     assert fake.rolled_back is True
 
@@ -232,10 +231,9 @@ def test_conn_context_swallows_metrics_failure(
         raise RuntimeError(msg)
 
     monkeypatch.setattr("app.metrics_collector.record_error", boom)
-    with pytest.raises(RuntimeError, match="original"):
-        with fresh_module._conn():
-            msg = "original"
-            raise RuntimeError(msg)
+    with pytest.raises(RuntimeError, match="original"), fresh_module._conn():
+        msg = "original"
+        raise RuntimeError(msg)
 
 
 def test_close_pool_is_idempotent(fresh_module: Any) -> None:

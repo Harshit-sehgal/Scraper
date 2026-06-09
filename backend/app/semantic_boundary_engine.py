@@ -1,5 +1,6 @@
 """Semantic Boundary Engine.
 =========================
+
 Determines whether adjacent tokens should merge or stay separate.
 
 Replaces hardcoded suffix lists and merge patterns with scored

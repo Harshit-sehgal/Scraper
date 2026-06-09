@@ -137,7 +137,11 @@ def test_persist_state_single(monkeypatch) -> None:
 def test_migrations_cached_per_db_path(monkeypatch) -> None:
     """Verify that migrations are correctly cached per database path when STATE_FILE_PATH changes."""
     from app.config import settings
-    from app.job_store import _MIGRATIONS_RUN_FOR, _get_connection, reset_job_store_for_tests
+    from app.job_store import (
+        _MIGRATIONS_RUN_FOR,
+        _get_connection,
+        reset_job_store_for_tests,
+    )
 
     # Reset migration cache for the test
     reset_job_store_for_tests()
@@ -394,7 +398,11 @@ def test_running_job_marked_failed_after_restart(monkeypatch) -> None:
 def test_persist_state_single_updates_only_one_job(monkeypatch) -> None:
     """Verify that persist_state_single only updates the single target job row and does not affect other jobs."""
     from app.config import settings
-    from app.job_store import persist_state_single, reset_job_store_for_tests, save_state
+    from app.job_store import (
+        persist_state_single,
+        reset_job_store_for_tests,
+        save_state,
+    )
     from app.models import Job, JobStatus
 
     reset_job_store_for_tests()
@@ -482,7 +490,10 @@ def test_same_domain_concurrency_respected(monkeypatch) -> None:
     """Verify that domain-level concurrency max_parallel limit is respected when scraping multiple same-domain URLs."""
     import asyncio
 
-    from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+    from app.domain_runtime_policy import (
+        get_domain_runtime_policy,
+        reset_domain_runtime_policy,
+    )
     from app.models import Job, JobStatus
     from app.services.job_runner import run_job
 

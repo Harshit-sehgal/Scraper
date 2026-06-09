@@ -9,14 +9,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.llm_bridge import get_llm_call_count, reset_llm_call_count
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ async def run_scraping_phase(
 
     Returns:
         Tuple of (all_raw_results, urls_with_records, warnings, scraped_metadata).
+
     """
     all_raw_results: list[dict] = []
     urls_with_records = 0

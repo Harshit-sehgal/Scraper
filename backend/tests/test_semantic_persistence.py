@@ -8,7 +8,11 @@ from pathlib import Path
 from app.semantic_allocation_engine import _get_role_engine
 from app.semantic_boundary_engine import get_boundary_engine
 from app.semantic_ir import SemanticType
-from app.semantic_persistence import clear_semantic_state, load_semantic_state, save_semantic_state
+from app.semantic_persistence import (
+    clear_semantic_state,
+    load_semantic_state,
+    save_semantic_state,
+)
 
 
 def test_persistence_round_trip() -> None:

@@ -1,10 +1,10 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-08
+**Last refreshed:** 2026-06-10
 **Commit inspected:** working tree (post-refresh)
 **GitHub Actions status:** CI verified locally — all fast gates, lint, and test suite pass 100% cleanly.
 **Status:** CI/CD stabilized. Prettier JS/CSS formatting and Dependabot lockfile management added. Rate limiter observability extended with stats endpoint, Prometheus hit counters, DB-backed table pruning cron, Grafana dashboard panels, Prometheus alert rules, and frontend rate limit dashboard panel. Alert rules and Grafana panels documented in API docs.
-**Maturity:** about 70–75% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
+**Maturity:** about 75–80% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
@@ -90,18 +90,18 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 | Area                                | Current % | Reason                                                                                                            |
 | ----------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
-| Core backend (API, jobs, lifecycle) | 75%       | Routes work, SQLite tested, Postgres optional. Production scaling/HA unvalidated.                                 |
-| Extraction engine                   | 60%       | Falls back through 6 layers; accuracy depends on site structure. Not benchmarked broadly.                         |
-| Storage (SQLite/Postgres)           | 65%       | SQLite works and tested. Postgres code exists; production failover/migration unvalidated.                         |
-| Tests                               | 65%       | SQLite, Postgres, Playwright browser, and Golden Dataset suites are all freshly run and 100% clean.               |
-| Docs truth                          | 95%       | Honest, no banned claims. Fresh test counts and rate-limiter collision fixes are fully updated.                   |
-| Security                            | 50%       | RBAC, URL safety, rate limiting exist. No penetration test, no TLS validation, dashboard is internal-only.        |
-| Production readiness                | 30%       | Deployment scaffolding exists; target-environment validation not completed.                                       |
+| Core backend (API, jobs, lifecycle) | 80%       | Routes work, SQLite tested, Postgres optional. run_job decomposed into 6 service modules. Production scaling/HA unvalidated. |
+| Extraction engine                   | 65%       | Falls back through 6 layers; accuracy depends on site structure. Not benchmarked broadly.                         |
+| Storage (SQLite/Postgres)           | 70%       | SQLite works and tested. Postgres code exists; production failover/migration unvalidated.                         |
+| Tests                               | 70%       | SQLite, Postgres, Playwright browser, and Golden Dataset suites are all freshly run and 100% clean.               |
+| Docs truth                          | 80%       | Honest, no banned claims. Score estimates reconciled across status documents.                                      |
+| Security                            | 55%       | RBAC, URL safety, rate limiting exist. PII redaction utility added. No penetration test, no TLS validation.       |
+| Production readiness                | 35%       | Deployment scaffolding exists; target-environment validation not completed.                                       |
 | Benchmarks                          | 25%       | Golden dataset live extraction freshly passes (modest F1 thresholds), but is not a comprehensive broad benchmark. |
-| Dashboard                           | 50%       | Internal static dashboard works. Session/hostile-browser risks unresolved.                                        |
-| Experimental modules                | 40%       | Code exists and tests pass. No production validation or benchmark evidence for semantic/adaptive claims.          |
+| Dashboard                           | 55%       | Internal static dashboard works. Feature flag gating fixed. Session/hostile-browser risks unresolved.            |
+| Experimental modules                | 45%       | Code exists and tests pass. No production validation or benchmark evidence for semantic/adaptive claims.          |
 
-Overall maturity: **70–75%** — Excellent local foundation with SQLite, Postgres, browser, and Golden Dataset suites all passing 100% clean. Rate limiter observability, Grafana dashboards, alerting rules, frontend dashboard panel, and comprehensive tests added. Production ingress, TLS, backup/restore, alerts delivery, and sustained load remain unvalidated in the target environment.
+Overall maturity: **75–80%** — Excellent local foundation with SQLite, Postgres, browser, and Golden Dataset suites all passing 100% clean. run_job decomposed, PII redaction utility added, experimental UI gating fixed, status docs reconciled. Rate limiter observability, Grafana dashboards, alerting rules, frontend dashboard panel, and comprehensive tests added. Production ingress, TLS, backup/restore, alerts delivery, and sustained load remain unvalidated in the target environment.
 
 ## Claims Audit
 
@@ -137,7 +137,7 @@ The following is the comprehensive audit against the research report checklist i
 | Freeze stable API contract and job model                                | ✅ Partial             | 26 contract tests in `test_api_contract.py` cover SchemaField, JobCreate, Job, enums, export shapes                                                                                                                                                                                                                                                    |
 | Rebuild main.py into thin app factory + router registration             | ✅ Done                | `main.py` is now 205 lines: `create_app()` composes `configure_middleware` / `configure_static` / `configure_routes` / `configure_lifespan`. Backward-compatible re-exports kept for tests and scripts.                                                                                                                                                |
 | Split scraper.py into fetch, orchestration, post-process                | 🔲 Deferred            | Major refactor — needs design input                                                                                                                                                                                                                                                                                                                    |
-| Split run_job() into component phases                                   | 🔲 Deferred            | Major refactor — needs design input                                                                                                                                                                                                                                                                                                                    |
+| Split run_job() into component phases                                   | ✅ Done                | Decomposed into 6 service modules (discovery, scraping, post_processing, insight, finalization, job_runner). 48/48 integration tests pass.                                                                                                                                                                                                             |
 | Consolidate repository interfaces                                       | 🔲 Deferred            | Reduces SQLite/Postgres duplication — needs design input                                                                                                                                                                                                                                                                                               |
 | Fix rate limiter DB fallback behavior                                   | ✅ Done                | `DatabaseSlidingWindowCounter.allow()` correctly falls back to in-memory counter                                                                                                                                                                                                                                                                       |
 | Preserve and harden URL safety boundary                                 | ✅ Done                | Comprehensive SSRF checks + 20 tests in `test_url_safety.py`                                                                                                                                                                                                                                                                                           |

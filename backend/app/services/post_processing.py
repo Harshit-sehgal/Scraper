@@ -8,14 +8,16 @@ from __future__ import annotations
 
 import datetime
 import logging
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.filters import apply_location_radius, process_results
 from app.models import FieldType
 from app.services._job_log import log_job_message as _log
 from app.utils.job import deduplicate_results, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,7 @@
 """Unit tests for recovery_strategies — plans, executor, and edge cases."""
 
+from typing import NoReturn
+
 import pytest
 from app.failure_classification import FailureCategory, FailureClassification
 from app.recovery_strategies import (
@@ -15,7 +17,7 @@ from app.recovery_strategies import (
 
 
 class TestRecoveryPlan:
-    def test_to_dict_contains_all_fields(self):
+    def test_to_dict_contains_all_fields(self) -> None:
         plan = RecoveryPlan(
             failure_category=FailureCategory.HYDRATION_FAILURE,
             primary_action=RecoveryAction.INCREASE_HYDRATION_WAIT,
@@ -36,7 +38,7 @@ class TestRecoveryPlan:
         assert d["should_escalate"] is True
         assert d["reason"] == "Testing to_dict"
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         plan = RecoveryPlan(
             failure_category=FailureCategory.TIMEOUT,
             primary_action=RecoveryAction.INCREASE_TIMEOUT,
@@ -53,7 +55,7 @@ class TestRecoveryPlan:
 
 
 class TestAttemptContext:
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         ctx = AttemptContext()
         assert ctx.timeout_ms is None
         assert ctx.hydration_wait_ms is None
@@ -74,7 +76,7 @@ class TestAttemptContext:
         assert ctx.force_container_discovery is False
         assert ctx.abort_domain is False
 
-    def test_custom_values(self):
+    def test_custom_values(self) -> None:
         ctx = AttemptContext(
             timeout_ms=30000,
             hydration_wait_ms=5000,
@@ -119,7 +121,7 @@ class TestAttemptContext:
 
 
 class TestRecoveryStrategist:
-    def test_plan_for_unknown_category_uses_fallback(self):
+    def test_plan_for_unknown_category_uses_fallback(self) -> None:
         """Unknown failure categories should use the UNKNOWN path."""
         strategist = get_recovery_strategist()
         classification = FailureClassification(
@@ -131,7 +133,7 @@ class TestRecoveryStrategist:
         assert plan.max_retry_attempts == 1
         assert plan.backoff_seconds == 3.0
 
-    def test_escalation_on_attempt_2(self):
+    def test_escalation_on_attempt_2(self) -> None:
         strategist = get_recovery_strategist()
         classification = FailureClassification(
             category=FailureCategory.HYDRATION_FAILURE,
@@ -141,7 +143,7 @@ class TestRecoveryStrategist:
         # Attempt 2 should use first escalation action
         assert plan.primary_action in RecoveryAction.__members__.values()
 
-    def test_escalation_beyond_available_actions(self):
+    def test_escalation_beyond_available_actions(self) -> None:
         strategist = get_recovery_strategist()
         classification = FailureClassification(
             category=FailureCategory.CONNECTION_TIMEOUT,
@@ -151,7 +153,7 @@ class TestRecoveryStrategist:
         # Should not crash; pick last available action or secondary
         assert plan.primary_action is not None
 
-    def test_all_failure_categories_have_paths(self):
+    def test_all_failure_categories_have_paths(self) -> None:
         """Every FailureCategory should have a defined recovery path."""
         strategist = get_recovery_strategist()
         for category in FailureCategory:
@@ -160,7 +162,7 @@ class TestRecoveryStrategist:
             assert plan.primary_action is not None
             assert plan.max_retry_attempts >= 0
 
-    def test_domain_info_tunes_anti_bot_params(self):
+    def test_domain_info_tunes_anti_bot_params(self) -> None:
         strategist = get_recovery_strategist()
         classification = FailureClassification(
             category=FailureCategory.RATE_LIMITED,
@@ -171,7 +173,7 @@ class TestRecoveryStrategist:
         # High anti-bot risk should increase delay
         assert plan.parameters.get("delay_ms", 0) > 10000  # Higher than default
 
-    def test_high_failure_rate_reduces_delays(self):
+    def test_high_failure_rate_reduces_delays(self) -> None:
         strategist = get_recovery_strategist()
         classification = FailureClassification(
             category=FailureCategory.HYDRATION_FAILURE,
@@ -194,7 +196,7 @@ class TestRecoveryStrategist:
 
 class TestRecoveryExecutor:
     @pytest.mark.asyncio
-    async def test_execute_no_handler_returns_false(self):
+    async def test_execute_no_handler_returns_false(self) -> None:
         executor = RecoveryExecutor()
         plan = RecoveryPlan(
             failure_category=FailureCategory.TIMEOUT,
@@ -205,10 +207,10 @@ class TestRecoveryExecutor:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_execute_with_handler_returns_result(self):
+    async def test_execute_with_handler_returns_result(self) -> None:
         executor = RecoveryExecutor()
 
-        async def fake_handler(params, context, attempt_ctx=None):
+        async def fake_handler(params, context, attempt_ctx=None) -> bool:
             return True
 
         executor.register_handler(RecoveryAction.INCREASE_TIMEOUT, fake_handler)
@@ -220,10 +222,10 @@ class TestRecoveryExecutor:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_execute_handler_exception_returns_false(self):
+    async def test_execute_handler_exception_returns_false(self) -> None:
         executor = RecoveryExecutor()
 
-        async def failing_handler(params, context, attempt_ctx=None):
+        async def failing_handler(params, context, attempt_ctx=None) -> NoReturn:
             msg = "handler crashed"
             raise RuntimeError(msg)
 
@@ -236,14 +238,14 @@ class TestRecoveryExecutor:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_escalation_on_primary_failure(self):
+    async def test_escalation_on_primary_failure(self) -> None:
         executor = RecoveryExecutor()
 
-        async def failing_handler(params, context, attempt_ctx=None):
+        async def failing_handler(params, context, attempt_ctx=None) -> NoReturn:
             msg = "primary crashed"
             raise RuntimeError(msg)
 
-        async def escalation_handler(params, context, attempt_ctx=None):
+        async def escalation_handler(params, context, attempt_ctx=None) -> bool:
             return True
 
         executor.register_handler(RecoveryAction.INCREASE_TIMEOUT, failing_handler)
@@ -259,10 +261,10 @@ class TestRecoveryExecutor:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_mutates_attempt_context(self):
+    async def test_mutates_attempt_context(self) -> None:
         executor = RecoveryExecutor()
 
-        async def set_skip(params, context, attempt_ctx=None):
+        async def set_skip(params, context, attempt_ctx=None) -> bool:
             if attempt_ctx is not None:
                 attempt_ctx.skip_url = True
             return True
@@ -278,10 +280,10 @@ class TestRecoveryExecutor:
         assert ctx.skip_url is True
 
     @pytest.mark.asyncio
-    async def test_all_escalation_failures_return_false(self):
+    async def test_all_escalation_failures_return_false(self) -> None:
         executor = RecoveryExecutor()
 
-        async def always_fail(params, context, attempt_ctx=None):
+        async def always_fail(params, context, attempt_ctx=None) -> NoReturn:
             msg = "always fails"
             raise RuntimeError(msg)
 
@@ -299,13 +301,13 @@ class TestRecoveryExecutor:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_register_handler_replaces_old(self):
+    async def test_register_handler_replaces_old(self) -> None:
         executor = RecoveryExecutor()
 
-        async def handler_a(params, context, attempt_ctx=None):
+        async def handler_a(params, context, attempt_ctx=None) -> bool:
             return False
 
-        async def handler_b(params, context, attempt_ctx=None):
+        async def handler_b(params, context, attempt_ctx=None) -> bool:
             return True
 
         executor.register_handler(RecoveryAction.ROTATE_PROXY, handler_a)
@@ -322,12 +324,12 @@ class TestRecoveryExecutor:
 
 
 class TestSingletons:
-    def test_get_recovery_executor_returns_same_instance(self):
+    def test_get_recovery_executor_returns_same_instance(self) -> None:
         e1 = get_recovery_executor()
         e2 = get_recovery_executor()
         assert e1 is e2
 
-    def test_get_recovery_strategist_returns_same_instance(self):
+    def test_get_recovery_strategist_returns_same_instance(self) -> None:
         s1 = get_recovery_strategist()
         s2 = get_recovery_strategist()
         assert s1 is s2

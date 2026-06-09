@@ -1,5 +1,6 @@
 """Semantic Segmentation Layer.
 ============================
+
 Intermediate Representation (IR) bridge between raw extraction and semantic mapping.
 
 Solves the core problem: the system no longer has a scraping problem,

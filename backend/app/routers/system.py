@@ -367,6 +367,11 @@ async def csp_violations(request: Request):
     body is bounded by the body-size middleware (5 MB) so an attacker cannot
     flood the metrics counters.
     """
+    # Validate Content-Type to prevent log injection via arbitrary POSTs
+    ctype = request.headers.get("content-type", "").lower()
+    if not ctype.startswith(("application/json", "application/csp-report")):
+        return JSONResponse(status_code=204, content=None)
+
     try:
         payload = await request.json()
     except (ValueError, TypeError):
@@ -398,11 +403,16 @@ async def csp_violations(request: Request):
     except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
         pass
 
+    # Sanitise log values: truncate and remove newlines to prevent log injection
+    def _sanitise(val: object, max_len: int = 120) -> str:
+        s = str(val)[:max_len]
+        return s.replace("\n", " ").replace("\r", " ")
+
     logger.info(
         "CSP violation: directive=%s blocked=%s document-uri=%s",
         directive_label,
-        csp_report.get("blocked-uri"),
-        csp_report.get("document-uri"),
+        _sanitise(csp_report.get("blocked-uri")),
+        _sanitise(csp_report.get("document-uri")),
     )
     return JSONResponse(status_code=204, content=None)
 

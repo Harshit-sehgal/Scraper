@@ -248,7 +248,7 @@ class TestEnforceSchemaIntegrity:
     def test_adds_type_mismatch_flags_key(self) -> None:
         schema = [SchemaField(name="phone", field_type=FieldType.PHONE)]
         record = {"phone": "not-a-phone"}
-        cleaned, mismatches = enforce_schema_integrity(record, schema)
+        cleaned, _mismatches = enforce_schema_integrity(record, schema)
         assert "type_mismatch_flags" in cleaned
         assert cleaned["type_mismatch_flags"] == ["phone:expected_phone"]
 
@@ -328,7 +328,7 @@ async def test_process_results_empty() -> None:
     """process_results with empty input returns empty."""
     from app.filters import process_results
 
-    cleaned, total, filtered_count, report = await process_results([], [], [])
+    cleaned, total, filtered_count, _report = await process_results([], [], [])
     assert cleaned == []
     assert total == 0
     assert filtered_count == 0
@@ -341,7 +341,7 @@ async def test_process_results_no_filters() -> None:
 
     schema = [SchemaField(name="age", field_type=FieldType.INTEGER)]
     raw = [{"age": "25"}, {"age": "thirty"}]
-    cleaned, total, filtered_count, report = await process_results(raw, schema, [])
+    cleaned, total, filtered_count, _report = await process_results(raw, schema, [])
     assert total == 2
     assert filtered_count == 2
     assert cleaned[0]["age"] == 25
@@ -359,7 +359,7 @@ async def test_process_results_with_filter() -> None:
         FilterRule(field_name="age", operator=FilterOperator.GREATER_THAN, value="18"),
     ]
     raw = [{"age": "25"}, {"age": "15"}, {"age": "30"}]
-    cleaned, total, filtered_count, report = await process_results(raw, schema, filters)
+    cleaned, total, filtered_count, _report = await process_results(raw, schema, filters)
     assert total == 3
     assert filtered_count == 2
     ages = {r["age"] for r in cleaned}
@@ -373,7 +373,7 @@ async def test_process_results_integrity_report() -> None:
 
     schema = [SchemaField(name="email", field_type=FieldType.EMAIL)]
     raw = [{"email": "user@example.com"}, {"email": "not-an-email"}]
-    cleaned, total, filtered_count, report = await process_results(raw, schema, [])
+    _cleaned, _total, _filtered_count, report = await process_results(raw, schema, [])
     assert report["records_with_type_mismatch"] == 1
     assert report["total_type_mismatches"] == 1
 
