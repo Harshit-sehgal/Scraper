@@ -27,7 +27,7 @@ DC := docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 
-.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate doctor
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -120,6 +120,15 @@ lint-all: lint mypy boundary deps-check ## Run full lint + type + boundary + dep
 
 # Local validation that mirrors CI (does not require Docker)
 validate: ## Run all CI checks locally (verify_all.sh)
+
+# ─── Bootstrap gate (Phase 0) ───────────────────────────────────────────────
+
+doctor: ## Run the repository health check (Python, venv, lockfiles, Playwright, pytest probe)
+	python3 scripts/doctor.py
+
+doctor-json: ## Emit doctor output as JSON for CI consumption
+	python3 scripts/doctor.py --json
+
 	bash scripts/verify_all.sh
 
 # ─── Production ─────────────────────────────────────────────────────────────
