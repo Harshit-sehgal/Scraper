@@ -1,7 +1,7 @@
 """Browser Pool — Persistent Chromium management and context pooling.
 
 LAW: Browser instances are heavy. Contexts are light.
-Reuse browsers to minimize startup latency; rotate contexts to maintain stealth.
+Reuse browsers to minimize startup latency; rotate contexts to reduce fingerprint consistency.
 """
 
 from __future__ import annotations

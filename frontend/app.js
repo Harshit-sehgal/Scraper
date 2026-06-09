@@ -178,9 +178,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   initTheme();
 
   // ── Initial view ──
-  const initialView = ["jobs", "new", "recycle", "cognition", "dashboard"].includes(String(uiState.view || ""))
+  let initialView = ["jobs", "new", "recycle", "cognition", "dashboard"].includes(String(uiState.view || ""))
     ? String(uiState.view)
     : "jobs";
+  // H2: Guard initial view restoration for cognition
+  if (initialView === "cognition" && window.DATAFORGE_EXPERIMENTAL !== true) {
+    initialView = "jobs";
+  }
   switchView(initialView);
 
   // ── Polling intervals ──

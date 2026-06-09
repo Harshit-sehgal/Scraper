@@ -36,7 +36,7 @@ class FetchStrategy(StrEnum):
     PLAYWRIGHT_FULL = "playwright_full"  # Full browser render
     # Minimal render, no media / fonts
     PLAYWRIGHT_LIGHTWEIGHT = "playwright_lightweight"
-    PLAYWRIGHT_STEALTH = "playwright_stealth"  # Extra stealth evasion
+    PLAYWRIGHT_STEALTH = "playwright_stealth"  # Enhanced fingerprint randomization
     HTTPX_BASIC = "httpx_basic"  # Raw HTTP, no JS
     HTTPX_WITH_UA = "httpx_with_ua"  # HTTP with browser user agent
     HTTPX_SMART = "httpx_smart"  # HTTP with session / cookies simulation

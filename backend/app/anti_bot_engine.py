@@ -1,4 +1,4 @@
-"""Anti-Bot Resilience Engine — Surviving hostile web environments.
+"""Anti-Bot Detection Engine — Identifying when automated access is blocked.
 
 Responsible for:
 - Detecting challenges (Cloudflare, Akamai, etc.)
@@ -74,7 +74,7 @@ SIGNAL_WEIGHTS = {
 
 
 class AntiBotEngine:
-    """Intelligent engine for detecting and bypassing anti-bot systems."""
+    """Intelligent engine for detecting and responding to anti-bot systems."""
 
     def __init__(self) -> None:
         self._block_history: dict[str, list[float]] = {}
