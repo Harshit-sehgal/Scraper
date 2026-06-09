@@ -640,6 +640,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql)
         except Exception:  # nosec B110
+            logger.exception("count_jobs_by_status failed")
             return {}
         return {str(row["status"]): int(row["cnt"]) for row in rows}
 
@@ -869,6 +870,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
         except Exception:  # nosec B110
+            logger.exception("read_results failed for job %s", job_id)
             return []
         out: list[dict] = []
         for row in rows:
@@ -895,6 +897,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 )
             return int(row["cnt"]) if row else 0
         except Exception:  # nosec B110
+            logger.exception("count_results failed for job %s", job_id)
             return 0
 
     def read_events(self, job_id: str, limit: int = 200, offset: int = 0, level_prefix: str | None = None) -> list[dict]:
@@ -912,6 +915,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, tuple(params))
         except Exception:  # nosec B110
+            logger.exception("read_events failed for job %s", job_id)
             return []
         return [
             {
@@ -986,6 +990,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 )
                 return int(cur.rowcount) if cur.rowcount else 0
         except Exception:  # nosec B110
+            logger.exception("prune_idempotency_keys failed")
             return 0
 
     def cleanup_companion_data(self, job_id: str) -> None:

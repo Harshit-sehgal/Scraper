@@ -177,7 +177,7 @@ def test_validate_internal_tlds() -> None:
     try:
         validate_public_http_url("http://example.com")
     except ValueError as e:
-        assert "internal TLD" not in str(e)  # noqa: PT017
+        assert "internal TLD" not in str(e)
 
 
 def test_validate_credentials_in_url() -> None:

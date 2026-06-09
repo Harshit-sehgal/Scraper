@@ -60,7 +60,13 @@ def _get_pool():
                     conninfo=dsn,
                     min_size=minconn,
                     max_size=maxconn,
-                    kwargs={"autocommit": False},
+                    kwargs={
+                        "autocommit": False,
+                        "keepalives": 1,
+                        "keepalives_idle": 30,
+                        "keepalives_interval": 10,
+                        "keepalives_count": 5,
+                    },
                     open=False,
                 )
                 _pool.open()

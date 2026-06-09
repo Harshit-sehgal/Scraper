@@ -500,6 +500,42 @@ def create_exports_router(jobs_store: dict):
             else:
                 job_meta.append((_jid, job.name or _jid, bool(job.results_on_disk), job.results_file_path))
 
+        # ── Build manifest with per-job status (E2) ────────────────────
+        manifest: list[dict[str, Any]] = []
+        for jid, jname, on_disk, fpath in job_meta:
+            entry: dict[str, Any] = {"job_id": jid, "job_name": jname, "status": "pending", "record_count": 0}
+            if on_disk:
+                from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+                first_page, total = await run_in_threadpool(
+                    load_paginated_job_results_from_disk,
+                    jid,
+                    limit=1,
+                    offset=0,
+                    file_path=fpath,
+                )
+                if first_page:
+                    entry["status"] = "included"
+                    entry["record_count"] = total
+                else:
+                    entry["status"] = "empty"
+            else:
+                job = jobs_store.get(jid)
+                if job and job.results:
+                    count = len(job.results)
+                    entry["status"] = "included"
+                    entry["record_count"] = count
+                    if count > 10000:
+                        entry["truncated"] = True
+                        entry["original_count"] = count
+                else:
+                    entry["status"] = "empty"
+            manifest.append(entry)
+
+        total_requested = len(manifest)
+        total_included = sum(1 for e in manifest if e["status"] == "included")
+        total_empty = sum(1 for e in manifest if e["status"] == "empty")
+
         # ── Streaming fieldnames discovery ──────────────────────────────
         # Load only the first page of each job to discover the union of
         # fieldnames.  This avoids loading all results into memory.
@@ -599,52 +635,59 @@ def create_exports_router(jobs_store: dict):
         # ── Route to format-specific handler ────────────────────────────
         ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
 
+        # ── Common manifest headers (E2) ────────────────────────────────
+        manifest_headers = {
+            "X-Export-Total-Jobs": str(total_requested),
+            "X-Export-Jobs-With-Data": str(total_included),
+            "X-Export-Empty-Jobs": str(total_empty),
+            "Content-Disposition": f'attachment; filename="batch_export_{ts}.{fmt}"',
+        }
+
         if fmt == "csv":
             return StreamingResponse(
                 _batch_csv_stream(_stream_pages(), fieldnames, body.flatten, ts),
                 media_type="text/csv",
-                headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.csv"'},
+                headers=manifest_headers,
             )
         if fmt == "json":
             return StreamingResponse(
-                _batch_json_stream(_stream_pages(), fieldnames, body.flatten, ts),
+                _batch_json_stream(_stream_pages(), fieldnames, body.flatten, ts, manifest),
                 media_type="application/json",
-                headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.json"'},
+                headers=manifest_headers,
             )
         # fmt == "xlsx"  # noqa: ERA001, RUF100
-        # XLSX requires full workbook in memory (openpyxl limitation).
-        # Collect pages into per-job lists with a per-job cap.
-        per_job_results: list[tuple[str, str, list[dict[str, Any]]]] = []
-        current_jid: str | None = None
-        current_rows: list[dict[str, Any]] = []
-        current_name: str = ""
-        async for jid, jname, page in _stream_pages():
-            if jid != current_jid:
-                if current_jid is not None:
-                    per_job_results.append((current_jid, current_name, current_rows))
-                current_jid = jid
-                current_name = jname
-                current_rows = []
-            current_rows.extend(page)
-            # Cap per-job to prevent OOM
-            if len(current_rows) > 10000:
-                current_rows = current_rows[:10000]
-        if current_jid is not None:
-            per_job_results.append((current_jid, current_name, current_rows))
-        return await run_in_threadpool(_batch_xlsx, per_job_results, fieldnames, body.flatten)
+        return await run_in_threadpool(_batch_xlsx, job_meta, fieldnames, body.flatten, manifest)
 
     def _batch_xlsx(
-        per_job_results: list[tuple[str, str, list[dict[str, Any]]]],
+        job_meta: list[tuple[str, str, bool, str | None]],
         fieldnames: list[str],
         flatten: bool,
+        manifest: list[dict[str, Any]] | None = None,
     ) -> Response:
         """Generate a batch Excel response.
 
         When *flatten* is True, all rows go into a single "Combined"
         sheet with a ``_source_job`` column. When False, each job gets
         its own sheet named after the job (truncated to 31 chars).
+
+        A "Summary" sheet (E2) is added as the first sheet with
+        per-job status metadata.
         """
         wb = Workbook(write_only=True)
+
+        # E2: Add a Summary sheet with per-job manifest
+        ws_summary = wb.create_sheet(title="Summary")
+        ws_summary.append(["Job ID", "Job Name", "Status", "Record Count", "Truncated"])
+        for entry in manifest or []:
+            ws_summary.append(
+                [
+                    entry.get("job_id", ""),
+                    entry.get("job_name", ""),
+                    entry.get("status", ""),
+                    str(entry.get("record_count", 0)),
+                    str(entry.get("truncated", False)),
+                ],
+            )
 
         def _row_values(row: dict[str, Any], fnames: list[str]) -> list[Any]:
             vals: list[Any] = []
@@ -655,6 +698,34 @@ def create_exports_router(jobs_store: dict):
                 else:
                     vals.append(_safe_cell(v))
             return vals
+
+        def _stream_pages_sync():
+            for jid, jname, on_disk, fpath in job_meta:
+                rows_yielded = 0
+                if on_disk:
+                    from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+                    offset = 0
+                    while rows_yielded < 10000:
+                        limit = min(_PAGINATION_CHUNK_SIZE, 10000 - rows_yielded)
+                        page, total = load_paginated_job_results_from_disk(
+                            jid,
+                            limit=limit,
+                            offset=offset,
+                            file_path=fpath,
+                        )
+                        if not page:
+                            break
+                        yield jid, jname, _strip_system_fields(page)
+                        rows_yielded += len(page)
+                        offset += len(page)
+                        if offset >= total:
+                            break
+                else:
+                    job = jobs_store.get(jid)
+                    if job and job.results:
+                        raw = list(job.results)[:10000]
+                        yield jid, jname, _strip_system_fields(raw)
 
         if flatten:
             all_fnames = list(fieldnames)
@@ -680,8 +751,8 @@ def create_exports_router(jobs_store: dict):
             used_flatten_names.add(sheet_name)
             ws = wb.create_sheet(title=sheet_name)
             ws.append(all_fnames)
-            for _, job_name, rows in per_job_results:
-                for row in rows:
+            for _, job_name, page in _stream_pages_sync():
+                for row in page:
                     vals = _row_values(row, fieldnames)
                     vals.append(job_name)
                     ws.append(vals)
@@ -689,25 +760,28 @@ def create_exports_router(jobs_store: dict):
             # Track used sheet names to avoid ``InvalidWorksheetTitle`` from
             # openpyxl when two jobs share the same 31-char prefix.
             used_sheet_names: set[str] = set()
-            for _, job_name, rows in per_job_results:
-                base = (job_name or "Sheet")[:31] or "Sheet"
-                sheet_name = base
-                suffix = 2
-                while sheet_name in used_sheet_names or sheet_name == "Sheet":
-                    candidate = f"{base[: 31 - 4]} (2)" if suffix == 2 and base != "Sheet" else f"{base[: 31 - 4]} ({suffix})"
-                    sheet_name = candidate[:31]
-                    suffix += 1
-                    if suffix > 999:
-                        # Defensive cap — at this point we have hundreds of
-                        # jobs with the same 31-char prefix, which is itself
-                        # a data-quality issue, but we should not loop forever.
-                        sheet_name = f"{base[: 31 - 4]}_x"
-                        break
-                used_sheet_names.add(sheet_name)
-                ws = wb.create_sheet(title=sheet_name)
-                ws.append(fieldnames)
-                for row in rows:
-                    ws.append(_row_values(row, fieldnames))
+            current_ws = None
+            current_jid = None
+            for jid, job_name, page in _stream_pages_sync():
+                if jid != current_jid:
+                    current_jid = jid
+                    base = (job_name or "Sheet")[:31] or "Sheet"
+                    sheet_name = base
+                    suffix = 2
+                    while sheet_name in used_sheet_names or sheet_name == "Sheet":
+                        candidate = f"{base[: 31 - 4]} (2)" if suffix == 2 and base != "Sheet" else f"{base[: 31 - 4]} ({suffix})"
+                        sheet_name = candidate[:31]
+                        suffix += 1
+                        if suffix > 999:
+                            sheet_name = f"{base[: 31 - 4]}_x"
+                            break
+                    used_sheet_names.add(sheet_name)
+                    current_ws = wb.create_sheet(title=sheet_name)
+                    current_ws.append(fieldnames)
+
+                if current_ws is not None:
+                    for row in page:
+                        current_ws.append(_row_values(row, fieldnames))
 
         output = io.BytesIO()
         wb.save(output)
@@ -781,15 +855,17 @@ def create_exports_router(jobs_store: dict):
 
     async def _batch_json_stream(
         pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
-        fieldnames: list[str],  # noqa: ARG001
+        _fieldnames: list[str],
         flatten: bool,
         _ts: str,
+        manifest: list[dict[str, Any]] | None = None,
     ):
         """Yield JSON chunks as a streaming generator.
 
         For flatten mode: yields a JSON array opening, then each row as
         a JSON object, then the closing bracket.
-        For grouped mode: yields a JSON object with an ``exports`` array.
+        For grouped mode: yields a JSON object with an ``exports`` array
+        and a ``manifest`` key (E2) with per-job status metadata.
         """
         if flatten:
             yield "[\n"
@@ -804,7 +880,9 @@ def create_exports_router(jobs_store: dict):
                     first = False
             yield "\n]\n"
         else:
-            yield '{\n  "exports": [\n'
+            yield '{\n  "manifest": '
+            yield json.dumps(manifest or [])
+            yield ',\n  "exports": [\n'
             first_job = True
             async for jid, job_name, page in pages:
                 if not first_job:

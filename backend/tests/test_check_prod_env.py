@@ -23,10 +23,10 @@ def env_file():
     os.unlink(f.name)
 
 
-def _write_env(path: Path, vars: dict[str, str]) -> None:  # noqa: A002
+def _write_env(path: Path, env_vars: dict[str, str]) -> None:
     """Write variables to an env file."""
     with open(path, "w") as f:
-        f.writelines(f'{key}="{value}"\n' for key, value in vars.items())
+        f.writelines(f'{key}="{value}"\n' for key, value in env_vars.items())
 
 
 class TestCheckProdEnvCore:

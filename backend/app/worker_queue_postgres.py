@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from contextlib import contextmanager
 
 from app.config import settings as _settings
@@ -76,6 +77,10 @@ def _get_pool():
                     minconn=minconn,
                     maxconn=maxconn,
                     dsn=dsn,
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5,
                 )
                 logger.info(
                     "Created psycopg2 worker queue pool for %s (minconn=%d, maxconn=%d)",
@@ -222,7 +227,6 @@ class PostgresWorkerQueue(PostgresWorkerQueueBase):
 # Factory and reset helpers (driver-aware)
 # ───────────────────────────────────────────────────────────────────────
 
-import threading
 
 _queue_instance: PostgresWorkerQueueBase | None = None
 _queue_lock = threading.Lock()

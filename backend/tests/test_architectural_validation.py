@@ -284,7 +284,7 @@ class TestCircularDependencies:
             visited = {module}
             cycles = self._find_cycles(module, visited, [module])
             for cycle in cycles:
-                cycles_found.append(cycle)  # noqa: PERF402
+                cycles_found.append(cycle)
             visited_global.update(visited)
 
         # Check that cycles don't cross layer boundaries (mostly)

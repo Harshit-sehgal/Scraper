@@ -105,11 +105,11 @@ class TestDashboardMetadata:
         assert dashboard.get("uid") == "dataforge-overview", "Dashboard UID must remain 'dataforge-overview'"
 
     def test_title_is_set(self, dashboard: dict) -> None:
-        assert isinstance(dashboard.get("title"), str) and dashboard["title"].strip(), "Title must be non-empty"  # noqa: PT018
+        assert isinstance(dashboard.get("title"), str) and dashboard["title"].strip(), "Title must be non-empty"
 
     def test_refresh_is_reasonable(self, dashboard: dict) -> None:
         refresh = dashboard.get("refresh", "")
-        assert isinstance(refresh, str) and refresh, "refresh must be a non-empty string"  # noqa: PT018
+        assert isinstance(refresh, str) and refresh, "refresh must be a non-empty string"
         # Parse: "30s", "1m", "5m" etc.
         unit = refresh[-1]
         assert unit in ("s", "m", "h"), f"Unrecognized refresh unit: {unit}"
@@ -136,7 +136,7 @@ class TestPanelIds:
     def test_ids_are_positive_integers(self, dashboard: dict) -> None:
         for panel in dashboard["panels"]:
             pid = panel.get("id")
-            assert isinstance(pid, int) and pid > 0, f"Panel '{panel.get('title', '?')}' has invalid id: {pid}"  # noqa: PT018
+            assert isinstance(pid, int) and pid > 0, f"Panel '{panel.get('title', '?')}' has invalid id: {pid}"
 
 
 # ── Grid Positions ──────────────────────────────────────────────────────
@@ -203,7 +203,7 @@ class TestPanelFields:
 
     def test_every_panel_has_type(self, dashboard: dict) -> None:
         for panel in dashboard["panels"]:
-            assert isinstance(panel.get("type"), str) and panel["type"].strip(), (  # noqa: PT018
+            assert isinstance(panel.get("type"), str) and panel["type"].strip(), (
                 f"Panel '{panel.get('title', '?')}' (id={panel.get('id')}) is missing 'type'"
             )
 
@@ -215,7 +215,7 @@ class TestPanelFields:
     def test_every_target_has_expr(self, dashboard: dict) -> None:
         for panel in dashboard["panels"]:
             for t in panel.get("targets", []):
-                assert isinstance(t.get("expr"), str) and t["expr"].strip(), (  # noqa: PT018
+                assert isinstance(t.get("expr"), str) and t["expr"].strip(), (
                     f"Panel '{panel.get('title', '?')}' (id={panel.get('id')}) has target without expr"
                 )
 
@@ -258,8 +258,8 @@ class TestDashboardLinks:
 
     def test_links_have_title_and_url(self, dashboard: dict) -> None:
         for link in dashboard.get("links", []):
-            assert isinstance(link.get("title"), str) and link["title"].strip(), f"Link missing title: {link}"  # noqa: PT018
-            assert isinstance(link.get("url"), str) and link["url"].strip(), f"Link '{link.get('title')}' missing url"  # noqa: PT018
+            assert isinstance(link.get("title"), str) and link["title"].strip(), f"Link missing title: {link}"
+            assert isinstance(link.get("url"), str) and link["url"].strip(), f"Link '{link.get('title')}' missing url"
 
     def test_at_least_one_link(self, dashboard: dict) -> None:
         links = dashboard.get("links", [])

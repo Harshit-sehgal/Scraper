@@ -238,7 +238,7 @@ async def run_scraping_phase(
             logger.warning("per-URL scrape raised %s", exc)
     scraped: list[ScrapeResult] = [r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4]
 
-    for _idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
+    for _idx, results, success, _meta in sorted(scraped, key=lambda x: x[0]):
         if job.cancel_requested or await cancel_check():
             job.cancel_requested = True
             from app.utils.job import mark_job_canceled

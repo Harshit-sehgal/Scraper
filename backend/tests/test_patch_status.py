@@ -115,7 +115,7 @@ class TestMainBlock:
     def test_main_block_runs_without_error(self) -> None:
         """Running patch_status.py as __main__ should not crash."""
         patch_path = Path(__file__).parent.parent / "app" / "patch_status.py"
-        result = subprocess.run(  # noqa: PLW1510
+        result = subprocess.run(
             [sys.executable, str(patch_path)],
             capture_output=True,
             text=True,

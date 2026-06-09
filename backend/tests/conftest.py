@@ -9,6 +9,7 @@ from types import ModuleType
 
 import httpx
 import pytest
+from app.models import FieldType, SchemaField
 
 
 def pytest_addoption(parser) -> None:
@@ -443,9 +444,6 @@ def reset_lifespan_state_fixture():
         reset_lifespan_state()
     except ImportError:
         pass
-
-
-from app.models import FieldType, SchemaField
 
 
 def make_schema_field_list(names: list[str], field_type: FieldType = FieldType.STRING) -> list[SchemaField]:

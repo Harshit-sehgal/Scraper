@@ -31,15 +31,15 @@ class TestSchemaFieldContract:
 
     def test_schema_field_rejects_reserved_names(self) -> None:
         for reserved in ("record_score", "_provenance", "_extraction_method", "source_url"):
-            with pytest.raises(ValueError):  # noqa: PT011
+            with pytest.raises(ValueError):
                 SchemaField(name=reserved, field_type=FieldType.STRING, description="", required=False)
 
     def test_schema_field_rejects_invalid_names(self) -> None:
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):
             SchemaField(name="123_invalid", field_type=FieldType.STRING, description="", required=False)
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):
             SchemaField(name="_", field_type=FieldType.STRING, description="", required=False)
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):
             SchemaField(name="1start_with_number", field_type=FieldType.STRING, description="", required=False)
 
 
@@ -70,7 +70,7 @@ class TestJobCreateContract:
         assert job.schema_fields[0].required is True
 
     def test_manual_job_rejects_empty_urls(self) -> None:
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):
             JobCreate(name="empty", mode="manual", urls=[])
 
     def test_max_pages_default(self) -> None:

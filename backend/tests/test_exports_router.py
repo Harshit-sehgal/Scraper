@@ -867,12 +867,17 @@ class TestBatchJsonExport:
         assert resp.status_code == 200
         data = json.loads(resp.content)
         assert isinstance(data, dict)
+        assert "manifest" in data, "Non-flatten JSON must include manifest (E2)"
         assert "exports" in data
         assert len(data["exports"]) == 2
         assert data["exports"][0]["job_id"] == "a"
         assert data["exports"][0]["job_name"] == "Job A"
         assert len(data["exports"][0]["results"]) == 1
         assert data["exports"][1]["job_id"] == "b"
+        # Verify manifest contents
+        assert len(data["manifest"]) == 2
+        assert data["manifest"][0]["status"] == "included"
+        assert data["manifest"][0]["record_count"] == 1
 
     @pytest.mark.asyncio
     async def test_batch_json_content_type(self, batch_json_client) -> None:

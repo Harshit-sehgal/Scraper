@@ -36,7 +36,7 @@ def _reset_module_state(monkeypatch):
     reset_notifier()
 
 
-def _make_enabled(token: str = "123456:ABCDEFG", chat_id: str = "999") -> TelegramNotifier:  # noqa: S107
+def _make_enabled(token: str = "123456:ABCDEFG", chat_id: str = "999") -> TelegramNotifier:
     """Build a fully-enabled notifier using direct env-var injection."""
     import os
 

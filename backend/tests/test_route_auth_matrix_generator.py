@@ -91,6 +91,8 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
     # body-size middleware (5 MB cap) and the global /api/* rate limiter.
     UNAUTHENTICATED_MUTATIONS = {
         ("POST", "/api/system/csp-violations"),  # browser CSP report, no key
+        ("POST", "/api/session"),  # self-service auth — any authenticated user can create a session
+        ("DELETE", "/api/session"),  # self-service auth — any authenticated user can clear their session
     }
 
     unsafe = [

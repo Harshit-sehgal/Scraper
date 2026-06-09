@@ -1,12 +1,6 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <script>
-      // Feature flag: experimental UI is visible only when
-      // DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true is set in the environment.
-      // The backend sets this as a data attribute on the body element.
-      window.DATAFORGE_EXPERIMENTAL = document.body.dataset.experimental === "true";
-    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
@@ -370,7 +364,13 @@
               <button type="button" class="mode-btn" data-mode="forensic" data-action="switch-operator-mode">
                 Forensic
               </button>
-              <button type="button" class="mode-btn" data-mode="stealth" data-action="switch-operator-mode" data-experimental="true">
+              <button
+                type="button"
+                class="mode-btn"
+                data-mode="stealth"
+                data-action="switch-operator-mode"
+                data-experimental="true"
+              >
                 Resilient
               </button>
               <button type="button" class="mode-btn" data-mode="low_cost" data-action="switch-operator-mode">
@@ -1102,11 +1102,21 @@
          (nginx has dedicated location blocks for both /app/ and root paths). -->
     <script type="module" src="app.js"></script>
     <script>
-      if (window.DATAFORGE_EXPERIMENTAL) {
-        document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
-          el.classList.add("visible");
+      // Fetch experimental feature flag from the public root endpoint
+      // and reveal experimental UI elements when enabled.
+      fetch("/")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.experimental_enabled) {
+            document.body.dataset.experimental = "true";
+            document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
+              el.classList.add("visible");
+            });
+          }
+        })
+        .catch(() => {
+          // Network or parse error — leave experimental UI hidden.
         });
-      }
     </script>
   </body>
 </html>

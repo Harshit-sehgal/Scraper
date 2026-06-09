@@ -29,7 +29,7 @@ _JOB_KWARGS: dict[str, Any] = {
 
 
 def _make_job_json(
-    id: str,  # noqa: A002
+    id: str,
     status: str,
     result: dict | None = None,
     name: str = "test-job",

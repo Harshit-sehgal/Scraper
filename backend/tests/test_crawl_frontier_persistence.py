@@ -76,9 +76,9 @@ async def test_frontier_persistence_across_restarts() -> None:
 
     # 2. Pop the highest priority URL (priority 5 + depth 0 * 5 = 5)
     # The priorities will be:
-    # page2: 5  # noqa: ERA001
-    # page1: 10  # noqa: ERA001
-    # start: 50 + 1 * 5 = 55  # noqa: ERA001
+    # page2: 5
+    # page1: 10
+    # start: 50 + 1 * 5 = 55
     next_url = await frontier.get_next_url()
     assert next_url == "https://example.com/page2"
 

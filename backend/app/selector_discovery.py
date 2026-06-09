@@ -5,6 +5,13 @@ This module has been refactored into focused sub-modules:
 - selector_discovery_url: URL analysis, redirect detection, form recovery
 
 All public symbols are re-exported for backward compatibility.
+
+Characterization (I3): ``analyze_url_for_fields`` is ~564 lines with 8 numbered
+steps. Each step is an extraction candidate (redirect detection, page fetch,
+search-form recovery, anti-bot/page analysis, LLM prompt building, LLM field
+suggestion, post-processing, acquisition-lineage construction). Early-return
+error paths (lines ~254-286 and ~288-321) duplicate dict-building logic that
+could be shared. Extract when test coverage for each step is in place.
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ async def test_provider(provider) -> bool:
     except Exception:
         import logging
 
-        logging.exception("Provider test failed")  # noqa: LOG015
+        logging.exception("Provider test failed")
         return False
 
 

@@ -198,26 +198,17 @@ function saveKeyFromModal() {
     toast("Admin key set for this session", "success");
   } else {
     // G2: Exchange API key for session cookie
+    setApiKey(key);
+    toast("API key set", "success");
     loginWithApiKey(key).then((ok) => {
-      if (ok) {
-        toast("Authenticated via session", "success");
-        import("./jobs.js")
-          .then((m) => {
-            m.refreshSystemStatus();
-            m.refreshJobs();
-          })
-          .catch((e) => console.warn("Failed to refresh after auth:", e));
-      } else {
-        // Fall back to legacy in-memory API key storage
-        setApiKey(key);
-        toast("API key set (legacy mode)", "success");
-        import("./jobs.js")
-          .then((m) => {
-            m.refreshSystemStatus();
-            m.refreshJobs();
-          })
-          .catch((e) => console.warn("Failed to refresh after API key set:", e));
-      }
+      if (!ok) return;
+      toast("Session cookie set", "success");
+      import("./jobs.js")
+        .then((m) => {
+          m.refreshSystemStatus();
+          m.refreshJobs();
+        })
+        .catch((e) => console.warn("Failed to refresh after auth:", e));
     });
   }
 

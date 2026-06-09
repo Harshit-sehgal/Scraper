@@ -11,7 +11,8 @@ from app.extraction_orchestrator import (
     _merge_composite_records,
 )
 from app.models import FieldType, SchemaField
-from conftest import make_schema_field_list
+
+from .conftest import make_schema_field_list
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ExtractionResult

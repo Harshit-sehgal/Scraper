@@ -457,7 +457,7 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args) -> None:  # noqa: A002
+    def log_message(self, format, *args) -> None:
         pass  # silence server logs during tests
 
 

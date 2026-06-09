@@ -90,7 +90,7 @@ ROUTE_MATRIX = [
     ("GET", "/api/scraper/health/summary", "admin"),
     ("GET", "/api/operator/dashboard", "admin"),
     ("GET", "/api/operator/health", "admin"),
-    # Note: POST /api/scraper/regressions/{entry_id}/generate-test is admin-only  # noqa: ERA001
+    # Note: POST /api/scraper/regressions/{entry_id}/generate-test is admin-only
     # but cannot be tested without a real regression entry in the database.
     # See test_route_auth_admin_key for the pattern used by other admin tests.
 ]

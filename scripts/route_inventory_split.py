@@ -143,6 +143,7 @@ _PREFIX_TO_SECTION = [
     ("/api/scraper", "Scraper/Telemetry Routes"),
     ("/api/operator", "Operator and System Routes"),
     ("/api/system", "Operator and System Routes"),
+    ("/api/session", "Session/Auth Routes"),
     ("/api/exports", "Export Routes"),
     ("/api/diagnostics", "Diagnostics Routes"),
 ]

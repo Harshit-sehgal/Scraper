@@ -85,7 +85,7 @@ def test_topological_law_bias() -> None:
     ws._topology._topological_laws[key] = 1.0
 
     # 2. Allocate a record where name and price are physically close
-    # Text: "ITEM_X is $100"  # noqa: ERA001
+    # Text: "ITEM_X is $100"
     from app.semantic_ir import SemanticType, create_token
 
     tokens = [create_token("ITEM_X", 0, 6, 0, SemanticType.TEXT), create_token("$100", 10, 14, 10, SemanticType.PRICE)]

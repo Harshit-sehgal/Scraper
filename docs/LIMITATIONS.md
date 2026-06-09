@@ -37,3 +37,7 @@ Use this project only on websites where scraping is allowed or authorized. Respe
 ## Banned Claims
 
 Do not claim production-ready, enterprise-grade, universal scraper, works on every website, anti-bot immune, fully autonomous, fully self-healing, guaranteed extraction, 100% accurate, complete, or fully benchmarked.
+
+## TODO / Placeholder Inventory (L2)
+
+The codebase contains zero TODO, FIXME, HACK, or XXX markers. All placeholders identified in Phase 0 have been replaced with visible documentation. No further action required.
