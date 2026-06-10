@@ -13,6 +13,7 @@
     "vitest": "^4.1.8"
   },
   "scripts": {
+    "lint": "npm run lint:css && npm run lint:js",
     "lint:css": "stylelint 'frontend/**/*.css'",
     "lint:css:fix": "stylelint 'frontend/**/*.css' --fix",
     "lint:js": "prettier --check 'frontend/**/*.{js,css,html,mjs}' 'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'",
