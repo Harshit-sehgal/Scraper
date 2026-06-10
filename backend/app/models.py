@@ -1,3 +1,5 @@
+from typing import Any
+
 """Pydantic models for the scraper API.
 
 Defines the data structures for jobs, schemas, filters, and results.
@@ -193,7 +195,7 @@ class JobCreate(BaseModel):
     deduplicate: bool = Field(True, description="Remove duplicate records")
     deduplicate_field: str = Field("", description="Field to use for deduplication")
     # Selectors map from URL analysis (item_container + field selectors)
-    selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
+    selectors_map: dict[str, Any] = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
 
@@ -298,7 +300,7 @@ class Job(BaseModel):
     deduplicate_field: str = ""
     min_record_score: float = 0.35
     # Selectors map from URL analysis (pre-discovered CSS selectors)
-    selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
+    selectors_map: dict[str, Any] = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
@@ -312,7 +314,7 @@ class Job(BaseModel):
     results: list[dict] = Field(default_factory=list)
     analysis: str | None = None
     discovered_urls: list[dict] = Field(default_factory=list)
-    quality_report: dict = Field(default_factory=dict)
+    quality_report: dict[str, Any] = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
     total_llm_calls: int = 0
     logs: list[LogEntry] = Field(default_factory=list)

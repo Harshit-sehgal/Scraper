@@ -27,8 +27,8 @@ async def run_post_processing(
     *,
     all_raw_results: list[dict],
     scraped: list[tuple[int, list[dict], bool, dict]],
-    ai_source_prediction: dict,
-    ai_structuring_report: dict,
+    ai_source_prediction: dict[str, Any],
+    ai_structuring_report: dict[str, Any],
     warnings: list[str],
     persist_fn: Callable,
 ) -> None:

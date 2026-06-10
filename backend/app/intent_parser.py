@@ -1,3 +1,5 @@
+from typing import Any
+
 """Layer 1: Intent Parser.
 ======================
 
@@ -20,9 +22,9 @@ class IntentSchema:
 
     raw_query: str
     entity_hint: str = ""  # weak metadata only, NOT core logic
-    semantic_needs: dict = field(default_factory=dict)  # {need: [synonyms]}
-    required_needs: list = field(default_factory=list)  # explicitly requested
-    optional_needs: list = field(default_factory=list)  # inferred from context
+    semantic_needs: dict[str, Any] = field(default_factory=dict)  # {need: [synonyms]}
+    required_needs: list[Any] = field(default_factory=list)  # explicitly requested
+    optional_needs: list[Any] = field(default_factory=list)  # inferred from context
 
 
 # Universal semantic need mappings (not domain-specific)
@@ -136,7 +138,7 @@ def _detect_entity_hint(query_lower: str) -> str:
     return "general"
 
 
-def _extract_semantic_needs(query_lower: str) -> dict:
+def _extract_semantic_needs(query_lower: str) -> dict[str, Any]:
     """Extract what information the user wants, not what domain.
 
     Includes a small core set of common semantic needs (price, date, location,
@@ -161,7 +163,7 @@ def _extract_semantic_needs(query_lower: str) -> dict:
     return needs
 
 
-def _determine_required_needs(semantic_needs: dict, query_lower: str) -> list:
+def _determine_required_needs(semantic_needs: dict[str, Any], query_lower: str) -> list[Any]:
     """Determine which needs are explicitly required by user."""
     required = []
 
@@ -184,7 +186,7 @@ def _determine_required_needs(semantic_needs: dict, query_lower: str) -> list:
     return required
 
 
-def _determine_optional_needs(semantic_needs: dict, required_needs: list) -> list:
+def _determine_optional_needs(semantic_needs: dict[str, Any], required_needs: list[Any]) -> list[Any]:
     """Determine which needs are optional (inferred but not explicitly requested)."""
     optional = []
 

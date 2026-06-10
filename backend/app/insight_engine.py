@@ -6,6 +6,7 @@ Extracted from scraper.py to reduce the god-object size.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from app.config import settings
 from app.llm_bridge import llm_json as _llm_json
@@ -30,7 +31,7 @@ async def generate_data_insight(results: list[dict]) -> str:
     return response or "Analysis generation encountered an upstream model error."
 
 
-async def suggest_schema_from_intent(intent: str, max_fields: int | None = None) -> dict:
+async def suggest_schema_from_intent(intent: str, max_fields: int | None = None) -> dict[str, Any]:
     """Convert a natural language intent into a structured SchemaField list."""
     if max_fields is None:
         max_fields = settings.INSIGHT_MAX_FIELDS
@@ -57,7 +58,7 @@ Maximum number of fields: {max_fields}
     return await _llm_json(messages, temperature=settings.LLM_TEMPERATURE, timeout=settings.LLM_TIMEOUT)  # type: ignore[no-any-return]
 
 
-def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) -> dict:
+def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) -> dict[str, Any]:
     """Sync version of suggest_schema_from_intent.
 
     Runs the async coroutine in a dedicated event loop on a background

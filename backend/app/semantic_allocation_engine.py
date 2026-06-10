@@ -17,7 +17,7 @@ Role-type compatibility is derived geometrically from the Role Manifold.
 
 import random
 from copy import deepcopy
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.field_laws import ROLE_EXCLUSIVITY
 from app.semantic_ir import (
@@ -134,7 +134,7 @@ def _name_similarity(a: str, b: str) -> float:
     return lcs / max(m, n)
 
 
-def seed_role_engine(schema_fields: list) -> None:
+def seed_role_engine(schema_fields: list[Any]) -> None:
     """Seed the RoleEmbeddingEngine manifold with initial priors and Manifold Transfer."""
     reng = _get_role_engine()
     ws = reng.ws
@@ -186,7 +186,7 @@ def seed_role_engine(schema_fields: list) -> None:
             ws.metrics.set_schema_instability(f_name, 0.5)
 
 
-def warm_start_from_values(records: list, schema_fields: list) -> None:
+def warm_start_from_values(records: list[Any], schema_fields: list[Any]) -> None:
     """Warm-start the Role Manifold with observed values."""
     if not records or not schema_fields:
         return
@@ -303,7 +303,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abst
                 role_comm_map[role_name] = i
 
         # Calculate community "Presence" in this record
-        comm_max_scores: dict = {}
+        comm_max_scores: dict[Any, float] = {}
         for (_, role), score in graph.compatibility.items():
             if role in role_comm_map:
                 c_idx = role_comm_map[role]
@@ -462,7 +462,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
     """Optimize semantic role assignment globally."""
     assigned_candidates: set[str] = set()
     filled_roles: set[str] = set()
-    field_conflicts: list = []
+    field_conflicts: list[Any] = []
 
     assignments = sorted(
         [(score, cand, role) for (cand, role), score in graph.compatibility.items()],
@@ -625,7 +625,7 @@ def allocate_semantic_roles(
     return record, graph
 
 
-def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
+def _run_allocation(graph: AllocationGraph, sorted_assignments: list[Any]) -> dict[str, Any]:
     """Run a full allocation given a sorted assignment list."""
     g = deepcopy(graph)
     assigned = set()
@@ -664,7 +664,7 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     return {"roles": {r: g.roles[r].filled_by for r in g.roles}, "coherence": coh}
 
 
-def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGraph) -> dict:
+def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGraph) -> dict[str, Any]:
     """Explain why a role was assigned to a candidate using topological evidence."""
     if role_name not in graph.roles:
         return {"error": f"Role {role_name} not found in graph"}

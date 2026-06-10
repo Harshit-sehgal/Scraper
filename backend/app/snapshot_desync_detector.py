@@ -1,3 +1,5 @@
+from typing import Any
+
 """Snapshot Desync Detector — identifies divergent state across instances.
 
 Compares serialized world state snapshots from different nodes to detect
@@ -46,7 +48,7 @@ class DesyncReport:
         self.epoch_gap = epoch_gap
         self.recommended_action = recommended_action
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_a": self.node_a,
             "node_b": self.node_b,
@@ -76,8 +78,8 @@ class SnapshotDesyncDetector:
 
     def compare(
         self,
-        snapshot_a: dict,
-        snapshot_b: dict,
+        snapshot_a: dict[str, Any],
+        snapshot_b: dict[str, Any],
         node_a: str = "node_a",
         node_b: str = "node_b",
     ) -> DesyncReport:
@@ -179,7 +181,7 @@ class SnapshotDesyncDetector:
 
     # ─── Clock Comparison ────────────────────────────────────────────
 
-    def _compare_clocks(self, clock_a: dict, clock_b: dict, node_a: str, node_b: str) -> str:  # noqa: ARG002, RUF100
+    def _compare_clocks(self, clock_a: dict[str, Any], clock_b: dict[str, Any], node_a: str, node_b: str) -> str:  # noqa: ARG002, RUF100
         """Determine causal relation between two vector clocks."""
         self_newer = False
         other_newer = False
@@ -208,7 +210,7 @@ class SnapshotDesyncDetector:
 
     # ─── Subsystem Comparators ───────────────────────────────────────
 
-    def _compare_topology(self, a: dict, b: dict) -> float:
+    def _compare_topology(self, a: dict[str, Any], b: dict[str, Any]) -> float:
         """Compare topology regions and laws. Returns divergence 0 - 1."""
         topo_a = a.get("topology", {})
         topo_b = b.get("topology", {})
@@ -244,7 +246,7 @@ class SnapshotDesyncDetector:
 
         return region_count_div * 0.25 + laws_div * 0.25 + cohesion_div * 0.20 + comm_div * 0.20 + epoch_div * 0.10
 
-    def _compare_manifold(self, a: dict, b: dict) -> float:
+    def _compare_manifold(self, a: dict[str, Any], b: dict[str, Any]) -> float:
         """Compare manifold role embeddings. Returns divergence 0 - 1."""
         man_a = a.get("manifold", {})
         man_b = b.get("manifold", {})
@@ -287,7 +289,7 @@ class SnapshotDesyncDetector:
 
         return (1.0 - role_jaccard) * 0.35 + avg_vec_dist * 0.35 + compat_div * 0.30
 
-    def _compare_energy(self, a: dict, b: dict) -> float:
+    def _compare_energy(self, a: dict[str, Any], b: dict[str, Any]) -> float:
         """Compare energy state metrics. Returns divergence 0 - 1."""
         energy_a = a.get("energy", {})
         energy_b = b.get("energy", {})
@@ -308,7 +310,7 @@ class SnapshotDesyncDetector:
 
         return total_div / count if count > 0 else 0.0
 
-    def _compare_instability(self, a: dict, b: dict) -> float:
+    def _compare_instability(self, a: dict[str, Any], b: dict[str, Any]) -> float:
         """Compare learned exclusions. Returns divergence 0 - 1."""
         inst_a = a.get("instability", {})
         inst_b = b.get("instability", {})
@@ -318,7 +320,7 @@ class SnapshotDesyncDetector:
 
         return self._dict_divergence(excl_a, excl_b)
 
-    def _compare_history(self, a: dict, b: dict) -> float:
+    def _compare_history(self, a: dict[str, Any], b: dict[str, Any]) -> float:
         """Compare history states. Returns divergence 0 - 1."""
         hist_a = a.get("history", {})
         hist_b = b.get("history", {})
@@ -351,7 +353,7 @@ class SnapshotDesyncDetector:
         diff = abs(a - b) / max(abs(a), abs(b))
         return min(1.0, diff)
 
-    def _dict_divergence(self, d1: dict, d2: dict, value_threshold: float = 0.01) -> float:
+    def _dict_divergence(self, d1: dict[str, Any], d2: dict[str, Any], value_threshold: float = 0.01) -> float:
         """Compute divergence between two dicts with numeric values."""
         keys_all = set(d1.keys()) | set(d2.keys())
         if not keys_all:

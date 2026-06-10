@@ -45,13 +45,13 @@ class CompoundRecord:
     original_text: str = ""
     confidence: float = 0.0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "segments": [{"label": s.label, "fields": s.fields, "raw_text": s.raw_text} for s in self.segments],
             "shared_fields": self.shared_fields,
         }
 
-    def flatten(self, schema_fields: list[str] | None = None) -> dict:  # noqa: ARG002, RUF100
+    def flatten(self, schema_fields: list[str] | None = None) -> dict[str, Any]:  # noqa: ARG002, RUF100
         """Flatten into a single dict for schema-aligned output.
 
         Naming convention: {segment_label}_{field_name}

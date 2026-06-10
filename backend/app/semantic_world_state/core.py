@@ -155,16 +155,16 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Public Delegation: History Operations ────────────────────────────
 
-    def record_decision(self, entry: dict) -> None:
+    def record_decision(self, entry: dict[str, Any]) -> None:
         self._history.record_decision(entry)
 
     def trim_decision_history(self, max_size: int = 1000, keep: int = 500) -> None:
         self._history.trim_decision_history(max_size, keep)
 
-    def get_recent_decisions(self, n: int = 20) -> list:
+    def get_recent_decisions(self, n: int = 20) -> list[Any]:
         return self._history.get_recent_decisions(n)
 
-    def update_recent_decision_metadata(self, recent_copy: list, coherence: float, threshold: float) -> None:
+    def update_recent_decision_metadata(self, recent_copy: list[Any], coherence: float, threshold: float) -> None:
         self._history.update_recent_decision_metadata(recent_copy, coherence, threshold)
 
     def get_topology_view(self) -> Any:
@@ -177,16 +177,16 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def set_region_energy(self, region_id: int, energy: float) -> None:
         self._topology.set_region_energy(region_id, energy)
 
-    def record_cohesion_merge_attempt(self, pair: tuple) -> None:
+    def record_cohesion_merge_attempt(self, pair: tuple[str, str]) -> None:
         self._topology.record_cohesion_merge_attempt(pair)
 
-    def record_cohesion_merge_success(self, pair: tuple) -> None:
+    def record_cohesion_merge_success(self, pair: tuple[str, str]) -> None:
         self._topology.record_cohesion_merge_success(pair)
 
-    def record_cohesion_split_attempt(self, pair: tuple) -> None:
+    def record_cohesion_split_attempt(self, pair: tuple[str, str]) -> None:
         self._topology.record_cohesion_split_attempt(pair)
 
-    def record_cohesion_split_success(self, pair: tuple) -> None:
+    def record_cohesion_split_success(self, pair: tuple[str, str]) -> None:
         self._topology.record_cohesion_split_success(pair)
 
     # ─── Substrate Branching (Phase 39) ──────────────────────────────────
@@ -355,7 +355,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         finally:
             active_transaction.reset(token)
 
-    def replay_transaction(self, tx: dict) -> None:
+    def replay_transaction(self, tx: dict[str, Any]) -> None:
         """Replay a transaction by executing its recorded entries."""
         label = tx.get("label", "replayed")
         self._replaying = True
@@ -409,7 +409,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         finally:
             self._replaying = False
 
-    def _filter_replay_details(self, method: Any, details: dict) -> dict:
+    def _filter_replay_details(self, method: Any, details: dict[str, Any]) -> dict[str, Any]:
         import inspect
 
         try:
@@ -431,7 +431,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         }
         return {key: value for key, value in details.items() if key in allowed}
 
-    def record_delta(self, subsystem: str, action: str, details: dict) -> None:
+    def record_delta(self, subsystem: str, action: str, details: dict[str, Any]) -> None:
         """Record a state delta in the current transaction journal."""
         if self._replaying:
             return
@@ -482,7 +482,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Distributed Consensus (Phase 32) ───────────────────────────────
 
-    def merge_state(self, remote_data: dict, trace_id: str | None = None) -> None:
+    def merge_state(self, remote_data: dict[str, Any], trace_id: str | None = None) -> None:
         """Merge a remote world state into the local state using vector clocks (Phase 32)."""
         remote_node = remote_data.get("node_id")
         remote_clock = remote_data.get("clock", {})
@@ -528,7 +528,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Manifold Federation ─────────────────────────────────────────────
 
-    def export_manifold(self) -> dict:
+    def export_manifold(self) -> dict[str, Any]:
         """Export learned role embeddings with Differential Noise (Phase 30)."""
         import random
 
@@ -549,7 +549,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             "privacy": "differential_noise_v1",
         }
 
-    def import_federated_manifold(self, data: dict) -> None:
+    def import_federated_manifold(self, data: dict[str, Any]) -> None:
         """Merge federated role embeddings into local manifold with Ontological Firewall (Phase 30)."""
         remote_manifold = data.get("manifold", {})
         with self.transaction("manifold_federation"):
@@ -583,20 +583,20 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             )
             self.record_delta("global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count})
 
-    def export_topology_laws(self) -> dict:
+    def export_topology_laws(self) -> dict[str, Any]:
         return {
             "laws": {f"{k[0]}|{k[1]}": v for k, v in self._topology.topological_laws.items()},
             "version": "1.0",
             "timestamp": time.time(),
         }
 
-    def import_federated_laws(self, data: dict) -> None:
+    def import_federated_laws(self, data: dict[str, Any]) -> None:
         remote_laws = data.get("laws", {})
         with self.transaction("federated_laws"):
             for key_str, remote_val in remote_laws.items():
                 parts = key_str.split("|")
                 if len(parts) == 2:
-                    pair = tuple(parts)
+                    pair: tuple[str, str] = tuple(parts)  # type: ignore[assignment]
                     local_val = self._topology.topological_laws.get(pair, 0.0)
                     new_val = local_val * 0.7 + remote_val * 0.3
                     self._topology.set_topological_law(pair, new_val)
@@ -606,7 +606,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Cognitive Health Summary ────────────────────────────────────────
 
-    def get_cognitive_health(self) -> dict:
+    def get_cognitive_health(self) -> dict[str, Any]:
         from app.semantic_inference_engine import RoleEmbeddingEngine
 
         reng = RoleEmbeddingEngine()
@@ -648,16 +648,16 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Manifold Delegation Methods ──────────────────────────────────────
 
-    def set_manifold_vector(self, role: str, vector: list) -> None:
+    def set_manifold_vector(self, role: str, vector: list[Any]) -> None:
         self._manifold.set_manifold_vector(role, vector)
 
-    def get_manifold_vector(self, role: str) -> list:
+    def get_manifold_vector(self, role: str) -> list[Any]:
         return self._manifold.get_manifold_vector(role)
 
     def has_manifold_role(self, role: str) -> bool:
         return self._manifold.has_manifold_role(role)
 
-    def get_manifold_roles(self) -> list:
+    def get_manifold_roles(self) -> list[Any]:
         return self._manifold.get_manifold_roles()
 
     def is_role_anchored(self, role: str) -> bool:
@@ -666,7 +666,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def remove_manifold_role(self, role: str) -> None:
         self._manifold.remove_manifold_role(role)
 
-    def blend_manifold_vector(self, role: str, other_vector: list, alpha: float = 0.7, beta: float = 0.3) -> None:
+    def blend_manifold_vector(self, role: str, other_vector: list[Any], alpha: float = 0.7, beta: float = 0.3) -> None:
         self._manifold.blend_manifold_vector(role, other_vector, alpha, beta)
 
     def get_manifold_checksum(self) -> str:
@@ -675,7 +675,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def clear_compatibility(self) -> None:
         self._manifold.clear_compatibility()
 
-    def clear_compatibility_for_key(self, key: tuple) -> None:
+    def clear_compatibility_for_key(self, key: tuple[str, str]) -> None:
         self._manifold.clear_compatibility_for_key(key)
 
     def set_compatibility(self, role: str, type_str: str, value: float) -> None:
@@ -687,10 +687,10 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def expand_dimensions(self, new_dim: int) -> None:
         self._manifold.expand_dimensions(new_dim)
 
-    def get_shards(self) -> set:
+    def get_shards(self) -> set[Any]:
         return self._manifold.get_shards()
 
-    def get_shard_roles(self, shard_id: str) -> list:
+    def get_shard_roles(self, shard_id: str) -> list[Any]:
         return self._manifold.get_shard_roles(shard_id)
 
     def shard_substrate(self) -> dict[str, list[str]]:
@@ -698,13 +698,13 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._manifold.shard_manifold(self._topology.global_communities)
         return self._topology.shard_topology()
 
-    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:
+    def apply_force_to_manifold(self, role: str, deltas: list[Any], clamp: bool = True) -> None:
         self._manifold.apply_force_to_manifold(role, deltas, clamp)
 
     def anchor_role(self, role: str) -> None:
         self._manifold.anchor_role(role)
 
-    def increment_co_occurrence(self, key: tuple, delta: int = 1) -> None:
+    def increment_co_occurrence(self, key: tuple[str, str], delta: int = 1) -> None:
         self._manifold.increment_co_occurrence(key, delta)
 
     @property
@@ -712,7 +712,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         return self._manifold.dimension
 
     @property
-    def role_anchors(self) -> set:
+    def role_anchors(self) -> set[Any]:
         return self._manifold.role_anchors
 
     # ─── Abstraction Delegation Methods ───────────────────────────────────
@@ -724,12 +724,12 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         return self._abstraction.get_envelope(envelope_id)
 
     @property
-    def abstraction_envelopes(self) -> dict:
+    def abstraction_envelopes(self) -> dict[str, Any]:
         return self._abstraction.envelopes
 
     # ─── Observability Delegation Methods ────────────────────────────────
 
-    def emit_telemetry(self, event_type: str, details: dict) -> None:
+    def emit_telemetry(self, event_type: str, details: dict[str, Any]) -> None:
         self._observability.emit_telemetry(event_type, details, trace_id=self._active_trace_id)
 
     def record_degradation(
@@ -750,17 +750,17 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         )
 
     @property
-    def observability_telemetry(self) -> list:
+    def observability_telemetry(self) -> list[Any]:
         return self._observability.telemetry
 
     @property
-    def observability_heatmap(self) -> dict:
+    def observability_heatmap(self) -> dict[str, Any]:
         return self._observability.heatmap
 
-    def get_role_drift(self, role: str) -> list:
+    def get_role_drift(self, role: str) -> list[Any]:
         return self._observability.get_role_drift(role)
 
-    def get_causal_telemetry(self) -> list:
+    def get_causal_telemetry(self) -> list[Any]:
         return self._observability.get_causal_telemetry()
 
     def log_drift(self, role: str, drift: float) -> None:
@@ -768,7 +768,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Intent Delegation Methods ───────────────────────────────────────
 
-    def set_intent(self, intent_id: str, target_vec: list, strength: float = 0.5, target_roles: list | None = None) -> None:
+    def set_intent(self, intent_id: str, target_vec: list[Any], strength: float = 0.5, target_roles: list | None = None) -> None:
         self._intent.set_intent(intent_id, target_vec, strength, target_roles)
 
     def remove_intent(self, intent_id: str) -> None:
@@ -778,12 +778,12 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._intent.clear()
 
     @property
-    def active_intents(self) -> dict:
+    def active_intents(self) -> dict[str, Any]:
         return self._intent.active_intents
 
     # ─── Action Delegation Methods ───────────────────────────────────────
 
-    def register_action(self, action_id: str, target_vec: list, handler_name: str, threshold: float = 0.3) -> None:
+    def register_action(self, action_id: str, target_vec: list[Any], handler_name: str, threshold: float = 0.3) -> None:
         self._action.register_action(action_id, target_vec, handler_name, threshold)
 
     def log_action_execution(self, action_id: str, success: bool, details: dict | None = None) -> None:
@@ -793,16 +793,16 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         return self._action.get_action(action_id)
 
     @property
-    def active_actions(self) -> dict:
+    def active_actions(self) -> dict[str, Any]:
         return self._action.active_actions
 
     @property
-    def action_history(self) -> list:
+    def action_history(self) -> list[Any]:
         return self._action.action_history
 
     # ─── Transition Delegation Methods ───────────────────────────────────
 
-    def update_seed_transition(self, data: dict) -> None:
+    def update_seed_transition(self, data: dict[Any, Any]) -> None:
         self._transition.update_seed(data)
 
     def get_transition_prob(self, type_a: str, type_b: str) -> float:
@@ -811,12 +811,12 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:
         self._transition.observe(type_a, type_b, is_role_boundary)
 
-    def get_high_transition_types(self, threshold: float = 0.6) -> list:
+    def get_high_transition_types(self, threshold: float = 0.6) -> list[Any]:
         return self._transition.get_high_transition_types(threshold)
 
     # ─── Vector Clock Delegation ─────────────────────────────────────────
 
-    def get_vector_clock(self) -> dict:
+    def get_vector_clock(self) -> dict[str, Any]:
         return self._vector_clock.to_dict()
 
     # ─── Instability Delegation Methods ──────────────────────────────────
@@ -824,7 +824,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def get_exclusion(self, r1: str, r2: str) -> float:
         return self._instability.get_exclusion(r1, r2)
 
-    def set_exclusion_by_key(self, key: tuple, value: float) -> None:
+    def set_exclusion_by_key(self, key: tuple[str, str], value: float) -> None:
         self._instability.set_exclusion(key, value)
         if value > 0.3:
             current_law = self._topology.topological_laws.get(key, 0.0)
@@ -850,21 +850,21 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         return self._topology
 
     @property
-    def topology_anchors(self) -> set:
+    def topology_anchors(self) -> set[Any]:
         return self._topology.anchors
 
     @property
-    def meso_clusters(self) -> list:
+    def meso_clusters(self) -> list[Any]:
         return self._topology.meso_clusters
 
     def compute_meso_clusters(self) -> None:
         self._topology.compute_meso_clusters()
 
-    def compute_macro_from_meso(self) -> dict:
+    def compute_macro_from_meso(self) -> dict[str, Any]:
         return self._topology.compute_macro_from_meso()
 
     @property
-    def macro_continents(self) -> list:
+    def macro_continents(self) -> list[Any]:
         return self._topology.get_view().get_macro_continents()
 
     def compute_macro_continents(self) -> None:
@@ -988,7 +988,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def solidified_motifs(self):
         return list(self._history.solidified_motifs)
 
-    def add_solidified_motifs(self, new_motifs: list) -> int:
+    def add_solidified_motifs(self, new_motifs: list[Any]) -> int:
         """Atomically merge ``new_motifs`` into the solidified set.
 
         Holds the substrate lock for the read-modify-write so concurrent
@@ -1148,7 +1148,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
                     logger.info("HIERARCHICAL SYNTHESIS: Distilled community %s into Envelope [%s]", constituents, envelope_id)
 
-    def merge_hierarchical_knowledge(self, other_abstraction: dict) -> None:
+    def merge_hierarchical_knowledge(self, other_abstraction: dict[str, Any]) -> None:
         remote_envelopes = other_abstraction.get("envelopes", {})
         if not remote_envelopes:
             return
@@ -1187,19 +1187,19 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Operations & Search Queries ──────────────────────────────────────
 
-    def topological_search(self, query: str) -> list:
+    def topological_search(self, query: str) -> list[Any]:
         return self._history.topological_search(query)
 
-    def execute_tql(self, query: str) -> dict:
+    def execute_tql(self, query: str) -> dict[str, Any]:
         from app.topological_query import get_tql_engine
 
         return get_tql_engine(ws=self).execute_tql(query)
 
-    def get_crystalline_attractors(self, token_vals=None) -> list:
+    def get_crystalline_attractors(self, token_vals=None) -> list[Any]:
         return self._history.get_crystalline_attractors(token_vals)
 
     @requires_invariants
-    def _synthesize_crystalline_record(self, record: dict, current_record: int | None = None) -> None:
+    def _synthesize_crystalline_record(self, record: dict[str, Any], current_record: int | None = None) -> None:
         idx = current_record if current_record is not None else self.metrics.total_records_processed
         self._history.synthesize_crystalline(record, idx)
 
@@ -1229,13 +1229,13 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         )
         self._history.trim_snapshots(max_size=500, keep=250)
 
-    def replay(self) -> list:
+    def replay(self) -> list[Any]:
         return self._history.get_snapshots()
 
-    def trace_waves(self) -> list:
+    def trace_waves(self) -> list[Any]:
         return self._history.get_wave_snapshots()
 
-    def diff_snapshots(self, idx_a: int = -2, idx_b: int = -1) -> dict:
+    def diff_snapshots(self, idx_a: int = -2, idx_b: int = -1) -> dict[str, Any]:
         return self._history.diff_snapshots(idx_a, idx_b)
 
     def clear(self) -> None:
@@ -1262,8 +1262,8 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Divergence & Merge (Phase 39) ───────────────────────────────────
 
-    def mutation_diff(self, other: "SemanticWorldState") -> dict:
-        diff: dict = {}
+    def mutation_diff(self, other: "SemanticWorldState") -> dict[str, Any]:
+        diff: dict[str, Any] = {}
         if self.metrics.total_records_processed != other.metrics.total_records_processed:
             diff["records_processed"] = (self.metrics.total_records_processed, other.metrics.total_records_processed)
         if self.metrics.global_energy != other.metrics.global_energy:
@@ -1290,7 +1290,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             diff["new_exclusions"] = [str(e) for e in new_exclusions]
         return diff
 
-    def semantic_diff(self, other: "SemanticWorldState") -> dict:
+    def semantic_diff(self, other: "SemanticWorldState") -> dict[str, Any]:
         divergence = {
             "manifold_drift": 0.0,
             "new_roles": [],

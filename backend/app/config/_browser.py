@@ -109,3 +109,5 @@ class BrowserSettings(BaseSettings):
     """Seconds between drain checks when closing browser pages."""
     BROWSER_CLEANUP_INTERVAL: int = 60
     """Seconds between periodic browser pool cleanup sweeps."""
+    BROWSER_SECURITY_HARDENING: bool = True
+    """Enable Chromium security flags (disable-dev-shm-usage, disable-extensions, etc.)."""

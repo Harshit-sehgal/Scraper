@@ -9,10 +9,10 @@ if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def compute_edge_field_forces(state: "TopologyState") -> dict[tuple[str, str], dict[str, float]]:
+def compute_edge_field_forces(state: "TopologyState") -> dict[tuple[str, str], dict[str, Any]]:
     """Compute force vectors from the unified edge field for each role pair."""
     view = state.get_view()
-    forces: dict[tuple[str, str], dict[str, float | str]] = {}
+    forces: dict[tuple[str, str], dict[str, Any]] = {}
     for edge in view.get_edge_fields():
         pair = (edge.source, edge.target) if edge.source < edge.target else (edge.target, edge.source)
         forces[pair] = {
@@ -22,10 +22,15 @@ def compute_edge_field_forces(state: "TopologyState") -> dict[tuple[str, str], d
             "route_strength": edge.route_strength,
             "semantics": edge.semantics,
         }
-    return forces  # type: ignore[return-value]
+    return forces
 
 
-def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pressure_amount: float, forces: dict) -> None:
+def redirect_repulsive_pressure(
+    state: "TopologyState",
+    source_region: Any,
+    pressure_amount: float,
+    forces: dict[tuple[str, str], dict[str, Any]],
+) -> None:
     """Redirect repulsive pressure through alternative high-affinity edge field routes."""
     # 1. Find high-affinity routes from the source region's roles
     route_targets: dict[str, float] = {}  # target_role -> weight
@@ -97,10 +102,10 @@ def redirect_repulsive_pressure(state: "TopologyState", source_region: Any, pres
         )
 
 
-def route_contradiction(state: "TopologyState", role_a: str, role_b: str, strength: float = 0.1) -> dict:
+def route_contradiction(state: "TopologyState", role_a: str, role_b: str, strength: float = 0.1) -> dict[str, Any]:
     """Route a contradiction event through the unified edge field."""
     forces = state.compute_edge_field_forces()
-    pair = tuple(sorted([role_a, role_b]))
+    pair: tuple[str, str] = (role_a, role_b) if role_a <= role_b else (role_b, role_a)
     force = forces.get(pair, {})  # type: ignore[arg-type]
 
     if not force:

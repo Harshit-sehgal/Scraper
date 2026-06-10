@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +17,35 @@ import httpx
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ─── Token Usage Tracking ─────────────────────────────────────────────
+
+_token_usage_lock = threading.Lock()
+_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
+def get_token_usage() -> dict[str, int]:
+    """Get accumulated token usage across all LLM calls in this process."""
+    with _token_usage_lock:
+        return dict(_token_usage)
+
+
+def reset_token_usage() -> None:
+    """Reset token usage counters."""
+    with _token_usage_lock:
+        _token_usage.update({"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+
+
+def _record_token_usage(response_data: dict[str, Any]) -> None:
+    """Extract and accumulate token usage from an API response."""
+    usage = response_data.get("usage")
+    if not usage:
+        return
+    with _token_usage_lock:
+        _token_usage["prompt_tokens"] += usage.get("prompt_tokens", 0)
+        _token_usage["completion_tokens"] += usage.get("completion_tokens", 0)
+        _token_usage["total_tokens"] += usage.get("total_tokens", 0)
+
 
 # ─── Legacy LLM Utility Support ──────────────────────────────────────
 
@@ -74,7 +104,7 @@ def _should_retry_http_error(error: Exception) -> bool:
 
 async def _call_openai_compatible_json(
     endpoint: str,
-    payload: dict,
+    payload: dict[str, Any],
     headers: dict | None = None,
     timeout: int | None = None,
     max_attempts: int | None = None,
@@ -97,6 +127,7 @@ async def _call_openai_compatible_json(
                 response = await client.post(endpoint, json=payload, headers=headers or {})
                 response.raise_for_status()
                 data = response.json()
+                _record_token_usage(data)
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
         except Exception as error:
@@ -122,7 +153,7 @@ async def _call_openai_compatible_json(
 
 async def _call_openai_compatible_text(
     endpoint: str,
-    payload: dict,
+    payload: dict[str, Any],
     headers: dict | None = None,
     timeout: int | None = None,
     max_attempts: int | None = None,
@@ -145,6 +176,7 @@ async def _call_openai_compatible_text(
                 response = await client.post(endpoint, json=payload, headers=headers or {})
                 response.raise_for_status()
                 data = response.json()
+                _record_token_usage(data)
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
             logger.exception("API call failed")
@@ -199,8 +231,8 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: RUF100, S110
-        pass  # nosec B110
+    except Exception:
+        logger.debug("Failed to record LLM call metric", exc_info=True)
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
     if timeout is None:
@@ -282,8 +314,8 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: RUF100, S110
-        pass  # nosec B110
+    except Exception:
+        logger.debug("Failed to record LLM call metric (fast path)", exc_info=True)
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
     if timeout is None:
@@ -339,8 +371,8 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: RUF100, S110
-        pass  # nosec B110
+    except Exception:
+        logger.debug("Failed to record LLM call metric (text path)", exc_info=True)
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
     if timeout is None:

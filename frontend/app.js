@@ -240,8 +240,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (currentView === "dashboard") {
         try {
           await refreshDashboard();
-        } catch {
-          // dashboard refresh failed silently
+        } catch (e) {
+          console.warn("Dashboard refresh failed:", e);
         }
       }
       scheduleDashboardRefresh();

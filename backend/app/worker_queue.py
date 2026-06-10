@@ -98,7 +98,7 @@ class QueueTask:
         self.scheduled_at = scheduled_at or self.created_at
         self.timeout_seconds = timeout_seconds
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "type": self.type,
@@ -116,7 +116,7 @@ class QueueTask:
         }
 
     @staticmethod
-    def from_dict(d: dict) -> "QueueTask":
+    def from_dict(d: dict[str, Any]) -> "QueueTask":
         task = QueueTask(
             task_type=d["type"],
             payload=d.get("payload", {}),
@@ -541,8 +541,8 @@ class WorkerQueue:
                         from app.metrics_collector import record_worker_failure
 
                         record_worker_failure(actual_type)
-                    except Exception:  # noqa: RUF100, S110
-                        pass  # nosec B110
+                    except Exception:
+                        logger.debug("Failed to record worker failure metric", exc_info=True)
                     conn.execute(
                         """INSERT OR REPLACE INTO task_history
                            (id, type, payload, priority, status, created_at,
@@ -943,8 +943,8 @@ class WorkerQueue:
                         # burn another request against the rate-limited
                         # endpoint.
                         await asyncio.sleep(cooldown)
-            except Exception:  # noqa: RUF100, S110
-                pass  # nosec B110
+            except Exception:
+                logger.debug("Error in post-execution cooldown logic", exc_info=True)
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 
     async def _cleanup_in_flight(self, task_id: str) -> None:
@@ -987,7 +987,7 @@ class WorkerQueue:
         finally:
             conn.close()
 
-    def get_status(self) -> dict:
+    def get_status(self) -> dict[str, Any]:
         """Return queue status for monitoring."""
         conn = self._conn()
         try:

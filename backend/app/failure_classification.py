@@ -134,10 +134,10 @@ class FailureClassification:
     recovery_strategy: str = "retry"
     """Recommended recovery strategy name."""
 
-    recovery_params: dict = field(default_factory=dict)
+    recovery_params: dict[str, Any] = field(default_factory=dict)
     """Parameters for the recovery strategy (delay_ms, rotate_proxy, etc.)."""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["category"] = self.category.value
         return result

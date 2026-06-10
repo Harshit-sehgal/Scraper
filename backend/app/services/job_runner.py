@@ -1,6 +1,7 @@
 import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from starlette.concurrency import run_in_threadpool
 
@@ -77,7 +78,7 @@ def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persis
 
 async def run_job(
     job_id: str,
-    jobs_store: dict,
+    jobs_store: dict[str, Any],
     persist_state_fn,
     max_discovery_urls: int,
     max_job_runtime_seconds: int,

@@ -1,3 +1,5 @@
+from typing import Any
+
 """Large-Scale Replay Buffer — streams historical deltas from persistent storage.
 
 The ReplayBuffer complements the in-memory EventJournal by providing:
@@ -37,7 +39,7 @@ class _CheckpointIndex:
         # snapshot_dict)
         self.entries: list[tuple[int, str, int, dict]] = []
 
-    def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict) -> None:
+    def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict[str, Any]) -> None:
         self.entries.append((global_idx, segment_path, offset, snapshot))
 
     def find_nearest(self, target_idx: int) -> tuple[int, str, int, dict] | None:
@@ -95,7 +97,7 @@ class ReplayBuffer:
 
     # ─── Writing ────────────────────────────────────────────────────
 
-    def append(self, delta_entry: dict) -> int:
+    def append(self, delta_entry: dict[str, Any]) -> int:
         """Append a delta entry to the buffer.
 
         Args:
@@ -323,7 +325,7 @@ class ReplayBuffer:
                 )
         return result
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Return buffer status for observability."""
         with self._lock:
             return {
@@ -426,8 +428,8 @@ class ReplayBuffer:
                 for line in f:
                     if line.strip():
                         count += 1
-        except Exception:  # nosec B110  # noqa: RUF100, S110
-            pass  # nosec B110
+        except Exception:
+            logger.debug("Failed to count entries in segment %s", seg_path, exc_info=True)
         return count
 
     # ─── Causal Chain Reconstruction ────────────────────────────

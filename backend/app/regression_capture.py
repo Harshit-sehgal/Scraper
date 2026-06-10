@@ -21,6 +21,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class RegressionEntry:
     schema_fields: list[str] = field(default_factory=list)
     """The schema fields in use when failure occurred."""
 
-    telemetry_snapshot: dict = field(default_factory=dict)
+    telemetry_snapshot: dict[str, Any] = field(default_factory=dict)
     """Snapshot of telemetry at time of failure."""
 
     fixture_filename: str = ""
@@ -368,7 +369,7 @@ class RegressionCapture:
 
         return pruned
 
-    def get_statistics(self) -> dict:
+    def get_statistics(self) -> dict[str, Any]:
         """Return summary statistics of the regression archive."""
         # Compute severity distribution
         severity_dist = {"critical": 0, "high": 0, "low": 0, "info": 0}

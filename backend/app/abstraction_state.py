@@ -1,3 +1,5 @@
+from typing import Any
+
 """AbstractionState — owns hierarchical concept mappings and role envelopes.
 
 True ownership boundary: NO external code should mutate envelopes directly.
@@ -34,7 +36,7 @@ class AbstractionState:
         if tx is not None:
             tx[f"abstraction_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("abstraction", action, details)
 
@@ -124,7 +126,7 @@ class AbstractionState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "abstraction": {
                 "envelopes": {
@@ -139,7 +141,7 @@ class AbstractionState:
             },
         }
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         abs_data = data.get("abstraction", {})
         raw_envelopes = abs_data.get("envelopes", {})

@@ -1,3 +1,5 @@
+from typing import Any
+
 """EnergyState — owns ALL energy and macro-state variables.
 
 True ownership boundary: NO external code should mutate global_energy directly.
@@ -30,7 +32,7 @@ class EnergyState:
         self._cumulative_density: float = 0.0
         self._cumulative_uncertainty: float = 0.0
         self._dataset_coherence: float = 0.5
-        self._schema_instability: dict = {}
+        self._schema_instability: dict[str, Any] = {}
         # ─── Energy Conservation Tracking ───────────────────────────────
         # Cumulative energy flowing out (source regions)
         self._total_energy_source: float = 0.0
@@ -61,7 +63,7 @@ class EnergyState:
         if tx is not None:
             tx[f"energy_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("energy", action, details)
 
@@ -383,7 +385,7 @@ class EnergyState:
 
     # ─── Bulk / Derived Setters ────────────────────────────────────────────
 
-    def update_from_regions(self, regions: list, region_count: int | None = None) -> None:
+    def update_from_regions(self, regions: list[Any], region_count: int | None = None) -> None:
         if not regions:
             return
         n = region_count or len(regions)
@@ -400,7 +402,7 @@ class EnergyState:
         self.set_entropy(avg_instability)
         self._set_val("cumulative_uncertainty", sum(r.instability for r in regions))
 
-    def evolve_from_regions(self, regions: list, region_count: int | None = None) -> None:
+    def evolve_from_regions(self, regions: list[Any], region_count: int | None = None) -> None:
         if not regions:
             return
         n = region_count or len(regions)
@@ -431,7 +433,7 @@ class EnergyState:
         cur_energy = self._get_val("global_energy")
         self._set_val("global_energy", cur_energy * 0.8 + target_energy * 0.2)
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         self._set_val("global_energy", data.get("global_energy", 5.0))
         self._set_val("global_entropy", data.get("global_entropy", 0.5))
@@ -451,7 +453,7 @@ class EnergyState:
         self._set_val("stability_debt", data.get("stability_debt", 0.0))
         self._set_val("_schema_instability", dict(data.get("schema_instability", {})))
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "global_energy": self.global_energy,
             "global_entropy": self.global_entropy,
@@ -491,7 +493,7 @@ class EnergyState:
         self._set_val("stability_debt", 0.0)
         self._set_val("_schema_instability", {})
 
-    def merge(self, other_data: dict, alpha: float = 0.5) -> None:
+    def merge(self, other_data: dict[str, Any], alpha: float = 0.5) -> None:
         """Merge remote energy state into local (Phase 32)."""
 
         def merge_field(field: str, remote_val: float, mode: str = "avg") -> None:

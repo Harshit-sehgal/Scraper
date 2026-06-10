@@ -116,8 +116,8 @@ class GlobalCognitiveScheduler:
                             severity="warning",
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
-                except Exception:  # nosec B110  # noqa: RUF100, S110
-                    pass  # nosec B110
+                except Exception:
+                    logger.debug("Failed to record degradation for task failure", exc_info=True)
 
             duration = time.time() - t0
             self._execution_stats["total_execution_time"] += duration

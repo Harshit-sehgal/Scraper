@@ -145,10 +145,10 @@ async def run_scraping_phase(
                     timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                 )
 
-                if "network_diagnostics" in recovery_stats:
+                if recovery_stats and "network_diagnostics" in recovery_stats:
                     for diag in recovery_stats["network_diagnostics"]:
                         await _safe_log(f"[NetworkDiagnostics] {diag}", level="info")
-                if "warnings" in recovery_stats:
+                if recovery_stats and "warnings" in recovery_stats:
                     for warn in recovery_stats["warnings"]:
                         await _safe_warning(warn)
 

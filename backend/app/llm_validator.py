@@ -228,7 +228,7 @@ def validate_selector_response(raw: Any) -> tuple[bool, str | None]:
     if not is_valid:
         return False, error
 
-    d: dict = raw
+    d: dict[str, Any] = raw
 
     if "item_container" not in d:
         return False, "Missing required key 'item_container'"

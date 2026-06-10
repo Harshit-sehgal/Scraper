@@ -1,11 +1,13 @@
+from typing import Any
+
 from app.models import SchemaField
 
 
-def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> dict:
+def normalize_scraped_record(record: dict[str, Any], schema_fields: list[SchemaField]) -> dict[str, Any]:
     """Ensure consistent schema order and basic normalization of values."""
     from app.html_utils import _is_empty_value
 
-    normalized: dict = {}
+    normalized: dict[str, Any] = {}
     for field in schema_fields:
         val = record.get(field.name)
         if _is_empty_value(val):
@@ -19,7 +21,7 @@ def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> 
     return normalized
 
 
-def _validate_extracted_data(record: dict, schema_fields: list[SchemaField]) -> bool:
+def _validate_extracted_data(record: dict[str, Any], schema_fields: list[SchemaField]) -> bool:
     """Basic validation to ensure at least some meaningful data was found."""
     from app.html_utils import _is_empty_value
 

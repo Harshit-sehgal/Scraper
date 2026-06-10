@@ -6,7 +6,7 @@ No action may be triggered if it violates system thermodynamic stability.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from weakref import WeakKeyDictionary
 
 
@@ -30,7 +30,7 @@ class SubstratePolicy:
         self.critical_entropy_threshold = 0.8
         self.min_attractor_plasticity = 0.1
 
-    def validate_substrate_health(self) -> dict:
+    def validate_substrate_health(self) -> dict[str, Any]:
         """Analyze current state against governance policies (Phase 68)."""
         ws = self.ws
         issues = []

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
@@ -225,7 +225,7 @@ def compute_macro_continents(state: TopologyState) -> None:
     state.record("compute_macro_continents", {"count": len(continents)})
 
 
-def compute_macro_from_meso(state: TopologyState) -> dict:
+def compute_macro_from_meso(state: TopologyState) -> dict[str, Any]:
     """Compute macro-scale properties from meso clusters.
 
     Returns dict with avg_convergence, avg_instability, fragmentation,

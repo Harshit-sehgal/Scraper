@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 # ─── Search Form Detection ──────────────────────────────────────────────
 
 
-def _detect_search_form(html: str) -> dict:
+def _detect_search_form(html: str) -> dict[str, Any]:
     """Detect search forms on a page and extract their field structure.
 
     Scans the page HTML for forms that look like search / query forms
@@ -263,7 +264,7 @@ async def _try_form_search_recovery(
     landing_page_html: str,
     landing_page_url: str,
     search_params: dict[str, str],
-) -> dict:
+) -> dict[str, Any]:
     """Try to recover from an expired session URL by submitting the site's
     search form programmatically.
 

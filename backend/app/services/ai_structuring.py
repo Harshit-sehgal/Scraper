@@ -1,3 +1,5 @@
+from typing import Any
+
 """AI structuring service — extracted from ``job_runner.run_job``.
 
 This module encapsulates the global AI structuring phase of the job
@@ -25,8 +27,8 @@ AiStructuringReport = dict
 
 def _should_run_global_ai_structuring(
     all_raw_results: list[dict],
-    schema_fields: list,
-    ai_source_prediction: dict,
+    schema_fields: list[Any],
+    ai_source_prediction: dict[str, Any],
     add_job_log,
 ) -> bool:
     """Determine whether global AI structuring should run.
@@ -52,7 +54,7 @@ def _should_run_global_ai_structuring(
     return True
 
 
-def _build_skipped_report(all_raw_results: list[dict], _schema_fields: list) -> AiStructuringReport:
+def _build_skipped_report(all_raw_results: list[dict], _schema_fields: list[Any]) -> AiStructuringReport:
     """Return a report indicating global AI structuring was skipped
     because per-source AI structuring was already applied.
     """
@@ -72,8 +74,8 @@ def _build_skipped_report(all_raw_results: list[dict], _schema_fields: list) -> 
 
 async def apply_global_ai_structuring(
     all_raw_results: list[dict],
-    schema_fields: list,
-    ai_source_prediction: dict,
+    schema_fields: list[Any],
+    ai_source_prediction: dict[str, Any],
     ai_structuring_timeout_seconds: int,
     add_job_log,
     on_llm_call,

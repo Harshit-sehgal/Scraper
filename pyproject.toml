@@ -152,7 +152,13 @@ markers = [
     "unit: fast unit tests that must not touch the network, database, or filesystem beyond the test's own tmp dir.",
     "api: API contract tests that exercise the FastAPI app via the in-process ASGI client.",
     "slow: tests whose expected runtime is > 5s. Useful for selective CI tiers.",
-    "timeout: marks tests to run with a timeout"
+    "timeout: marks tests to run with a timeout",
+    "accuracy: benchmark tests measuring extraction accuracy (F1, precision, recall).",
+    "performance: benchmark tests measuring latency, throughput, and pages per minute.",
+    "reliability: benchmark tests measuring error rates, timeout rates, and success rates.",
+    "resource: benchmark tests measuring memory and CPU usage.",
+    "scalability: benchmark tests measuring concurrent job handling and throughput under load.",
+    "comprehensive: benchmark tests producing full reports across all categories.",
 ]
 
 [tool.coverage.run]

@@ -9,18 +9,18 @@ mutations are performed here.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
 
 
-def world_state_to_dict(ws: SemanticWorldState) -> dict:
+def world_state_to_dict(ws: SemanticWorldState) -> dict[str, Any]:
     """Serialize the world state to a dict for JSON-compatible storage."""
     return ws.to_dict()  # type: ignore[no-any-return]
 
 
-def world_state_from_dict(ws: SemanticWorldState, data: dict) -> None:
+def world_state_from_dict(ws: SemanticWorldState, data: dict[str, Any]) -> None:
     """Restore the world state from a serialized dict.
 
     Delegates to SemanticWorldState.from_dict() which correctly dispatches

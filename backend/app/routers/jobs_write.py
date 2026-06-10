@@ -13,7 +13,7 @@ import asyncio
 import datetime
 import logging
 import re
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
@@ -642,7 +642,7 @@ def register_jobs_write_routes(
                     manager.recycle_bin_store[jid] = manager.jobs_store.pop(jid)
             remaining = len(manager.jobs_store)
 
-        result: dict = {
+        result: dict[str, Any] = {
             "message": f"Cleared {len(cleared_ids)} terminal jobs",
             "cleared": len(cleared_ids),
             "kept_recent": keep_recent,
@@ -748,7 +748,7 @@ def register_jobs_write_routes(
         with manager.lock:
             for jid in deleted_ids:
                 manager.recycle_bin_store.pop(jid, None)
-        result: dict = {"message": f"Recycle bin cleared ({len(deleted_ids)} items)", "cleared": len(deleted_ids)}
+        result: dict[str, Any] = {"message": f"Recycle bin cleared ({len(deleted_ids)} items)", "cleared": len(deleted_ids)}
         if failed_ids:
             result["failed"] = failed_ids
             result["message"] += f" ({len(failed_ids)} failed)"

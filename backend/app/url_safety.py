@@ -566,7 +566,7 @@ def get_safe_client(**kwargs: Any) -> httpx.Client:
 # ───────────────────────────────────────────────────────────────────────
 
 
-def verify_ssrf_self_check() -> dict:
+def verify_ssrf_self_check() -> dict[str, Any]:
     """Confirm that the SSRF-safe transport factory still enforces the
     safety path against the currently-installed ``httpx`` / ``httpcore``
     versions.

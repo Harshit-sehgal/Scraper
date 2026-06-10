@@ -1,9 +1,10 @@
 import datetime
+from typing import Any
 
 from app.utils.quality import normalized_dedup_text
 
 
-def normalize_job_results(results: list[dict], schema_fields: list):
+def normalize_job_results(results: list[dict], schema_fields: list[Any]):
     """Force consistent schema order in each record and keep extra keys after standard fields."""
     normalized = []
     for record in results:
@@ -16,7 +17,7 @@ def normalize_job_results(results: list[dict], schema_fields: list):
     return normalized
 
 
-def deduplicate_results(records: list[dict], schema_fields: list, deduplicate_field: str = "") -> list[dict]:
+def deduplicate_results(records: list[dict], schema_fields: list[Any], deduplicate_field: str = "") -> list[dict]:
     if not records:
         return records
 

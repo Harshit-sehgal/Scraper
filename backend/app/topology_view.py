@@ -1,3 +1,5 @@
+from typing import Any
+
 """TopologyView — read-only view of the topology graph.
 
 Returns immutable snapshots (RegionSnapshots, dicts) instead of live
@@ -82,7 +84,7 @@ class TopologyView:
             version=r.version,
         )
 
-    def _snapshot_dict(self, r: FieldConflictRegion) -> dict:
+    def _snapshot_dict(self, r: FieldConflictRegion) -> dict[str, Any]:
         """Return a region as a plain dict — for use in serialization / formatting."""
         return {
             "region_id": r.region_id,
@@ -197,7 +199,7 @@ class TopologyView:
                 return self._snapshot(r)
         return None
 
-    def find_by_token_and_roles(self, token: str, sorted_roles: tuple) -> RegionSnapshot | None:
+    def find_by_token_and_roles(self, token: str, sorted_roles: tuple[str, ...]) -> RegionSnapshot | None:
         for r in self._regions:
             if r.token == token and tuple(sorted(r.competing_roles)) == sorted_roles:
                 return self._snapshot(r)
@@ -212,7 +214,7 @@ class TopologyView:
     def get_regions_for_role(self, role: str) -> list[RegionSnapshot]:
         return [self._snapshot(r) for r in self._regions if role in r.competing_roles]
 
-    def aggregate_metrics(self) -> dict:
+    def aggregate_metrics(self) -> dict[str, Any]:
         if not self._regions:
             return {}
         n = len(self._regions)
@@ -247,7 +249,7 @@ class TopologyView:
         return dict(self._schema_patterns)
 
     @property
-    def topological_laws(self) -> dict:
+    def topological_laws(self) -> dict[str, Any]:
         return dict(self._laws)
 
     @property

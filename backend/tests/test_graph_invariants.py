@@ -24,7 +24,7 @@ def test_world_state_round_trip_preserves_structure() -> None:
     ws._energy.total_records_processed = 100
     ws._energy.set_energy(3.14)
     ws._manifold.set_compatibility("name", "text", 0.8)
-    ws._instability.set_exclusion(tuple(sorted(["origin", "destination"])), 0.9)
+    ws._instability.set_exclusion(("destination", "origin"), 0.9)
     ws._motif._motif_counts[tuple(sorted(["A", "B"]))] = 5
     ws._motif._motif_timestamps[tuple(sorted(["A", "B"]))] = 42
     key = ("a", "b")

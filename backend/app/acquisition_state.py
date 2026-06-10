@@ -9,6 +9,7 @@ redirect_info with typed, testable models.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -159,7 +160,7 @@ class AcquisitionLineage(BaseModel):
         }
         return messages.get(self.state, "URL acquisition completed.")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to a dict compatible with the existing redirect_info format.
 
         This provides backward compatibility while the API transitions
@@ -215,7 +216,7 @@ class AcquisitionLineage(BaseModel):
     @classmethod
     def from_redirect_info(
         cls,
-        redirect_info: dict,
+        redirect_info: dict[str, Any],
         original_url: str,
         final_url: str,
         fetch_method: str = "",

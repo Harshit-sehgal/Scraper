@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import psycopg2
 from psycopg2 import pool as pg_pool
@@ -176,7 +176,7 @@ def shutdown_postgres() -> None:
     _close_pool()
 
 
-def verify_postgres_connectivity() -> dict:
+def verify_postgres_connectivity() -> dict[str, Any]:
     """Synchronously verify Postgres is reachable before activating the repository.
 
     Uses a standalone connection (not the shared pool) so the pool is

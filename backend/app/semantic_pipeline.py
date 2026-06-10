@@ -132,7 +132,7 @@ class PipelineReport:
     metadata_fields_stripped: list[str] = field(default_factory=list)
 
 
-def strip_metadata(records: list | None) -> list:
+def strip_metadata(records: list | None) -> list[Any]:
     """Remove all metadata fields from records."""
     if not records:
         return []
@@ -282,7 +282,12 @@ def filter_noise_records(records: list[dict] | None) -> list[dict]:
     return filtered
 
 
-def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn: Callable, universal_roots: Any) -> list:
+def detect_role_swap_warnings(
+    output: dict[str, Any],
+    schema_fields: list[Any],
+    detect_type_fn: Callable,
+    universal_roots: Any,
+) -> list[Any]:
     """Detect potential role swap warnings from allocation output."""
     from app.semantic_segmentation import sem_type_str
 
@@ -305,7 +310,7 @@ def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn:
 def run_pipeline(
     records: list | None,
     schema_fields: list[str],
-) -> list:
+) -> list[Any]:
     """Run the full semantic pipeline orchestrator."""
     if not records:
         return []
@@ -361,7 +366,7 @@ def run_pipeline(
         records = group_adjacent_entities(records)
 
         # Layer 5: Global semantic allocation
-        allocated_records: list = []
+        allocated_records: list[Any] = []
         for record in records:
             state.clear_active_regions()
             tokens = []
@@ -431,7 +436,7 @@ def run_pipeline(
             # Output comes from topology state when the allocator detected a conflict
             # (field_owned_roles). Otherwise the allocator's assignment is used.
             topo_view = get_world_state().get_topology_view()
-            output: dict = {}
+            output: dict[str, Any] = {}
             field_owned = {fc["role"] for fc in getattr(alloc_graph, "field_conflicts", [])}
             for role_name in schema_fields:
                 if role_name in record and record.get(role_name) is not None and role_name not in field_owned:
@@ -461,7 +466,7 @@ def run_pipeline(
                 output["_allocation_conflicts"] = alloc_conflicts
                 for fc in alloc_conflicts:
                     role = fc["role"]
-                    if role not in output or not output[role]:
+                    if isinstance(role, str) and (role not in output or not output[role]):
                         output[role] = fc["candidate"]
                         output[f"_{role}_conflict"] = fc["reason"]
 

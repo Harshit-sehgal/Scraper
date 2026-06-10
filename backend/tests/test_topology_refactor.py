@@ -5,6 +5,8 @@ topology_thermodynamics, topology_waves, and topology_region_ops
 behave identically to calling the corresponding TopologyState methods.
 """
 
+from typing import Any
+
 from app.topology_state import TopologyState
 
 # ─── topology_forces ────────────────────────────────────────────────
@@ -189,7 +191,7 @@ def test_redirect_repulsive_pressure_routes_through_affinity() -> None:
     target = ts.add(["b"], "T2", instability=0.1)
 
     # Build a forces dict with a high-affinity edge a↔b
-    forces: dict[tuple[str, str], dict[str, object]] = {
+    forces: dict[tuple[str, str], dict[str, Any]] = {
         ("a", "b"): {
             "affinity": 0.8,
             "repulsion": 0.1,
@@ -215,7 +217,7 @@ def test_redirect_repulsive_pressure_remainder_heats_source() -> None:
     ts.add(["b"], "T2", instability=0.1)
 
     # Low route_strength means most pressure won't be redirected
-    forces: dict[tuple[str, str], dict[str, object]] = {
+    forces: dict[tuple[str, str], dict[str, Any]] = {
         ("a", "b"): {
             "affinity": 0.4,
             "repulsion": 0.1,

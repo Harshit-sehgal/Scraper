@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -222,7 +223,7 @@ class DomainRuntimePolicy:
             return "retry_later_or_reduce_request_rate"
         return "inspect_failure_telemetry"
 
-    def get_summary(self) -> dict:
+    def get_summary(self) -> dict[str, Any]:
         """Return a snapshot of all tracked domains (for observability)."""
         return {
             key: {

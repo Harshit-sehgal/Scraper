@@ -22,7 +22,7 @@ import ipaddress
 import logging
 import os
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi.responses import JSONResponse
 
@@ -809,7 +809,7 @@ class RateLimiterMiddleware:
 
         return response  # type: ignore[no-any-return]
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Return current rate limiter stats (for observability)."""
         return {
             "enabled": self._global_max > 0 or (self._per_ip and self._per_ip_max > 0),

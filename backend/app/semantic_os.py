@@ -1,3 +1,5 @@
+from typing import Any
+
 """Semantic OS — Official Engine Interface.
 ======================================
 
@@ -38,7 +40,7 @@ class SemanticOS:
         """Standard entry point for cognitive evolution."""
         return self.ws.dream(cycles=cycles)
 
-    def query(self, tql_string: str) -> dict:
+    def query(self, tql_string: str) -> dict[str, Any]:
         """Execute a topological query."""
         return self.ws.execute_tql(tql_string)
 
@@ -64,11 +66,11 @@ class SemanticOS:
 
     # ─── Multi-Node Consensus (Phase 32) ─────────────────────────────────
 
-    def sync_node(self, remote_state: dict, trace_id: str | None = None) -> None:
+    def sync_node(self, remote_state: dict[str, Any], trace_id: str | None = None) -> None:
         """Synchronize with another Semantic OS node."""
         self.ws.merge_state(remote_state, trace_id=trace_id)
 
-    def get_substrate_clock(self) -> dict:
+    def get_substrate_clock(self) -> dict[str, Any]:
         """Return the current vector clock."""
         return self.ws.get_vector_clock()
 
@@ -93,7 +95,7 @@ class SemanticOS:
             energy=self.ws.metrics.global_energy,
         )
 
-    def get_network_health(self) -> dict:
+    def get_network_health(self) -> dict[str, Any]:
         """Return the global health of the distributed network (Phase 33)."""
         from app.heartbeat_manager import get_heartbeat_manager
 
@@ -101,11 +103,11 @@ class SemanticOS:
 
     # ─── Knowledge Federation (Phase 29) ─────────────────────────────────
 
-    def share_knowledge(self) -> dict:
+    def share_knowledge(self) -> dict[str, Any]:
         """Export learned role meanings for other instances."""
         return self.ws.export_manifold()
 
-    def absorb_knowledge(self, federation_data: dict) -> None:
+    def absorb_knowledge(self, federation_data: dict[str, Any]) -> None:
         """Import role meanings from another instance."""
         self.ws.import_federated_manifold(federation_data)
 
@@ -178,7 +180,7 @@ class SemanticOS:
         """Merge an experimental branch back into the main OS consensus."""
         self.ws.merge_branch(branch_os.ws, alpha=alpha)
 
-    def diff_substrate(self, other_os: "SemanticOS") -> dict:
+    def diff_substrate(self, other_os: "SemanticOS") -> dict[str, Any]:
         """Quantify divergence between this OS and another."""
         return self.ws.semantic_diff(other_os.ws)
 
@@ -215,7 +217,7 @@ class SemanticOS:
         """Query historical manifold drift for a specific role."""
         return self.ws.get_role_drift(role)
 
-    def log_manual_telemetry(self, event_type: str, details: dict) -> None:
+    def log_manual_telemetry(self, event_type: str, details: dict[str, Any]) -> None:
         """Inject a manual telemetry event into the stream."""
         with self.ws.transaction("manual_telemetry"):
             self.ws.emit_telemetry(event_type, details)

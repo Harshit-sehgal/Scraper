@@ -93,7 +93,7 @@ class SelectorMemory:
                 with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
 
-    def _compute_confidence(self, entry: dict) -> SelectorConfidenceScore:
+    def _compute_confidence(self, entry: dict[str, Any]) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.
 
         Formula:
@@ -147,7 +147,7 @@ class SelectorMemory:
             reason=reason,
         )
 
-    def _auto_cleanup(self, force: bool = False) -> dict:
+    def _auto_cleanup(self, force: bool = False) -> dict[str, Any]:
         """Auto-cleanup low-confidence selectors.
 
         Returns:
@@ -253,7 +253,7 @@ class SelectorMemory:
 
         return entry.get("selectors")
 
-    def record_success(self, url: str, selectors: dict) -> None:
+    def record_success(self, url: str, selectors: dict[str, Any]) -> None:
         """Record a successful extraction with these selectors."""
         domain = self._extract_domain(url)
         if not domain:
@@ -378,7 +378,7 @@ class SelectorMemory:
 
         return stats
 
-    def force_cleanup(self) -> dict:
+    def force_cleanup(self) -> dict[str, Any]:
         """Force cleanup of low-confidence selectors (ignore interval check)."""
         return self._auto_cleanup(force=True)
 

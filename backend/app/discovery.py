@@ -1,3 +1,5 @@
+from typing import Any
+
 """Auto-Discovery Engine: Given a topic / query, automatically finds the best
 web pages to scrape by searching the web and ranking results.
 
@@ -115,7 +117,7 @@ def _canonicalize_url(url: str) -> str:
         return ""
 
 
-def infer_source_metadata(url: str, title: str = "", body: str = "") -> dict:
+def infer_source_metadata(url: str, title: str = "", body: str = "") -> dict[str, Any]:
     source_domain = _extract_domain(url)
 
     if _domain_matches(source_domain, SOCIAL_ROOT_DOMAINS):
@@ -217,7 +219,7 @@ def _contact_fields_requested(data_fields: list[str]) -> bool:
     return any(token in merged for token in ["phone", "email", "contact", "whatsapp"])
 
 
-def _score_result(item: dict, query: str, location: str, data_fields: list[str], source_type: str) -> float:
+def _score_result(item: dict[str, Any], query: str, location: str, data_fields: list[str], source_type: str) -> float:
     title = (item.get("title") or "").lower()
     body = (item.get("body") or "").lower()
     href = (item.get("href") or "").lower()
@@ -296,7 +298,7 @@ async def discover_urls(
         raw_results = await run_sync_in_thread(fetch_ddg)
 
         seen_urls = set()
-        ranked: list = []
+        ranked: list[Any] = []
         for r in raw_results:
             url = (r.get("href") or "").strip()
             canonical = _canonicalize_url(url)

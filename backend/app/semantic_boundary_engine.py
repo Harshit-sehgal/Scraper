@@ -1,3 +1,5 @@
+from typing import Any
+
 """Semantic Boundary Engine.
 =========================
 
@@ -255,7 +257,7 @@ class SemanticBoundaryEngine:
         self.motif_learner = MotifLearner()
 
     @property
-    def decision_history(self) -> list:
+    def decision_history(self) -> list[Any]:
         return get_world_state().decision_history  # type: ignore[no-any-return]
 
     def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> BoundaryScore:  # noqa: ARG002, C901, PLR0911, PLR0913, RUF100
@@ -332,11 +334,11 @@ class SemanticBoundaryEngine:
         score.uncertainty = 0.5
         return score
 
-    def save_state(self) -> dict:
+    def save_state(self) -> dict[str, Any]:
         """Export learned memory for persistence."""
         return get_world_state().to_dict()  # type: ignore[no-any-return]
 
-    def load_state(self, state: dict) -> None:
+    def load_state(self, state: dict[str, Any]) -> None:
         """Import learned memory from persistence."""
         get_world_state().from_dict(state)
 
@@ -362,7 +364,7 @@ class SemanticBoundaryEngine:
         ws.update_recent_decision_metadata(recent, coherence, threshold)
 
 
-def group_adjacent_entities(records: list) -> list:
+def group_adjacent_entities(records: list[Any]) -> list[Any]:
     """Merge consecutive segmented values that form multi-token entities."""
     if not records:
         return records

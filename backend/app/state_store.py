@@ -1,3 +1,5 @@
+from typing import Any
+
 """Simple JSON persistence for job and recycle-bin state with safety guarantees.
 
 Storage safety features:
@@ -48,7 +50,7 @@ def get_state_file_path() -> Path:
     return _DEFAULT_STATE_FILE
 
 
-def _validate_payload(payload: dict) -> bool:
+def _validate_payload(payload: dict[str, Any]) -> bool:
     """Basic structural validation of the loaded state payload."""
     if not isinstance(payload, dict):
         return False
@@ -128,7 +130,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
     return jobs_store, recycle_bin_store, world_state_data
 
 
-def _write_state_to_disk(path: Path, payload: dict) -> None:
+def _write_state_to_disk(path: Path, payload: dict[str, Any]) -> None:
     """Atomically write state to disk with retry and backup creation."""
     temp_path = path.with_suffix(path.suffix + ".tmp")
     backup_path = path.with_suffix(path.suffix + _BACKUP_SUFFIX)

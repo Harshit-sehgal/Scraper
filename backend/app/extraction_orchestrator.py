@@ -13,6 +13,7 @@ Layers:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from app.config import settings
 from app.container_discovery import (
@@ -110,7 +111,7 @@ def _merge_composite_records(
 def _multi_pass_extraction(
     html: str,
     schema_fields: list[SchemaField],
-    selectors_map: dict,
+    selectors_map: dict[str, Any],
     base_url: str = "",
     user_intent: str = "",
 ) -> list[dict]:
@@ -287,8 +288,8 @@ async def orchestrate_extraction(
 
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:  # noqa: RUF100, S110
-            pass  # nosec B110
+        except Exception:
+            logger.debug("Failed to parse network payload for record arrays", exc_info=True)
 
     # Extract network results
     from app.network_payload_extractor import (
@@ -810,7 +811,7 @@ def _detect_field_swaps(
     return swaps
 
 
-def _check_type_compatibility(field_type: FieldType, values: list) -> float:
+def _check_type_compatibility(field_type: FieldType, values: list[Any]) -> float:
     """Check if values are compatible with a given FieldType.
 
     Returns a score from 0.0 (incompatible) to 1.0 (best observed match).
@@ -861,7 +862,7 @@ def _check_type_compatibility(field_type: FieldType, values: list) -> float:
     return 0.8
 
 
-def _align_selectors(selectors: dict, swaps: dict) -> dict:
+def _align_selectors(selectors: dict[str, Any], swaps: dict[str, Any]) -> dict[str, Any]:
     """Re-map selectors based on detected swaps."""
     if not swaps:
         return selectors

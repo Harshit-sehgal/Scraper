@@ -1,3 +1,5 @@
+from typing import Any
+
 """Event Journal — mutation tracing and causality chain for the semantic field.
 
 Every mutation to the world state is recorded as a journal entry with:
@@ -26,13 +28,20 @@ class EventJournal:
     """
 
     def __init__(self, max_entries: int = 10000) -> None:
-        self._entries: list = []
+        self._entries: list[Any] = []
         self._max = max_entries
         self._enabled = True
         self._checkpoints: dict[int, dict] = {}  # event_idx -> full_snapshot
         self._current_idx = 0
 
-    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: dict | None = None) -> None:
+    def record(
+        self,
+        source: str,
+        mutation_type: str,
+        before: dict[str, Any],
+        after: dict[str, Any],
+        metadata: dict | None = None,
+    ) -> None:
         """Record a mutation event using delta-encoding (Phase 57).
 
         Also persists to the large-scale ReplayBuffer for streaming replay
@@ -146,11 +155,11 @@ class EventJournal:
 
         return state
 
-    def replay(self, start: int = 0) -> list:
+    def replay(self, start: int = 0) -> list[Any]:
         """Return journal entries from index `start` onward for replay."""
         return list(self._entries[start:])
 
-    def get_causality_chain(self, mutation_type: str | None = None) -> list:
+    def get_causality_chain(self, mutation_type: str | None = None) -> list[Any]:
         """Return the chain of events by type, showing causal relationships."""
         chain = []
         for e in self._entries:
@@ -166,7 +175,7 @@ class EventJournal:
             )
         return chain
 
-    def get_last_n(self, n: int = 10) -> list:
+    def get_last_n(self, n: int = 10) -> list[Any]:
         """Return the last N entries for debugging."""
         return self._entries[-n:]
 
@@ -189,7 +198,7 @@ def get_journal() -> EventJournal:
     return _journal
 
 
-def _compute_delta(before: dict, after: dict) -> dict:
+def _compute_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     """Compute what changed between two state snapshots.
 
     Includes Semantic Delta Compression (Phase 61): ignores trivial
@@ -210,7 +219,7 @@ def _compute_delta(before: dict, after: dict) -> dict:
     return delta
 
 
-def _apply_delta(state: dict, delta: dict) -> None:
+def _apply_delta(state: dict[str, Any], delta: dict[str, Any]) -> None:
     """Apply a delta-encoded change to a state dictionary."""
     for k, change in delta.items():
         state[k] = change["to"]

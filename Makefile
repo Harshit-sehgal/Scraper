@@ -27,7 +27,7 @@ DC := docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 
-.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate doctor api-docs api-docs-check
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -81,6 +81,19 @@ test-all: ## Run all tests (including API-dependent, requires GROQ_API_KEY)
 
 test-file: ## Run tests in a specific file (usage: make test-file FILE=test_foo.py)
 	$(DC) exec $(SERVICE) python -m pytest -q --tb=short backend/tests/$(FILE)
+
+test-coverage: ## Run tests with coverage report
+	$(DC) exec $(SERVICE) python -m pytest --cov=backend/app --cov-report=term-missing --cov-report=html:coverage_html --cov-fail-under=60 -q --tb=short
+
+test-coverage-report: ## Generate and open coverage HTML report
+	$(DC) exec $(SERVICE) python -m pytest --cov=backend/app --cov-report=html:coverage_html --cov-fail-under=60 -q --tb=short
+	@echo "Coverage report generated at coverage_html/index.html"
+
+test-flaky: ## Run tests 3 times to detect flaky tests
+	$(DC) exec $(SERVICE) python -m pytest --count=3 --timeout=30 -q --tb=short -x
+
+test-reliability: ## Run full test suite with reliability checks
+	$(DC) exec $(SERVICE) python -m pytest --timeout=30 -q --tb=short --reruns=2 --reruns-delay=1
 
 test-telegram: ## Print the current Telegram notifier status
 	@PYTHONPATH=backend python3 scripts/send_telegram.py --status || true

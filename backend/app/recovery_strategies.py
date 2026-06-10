@@ -69,7 +69,7 @@ class RecoveryPlan:
     should_escalate: bool = False
     reason: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["failure_category"] = self.failure_category.value
         result["primary_action"] = self.primary_action.value
@@ -382,7 +382,7 @@ class RecoveryStrategist:
             reason=reason,
         )
 
-    def _tune_parameters(self, params: dict, domain_info: dict, category: FailureCategory) -> dict:
+    def _tune_parameters(self, params: dict[str, Any], domain_info: dict[str, Any], category: FailureCategory) -> dict[str, Any]:
         """Tune recovery parameters based on domain intelligence.
 
         Example:

@@ -143,7 +143,7 @@ def coerce_value(value: Any, field_type: FieldType):
         return str(value) if value is not None else None
 
 
-def coerce_record(record: dict, schema_fields: list[SchemaField]) -> dict:
+def coerce_record(record: dict[str, Any], schema_fields: list[SchemaField]) -> dict[str, Any]:
     """Apply type coercion to all fields in a record."""
     field_types = {f.name: f.field_type for f in schema_fields}
     coerced = {}
@@ -155,7 +155,7 @@ def coerce_record(record: dict, schema_fields: list[SchemaField]) -> dict:
     return coerced
 
 
-def normalize_record(record: dict, schema_fields: list[SchemaField]) -> dict:
+def normalize_record(record: dict[str, Any], schema_fields: list[SchemaField]) -> dict[str, Any]:
     """Ensure a record contains all schema fields (same order), plus any extra keys."""
     normalized = {}
     for field in schema_fields:
@@ -191,7 +191,7 @@ def _is_entity_name_field(field_name: str) -> bool:
     return any(token in low for token in ["company", "name", "studio", "firm", "agency"])
 
 
-def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> tuple[dict, list[str]]:
+def enforce_schema_integrity(record: dict[str, Any], schema_fields: list[SchemaField]) -> tuple[dict, list[str]]:
     """Apply strict per-field semantic cleanup and record mismatch flags."""
     cleaned = dict(record)
     mismatches: list[str] = []
@@ -279,7 +279,7 @@ def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 
         signal.signal(signal.SIGALRM, old_handler)
 
 
-async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, C901, PLR0911, PLR0912, RUF100
+async def apply_filter(record: dict[str, Any], rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, C901, PLR0911, PLR0912, RUF100
     """Check if a single record passes a filter rule.
 
     Returns True if the record should be KEPT.
@@ -405,7 +405,7 @@ def _infer_location_field_names(
     return deduped
 
 
-def _pick_record_location(record: dict, candidate_fields: list[str]) -> str | None:
+def _pick_record_location(record: dict[str, Any], candidate_fields: list[str]) -> str | None:
     for field in candidate_fields:
         value = record.get(field)
         if value is None:

@@ -23,12 +23,12 @@ class HistoryState:
 
     def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
-        self._decision_history: list = []
-        self._topology_snapshots: list = []
-        self._crystalline_records: list = []
-        self._dataset_consensus: dict = {}
-        self._solidified_motifs: list = []
-        self._transaction_journal: list = []
+        self._decision_history: list[Any] = []
+        self._topology_snapshots: list[Any] = []
+        self._crystalline_records: list[Any] = []
+        self._dataset_consensus: dict[str, Any] = {}
+        self._solidified_motifs: list[Any] = []
+        self._transaction_journal: list[Any] = []
         self._field_activation_count: int = 0
 
     @property
@@ -106,30 +106,30 @@ class HistoryState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def transaction_journal(self) -> list:
+    def transaction_journal(self) -> list[Any]:
         return list(self._get_val("transaction_journal"))
 
     def transaction_count(self) -> int:
         return len(self._get_val("transaction_journal"))
 
     @property
-    def decision_history(self) -> list:
+    def decision_history(self) -> list[Any]:
         return list(self._get_val("decision_history"))
 
     @decision_history.setter
-    def decision_history(self, value: list) -> None:
+    def decision_history(self, value: list[Any]) -> None:
         self._set_val("decision_history", list(value))
 
     @property
-    def topology_snapshots(self) -> list:
+    def topology_snapshots(self) -> list[Any]:
         return list(self._get_val("topology_snapshots"))
 
     @topology_snapshots.setter
-    def topology_snapshots(self, value: list) -> None:
+    def topology_snapshots(self, value: list[Any]) -> None:
         self._set_val("topology_snapshots", list(value))
 
     @property
-    def crystalline_records(self) -> list:
+    def crystalline_records(self) -> list[Any]:
         return list(self._get_val("crystalline_records"))
 
     @property
@@ -144,14 +144,14 @@ class HistoryState:
         return len(self._get_val("crystalline_records"))
 
     @property
-    def dataset_consensus(self) -> dict:
+    def dataset_consensus(self) -> dict[str, Any]:
         return dict(self._get_val("dataset_consensus"))
 
     @property
-    def solidified_motifs(self) -> list:
+    def solidified_motifs(self) -> list[Any]:
         return list(self._get_val("solidified_motifs"))
 
-    def add_solidified_motifs(self, new_motifs: list) -> int:
+    def add_solidified_motifs(self, new_motifs: list[Any]) -> int:
         """Merge new motifs into the solidified set, deduplicating.
 
         Each motif is normalised to a sorted tuple to make set-membership
@@ -196,7 +196,7 @@ class HistoryState:
             self._set_val("topology_snapshots", snapshots[-keep:])
             self._record("trim_snapshots", {"max_size": max_size, "keep": keep})
 
-    def merge_journal(self, remote_journal: list) -> None:
+    def merge_journal(self, remote_journal: list[Any]) -> None:
         """Merge a remote transaction journal into local history (Phase 67).
 
         Identifies missing transactions using trace_id and inserts them in
@@ -222,11 +222,11 @@ class HistoryState:
 
     # ─── Controlled Mutations: Decision History ─────────────────────────
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("history", action, details)
 
-    def record_decision(self, entry: dict) -> None:
+    def record_decision(self, entry: dict[str, Any]) -> None:
         dh = self._get_val("decision_history")
         dh.append(entry)
         self._set_val("decision_history", dh)
@@ -243,13 +243,13 @@ class HistoryState:
         self._set_val("decision_history", [])
         self._record("clear_decision_history", {})
 
-    def get_recent_decisions(self, n: int = 20) -> list:
+    def get_recent_decisions(self, n: int = 20) -> list[Any]:
         """Get the n most recent decisions as a COPY (no alias risk)."""
         dh = self._get_val("decision_history")
         recent = dh[-n:]
         return [dict(d) if isinstance(d, dict) else d for d in recent]
 
-    def update_recent_decision_metadata(self, recent_copy: list, coherence: float, threshold: float) -> None:
+    def update_recent_decision_metadata(self, recent_copy: list[Any], coherence: float, threshold: float) -> None:
         """Update matching recent decisions in the real history.
 
         Takes a COPY previously returned by get_recent_decisions, updates
@@ -276,20 +276,20 @@ class HistoryState:
 
     # ─── Controlled Mutations: Topology Snapshots ────────────────────────
 
-    def add_snapshot(self, snapshot: dict) -> None:
+    def add_snapshot(self, snapshot: dict[str, Any]) -> None:
         ts = self._get_val("topology_snapshots")
         ts.append(snapshot)
         self._set_val("topology_snapshots", ts)
         self._record("add_snapshot", {"snapshot": snapshot})
 
-    def get_snapshots(self) -> list:
+    def get_snapshots(self) -> list[Any]:
         return list(self._get_val("topology_snapshots"))
 
-    def get_wave_snapshots(self) -> list:
+    def get_wave_snapshots(self) -> list[Any]:
         ts = self._get_val("topology_snapshots")
         return [s for s in ts if "wave" in s.get("label", "")]
 
-    def diff_snapshots(self, idx_a: int = -2, idx_b: int = -1) -> dict:
+    def diff_snapshots(self, idx_a: int = -2, idx_b: int = -1) -> dict[str, Any]:
         """Return the diff between two snapshots for causal chain inspection."""
         ts = self._get_val("topology_snapshots")
         if len(ts) < 2:
@@ -307,7 +307,7 @@ class HistoryState:
 
     # ─── Controlled Mutations: Crystalline Records ───────────────────────
 
-    def synthesize_crystalline(self, record: dict, current_record: int) -> None:
+    def synthesize_crystalline(self, record: dict[str, Any], current_record: int) -> None:
         """Synthesize a high-integrity knowledge record with temporal awareness."""
         record["_record_index"] = current_record
         cr = self._get_val("crystalline_records")
@@ -315,7 +315,7 @@ class HistoryState:
         self._set_val("crystalline_records", cr)
         self._record("synthesize_crystalline", {"record": record, "current_record": current_record})
 
-    def get_crystalline_attractors(self, token_vals=None) -> list:
+    def get_crystalline_attractors(self, token_vals=None) -> list[Any]:
         cr = self._get_val("crystalline_records")
         if not cr:
             return []
@@ -325,7 +325,7 @@ class HistoryState:
             return [r for r in cr if any(str(tv) in str(v) for tv in token_vals for v in r.values() if v is not None)]
         return list(cr)
 
-    def topological_search(self, query: str) -> list:
+    def topological_search(self, query: str) -> list[Any]:
         q = query.lower()
         cr = self._get_val("crystalline_records")
         return [r for r in cr if any(q in str(v).lower() for v in r.values())]
@@ -343,7 +343,7 @@ class HistoryState:
                 score += weight
         return min(1.0, score)
 
-    def record_transaction(self, tx: dict, capacity: int = 1000) -> None:
+    def record_transaction(self, tx: dict[str, Any], capacity: int = 1000) -> None:
         tj = self._get_val("transaction_journal")
         tj.append(tx)
         if len(tj) > capacity:
@@ -353,12 +353,12 @@ class HistoryState:
         # Causal journaling already captures this; recording the recording
         # causes infinite recursion.
 
-    def get_transaction_journal(self) -> list:
+    def get_transaction_journal(self) -> list[Any]:
         return list(self._get_val("transaction_journal"))
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         dh = self._get_val("decision_history")
         ts = self._get_val("topology_snapshots")
         tj = self._get_val("transaction_journal")
@@ -375,7 +375,7 @@ class HistoryState:
             "field_activation_count": self.field_activation_count,
         }
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         self._set_val("decision_history", list(data.get("decision_history", [])))
         self._set_val("topology_snapshots", list(data.get("topology_snapshots", [])))

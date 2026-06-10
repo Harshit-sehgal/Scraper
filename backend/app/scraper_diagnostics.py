@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.data_utils import process_raw_records
 from app.extraction_orchestrator import orchestrate_extraction
@@ -42,7 +42,7 @@ class ScraperDiagnosticReport:
         self.record_samples: list[dict] = []
         self.errors: list[str] = []
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "url": self.url,
             "latency_ms": round((time.time() - self.start_time) * 1000, 2),

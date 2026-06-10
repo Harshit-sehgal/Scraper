@@ -63,7 +63,7 @@ class ManifoldState:
         if tx is not None:
             tx[f"manifold_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("manifold", action, details)
 
@@ -137,14 +137,14 @@ class ManifoldState:
     def role_manifold(self) -> dict[str, list]:
         return {k: list(v) for k, v in self._get_struct("role_manifold").items()}
 
-    def get_manifold_vector(self, role: str) -> list:
+    def get_manifold_vector(self, role: str) -> list[Any]:
         """Return a COPY of the role's vector to prevent reference aliasing."""
         vec = self._get_struct("role_manifold").get(role)
         if vec is not None:
             return list(vec)
         return []
 
-    def set_manifold_vector(self, role: str, vector: list) -> None:
+    def set_manifold_vector(self, role: str, vector: list[Any]) -> None:
         """Formally set a role's manifold vector with drift tracking (Phase 63)."""
         manifold = self._get_struct("role_manifold")
 
@@ -164,7 +164,7 @@ class ManifoldState:
             {"role": role, "vector": vector, "displacement": displacement if "displacement" in locals() else 0.0},
         )
 
-    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:
+    def apply_force_to_manifold(self, role: str, deltas: list[Any], clamp: bool = True) -> None:
         """Apply a delta array to a role's manifold vector with drift tracking (Phase 63)."""
         if self.is_role_anchored(role):
             return
@@ -210,7 +210,7 @@ class ManifoldState:
         neutral = dim * 0.25
         return max(0.0, min(1.0, (sim - neutral) / (dim * 0.1)))  # type: ignore[no-any-return]
 
-    def blend_manifold_vector(self, role: str, other_vector: list, alpha: float = 0.7, beta: float = 0.3) -> None:
+    def blend_manifold_vector(self, role: str, other_vector: list[Any], alpha: float = 0.7, beta: float = 0.3) -> None:
         """Blend an external vector into the role's manifold vector with drift tracking (Phase 63)."""
         if self.is_role_anchored(role):
             return
@@ -258,7 +258,7 @@ class ManifoldState:
             self._set_struct("role_manifold", manifold)
             self._record("remove_manifold_role", {"role": role})
 
-    def prune_manifold(self, instability_map: dict, threshold: float = 0.8) -> int:
+    def prune_manifold(self, instability_map: dict[str, Any], threshold: float = 0.8) -> int:
         """Remove highly unstable roles (Phase 29)."""
         manifold = self._get_struct("role_manifold")
         pruned = 0
@@ -395,7 +395,7 @@ class ManifoldState:
         self._set_struct("role_compatibility", {})
         self._record("clear_compatibility", {})
 
-    def clear_compatibility_for_key(self, key: tuple) -> None:
+    def clear_compatibility_for_key(self, key: tuple[str, str]) -> None:
         compat = self._get_struct("role_compatibility")
         compat.pop(key, None)
         self._set_struct("role_compatibility", compat)
@@ -430,7 +430,7 @@ class ManifoldState:
     def role_co_occurrence(self) -> dict[tuple[str, str, str, str], int]:
         return dict(self._get_struct("role_co_occurrence"))
 
-    def increment_co_occurrence(self, key: tuple, delta: int = 1) -> None:
+    def increment_co_occurrence(self, key: tuple[str, str], delta: int = 1) -> None:
         struct = self._get_struct("role_co_occurrence")
         struct[key] = struct.get(key, 0) + delta
         self._set_struct("role_co_occurrence", struct)
@@ -440,7 +440,7 @@ class ManifoldState:
         else:
             self.total_co_occurrences += delta
 
-    def get_co_occurrence(self, key: tuple) -> int:
+    def get_co_occurrence(self, key: tuple[str, str]) -> int:
         return self._get_struct("role_co_occurrence").get(key, 0)  # type: ignore[no-any-return]
 
     def get_role_certainty(self, role: str) -> float:
@@ -475,7 +475,7 @@ class ManifoldState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role_manifold": dict(self._role_manifold),
             "role_compatibility": {f"{k[0]}|{k[1]}": v for k, v in self._role_compatibility.items()},
@@ -488,7 +488,7 @@ class ManifoldState:
             "total_co_occurrences": self.total_co_occurrences,
         }
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         self._role_manifold = {k: list(v) for k, v in data.get("role_manifold", {}).items()}
         for k, v in data.get("role_compatibility", {}).items():
@@ -520,7 +520,7 @@ class ManifoldState:
         else:
             self.dimension = 16
 
-    def merge(self, other_data: dict, alpha: float = 0.5) -> None:
+    def merge(self, other_data: dict[str, Any], alpha: float = 0.5) -> None:
         """Merge remote manifold state into local (Phase 32 / 60)."""
         remote_manifold = other_data.get("role_manifold", {})
 

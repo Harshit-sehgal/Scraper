@@ -12,7 +12,7 @@ import secrets
 import threading
 import zipfile
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
@@ -143,7 +143,7 @@ async def system_status(
             job_total = len(jobs_store)
             recycle_count = len(recycle_bin_store)
 
-    response: dict = {
+    response: dict[str, Any] = {
         "status": "online",
         "backend": backend,
         "worker_mode": is_worker_mode(),
@@ -189,7 +189,7 @@ async def system_status(
     return response
 
 
-def _compute_job_counts() -> dict:
+def _compute_job_counts() -> dict[str, Any]:
     """Compute per-status job counts from the in-memory jobs_store.
 
     Reads ``jobs_store`` under the project-wide ``_jobs_store_lock`` so

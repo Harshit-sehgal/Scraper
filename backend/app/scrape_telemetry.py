@@ -78,7 +78,7 @@ class ScrapeTelemetry:
     # Time spent waiting for JS / DOM quiescence
     js_render_delay_ms: float = 0.0
     # Per-field extraction confidence scores
-    confidence_map: dict = field(default_factory=dict)
+    confidence_map: dict[str, Any] = field(default_factory=dict)
     # "critical" | "high" | "low" | "info"
     regression_severity: str | None = None
     failure_category: str | None = None
@@ -89,7 +89,7 @@ class ScrapeTelemetry:
     error: str | None = None
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -110,10 +110,7 @@ class ScrapeTelemetryCollector:
 
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
         except Exception:
-            logger.exception(
-                "Failed to update domain intelligence for %s (telemetry not lost)",
-                url,
-            )
+            logger.debug("Failed to update domain intelligence from telemetry", exc_info=True)
 
         # Emit to semantic world state observability if available
         try:
@@ -144,10 +141,7 @@ class ScrapeTelemetryCollector:
                 },
             )
         except Exception:
-            logger.exception(
-                "Failed to emit scrape telemetry to world state for %s (telemetry not lost)",
-                url,
-            )
+            logger.debug("Failed to emit telemetry to semantic world state", exc_info=True)
 
         return telemetry
 

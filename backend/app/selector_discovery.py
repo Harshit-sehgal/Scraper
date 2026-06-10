@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, cast
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -119,7 +119,7 @@ async def analyze_url_for_fields(
     search_params: dict[str, str] | None = None,
     acquisition_mode: str = "standard",
     _escalation_depth: int = 0,
-) -> dict:
+) -> dict[str, Any]:
     """Analyze a URL and auto-detect what data fields can be extracted.
 
     This is the core of the "preview URL → suggest fields" workflow.
@@ -240,7 +240,7 @@ async def analyze_url_for_fields(
     # Detect session-bound URL parameters
     session_detection: dict[str, Any]
     if config.detect_session_params:
-        session_detection = cast("dict[str, Any]", detect_session_params(url))
+        session_detection = detect_session_params(url)
     else:
         session_detection = {
             "is_session_bound": False,
@@ -333,7 +333,7 @@ async def analyze_url_for_fields(
     # to generate a fresh search session.
     search_form: dict[str, Any]
     if config.attempt_search_form:
-        search_form = cast("dict[str, Any]", _detect_search_form(html))
+        search_form = _detect_search_form(html)
     else:
         search_form = {"detected": False, "form_fields": [], "search_fields": [], "action": ""}
     search_recovery = None

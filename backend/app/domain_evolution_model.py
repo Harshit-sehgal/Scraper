@@ -23,7 +23,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.selector_memory import get_selector_memory
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
-async def _trigger_webhook(url: str, payload: dict) -> None:
+async def _trigger_webhook(url: str, payload: dict[str, Any]) -> None:
     import httpx
 
     try:
@@ -76,7 +76,7 @@ class DomainEvolutionMetrics:
 
     volatility_index: float = 0.0  # 0.0 (stable) to 1.0 (extremely volatile)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["mutation_timeline"] = list(self.mutation_timeline)
         d["anti_bot_escalation_timeline"] = list(self.anti_bot_escalation_timeline)
@@ -310,7 +310,7 @@ class DomainEvolutionModel:
         volatile = [m for m in self._domains.values() if m.volatility_index >= threshold]
         return sorted(volatile, key=lambda x: x.volatility_index, reverse=True)
 
-    def get_evolution_report(self) -> dict:
+    def get_evolution_report(self) -> dict[str, Any]:
         """Get comprehensive evolution analysis report."""
         if not self._domains:
             return {

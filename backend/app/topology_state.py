@@ -210,7 +210,7 @@ class TopologyState:
         # ─── Topology-Derived Structures ───────────────────────────────
         self._communities: list[set[str]] = []
         self._schema_patterns: dict[tuple[str, str], float] = {}
-        self._topological_laws: dict = {}
+        self._topological_laws: dict[tuple[str, str], float] = {}
         self._neighborhood_cohesion: dict[tuple[str, str], float] = {}
         self._centrality: dict[str, float] = {}
         self._impossible_neighborhoods: list[set[str]] = []
@@ -264,7 +264,7 @@ class TopologyState:
             return tx[key]  # type: ignore[no-any-return]
         return set()
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if "region_id" in details:
             self._modified_regions.add(details["region_id"])
         if self._delta_callback:
@@ -396,7 +396,7 @@ class TopologyState:
         """Public accessor — sets a topology structure by key for topology modules."""
         self._set_struct(key, val)
 
-    def record(self, action: str, details: dict) -> None:
+    def record(self, action: str, details: dict[str, Any]) -> None:
         """Public accessor — records a topology mutation event."""
         self._record(action, details)
 
@@ -532,7 +532,7 @@ class TopologyState:
             read_callback=self._read_callback,
         )
 
-    def find_region_for_mutation(self, token: str, sorted_roles: tuple) -> str | None:
+    def find_region_for_mutation(self, token: str, sorted_roles: tuple[str, ...]) -> str | None:
         for r in self._get_regions():
             if r.token == token and tuple(sorted(r.competing_roles)) == sorted_roles:
                 return r.region_id
@@ -564,7 +564,7 @@ class TopologyState:
         return dict(self._get_struct("schema_patterns"))
 
     @property
-    def topological_laws(self) -> dict:
+    def topological_laws(self) -> dict[tuple[str, str], float]:
         return dict(self._get_struct("topological_laws"))
 
     @property
@@ -609,29 +609,29 @@ class TopologyState:
     def get_cohesion_split_attempts(self) -> dict[tuple[str, str], float]:
         return self._get_struct("split_attempts")  # type: ignore[no-any-return]
 
-    def record_cohesion_merge_attempt(self, pair: tuple) -> None:
+    def record_cohesion_merge_attempt(self, pair: tuple[str, str]) -> None:
         struct = self._get_struct("merge_attempts")
         struct[pair] = struct.get(pair, 0.0) + 1.0
         self._set_struct("merge_attempts", struct)
 
-    def record_cohesion_merge_success(self, pair: tuple) -> None:
+    def record_cohesion_merge_success(self, pair: tuple[str, str]) -> None:
         struct = self._get_struct("merge_success")
         struct[pair] = struct.get(pair, 0.0) + 1.0
         self._set_struct("merge_success", struct)
 
-    def set_neighborhood_cohesion(self, pair: tuple, value: float) -> None:
+    def set_neighborhood_cohesion(self, pair: tuple[str, str], value: float) -> None:
         """Formally set a neighborhood cohesion value (Phase 68)."""
         struct = self._get_struct("neighborhood_cohesion")
         struct[tuple(sorted(pair))] = max(0.0, min(1.0, value))
         self._set_struct("neighborhood_cohesion", struct)
         self._record("set_neighborhood_cohesion", {"pair": pair, "value": value})
 
-    def record_cohesion_split_attempt(self, pair: tuple) -> None:
+    def record_cohesion_split_attempt(self, pair: tuple[str, str]) -> None:
         struct = self._get_struct("split_attempts")
         struct[pair] = struct.get(pair, 0.0) + 1.0
         self._set_struct("split_attempts", struct)
 
-    def record_cohesion_split_success(self, pair: tuple) -> None:
+    def record_cohesion_split_success(self, pair: tuple[str, str]) -> None:
         struct = self._get_struct("split_success")
         struct[pair] = struct.get(pair, 0.0) + 1.0
         self._set_struct("split_success", struct)
@@ -640,7 +640,7 @@ class TopologyState:
         """Flood-fill communities from cohesion + field regions. Delegates to topology_clustering."""
         _cluster_detect_communities(self)
 
-    def update_schema_patterns(self, exclusion_key: tuple, exclusion_val: float) -> None:
+    def update_schema_patterns(self, exclusion_key: tuple[str, str], exclusion_val: float) -> None:
         """Update schema patterns with EMA. Delegates to topology_clustering."""
         _cluster_update_schema(self, exclusion_key, exclusion_val)
 
@@ -648,7 +648,7 @@ class TopologyState:
         """Apply exponential decay to topological laws. Delegates to topology_clustering."""
         _cluster_decay_laws(self)
 
-    def set_topological_law(self, pair: tuple, value: float) -> None:
+    def set_topological_law(self, pair: tuple[str, str], value: float) -> None:
         """Set a topological law for a role pair. Delegates to topology_clustering."""
         _cluster_set_law(self, pair, value)
 
@@ -724,7 +724,7 @@ class TopologyState:
             return True
         return False
 
-    def replace_all(self, new_regions: list) -> None:
+    def replace_all(self, new_regions: list[Any]) -> None:
         """Replace the entire regional manifold (Phase 50)."""
         replace_all_regions(self, new_regions)
 
@@ -838,28 +838,33 @@ class TopologyState:
         """
         return self._compute_edge_field_forces()
 
-    def redirect_repulsive_pressure(self, source_region, pressure_amount: float, forces: dict):
+    def redirect_repulsive_pressure(self, source_region, pressure_amount: float, forces: dict[tuple[str, str], dict[str, Any]]):
         """Redirect repulsive pressure through alternative high-affinity edge field routes.
 
         Public accessor — delegates to ``topology_forces.redirect_repulsive_pressure``.
         """
         return self._redirect_repulsive_pressure(source_region, pressure_amount, forces)
 
-    def _compute_edge_field_forces(self) -> dict[tuple[str, str], dict[str, float]]:
+    def _compute_edge_field_forces(self) -> dict[tuple[str, str], dict[str, Any]]:
         """Compute force vectors from the unified edge field for each role pair.
 
         Delegates to ``topology_forces.compute_edge_field_forces``.
         """
         return _forces_compute(self)
 
-    def _redirect_repulsive_pressure(self, source_region, pressure_amount: float, forces: dict):
+    def _redirect_repulsive_pressure(
+        self,
+        source_region,
+        pressure_amount: float,
+        forces: dict[tuple[str, str], dict[str, Any]],
+    ):
         """Redirect repulsive pressure through alternative high-affinity edge field routes.
 
         Delegates to ``topology_forces.redirect_repulsive_pressure``.
         """
         return _forces_redirect(self, source_region, pressure_amount, forces)
 
-    def route_contradiction(self, role_a: str, role_b: str, strength: float = 0.1) -> dict:
+    def route_contradiction(self, role_a: str, role_b: str, strength: float = 0.1) -> dict[str, Any]:
         """Route a contradiction event through the unified edge field.
 
         Delegates to ``topology_forces.route_contradiction``.
@@ -882,7 +887,7 @@ class TopologyState:
         """
         return _thermo_propagate_all(self)
 
-    def redistribute_instability(self, damping: float = 1.0) -> dict:
+    def redistribute_instability(self, damping: float = 1.0) -> dict[str, Any]:
         """Redistribute instability across regions using thermodynamic free energy gradients.
 
         Delegates to ``topology_thermodynamics.redistribute_instability``.
@@ -912,7 +917,7 @@ class TopologyState:
         """Delegate to topology_dynamics.compute_meso_clusters."""
         compute_meso_clusters(self)
 
-    def compute_macro_from_meso(self) -> dict:
+    def compute_macro_from_meso(self) -> dict[str, Any]:
         """Delegate to topology_dynamics.compute_macro_from_meso."""
         return compute_macro_from_meso(self)
 
@@ -934,15 +939,15 @@ class TopologyState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the full topology state. Delegates to topology_persistence."""
         return topology_to_dict(self)
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         """Deserialize topology state. Delegates to topology_persistence."""
         topology_from_dict(self, data)
 
-    def merge(self, other_data: dict, alpha: float = 0.5) -> None:
+    def merge(self, other_data: dict[str, Any], alpha: float = 0.5) -> None:
         """Merge remote topology state into local (Phase 32 / 60). Delegates to topology_persistence."""
         merge_topology(self, other_data, alpha)
 

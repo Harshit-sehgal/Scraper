@@ -24,7 +24,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.worker_queue import Priority, QueueTask
 
@@ -827,7 +827,7 @@ class PostgresWorkerQueueBase(ABC):
         """Async version of ``get_task_state`` — runs the blocking DB call in a thread."""
         return await asyncio.to_thread(self.get_task_state, task_id)
 
-    def get_status(self) -> dict:
+    def get_status(self) -> dict[str, Any]:
         """Return queue status for monitoring.
 
         This method is synchronous and performs blocking DB calls. When called
@@ -876,7 +876,7 @@ class PostgresWorkerQueueBase(ABC):
             logger.exception("Failed to get Postgres queue status")
             return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
-    async def get_status_async(self) -> dict:
+    async def get_status_async(self) -> dict[str, Any]:
         """Async version of ``get_status`` — runs the blocking DB call in a thread."""
         return await asyncio.to_thread(self.get_status)
 
