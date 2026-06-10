@@ -1,6 +1,6 @@
 """Value classification, field type suggestion, and field name inference.
 
-Extracted from selector_discovery_url.py for modularity.
+Extracted from the legacy selector_discovery_url module for modularity.
 
 Ownership boundary: classifies extracted text values by type, maps value
 patterns to field type suggestions, builds LLM prompts for field naming,

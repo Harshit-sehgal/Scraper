@@ -44,12 +44,27 @@ numpy>=1.24.0,<3.0.0
 # ─── Database ──────────────────────────────────────────────────────────────
 # psycopg 3 is the recommended Postgres driver; it ships with its own
 # connection pool (``psycopg_pool.ConnectionPool``). Opt in via
-# ``DATAFORGE_PG_DRIVER=psycopg3``. ``psycopg2-binary`` is intentionally
-# NOT in the production image; it is a dev-only optional dependency
-# (see ``backend/requirements-dev.in``) for operators who still need the
-# legacy ``PostgresJobRepository`` (psycopg2 driver).
+# ``DATAFORGE_PG_DRIVER=psycopg3``.
+# ``psycopg2-binary`` is the legacy driver — both are used in production
+# (psycopg2 is the default, psycopg3 is opt-in via env var). Both must
+# be available at runtime.
 psycopg[binary,pool]>=3.2.0,<4.0.0
+psycopg2-binary>=2.9.0,<3.0.0
 aiosqlite>=0.20.0,<1.0.0
+
+# ─── LLM Provider Fallback ──────────────────────────────────────────────────
+# ``g4f`` provides an optional fallback path in ``app/llm_bridge.py`` when
+# the primary LLM provider is unavailable. The import is wrapped in a
+# soft-failure handler so the package is required at runtime, not just at
+# import time.
+g4f>=0.5.0,<1.0.0
+
+# ─── ASGI / Starlette Utilities ─────────────────────────────────────────────
+# ``starlette`` is a FastAPI transitive dependency but is also used
+# directly in several service modules (``ai_structuring``, ``scraping``,
+# ``finalization``, ``job_runner``) for ``run_in_threadpool``. Declared
+# explicitly so future FastAPI re-pin choices cannot silently remove it.
+starlette>=0.36.0,<1.0.0
 
 # ─── Geocoding ──────────────────────────────────────────────────────────────
 geopy>=2.4.0,<3.0.0

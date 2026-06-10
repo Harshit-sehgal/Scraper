@@ -1,6 +1,6 @@
 """Search form detection and POST recovery for expired session URLs.
 
-Extracted from selector_discovery_url.py for modularity.
+Extracted from the legacy selector_discovery_url module for modularity.
 
 Ownership boundary: detects HTML search forms, builds absolute URLs,
 maps search parameters to form fields, and attempts POST/GET recovery.

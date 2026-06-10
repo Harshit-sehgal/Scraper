@@ -1,6 +1,6 @@
 """Content quality assessment for scraped pages.
 
-Extracted from selector_discovery_url.py for modularity.
+Extracted from the legacy selector_discovery_url module for modularity.
 
 Ownership boundary: assesses page content quality, detects landing pages,
 extracts container text values. Redirect detection lives in url_redirects.py.

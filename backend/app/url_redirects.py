@@ -1,6 +1,6 @@
 """URL redirect detection and classification.
 
-Extracted from selector_discovery_url.py for modularity.
+Extracted from the legacy selector_discovery_url module for modularity.
 
 Ownership boundary: handles URL-level redirect detection and acquisition
 lineage construction. Content analysis lives in content_quality.py.
