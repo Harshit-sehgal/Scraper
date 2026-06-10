@@ -32,6 +32,7 @@ import sys
 import threading
 import time
 import urllib.parse
+from typing import Any
 
 import pytest
 from app.models import FieldType, SchemaField
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Thresholds ──────────────────────────────────────────────────────────────
 
-THRESHOLDS = {
+THRESHOLDS: dict[str, int | float] = {
     # Accuracy thresholds
     "min_f1_score": 0.75,
     "min_precision": 0.70,
@@ -630,10 +631,10 @@ async def test_concurrent_jobs(benchmark_server, accuracy_schema):
         return len(results), latency
 
     # Run concurrent jobs
-    tasks = [extract_job() for _ in range(THRESHOLDS["min_concurrent_jobs"])]
+    tasks = [extract_job() for _ in range(int(THRESHOLDS["min_concurrent_jobs"]))]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    successes = [r for r in results if not isinstance(r, Exception)]
+    successes = [r for r in results if isinstance(r, tuple)]
     latencies = [r[1] for r in successes]
 
     assert len(successes) >= THRESHOLDS["min_concurrent_jobs"] * 0.8, (
@@ -666,7 +667,7 @@ async def test_throughput_under_load(benchmark_server, accuracy_schema):
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     elapsed = time.time() - start
-    total_records = sum(r for r in results if not isinstance(r, Exception))
+    total_records = sum(r for r in results if isinstance(r, int))
     throughput = total_records / elapsed
 
     assert throughput >= THRESHOLDS["min_throughput_under_load"], (
@@ -682,7 +683,7 @@ async def test_throughput_under_load(benchmark_server, accuracy_schema):
 @pytest.mark.asyncio
 async def test_comprehensive_benchmark_report(benchmark_server, accuracy_schema, expected_data):
     """Generate a comprehensive benchmark report with all metrics."""
-    report = {
+    report: dict[str, Any] = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "thresholds": THRESHOLDS,
         "accuracy": {},
