@@ -66,7 +66,7 @@ def retry_async(
                             max_delay,
                         )
                         if jitter:
-                            delay = delay * (0.5 + random.random())
+                            delay = delay * (0.5 + random.random())  # nosec B311
                         logger.debug(
                             "Retry %d/%d for %s: %s: %s, waiting %.2fs",
                             attempt + 1,
@@ -122,7 +122,7 @@ def retry_sync(
                             max_delay,
                         )
                         if jitter:
-                            delay = delay * (0.5 + random.random())
+                            delay = delay * (0.5 + random.random())  # nosec B311
                         logger.debug(
                             "Retry %d/%d for %s: %s: %s, waiting %.2fs",
                             attempt + 1,
