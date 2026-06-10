@@ -105,10 +105,16 @@ jobs:
 
       - name: Validate nginx config
         run: |
-          # NOTE: nginx.conf now has 'resolver 127.0.0.11' + 'resolve' flag
-          # on the upstream server directive so nginx -t can pass without
-          # a real dataforge container to resolve.
-          docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:alpine nginx -t
+          # Generate self-signed certs so nginx -t can successfully load SSL directives
+          openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 1 -nodes -subj "/CN=localhost"
+          export DATAFORGE_TLS_CERT="/etc/nginx/cert.pem"
+          export DATAFORGE_TLS_KEY="/etc/nginx/key.pem"
+          envsubst '$DATAFORGE_TLS_CERT $DATAFORGE_TLS_KEY' < nginx.conf > nginx.conf.validated
+          docker run --rm \
+            -v "$PWD/nginx.conf.validated:/etc/nginx/nginx.conf:ro" \
+            -v "$PWD/cert.pem:/etc/nginx/cert.pem:ro" \
+            -v "$PWD/key.pem:/etc/nginx/key.pem:ro" \
+            nginx:alpine nginx -t
 
       - name: Validate prometheus config
         run: |
