@@ -92,7 +92,7 @@ def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> li
             for i, item in enumerate(obj):
                 _recurse(item, f"{current_path}[{i}]", depth + 1)
 
-    def _check_array(arr: list, arr_path: str, source: str) -> None:
+    def _check_array(arr: list[Any], arr_path: str, source: str) -> None:
         if not arr:
             return
         records = [item for item in arr if isinstance(item, dict)]
@@ -350,7 +350,7 @@ def map_json_records_to_schema(
 
     # Map each record
     for record in records[:200]:
-        mapped: dict = {}
+        mapped: dict[str, Any] = {}
         for key, (field, confidence) in key_to_field.items():
             if key in record and record[key] is not None:
                 val_extracted, suffix = _extract_nested_value_with_suffix(record[key])

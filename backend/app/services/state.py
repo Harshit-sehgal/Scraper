@@ -1,11 +1,13 @@
+from typing import Any
+
 from app.globals import _jobs_store_lock
 from app.storage_interface import get_job_repository
 
 
 def _compute_prunable_ids(
-    store: dict,
+    store: dict[str, Any],
     max_history: int,
-) -> set:
+) -> set[Any]:
     """Return the set of job IDs that should be pruned from *store*.
 
     Only terminal jobs (completed, degraded, empty, failed, canceled) are
@@ -35,7 +37,12 @@ def _compute_prunable_ids(
     return {jid for jid in store if jid not in keep_ids}
 
 
-def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int) -> None:
+def persist_state(
+    jobs_store: dict[str, Any],
+    recycle_bin_store: dict[str, Any],
+    max_job_history: int,
+    max_recycle_bin_history: int,
+) -> None:
     """Persist the in-memory stores to disk and database.
 
     Pruning happens on the *real* stores under the lock so that the
@@ -74,8 +81,8 @@ def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: in
 
 
 def prune_history_stores(
-    jobs_store: dict,
-    recycle_bin_store: dict,
+    jobs_store: dict[str, Any],
+    recycle_bin_store: dict[str, Any],
     max_job_history: int,
     max_recycle_bin_history: int,
 ) -> None:

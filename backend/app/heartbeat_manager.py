@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 
 class HeartbeatManager:
@@ -10,7 +11,7 @@ class HeartbeatManager:
     def __init__(self) -> None:
         self.node_registry: dict[str, dict] = {}
 
-    def record_heartbeat(self, node_id: str, clock: dict, checksum: str, energy: float) -> None:
+    def record_heartbeat(self, node_id: str, clock: dict[str, Any], checksum: str, energy: float) -> None:
         """Record health metrics from a node."""
         self.node_registry[node_id] = {
             "last_seen": time.time(),
@@ -20,7 +21,7 @@ class HeartbeatManager:
             "status": "online",
         }
 
-    def get_global_health(self) -> dict:
+    def get_global_health(self) -> dict[str, Any]:
         """Analyze the alignment of all known nodes."""
         now = time.time()
         active_nodes = []

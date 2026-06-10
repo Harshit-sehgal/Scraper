@@ -6,6 +6,8 @@ whether data is trustworthy enough for downstream processing.
 
 from __future__ import annotations
 
+from typing import Any
+
 
 def assess_acquisition_quality(
     *,
@@ -47,7 +49,7 @@ def quality_summary(
     data_evidence_score: float = 0.0,
     anti_bot_score: float = 0.0,
     visible_text_length: int = 0,
-) -> dict:
+) -> dict[str, Any]:
     """Return a dict with the score breakdown and overall gate result."""
     result = assess_acquisition_quality(
         data_evidence_score=data_evidence_score,

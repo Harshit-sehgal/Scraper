@@ -9,6 +9,7 @@ to expire, rather than waiting for a redirect to discover the problem.
 from __future__ import annotations
 
 import re
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from app.config import settings
@@ -91,7 +92,7 @@ def _looks_like_opaque_path_token(segment: str) -> bool:
     return False
 
 
-def detect_session_params(url: str) -> dict:
+def detect_session_params(url: str) -> dict[str, Any]:
     """Detect ephemeral / session-bound parameters in a URL.
 
     Scans the URL's query string for parameters that are likely to be

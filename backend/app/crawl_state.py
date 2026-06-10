@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from app.crawl_frontier import get_crawl_frontier
 from app.crawl_policy import get_crawl_policy
@@ -34,7 +35,7 @@ class CrawlStateAdapter:
         """Enqueue newly discovered links from a scraped page."""
         return await self._frontier.add_discovered_links(links, source_url, source_depth)
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Fetch operational stats from policy engine and frontier."""
         return {
             "frontier": self._frontier.get_stats(),

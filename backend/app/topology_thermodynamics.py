@@ -3,7 +3,7 @@
 Extracted from topology_state.py for modularity.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.core_types import MAX_COUPLING_TRANSFER
 from app.field_laws import COUPLING_COEFFICIENT, FREE_ENERGY_CLAMP
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def evolve_all(state: "TopologyState", force: bool = False) -> list:
+def evolve_all(state: "TopologyState", force: bool = False) -> list[Any]:
     """Evolve all basins modulated by edge field forces and multi-scale feedback."""
     forces = state._compute_edge_field_forces()
 
@@ -55,7 +55,7 @@ def evolve_all(state: "TopologyState", force: bool = False) -> list:
     return all_effects
 
 
-def propagate_all(state: "TopologyState") -> list:
+def propagate_all(state: "TopologyState") -> list[Any]:
     """Propagate instability through the unified edge field."""
     forces = state._compute_edge_field_forces()
     all_effects = []
@@ -115,7 +115,7 @@ def propagate_all(state: "TopologyState") -> list:
     return all_effects
 
 
-def redistribute_instability(state: "TopologyState", damping: float = 1.0) -> dict:
+def redistribute_instability(state: "TopologyState", damping: float = 1.0) -> dict[str, Any]:
     """Redistribute instability across regions using thermodynamic free energy gradients."""
     regs = state._get_regions()
     if len(regs) < 2:

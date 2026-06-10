@@ -1,3 +1,5 @@
+from typing import Any
+
 """Foundational Types for the Semantic Substrate.
 
 LAW: Physical truth is a topological property of the field.
@@ -34,7 +36,7 @@ class FieldConflictRegion:
     integrity: float = 0.5
     domain: str = ""
     source_record: str = ""
-    local_memory: dict = field(default_factory=dict)
+    local_memory: dict[str, Any] = field(default_factory=dict)
     idle_cycles: int = 0
     energy_reservoir: float = 0.0
     version: int = 1  # MVCC monotonic version counter
@@ -114,7 +116,7 @@ class FieldConflictRegion:
                     effects.append((key, effect_strength))
         return effects
 
-    def propagate(self) -> list:
+    def propagate(self) -> list[Any]:
         """Autonomous propagation — governed by formal locality laws."""
         effects = []
         for role in self.competing_roles:

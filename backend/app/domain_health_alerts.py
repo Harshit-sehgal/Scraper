@@ -25,7 +25,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class DomainHealthAlert:
     recommendations: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["level"] = self.level.value
         return result

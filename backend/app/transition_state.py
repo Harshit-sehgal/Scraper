@@ -1,3 +1,5 @@
+from typing import Any
+
 """TransitionState — owns all transition probability state.
 
 True ownership boundary: NO external code should mutate transition_probs
@@ -34,7 +36,7 @@ class TransitionState:
         if tx is not None:
             tx[f"transition_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("transition", action, details)
 
@@ -85,7 +87,7 @@ class TransitionState:
     def get_prob(self, type_a: str, type_b: str) -> float:
         return self._get_struct("transition_probs").get((type_a, type_b), 0.4)  # type: ignore[no-any-return]
 
-    def get_high_transition_types(self, threshold: float = 0.6) -> list:
+    def get_high_transition_types(self, threshold: float = 0.6) -> list[Any]:
         probs = self._get_struct("transition_probs")
         return [(a, b) for (a, b), p in probs.items() if p > threshold]
 
@@ -122,7 +124,7 @@ class TransitionState:
         self._set_struct("transition_observations", obs + 1)
         self._record("observe", {"type_a": type_a, "type_b": type_b, "is_role_boundary": is_role_boundary})
 
-    def update_seed(self, data: dict) -> None:
+    def update_seed(self, data: dict[Any, Any]) -> None:
         """Seed bootstrap transitions (overwrites only if empty)."""
         probs = self._get_struct("transition_probs")
         if not probs:
@@ -132,13 +134,13 @@ class TransitionState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "transition_probs": {f"{k[0]}|{k[1]}": v for k, v in self._transition_probs.items()},
             "transition_observations": self.transition_observations,
         }
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         for k, v in data.get("transition_probs", {}).items():
             if "|" in k:

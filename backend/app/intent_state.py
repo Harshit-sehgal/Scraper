@@ -1,3 +1,5 @@
+from typing import Any
+
 """IntentState — owns user-defined cognitive goals and field biasing vectors.
 
 True ownership boundary: NO external code should mutate active_intents directly.
@@ -31,7 +33,7 @@ class IntentState:
         if tx is not None:
             tx[f"intent_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("intent", action, details)
 
@@ -109,10 +111,10 @@ class IntentState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {"active_intents": self.active_intents}
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         self._set_struct("active_intents", {k: dict(v) for k, v in data.get("active_intents", {}).items()})
 

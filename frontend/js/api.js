@@ -200,16 +200,18 @@ function saveKeyFromModal() {
     // G2: Exchange API key for session cookie
     setApiKey(key);
     toast("API key set", "success");
-    loginWithApiKey(key).then((ok) => {
-      if (!ok) return;
-      toast("Session cookie set", "success");
-      import("./jobs.js")
-        .then((m) => {
-          m.refreshSystemStatus();
-          m.refreshJobs();
-        })
-        .catch((e) => console.warn("Failed to refresh after auth:", e));
-    });
+    loginWithApiKey(key)
+      .then((ok) => {
+        if (!ok) return;
+        toast("Session cookie set", "success");
+        import("./jobs.js")
+          .then((m) => {
+            m.refreshSystemStatus();
+            m.refreshJobs();
+          })
+          .catch((e) => console.warn("Failed to refresh after auth:", e));
+      })
+      .catch((e) => console.warn("Login flow error:", e));
   }
 
   closeKeyModal();

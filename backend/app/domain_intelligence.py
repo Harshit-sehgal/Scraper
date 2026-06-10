@@ -12,6 +12,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -34,7 +35,7 @@ class DomainIntelligence:
         self.failure_history = data.get("failure_history", {}) if data else {}
         self.last_updated = data.get("last_updated", time.time()) if data else time.time()
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "domain": self.domain,
             "hydration_delay_ms": round(self.hydration_delay_ms, 2),
@@ -98,7 +99,7 @@ class DomainIntelligenceRegistry:
             self._registry[domain] = DomainIntelligence(domain)
         return self._registry[domain]
 
-    def update_from_telemetry(self, telemetry: dict) -> None:
+    def update_from_telemetry(self, telemetry: dict[str, Any]) -> None:
         """Update domain intelligence based on a recent scrape telemetry snapshot."""
         url = telemetry.get("url", "")
         domain = self._extract_domain(url)

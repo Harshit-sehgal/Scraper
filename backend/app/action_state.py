@@ -1,3 +1,5 @@
+from typing import Any
+
 """ActionState — owns executable cognitive actions and their manifold anchors.
 
 True ownership boundary: NO external code should mutate active_actions directly.
@@ -34,7 +36,7 @@ class ActionState:
         if tx is not None:
             tx[f"action_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("action", action, details)
 
@@ -127,10 +129,10 @@ class ActionState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {"active_actions": self.active_actions, "action_history": self.action_history[-100:]}  # Limit history
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         self._set_struct("active_actions", {k: dict(v) for k, v in data.get("active_actions", {}).items()})
         self._set_struct("action_history", list(data.get("action_history", [])))

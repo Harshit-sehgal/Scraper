@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 
 class CognitiveBudget:
@@ -40,7 +41,7 @@ class CognitiveBudget:
         return self._interrupted
 
     @property
-    def usage_report(self) -> dict:
+    def usage_report(self) -> dict[str, Any]:
         return {
             "cycles": self.cycle_count,
             "elapsed_ms": round((time.time() - self.start_time) * 1000.0, 2),

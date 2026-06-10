@@ -1,3 +1,5 @@
+from typing import Any
+
 """MotifState — owns all motif memory and stability tracking.
 
 True ownership boundary: NO external code should mutate motif_counts,
@@ -42,7 +44,7 @@ class MotifState:
         if tx is not None:
             tx[f"motif_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("motif", action, details)
 
@@ -184,7 +186,7 @@ class MotifState:
         self._set_struct("motif_timestamps", times)
         self._set_struct("motif_stability", stabs)
 
-    def predict_future_motifs(self, current_record: int, threshold: float = 0.2) -> list:
+    def predict_future_motifs(self, current_record: int, threshold: float = 0.2) -> list[Any]:
         """Forecast future motifs based on recent growth and stability."""
         predictions = []
         counts = self._get_struct("motif_counts")
@@ -203,14 +205,14 @@ class MotifState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "motif_counts": {str(k): v for k, v in self._motif_counts.items()},
             "motif_timestamps": {str(k): v for k, v in self._motif_timestamps.items()},
             "motif_stability": {str(k): v for k, v in self._motif_stability.items()},
         }
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         # Build the three target containers in local variables, then assign
         # them through ``_set_struct`` so the active transaction's staging
@@ -221,10 +223,10 @@ class MotifState:
         counts: Counter = Counter()
         for k, v in data.get("motif_counts", {}).items():
             counts[tuple(self._parse_motif_key(k))] = v
-        timestamps: dict = {}
+        timestamps: dict[tuple[Any, ...], Any] = {}
         for k, v in data.get("motif_timestamps", {}).items():
             timestamps[tuple(self._parse_motif_key(k))] = v
-        stability: dict = {}
+        stability: dict[tuple[Any, ...], Any] = {}
         for k, v in data.get("motif_stability", {}).items():
             stability[tuple(self._parse_motif_key(k))] = v
         self._set_struct("motif_counts", counts)
@@ -233,7 +235,7 @@ class MotifState:
 
     MAX_MOTIF_KEY_LENGTH = 1_000_000
 
-    def _parse_motif_key(self, key: str) -> tuple:
+    def _parse_motif_key(self, key: str) -> tuple[Any, ...]:
         import ast
 
         if len(key) > self.MAX_MOTIF_KEY_LENGTH:
@@ -253,7 +255,7 @@ class MotifState:
         self._set_struct("motif_timestamps", {})
         self._set_struct("motif_stability", {})
 
-    def merge(self, other_data: dict) -> None:
+    def merge(self, other_data: dict[str, Any]) -> None:
         """Merge motif memory from another node or branch (Phase 32 / 39)."""
         counts = self._get_struct("motif_counts")
         times = self._get_struct("motif_timestamps")

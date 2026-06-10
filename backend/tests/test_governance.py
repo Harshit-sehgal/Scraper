@@ -66,7 +66,7 @@ def test_community_density_quota() -> None:
         # Link all in one community via high cohesion
         for i in range(len(roles)):
             for j in range(i + 1, len(roles)):
-                key = tuple(sorted([roles[i], roles[j]]))
+                key = (roles[i], roles[j]) if roles[i] < roles[j] else (roles[j], roles[i])
                 ws._topology.set_neighborhood_cohesion(key, 0.9)
 
     # 2. Refresh communities

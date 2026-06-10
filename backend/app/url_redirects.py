@@ -8,6 +8,8 @@ lineage construction. Content analysis lives in content_quality.py.
 
 from __future__ import annotations
 
+from typing import Any
+
 # ─── Imports boundary ──────────────────────────────────────────────────────
 #
 # `acquisition_state` is a research-shell module (see
@@ -19,7 +21,7 @@ from __future__ import annotations
 # ─── Redirect Detection ────────────────────────────────────────────────
 
 
-def _detect_redirect(original_url: str, final_url: str) -> dict:
+def _detect_redirect(original_url: str, final_url: str) -> dict[str, Any]:
     """Detect and classify URL redirects by comparing original vs final URL.
 
     Compares the originally requested URL against the final URL after
@@ -146,7 +148,7 @@ def build_redirect_info(
     search_params: dict[str, str] | None = None,
     fetch_method: str = "",
     existing_redirect_info: dict | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Build redirect_info dict from an AcquisitionLineage.
 
     Uses the typed AcquisitionLineage model to determine the correct

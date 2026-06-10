@@ -7,13 +7,13 @@ caller through TopologyState APIs.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def compute_aggregate_metrics(state: "TopologyState") -> dict:
+def compute_aggregate_metrics(state: "TopologyState") -> dict[str, Any]:
     """Aggregate region metrics into summary dicts."""
     regs = state._get_regions()
     if not regs:

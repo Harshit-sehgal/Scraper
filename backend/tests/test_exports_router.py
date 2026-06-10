@@ -55,6 +55,98 @@ async def client(app: FastAPI):
         yield c
 
 
+# ─── CSV injection protection ──────────────────────────────────────
+
+
+class TestCSVInjectionProtection:
+    """Verify that dangerous formula prefixes are neutralized in CSV/Excel exports."""
+
+    @pytest.mark.asyncio
+    async def test_csv_injection_prefixes_are_escaped(self, client) -> None:
+        """Values starting with =, +, -, @, tab, or CR must be prefix-escaped."""
+        dangerous_results = [
+            {"name": "=SUM(A1:A10)", "value": 100},
+            {"name": "+CMD('/etc/passwd')", "value": 200},
+            {"name": "-1+2", "value": 300},
+            {"name": "@SUM(A1:A10)", "value": 400},
+            {"name": "\t=CMD", "value": 500},
+            {"name": "\r=CMD", "value": 600},
+        ]
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["inj-job"] = _make_job(
+            "inj-job",
+            name="injection-test",
+            results=dangerous_results,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = httpx.ASGITransport(app=test_app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.get("/api/jobs/inj-job/export/csv")
+        assert resp.status_code == 200
+        body = resp.text
+        # Each dangerous value must be prefixed with a single quote
+        assert "'=SUM(A1:A10)" in body
+        assert "'+CMD('/etc/passwd')" in body
+        assert "'-1+2" in body
+        assert "'@SUM(A1:A10)" in body
+        assert "'\t=CMD" in body
+        assert "'\r=CMD" in body
+
+    @pytest.mark.asyncio
+    async def test_csv_safe_values_not_modified(self, client) -> None:
+        """Normal string values must not be modified by the injection protection."""
+        safe_results = [
+            {"name": "Alice", "value": 100},
+            {"name": "Bob Smith", "value": 200},
+            {"name": "12345", "value": 300},
+        ]
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["safe-job"] = _make_job(
+            "safe-job",
+            name="safe-test",
+            results=safe_results,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = httpx.ASGITransport(app=test_app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.get("/api/jobs/safe-job/export/csv")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Alice" in body
+        assert "Bob Smith" in body
+        # No spurious single quotes added
+        assert "'Alice" not in body
+        assert "'Bob" not in body
+
+    @pytest.mark.asyncio
+    async def test_excel_injection_prefixes_are_escaped(self, client) -> None:
+        """Excel export must also neutralize formula-injection prefixes."""
+        dangerous_results = [
+            {"name": "=SUM(A1:A10)", "value": 100},
+        ]
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["inj-xlsx"] = _make_job(
+            "inj-xlsx",
+            name="xlsx-injection-test",
+            results=dangerous_results,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = httpx.ASGITransport(app=test_app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.get("/api/jobs/inj-xlsx/export/excel")
+        assert resp.status_code == 200
+        # Verify it returns an Excel file (not a 500 error)
+        assert resp.headers["content-type"].startswith("application/vnd.openxmlformats")
+
+
+import httpx
+
 # ─── Missing job / empty results ────────────────────────────────────
 
 

@@ -52,7 +52,7 @@ class VisibleTextBlock:
     # "price", "date", "email", "phone", "currency", "url", "time", "location", "organization", "name", "code", etc.
     pattern_type: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -85,7 +85,7 @@ class CandidateContainer:
     sibling_similarity: float = 0.0
     record_score: float = 0.0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -115,7 +115,7 @@ class PageEvidence:
     dom_node_count: int = 0
     bounding_boxes: list[dict] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
         # Keep it serializable
 

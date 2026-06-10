@@ -19,6 +19,7 @@ Categories:
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import Any
 
 from app.config import settings
 
@@ -34,7 +35,7 @@ class ZeroResultClassification:
     operator_hint: str
     recommended_action: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -205,7 +206,7 @@ def _has_auth_patterns(text: str) -> bool:
 
 
 def _any_field_matches_page(
-    schema_fields: list,
+    schema_fields: list[Any],
     html: str,
     visible_text: str,
 ) -> bool:

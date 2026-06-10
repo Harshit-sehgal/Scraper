@@ -1,3 +1,5 @@
+from typing import Any
+
 """Layer 3: Semantic Mapper.
 =========================
 
@@ -201,7 +203,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType
     return SemanticType.TEXT, 0.50
 
 
-def is_child_fragment(value: str, seen_values: set) -> bool:
+def is_child_fragment(value: str, seen_values: set[Any]) -> bool:
     """Check if a value is a child fragment of an already-seen larger value.
 
     Prevents over-segmentation by suppressing tokens that are physically contained

@@ -16,7 +16,7 @@ def normalized_dedup_text(value: Any) -> str:
     return " ".join(str(value).split()).strip().casefold()
 
 
-def compute_source_breakdown(results: list[dict]) -> dict:
+def compute_source_breakdown(results: list[dict]) -> dict[str, Any]:
     """Compute count and percentage of records per source domain."""
     from urllib.parse import urlparse
 
@@ -127,7 +127,7 @@ def _value_quality(field: SchemaField, value) -> float:
     return min(score, 1.0)
 
 
-def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> float:
+def score_record_quality(record: dict[str, Any], schema_fields: list[SchemaField]) -> float:
     """Ensemble-based quality scoring for an extracted record.
 
     Uses multiple "votes" to determine probabilistic confidence:
@@ -190,16 +190,16 @@ def build_quality_report(
     raw_results: list[dict],
     post_filter_count: int,
     post_radius_count: int,
-    radius_report: dict,
+    radius_report: dict[str, Any],
     final_results: list[dict],
     min_record_score: float,
-    type_integrity_report: dict,
-    source_breakdown: dict,
+    type_integrity_report: dict[str, Any],
+    source_breakdown: dict[str, Any],
     ai_source_prediction: dict | None = None,
     ai_structuring_report: dict | None = None,
     warnings: list[str] | None = None,
     acquisition_lineages: list[dict] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     scores = [safe_score(r.get("record_score", 0.0)) for r in raw_results if isinstance(r, dict)]
     kept_scores = [safe_score(r.get("record_score", 0.0)) for r in final_results if isinstance(r, dict)]
     avg_score = round(mean(scores), 3) if scores else 0.0
@@ -233,7 +233,7 @@ def build_quality_report(
     source_ai["ai_row_rate"] = round((structured / processed), 3) if processed else 0.0
 
     # Build acquisition summary from per-URL lineages
-    acquisition_summary: dict = {
+    acquisition_summary: dict[str, Any] = {
         "per_url": acquisition_lineages or [],
         "direct": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "direct"),
         "recovered": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "recovered"),

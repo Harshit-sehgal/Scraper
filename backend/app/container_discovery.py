@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
@@ -120,7 +121,7 @@ class ContainerRanking:
     best_score: float = 0.0
     total_candidates: int = 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_selector": self.best_selector,
             "best_score": self.best_score,
@@ -318,7 +319,7 @@ def _refine_container_score(
 
 async def multi_pass_container_extraction(
     html: str,
-    schema_fields: list,
+    schema_fields: list[Any],
     url: str = "",
     user_intent: str = "",  # noqa: ARG001, RUF100
     min_quality: float = 0.3,
@@ -416,7 +417,7 @@ async def multi_pass_container_extraction(
 async def _extract_from_container(
     container: CandidateContainer,
     html: str,
-    schema_fields: list,
+    schema_fields: list[Any],
     url: str = "",  # noqa: ARG001, RUF100
 ) -> ContainerExtractionResult:
     """Attempt to extract structured records from a single container.
@@ -485,8 +486,8 @@ async def _extract_from_container(
 
 def _extract_record_from_element(
     element: Tag,
-    schema_fields: list,
-) -> dict:
+    schema_fields: list[Any],
+) -> dict[str, Any]:
     """Extract field values from a single container element using pattern matching.
 
     This is a general text-based extractor. It looks at the text content
@@ -497,7 +498,7 @@ def _extract_record_from_element(
     value; fields named "destination"/"arrival"/"return"/"to_" get the last.
     String / organization fields are processed last so typed fields get first pick.
     """
-    record: dict = {}
+    record: dict[str, Any] = {}
     full_text = element.get_text(separator=" ", strip=True)
 
     # Get all text-node-level snippets
@@ -518,7 +519,7 @@ def _extract_record_from_element(
         return any(start < ue and end > us for us, ue in used_spans)
 
     # Process fields in order: typed fields first, string / org last
-    _TYPED_PRIORITY: dict = {
+    _TYPED_PRIORITY: dict[str, Any] = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
@@ -531,7 +532,7 @@ def _extract_record_from_element(
     sorted_fields = sorted(
         enumerate(schema_fields),
         key=lambda item: (
-            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else None, 3),
+            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else FieldType.STRING, 3),
             # Within same priority, fields with "use_last" semantics go second
             (0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1),
         ),
@@ -563,7 +564,7 @@ def _extract_record_from_element(
 
 def _collect_all_pattern_matches(
     full_text: str,
-) -> dict:
+) -> dict[str, Any]:
     """Pass 1: Collect ALL pattern matches from the text, organized by type.
 
     Returns a dict:
@@ -699,7 +700,7 @@ def _extract_field_value_stateful(
     field_desc: str,
     full_text: str,
     snippets: list[str],
-    matches_by_type: dict,
+    matches_by_type: dict[str, Any],
     used_spans: list[tuple[int, int]],
     used_snippet_indices: set[int],
 ) -> str | None:
@@ -709,7 +710,7 @@ def _extract_field_value_stateful(
     different matches. Uses use_last heuristic for paired fields.
     """
 
-    def _consume_match(matches: list) -> str | None:
+    def _consume_match(matches: list[Any]) -> str | None:
         """Pop the next available match, respecting use_last."""
         use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
 
@@ -841,7 +842,7 @@ def _extract_field_value_stateful(
 def classify_container_failure(
     result: MultiPassResult,
     evidence: PageEvidence | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Classify why container-based extraction failed.
 
     Returns a dict with:

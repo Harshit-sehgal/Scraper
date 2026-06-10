@@ -8,12 +8,17 @@ extracts container text values. Redirect detection lives in url_redirects.py.
 
 from __future__ import annotations
 
+import logging
+from typing import Any
+
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 # ─── Content Quality Assessment ────────────────────────────────────────
 
 
-def _assess_content_quality(html: str, profile) -> dict:
+def _assess_content_quality(html: str, profile) -> dict[str, Any]:
     """Assess whether the fetched page contains meaningful data containers.
 
     Detects landing pages (hero banners, search forms, welcome text),
@@ -106,8 +111,8 @@ def _assess_content_quality(html: str, profile) -> dict:
         try:
             containers = soup.select(container_selector)
             data_container_count = sum(1 for c in containers if len(c.get_text(strip=True)) > 20)
-        except Exception:  # noqa: RUF100, S110
-            pass  # nosec B110
+        except Exception:
+            logger.debug("Container selector '%s' evaluation failed", container_selector, exc_info=True)
 
     # ── Generic Data Container Discovery (fallback) ─────────────────
     # When profile's container selector finds little, scan for repeating
@@ -198,7 +203,7 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
     Also collects img alt texts.
     """
     soup = BeautifulSoup(html, "html.parser")
-    containers: list = soup.select(container_selector)
+    containers: list[Any] = soup.select(container_selector)
 
     # Fallback: scan all visible elements
     if not containers:

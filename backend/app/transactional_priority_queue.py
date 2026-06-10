@@ -77,7 +77,7 @@ class PriorityQueueEntry:
             return self.timestamp < other.timestamp
         return self.effective_priority < other.effective_priority
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "priority": int(self.priority),
             "effective_priority": round(self.effective_priority, 2),
@@ -113,7 +113,7 @@ class TransactionalPriorityQueue:
         self._next_entry_id = 0
 
         # Lazy deletion: track invalidated trace_ids to avoid O(n) remove
-        self._invalid_trace_ids: set = set()
+        self._invalid_trace_ids: set[Any] = set()
 
         # Tracking
         self._completed_count = 0
@@ -305,7 +305,7 @@ class TransactionalPriorityQueue:
 
     # ─── Status ─────────────────────────────────────────────────────
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Return queue status for observability."""
         with self._lock:
             entries = sorted(self._heap, key=lambda e: e.effective_priority)

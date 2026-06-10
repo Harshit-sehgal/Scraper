@@ -1,6 +1,7 @@
 # mypy: ignore-errors
 # type: ignore
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class MetricsMixin:
         pressure = (health["system_energy"] / 10.0 + health["fragmentation"] + entropy_pressure) - health["certainty"] * 0.5
         return max(0.1, min(2.0, pressure))
 
-    def evaluate_topological_consistency(self) -> dict:
+    def evaluate_topological_consistency(self) -> dict[str, Any]:
         """Evaluate the manifold's logical consistency (Meta-Reasoning - Phase 38)."""
         envelopes = self._abstraction.envelopes
         contradictions = []
@@ -140,7 +141,7 @@ class MetricsMixin:
         self._history.trim_snapshots(max_size=max_size, keep=keep)
         return before - len(self._history.get_snapshots())
 
-    def gc_collect(self) -> dict:
+    def gc_collect(self) -> dict[str, Any]:
         """Run full garbage collection cycle. Returns dict with counts per category."""
         return {
             "regions": self.gc_collect_stale_regions(),

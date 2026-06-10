@@ -62,12 +62,12 @@ def _selector_css(sel_entry) -> str | None:
 
 
 def build_selector_field_metadata(
-    field_sels: dict,
+    field_sels: dict[str, Any],
     schema_fields: list[SchemaField],
-) -> dict:
+) -> dict[str, Any]:
     """Build type-hint metadata for alignment from selector map + schema."""
     schema_by_name = {f.name: f for f in schema_fields}
-    meta: dict = {}
+    meta: dict[str, Any] = {}
     for key, entry in (field_sels or {}).items():
         if isinstance(entry, dict):
             meta[key] = dict(entry)
@@ -425,7 +425,7 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
 
 def extract_raw_from_selectors(
     html: str,
-    selectors_map: dict,
+    selectors_map: dict[str, Any],
     base_url: str = "",  # noqa: ARG001, RUF100
 ) -> list[dict]:
     """Extract every field in the selector map from each item container (unmapped keys)."""
@@ -439,13 +439,13 @@ def extract_raw_from_selectors(
 
     raw_records: list[dict] = []
     for node in containers:
-        record: dict = {}
+        record: dict[str, Any] = {}
         used_spans: list[tuple[int, int]] = []
-        used_child_indices: set = set()
+        used_child_indices: set[Any] = set()
         # Sort fields: typed fields with regex patterns first, then LOCATION / CODE, then STRING / None last.
         # This prevents STRING fields from greedily consuming children that
         # typed fields should match.
-        _TYPED_ORDER: dict = {}
+        _TYPED_ORDER: dict[Any, int] = {}
         for ftype in (
             FieldType.CURRENCY,
             FieldType.EMAIL,
@@ -504,7 +504,7 @@ def extract_raw_from_selectors(
 
 def apply_selectors(
     html: str,
-    selectors_map: dict,
+    selectors_map: dict[str, Any],
     schema_fields: list[SchemaField],
     base_url: str = "",
     return_field_quality: bool = False,
@@ -540,7 +540,7 @@ def apply_selectors(
 
     for idx, aligned in enumerate(aligned_records):
         node = containers[idx] if idx < len(containers) else None
-        record: dict = {}
+        record: dict[str, Any] = {}
         for field in schema_fields:
             val = aligned.get(field.name)
             record[field.name] = _sanitize_field_value(field, val, base_url=base_url)
@@ -631,7 +631,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
             continue
         seen_texts.add(text)
 
-        record: dict = {}
+        record: dict[str, Any] = {}
 
         for field in schema_fields:
             ft = field.field_type

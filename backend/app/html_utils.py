@@ -4,7 +4,7 @@ import asyncio
 import logging
 import re
 import time
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
@@ -140,7 +140,7 @@ def _is_empty_value(value) -> bool:
     return False
 
 
-def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool:
+def _is_likely_noise_row(record: dict[str, Any], schema_fields: list[SchemaField]) -> bool:
     """Determine if a record is noise using semantic density and structural analysis."""
     from app.semantic_segmentation import (  # research-shell, lazy
         is_likely_noise_field,
@@ -263,13 +263,13 @@ def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
 
 
 def _enrich_record_contacts(
-    record: dict,
+    record: dict[str, Any],
     schema_fields: list[SchemaField],
     node,
     page_email: str | None = None,
     page_phone: str | None = None,
     allow_page_fallback: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """Try to find missing contact info within a specific DOM node or page context."""
     email_field = next((f for f in schema_fields if f.field_type == FieldType.EMAIL), None)
     phone_field = next((f for f in schema_fields if f.field_type == FieldType.PHONE), None)
@@ -560,8 +560,8 @@ async def fetch_page_content(
                     raise ValueError(msg)
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:  # noqa: RUF100, S110
-                pass  # nosec B110
+            except Exception:
+                logger.debug("Secondary load state wait failed for %s", url, exc_info=True)
 
             logger.warning(
                 "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",

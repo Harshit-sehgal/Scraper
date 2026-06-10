@@ -23,6 +23,7 @@ import logging
 import time
 from dataclasses import asdict, dataclass
 from statistics import mean
+from typing import Any
 
 from app.config import settings
 
@@ -43,7 +44,7 @@ class TuningParameters:
     last_adjusted: float = 0.0
     adjustment_count: int = 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -96,7 +97,7 @@ class SelfTuningController:
             )
         return self._parameters[domain]
 
-    def record_telemetry(self, domain: str, telemetry: dict) -> None:
+    def record_telemetry(self, domain: str, telemetry: dict[str, Any]) -> None:
         """Record a telemetry snapshot for tuning.
 
         Args:
@@ -202,7 +203,7 @@ class SelfTuningController:
         """Get current tuning parameters for a domain."""
         return self._get_or_create_params(domain)
 
-    def get_tuning_report(self) -> dict:
+    def get_tuning_report(self) -> dict[str, Any]:
         """Get comprehensive tuning report for all domains."""
         domains = list(self._parameters.keys())
 

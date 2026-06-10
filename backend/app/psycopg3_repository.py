@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager, suppress
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.postgres_repository_base import (
     PostgresRepositoryBase,
@@ -182,7 +182,7 @@ def shutdown_psycopg3() -> None:
     _close_pool()
 
 
-def verify_psycopg3_connectivity() -> dict:
+def verify_psycopg3_connectivity() -> dict[str, Any]:
     """Synchronously verify Postgres is reachable using psycopg 3."""
     try:
         import psycopg

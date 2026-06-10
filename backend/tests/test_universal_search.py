@@ -63,7 +63,7 @@ def test_autonomous_law_induction() -> None:
     ws.clear()
 
     # 1. Establish high cohesion between role_a and role_b
-    key = tuple(sorted(["role_a", "role_b"]))
+    key = ("role_a", "role_b")
     for _ in range(10):
         ws._topology.record_cohesion_merge_attempt(key)
         ws._topology.record_cohesion_merge_success(key)
@@ -81,7 +81,7 @@ def test_topological_law_bias() -> None:
     ws.clear()
 
     # 1. Establish a proximity law between 'name' and 'price'
-    key = tuple(sorted(["name", "price"]))
+    key = ("name", "price")
     ws._topology._topological_laws[key] = 1.0
 
     # 2. Allocate a record where name and price are physically close

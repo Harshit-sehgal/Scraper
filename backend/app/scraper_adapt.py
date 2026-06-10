@@ -20,12 +20,12 @@ from app.crawl_frontier import get_crawl_frontier
 logger = logging.getLogger(__name__)
 
 
-def _run_motif_feedback(results: list[dict], schema_fields: list, world_state: Any | None) -> int:
+def _run_motif_feedback(results: list[dict], schema_fields: list[Any], world_state: Any | None) -> int:
     """Extract field co-occurrence motifs from results and feed back into world_state.
 
     Returns the number of new motifs added (0 if none or if world_state is unavailable).
     """
-    new_motifs: list = []
+    new_motifs: list[Any] = []
     if results and world_state:
         from app.motif_feedback import MotifFeedbackEngine  # research-shell, lazy
 
@@ -173,7 +173,7 @@ def run_all_adaptive_hooks(
     html: str,  # noqa: ARG001, RUF100
     domain: str,
     results: list[dict],
-    schema_fields: list,
+    schema_fields: list[Any],
     world_state: Any | None,
     extraction_method: str,
     fetch_ms: float,

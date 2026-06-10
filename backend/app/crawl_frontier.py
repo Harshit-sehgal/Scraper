@@ -16,6 +16,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from starlette.concurrency import run_in_threadpool
@@ -464,7 +465,7 @@ class CrawlFrontier:
                 heapq.heappush(self._queue, item)
         return domain_urls
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Return frontier operational statistics."""
         return {
             "queue_size": len(self._queue),

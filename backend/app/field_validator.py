@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
 
 
-def validate_world_state(ws: SemanticWorldState) -> list:
+def validate_world_state(ws: SemanticWorldState) -> list[Any]:
     """Validate world state integrity. Returns list of issues found (empty = clean)."""
     issues = []
     view = ws.get_topology_view()

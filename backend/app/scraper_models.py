@@ -51,7 +51,7 @@ class ScrapeAttemptResult(list):
         self.warnings = warnings or []
         self.network_diagnostics = network_diagnostics or []
 
-    def to_telemetry_dict(self) -> dict:
+    def to_telemetry_dict(self) -> dict[str, Any]:
         """Return scrape metadata as a dict for diagnostics."""
         return {
             "records": len(self),

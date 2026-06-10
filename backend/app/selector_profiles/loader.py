@@ -1,3 +1,5 @@
+from typing import Any
+
 """Selector Profile Loader — domain-specific extraction via JSON configs.
 
 Design:
@@ -130,7 +132,7 @@ def _parse_currency(text: str | None) -> str | None:
     return None
 
 
-def _postprocess_field(value, field_config: dict) -> str | None:
+def _postprocess_field(value, field_config: dict[str, Any]) -> str | None:
     """Apply type-specific post-processing to an extracted field value."""
     if value is None:
         return None
@@ -159,7 +161,7 @@ def _postprocess_field(value, field_config: dict) -> str | None:
 
 async def extract_with_profile(
     url: str,
-    profile: dict,
+    profile: dict[str, Any],
     max_wait: int | None = None,
 ) -> list[dict]:
     """Extract structured data from a URL using a selector profile.

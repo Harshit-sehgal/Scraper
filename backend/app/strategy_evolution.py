@@ -26,6 +26,7 @@ import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class StrategyPerformance:
         """Strategy performance is declining."""
         return self.success_rate < 0.6 or self.consecutive_failures >= 3
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["error_patterns"] = dict(self.error_patterns)
         return d
@@ -273,8 +274,8 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:  # nosec B110  # noqa: RUF100, S110
-                pass  # nosec B110
+            except Exception:
+                logger.debug("Anti-bot detection failed during cold start", exc_info=True)
 
             return StrategyRecommendation(
                 recommended_strategy=FetchStrategy.PLAYWRIGHT_FULL,
@@ -312,8 +313,8 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:  # nosec B110  # noqa: RUF100, S110
-            pass  # nosec B110
+        except Exception:
+            logger.debug("Anti-bot feedback check failed for %s", domain, exc_info=True)
 
         best_strategy = state.get_best_strategy()
         best_perf = state.strategies[best_strategy]
@@ -383,7 +384,7 @@ class StrategyEvolutionEngine:
 
         return state.current_strategy
 
-    def get_domain_strategy_report(self, domain: str) -> dict:
+    def get_domain_strategy_report(self, domain: str) -> dict[str, Any]:
         """Get detailed strategy analysis for a domain."""
         state = self._get_or_create_state(domain)
 
@@ -469,7 +470,7 @@ class StrategyEvolutionEngine:
 
         return False
 
-    def get_all_domains_strategy_report(self) -> dict:
+    def get_all_domains_strategy_report(self) -> dict[str, Any]:
         """Get strategy report for all domains."""
         if not self.domain_states:
             return {

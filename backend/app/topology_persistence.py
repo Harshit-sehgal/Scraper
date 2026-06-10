@@ -8,7 +8,7 @@ Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 
 import contextlib
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 # ─── Bulk Region Lifecycle ──────────────────────────────────────────────
 
 
-def replace_all_regions(state: "TopologyState", new_regions: list) -> None:
+def replace_all_regions(state: "TopologyState", new_regions: list[Any]) -> None:
     """Replace the entire regional manifold (Phase 50)."""
     state.set_regions(list(new_regions))
     if state._staging is not None:
@@ -69,7 +69,7 @@ def garbage_collect_topology(state: "TopologyState", max_idle: int = 10) -> int:
 # ─── Serialization ──────────────────────────────────────────────────────
 
 
-def topology_to_dict(state: "TopologyState") -> dict:
+def topology_to_dict(state: "TopologyState") -> dict[str, Any]:
     """Serialize the full topology state to a dict."""
     from dataclasses import asdict
 
@@ -95,7 +95,7 @@ def topology_to_dict(state: "TopologyState") -> dict:
     }
 
 
-def topology_from_dict(state: "TopologyState", data: dict) -> None:
+def topology_from_dict(state: "TopologyState", data: dict[str, Any]) -> None:
     """Deserialize topology state from a dict."""
     from app.core_types import FieldConflictRegion
     from app.topology_state_types import parse_topology_key
@@ -163,7 +163,7 @@ def topology_from_dict(state: "TopologyState", data: dict) -> None:
 # ─── Merge / Reconciliation ─────────────────────────────────────────────
 
 
-def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5) -> None:
+def merge_topology(state: "TopologyState", other_data: dict[str, Any], alpha: float = 0.5) -> None:
     """Merge remote topology state into local (Phase 32 / 60)."""
     from app.core_types import FieldConflictRegion
     from app.topology_state_types import parse_topology_key
@@ -211,11 +211,11 @@ def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5)
     # Merge topological laws (Max)
     remote_laws = other_data.get("topological_laws", {})
     for key_str, r_val in remote_laws.items():
-        pair = None
+        pair: tuple[str, str] | None = None
         if "|" in key_str:
             parts = key_str.split("|")
             if len(parts) == 2:
-                pair = tuple(parts)
+                pair = (parts[0], parts[1])
         else:
             with contextlib.suppress(ValueError):
                 pair = parse_topology_key(key_str)

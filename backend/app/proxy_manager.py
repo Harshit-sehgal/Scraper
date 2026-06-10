@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import Any
 
 from app.config import settings
 from app.utils.log_redaction import mask_proxy_url
@@ -164,7 +165,7 @@ class ProxyManager:
 
         return {"server": self.current_proxy}
 
-    def get_health_stats(self) -> dict:
+    def get_health_stats(self) -> dict[str, Any]:
         """Return health statistics for all proxies."""
         stats = {}
         for proxy in self._proxy_list:

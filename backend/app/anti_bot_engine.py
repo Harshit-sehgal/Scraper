@@ -192,7 +192,7 @@ class AntiBotEngine:
             return True
         return bool(len(recent) >= 2 and sum(recent) / len(recent) > settings.ANTIBOT_STEALTH_ESCALATION_MEAN)
 
-    def get_stealth_profile(self, domain: str) -> dict:
+    def get_stealth_profile(self, domain: str) -> dict[str, Any]:
         """Return a comprehensive stealth profile for a domain.
 
         Returns a dict with:
@@ -291,7 +291,7 @@ class AntiBotEngine:
         age_hours = (time.time() - last_update) / 3600
         return age_hours > max_age_hours
 
-    def get_retry_policy(self, url: str, last_score: float) -> dict:  # noqa: ARG002, RUF100
+    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:  # noqa: ARG002, RUF100
         """Determine the next step based on the block score and domain history."""
         policy = {}
 

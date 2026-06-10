@@ -16,7 +16,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.models import Job, JobStatus
 from app.storage_interface import JobRepository
@@ -101,7 +101,7 @@ def build_create_recycle_bin_sql() -> str:
 # ───────────────────────────────────────────────────────────────────────
 
 
-def job_to_row(job: Job) -> dict:
+def job_to_row(job: Job) -> dict[str, Any]:
     """Convert a Job model to a flat row dict for Postgres storage."""
     return {
         "id": job.id,
@@ -157,7 +157,7 @@ def job_to_row(job: Job) -> dict:
     }
 
 
-def row_to_job(row: dict) -> Job | None:
+def row_to_job(row: dict[str, Any]) -> Job | None:
     """Convert a Postgres row dict back to a Job model."""
     try:
         from app.models import SourcePolicy
@@ -224,7 +224,7 @@ def row_to_job(row: dict) -> Job | None:
 # ───────────────────────────────────────────────────────────────────────
 
 
-def sync_job_results(conn, job_id: str, results: list) -> None:
+def sync_job_results(conn, job_id: str, results: list[Any]) -> None:
     """Replace the ``job_results`` rows for ``job_id`` with ``results``."""
     execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
     if results:
@@ -1095,7 +1095,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     logger.warning("Failed to deserialize world_state payload: %s", e)
             return None
 
-    def save_world_state(self, payload: dict) -> None:
+    def save_world_state(self, payload: dict[str, Any]) -> None:
         self._ensure()
         now = datetime.datetime.now(datetime.UTC).isoformat()
         payload_json = json.dumps(payload, ensure_ascii=False)
@@ -1132,7 +1132,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 (worker_id, now, hostname, pid, now),
             )
 
-    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
         self._ensure()
         with self._conn() as conn:
             # When multiple pids share a worker_id, return the freshest
@@ -1199,7 +1199,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             )
         return results
 
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         try:
             self._ensure()
             with self._conn() as conn:

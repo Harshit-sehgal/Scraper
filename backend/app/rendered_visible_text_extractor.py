@@ -55,7 +55,7 @@ class VisualCard:
     pattern_signature: str = ""  # Ordered list of pattern types in this card
     score: float = 0.0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "index": self.index,
             "y_start": self.y_start,
@@ -142,7 +142,7 @@ async def capture_bounding_boxes(page) -> list[dict]:
 
 def extract_from_visible_blocks(
     html: str,
-    schema_fields: list,
+    schema_fields: list[Any],
     url: str = "",
 ) -> list[dict]:
     """Extract structured records from rendered visible text blocks.
@@ -483,15 +483,15 @@ def _build_cluster_signature(cards: list[VisualCard]) -> str:
 
 def _extract_record_from_card(
     card: VisualCard,
-    schema_fields: list,
-) -> dict:
+    schema_fields: list[Any],
+) -> dict[str, Any]:
     """Extract field values from a visual card using pattern matching.
 
     Uses stateful span tracking to ensure each text span is consumed by only
     one field. Fields with "return"/"arrival"/"dest"/"to_" semantics get the
     LAST matching value; fields with "origin"/"departure"/"from" get the first.
     """
-    record: dict = {}
+    record: dict[str, Any] = {}
     full_text = card.combined_text
 
     # Get all text snippets with their pattern types
@@ -508,7 +508,7 @@ def _extract_record_from_card(
         return any(start < ue and end > us for us, ue in used_spans)
 
     # Priority sort: typed fields first, string / org last
-    _TYPED_PRIORITY: dict = {
+    _TYPED_PRIORITY: dict[str, Any] = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
@@ -519,7 +519,7 @@ def _extract_record_from_card(
     sorted_fields = sorted(
         enumerate(schema_fields),
         key=lambda item: (
-            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else None, 3),
+            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else FieldType.STRING, 3),
             (0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1),
         ),
     )
@@ -550,7 +550,7 @@ def _extract_record_from_card(
 
 def _collect_card_pattern_matches(
     full_text: str,
-) -> dict:
+) -> dict[str, Any]:
     """Pass 1: Collect ALL pattern matches from card text, organized by type."""
     matches: dict[str, list[tuple[str, int, int]]] = {
         "email": [],
@@ -675,13 +675,13 @@ def _extract_card_field_stateful(
     field_desc: str,
     full_text: str,
     snippets: list[tuple[str, str]],
-    matches_by_type: dict,
+    matches_by_type: dict[str, Any],
     used_spans: list[tuple[int, int]],
     used_snippet_indices: set[int],
 ) -> Any:
     """Extract a field value with stateful span tracking."""
 
-    def _consume_match(matches: list) -> str | None:
+    def _consume_match(matches: list[Any]) -> str | None:
         use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
 
         if use_last:

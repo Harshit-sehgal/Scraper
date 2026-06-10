@@ -20,7 +20,7 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.trend_analyzer import DomainTrend
@@ -90,7 +90,7 @@ class Prediction:
     data_window_size: int = 0
     sample_count: int = 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "domain": self.domain,
             "risk_level": self.risk_level,
@@ -134,7 +134,7 @@ class PredictionReport:
     top_risks: list[dict] = field(default_factory=list)
     """Sorted by risk level and confidence, limited to top 10."""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "generated_at": self.generated_at,
             "domains_analyzed": self.domains_analyzed,

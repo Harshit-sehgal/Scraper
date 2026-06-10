@@ -16,7 +16,7 @@ import logging
 import re
 import secrets
 import time
-from typing import Annotated, ClassVar
+from typing import Annotated, Any, ClassVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -71,7 +71,7 @@ class KnowledgeMergeRequest(BaseModel):
     )
 
     @classmethod
-    def validate_payload(cls, data: dict) -> KnowledgeMergeRequest:
+    def validate_payload(cls, data: dict[str, Any]) -> KnowledgeMergeRequest:
         """Validate and cap payload size.
 
         Operates on a shallow copy so the caller's dict is never mutated

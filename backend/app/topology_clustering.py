@@ -80,7 +80,7 @@ def shard_topology_regions(state: "TopologyState") -> dict[str, list[str]]:
 # ─── Schema Patterns ────────────────────────────────────────────────────
 
 
-def update_schema_patterns(state: "TopologyState", exclusion_key: tuple, exclusion_val: float) -> None:
+def update_schema_patterns(state: "TopologyState", exclusion_key: tuple[str, str], exclusion_val: float) -> None:
     """Update schema patterns with exponential moving average."""
     struct = state.get_struct("schema_patterns")
     cur = struct.get(exclusion_key, 0.0)
@@ -103,7 +103,7 @@ def decay_topological_laws(state: "TopologyState") -> None:
     state.set_struct("topological_laws", struct)
 
 
-def set_topological_law(state: "TopologyState", pair: tuple, value: float) -> None:
+def set_topological_law(state: "TopologyState", pair: tuple[str, str], value: float) -> None:
     """Set a topological law for a role pair."""
     from app.topology_state_types import _clamp_signed
 

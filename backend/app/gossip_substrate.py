@@ -213,7 +213,7 @@ class GossipSubstrate:
             logger.warning("[Gossip] Sync with %s failed: %s", peer_id, e)
             return False
 
-    def _detect_conflicts(self, local_id: str, peer_id: str, remote_state: dict, remote_clock: dict) -> bool:
+    def _detect_conflicts(self, local_id: str, peer_id: str, remote_state: dict[str, Any], remote_clock: dict[str, Any]) -> bool:
         """Detect if there are conflicting state changes.
 
         Returns: True if conflicts detected

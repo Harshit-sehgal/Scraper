@@ -1,3 +1,5 @@
+from typing import Any
+
 """Role Embedding Engine.
 =====================
 
@@ -352,7 +354,7 @@ class RoleEmbeddingEngine:
 
         self.detect_dimensionality_need()
 
-    def _relax_roles(self, roles: list[str], manifold_full: dict, base_rate: float) -> None:
+    def _relax_roles(self, roles: list[str], manifold_full: dict[str, Any], base_rate: float) -> None:
         """Internal helper for localized relaxation of a subset of roles."""
         # 1. Filter out anchored roles
         roles = [r for r in roles if not self.ws.is_role_anchored(r)]
@@ -444,7 +446,7 @@ class RoleEmbeddingEngine:
                         force = diff * strength * 0.1 * base_rate
                         role_vec[k] = max(0.0, min(1.0, role_vec[k] + force))
 
-    def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool) -> None:
+    def learn_co_occurrence(self, assignment_a: tuple[str, ...], assignment_b: tuple[str, ...], success: bool) -> None:
         key = assignment_a + assignment_b
         self.ws.increment_co_occurrence(key, 1 if success else -1)
 
@@ -512,15 +514,15 @@ class RoleEmbeddingEngine:
             logger.info("DIMENSIONALITY INDUCTION: Expanding manifold resolution to %s.", new_dim)
             self.ws.expand_dimensions(new_dim)
 
-    def save_cache(self) -> dict:
-        cache: dict = {}
+    def save_cache(self) -> dict[str, Any]:
+        cache: dict[str, Any] = {}
         for (r, t), v in self.compatibility_cache.items():
             cache[f"compat:{r}:{t}"] = v
         for role, vec in self.manifold.items():
             cache[f"manifold:{role}"] = vec
         return cache
 
-    def load_cache(self, data: dict) -> None:
+    def load_cache(self, data: dict[str, Any]) -> None:
         self.ws.clear_compatibility()
         for k, v in data.items():
             if k.startswith("compat:"):

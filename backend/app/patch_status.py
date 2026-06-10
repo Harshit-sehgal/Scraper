@@ -1,3 +1,5 @@
+from typing import Any
+
 """Architecture Patch Notes — documents all tracked-file changes needed.
 
 These changes need to be applied to the 4 tracked files that keep reverting.
@@ -13,7 +15,7 @@ Fixes needed:
 import logging
 
 
-def check_all_fixes() -> dict:
+def check_all_fixes() -> dict[str, Any]:
     """Check if all tracked-file fixes are currently applied."""
     results = {}
 
@@ -87,7 +89,7 @@ def check_all_fixes() -> dict:
     return results
 
 
-def generate_patch_report(results: dict) -> str:
+def generate_patch_report(results: dict[str, Any]) -> str:
     """Generate a human-readable patch report."""
     lines = []
     lines.append("Architecture Patch Status Report")
@@ -99,7 +101,7 @@ def generate_patch_report(results: dict) -> str:
     lines.append(f"Fixes applied: {fixed}/{total}")
     lines.append("")
 
-    by_module: dict = {}
+    by_module: dict[str, Any] = {}
     for key, ok in results.items():
         module = "other"
         if "ROLE_EXCLUSIVITY" in key:

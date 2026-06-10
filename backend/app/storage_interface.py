@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
+from typing import Any
 
 from app.models import Job
 
@@ -267,7 +268,7 @@ class JobRepository(ABC):
         """
         return 0
 
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         """Check repository health. Returns a dict with 'ok' key and backend info."""
         return {"ok": True, "backend": self.__class__.__name__}
 
@@ -288,7 +289,7 @@ class JobRepository(ABC):
             msg,
         )
 
-    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
         """Return health info for a specific worker.
 
         Returns a dict with:
@@ -359,7 +360,7 @@ class JobRepository(ABC):
         """Load semantic world state from the persistent store."""
         return None
 
-    def save_world_state(self, payload: dict) -> None:
+    def save_world_state(self, payload: dict[str, Any]) -> None:
         """Save semantic world state to the persistent store."""
 
 
@@ -378,7 +379,7 @@ class SQLiteJobRepository(JobRepository):
 
         _record_hb(worker_id, hostname, pid)
 
-    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict:
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
         from app.job_store import get_worker_health as _get_health
 
         return _get_health(worker_id, ttl_seconds=ttl_seconds)
@@ -393,7 +394,7 @@ class SQLiteJobRepository(JobRepository):
 
         return _count(include_deleted=include_deleted)
 
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         """Check the SQLite backend's health and schema state.
 
         Returns a dict with ``ok`` flag, schema version, and row counts.
@@ -694,7 +695,7 @@ class SQLiteJobRepository(JobRepository):
 
         persist_state_single(job)
 
-    def save_world_state(self, payload: dict) -> None:
+    def save_world_state(self, payload: dict[str, Any]) -> None:
         """Save semantic world state to the SQLite world_state.json file atomically."""
         import json
         import os
@@ -1031,13 +1032,13 @@ def reset_repository() -> None:
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
-            except Exception:  # nosec B110  # noqa: RUF100, S110
-                pass  # nosec B110
+            except Exception:
+                logger.warning("Failed to shut down Postgres repository", exc_info=True)
         elif "Psycopg3JobRepository" in cls_name:
             try:
                 from app.psycopg3_repository import shutdown_psycopg3
 
                 shutdown_psycopg3()
-            except Exception:  # nosec B110  # noqa: RUF100, S110
-                pass  # nosec B110
+            except Exception:
+                logger.warning("Failed to shut down Psycopg3 repository", exc_info=True)
     _repository_instance = None

@@ -76,7 +76,7 @@ class FieldProvenance:
     llm_hint: str | None = None
     fallback_chain: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         # Truncate source snippet for serialization
         if result.get("source_snippet") and len(result["source_snippet"]) > 200:
@@ -117,7 +117,7 @@ class ExtractionProvenance:
     fallback_path: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["fields"] = {k: v.to_dict() if isinstance(v, FieldProvenance) else v for k, v in result["fields"].items()}
         return result
@@ -291,7 +291,7 @@ def enrich_records_with_provenance(
     return enriched
 
 
-def summarize_provenance(provenance: ExtractionProvenance) -> dict:
+def summarize_provenance(provenance: ExtractionProvenance) -> dict[str, Any]:
     """Create a human-readable summary of the extraction provenance.
 
     Useful for dashboard display, export metadata, and logging.

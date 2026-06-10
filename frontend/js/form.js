@@ -59,6 +59,7 @@ export async function initForm() {
 
 export function addField(preset = null) {
   const c = document.getElementById("schema-container");
+  if (!c) return;
   const row = document.createElement("div");
   row.className = "field-row";
   const p = preset || {};
@@ -373,7 +374,8 @@ export async function submitJob(e) {
   const maxPerDomain = Number.isFinite(perDomainInput) ? Math.max(1, Math.min(25, perDomainInput)) : 4;
   const perDomainTarget = document.getElementById("inp-max-per-domain");
   if (perDomainTarget) perDomainTarget.value = String(maxPerDomain);
-  let maxPages = parseInt(document.getElementById("inp-max-pages")?.value, 10) || 10;
+  const rawMax = parseInt(document.getElementById("inp-max-pages")?.value, 10);
+  let maxPages = Number.isFinite(rawMax) ? rawMax : 10;
 
   if (currentMode === "manual") {
     const urlsEl = document.getElementById("inp-urls");
@@ -388,12 +390,13 @@ export async function submitJob(e) {
       return;
     }
   } else {
-    topic = document.getElementById("inp-topic").value.trim();
-    location = document.getElementById("inp-location").value.trim();
-    domain = document.getElementById("inp-domain").value.trim();
-    const discoverInput = parseInt(document.getElementById("inp-discover-pages").value, 10);
+    topic = document.getElementById("inp-topic")?.value?.trim() ?? "";
+    location = document.getElementById("inp-location")?.value?.trim() ?? "";
+    domain = document.getElementById("inp-domain")?.value?.trim() ?? "";
+    const discoverInput = parseInt(document.getElementById("inp-discover-pages")?.value, 10);
     maxPages = Number.isFinite(discoverInput) ? Math.max(1, Math.min(20, discoverInput)) : maxPages;
-    document.getElementById("inp-discover-pages").value = String(maxPages);
+    const discoverEl = document.getElementById("inp-discover-pages");
+    if (discoverEl) discoverEl.value = String(maxPages);
     if (!topic) {
       toast("Enter a topic", "error");
       return;

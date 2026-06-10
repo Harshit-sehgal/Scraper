@@ -90,11 +90,13 @@ export async function viewResults(id) {
     if (warnBanner) {
       if (j.status === "empty_result") {
         warnBanner.textContent = `No records extracted. ${j.error || "The page may be session-bound, blocked, empty, or require JavaScript rendering."}`;
-        warnBanner.className = "banner banner-warning";
+        warnBanner.classList.remove("banner-info", "banner-success", "banner-error");
+        warnBanner.classList.add("banner", "banner-warning");
         warnBanner.style.display = "block";
       } else if (j.status === "degraded") {
         warnBanner.textContent = j.error || "Some URLs produced no results.";
-        warnBanner.className = "banner banner-warning";
+        warnBanner.classList.remove("banner-info", "banner-success", "banner-error");
+        warnBanner.classList.add("banner", "banner-warning");
         warnBanner.style.display = "block";
       } else {
         warnBanner.style.display = "none";

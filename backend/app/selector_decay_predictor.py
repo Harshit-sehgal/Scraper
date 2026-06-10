@@ -23,6 +23,7 @@ import os
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from app.selector_memory import SelectorConfidenceScore, get_selector_memory
 
@@ -42,7 +43,7 @@ class DecayPrediction:
     failure_velocity: float
     recommendations: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -272,7 +273,7 @@ class SelectorDecayPredictor:
 
         return sorted(at_risk, key=lambda x: x.decay_risk, reverse=True)
 
-    def get_decay_report(self) -> dict:
+    def get_decay_report(self) -> dict[str, Any]:
         """Get comprehensive decay prediction report for all domains."""
         memory = get_selector_memory()
         domains = list(memory._memory.keys())

@@ -392,7 +392,7 @@ function renderJobs(jobs) {
 
   // Apply status-change flash animation if a job just transitioned
   if (_flashJobId) {
-    const flashRow = list.querySelector(`[data-id="${_flashJobId}"]`);
+    const flashRow = list.querySelector(`[data-id="${CSS.escape(_flashJobId)}"]`);
     if (flashRow) {
       flashRow.classList.add("status-change");
       flashRow.addEventListener(

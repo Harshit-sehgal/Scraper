@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def extract_from_network(
     hydration_data: dict[str, Any],
-    schema_fields: list,
+    schema_fields: list[Any],
     url: str = "",  # noqa: ARG001, RUF100
     network_payloads: list[dict] | None = None,
 ) -> list[dict]:
@@ -144,7 +144,7 @@ def extract_from_network(
 
 def _extract_from_jsonld(
     jsonld_data: list[dict],
-    schema_fields: list,
+    schema_fields: list[Any],
 ) -> list[dict]:
     """Extract records from JSON-LD structured data."""
     records: list[dict] = []
@@ -201,7 +201,7 @@ def _extract_from_jsonld(
     return records
 
 
-def _map_jsonld_item(item: dict, schema_fields: list) -> dict | None:
+def _map_jsonld_item(item: dict[str, Any], schema_fields: list[Any]) -> dict | None:
     """Map a single JSON-LD item to schema fields.
 
     Extracts common JSON-LD properties and maps them to schema fields
@@ -210,7 +210,7 @@ def _map_jsonld_item(item: dict, schema_fields: list) -> dict | None:
     if not item or not isinstance(item, dict):
         return None
 
-    record: dict = {}
+    record: dict[str, Any] = {}
     item_type = (item.get("@type") or "").lower()
 
     # Type-based extraction
@@ -259,7 +259,7 @@ def _map_jsonld_item(item: dict, schema_fields: list) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def _extract_product_fields(item: dict) -> dict:
+def _extract_product_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
@@ -270,7 +270,7 @@ def _extract_product_fields(item: dict) -> dict:
     }
 
 
-def _extract_offer_fields(item: dict) -> dict:
+def _extract_offer_fields(item: dict[str, Any]) -> dict[str, Any]:
     price = (
         item.get("price", "") or item.get("priceSpecification", {}).get("price", "")
         if isinstance(item.get("priceSpecification"), dict)
@@ -288,7 +288,7 @@ def _extract_offer_fields(item: dict) -> dict:
     }
 
 
-def _extract_flight_fields(item: dict) -> dict:
+def _extract_flight_fields(item: dict[str, Any]) -> dict[str, Any]:
     carrier = ""
     if isinstance(item.get("airline"), dict):
         carrier = item["airline"].get("name", "")
@@ -333,7 +333,7 @@ def _extract_flight_fields(item: dict) -> dict:
     }
 
 
-def _extract_hotel_fields(item: dict) -> dict:
+def _extract_hotel_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
@@ -348,7 +348,7 @@ def _extract_hotel_fields(item: dict) -> dict:
     }
 
 
-def _extract_restaurant_fields(item: dict) -> dict:
+def _extract_restaurant_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
@@ -363,7 +363,7 @@ def _extract_restaurant_fields(item: dict) -> dict:
     }
 
 
-def _extract_job_fields(item: dict) -> dict:
+def _extract_job_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": item.get("title", "") or item.get("name", "") or "",
         "description": item.get("description", "") or "",
@@ -379,7 +379,7 @@ def _extract_job_fields(item: dict) -> dict:
     }
 
 
-def _extract_event_fields(item: dict) -> dict:
+def _extract_event_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
@@ -392,7 +392,7 @@ def _extract_event_fields(item: dict) -> dict:
     }
 
 
-def _extract_business_fields(item: dict) -> dict:
+def _extract_business_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
@@ -406,7 +406,7 @@ def _extract_business_fields(item: dict) -> dict:
     }
 
 
-def _extract_person_fields(item: dict) -> dict:
+def _extract_person_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "email": item.get("email", "") or "",
@@ -416,7 +416,7 @@ def _extract_person_fields(item: dict) -> dict:
     }
 
 
-def _extract_article_fields(item: dict) -> dict:
+def _extract_article_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "headline": item.get("headline", "") or item.get("name", "") or "",
         "description": item.get("description", "") or item.get("abstract", "") or "",
@@ -428,7 +428,7 @@ def _extract_article_fields(item: dict) -> dict:
     }
 
 
-def _extract_book_fields(item: dict) -> dict:
+def _extract_book_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "author": item.get("author", {}).get("name", "") if isinstance(item.get("author"), dict) else "",
@@ -442,7 +442,7 @@ def _extract_book_fields(item: dict) -> dict:
     }
 
 
-def _extract_movie_fields(item: dict) -> dict:
+def _extract_movie_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or item.get("abstract", "") or "",
@@ -455,7 +455,7 @@ def _extract_movie_fields(item: dict) -> dict:
     }
 
 
-def _extract_app_fields(item: dict) -> dict:
+def _extract_app_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or item.get("abstract", "") or "",
@@ -472,7 +472,7 @@ def _extract_app_fields(item: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _extract_address(item: dict) -> str:
+def _extract_address(item: dict[str, Any]) -> str:
     """Extract a formatted address from a JSON-LD item."""
     addr = item.get("address", {})
     if isinstance(addr, dict):
@@ -489,7 +489,7 @@ def _extract_address(item: dict) -> str:
     return ""
 
 
-def _extract_price_from_offers(item: dict) -> str:
+def _extract_price_from_offers(item: dict[str, Any]) -> str:
     """Extract a price from the offers field of any JSON-LD item."""
     offers = item.get("offers", {})
     if isinstance(offers, list):
@@ -513,8 +513,8 @@ def _extract_price_from_offers(item: dict) -> str:
 
 
 def _extract_from_nested_json(
-    data: dict,
-    schema_fields: list,
+    data: dict[str, Any],
+    schema_fields: list[Any],
     max_depth: int = 6,
 ) -> list[dict]:
     """Recursively search a nested JSON object for arrays of structured records.
@@ -569,7 +569,7 @@ def _extract_from_nested_json(
     return records
 
 
-def _is_record_like(item: dict, schema_fields: list) -> bool:
+def _is_record_like(item: dict[str, Any], schema_fields: list[Any]) -> bool:
     """Check if a dict looks like a data record (contains typed values)."""
     if not item or not isinstance(item, dict):
         return False
@@ -585,7 +585,7 @@ def _is_record_like(item: dict, schema_fields: list) -> bool:
     return meaningful >= 2
 
 
-def _count_field_matches(records: list[dict], schema_fields: list) -> int:
+def _count_field_matches(records: list[dict], schema_fields: list[Any]) -> int:
     """Count how many schema field names appear as keys in the records."""
     keys: set[str] = set()
     for r in records:
@@ -600,9 +600,9 @@ def _count_field_matches(records: list[dict], schema_fields: list) -> int:
 
 
 def _map_json_keys_to_schema(
-    item: dict,
-    schema_fields: list,
-) -> dict:
+    item: dict[str, Any],
+    schema_fields: list[Any],
+) -> dict[str, Any]:
     """Map JSON keys to schema fields using key-level alignment.
 
     For each schema field, looks through the JSON item for matching keys
@@ -611,7 +611,7 @@ def _map_json_keys_to_schema(
     if not item or not isinstance(item, dict):
         return {}
 
-    record: dict = {}
+    record: dict[str, Any] = {}
 
     # Build a flat key-value map from the item (handles nesting)
     flat_values = _flatten_json_keys(item)
@@ -770,8 +770,8 @@ def _find_value_for_field(
 
 
 def _extract_from_apollo_state(
-    apollo_data: dict,
-    schema_fields: list,
+    apollo_data: dict[str, Any],
+    schema_fields: list[Any],
 ) -> list[dict]:
     """Extract records from Apollo / Relay client-side cache state.
 
@@ -822,7 +822,7 @@ def _extract_from_apollo_state(
 
 def _extract_records_from_payloads(
     payloads: list[dict],
-    schema_fields: list,
+    schema_fields: list[Any],
 ) -> list[dict]:
     """Try to extract structured records from captured network payloads.
 

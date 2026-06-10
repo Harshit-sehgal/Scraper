@@ -1,3 +1,5 @@
+from typing import Any
+
 """SQLite-backed job storage with transactional safety and schema migrations.
 
 Replaces JSON persistence with durable SQLite storage. Provides:
@@ -96,7 +98,7 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
         logger.warning("JSON-to-SQLite migration skipped: %s", e)
 
 
-def _job_from_raw(raw: dict) -> dict:
+def _job_from_raw(raw: dict[str, Any]) -> dict[str, Any]:
     """Convert a raw JSON job dict to the format expected by _row_to_job."""
     out = dict(raw)
     for field in [
@@ -116,7 +118,7 @@ def _job_from_raw(raw: dict) -> dict:
     return out
 
 
-def _job_to_row(job: Job) -> dict:
+def _job_to_row(job: Job) -> dict[str, Any]:
     """Convert a Job model to a flat row dict for SQLite storage."""
     return {
         "id": job.id,
@@ -172,7 +174,7 @@ def _job_to_row(job: Job) -> dict:
     }
 
 
-def _row_to_job(row: dict) -> Job | None:
+def _row_to_job(row: dict[str, Any]) -> Job | None:
     """Convert a SQLite row dict back to a Job model."""
     try:
         source_policy_str = row.get("source_policy", "all_sources")
@@ -565,9 +567,6 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 # would see ``worker_heartbeats_v5_backup`` (no
                 # current row) and try to re-run the migration,
                 # re-raising the same error.
-                logger.exception(
-                    "v5→v6 worker_heartbeats migration failed; rolling back to v5 state",
-                )
                 conn.execute("DROP TABLE worker_heartbeats")
                 conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
                 raise
@@ -754,7 +753,7 @@ def persist_state_single(job: Job) -> None:
 def _sync_job_results(
     conn: sqlite3.Connection,
     job_id: str,
-    results: list,
+    results: list[Any],
 ) -> None:
     """Replace the ``job_results`` rows for ``job_id`` with ``results``.
 
@@ -1021,7 +1020,7 @@ def prune_idempotency_keys(older_than_days: int = 7) -> int:
     return int(deleted)
 
 
-def get_storage_health() -> dict:
+def get_storage_health() -> dict[str, Any]:
     """Check that SQLite storage is reachable and schema is valid.
 
     Returns a dict with:
@@ -1136,7 +1135,7 @@ def count_jobs_by_status(include_deleted: bool = False) -> dict[str, int]:
     return counts
 
 
-def get_storage_status() -> dict:
+def get_storage_status() -> dict[str, Any]:
     """Return detailed storage backend status.
 
     Returns:
@@ -1217,7 +1216,7 @@ def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
             conn.close()
 
 
-def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict:
+def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
     """Return health info for a specific worker.
 
     Returns a dict with:

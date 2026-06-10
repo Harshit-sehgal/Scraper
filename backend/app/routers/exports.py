@@ -39,7 +39,7 @@ def _strip_system_fields(records: list[dict]) -> list[dict]:
     return [{k: v for k, v in r.items() if not k.startswith("_")} for r in records]
 
 
-def _flat_row(row: dict, fieldnames: list[str]) -> dict:
+def _flat_row(row: dict[str, Any], fieldnames: list[str]) -> dict[str, Any]:
     """Flatten list values in a row to comma-separated strings and escape formula injection."""
     flat = {}
     for k in fieldnames:
@@ -108,7 +108,7 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
         logger.debug("Failed to record export outcome metric for %s", fmt)
 
 
-def create_exports_router(jobs_store: dict):
+def create_exports_router(jobs_store: dict[str, Any]):
     router = APIRouter()
 
     # Single-process lock guarding refresh-from-repo writes into ``jobs_store``.

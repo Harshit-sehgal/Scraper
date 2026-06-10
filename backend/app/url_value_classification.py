@@ -11,6 +11,7 @@ content_quality.py; search form detection in search_form_recovery.py.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 # ─── Value Classification ───────────────────────────────────────────
 
@@ -260,7 +261,7 @@ def _value_patterns_to_field_types(patterns) -> list[dict]:
     return suggestions
 
 
-def build_url_analysis_prompt(values: list[str], page_analysis: dict) -> str:
+def build_url_analysis_prompt(values: list[str], page_analysis: dict[str, Any]) -> str:
     """Build a prompt using structured container values instead of raw HTML.
 
     Rather than sending raw HTML to the LLM and asking it to both parse AND

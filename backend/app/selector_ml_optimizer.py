@@ -413,7 +413,7 @@ class SelectorOptimizationEngine:
 
     def get_optimization_history(self, domain: str, limit: int = 10) -> list[dict]:
         """Get recent optimization reports for a domain."""
-        hist: list = self.optimization_history.get(domain, [])
+        hist: list[Any] = self.optimization_history.get(domain, [])
         return hist[-limit:]
 
     def learn_from_results(

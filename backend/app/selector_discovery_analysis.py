@@ -59,7 +59,7 @@ def _get_feedback_engine():
     return _MotifFeedbackEngine()
 
 
-def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict:  # noqa: ARG001, RUF100
+def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict[str, Any]:  # noqa: ARG001, RUF100
     """Analyze high-level page structure and value patterns to guide LLM discovery."""
     profile = detect_page_structure(html)
     patterns = detect_value_patterns(html)
@@ -184,7 +184,7 @@ async def discover_selectors(
     html: str,
     schema_fields: list[SchemaField],
     solidified_motifs: list | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Analyze page structure and map schema to CSS selectors via LLM.
 
     Args:
@@ -344,7 +344,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
     }
 
 
-def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
+def _compute_ui_noise_score(elements: list[Any], texts: list[str]) -> float:
     """Score how likely a container candidate is to be UI chrome vs data.
 
     Uses structural signals — no domain-specific phrases:
@@ -577,7 +577,7 @@ def _build_css_for_element(el) -> str | None:
     return None
 
 
-def _infer_field_selectors_from_container(container_sel: str, html: str, schema_fields: list[SchemaField]) -> dict:
+def _infer_field_selectors_from_container(container_sel: str, html: str, schema_fields: list[SchemaField]) -> dict[str, Any]:
     """Infer field-level selectors by scanning container items for type-matching text.
 
     Returns a dict mapping field_name to selector (string). Empty string means
@@ -589,7 +589,7 @@ def _infer_field_selectors_from_container(container_sel: str, html: str, schema_
     if not containers:
         return {}
 
-    field_map: dict = {}
+    field_map: dict[str, Any] = {}
     first_item = containers[0]
 
     for field in schema_fields:

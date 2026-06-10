@@ -93,7 +93,7 @@ class ObservabilityState:
         if tx is not None:
             tx[f"observability_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("observability", action, details)
 
@@ -138,7 +138,7 @@ class ObservabilityState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def emit_telemetry(self, event_type: str, details: dict, trace_id: str | None = None) -> None:
+    def emit_telemetry(self, event_type: str, details: dict[str, Any], trace_id: str | None = None) -> None:
         """Record a cognitive event in the telemetry stream (Phase 41)."""
         entry = {
             "type": event_type,
@@ -221,7 +221,7 @@ class ObservabilityState:
         self._set_struct("activity_heatmap", heatmap)
         self._record("decay_heatmap", {"rate": rate})
 
-    def analyze_causal_divergence(self, local_clock: dict, remote_clock: dict) -> dict:
+    def analyze_causal_divergence(self, local_clock: dict[str, Any], remote_clock: dict[str, Any]) -> dict[str, Any]:
         """Quantify the causal distance between two substrate nodes (Phase 67)."""
         all_nodes = set(local_clock.keys()) | set(remote_clock.keys())
 
@@ -301,7 +301,7 @@ class ObservabilityState:
         max_entropy = math.log2(len(snapshot.role_names)) if len(snapshot.role_names) > 1 else 1.0
         return entropy / max_entropy  # type: ignore[no-any-return]
 
-    def get_governance_report(self, snapshot: GovernanceSnapshot) -> dict:
+    def get_governance_report(self, snapshot: GovernanceSnapshot) -> dict[str, Any]:
         """Summary of emergent systems health and governance status (Phase 56)."""
         # Build manifold_history from snapshot drift data
         manifold_history = {}
@@ -335,7 +335,7 @@ class ObservabilityState:
         max_conf = max(o["confidence"] for o in oscillations)
         return max(0.2, 1.0 - max_conf * 0.8)  # type: ignore[no-any-return]
 
-    def get_stability_policy(self, snapshot: GovernanceSnapshot) -> dict:
+    def get_stability_policy(self, snapshot: GovernanceSnapshot) -> dict[str, Any]:
         """Return a dynamic stabilization policy for the current field state (Phase 49)."""
         snapshots = list(snapshot.topology_snapshots)
         damping = self.calculate_damping_factor(snapshots)
@@ -487,7 +487,7 @@ class ObservabilityState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "observability": {
                 "activity_heatmap": self.heatmap,
@@ -496,7 +496,7 @@ class ObservabilityState:
             },
         }
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         obs_data = data.get("observability", {})
         self._set_struct("activity_heatmap", dict(obs_data.get("activity_heatmap", {})))
@@ -516,7 +516,7 @@ class ObservabilityState:
         self._set_struct("activity_heatmap", {})
         self._set_struct("drift_log", {})
 
-    def get_memory_profile(self, snapshot: GovernanceSnapshot) -> dict:
+    def get_memory_profile(self, snapshot: GovernanceSnapshot) -> dict[str, Any]:
         """Estimate subsystem memory pressure from snapshot data.
 
         Uses pre-serialized dicts from the snapshot instead of live state,
@@ -524,7 +524,7 @@ class ObservabilityState:
         """
         import json
 
-        def estimate_dict(d: dict) -> int:
+        def estimate_dict(d: dict[str, Any]) -> int:
             try:
                 return len(json.dumps(d, sort_keys=True, default=str))
             except Exception:
@@ -543,7 +543,7 @@ class ObservabilityState:
         profile["total_estimated_bytes"] = sum(value for key, value in profile.items() if key != "total_records")
         return profile
 
-    def get_semantic_health_index(self, snapshot: GovernanceSnapshot) -> dict:
+    def get_semantic_health_index(self, snapshot: GovernanceSnapshot) -> dict[str, Any]:
         """Compute the multi-dimensional Semantic Health Index (Phase 64).
 
         Laws of Health:
@@ -615,7 +615,7 @@ class ObservabilityState:
             "status": "optimal" if health_score > 0.8 else "degraded" if health_score > 0.4 else "critical",
         }
 
-    def calculate_semantic_importance(self, region, centrality: dict) -> float:
+    def calculate_semantic_importance(self, region, centrality: dict[str, Any]) -> float:
         """Compute the topological importance of a region (Phase 50).
 
         High Importance = high centrality, low instability, and participation in stable motifs.
@@ -697,7 +697,7 @@ class ObservabilityState:
 # ─── Legacy Observability Utilities ──────────────────────────────────
 
 
-def field_summary(ws: SemanticWorldState) -> dict:
+def field_summary(ws: SemanticWorldState) -> dict[str, Any]:
     """Return a summary of the field's current energetic state."""
     return {
         "energy": ws.metrics.global_energy,
@@ -707,7 +707,7 @@ def field_summary(ws: SemanticWorldState) -> dict:
     }
 
 
-def topology_report(ws: SemanticWorldState) -> dict:
+def topology_report(ws: SemanticWorldState) -> dict[str, Any]:
     """Return a detailed report of the manifold's topology."""
     return {
         "pressure": ws.get_system_pressure(),

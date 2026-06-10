@@ -1,12 +1,13 @@
 # mypy: ignore-errors
 # type: ignore
 import time
+from typing import Any
 
 from app.invariant_firewall import requires_invariants
 
 
 class SerializationMixin:
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize state to a JSON-compatible dictionary."""
         with self._lock:
             history_journal = self._history.transaction_journal
@@ -35,7 +36,7 @@ class SerializationMixin:
             return result
 
     @requires_invariants
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         """Load state from a dictionary."""
         self.clear()
 

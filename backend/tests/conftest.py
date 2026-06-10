@@ -598,3 +598,15 @@ def client(monkeypatch):
                 conn.close()
     except Exception:  # noqa: RUF100, S110
         pass
+
+
+@pytest.fixture
+def auth_headers() -> dict:
+    """Empty auth headers — API key auth is disabled in tests via conftest."""
+    return {}
+
+
+@pytest.fixture
+def operator_headers() -> dict:
+    """Empty operator headers — operator auth is disabled in tests via conftest."""
+    return {}

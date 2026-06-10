@@ -79,8 +79,24 @@ class BrowserPool:
 
             if not self._browser or not self._browser.is_connected():
                 logger.info("[BrowserPool] Launching new Chromium instance")
+                # Security hardening flags for Chromium
+                browser_args = []
+                if settings.BROWSER_SECURITY_HARDENING:
+                    browser_args.extend(
+                        [
+                            "--disable-dev-shm-usage",  # Avoid /dev/shm issues in Docker
+                            "--disable-extensions",  # Prevent extension-based attacks
+                            "--disable-background-networking",  # Reduce attack surface
+                            "--disable-default-apps",  # Remove default app attack surface
+                            "--disable-gpu",  # Reduce GPU-based attack surface
+                            "--no-first-run",  # Skip first-run wizard
+                        ],
+                    )
                 try:
-                    self._browser = await self._playwright.chromium.launch(headless=settings.PLAYWRIGHT_HEADLESS)
+                    self._browser = await self._playwright.chromium.launch(
+                        headless=settings.PLAYWRIGHT_HEADLESS,
+                        args=browser_args or None,
+                    )
                 except Exception:
                     self.crash_count += 1
                     logger.exception("[BrowserPool] Failed to launch browser")
@@ -268,7 +284,7 @@ class BrowserPool:
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False
 
-    def get_metrics(self) -> dict:
+    def get_metrics(self) -> dict[str, Any]:
         """Return browser pool operational metrics."""
         return {
             "startup_latency_ms": round(self.startup_latency_ms, 2),

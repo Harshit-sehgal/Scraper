@@ -66,7 +66,13 @@ class TopologyMixin:
             )
 
     @requires_invariants
-    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:  # noqa: ARG002, C901, FBT001, FBT002, PLR0912, PLR0915, RUF100
+    def capture_pre_allocation_field(
+        self,
+        tokens: list[Any],
+        schema_fields: list[Any],
+        is_noise: bool = False,  # noqa: ARG002
+        domain: str = "",
+    ) -> int:  # noqa: C901, FBT001, FBT002, PLR0912, PLR0915, RUF100
         """Capture pre-allocation conflict topology from tokens with Relational Recall (Phase 31)."""
         with self.transaction("pre_allocation_capture"):
             from app.failure_injector import get_injector
@@ -471,7 +477,7 @@ class TopologyMixin:
                     self._manifold.set_manifold_vector(hypo_role, [0.5] * 16)
                     self._energy.set_schema_instability(hypo_role, 0.5)
 
-    def local_view(self, role: str) -> dict:
+    def local_view(self, role: str) -> dict[str, Any]:
         from app.field_laws import ROLE_EXCLUSIVITY
 
         neighbors = set()
@@ -492,7 +498,7 @@ class TopologyMixin:
             "local_compatibilities": len(local_compat),
         }
 
-    def trace_field_evolution(self, token: str = "") -> dict:  # nosec B107
+    def trace_field_evolution(self, token: str = "") -> dict[str, Any]:  # nosec B107
         view = self._topology.get_view()
         chain = {
             "regions": view.region_count(),
@@ -513,7 +519,7 @@ class TopologyMixin:
                 for r in view.find_by_token(token)
             ]
         elif view.region_count() > 0:
-            regions_by_token: dict = {}
+            regions_by_token: dict[str, Any] = {}
             for r in view.all_regions():
                 regions_by_token.setdefault(r.token, []).append(
                     {
@@ -527,7 +533,7 @@ class TopologyMixin:
             chain["regions_by_token"] = regions_by_token
         return chain
 
-    def multi_scale_regions(self) -> dict:
+    def multi_scale_regions(self) -> dict[str, Any]:
         view = self._topology.get_view()
         regions = view.all_regions()
 
@@ -591,7 +597,7 @@ class TopologyMixin:
         return {"micro": micro, "meso": meso, "macro": macro}
 
     @requires_invariants
-    def observe_field_perturbation(self, output: dict, tokens: list) -> None:  # noqa: ARG002, C901, PLR0912, PLR0915, RUF100
+    def observe_field_perturbation(self, output: dict[str, Any], tokens: list[Any]) -> None:  # noqa: ARG002, C901, PLR0912, PLR0915, RUF100
         from app.instability_api import get_immune_system
 
         immune = get_immune_system(ws=self)
@@ -721,7 +727,7 @@ class TopologyMixin:
         self._total_energy_before = (
             sum(r.local_energy for r in self._topology.iterate_regions()) if self._topology.region_count() > 0 else 0.0
         )
-        role_map: dict = {}
+        role_map: dict[str, Any] = {}
         for r in self._topology.iterate_regions():
             for role in r.competing_roles:
                 role_map.setdefault(role, []).append(r)
@@ -825,7 +831,7 @@ class TopologyMixin:
             return 0
 
     @requires_invariants
-    def dream(self, cycles: int = 1, budget: Any | None = None) -> dict:
+    def dream(self, cycles: int = 1, budget: Any | None = None) -> dict[str, Any]:
         dreams = []
         from app.runtime_budget import CognitiveBudget
 

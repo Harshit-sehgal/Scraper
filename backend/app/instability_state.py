@@ -1,3 +1,5 @@
+from typing import Any
+
 """InstabilityState — owns learned exclusions and controls all tension mutations.
 
 True ownership boundary: NO external code should mutate learned_exclusions directly.
@@ -38,7 +40,7 @@ class InstabilityState:
         if tx is not None:
             tx[f"instability_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict) -> None:
+    def _record(self, action: str, details: dict[str, Any]) -> None:
         if self._delta_callback:
             self._delta_callback("instability", action, details)
 
@@ -75,7 +77,7 @@ class InstabilityState:
         source = self._staging if self._staging is not None else self._exclusions
         return source.get(key, 0.0)
 
-    def get_exclusion_by_key(self, key: tuple) -> float:
+    def get_exclusion_by_key(self, key: tuple[str, str]) -> float:
         source = self._staging if self._staging is not None else self._exclusions
         return source.get(tuple(sorted(key)), 0.0)
 
@@ -89,7 +91,7 @@ class InstabilityState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def set_exclusion(self, key: tuple, value: float) -> None:
+    def set_exclusion(self, key: tuple[str, str], value: float) -> None:
         sk = tuple(sorted(key))
         clamped = max(0.0, min(1.0, value))
         target = self._staging if self._staging is not None else self._exclusions
@@ -125,7 +127,7 @@ class InstabilityState:
             else:
                 target[key] = new_val
 
-    def delete_exclusion(self, key: tuple) -> None:
+    def delete_exclusion(self, key: tuple[str, str]) -> None:
         target = self._staging if self._staging is not None else self._exclusions
         target.pop(tuple(sorted(key)), None)
         self._record("delete_exclusion", {"key": key})
@@ -144,13 +146,13 @@ class InstabilityState:
 
     # ─── Serialization ───────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {"learned_exclusions": {f"{k[0]}|{k[1]}": v for k, v in self._exclusions.items()}}
 
     # Maximum length for a string key before trying ast.literal_eval  # nosec
     MAX_KEY_LENGTH = 1_000_000
 
-    def from_dict(self, data: dict) -> None:
+    def from_dict(self, data: dict[str, Any]) -> None:
         self.clear()
         target = self._staging if self._staging is not None else self._exclusions
 
@@ -184,7 +186,7 @@ class InstabilityState:
         target = self._staging if self._staging is not None else self._exclusions
         target.clear()
 
-    def merge(self, other_data: dict) -> None:
+    def merge(self, other_data: dict[str, Any]) -> None:
         """Merge remote instability state into local (Phase 32)."""
         # data format uses pipe-separated keys
         remote_excl = other_data.get("learned_exclusions", {})

@@ -10,6 +10,7 @@ import logging
 import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from app.acquisition_state import AcquisitionState
 from app.config import settings
@@ -34,7 +35,7 @@ class AcquisitionEvent:
     fetch_time_ms: float = 0.0
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -102,7 +103,7 @@ class AcquisitionTelemetryCollector:
         n = n if n is not None else settings.ACQUISITION_TELEMETRY_RECENT_DEFAULT
         return [e.to_dict() for e in self._history[-n:]]
 
-    def get_summary(self) -> dict:
+    def get_summary(self) -> dict[str, Any]:
         """Get aggregate acquisition statistics."""
         total = sum(self._state_counts.values())
         recovery_rate = self._recovery_successes / self._recovery_attempts if self._recovery_attempts > 0 else 0.0

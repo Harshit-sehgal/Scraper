@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 
 def get_world_state() -> SemanticWorldState:
@@ -36,7 +36,7 @@ class TopologicalQuery:
         target_vec = reng._get_type_vector(stype)
         return self._find_near_vec(target_vec, radius)
 
-    def _find_near_vec(self, target_vec: list, radius: float, exclude_role: str | None = None) -> list[dict]:
+    def _find_near_vec(self, target_vec: list[Any], radius: float, exclude_role: str | None = None) -> list[dict]:
         results = []
         for role in self.ws.get_manifold_roles():
             if role == exclude_role:
@@ -58,7 +58,7 @@ class TopologicalQuery:
         """Return all protected relational anchors."""
         return list(self.ws.topology_anchors)
 
-    def execute_tql(self, query: str) -> dict:
+    def execute_tql(self, query: str) -> dict[str, Any]:
         """Simple TQL Parser and Executor.
 
         Supported syntax:

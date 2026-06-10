@@ -53,7 +53,7 @@ def _build_acquisition_lineage_from_result(
     result: ScrapeAttemptResult,
     state: str = "direct",
     recovery_method: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Build an acquisition lineage dict from a ScrapeAttemptResult."""
     return {
         "state": state,
@@ -133,7 +133,7 @@ async def run_post_extraction_processing(
 
     # ── Selector hit rate ───────────────────────────────────────────────
     selector_hit_rate = 0.0
-    confidence_map: dict = {}
+    confidence_map: dict[str, Any] = {}
     if results:
         field_hits = 0
         total_slots = len(results) * len(schema_fields)
