@@ -201,8 +201,12 @@ where = ["backend"]
 # `app` is the first-party package; scripts/ at the project root import from
 # it but deptry doesn't auto-detect this layout. Excluding `app` from the
 # missing-dep scan and mapping `bs4`→`beautifulsoup4` keeps the report clean.
+# `requirements_files` points deptry at pyproject.toml so the canonical
+# source of truth is used (instead of also scanning requirements.in which
+# would double-count).
 [tool.deptry]
 exclude = ["scripts/*"]
+requirements_files = ["pyproject.toml"]
 
 [tool.deptry.package_module_name_map]
 "beautifulsoup4" = ["bs4"]
