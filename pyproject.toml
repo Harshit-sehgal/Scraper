@@ -197,6 +197,18 @@ package-dir = {"" = "backend"}
 [tool.setuptools.packages.find]
 where = ["backend"]
 
+# ─── Deptry ───────────────────────────────────────────────────────────────
+# `app` is the first-party package; scripts/ at the project root import from
+# it but deptry doesn't auto-detect this layout. Excluding `app` from the
+# missing-dep scan and mapping `bs4`→`beautifulsoup4` keeps the report clean.
+[tool.deptry]
+exclude = ["scripts/*"]
+
+[tool.deptry.package_module_name_map]
+"beautifulsoup4" = ["bs4"]
+"duckduckgo_search" = ["duckduckgo_search"]
+"prometheus-client" = ["prometheus_client"]
+
 # ─── Bandit ───────────────────────────────────────────────────────────────
 # The core product code in ``backend/app/`` is held to a strict Bandit
 # default. Per-file `# nosec` annotations with justification are used
