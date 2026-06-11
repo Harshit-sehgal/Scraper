@@ -4,6 +4,8 @@
 
 import { esc, toast } from "./utils.js";
 import { API, apiFetch } from "./api.js";
+import { currentMode } from "./views.js";
+import { addField } from "./form.js";
 
 // ─── State ───
 
@@ -242,7 +244,6 @@ export async function applyAnalyzedFields() {
   const schemaContainer = document.getElementById("schema-container");
   if (schemaContainer) schemaContainer.innerHTML = "";
 
-  const { addField } = await import("./form.js");
   selected.forEach((f) => {
     addField({
       name: f.name,
@@ -254,7 +255,6 @@ export async function applyAnalyzedFields() {
   // Pre-populate URLs textarea
   const urlInput = document.getElementById("inp-analyze-url");
   const urlsTextarea = document.getElementById("inp-urls");
-  const { currentMode } = await import("./views.js");
   if (urlInput && urlsTextarea && currentMode === "manual") {
     const url = urlInput.value.trim();
     if (url && !urlsTextarea.value.includes(url)) {

@@ -11,6 +11,8 @@ import {
   closeConfirm,
   isConfirmVisible,
 } from "./utils.js";
+import { refreshJobs, onJobsFilterChanged } from "./jobs.js";
+import { renderFilteredResults } from "./results.js";
 
 export let currentView = "jobs";
 export let currentMode = "manual";
@@ -52,7 +54,7 @@ export function switchView(name) {
     tabEl.setAttribute("aria-selected", "true");
   }
 
-  if (name === "jobs") import("./jobs.js").then((m) => m.refreshJobs()).catch(() => {});
+  if (name === "jobs") refreshJobs().catch(() => {});
   if (name === "new") import("./form.js").then((m) => m.initForm()).catch(() => {});
   if (name === "recycle") import("./recycle.js").then((m) => m.refreshRecycleBin()).catch(() => {});
   if (name === "cognition") import("./cognition.js").then((m) => m.refreshCognition()).catch(() => {});
@@ -140,14 +142,14 @@ export function onGlobalKeydown(e) {
 
     if (document.activeElement === jobsSearch && jobsSearch?.value) {
       jobsSearch.value = "";
-      import("./jobs.js").then((m) => m.onJobsFilterChanged()).catch(() => {});
+      onJobsFilterChanged();
       e.preventDefault();
       return;
     }
 
     if (document.activeElement === resultSearch && resultSearch?.value) {
       resultSearch.value = "";
-      import("./results.js").then((m) => m.renderFilteredResults()).catch(() => {});
+      renderFilteredResults();
       e.preventDefault();
     }
   }
