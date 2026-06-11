@@ -13,8 +13,10 @@ from fastapi import APIRouter, Request, Response
 from fastapi.security import APIKeyHeader
 
 from app.auth.session import (
+    SESSION_COOKIE,
     clear_session_cookie,
     get_session_role,
+    revoke_session_cookie,
     set_session_cookie,
 )
 
@@ -53,8 +55,11 @@ async def create_session(
 
 
 @router.delete("/api/session")
-async def destroy_session(response: Response):
+async def destroy_session(request: Request, response: Response):
     """Clear the session cookie, effectively logging out."""
+    cookie = request.cookies.get(SESSION_COOKIE)
+    if cookie:
+        revoke_session_cookie(cookie)
     clear_session_cookie(response)
     return {"status": "ok", "message": "Session cookie cleared."}
 

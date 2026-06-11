@@ -26,7 +26,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from app.worker_queue import Priority, QueueTask
+from app.worker_queue import Priority, QueueTask, _record_scheduled_job_usage
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -310,6 +310,7 @@ class PostgresWorkerQueueBase(ABC):
         timeout_seconds: int = 300,
         task_id: str | None = None,
         scheduled_at: str | None = None,
+        usage_context: dict[str, Any] | None = None,
     ) -> str:
         """Add a new task to the queue. Returns the task ID."""
         task = QueueTask(
@@ -320,6 +321,13 @@ class PostgresWorkerQueueBase(ABC):
             timeout_seconds=timeout_seconds,
             task_id=task_id,
             scheduled_at=scheduled_at,
+        )
+        _record_scheduled_job_usage(
+            task_id=task.id,
+            task_type=task.type,
+            payload=task.payload,
+            scheduled_at=task.scheduled_at,
+            usage_context=usage_context,
         )
 
         await asyncio.to_thread(

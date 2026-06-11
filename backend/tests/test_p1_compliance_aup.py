@@ -123,6 +123,7 @@ async def test_accept_records_acceptance(saas_client) -> None:
     refreshed = store.get_user("u2")
     assert refreshed is not None
     assert refreshed.aup_accepted_at == body["aup_accepted_at"]
+    assert refreshed.aup_version_accepted == CURRENT_AUP_VERSION
 
 
 @pytest.mark.asyncio
@@ -138,6 +139,34 @@ async def test_accept_is_idempotent(saas_client) -> None:
     second_ts = r2.json()["aup_accepted_at"]
     # The COALESCE in the store keeps the FIRST timestamp.
     assert second_ts == first_ts
+
+
+@pytest.mark.asyncio
+async def test_stale_aup_version_still_requires_current_acceptance(saas_client) -> None:
+    client, store, user_ref, _tmp = saas_client
+    user_ref["value"] = "u-versioned"
+    _create_user(store, "u-versioned")
+
+    stale = await client.post("/api/saas/aup/accept", json={"aup_version": "2026-01-01-v0"})
+    assert stale.status_code == 200
+    stale_body = stale.json()
+    assert stale_body["aup_version_accepted"] == "2026-01-01-v0"
+    assert stale_body["requires_acceptance"] is True
+
+    status = await client.get("/api/saas/aup/status")
+    assert status.status_code == 200
+    assert status.json()["aup_version_accepted"] == "2026-01-01-v0"
+    assert status.json()["requires_acceptance"] is True
+
+    current = await client.post("/api/saas/aup/accept", json={"aup_version": CURRENT_AUP_VERSION})
+    assert current.status_code == 200
+    current_body = current.json()
+    assert current_body["aup_version_accepted"] == CURRENT_AUP_VERSION
+    assert current_body["requires_acceptance"] is False
+
+    refreshed = store.get_user("u-versioned")
+    assert refreshed is not None
+    assert refreshed.aup_version_accepted == CURRENT_AUP_VERSION
 
 
 # ─── Audit log emission ─────────────────────────────────────────────

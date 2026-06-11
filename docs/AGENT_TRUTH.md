@@ -335,8 +335,55 @@ faulty denylist cannot break the scraper.
 1. **Full SaaS signup/login flow** — email verification, password reset, OAuth providers
 2. **Billing provider integration** — Stripe/Paddle in test mode, subscription lifecycle, webhooks
 3. **Staging operations proof** — deployment, TLS, secrets, backups, restore drill, monitoring, alerting, load tests, incident runbooks
-4. **Full metering coverage** — page fetches, browser minutes, scheduled jobs, worker-side execution
+4. **Remaining metering coverage** — retries/worker edge cases, billing-provider reconciliation, and any non-job diagnostic browser usage
 5. **Benchmark corpus** — 50-100 static HTML fixtures, precision/recall/F1 metrics, CI regression gates
 6. **P2 coverage gaps** — notifications (0%), env parsing (0%), rate-limit boundaries, scraper failure modes
 7. **P2-QUEUE-001** — durable job state, worker idempotency, stuck-job detection
 8. **P2-DEPS-001** — split dependencies into core/browser/postgres/experimental/research/dev extras
+
+## Refresh — 2026-06-11 (Codex sweep: metering, sessions, AUP versioning)
+
+### Fixed in this sweep
+
+- **Page-fetch quota preflight** — `app.services.scraping._record_page_fetch` now returns an allow/deny decision. `run_scraping_phase` records the page-fetch usage before the expensive scrape call and skips the URL when `PAGE_FETCHED` quota is exhausted. Ledger infrastructure failures still fail open; quota exhaustion fails closed for that URL.
+- **Revocable sessions** — session cookies now include a signed server-side session id stored in an ignored SQLite `session.db`. Verification requires an active, unexpired, unrevoked row. `DELETE /api/session` revokes the current server-side session before clearing the browser cookie, so replaying the old cookie no longer authenticates.
+- **AUP version persistence** — SaaS users now persist `aup_version_accepted`. Status no longer assumes any acceptance timestamp equals the current AUP version; accepting a stale version keeps `requires_acceptance=true` until the current version is accepted.
+- **Additional usage metering** — `JOB_COMPLETED` is recorded idempotently during finalization, and `AI_STRUCTURING` is recorded when the global AI-structuring phase actually runs. Existing API request, job creation, page fetch, and export metering remain covered.
+
+### Tests and validation
+
+- `pytest backend/tests/test_p0_billing_usage.py -q -o addopts=` — **22 passed**.
+- `pytest backend/tests/test_session_auth.py backend/tests/test_p0_auth_tenant.py -q -o addopts=` — **30 passed**.
+- `pytest backend/tests/test_saas_identity.py backend/tests/test_p1_compliance_aup.py -q -o addopts=` — **28 passed**.
+- Touched-file `ruff`, `mypy`, and `pyflakes` — pass.
+- `bash scripts/run_validation.sh --full --skip-postgres` — **All checks passed**: compileall, architecture validator, research boundary, dependency bounds, URL safety smoke, P0 auth/tenant, P0 billing, full backend pytest, ruff, mypy, pyflakes, bandit, pip-audit, npm lint, and npm tests. Summary log: `artifacts/validation/codex_final_run_validation_full_skip_postgres_2026-06-11.log`.
+
+### Still unproven / remaining
+
+- External billing-provider integration, subscription lifecycle, and webhook handling are still not implemented/proven.
+- Browser-minute and scheduled-job metering are wired for the normal job/queue path as of the 2026-06-12 local refresh below.
+- Staging deployment, TLS, secrets, backups, restore drill, monitoring, alerting, load tests, and incident runbooks remain unproven in a target environment.
+
+## Refresh — 2026-06-12 local / 2026-06-11 UTC logs (metering, docs drift, safety scan)
+
+### Fixed in this sweep
+
+- **Scheduled-job metering** — `WorkerQueue.enqueue` and the shared Postgres queue base now record `UsageType.SCHEDULED_JOB` before inserting attributed tasks. Quota exhaustion raises and `POST /api/jobs` returns `429` in worker mode without leaving a queued task behind.
+- **Browser-minute metering** — Playwright fetches now record `UsageType.BROWSER_MINUTE` with job/user/org/project context passed through `run_scraping_phase -> scrape_url_with_recovery -> scrape_url_attempt -> scrape_url -> fetch_page_content`. Quota exhaustion falls back to the safe HTTP path instead of launching a browser.
+- **Docs drift fixed** — `docs/API.md` now includes `/api/saas/aup/status` and `/api/saas/aup/accept`; `docs/ENV_VARIABLES.md` documents `DATAFORGE_JOB_STORE_PATH` and `DATAFORGE_DENYLIST_DB_PATH`; `scripts/docs_lint.py` now actually excludes the experimental section unless `--include-experimental` is passed.
+- **Safety scan cleanup** — removed the unsafe `use_captcha_solver` chaos-scenario recovery-action label and replaced it with `surface_authorized_access_required`.
+
+### Fresh validation evidence
+
+- `bash scripts/run_validation.sh --full` — **All checks passed**: compileall, architecture validator, research boundary, dependency bounds, URL safety smoke, P0 auth/tenant, P0 billing (`28` tests), full backend pytest, Docker-backed Postgres parity, ruff, mypy (`521` source files), pyflakes, bandit, pip-audit, npm lint, and npm tests. Summary log: `artifacts/validation/codex_2026-06-12_run_validation_full_final.log`.
+- `pytest backend/tests/test_p0_billing_usage.py backend/tests/test_api_worker_integration.py backend/tests/test_worker_queue.py backend/tests/test_worker_queue_postgres.py -q -o addopts= --tb=short` — **91 passed, 22 skipped**. Log: `artifacts/validation/codex_2026-06-12_metering_worker_targeted_final.log`.
+- `pytest backend/tests -m browser --run-browser -q -o addopts= --tb=short` — **17 passed**. Log: `artifacts/validation/codex_2026-06-12_browser_marked_tests.log`.
+- `python scripts/verify_docs_match_code.py` — pass. Log: `artifacts/validation/codex_2026-06-12_verify_docs_match_code_after_docs_fix.log`.
+- `python scripts/docs_lint.py` — pass, `50` stable routes matched. Log: `artifacts/validation/codex_2026-06-12_docs_lint_after_docs_fix.log`.
+- Safety scan for CAPTCHA solver/bypass strings across code/tests/docs/scripts — no matches after the patch.
+
+### Still unproven / remaining
+
+- External billing-provider integration, subscription lifecycle, provider reconciliation, and webhook handling are still not implemented/proven.
+- Staging deployment, TLS, secrets management, backups, restore drill, monitoring, alerting, load tests, and incident runbooks remain unproven in a target environment.
+- Non-job diagnostic/browser utilities may call browser fetches without usage attribution; the verified metering path is the normal job execution path.

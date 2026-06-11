@@ -23,6 +23,8 @@ class UsageType(Enum):
     JOB_CREATED = "job_created"
     JOB_COMPLETED = "job_completed"
     PAGE_FETCHED = "page_fetched"
+    BROWSER_MINUTE = "browser_minute"
+    SCHEDULED_JOB = "scheduled_job"
     AI_STRUCTURING = "ai_structuring"
     EXPORT_GENERATED = "export_generated"
     API_REQUEST = "api_request"

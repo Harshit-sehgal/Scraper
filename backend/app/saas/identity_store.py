@@ -24,6 +24,7 @@ import logging
 import sqlite3
 import threading
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,7 @@ def _row_to_user(row: sqlite3.Row | dict) -> User:
             "created_at": row["created_at"] or "",
             "email_verified_at": row["email_verified_at"] or None,
             "aup_accepted_at": row["aup_accepted_at"] or None,
+            "aup_version_accepted": row["aup_version_accepted"] or None,
         },
     )
 
@@ -151,7 +153,12 @@ class IdentityStore(ABC):
     def set_user_status(self, user_id: str, status: UserStatus) -> User | None: ...
 
     @abstractmethod
-    def mark_aup_accepted(self, user_id: str, accepted_at: str | None = None) -> User | None: ...
+    def mark_aup_accepted(
+        self,
+        user_id: str,
+        accepted_at: str | None = None,
+        aup_version: str | None = None,
+    ) -> User | None: ...
 
     @abstractmethod
     def create_organization(self, org: Organization) -> Organization: ...
@@ -266,7 +273,8 @@ class SQLiteIdentityStore(IdentityStore):
                     password_hash TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL DEFAULT '',
                     email_verified_at TEXT DEFAULT NULL,
-                    aup_accepted_at TEXT DEFAULT NULL
+                    aup_accepted_at TEXT DEFAULT NULL,
+                    aup_version_accepted TEXT DEFAULT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
@@ -318,6 +326,8 @@ class SQLiteIdentityStore(IdentityStore):
                     ON api_keys(project_id, revoked_at);
                 """,
             )
+            with suppress(sqlite3.OperationalError):
+                conn.execute("ALTER TABLE users ADD COLUMN aup_version_accepted TEXT DEFAULT NULL")
             conn.commit()
         self._initialized = True
 
@@ -330,8 +340,8 @@ class SQLiteIdentityStore(IdentityStore):
                     """
                     INSERT INTO users
                         (id, email, display_name, status, password_hash,
-                         created_at, email_verified_at, aup_accepted_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                         created_at, email_verified_at, aup_accepted_at, aup_version_accepted)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user.id,
@@ -342,6 +352,7 @@ class SQLiteIdentityStore(IdentityStore):
                         user.created_at or _now_iso(),
                         user.email_verified_at,
                         user.aup_accepted_at,
+                        user.aup_version_accepted,
                     ),
                 )
                 conn.commit()
@@ -376,28 +387,42 @@ class SQLiteIdentityStore(IdentityStore):
             conn.commit()
         return self.get_user(user_id)
 
-    def mark_aup_accepted(self, user_id: str, accepted_at: str | None = None) -> User | None:
+    def mark_aup_accepted(
+        self,
+        user_id: str,
+        accepted_at: str | None = None,
+        aup_version: str | None = None,
+    ) -> User | None:
         """Record that *user_id* accepted the Acceptable Use Policy.
 
-        ``accepted_at`` defaults to "now" in UTC ISO format. Idempotent:
-        re-accepting just refreshes the timestamp; the value never goes
-        backwards (we keep the first acceptance timestamp).
+        ``accepted_at`` defaults to "now" in UTC ISO format. Re-accepting
+        the same AUP version keeps the first timestamp. Accepting a new
+        AUP version updates both the version and acceptance timestamp.
 
         Returns the updated user, or ``None`` if no such user exists.
         """
         if not user_id:
             return None
         new_ts = (accepted_at or _now_iso()).strip() or _now_iso()
+        version = (aup_version or "").strip()
         with self._lock, self._connect() as conn:
-            # Keep the earliest acceptance timestamp (idempotent
-            # re-acceptance does not reset the clock).
             conn.execute(
                 """
                 UPDATE users
-                SET aup_accepted_at = COALESCE(aup_accepted_at, ?)
+                SET
+                    aup_accepted_at = CASE
+                        WHEN aup_accepted_at IS NULL OR COALESCE(aup_version_accepted, '') != ?
+                        THEN ?
+                        ELSE aup_accepted_at
+                    END,
+                    aup_version_accepted = CASE
+                        WHEN COALESCE(aup_version_accepted, '') != ?
+                        THEN ?
+                        ELSE aup_version_accepted
+                    END
                 WHERE id = ?
                 """,
-                (new_ts, user_id),
+                (version, new_ts, version, version, user_id),
             )
             conn.commit()
         return self.get_user(user_id)
