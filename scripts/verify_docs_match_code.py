@@ -98,6 +98,7 @@ def verify_routes() -> tuple[bool, list[str]]:
         "GET /docs/oauth2-redirect",
         "GET /redoc",
         "GET /openapi.json",
+        "GET /metrics",  # Prometheus metrics endpoint (not a user-facing API route)
     }
     missing_in_docs = (code_routes - doc_routes) - ignored_routes
     if missing_in_docs:
@@ -146,10 +147,17 @@ def verify_env_vars() -> tuple[bool, list[str]]:
     code_vars = get_env_vars_from_code()
     doc_vars = get_env_vars_from_docs()
 
+    # Known false positives: template patterns and wildcard prefixes that
+    # the regex picks up but aren't real env var names.
+    ignored_env_vars = {
+        "DATAFORGE_METRICS_TOKEN__",  # Prometheus template delimiter (real var is DATAFORGE_METRICS_TOKEN)
+        "DATAFORGE_TELEGRAM_",  # Wildcard prefix in comments (real vars are DATAFORGE_TELEGRAM_BOT_TOKEN etc.)
+    }
+
     issues = []
 
     # Variables in code but not in docs
-    missing_in_docs = code_vars - doc_vars
+    missing_in_docs = (code_vars - doc_vars) - ignored_env_vars
     if missing_in_docs:
         issues.append("Environment variables in code but not in docs:")
         for var in sorted(missing_in_docs):

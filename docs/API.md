@@ -92,6 +92,10 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 
 ## Batch Export
 
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| POST | `/api/exports/batch` | Operator or admin |
+
 `POST /api/exports/batch` — Export results from multiple jobs in a single request. Operator or admin.
 
 | Property | Type | Default | Description |
