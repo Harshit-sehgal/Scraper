@@ -1,10 +1,27 @@
 import time
 
+import pytest
 from app.rate_limiter import (
     DatabaseSlidingWindowCounter,
     RateLimiterMiddleware,
     SlidingWindowCounter,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolate_db(tmp_path, monkeypatch) -> None:
+    """Isolate the SQLite database for each test to prevent concurrency issues."""
+    from app import job_store
+    from app.config import settings
+
+    db_path = tmp_path / "rate_limit_test.db"
+    state_file = tmp_path / "rate_limit_test.json"
+
+    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(state_file))
+    monkeypatch.setattr(settings, "STATE_FILE_PATH", str(state_file))
+    monkeypatch.setattr(job_store, "_get_db_path", lambda: db_path)
+
+    job_store._MIGRATIONS_RUN_FOR.discard(db_path)
 
 
 def _cleanup_rate_limit_key(key: str) -> None:
