@@ -215,7 +215,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
 
         await get_browser_pool().close()
         logger.info("Browser pool closed successfully")
-    except Exception as e:
+    except (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError) as e:
         logger.warning("Failed to close browser pool during shutdown: %s", e)
 
     # Close Telegram notifier HTTP client to prevent leaked sockets
@@ -226,7 +226,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
         if _notifier is not None:
             await _notifier.close()
             logger.info("Telegram notifier closed successfully")
-    except Exception as e:
+    except (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError) as e:
         logger.warning("Failed to close Telegram notifier during shutdown: %s", e)
 
     # Shut down background log-persistence executor
@@ -235,7 +235,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
 
         shutdown_log_persist_executor()
         logger.info("Log persistence executor shut down")
-    except Exception as e:
+    except (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError) as e:
         logger.warning("Failed to shut down log persistence executor: %s", e)
 
 
