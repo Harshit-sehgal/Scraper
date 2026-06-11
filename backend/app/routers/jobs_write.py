@@ -140,6 +140,17 @@ def register_jobs_write_routes(
     ):
         # Extract user identity for data isolation
         _role, user_id = get_current_user(request)
+        # P0-SAAS-001: also pull org/project from the resolved AuthContext
+        # so jobs created with persistent API keys carry tenant ownership.
+        try:
+            from app.utils.rbac import resolve_auth_context
+
+            _ctx = resolve_auth_context(request, allow_cookie=True)
+            _owner_org_id = _ctx.org_id
+            _owner_project_id = _ctx.project_id
+        except Exception:
+            _owner_org_id = ""
+            _owner_project_id = ""
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -221,6 +232,8 @@ def register_jobs_write_routes(
             deduplicate_field=job_data.deduplicate_field,
             min_record_score=job_data.min_record_score,
             created_by=user_id,
+            org_id=_owner_org_id,
+            project_id=_owner_project_id,
         )
         try:
             get_usage_ledger().record_usage(
@@ -229,6 +242,8 @@ def register_jobs_write_routes(
                 quantity=1,
                 metadata={"job_id": job.id},
                 idempotency_key=idem_key or f"job-created:{job.id}",
+                org_id=_owner_org_id,
+                project_id=_owner_project_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=429, detail=str(exc)) from exc

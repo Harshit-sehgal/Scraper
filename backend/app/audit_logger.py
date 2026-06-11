@@ -129,6 +129,9 @@ def log_auth_event(
     resource: str = "",
     outcome: str = "success",
     details: dict[str, Any] | None = None,
+    *,
+    org_id: str = "",
+    project_id: str = "",
 ) -> None:
     """Log an authentication-related event.
 
@@ -138,15 +141,22 @@ def log_auth_event(
         resource: Optional resource being accessed
         outcome: "success" or "failure"
         details: Optional additional context
+        org_id: P0-SAAS-001 tenant attribution (written into ``details["org_id"]``)
+        project_id: P0-SAAS-001 project attribution (written into ``details["project_id"]``)
 
     """
+    merged_details: dict[str, Any] = dict(details or {})
+    if org_id:
+        merged_details.setdefault("org_id", org_id)
+    if project_id:
+        merged_details.setdefault("project_id", project_id)
     event = AuditEvent(
         event_type="auth",
         actor=actor,
         action=action,
         resource=resource,
         outcome=outcome,
-        details=details,
+        details=merged_details,
     )
     _get_audit_logger().info(event.to_log_line())
 
@@ -212,6 +222,10 @@ def log_data_access(
     action: str,
     resource: str,
     details: dict[str, Any] | None = None,
+    outcome: str = "success",
+    *,
+    org_id: str = "",
+    project_id: str = "",
 ) -> None:
     """Log a data access event (exports, sensitive reads).
 
@@ -220,15 +234,23 @@ def log_data_access(
         action: The access action (e.g. "export_csv", "export_json")
         resource: The resource being accessed
         details: Optional additional context
+        outcome: The outcome of the access (success or failure)
+        org_id: P0-SAAS-001 tenant attribution
+        project_id: P0-SAAS-001 project attribution
 
     """
+    merged_details: dict[str, Any] = dict(details or {})
+    if org_id:
+        merged_details.setdefault("org_id", org_id)
+    if project_id:
+        merged_details.setdefault("project_id", project_id)
     event = AuditEvent(
         event_type="data_access",
         actor=actor,
         action=action,
         resource=resource,
-        outcome="success",
-        details=details,
+        outcome=outcome,
+        details=merged_details,
     )
     _get_audit_logger().info(event.to_log_line())
 
@@ -239,6 +261,9 @@ def log_job_event(
     job_id: str,
     outcome: str = "success",
     details: dict[str, Any] | None = None,
+    *,
+    org_id: str = "",
+    project_id: str = "",
 ) -> None:
     """Log a job lifecycle event.
 
@@ -248,15 +273,22 @@ def log_job_event(
         job_id: The job ID
         outcome: "success" or "failure"
         details: Optional additional context
+        org_id: P0-SAAS-001 tenant attribution
+        project_id: P0-SAAS-001 project attribution
 
     """
+    merged_details: dict[str, Any] = dict(details or {})
+    if org_id:
+        merged_details.setdefault("org_id", org_id)
+    if project_id:
+        merged_details.setdefault("project_id", project_id)
     event = AuditEvent(
         event_type="job",
         actor=actor,
         action=action,
         resource=f"job:{job_id}",
         outcome=outcome,
-        details=details,
+        details=merged_details,
     )
     _get_audit_logger().info(event.to_log_line())
 

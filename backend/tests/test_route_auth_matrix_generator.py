@@ -93,6 +93,7 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
         ("POST", "/api/system/csp-violations"),  # browser CSP report, no key
         ("POST", "/api/session"),  # self-service auth — any authenticated user can create a session
         ("DELETE", "/api/session"),  # self-service auth — any authenticated user can clear their session
+        ("POST", "/api/saas/aup/accept"),  # P1-COMPLIANCE-001: AUP acceptance (idempotent, any authenticated user)
     }
 
     unsafe = [

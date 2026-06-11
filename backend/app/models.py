@@ -305,6 +305,8 @@ class Job(BaseModel):
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_by: str = Field(default="", description="Owner identity (user ID or API key fingerprint) for data isolation")
+    org_id: str = Field(default="", description="Tenant org id; populated for persistent API keys (P0-SAAS-001)")
+    project_id: str = Field(default="", description="Project id; populated for persistent API keys (P0-SAAS-001)")
     created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
     started_at: str | None = None
     completed_at: str | None = None

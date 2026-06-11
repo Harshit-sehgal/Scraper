@@ -30,7 +30,7 @@ from app.models import Job, JobStatus, SourcePolicy
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 7
+_CURRENT_SCHEMA_VERSION = 8
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -171,6 +171,8 @@ def _job_to_row(job: Job) -> dict[str, Any]:
         "results_on_disk": 1 if job.results_on_disk else 0,
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
         "created_by": job.created_by or "",
+        "org_id": job.org_id or "",
+        "project_id": job.project_id or "",
     }
 
 
@@ -228,6 +230,8 @@ def _row_to_job(row: dict[str, Any]) -> Job | None:
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
                 "created_by": row.get("created_by", ""),
+                "org_id": row.get("org_id", "") or "",
+                "project_id": row.get("project_id", "") or "",
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -582,6 +586,22 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     conn.execute(f"ALTER TABLE {table_name} ADD COLUMN created_by TEXT DEFAULT ''")
             current = 7
 
+        if current < 8:
+            # v8: SaaS identity columns for P0-SAAS-001. Persistent API
+            # keys (issued by app.saas.ApiKeyService) bind jobs to an
+            # org and a project; the legacy ``created_by`` fingerprint
+            # remains for env-backed API keys. The index is conditional
+            # on the table having the column to keep this safe to run
+            # on partially-migrated dev databases.
+            for table_name in ["jobs", "recycle_bin"]:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                v8_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+                if "org_id" not in v8_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN org_id TEXT DEFAULT ''")
+                if "project_id" not in v8_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN project_id TEXT DEFAULT ''")
+            current = 8
+
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
         conn.commit()
@@ -599,6 +619,12 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)",
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_org_id ON jobs(org_id)",
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id)",
     )
 
 

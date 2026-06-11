@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-11 15:16:34 UTC
+**Generated:** 2026-06-11 17:20:43 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -94,7 +94,9 @@ For the diff between stable and experimental, see
 
 | Method | Path |
 | --- | --- |
+| DELETE | `/api/operator/denylist` |
 | GET | `/api/operator/dashboard` |
+| GET | `/api/operator/denylist` |
 | GET | `/api/operator/health` |
 | GET | `/api/operator/mode` |
 | GET | `/api/operator/predictions` |
@@ -115,6 +117,7 @@ For the diff between stable and experimental, see
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
 | GET | `/api/system/topology` |
+| POST | `/api/operator/denylist` |
 | POST | `/api/operator/mode` |
 | POST | `/api/system/csp-violations` |
 | POST | `/api/system/merge/knowledge` |
@@ -135,4 +138,11 @@ For the diff between stable and experimental, see
 | --- | --- |
 | POST | `/api/exports/batch` |
 
-**Total routes:** 80
+## Other
+
+| Method | Path |
+| --- | --- |
+| GET | `/api/saas/aup/status` |
+| POST | `/api/saas/aup/accept` |
+
+**Total routes:** 85

@@ -7,6 +7,22 @@ import time
 from pathlib import Path
 from types import ModuleType
 
+# Setup test environment variables first, before importing any app modules.
+ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = ROOT / "backend"
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
+os.environ["DATAFORGE_ENV"] = "development"
+os.environ["DATAFORGE_ALLOW_INSECURE_DEV_AUTH"] = "true"
+os.environ["DATAFORGE_API_KEY"] = ""
+os.environ["DATAFORGE_ADMIN_API_KEY"] = ""
+os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
+os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
+os.environ.pop("DATAFORGE_DATABASE_URL", None)
+os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
+
 import httpx
 import pytest
 from app.models import FieldType, SchemaField
@@ -229,29 +245,6 @@ def pytest_runtest_logreport(report) -> None:
         if stats is not None:
             stats["passed"] += 1
 
-
-ROOT = Path(__file__).resolve().parents[2]
-BACKEND_ROOT = ROOT / "backend"
-if str(BACKEND_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_ROOT))
-
-# Keep test state isolated from developer runtime state.
-os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
-
-# Set development environment and disable API key validation for tests
-os.environ["DATAFORGE_ENV"] = "development"
-os.environ["DATAFORGE_ALLOW_INSECURE_DEV_AUTH"] = "true"
-os.environ["DATAFORGE_API_KEY"] = ""
-os.environ["DATAFORGE_ADMIN_API_KEY"] = ""
-os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
-# Force SQLite for tests to avoid Postgres env bleed from .env
-os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
-os.environ.pop("DATAFORGE_DATABASE_URL", None)
-# Enable experimental routes for the default test client. Production-mode
-# gate tests (test_research_leak_tracking, test_main_routes_gate,
-# test_experimental_gate) explicitly set this to "false" and re-import
-# app.main to verify the gate holds.
-os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
 
 main_mod: ModuleType | None = None
 try:

@@ -191,6 +191,23 @@ def validate_public_http_url(url: str) -> None:
             _record_ssrf_reject("internal_tld")
             raise ValueError(msg)
 
+    # 6. Reject admin denylisted domains (P1-COMPLIANCE-001).  Consulted
+    #    AFTER the SSRF / internal-TLD checks so a denylisted domain is
+    #    still rejected for the right reason if it also happens to be
+    #    loopback/internal.  Best-effort: a broken denylist subsystem
+    #    must NEVER turn a safe URL into a 5xx; we log and proceed.
+    try:
+        from app.admin_denylist import validate_against_denylist
+
+        validate_against_denylist(url)
+    except ImportError:
+        logger.debug("Admin denylist module not available; skipping denylist check")
+    except ValueError:
+        _record_ssrf_reject("admin_denylisted")
+        raise
+    except Exception as e:
+        logger.debug("Admin denylist check failed (non-fatal): %s", e)
+
     # Design note: DNS-based SSRF protection is handled by the transport
     # layer which resolves DNS asynchronously via loop.getaddrinfo().
     # We intentionally do NOT resolve DNS here to avoid blocking the

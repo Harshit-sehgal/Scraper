@@ -268,9 +268,9 @@ def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db) -> 
     conn.row_factory = sqlite3.Row
     _run_migrations(conn)
 
-    # Verify schema_version is now 7 (v7 adds created_by column)
+    # Verify schema_version is now 8 (v8 adds org_id/project_id columns)
     ver_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-    assert ver_row[0] == 7, f"Expected schema version 7, got {ver_row[0]}"
+    assert ver_row[0] == 8, f"Expected schema version 8, got {ver_row[0]}"
 
     # Verify worker_heartbeats has composite PK (worker_id, pid)
     table_info = conn.execute("PRAGMA table_info(worker_heartbeats)").fetchall()

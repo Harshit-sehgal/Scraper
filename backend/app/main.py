@@ -44,6 +44,7 @@ from app.routers.operator import router as operator_router
 from app.routers.scraper import router as scraper_router
 from app.routers.session import router as session_router
 from app.routers.system import router as system_router
+from app.saas.router import router as saas_router
 from app.services.job_runner import run_job
 from app.storage_interface import get_job_repository
 
@@ -141,6 +142,7 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(create_exports_router(jobs_store=jobs_store))
     app.include_router(scraper_router)
     app.include_router(operator_router)
+    app.include_router(saas_router)
     app.include_router(system_router)
     app.include_router(health_router)
     app.include_router(session_router)
