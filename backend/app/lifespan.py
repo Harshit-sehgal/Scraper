@@ -22,6 +22,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Exceptions that cleanup/shutdown handlers should tolerate rather than
+# allowing to propagate. This covers the most likely operational errors
+# (missing modules, OS issues, bad state) without masking programming
+# errors like NameError or SyntaxError.
+_SHUTDOWN_EXCEPTIONS = (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError)
+
 # Repository is resolved lazily inside lifespan()
 job_repo = None
 gossip = None
@@ -215,7 +221,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
 
         await get_browser_pool().close()
         logger.info("Browser pool closed successfully")
-    except (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError) as e:
+    except _SHUTDOWN_EXCEPTIONS as e:
         logger.warning("Failed to close browser pool during shutdown: %s", e)
 
     # Close Telegram notifier HTTP client to prevent leaked sockets
@@ -226,7 +232,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
         if _notifier is not None:
             await _notifier.close()
             logger.info("Telegram notifier closed successfully")
-    except (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError) as e:
+    except _SHUTDOWN_EXCEPTIONS as e:
         logger.warning("Failed to close Telegram notifier during shutdown: %s", e)
 
     # Shut down background log-persistence executor
@@ -235,7 +241,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
 
         shutdown_log_persist_executor()
         logger.info("Log persistence executor shut down")
-    except (RuntimeError, OSError, ImportError, AttributeError, TypeError, ValueError) as e:
+    except _SHUTDOWN_EXCEPTIONS as e:
         logger.warning("Failed to shut down log persistence executor: %s", e)
 
 
@@ -248,7 +254,7 @@ def schedule_background_task(coro):
             t.result()
         except asyncio.CancelledError:
             pass
-        except Exception:
+        except _SHUTDOWN_EXCEPTIONS:
             logger.exception("Background task failed")
 
     task.add_done_callback(_handle_task_result)

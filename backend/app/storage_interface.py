@@ -289,7 +289,7 @@ class JobRepository(ABC):
             msg,
         )
 
-    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, object]:
         """Return health info for a specific worker.
 
         Returns a dict with:
@@ -307,7 +307,7 @@ class JobRepository(ABC):
             msg,
         )
 
-    def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict]:
+    def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict[str, object]]:
         """Return health info for all registered workers.
 
         Returns a list of dicts, each with the same shape as
@@ -379,12 +379,12 @@ class SQLiteJobRepository(JobRepository):
 
         _record_hb(worker_id, hostname, pid)
 
-    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
+    def get_worker_health(self, worker_id: str, ttl_seconds: int = 60) -> dict[str, object]:
         from app.job_store import get_worker_health as _get_health
 
         return _get_health(worker_id, ttl_seconds=ttl_seconds)
 
-    def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict]:
+    def get_all_worker_healths(self, ttl_seconds: int = 60) -> list[dict[str, object]]:
         from app.job_store import get_all_worker_healths as _get_all
 
         return _get_all(ttl_seconds=ttl_seconds)
