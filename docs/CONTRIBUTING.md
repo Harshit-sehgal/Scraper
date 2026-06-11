@@ -47,8 +47,8 @@ source .venv/bin/activate  # Linux/Mac
 
 ```bash
 # Backend dependencies
-pip install -r backend/requirements.txt
-pip install -r backend/requirements-dev.txt
+pip install .
+pip install -e ".[dev]"
 
 # Frontend dependencies
 npm install

@@ -19,8 +19,8 @@ cd dataforge-scraper
 # Install Python dependencies
 python -m venv .venv
 source .venv/bin/activate
-pip install -r backend/requirements.txt
-pip install -r backend/requirements-dev.txt
+pip install .
+pip install -e ".[dev]"
 
 # Install Playwright browsers
 playwright install chromium
