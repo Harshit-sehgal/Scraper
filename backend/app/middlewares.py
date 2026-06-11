@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import secrets
 import time
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from fastapi.responses import JSONResponse
@@ -253,8 +254,6 @@ async def csp_report_only_middleware(request: Request, call_next):
         return await call_next(request)
 
     response = await call_next(request)
-    from contextlib import suppress
-
     with suppress(AttributeError, TypeError, ValueError):
         response.headers.setdefault(
             "Content-Security-Policy-Report-Only",

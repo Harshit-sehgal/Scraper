@@ -405,7 +405,7 @@ class SQLiteJobRepository(JobRepository):
             from app.job_store import _CURRENT_SCHEMA_VERSION, get_storage_health
 
             return get_storage_health()
-        except Exception as exc:
+        except (OSError, RuntimeError, ImportError, ValueError, AttributeError, TypeError) as exc:
             return {
                 "ok": False,
                 "backend": "sqlite",
