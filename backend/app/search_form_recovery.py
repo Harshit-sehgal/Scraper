@@ -412,7 +412,7 @@ async def _try_form_search_recovery(
             "form_info": form_info,
             "error": "Search form submission timed out after 30 seconds",
         }
-    except Exception:  # nosec B110
+    except Exception:
         logger.exception("Search form submission failed unexpectedly")
         return {
             "success": False,

@@ -93,7 +93,7 @@ async def body_size_middleware(request: Request, call_next):
                     content={"detail": "Request body too large (max 5MB)"},
                 )
         except (ValueError, TypeError):
-            pass  # nosec B110 — unparseable CL falls through to streaming check
+            pass
 
     chunks: list[bytes] = []
     bytes_received = 0

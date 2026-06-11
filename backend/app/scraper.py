@@ -263,7 +263,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     redact_url(url),
                 )
         except Exception:  # nosec B110  # noqa: RUF100, S110
-            pass  # nosec B110
+            pass
     return None
 
 
@@ -655,7 +655,7 @@ async def scrape_url(
             record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
         else:
             record_anti_bot_classification("ok")
-    except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError):  # nosec B110
+    except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError):
         pass
 
     soup_for_density = BeautifulSoup(html, "html.parser")

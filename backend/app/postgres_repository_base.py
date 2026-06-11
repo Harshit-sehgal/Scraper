@@ -243,7 +243,7 @@ def sync_job_events(conn, job_id: str, logs) -> None:
         if hasattr(entry, "model_dump"):
             try:
                 entry_dict = entry.model_dump()
-            except Exception:  # nosec B110
+            except Exception:
                 entry_dict = {"timestamp": "", "level": "info", "message": str(entry)}
         elif isinstance(entry, dict):
             entry_dict = entry
@@ -272,13 +272,13 @@ def ensure_required_tables(conn) -> None:
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:  # nosec B110
+        except Exception:
             logger.debug("ALTER TABLE jobs ADD COLUMN %s failed (ignored)", col_def)
     execute(conn, build_create_recycle_bin_sql())
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:  # nosec B110
+        except Exception:
             logger.debug("ALTER TABLE recycle_bin ADD COLUMN %s failed (ignored)", col_def)
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -287,7 +287,7 @@ def ensure_required_tables(conn) -> None:
     ]:
         try:
             execute(conn, idx_sql)
-        except Exception:  # nosec B110
+        except Exception:
             logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
 
 
@@ -345,7 +345,7 @@ def _migrate_worker_heartbeats_v6(conn) -> None:
                 """,
             )
             cur.execute("DROP TABLE worker_heartbeats_v5_backup")
-        except Exception:  # nosec B110
+        except Exception:
             cur.execute("ROLLBACK TO SAVEPOINT migrate_wh_v6")
             logger.exception(
                 "worker_heartbeats v5→v6 migration failed; the table is "
@@ -639,7 +639,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql)
-        except Exception:  # nosec B110
+        except Exception:
             logger.exception("count_jobs_by_status failed")
             return {}
         return {str(row["status"]): int(row["cnt"]) for row in rows}
@@ -869,7 +869,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
-        except Exception:  # nosec B110
+        except Exception:
             logger.exception("read_results failed for job %s", job_id)
             return []
         out: list[dict] = []
@@ -896,7 +896,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (job_id,),
                 )
             return int(row["cnt"]) if row else 0
-        except Exception:  # nosec B110
+        except Exception:
             logger.exception("count_results failed for job %s", job_id)
             return 0
 
@@ -914,7 +914,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, tuple(params))
-        except Exception:  # nosec B110
+        except Exception:
             logger.exception("read_events failed for job %s", job_id)
             return []
         return [
@@ -989,7 +989,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (f"{int(older_than_days)} days",),
                 )
                 return int(cur.rowcount) if cur.rowcount else 0
-        except Exception:  # nosec B110
+        except Exception:
             logger.exception("prune_idempotency_keys failed")
             return 0
 
@@ -1217,7 +1217,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "job_count": job_count or 0,
                     "recycle_bin_count": recycle_count or 0,
                 }
-        except Exception as e:  # nosec B110
+        except Exception as e:
             logger.exception("Postgres health check failed")
             return {
                 "ok": False,

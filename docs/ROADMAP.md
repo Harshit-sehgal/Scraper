@@ -306,7 +306,7 @@ after the deep-research remediation pass (2026-06).
 - **Status:** `docs/API.md` documents the batch export endpoint with format
   options, flatten modes, error codes, and a curl example — plus a new Rate
   Limiting section explaining the dual-layer tiers, response headers, safe IP
-  extraction, and DB-backed promotion. `.env.example` and `backend/.env.example`
+  extraction, and DB-backed promotion. `.env.example`
   include `RATE_LIMIT_GLOBAL`, `RATE_LIMIT_PER_IP`, `RATE_LIMIT_PER_IP_ENABLED`,
   and `RATE_LIMIT_DB_BACKED`. `docs/SETUP.md` has a new Rate Limiting section
   explaining defaults and production auto-promotion.

@@ -143,7 +143,7 @@ async def _call_openai_compatible_json(
                         await asyncio.sleep(float(retry_after))
                         continue
                     except (ValueError, TypeError):
-                        pass  # nosec B110
+                        pass
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
@@ -191,7 +191,7 @@ async def _call_openai_compatible_text(
                         await asyncio.sleep(float(retry_after))
                         continue
                     except (ValueError, TypeError):
-                        pass  # nosec B110
+                        pass
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:

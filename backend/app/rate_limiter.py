@@ -736,7 +736,7 @@ class RateLimiterMiddleware:
             response.headers["X-RateLimit-Limit"] = str(counter.max_requests)
             response.headers["X-RateLimit-Remaining"] = str(counter.remaining())
             response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
-        except (AttributeError, TypeError, ValueError):  # nosec B110
+        except (AttributeError, TypeError, ValueError):
             pass
 
     # ── Main middleware dispatch ───────────────────────────────────────

@@ -1170,4 +1170,4 @@ def reset_worker_queue() -> None:
 
         reset_postgres_worker_queue()
     except ImportError:
-        pass  # nosec B110
+        pass

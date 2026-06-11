@@ -247,7 +247,7 @@ def schedule_background_task(coro):
         try:
             t.result()
         except asyncio.CancelledError:
-            pass  # nosec B110
+            pass
         except Exception:
             logger.exception("Background task failed")
 

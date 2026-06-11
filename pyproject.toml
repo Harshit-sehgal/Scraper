@@ -206,7 +206,7 @@ where = ["backend"]
 # clean. `requirements_files` points deptry at pyproject.toml so the
 # canonical source of truth is used.
 [tool.deptry]
-exclude = ["scripts/*", ".pylint_venv/**", ".venv/**", "data/**", "logs/**"]
+exclude = ["scripts/*", "backend/benchmarks/*", ".pylint_venv/**", ".venv/**", "data/**", "logs/**"]
 requirements_files = ["pyproject.toml"]
 # DEP002 = unused-dependency: CLI-only dev tools (ruff, mypy, bandit,
 # pip-audit, pyflakes, pytest-*) are used via subprocess / entrypoints,

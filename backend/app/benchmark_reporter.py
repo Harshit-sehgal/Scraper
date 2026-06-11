@@ -82,7 +82,7 @@ class BenchmarkReporter:
         # Update the visual regression dashboard
         try:
             self.generate_dashboard()
-        except Exception:  # nosec B110
+        except Exception:
             logger.warning("[Reporter] Failed to update regression dashboard")
 
         return comparison

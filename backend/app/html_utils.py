@@ -621,7 +621,7 @@ async def fetch_page_content(
                 for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
             ):
                 is_antibot = True
-        except Exception:  # nosec B110
+        except Exception:
             # If detect_anti_bot itself fails, rely on keyword matching only
             is_antibot = any(
                 marker in err_msg

@@ -52,7 +52,7 @@ def _release_lock(fd) -> None:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
     except OSError:
-        pass  # nosec B110
+        pass
 
 
 def load_semantic_state() -> None:
