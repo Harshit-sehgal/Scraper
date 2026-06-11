@@ -375,7 +375,7 @@ class BrowserPool:
         logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")
         try:
             await self._hard_recycle()
-        except (Error, OSError, RuntimeError, ValueError):
+        except (Error, OSError, RuntimeError, ValueError, TypeError):
             logger.exception("[BrowserPool] Hard recycle failed")
         finally:
             async with self._lock:
@@ -386,7 +386,7 @@ class BrowserPool:
         for ctx in list(self._contexts.values()):
             try:
                 await ctx.close()
-            except (Error, OSError, RuntimeError, ValueError) as e:
+            except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                 logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
@@ -394,14 +394,14 @@ class BrowserPool:
         if self._browser:
             try:
                 await self._browser.close()
-            except (Error, OSError, RuntimeError, ValueError) as e:
+            except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                 logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
 
         if self._playwright:
             try:
                 await self._playwright.stop()
-            except (Error, OSError, RuntimeError, ValueError) as e:
+            except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                 logger.debug("[BrowserPool] Failed to stop playwright during hard recycle: %s", e)
             self._playwright = None
 

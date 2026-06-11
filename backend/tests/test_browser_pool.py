@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.browser_pool import BrowserPool, get_browser_pool
+from playwright.async_api import Error
 
 
 def _sync_mock_context() -> MagicMock:
@@ -326,7 +327,7 @@ class TestGetContext:
             patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
         ):
             mock_pw = AsyncMock()
-            mock_pw.chromium.launch.side_effect = Exception("Launch failed")
+            mock_pw.chromium.launch.side_effect = Error("Launch failed")
             # async_playwright() returns a manager whose .start() is awaitable
             mock_pw_manager = MagicMock()
             mock_pw_manager.start = AsyncMock(return_value=mock_pw)
@@ -379,7 +380,7 @@ class TestCheckHealth:
     async def test_returns_false_when_health_check_raises(self) -> None:
         pool = BrowserPool()
         mock_browser = _sync_browser_mock(is_connected=True)
-        mock_browser.new_context.side_effect = Exception("Connection error")
+        mock_browser.new_context.side_effect = Error("Connection error")
         pool._browser = mock_browser
 
         result = await pool.check_health()
@@ -417,7 +418,7 @@ class TestHardRecycle:
     async def test_handles_close_exceptions_gracefully(self) -> None:
         pool = BrowserPool()
         failing_ctx = _sync_mock_context()
-        failing_ctx.close.side_effect = Exception("Close failed")
+        failing_ctx.close.side_effect = Error("Close failed")
         pool._contexts["test"] = failing_ctx
         pool._browser = _sync_browser_mock(is_connected=True)
         pool._playwright = MagicMock()
@@ -603,7 +604,7 @@ class TestCloseWithCleanup:
     async def test_handles_playwright_stop_exception(self) -> None:
         pool = BrowserPool()
         mock_pw = AsyncMock()
-        mock_pw.stop.side_effect = Exception("Stop failed")
+        mock_pw.stop.side_effect = Error("Stop failed")
         pool._playwright = mock_pw
 
         await pool.close()  # Should not raise
