@@ -623,7 +623,7 @@ def verify_ssrf_self_check() -> dict[str, Any]:
             diag["reason"] = (
                 "Pool's _network_backend is not a SafeAsyncNetworkBackend "
                 f"({type(backend).__name__}). httpx/httpcore internals may "
-                "have changed; re-pin the supported versions in requirements.lock.txt."
+                "have changed; re-pin the supported versions in pyproject.toml."
             )
             return diag
 

@@ -44,7 +44,7 @@ The checker rejects placeholder API keys, placeholder database credentials, wild
 
 ## Dependency Note
 
-The Dockerfile installs Python packages from `backend/requirements.lock.txt`, not the loose `requirements.txt`. This supports reproducible dependency installation. The image builds locally, but it should still be built in CI and in the target deployment environment.
+The Dockerfile installs Python packages from `pyproject.toml` (the single source of truth for both production and dev dependencies). This supports reproducible dependency installation. The image builds locally, but it should still be built in CI and in the target deployment environment.
 
 ## Before Public Deployment
 

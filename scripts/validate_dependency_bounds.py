@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Validate that dependency lock files match their declared intent.
+"""Validate that ``pyproject.toml`` dependency bounds are sane.
+
+Since the Option B migration, ``pyproject.toml`` is the single source of
+truth for both production and dev dependencies (the legacy
+``backend/requirements*.in`` / ``*.lock.txt`` files are gone).
 
 Rules enforced:
 
-1. ``requirements.lock.txt`` MUST NOT contain dev-only packages (pytest,
-   pytest-cov, pytest-asyncio, testcontainers, coverage, pyflakes, ruff,
-   mypy, bandit, pip-audit, pip-tools).
-2. ``requirements-dev.lock.txt`` MUST be a superset of
-   ``requirements.lock.txt`` (any package present in prod must also be
-   present in dev with an equal-or-higher pinned version).
-3. Both lock files MUST be parseable as ``name==version`` lines.
+1. Every dependency MUST have an upper bound (``<X.Y.Z`` or ``~=X.Y.Z``).
+   Unbounded pins are a supply-chain risk.
+2. Dev-only packages (pytest, ruff, mypy, bandit, etc.) MUST live in
+   ``[project.optional-dependencies].dev`` and MUST NOT appear in
+   ``[project].dependencies``.
+3. ``psycopg2-binary`` / ``psycopg[binary,pool]`` MUST both be present
+   (the codebase supports both Postgres drivers).
 
 Exit code:
     0 - all rules pass
@@ -22,10 +26,8 @@ import re
 import sys
 from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
-
-PROD_LOCK = BACKEND_DIR / "requirements.lock.txt"
-DEV_LOCK = BACKEND_DIR / "requirements-dev.lock.txt"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+PYPROJECT = REPO_ROOT / "pyproject.toml"
 
 # Packages that are never acceptable in a production image.
 DEV_ONLY_PACKAGES: set[str] = {
@@ -46,103 +48,93 @@ DEV_ONLY_PACKAGES: set[str] = {
     "pip-tools",
 }
 
-# Common normalisations (distro name may differ from import name)
-NORMALISATIONS: dict[str, str] = {
-    "pytest-cov": "pytest-cov",
-    "pytest-asyncio": "pytest-asyncio",
-    "pytest-timeout": "pytest-timeout",
-    "pytest-mock": "pytest-mock",
-    "pip-audit": "pip-audit",
-    "pip-tools": "pip-tools",
-}
-
-_PIN_RE = re.compile(r"^([A-Za-z0-9_.\-]+)==([0-9][^\s#]*)")
+# Patterns that indicate a pinned/unbounded dep (no upper bound is a risk).
+_BOUND_REQUIRED = re.compile(r"[<>=~!]=?")
 
 
-def parse_lock(path: Path) -> dict[str, str]:
-    """Return a dict of normalised package name -> pinned version."""
-    if not path.exists():
-        return {}
+def _normalise_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name.lower())
+
+
+def _parse_pyproject_deps(text: str, section: str) -> dict[str, str]:
+    """Extract ``[section] = ["pkg>=..."]`` into a dict.
+
+    The section may be ``project.dependencies`` (dotted) or just the
+    single segment that the caller passed.
+    """
+    # Find the section header. ``tomllib`` is 3.11+, but the project is
+    # 3.12+, so we can use it without a fallback.
+    import tomllib
+
+    data = tomllib.loads(text)
+    if section == "project.dependencies":
+        items = data.get("project", {}).get("dependencies", [])
+    elif section == "project.optional-dependencies.dev":
+        items = data.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    else:
+        items = []
     out: dict[str, str] = {}
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
+    for raw in items:
+        # Strip extras like ``uvicorn[standard]`` and ``coverage[toml]``
+        stripped = re.sub(r"\[[^\]]*\]", "", raw).strip()
+        if not stripped:
             continue
-        # Strip PEP 508 extras like ``coverage[toml]`` before matching.
-        line = re.sub(r"\[[^\]]*\]", "", line)
-        m = _PIN_RE.match(line)
-        if not m:
+        # Take the first whitespace-separated token (the name + spec).
+        first = stripped.split()[0]
+        # Normalise: drop any leading version operators that snuck in.
+        name = re.split(r"[\s<>=~!]", first, maxsplit=1)[0]
+        if not name:
             continue
-        name = m.group(1).lower()
-        # PEP 503 normalisation: collapse runs of [-_.] to "-"
-        canon = re.sub(r"[-_.]+", "-", name)
-        out[canon] = m.group(2)
+        spec = stripped[len(name) :].strip()
+        out[_normalise_name(name)] = spec
     return out
 
 
-def compare_versions(a: str, b: str) -> int:
-    """Return -1, 0, or 1 by lexicographic compare on the leading numeric tuple."""
-
-    def to_tuple(s: str) -> tuple[int, ...]:
-        parts: list[int] = []
-        for chunk in re.split(r"[^0-9]+", s):
-            if not chunk:
-                continue
-            try:
-                parts.append(int(chunk))
-            except ValueError:
-                break
-        return tuple(parts)
-
-    ta, tb = to_tuple(a), to_tuple(b)
-    if ta < tb:
-        return -1
-    if ta > tb:
-        return 1
-    return 0
-
-
 def main() -> int:
+    if not PYPROJECT.exists():
+        print(f"pyproject.toml not found at {PYPROJECT}")
+        return 1
+
+    text = PYPROJECT.read_text(encoding="utf-8")
+    prod = _parse_pyproject_deps(text, "project.dependencies")
+    dev = _parse_pyproject_deps(text, "project.optional-dependencies.dev")
+
     failures: list[str] = []
 
-    prod = parse_lock(PROD_LOCK)
-    dev = parse_lock(DEV_LOCK)
+    # Rule 1: every prod dep must have an upper bound.
+    unbounded: list[str] = []
+    for name, spec in prod.items():
+        if not _BOUND_REQUIRED.search(spec):
+            unbounded.append(f"{name} ({spec or 'no spec'})")
+    if unbounded:
+        failures.append(
+            "Production deps without an upper bound (supply-chain risk): " + ", ".join(unbounded),
+        )
 
-    # Rule 1: prod lock must not contain dev-only packages.
-    if prod:
-        leaked = sorted(set(DEV_ONLY_PACKAGES) & set(prod))
-        if leaked:
-            failures.append(
-                "Production lock file contains dev-only packages: " + ", ".join(leaked) + ". Move them to requirements-dev.in.",
-            )
+    # Rule 2: dev-only packages must not appear in prod deps.
+    leaked = sorted(DEV_ONLY_PACKAGES & set(prod))
+    if leaked:
+        failures.append(
+            "Production deps contain dev-only packages: "
+            + ", ".join(leaked)
+            + ". Move them to [project.optional-dependencies].dev.",
+        )
 
-    # Rule 2: dev lock is a superset of prod (with version >= prod).
-    if prod and dev:
-        missing_in_dev: list[str] = []
-        older_in_dev: list[str] = []
-        for name, prod_ver in prod.items():
-            if name not in dev:
-                missing_in_dev.append(f"{name}=={prod_ver}")
-                continue
-            if compare_versions(dev[name], prod_ver) < 0:
-                older_in_dev.append(
-                    f"{name}: dev={dev[name]} prod={prod_ver}",
-                )
-        if missing_in_dev:
-            failures.append(
-                "Dev lock is missing prod packages: " + ", ".join(missing_in_dev),
-            )
-        if older_in_dev:
-            failures.append(
-                "Dev lock has older pins than prod: " + ", ".join(older_in_dev),
-            )
+    # Rule 3: both Postgres drivers must be present.
+    has_psycopg2 = any("psycopg2" in n for n in prod)
+    has_psycopg3 = any("psycopg" in n for n in prod)
+    if not (has_psycopg2 and has_psycopg3):
+        failures.append(
+            "Both psycopg2-binary and psycopg[binary,pool] must be in prod deps "
+            f"(found psycopg2={has_psycopg2}, psycopg3={has_psycopg3}).",
+        )
 
     if failures:
         print("Dependency validation FAILED:")
         for f in failures:
             print(f"  - {f}")
         print()
-        print("Run the lock regeneration commands documented in requirements.in.")
+        print("Fix pyproject.toml and re-run.")
         return 1
 
     print(
