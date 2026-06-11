@@ -62,15 +62,18 @@ after the deep-research remediation pass (2026-06).
 
 ### W4 — Dependency hygiene — done in this pass
 
-- **Status:** `requirements.txt` and `requirements-dev.txt` are single-line
-  `-r` wrappers pointing at the lock files. `requirements.lock.txt` and
-  `requirements-dev.lock.txt` are committed and CI-validated via
-  `validate_dependency_bounds.py`. All 9 GitHub workflows + `Dockerfile` +
-  `scripts/start.sh` install from the lock files. The wrapper contract is
-  pinned by `test_requirements_wrapper_contract.py` (7 tests).
-- **Next:** add Dependabot for the lock files (rebase-only, weekly).
-- **Done in this pass:** lockfile split, wrapper contract test, workflow /
-  docs alignment.
+- **Status:** `pyproject.toml` is the **single source of truth** for both
+  production and dev dependencies (PEP 621 standard). The legacy
+  `backend/requirements.in` / `requirements-dev.in` / `*.lock.txt` /
+  `*.txt` files have been removed. `validate_dependency_bounds.py`
+  enforces upper bounds on every dep and prevents dev-only packages
+  from leaking into the production image. All GitHub workflows +
+  `Dockerfile` + `scripts/start.sh` install from `pyproject.toml`
+  (e.g. `pip install .` for prod, `pip install -e ".[dev]"` for dev).
+- **Next:** add Dependabot for `pyproject.toml` (rebase-only, weekly).
+- **Done in this pass:** migration to `pyproject.toml`-only workflow,
+  bounds validator rewrite, workflow / docs alignment, removal of
+  legacy `requirements*.in`/`.lock.txt`/`.txt` files.
 
 ### W5 — CI hardening — done in this pass
 

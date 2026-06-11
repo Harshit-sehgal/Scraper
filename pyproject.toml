@@ -8,8 +8,11 @@ authors = [
 license = { text = "MIT" }
 requires-python = ">=3.12"
 # ─── Dependencies ──────────────────────────────────────────────────────────
-# MUST be kept in sync with backend/requirements.in.
-# Run: pip-compile --generate-hashes --output-file=requirements.lock.txt requirements.in
+# This file is the single source of truth for both production and dev
+# dependencies (PEP 621 standard). The legacy backend/requirements*.in and
+# *.lock.txt files have been removed. Production installs use
+# ``pip install .``; dev installs use ``pip install -e ".[dev]"``.
+# Bounds are validated by ``scripts/validate_dependency_bounds.py``.
 # =============================================================================
 dependencies = [
     "fastapi>=0.110.0,<1.0.0",
@@ -41,9 +44,9 @@ dependencies = [
 
 [project.optional-dependencies]
 # ─── Dev dependencies ────────────────────────────────────────────────────
-# MUST be kept in sync with backend/requirements-dev.in.
-# Run: pip-compile --generate-hashes --output-file=requirements-dev.lock.txt \
-#                  --extra=dev requirements.in
+# Installed with ``pip install -e ".[dev]"``. Dev-only packages MUST NOT
+# appear in the production ``[project].dependencies`` list; the
+# ``scripts/validate_dependency_bounds.py`` gate enforces this.
 dev = [
     "pytest>=8.0.0,<10.0.0",
     "pytest-asyncio>=0.23.0,<2.0.0",
@@ -57,8 +60,7 @@ dev = [
     "mypy>=1.0.0",
     "pyflakes>=3.2.0",
     "bandit>=1.7.0",
-    "pip-audit>=2.7.0",
-    "pip-tools>=7.4.0"
+    "pip-audit>=2.7.0"
 ]
 
 [tool.ruff]
@@ -199,19 +201,29 @@ where = ["backend"]
 
 # ─── Deptry ───────────────────────────────────────────────────────────────
 # `app` is the first-party package; scripts/ at the project root import from
-# it but deptry doesn't auto-detect this layout. Excluding `app` from the
-# missing-dep scan and mapping `bs4`→`beautifulsoup4` keeps the report clean.
-# `requirements_files` points deptry at pyproject.toml so the canonical
-# source of truth is used (instead of also scanning requirements.in which
-# would double-count).
+# it but deptry doesn't auto-detect this layout. Excluding `scripts/*` from
+# the missing-dep scan and mapping `bs4`→`beautifulsoup4` keeps the report
+# clean. `requirements_files` points deptry at pyproject.toml so the
+# canonical source of truth is used.
 [tool.deptry]
-exclude = ["scripts/*"]
+exclude = ["scripts/*", ".pylint_venv/**", ".venv/**", "data/**", "logs/**"]
 requirements_files = ["pyproject.toml"]
+# DEP002 = unused-dependency: CLI-only dev tools (ruff, mypy, bandit,
+# pip-audit, pyflakes, pytest-*) are used via subprocess / entrypoints,
+# not as imports. Libraries (lxml, pandas, aiosqlite, aiofiles, aiohttp)
+# are transitive / future-use deps retained in the direct stack.
+# DEP003 = transitive-dependency: psycopg_pool, scripts, conftest are
+# internal-only modules and pytest test fixtures.
+ignore = ["DEP002", "DEP003"]
 
 [tool.deptry.package_module_name_map]
 "beautifulsoup4" = ["bs4"]
 "duckduckgo_search" = ["duckduckgo_search"]
 "prometheus-client" = ["prometheus_client"]
+"PyYAML" = ["yaml"]
+"python-dotenv" = ["dotenv"]
+"psycopg2-binary" = ["psycopg2"]
+"psycopg[binary,pool]" = ["psycopg", "psycopg_pool"]
 
 # ─── Bandit ───────────────────────────────────────────────────────────────
 # The core product code in ``backend/app/`` is held to a strict Bandit

@@ -37,8 +37,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
-REQUIREMENTS_LOCK = REPO_ROOT / "backend" / "requirements.lock.txt"
-REQUIREMENTS_DEV_LOCK = REPO_ROOT / "backend" / "requirements-dev.lock.txt"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 MIN_PY = (3, 12)
 
@@ -85,17 +83,7 @@ def _venv_present() -> CheckResult:
         required=False,
         ok=venv.exists(),
         detail=str(venv) if venv.exists() else "no .venv",
-        hint="python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.lock.txt",
-    )
-
-
-def _lock_files_present() -> CheckResult:
-    missing = [str(p.relative_to(REPO_ROOT)) for p in (REQUIREMENTS_LOCK, REQUIREMENTS_DEV_LOCK) if not p.exists()]
-    return CheckResult(
-        name="lockfiles",
-        required=True,
-        ok=not missing,
-        detail="ok" if not missing else f"missing: {', '.join(missing)}",
+        hint='python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"',
     )
 
 
@@ -428,7 +416,6 @@ def _frontend_syntax() -> CheckResult:
 CHECKS = [
     _python_version,
     _pyproject_present,
-    _lock_files_present,
     _venv_present,
     lambda: _binary("git", required=True),
     lambda: _binary("docker", required=False, hint="Docker is optional for unit tests."),

@@ -126,7 +126,7 @@ mypy: ## Run mypy type checker
 boundary: ## Run the research-shell boundary check (CI invariant)
 	PYTHONPATH=backend python3 scripts/check_research_boundary.py
 
-deps-check: ## Validate pyproject.toml dependency bounds vs requirements.lock
+deps-check: ## Validate pyproject.toml dependency bounds (single source of truth)
 	python3 scripts/validate_dependency_bounds.py
 
 lint-all: lint mypy boundary deps-check ## Run full lint + type + boundary + deps suite

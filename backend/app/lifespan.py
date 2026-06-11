@@ -135,7 +135,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
             f"SSRF self-check failed: {ssrf_check.get('reason', 'unknown')}. "
             f"httpx={ssrf_check.get('httpx_version')} "
             f"httpcore={ssrf_check.get('httpcore_version')}. "
-            "Pin supported versions in backend/requirements.lock.txt."
+            "Pin supported versions in pyproject.toml."
         )
         if settings.ENV.lower() in ("production", "staging"):
             raise RuntimeError(msg)

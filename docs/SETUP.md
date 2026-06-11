@@ -7,7 +7,7 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r backend/requirements-dev.lock.txt
+pip install -e ".[dev]"
 playwright install chromium
 ```
 
