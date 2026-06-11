@@ -399,6 +399,7 @@ jobs:
     needs:
       - syntax-and-architecture
       - test-collection
+      - audit-research-leak
       - test-sqlite
       - test-security
       - test-benchmarks
@@ -425,6 +426,7 @@ jobs:
           | --- | --- | --- |
           | **Syntax** | Passed (Local/CI: ${{ needs.syntax-and-architecture.result }}) | Checks python code compilation and syntax validity |
           | **Architecture** | Passed (Local/CI: ${{ needs.syntax-and-architecture.result }}) | Verifies system boundaries and structure |
+          | **Research Quarantine** | Passed (Local/CI: ${{ needs.audit-research-leak.result }}) | Verifies experimental routes are not eagerly imported |
           | **SQLite tests** | Passed (Local/CI: ${{ needs.test-sqlite.result }}) | Runs full SQLite-backed functional suite |
           | **Postgres local** | Passed locally (Local/CI: ${{ needs.test-postgres.result }}) | Verified using localized test container integration |
           | **Browser local** | Passed locally (Local/CI: ${{ needs.test-browser-e2e.result }}) | Playwright local scraper-assisted lifecycles |
@@ -445,6 +447,7 @@ jobs:
     needs:
       - syntax-and-architecture
       - test-collection
+      - audit-research-leak
       - test-sqlite
       - test-security
       - test-benchmarks
@@ -464,7 +467,7 @@ jobs:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
-            🔔 Production Readiness Status: ${{ (needs.syntax-and-architecture.result == 'success' && needs.test-collection.result == 'success' && needs.test-sqlite.result == 'success' && needs.test-security.result == 'success' && needs.test-benchmarks.result == 'success' && needs.test-postgres.result == 'success' && needs.test-browser-e2e.result == 'success' && needs.test-golden-dataset.result == 'success' && needs.docker-build.result == 'success' && needs.docs-validation.result == 'success' && needs.final-report.result == 'success') && '✅ Passed' || '❌ Failed' }}
+            🔔 Production Readiness Status: ${{ (needs.syntax-and-architecture.result == 'success' && needs.test-collection.result == 'success' && needs.audit-research-leak.result == 'success' && needs.test-sqlite.result == 'success' && needs.test-security.result == 'success' && needs.test-benchmarks.result == 'success' && needs.test-postgres.result == 'success' && needs.test-browser-e2e.result == 'success' && needs.test-golden-dataset.result == 'success' && needs.docker-build.result == 'success' && needs.docs-validation.result == 'success' && needs.final-report.result == 'success') && '✅ Passed' || '❌ Failed' }}
 
             Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
