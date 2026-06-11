@@ -1,0 +1,1521 @@
+[main]	INFO	Found project level .bandit file: backend/.bandit
+[main]	INFO	Using command line arg for selected targets
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	running on Python 3.12.3
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/admin_denylist.py:176
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/admin_denylist.py:199
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/admin_denylist.py:202
+[tester]	WARNING	nosec encountered (B110), but no failed test on file backend/app/postgres_repository.py:125
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:864
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:864
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:886
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:886
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:912
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:912
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1083
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1083
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1101
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1101
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1123
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1123
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1134
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/postgres_repository_base.py:1134
+[tester]	WARNING	nosec encountered (B110), but no failed test on file backend/app/psycopg3_repository.py:152
+[tester]	WARNING	nosec encountered (B110), but no failed test on file backend/app/scraper.py:267
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/storage_interface.py:460
+[tester]	WARNING	nosec encountered (B608), but no failed test on file backend/app/storage_interface.py:543
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/app/url_safety.py:155
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/app/url_safety.py:155
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/app/url_safety.py:155
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/app/url_safety.py:155
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/app/url_safety.py:155
+[tester]	WARNING	nosec encountered (B110), but no failed test on file backend/app/worker_queue_postgres_psycopg3.py:110
+[tester]	WARNING	nosec encountered (B110), but no failed test on file backend/app/worker_queue_postgres_psycopg3.py:168
+[manager]	WARNING	Test in comment: string is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: equality is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: against is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: empty is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: string is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: no is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: credential is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: present is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: initialized is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: empty is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: populated is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: below is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: only is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: on is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: valid is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: Bearer is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: prefix is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: this is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: rejects is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: bind is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: all is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: and is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: loopback is not a test name or id, ignoring
+[manager]	WARNING	Test in comment: targets is not a test name or id, ignoring
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/forge_kernel/security/url_safety.py:53
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/forge_kernel/security/url_safety.py:53
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/forge_kernel/security/url_safety.py:53
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/forge_kernel/security/url_safety.py:53
+[tester]	WARNING	nosec encountered (B104), but no failed test on file backend/forge_kernel/security/url_safety.py:53
+Working... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:03
+Run started:2026-06-11 17:40:25.981170+00:00
+Files in scope (259):
+	backend/app/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/abstraction_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/acquisition_mode.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/acquisition_quality_gate.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/acquisition_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/acquisition_telemetry.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/action_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/admin_denylist.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/anti_bot_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/async_utils.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/audit_logger.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/auth/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/auth/session.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/benchmark_accuracy.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/benchmark_reporter.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/browser_network_capture.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/browser_pool.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/chaos_metrics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/chaos_scenarios.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/chaos_simulator.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/checkpoint_manager.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/cleaning_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/compound_record_assembler.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/_browser.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/_communication.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/_extraction.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/_jobs.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/_paths.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/config/_security.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/container_discovery.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/content_quality.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/core_types.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/crawl_frontier.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/crawl_policy.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/crawl_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/data_utils.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/degradation_predictor.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/discovery.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/domain_evolution_model.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/domain_health_alerts.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/domain_intelligence.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/domain_runtime_policy.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/empty_response_detector.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/energy_api.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/energy_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/event_dispatcher.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/event_journal.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/experimental_startup.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/extraction_orchestrator.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/extraction_provenance.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/failure_classification.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/failure_injector.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/federation_manager.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/field_laws.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/field_validator.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/filters.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/geocode_cache.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/globals.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/gossip_substrate.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/graph_update_scheduler.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/heartbeat_manager.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/history_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/html_utils.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/insight_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/instability_api.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/instability_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/intent_parser.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/intent_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/invariant_firewall.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/job_store.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/lifespan.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/llm_bridge.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/llm_validator.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/main.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/manifold_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/metrics_collector.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/middlewares.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/models.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/motif_feedback.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/motif_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/network_extractor.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/network_payload_extractor.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/observability.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/page_evidence_collector.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/page_profiler.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/patch_status.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/persistence_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/policy_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/postgres_repository.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/postgres_repository_base.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/proxy_manager.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/psycopg3_repository.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/rate_limiter.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/recovery_handlers.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/recovery_strategies.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/regression_capture.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/regression_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/rendered_visible_text_extractor.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/replay_buffer.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/research/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/resource_governor.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/experimental.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/exports.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/health.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/jobs.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/jobs_read.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/jobs_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/jobs_write.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/operator.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/scraper.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/session.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/routers/system.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/runtime_budget.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/runtime_deps.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/saas/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/saas/identity_store.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/saas/models.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/saas/router.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/saas/service.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scrape_telemetry.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scraper.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scraper_adapt.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scraper_diagnostics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scraper_models.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scraper_postprocess.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/scraper_recovery_integration.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/search_form_recovery.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_decay_predictor.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_discovery.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_discovery_analysis.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_memory.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_ml_optimizer.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_profiles/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/selector_profiles/loader.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/self_tuning_extraction.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_allocation_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_boundary_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_events.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_inference_engine.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_ir.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_mapper.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_os.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_persistence.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_pipeline.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_segmentation.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/core.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/events.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/locks.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/memory.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/metrics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/serialization.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/semantic_world_state/topology.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/_job_log.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/ai_structuring.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/discovery.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/exports.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/finalization.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/insight.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/job_runner.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/notifications.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/post_processing.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/scraping.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/services/status_classifier.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/session_url_detector.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/snapshot_desync_detector.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/state_store.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/storage_interface.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/strategy_evolution.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/telemetry_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topological_query.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_api.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_clustering.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_dynamics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_forces.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_gc.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_metrics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_persistence.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_region_ops.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_state_types.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_thermodynamics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_view.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/topology_waves.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/transaction_context.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/transactional_priority_queue.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/transition_state.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/trend_analyzer.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/url_redirects.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/url_safety.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/url_value_classification.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/billing.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/circuit_breaker.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/env.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/export.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/extraction_metrics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/extraction_validation.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/graceful_degradation.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/health_check.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/job.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/job_results_store.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/log_redaction.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/prod_security_validator.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/quality.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/rate_limit.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/rbac.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/retry.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/telegram_notifier.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/usage_ledger.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/utils/worker_id.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/vector_clock.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/visualization.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/worker_heartbeat.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/worker_queue.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/worker_queue_postgres.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/worker_queue_postgres_base.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/worker_queue_postgres_psycopg3.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/app/zero_result_classifier.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/__main__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/app.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/deps.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/middleware.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/routers/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/routers/exports.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/routers/health.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/routers/jobs.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/api/routers/system.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/config/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/config/settings.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/contracts/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/contracts/analysis.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/contracts/export.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/contracts/job.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/contracts/result.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/extraction/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/extraction/fetch.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/extraction/pipeline.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/extraction/quality.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/observability/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/observability/metrics.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/persistence/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/persistence/postgres.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/persistence/sqlite.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/security/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/security/rate_limiter.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/security/rbac.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/security/url_safety.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/services/__init__.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/services/export_service.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/services/extraction_service.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+	backend/forge_kernel/services/job_service.py (score: {SEVERITY: 0, CONFIDENCE: 0})
+Files excluded (1172):
+	backend/.bandit
+	backend/.coverage
+	backend/.env
+	backend/.gitignore
+	backend/.mypy_cache/.gitignore
+	backend/.mypy_cache/3.12/cache.0.db
+	backend/.mypy_cache/3.12/cache.1.db
+	backend/.mypy_cache/3.12/cache.10.db
+	backend/.mypy_cache/3.12/cache.11.db
+	backend/.mypy_cache/3.12/cache.12.db
+	backend/.mypy_cache/3.12/cache.13.db
+	backend/.mypy_cache/3.12/cache.14.db
+	backend/.mypy_cache/3.12/cache.15.db
+	backend/.mypy_cache/3.12/cache.2.db
+	backend/.mypy_cache/3.12/cache.3.db
+	backend/.mypy_cache/3.12/cache.4.db
+	backend/.mypy_cache/3.12/cache.5.db
+	backend/.mypy_cache/3.12/cache.6.db
+	backend/.mypy_cache/3.12/cache.7.db
+	backend/.mypy_cache/3.12/cache.8.db
+	backend/.mypy_cache/3.12/cache.9.db
+	backend/.mypy_cache/CACHEDIR.TAG
+	backend/README_DEPLOYMENT.md
+	backend/app/__pycache__/__init__.cpython-312.pyc
+	backend/app/__pycache__/abstraction_state.cpython-312.pyc
+	backend/app/__pycache__/acquisition_mode.cpython-312.pyc
+	backend/app/__pycache__/acquisition_quality_gate.cpython-312.pyc
+	backend/app/__pycache__/acquisition_state.cpython-312.pyc
+	backend/app/__pycache__/acquisition_telemetry.cpython-312.pyc
+	backend/app/__pycache__/action_state.cpython-312.pyc
+	backend/app/__pycache__/admin_denylist.cpython-312.pyc
+	backend/app/__pycache__/anti_bot_engine.cpython-312.pyc
+	backend/app/__pycache__/async_utils.cpython-312.pyc
+	backend/app/__pycache__/audit_logger.cpython-312.pyc
+	backend/app/__pycache__/benchmark_accuracy.cpython-312.pyc
+	backend/app/__pycache__/benchmark_reporter.cpython-312.pyc
+	backend/app/__pycache__/browser_network_capture.cpython-312.pyc
+	backend/app/__pycache__/browser_pool.cpython-312.pyc
+	backend/app/__pycache__/chaos_metrics.cpython-312.pyc
+	backend/app/__pycache__/chaos_scenarios.cpython-312.pyc
+	backend/app/__pycache__/chaos_simulator.cpython-312.pyc
+	backend/app/__pycache__/checkpoint_manager.cpython-312.pyc
+	backend/app/__pycache__/cleaning_engine.cpython-312.pyc
+	backend/app/__pycache__/compound_record_assembler.cpython-312.pyc
+	backend/app/__pycache__/container_discovery.cpython-312.pyc
+	backend/app/__pycache__/content_quality.cpython-312.pyc
+	backend/app/__pycache__/core_types.cpython-312.pyc
+	backend/app/__pycache__/crawl_frontier.cpython-312.pyc
+	backend/app/__pycache__/crawl_policy.cpython-312.pyc
+	backend/app/__pycache__/crawl_state.cpython-312.pyc
+	backend/app/__pycache__/data_utils.cpython-312.pyc
+	backend/app/__pycache__/degradation_predictor.cpython-312.pyc
+	backend/app/__pycache__/discovery.cpython-312.pyc
+	backend/app/__pycache__/domain_evolution_model.cpython-312.pyc
+	backend/app/__pycache__/domain_health_alerts.cpython-312.pyc
+	backend/app/__pycache__/domain_intelligence.cpython-312.pyc
+	backend/app/__pycache__/domain_runtime_policy.cpython-312.pyc
+	backend/app/__pycache__/empty_response_detector.cpython-312.pyc
+	backend/app/__pycache__/energy_api.cpython-312.pyc
+	backend/app/__pycache__/energy_state.cpython-312.pyc
+	backend/app/__pycache__/event_dispatcher.cpython-312.pyc
+	backend/app/__pycache__/event_journal.cpython-312.pyc
+	backend/app/__pycache__/experimental_startup.cpython-312.pyc
+	backend/app/__pycache__/extraction_orchestrator.cpython-312.pyc
+	backend/app/__pycache__/extraction_provenance.cpython-312.pyc
+	backend/app/__pycache__/failure_classification.cpython-312.pyc
+	backend/app/__pycache__/failure_injector.cpython-312.pyc
+	backend/app/__pycache__/federation_manager.cpython-312.pyc
+	backend/app/__pycache__/field_laws.cpython-312.pyc
+	backend/app/__pycache__/field_validator.cpython-312.pyc
+	backend/app/__pycache__/filters.cpython-312.pyc
+	backend/app/__pycache__/geocode_cache.cpython-312.pyc
+	backend/app/__pycache__/globals.cpython-312.pyc
+	backend/app/__pycache__/gossip_substrate.cpython-312.pyc
+	backend/app/__pycache__/graph_update_scheduler.cpython-312.pyc
+	backend/app/__pycache__/heartbeat_manager.cpython-312.pyc
+	backend/app/__pycache__/history_state.cpython-312.pyc
+	backend/app/__pycache__/html_utils.cpython-312.pyc
+	backend/app/__pycache__/insight_engine.cpython-312.pyc
+	backend/app/__pycache__/instability_api.cpython-312.pyc
+	backend/app/__pycache__/instability_state.cpython-312.pyc
+	backend/app/__pycache__/intent_parser.cpython-312.pyc
+	backend/app/__pycache__/intent_state.cpython-312.pyc
+	backend/app/__pycache__/invariant_firewall.cpython-312.pyc
+	backend/app/__pycache__/job_store.cpython-312.pyc
+	backend/app/__pycache__/lifespan.cpython-312.pyc
+	backend/app/__pycache__/llm_bridge.cpython-312.pyc
+	backend/app/__pycache__/llm_validator.cpython-312.pyc
+	backend/app/__pycache__/main.cpython-312.pyc
+	backend/app/__pycache__/manifold_state.cpython-312.pyc
+	backend/app/__pycache__/metrics_collector.cpython-312.pyc
+	backend/app/__pycache__/middlewares.cpython-312.pyc
+	backend/app/__pycache__/models.cpython-312.pyc
+	backend/app/__pycache__/motif_feedback.cpython-312.pyc
+	backend/app/__pycache__/motif_state.cpython-312.pyc
+	backend/app/__pycache__/network_extractor.cpython-312.pyc
+	backend/app/__pycache__/network_payload_extractor.cpython-312.pyc
+	backend/app/__pycache__/observability.cpython-312.pyc
+	backend/app/__pycache__/page_evidence_collector.cpython-312.pyc
+	backend/app/__pycache__/page_profiler.cpython-312.pyc
+	backend/app/__pycache__/patch_status.cpython-312.pyc
+	backend/app/__pycache__/persistence_state.cpython-312.pyc
+	backend/app/__pycache__/policy_engine.cpython-312.pyc
+	backend/app/__pycache__/postgres_repository.cpython-312.pyc
+	backend/app/__pycache__/postgres_repository_base.cpython-312.pyc
+	backend/app/__pycache__/proxy_manager.cpython-312.pyc
+	backend/app/__pycache__/psycopg3_repository.cpython-312.pyc
+	backend/app/__pycache__/rate_limiter.cpython-312.pyc
+	backend/app/__pycache__/recovery_handlers.cpython-312.pyc
+	backend/app/__pycache__/recovery_strategies.cpython-312.pyc
+	backend/app/__pycache__/regression_capture.cpython-312.pyc
+	backend/app/__pycache__/regression_state.cpython-312.pyc
+	backend/app/__pycache__/rendered_visible_text_extractor.cpython-312.pyc
+	backend/app/__pycache__/replay_buffer.cpython-312.pyc
+	backend/app/__pycache__/resource_governor.cpython-312.pyc
+	backend/app/__pycache__/runtime_budget.cpython-312.pyc
+	backend/app/__pycache__/runtime_deps.cpython-312.pyc
+	backend/app/__pycache__/scrape_telemetry.cpython-312.pyc
+	backend/app/__pycache__/scraper.cpython-312.pyc
+	backend/app/__pycache__/scraper_adapt.cpython-312.pyc
+	backend/app/__pycache__/scraper_diagnostics.cpython-312.pyc
+	backend/app/__pycache__/scraper_models.cpython-312.pyc
+	backend/app/__pycache__/scraper_postprocess.cpython-312.pyc
+	backend/app/__pycache__/scraper_recovery_integration.cpython-312.pyc
+	backend/app/__pycache__/search_form_recovery.cpython-312.pyc
+	backend/app/__pycache__/selector_decay_predictor.cpython-312.pyc
+	backend/app/__pycache__/selector_discovery.cpython-312.pyc
+	backend/app/__pycache__/selector_discovery_analysis.cpython-312.pyc
+	backend/app/__pycache__/selector_engine.cpython-312.pyc
+	backend/app/__pycache__/selector_memory.cpython-312.pyc
+	backend/app/__pycache__/selector_ml_optimizer.cpython-312.pyc
+	backend/app/__pycache__/self_tuning_extraction.cpython-312.pyc
+	backend/app/__pycache__/semantic_allocation_engine.cpython-312.pyc
+	backend/app/__pycache__/semantic_boundary_engine.cpython-312.pyc
+	backend/app/__pycache__/semantic_events.cpython-312.pyc
+	backend/app/__pycache__/semantic_inference_engine.cpython-312.pyc
+	backend/app/__pycache__/semantic_ir.cpython-312.pyc
+	backend/app/__pycache__/semantic_mapper.cpython-312.pyc
+	backend/app/__pycache__/semantic_os.cpython-312.pyc
+	backend/app/__pycache__/semantic_persistence.cpython-312.pyc
+	backend/app/__pycache__/semantic_pipeline.cpython-312.pyc
+	backend/app/__pycache__/semantic_segmentation.cpython-312.pyc
+	backend/app/__pycache__/session_url_detector.cpython-312.pyc
+	backend/app/__pycache__/snapshot_desync_detector.cpython-312.pyc
+	backend/app/__pycache__/state_store.cpython-312.pyc
+	backend/app/__pycache__/storage_interface.cpython-312.pyc
+	backend/app/__pycache__/strategy_evolution.cpython-312.pyc
+	backend/app/__pycache__/telemetry_state.cpython-312.pyc
+	backend/app/__pycache__/topological_query.cpython-312.pyc
+	backend/app/__pycache__/topology_api.cpython-312.pyc
+	backend/app/__pycache__/topology_clustering.cpython-312.pyc
+	backend/app/__pycache__/topology_dynamics.cpython-312.pyc
+	backend/app/__pycache__/topology_forces.cpython-312.pyc
+	backend/app/__pycache__/topology_gc.cpython-312.pyc
+	backend/app/__pycache__/topology_metrics.cpython-312.pyc
+	backend/app/__pycache__/topology_persistence.cpython-312.pyc
+	backend/app/__pycache__/topology_region_ops.cpython-312.pyc
+	backend/app/__pycache__/topology_state.cpython-312.pyc
+	backend/app/__pycache__/topology_state_types.cpython-312.pyc
+	backend/app/__pycache__/topology_thermodynamics.cpython-312.pyc
+	backend/app/__pycache__/topology_view.cpython-312.pyc
+	backend/app/__pycache__/topology_waves.cpython-312.pyc
+	backend/app/__pycache__/transaction_context.cpython-312.pyc
+	backend/app/__pycache__/transactional_priority_queue.cpython-312.pyc
+	backend/app/__pycache__/transition_state.cpython-312.pyc
+	backend/app/__pycache__/trend_analyzer.cpython-312.pyc
+	backend/app/__pycache__/url_redirects.cpython-312.pyc
+	backend/app/__pycache__/url_safety.cpython-312.pyc
+	backend/app/__pycache__/url_value_classification.cpython-312.pyc
+	backend/app/__pycache__/vector_clock.cpython-312.pyc
+	backend/app/__pycache__/visualization.cpython-312.pyc
+	backend/app/__pycache__/worker_heartbeat.cpython-312.pyc
+	backend/app/__pycache__/worker_queue.cpython-312.pyc
+	backend/app/__pycache__/worker_queue_postgres.cpython-312.pyc
+	backend/app/__pycache__/worker_queue_postgres_base.cpython-312.pyc
+	backend/app/__pycache__/worker_queue_postgres_psycopg3.cpython-312.pyc
+	backend/app/__pycache__/zero_result_classifier.cpython-312.pyc
+	backend/app/auth/__pycache__/__init__.cpython-312.pyc
+	backend/app/auth/__pycache__/session.cpython-312.pyc
+	backend/app/config/__pycache__/__init__.cpython-312.pyc
+	backend/app/config/__pycache__/_browser.cpython-312.pyc
+	backend/app/config/__pycache__/_communication.cpython-312.pyc
+	backend/app/config/__pycache__/_extraction.cpython-312.pyc
+	backend/app/config/__pycache__/_jobs.cpython-312.pyc
+	backend/app/config/__pycache__/_paths.cpython-312.pyc
+	backend/app/config/__pycache__/_security.cpython-312.pyc
+	backend/app/research/__pycache__/__init__.cpython-312.pyc
+	backend/app/routers/__pycache__/__init__.cpython-312.pyc
+	backend/app/routers/__pycache__/experimental.cpython-312.pyc
+	backend/app/routers/__pycache__/exports.cpython-312.pyc
+	backend/app/routers/__pycache__/health.cpython-312.pyc
+	backend/app/routers/__pycache__/jobs.cpython-312.pyc
+	backend/app/routers/__pycache__/jobs_read.cpython-312.pyc
+	backend/app/routers/__pycache__/jobs_state.cpython-312.pyc
+	backend/app/routers/__pycache__/jobs_write.cpython-312.pyc
+	backend/app/routers/__pycache__/operator.cpython-312.pyc
+	backend/app/routers/__pycache__/scraper.cpython-312.pyc
+	backend/app/routers/__pycache__/session.cpython-312.pyc
+	backend/app/routers/__pycache__/system.cpython-312.pyc
+	backend/app/saas/__pycache__/__init__.cpython-312.pyc
+	backend/app/saas/__pycache__/identity_store.cpython-312.pyc
+	backend/app/saas/__pycache__/models.cpython-312.pyc
+	backend/app/saas/__pycache__/router.cpython-312.pyc
+	backend/app/saas/__pycache__/service.cpython-312.pyc
+	backend/app/selector_profiles/__pycache__/__init__.cpython-312.pyc
+	backend/app/selector_profiles/__pycache__/loader.cpython-312.pyc
+	backend/app/selector_profiles/profiles/books.toscrape.com.json
+	backend/app/selector_profiles/profiles/example.com.json
+	backend/app/selector_profiles/profiles/flightsnholidays.co.uk.json
+	backend/app/selector_profiles/profiles/httpbin.org.json
+	backend/app/selector_profiles/profiles/quotes.toscrape.com.json
+	backend/app/selector_profiles/profiles/scrapethissite.com.json
+	backend/app/semantic_world_state/__pycache__/__init__.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/core.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/events.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/locks.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/memory.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/metrics.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/serialization.cpython-312.pyc
+	backend/app/semantic_world_state/__pycache__/topology.cpython-312.pyc
+	backend/app/services/__pycache__/__init__.cpython-312.pyc
+	backend/app/services/__pycache__/_job_log.cpython-312.pyc
+	backend/app/services/__pycache__/ai_structuring.cpython-312.pyc
+	backend/app/services/__pycache__/discovery.cpython-312.pyc
+	backend/app/services/__pycache__/exports.cpython-312.pyc
+	backend/app/services/__pycache__/finalization.cpython-312.pyc
+	backend/app/services/__pycache__/insight.cpython-312.pyc
+	backend/app/services/__pycache__/job_runner.cpython-312.pyc
+	backend/app/services/__pycache__/notifications.cpython-312.pyc
+	backend/app/services/__pycache__/post_processing.cpython-312.pyc
+	backend/app/services/__pycache__/scraping.cpython-312.pyc
+	backend/app/services/__pycache__/state.cpython-312.pyc
+	backend/app/services/__pycache__/status_classifier.cpython-312.pyc
+	backend/app/utils/__pycache__/__init__.cpython-312.pyc
+	backend/app/utils/__pycache__/billing.cpython-312.pyc
+	backend/app/utils/__pycache__/circuit_breaker.cpython-312.pyc
+	backend/app/utils/__pycache__/env.cpython-312.pyc
+	backend/app/utils/__pycache__/export.cpython-312.pyc
+	backend/app/utils/__pycache__/extraction_metrics.cpython-312.pyc
+	backend/app/utils/__pycache__/extraction_validation.cpython-312.pyc
+	backend/app/utils/__pycache__/graceful_degradation.cpython-312.pyc
+	backend/app/utils/__pycache__/health_check.cpython-312.pyc
+	backend/app/utils/__pycache__/job.cpython-312.pyc
+	backend/app/utils/__pycache__/job_results_store.cpython-312.pyc
+	backend/app/utils/__pycache__/log_redaction.cpython-312.pyc
+	backend/app/utils/__pycache__/prod_security_validator.cpython-312.pyc
+	backend/app/utils/__pycache__/quality.cpython-312.pyc
+	backend/app/utils/__pycache__/rate_limit.cpython-312.pyc
+	backend/app/utils/__pycache__/rbac.cpython-312.pyc
+	backend/app/utils/__pycache__/retry.cpython-312.pyc
+	backend/app/utils/__pycache__/telegram_notifier.cpython-312.pyc
+	backend/app/utils/__pycache__/usage_ledger.cpython-312.pyc
+	backend/app/utils/__pycache__/worker_id.cpython-312.pyc
+	backend/backend/data/semantic_state.json
+	backend/backend/data/semantic_state.json.lock
+	backend/backend/data/test_domain_intel.json
+	backend/benchmarks/__init__.py
+	backend/benchmarks/__pycache__/__init__.cpython-312.pyc
+	backend/benchmarks/__pycache__/benchmark_hostile.cpython-312.pyc
+	backend/benchmarks/__pycache__/benchmark_longevity.cpython-312.pyc
+	backend/benchmarks/__pycache__/benchmark_replay.cpython-312.pyc
+	backend/benchmarks/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc
+	backend/benchmarks/__pycache__/conftest.cpython-312.pyc
+	backend/benchmarks/__pycache__/test_benchmark_corpus.cpython-312.pyc
+	backend/benchmarks/__pycache__/test_benchmark_enforceable.cpython-312.pyc
+	backend/benchmarks/__pycache__/test_benchmark_smoke.cpython-312.pyc
+	backend/benchmarks/benchmark_hostile.py
+	backend/benchmarks/benchmark_longevity.py
+	backend/benchmarks/benchmark_replay.py
+	backend/benchmarks/benchmark_report.json
+	backend/benchmarks/conftest.py
+	backend/benchmarks/test_benchmark_corpus.py
+	backend/benchmarks/test_benchmark_enforceable.py
+	backend/benchmarks/test_benchmark_smoke.py
+	backend/data/replay_buffer/segment_000389.jsonl
+	backend/data/replay_buffer/segment_000390.jsonl
+	backend/data/replay_buffer/segment_000391.jsonl
+	backend/data/replay_buffer/segment_000392.jsonl
+	backend/data/replay_buffer/segment_000393.jsonl
+	backend/data/replay_buffer/segment_000394.jsonl
+	backend/data/replay_buffer/segment_000395.jsonl
+	backend/data/replay_buffer/segment_000396.jsonl
+	backend/data/replay_buffer/segment_000397.jsonl
+	backend/data/replay_buffer/segment_000398.jsonl
+	backend/data/replay_buffer/segment_000399.jsonl
+	backend/data/replay_buffer/segment_000400.jsonl
+	backend/data/replay_buffer/segment_000401.jsonl
+	backend/data/replay_buffer/segment_000402.jsonl
+	backend/data/replay_buffer/segment_000403.jsonl
+	backend/data/replay_buffer/segment_000404.jsonl
+	backend/data/replay_buffer/segment_000405.jsonl
+	backend/data/replay_buffer/segment_000406.jsonl
+	backend/data/replay_buffer/segment_000407.jsonl
+	backend/data/replay_buffer/segment_000408.jsonl
+	backend/data/replay_buffer/segment_000409.jsonl
+	backend/data/replay_buffer/segment_000410.jsonl
+	backend/data/replay_buffer/segment_000411.jsonl
+	backend/data/replay_buffer/segment_000412.jsonl
+	backend/data/replay_buffer/segment_000413.jsonl
+	backend/data/replay_buffer/segment_000414.jsonl
+	backend/data/replay_buffer/segment_000415.jsonl
+	backend/data/replay_buffer/segment_000416.jsonl
+	backend/data/replay_buffer/segment_000417.jsonl
+	backend/data/replay_buffer/segment_000418.jsonl
+	backend/data/replay_buffer/segment_000419.jsonl
+	backend/data/replay_buffer/segment_000420.jsonl
+	backend/data/replay_buffer/segment_000421.jsonl
+	backend/data/replay_buffer/segment_000422.jsonl
+	backend/data/replay_buffer/segment_000423.jsonl
+	backend/data/replay_buffer/segment_000424.jsonl
+	backend/data/replay_buffer/segment_000425.jsonl
+	backend/data/replay_buffer/segment_000426.jsonl
+	backend/data/replay_buffer/segment_000427.jsonl
+	backend/data/replay_buffer/segment_000428.jsonl
+	backend/data/replay_buffer/segment_000429.jsonl
+	backend/data/replay_buffer/segment_000430.jsonl
+	backend/data/replay_buffer/segment_000431.jsonl
+	backend/data/replay_buffer/segment_000432.jsonl
+	backend/data/replay_buffer/segment_000433.jsonl
+	backend/data/replay_buffer/segment_000434.jsonl
+	backend/data/replay_buffer/segment_000435.jsonl
+	backend/data/replay_buffer/segment_000436.jsonl
+	backend/data/replay_buffer/segment_000437.jsonl
+	backend/data/replay_buffer/segment_000438.jsonl
+	backend/data/replay_buffer/segment_000439.jsonl
+	backend/dataforge_scraper.egg-info/PKG-INFO
+	backend/dataforge_scraper.egg-info/SOURCES.txt
+	backend/dataforge_scraper.egg-info/dependency_links.txt
+	backend/dataforge_scraper.egg-info/requires.txt
+	backend/dataforge_scraper.egg-info/top_level.txt
+	backend/forge_kernel/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/__pycache__/__main__.cpython-312.pyc
+	backend/forge_kernel/api/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/api/__pycache__/app.cpython-312.pyc
+	backend/forge_kernel/api/__pycache__/deps.cpython-312.pyc
+	backend/forge_kernel/api/__pycache__/middleware.cpython-312.pyc
+	backend/forge_kernel/api/routers/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/api/routers/__pycache__/exports.cpython-312.pyc
+	backend/forge_kernel/api/routers/__pycache__/health.cpython-312.pyc
+	backend/forge_kernel/api/routers/__pycache__/jobs.cpython-312.pyc
+	backend/forge_kernel/api/routers/__pycache__/system.cpython-312.pyc
+	backend/forge_kernel/config/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/config/__pycache__/settings.cpython-312.pyc
+	backend/forge_kernel/contracts/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/contracts/__pycache__/analysis.cpython-312.pyc
+	backend/forge_kernel/contracts/__pycache__/export.cpython-312.pyc
+	backend/forge_kernel/contracts/__pycache__/job.cpython-312.pyc
+	backend/forge_kernel/contracts/__pycache__/result.cpython-312.pyc
+	backend/forge_kernel/extraction/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/extraction/__pycache__/fetch.cpython-312.pyc
+	backend/forge_kernel/extraction/__pycache__/pipeline.cpython-312.pyc
+	backend/forge_kernel/extraction/__pycache__/quality.cpython-312.pyc
+	backend/forge_kernel/observability/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/observability/__pycache__/metrics.cpython-312.pyc
+	backend/forge_kernel/persistence/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/persistence/__pycache__/postgres.cpython-312.pyc
+	backend/forge_kernel/persistence/__pycache__/sqlite.cpython-312.pyc
+	backend/forge_kernel/security/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/security/__pycache__/rate_limiter.cpython-312.pyc
+	backend/forge_kernel/security/__pycache__/rbac.cpython-312.pyc
+	backend/forge_kernel/security/__pycache__/url_safety.cpython-312.pyc
+	backend/forge_kernel/services/__pycache__/__init__.cpython-312.pyc
+	backend/forge_kernel/services/__pycache__/export_service.cpython-312.pyc
+	backend/forge_kernel/services/__pycache__/extraction_service.cpython-312.pyc
+	backend/forge_kernel/services/__pycache__/job_service.cpython-312.pyc
+	backend/init-db/init.sql
+	backend/tests/__init__.py
+	backend/tests/__pycache__/__init__.cpython-312.pyc
+	backend/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/conftest.cpython-312.pyc
+	backend/tests/__pycache__/distributed_divergence.cpython-312.pyc
+	backend/tests/__pycache__/evolutionary_ecology.cpython-312.pyc
+	backend/tests/__pycache__/manual_run_manual_test.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_api.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_app_scrape.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_chennai.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_extract.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_flights_e2e.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_hn.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_insight.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_modes.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_pollinations.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_providers.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_real_scrape.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_threebestrated.cpython-312.pyc
+	backend/tests/__pycache__/manual_test_workflow.cpython-312.pyc
+	backend/tests/__pycache__/test_accuracy.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_accuracy.cpython-312.pyc
+	backend/tests/__pycache__/test_acquisition_mode.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_acquisition_mode.cpython-312.pyc
+	backend/tests/__pycache__/test_acquisition_quality_gate.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_acquisition_quality_gate.cpython-312.pyc
+	backend/tests/__pycache__/test_acquisition_state.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_acquisition_state.cpython-312.pyc
+	backend/tests/__pycache__/test_acquisition_telemetry.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_acquisition_telemetry.cpython-312.pyc
+	backend/tests/__pycache__/test_active_stability.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_active_stability.cpython-312.pyc
+	backend/tests/__pycache__/test_adaptive_dom_quietness.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_adaptive_dom_quietness.cpython-312.pyc
+	backend/tests/__pycache__/test_adaptive_governance.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_adaptive_governance.cpython-312.pyc
+	backend/tests/__pycache__/test_ai_structuring_recovery.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_ai_structuring_recovery.cpython-312.pyc
+	backend/tests/__pycache__/test_api_contract.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_api_contract.cpython-312.pyc
+	backend/tests/__pycache__/test_api_regressions.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_api_regressions.cpython-312.pyc
+	backend/tests/__pycache__/test_api_worker_integration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_api_worker_integration.cpython-312.pyc
+	backend/tests/__pycache__/test_architectural_validation.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_architectural_validation.cpython-312.pyc
+	backend/tests/__pycache__/test_architecture_integration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_architecture_integration.cpython-312.pyc
+	backend/tests/__pycache__/test_architecture_invariants.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_architecture_invariants.cpython-312.pyc
+	backend/tests/__pycache__/test_async_lock_safety.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_async_lock_safety.cpython-312.pyc
+	backend/tests/__pycache__/test_async_utils.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_async_utils.cpython-312.pyc
+	backend/tests/__pycache__/test_atomic_repository_ops.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_atomic_repository_ops.cpython-312.pyc
+	backend/tests/__pycache__/test_audit_logger.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_audit_logger.cpython-312.pyc
+	backend/tests/__pycache__/test_audit_logger_integration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_audit_logger_integration.cpython-312.pyc
+	backend/tests/__pycache__/test_benchmark_fixtures.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_benchmark_fixtures.cpython-312.pyc
+	backend/tests/__pycache__/test_benchmark_governance.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_benchmark_governance.cpython-312.pyc
+	backend/tests/__pycache__/test_benchmark_reporter.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_benchmark_reporter.cpython-312.pyc
+	backend/tests/__pycache__/test_benchmark_suite.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_benchmark_suite.cpython-312.pyc
+	backend/tests/__pycache__/test_browser_network_capture.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_browser_network_capture.cpython-312.pyc
+	backend/tests/__pycache__/test_browser_pool.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_browser_pool.cpython-312.pyc
+	backend/tests/__pycache__/test_chaos_engineering.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_chaos_engineering.cpython-312.pyc
+	backend/tests/__pycache__/test_check_prod_env.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_check_prod_env.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_agency.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_agency.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_elasticity.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_elasticity.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_immunity.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_immunity.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_observability.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_observability.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_safety.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_safety.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_scheduling.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_scheduling.cpython-312.pyc
+	backend/tests/__pycache__/test_cognitive_steering.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_cognitive_steering.cpython-312.pyc
+	backend/tests/__pycache__/test_contact_enrichment.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_contact_enrichment.cpython-312.pyc
+	backend/tests/__pycache__/test_container_discovery.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_container_discovery.cpython-312.pyc
+	backend/tests/__pycache__/test_contract_smoke.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_contract_smoke.cpython-312.pyc
+	backend/tests/__pycache__/test_contradiction_reallocation.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_contradiction_reallocation.cpython-312.pyc
+	backend/tests/__pycache__/test_count_jobs_by_status.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_count_jobs_by_status.cpython-312.pyc
+	backend/tests/__pycache__/test_crawl_frontier_persistence.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_crawl_frontier_persistence.cpython-312.pyc
+	backend/tests/__pycache__/test_csp_report_endpoint_public.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_csp_report_endpoint_public.cpython-312.pyc
+	backend/tests/__pycache__/test_csp_report_only.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_csp_report_only.cpython-312.pyc
+	backend/tests/__pycache__/test_dashboard_security.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_dashboard_security.cpython-312.pyc
+	backend/tests/__pycache__/test_data_utils.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_data_utils.cpython-312.pyc
+	backend/tests/__pycache__/test_db_rate_limiter.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_db_rate_limiter.cpython-312.pyc
+	backend/tests/__pycache__/test_degradation_predictor.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_degradation_predictor.cpython-312.pyc
+	backend/tests/__pycache__/test_deterministic_dotenv.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_deterministic_dotenv.cpython-312.pyc
+	backend/tests/__pycache__/test_deterministic_replay.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_deterministic_replay.cpython-312.pyc
+	backend/tests/__pycache__/test_discovery_dependency.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_discovery_dependency.cpython-312.pyc
+	backend/tests/__pycache__/test_discovery_quality.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_discovery_quality.cpython-312.pyc
+	backend/tests/__pycache__/test_distributed_consensus.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_distributed_consensus.cpython-312.pyc
+	backend/tests/__pycache__/test_dns_isolation.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_dns_isolation.cpython-312.pyc
+	backend/tests/__pycache__/test_doctor_script.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_doctor_script.cpython-312.pyc
+	backend/tests/__pycache__/test_domain_evolution_model.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_domain_evolution_model.cpython-312.pyc
+	backend/tests/__pycache__/test_domain_health_stress.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_domain_health_stress.cpython-312.pyc
+	backend/tests/__pycache__/test_domain_intelligence.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_domain_intelligence.cpython-312.pyc
+	backend/tests/__pycache__/test_domain_runtime_policy.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_domain_runtime_policy.cpython-312.pyc
+	backend/tests/__pycache__/test_edge_field_model.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_edge_field_model.cpython-312.pyc
+	backend/tests/__pycache__/test_egress_hardening.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_egress_hardening.cpython-312.pyc
+	backend/tests/__pycache__/test_empty_response_detector.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_empty_response_detector.cpython-312.pyc
+	backend/tests/__pycache__/test_event_cascade.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_event_cascade.cpython-312.pyc
+	backend/tests/__pycache__/test_experimental_gate.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_experimental_gate.cpython-312.pyc
+	backend/tests/__pycache__/test_experimental_uncov.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_experimental_uncov.cpython-312.pyc
+	backend/tests/__pycache__/test_exports_router.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_exports_router.cpython-312.pyc
+	backend/tests/__pycache__/test_exports_sheet_collision_edge_cases.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_exports_sheet_collision_edge_cases.cpython-312.pyc
+	backend/tests/__pycache__/test_extracted_modules.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_extracted_modules.cpython-312.pyc
+	backend/tests/__pycache__/test_extraction_integration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_extraction_integration.cpython-312.pyc
+	backend/tests/__pycache__/test_extraction_orchestrator.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_extraction_orchestrator.cpython-312.pyc
+	backend/tests/__pycache__/test_extraction_precision.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_extraction_precision.cpython-312.pyc
+	backend/tests/__pycache__/test_extraction_provenance.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_extraction_provenance.cpython-312.pyc
+	backend/tests/__pycache__/test_failure_classification.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_failure_classification.cpython-312.pyc
+	backend/tests/__pycache__/test_failure_injector.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_failure_injector.cpython-312.pyc
+	backend/tests/__pycache__/test_federation_evolution.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_federation_evolution.cpython-312.pyc
+	backend/tests/__pycache__/test_field_adversarial_stress.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_field_adversarial_stress.cpython-312.pyc
+	backend/tests/__pycache__/test_field_validator.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_field_validator.cpython-312.pyc
+	backend/tests/__pycache__/test_field_waves.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_field_waves.cpython-312.pyc
+	backend/tests/__pycache__/test_filters.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_filters.cpython-312.pyc
+	backend/tests/__pycache__/test_forge_kernel.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_forge_kernel.cpython-312.pyc
+	backend/tests/__pycache__/test_frontend_no_web_storage_for_keys.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_frontend_no_web_storage_for_keys.cpython-312.pyc
+	backend/tests/__pycache__/test_ga_hardening.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_ga_hardening.cpython-312.pyc
+	backend/tests/__pycache__/test_geocode_cache.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_geocode_cache.cpython-312.pyc
+	backend/tests/__pycache__/test_global_orchestration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_global_orchestration.cpython-312.pyc
+	backend/tests/__pycache__/test_globals_config.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_globals_config.cpython-312.pyc
+	backend/tests/__pycache__/test_golden_dataset.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_golden_dataset.cpython-312.pyc
+	backend/tests/__pycache__/test_governance.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_governance.cpython-312.pyc
+	backend/tests/__pycache__/test_governance_visualization.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_governance_visualization.cpython-312.pyc
+	backend/tests/__pycache__/test_grafana_dashboard.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_grafana_dashboard.cpython-312.pyc
+	backend/tests/__pycache__/test_graph_invariants.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_graph_invariants.cpython-312.pyc
+	backend/tests/__pycache__/test_graph_update_scheduler_char.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_graph_update_scheduler_char.cpython-312.pyc
+	backend/tests/__pycache__/test_helpers.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_helpers.cpython-312.pyc
+	backend/tests/__pycache__/test_hierarchical_synthesis.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_hierarchical_synthesis.cpython-312.pyc
+	backend/tests/__pycache__/test_html_utils_quarantine.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_html_utils_quarantine.cpython-312.pyc
+	backend/tests/__pycache__/test_html_utils_utility.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_html_utils_utility.cpython-312.pyc
+	backend/tests/__pycache__/test_idempotency_keys.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_idempotency_keys.cpython-312.pyc
+	backend/tests/__pycache__/test_insight_engine.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_insight_engine.cpython-312.pyc
+	backend/tests/__pycache__/test_intent_parser_alignment.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_intent_parser_alignment.cpython-312.pyc
+	backend/tests/__pycache__/test_job_api_e2e.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_job_api_e2e.cpython-312.pyc
+	backend/tests/__pycache__/test_job_events_route.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_job_events_route.cpython-312.pyc
+	backend/tests/__pycache__/test_job_lifecycle.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_job_lifecycle.cpython-312.pyc
+	backend/tests/__pycache__/test_job_results_store.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_job_results_store.cpython-312.pyc
+	backend/tests/__pycache__/test_job_results_store_security.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_job_results_store_security.cpython-312.pyc
+	backend/tests/__pycache__/test_job_store_persistence.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_job_store_persistence.cpython-312.pyc
+	backend/tests/__pycache__/test_jobs_summary_contract.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_jobs_summary_contract.cpython-312.pyc
+	backend/tests/__pycache__/test_layer7_memory.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_layer7_memory.cpython-312.pyc
+	backend/tests/__pycache__/test_lifespan_core.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_lifespan_core.cpython-312.pyc
+	backend/tests/__pycache__/test_list_jobs_pagination.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_list_jobs_pagination.cpython-312.pyc
+	backend/tests/__pycache__/test_llm_bridge.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_llm_bridge.cpython-312.pyc
+	backend/tests/__pycache__/test_llm_validator.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_llm_validator.cpython-312.pyc
+	backend/tests/__pycache__/test_main_routes_gate.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_main_routes_gate.cpython-312.pyc
+	backend/tests/__pycache__/test_manual_tests.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_manual_tests.cpython-312.pyc
+	backend/tests/__pycache__/test_mega_horizon.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_mega_horizon.cpython-312.pyc
+	backend/tests/__pycache__/test_metastability.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_metastability.cpython-312.pyc
+	backend/tests/__pycache__/test_metrics.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_metrics.cpython-312.pyc
+	backend/tests/__pycache__/test_metrics_observability.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_metrics_observability.cpython-312.pyc
+	backend/tests/__pycache__/test_migration_regression.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_migration_regression.cpython-312.pyc
+	backend/tests/__pycache__/test_motif_feedback.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_motif_feedback.cpython-312.pyc
+	backend/tests/__pycache__/test_mvcc.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_mvcc.cpython-312.pyc
+	backend/tests/__pycache__/test_network_extractor.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_network_extractor.cpython-312.pyc
+	backend/tests/__pycache__/test_network_payload_extractor.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_network_payload_extractor.cpython-312.pyc
+	backend/tests/__pycache__/test_nginx_tls_posture.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_nginx_tls_posture.cpython-312.pyc
+	backend/tests/__pycache__/test_no_load_jobs_on_hot_path.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_no_load_jobs_on_hot_path.cpython-312.pyc
+	backend/tests/__pycache__/test_operator.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_operator.cpython-312.pyc
+	backend/tests/__pycache__/test_owasp.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_owasp.cpython-312.pyc
+	backend/tests/__pycache__/test_p0_auth_tenant.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_p0_auth_tenant.cpython-312.pyc
+	backend/tests/__pycache__/test_p0_billing_usage.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_p0_billing_usage.cpython-312.pyc
+	backend/tests/__pycache__/test_p1_compliance_aup.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_p1_compliance_aup.cpython-312.pyc
+	backend/tests/__pycache__/test_p1_compliance_denylist.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_p1_compliance_denylist.cpython-312.pyc
+	backend/tests/__pycache__/test_paginated_results.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_paginated_results.cpython-312.pyc
+	backend/tests/__pycache__/test_partition_healing.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_partition_healing.cpython-312.pyc
+	backend/tests/__pycache__/test_partition_recovery.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_partition_recovery.cpython-312.pyc
+	backend/tests/__pycache__/test_patch_status.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_patch_status.cpython-312.pyc
+	backend/tests/__pycache__/test_pg_pool_settings.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_pg_pool_settings.cpython-312.pyc
+	backend/tests/__pycache__/test_playwright_browser_e2e.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_playwright_browser_e2e.cpython-312.pyc
+	backend/tests/__pycache__/test_postgres_integration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_postgres_integration.cpython-312.pyc
+	backend/tests/__pycache__/test_postgres_repository.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_postgres_repository.cpython-312.pyc
+	backend/tests/__pycache__/test_priority_queue.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_priority_queue.cpython-312.pyc
+	backend/tests/__pycache__/test_prod_security_validator.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_prod_security_validator.cpython-312.pyc
+	backend/tests/__pycache__/test_production_driver_selection.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_production_driver_selection.cpython-312.pyc
+	backend/tests/__pycache__/test_production_hardening.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_production_hardening.cpython-312.pyc
+	backend/tests/__pycache__/test_production_security.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_production_security.cpython-312.pyc
+	backend/tests/__pycache__/test_production_simulation.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_production_simulation.cpython-312.pyc
+	backend/tests/__pycache__/test_production_synthesis.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_production_synthesis.cpython-312.pyc
+	backend/tests/__pycache__/test_profile_alignment_e2e.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_profile_alignment_e2e.cpython-312.pyc
+	backend/tests/__pycache__/test_proxy_manager.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_proxy_manager.cpython-312.pyc
+	backend/tests/__pycache__/test_psycopg3_import_smoke.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_psycopg3_import_smoke.cpython-312.pyc
+	backend/tests/__pycache__/test_psycopg3_repository.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_psycopg3_repository.cpython-312.pyc
+	backend/tests/__pycache__/test_pyflakes_fixes.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_pyflakes_fixes.cpython-312.pyc
+	backend/tests/__pycache__/test_pytest_timeout.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_pytest_timeout.cpython-312.pyc
+	backend/tests/__pycache__/test_rate_limit_db_promotion.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_rate_limit_db_promotion.cpython-312.pyc
+	backend/tests/__pycache__/test_rate_limiter_config_respect.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_rate_limiter_config_respect.cpython-312.pyc
+	backend/tests/__pycache__/test_rate_limiter_unit.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_rate_limiter_unit.cpython-312.pyc
+	backend/tests/__pycache__/test_rbac.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_rbac.cpython-312.pyc
+	backend/tests/__pycache__/test_rbac_route_matrix_regression.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_rbac_route_matrix_regression.cpython-312.pyc
+	backend/tests/__pycache__/test_recovery_correctness.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_recovery_correctness.cpython-312.pyc
+	backend/tests/__pycache__/test_recovery_integration.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_recovery_integration.cpython-312.pyc
+	backend/tests/__pycache__/test_recovery_strategies.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_recovery_strategies.cpython-312.pyc
+	backend/tests/__pycache__/test_regression_capture.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_regression_capture.cpython-312.pyc
+	backend/tests/__pycache__/test_relational_memory.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_relational_memory.cpython-312.pyc
+	backend/tests/__pycache__/test_replay_buffer.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_replay_buffer.cpython-312.pyc
+	backend/tests/__pycache__/test_repository_parity.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_repository_parity.cpython-312.pyc
+	backend/tests/__pycache__/test_research_boundary.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_research_boundary.cpython-312.pyc
+	backend/tests/__pycache__/test_research_kernel_boundary_invariant.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_research_kernel_boundary_invariant.cpython-312.pyc
+	backend/tests/__pycache__/test_research_leak_tracking.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_research_leak_tracking.cpython-312.pyc
+	backend/tests/__pycache__/test_resource_governor.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_resource_governor.cpython-312.pyc
+	backend/tests/__pycache__/test_route_auth_matrix.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_route_auth_matrix.cpython-312.pyc
+	backend/tests/__pycache__/test_route_auth_matrix_generator.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_route_auth_matrix_generator.cpython-312.pyc
+	backend/tests/__pycache__/test_route_inventory_split.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_route_inventory_split.cpython-312.pyc
+	backend/tests/__pycache__/test_router_quarantine.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_router_quarantine.cpython-312.pyc
+	backend/tests/__pycache__/test_run_job_characterization.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_run_job_characterization.cpython-312.pyc
+	backend/tests/__pycache__/test_saas_identity.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_saas_identity.cpython-312.pyc
+	backend/tests/__pycache__/test_scaling.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_scaling.cpython-312.pyc
+	backend/tests/__pycache__/test_scrape_attempt_result.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_scrape_attempt_result.cpython-312.pyc
+	backend/tests/__pycache__/test_scrape_telemetry.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_scrape_telemetry.cpython-312.pyc
+	backend/tests/__pycache__/test_scraper_diagnostics.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_scraper_diagnostics.cpython-312.pyc
+	backend/tests/__pycache__/test_security.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_security.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_decay_predictor.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_decay_predictor.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_discovery.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_discovery.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_engine.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_engine.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_extract_align.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_extract_align.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_ml_optimizer.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_ml_optimizer.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_profile_loader.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_profile_loader.cpython-312.pyc
+	backend/tests/__pycache__/test_selector_profile_loader_extended.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_selector_profile_loader_extended.cpython-312.pyc
+	backend/tests/__pycache__/test_self_tuning_extraction.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_self_tuning_extraction.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_invariants.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_invariants.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_lifecycle.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_lifecycle.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_mapper.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_mapper.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_persistence.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_persistence.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_pipeline.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_pipeline.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_segmentation.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_segmentation.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_sharding.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_sharding.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_stress.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_stress.cpython-312.pyc
+	backend/tests/__pycache__/test_semantic_survivability.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_semantic_survivability.cpython-312.pyc
+	backend/tests/__pycache__/test_session_auth.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_session_auth.cpython-312.pyc
+	backend/tests/__pycache__/test_session_bound_e2e.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_session_bound_e2e.cpython-312.pyc
+	backend/tests/__pycache__/test_session_recovery.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_session_recovery.cpython-312.pyc
+	backend/tests/__pycache__/test_session_url_detector.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_session_url_detector.cpython-312.pyc
+	backend/tests/__pycache__/test_sharded_federation.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_sharded_federation.cpython-312.pyc
+	backend/tests/__pycache__/test_snapshot_desync_detector.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_snapshot_desync_detector.cpython-312.pyc
+	backend/tests/__pycache__/test_sovereignty.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_sovereignty.cpython-312.pyc
+	backend/tests/__pycache__/test_ssrf_public_transport.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_ssrf_public_transport.cpython-312.pyc
+	backend/tests/__pycache__/test_state_ownership.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_state_ownership.cpython-312.pyc
+	backend/tests/__pycache__/test_state_store.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_state_store.cpython-312.pyc
+	backend/tests/__pycache__/test_storage_endpoints.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_storage_endpoints.cpython-312.pyc
+	backend/tests/__pycache__/test_storage_migrations.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_storage_migrations.cpython-312.pyc
+	backend/tests/__pycache__/test_storage_split_v4.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_storage_split_v4.cpython-312.pyc
+	backend/tests/__pycache__/test_strategy_evolution.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_strategy_evolution.cpython-312.pyc
+	backend/tests/__pycache__/test_substrate_branching.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_substrate_branching.cpython-312.pyc
+	backend/tests/__pycache__/test_substrate_plugins.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_substrate_plugins.cpython-312.pyc
+	backend/tests/__pycache__/test_substrate_self_evolution.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_substrate_self_evolution.cpython-312.pyc
+	backend/tests/__pycache__/test_summary_dto_contract.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_summary_dto_contract.cpython-312.pyc
+	backend/tests/__pycache__/test_targeted_reads.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_targeted_reads.cpython-312.pyc
+	backend/tests/__pycache__/test_telegram_notifier.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_telegram_notifier.cpython-312.pyc
+	backend/tests/__pycache__/test_telemetry_state.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_telemetry_state.cpython-312.pyc
+	backend/tests/__pycache__/test_thermodynamic_reasoning.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_thermodynamic_reasoning.cpython-312.pyc
+	backend/tests/__pycache__/test_three_way_acquisition.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_three_way_acquisition.cpython-312.pyc
+	backend/tests/__pycache__/test_topological_query.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_topological_query.cpython-312.pyc
+	backend/tests/__pycache__/test_topology_key_parser.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_topology_key_parser.cpython-312.pyc
+	backend/tests/__pycache__/test_topology_refactor.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_topology_refactor.cpython-312.pyc
+	backend/tests/__pycache__/test_transaction_context.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_transaction_context.cpython-312.pyc
+	backend/tests/__pycache__/test_transactions.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_transactions.cpython-312.pyc
+	backend/tests/__pycache__/test_trend_analyzer.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_trend_analyzer.cpython-312.pyc
+	backend/tests/__pycache__/test_universal_search.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_universal_search.cpython-312.pyc
+	backend/tests/__pycache__/test_url_analyzer_redirect.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_url_analyzer_redirect.cpython-312.pyc
+	backend/tests/__pycache__/test_url_redirects_quarantine.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_url_redirects_quarantine.cpython-312.pyc
+	backend/tests/__pycache__/test_url_safety.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_url_safety.cpython-312.pyc
+	backend/tests/__pycache__/test_url_safety_self_check.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_url_safety_self_check.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_id.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_id.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_queue.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_queue.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_queue_base_helpers.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_queue_base_helpers.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_queue_factory_dispatch.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_queue_factory_dispatch.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_queue_postgres.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_queue_postgres.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_queue_psycopg3_driver.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_queue_psycopg3_driver.cpython-312.pyc
+	backend/tests/__pycache__/test_worker_queue_psycopg3_import_smoke.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_worker_queue_psycopg3_import_smoke.cpython-312.pyc
+	backend/tests/__pycache__/test_zero_result_classifier.cpython-312-pytest-9.0.3.pyc
+	backend/tests/__pycache__/test_zero_result_classifier.cpython-312.pyc
+	backend/tests/__pycache__/verify_symmetry.cpython-312.pyc
+	backend/tests/conftest.py
+	backend/tests/distributed_divergence.py
+	backend/tests/evolutionary_ecology.py
+	backend/tests/fixtures/pages/10933defd606.html
+	backend/tests/fixtures/pages/147db5fb9615.html
+	backend/tests/fixtures/pages/1a21655575cd.html
+	backend/tests/fixtures/pages/1bcd9388dd05.html
+	backend/tests/fixtures/pages/28078bb01141.html
+	backend/tests/fixtures/pages/38714795dea8.html
+	backend/tests/fixtures/pages/395f96f5d719.html
+	backend/tests/fixtures/pages/414c34fc999d.html
+	backend/tests/fixtures/pages/430d0c62505d.html
+	backend/tests/fixtures/pages/48ba473726c2.html
+	backend/tests/fixtures/pages/5454cc7fecb5.html
+	backend/tests/fixtures/pages/569a5e557082.html
+	backend/tests/fixtures/pages/664ac2ce0e16.html
+	backend/tests/fixtures/pages/6995182f157f.html
+	backend/tests/fixtures/pages/6c8a24738440.html
+	backend/tests/fixtures/pages/6d0d8fe8c665.html
+	backend/tests/fixtures/pages/714df5237eba.html
+	backend/tests/fixtures/pages/762d40cbf2ed.html
+	backend/tests/fixtures/pages/76e7193c9867.html
+	backend/tests/fixtures/pages/8581cb1a7a59.html
+	backend/tests/fixtures/pages/88a11983779c.html
+	backend/tests/fixtures/pages/8f2aabc1ca59.html
+	backend/tests/fixtures/pages/9345bbbd7df7.html
+	backend/tests/fixtures/pages/9c1d02e32c5c.html
+	backend/tests/fixtures/pages/9cc913e0a06b.html
+	backend/tests/fixtures/pages/9fdd63da3416.html
+	backend/tests/fixtures/pages/a9e7512f2efd.html
+	backend/tests/fixtures/pages/ab3e590b0cbc.html
+	backend/tests/fixtures/pages/ac77c570214b.html
+	backend/tests/fixtures/pages/affe7187b56e.html
+	backend/tests/fixtures/pages/b459e17e9b43.html
+	backend/tests/fixtures/pages/b885fe6c2e9f.html
+	backend/tests/fixtures/pages/c4ef154cf4f4.html
+	backend/tests/fixtures/pages/c5a5088c65dc.html
+	backend/tests/fixtures/pages/cb176adaa9eb.html
+	backend/tests/fixtures/pages/ce3c5249ec43.html
+	backend/tests/fixtures/pages/ceb2f8dda77d.html
+	backend/tests/fixtures/pages/cf4be5cf39f5.html
+	backend/tests/fixtures/pages/df2c95e3c052.html
+	backend/tests/fixtures/pages/e19cf6fcf7b7.html
+	backend/tests/fixtures/pages/e2650ac26583.html
+	backend/tests/fixtures/pages/e31500c37fa4.html
+	backend/tests/fixtures/pages/e690d18e9300.html
+	backend/tests/fixtures/pages/e83c97fd30e1.html
+	backend/tests/fixtures/pages/eb9b319cbca0.html
+	backend/tests/fixtures/pages/f8b95ce21675.html
+	backend/tests/fixtures/pages/fc948aeefd4b.html
+	backend/tests/fixtures/pages/fd8b89674698.html
+	backend/tests/fixtures/pages/fedc56bcbc35.html
+	backend/tests/fixtures/pages/ffe8fdac3e52.html
+	backend/tests/fixtures/pages/legacy_directory.html
+	backend/tests/fixtures/pages/messy_blog.html
+	backend/tests/fixtures/pages/travel_site.html
+	backend/tests/golden_dataset/README.md
+	backend/tests/golden_dataset/expected/books_toscrape.json
+	backend/tests/golden_dataset/expected/example_com.json
+	backend/tests/golden_dataset/expected/httpbin_html.json
+	backend/tests/golden_dataset/expected/quotes_toscrape.json
+	backend/tests/golden_dataset/expected/scrapethissite_simple.json
+	backend/tests/golden_dataset/sites.json
+	backend/tests/manual_run_manual_test.py
+	backend/tests/manual_test_api.py
+	backend/tests/manual_test_app_scrape.py
+	backend/tests/manual_test_chennai.py
+	backend/tests/manual_test_extract.py
+	backend/tests/manual_test_flights_e2e.py
+	backend/tests/manual_test_hn.py
+	backend/tests/manual_test_insight.py
+	backend/tests/manual_test_modes.py
+	backend/tests/manual_test_pollinations.py
+	backend/tests/manual_test_providers.py
+	backend/tests/manual_test_real_scrape.py
+	backend/tests/manual_test_threebestrated.py
+	backend/tests/manual_test_workflow.py
+	backend/tests/test_accuracy.py
+	backend/tests/test_acquisition_mode.py
+	backend/tests/test_acquisition_quality_gate.py
+	backend/tests/test_acquisition_state.py
+	backend/tests/test_acquisition_telemetry.py
+	backend/tests/test_active_stability.py
+	backend/tests/test_adaptive_dom_quietness.py
+	backend/tests/test_adaptive_governance.py
+	backend/tests/test_ai_structuring_recovery.py
+	backend/tests/test_api_contract.py
+	backend/tests/test_api_regressions.py
+	backend/tests/test_api_worker_integration.py
+	backend/tests/test_architectural_validation.py
+	backend/tests/test_architecture_integration.py
+	backend/tests/test_architecture_invariants.py
+	backend/tests/test_async_lock_safety.py
+	backend/tests/test_async_utils.py
+	backend/tests/test_atomic_repository_ops.py
+	backend/tests/test_audit_logger.py
+	backend/tests/test_audit_logger_integration.py
+	backend/tests/test_benchmark_fixtures.py
+	backend/tests/test_benchmark_governance.py
+	backend/tests/test_benchmark_reporter.py
+	backend/tests/test_benchmark_suite.py
+	backend/tests/test_browser_network_capture.py
+	backend/tests/test_browser_pool.py
+	backend/tests/test_chaos_engineering.py
+	backend/tests/test_check_prod_env.py
+	backend/tests/test_cognitive_agency.py
+	backend/tests/test_cognitive_elasticity.py
+	backend/tests/test_cognitive_immunity.py
+	backend/tests/test_cognitive_observability.py
+	backend/tests/test_cognitive_safety.py
+	backend/tests/test_cognitive_scheduling.py
+	backend/tests/test_cognitive_steering.py
+	backend/tests/test_contact_enrichment.py
+	backend/tests/test_container_discovery.py
+	backend/tests/test_contract_smoke.py
+	backend/tests/test_contradiction_reallocation.py
+	backend/tests/test_count_jobs_by_status.py
+	backend/tests/test_crawl_frontier_persistence.py
+	backend/tests/test_csp_report_endpoint_public.py
+	backend/tests/test_csp_report_only.py
+	backend/tests/test_dashboard_security.py
+	backend/tests/test_data_utils.py
+	backend/tests/test_db_rate_limiter.py
+	backend/tests/test_degradation_predictor.py
+	backend/tests/test_deterministic_dotenv.py
+	backend/tests/test_deterministic_replay.py
+	backend/tests/test_discovery_dependency.py
+	backend/tests/test_discovery_quality.py
+	backend/tests/test_distributed_consensus.py
+	backend/tests/test_dns_isolation.py
+	backend/tests/test_doctor_script.py
+	backend/tests/test_domain_evolution_model.py
+	backend/tests/test_domain_health_stress.py
+	backend/tests/test_domain_intelligence.py
+	backend/tests/test_domain_runtime_policy.py
+	backend/tests/test_edge_field_model.py
+	backend/tests/test_egress_hardening.py
+	backend/tests/test_empty_response_detector.py
+	backend/tests/test_event_cascade.py
+	backend/tests/test_experimental_gate.py
+	backend/tests/test_experimental_uncov.py
+	backend/tests/test_exports_router.py
+	backend/tests/test_exports_sheet_collision_edge_cases.py
+	backend/tests/test_extracted_modules.py
+	backend/tests/test_extraction_integration.py
+	backend/tests/test_extraction_orchestrator.py
+	backend/tests/test_extraction_precision.py
+	backend/tests/test_extraction_provenance.py
+	backend/tests/test_failure_classification.py
+	backend/tests/test_failure_injector.py
+	backend/tests/test_federation_evolution.py
+	backend/tests/test_field_adversarial_stress.py
+	backend/tests/test_field_validator.py
+	backend/tests/test_field_waves.py
+	backend/tests/test_filters.py
+	backend/tests/test_forge_kernel.py
+	backend/tests/test_frontend_no_web_storage_for_keys.py
+	backend/tests/test_ga_hardening.py
+	backend/tests/test_geocode_cache.py
+	backend/tests/test_global_orchestration.py
+	backend/tests/test_globals_config.py
+	backend/tests/test_golden_dataset.py
+	backend/tests/test_governance.py
+	backend/tests/test_governance_visualization.py
+	backend/tests/test_grafana_dashboard.py
+	backend/tests/test_graph_invariants.py
+	backend/tests/test_graph_update_scheduler_char.py
+	backend/tests/test_helpers.py
+	backend/tests/test_hierarchical_synthesis.py
+	backend/tests/test_html_utils_quarantine.py
+	backend/tests/test_html_utils_utility.py
+	backend/tests/test_idempotency_keys.py
+	backend/tests/test_insight_engine.py
+	backend/tests/test_intent_parser_alignment.py
+	backend/tests/test_job_api_e2e.py
+	backend/tests/test_job_events_route.py
+	backend/tests/test_job_lifecycle.py
+	backend/tests/test_job_results_store.py
+	backend/tests/test_job_results_store_security.py
+	backend/tests/test_job_store_persistence.py
+	backend/tests/test_jobs_summary_contract.py
+	backend/tests/test_layer7_memory.py
+	backend/tests/test_lifespan_core.py
+	backend/tests/test_list_jobs_pagination.py
+	backend/tests/test_llm_bridge.py
+	backend/tests/test_llm_validator.py
+	backend/tests/test_main_routes_gate.py
+	backend/tests/test_manual_tests.py
+	backend/tests/test_mega_horizon.py
+	backend/tests/test_metastability.py
+	backend/tests/test_metrics.py
+	backend/tests/test_metrics_observability.py
+	backend/tests/test_migration_regression.py
+	backend/tests/test_motif_feedback.py
+	backend/tests/test_mvcc.py
+	backend/tests/test_network_extractor.py
+	backend/tests/test_network_payload_extractor.py
+	backend/tests/test_nginx_tls_posture.py
+	backend/tests/test_no_load_jobs_on_hot_path.py
+	backend/tests/test_operator.py
+	backend/tests/test_owasp.py
+	backend/tests/test_p0_auth_tenant.py
+	backend/tests/test_p0_billing_usage.py
+	backend/tests/test_p1_compliance_aup.py
+	backend/tests/test_p1_compliance_denylist.py
+	backend/tests/test_page.html
+	backend/tests/test_paginated_results.py
+	backend/tests/test_partition_healing.py
+	backend/tests/test_partition_recovery.py
+	backend/tests/test_patch_status.py
+	backend/tests/test_pg_pool_settings.py
+	backend/tests/test_playwright_browser_e2e.py
+	backend/tests/test_postgres_integration.py
+	backend/tests/test_postgres_repository.py
+	backend/tests/test_priority_queue.py
+	backend/tests/test_prod_security_validator.py
+	backend/tests/test_production_driver_selection.py
+	backend/tests/test_production_hardening.py
+	backend/tests/test_production_security.py
+	backend/tests/test_production_simulation.py
+	backend/tests/test_production_synthesis.py
+	backend/tests/test_profile_alignment_e2e.py
+	backend/tests/test_proxy_manager.py
+	backend/tests/test_psycopg3_import_smoke.py
+	backend/tests/test_psycopg3_repository.py
+	backend/tests/test_pyflakes_fixes.py
+	backend/tests/test_pytest_timeout.py
+	backend/tests/test_rate_limit_db_promotion.py
+	backend/tests/test_rate_limiter_config_respect.py
+	backend/tests/test_rate_limiter_unit.py
+	backend/tests/test_rbac.py
+	backend/tests/test_rbac_route_matrix_regression.py
+	backend/tests/test_recovery_correctness.py
+	backend/tests/test_recovery_integration.py
+	backend/tests/test_recovery_strategies.py
+	backend/tests/test_regression_capture.py
+	backend/tests/test_relational_memory.py
+	backend/tests/test_replay_buffer.py
+	backend/tests/test_repository_parity.py
+	backend/tests/test_research_boundary.py
+	backend/tests/test_research_kernel_boundary_invariant.py
+	backend/tests/test_research_leak_tracking.py
+	backend/tests/test_resource_governor.py
+	backend/tests/test_route_auth_matrix.py
+	backend/tests/test_route_auth_matrix_generator.py
+	backend/tests/test_route_inventory_split.py
+	backend/tests/test_router_quarantine.py
+	backend/tests/test_run_job_characterization.py
+	backend/tests/test_saas_identity.py
+	backend/tests/test_scaling.py
+	backend/tests/test_scrape_attempt_result.py
+	backend/tests/test_scrape_telemetry.py
+	backend/tests/test_scraper_diagnostics.py
+	backend/tests/test_security.py
+	backend/tests/test_selector_decay_predictor.py
+	backend/tests/test_selector_discovery.py
+	backend/tests/test_selector_engine.py
+	backend/tests/test_selector_extract_align.py
+	backend/tests/test_selector_ml_optimizer.py
+	backend/tests/test_selector_profile_loader.py
+	backend/tests/test_selector_profile_loader_extended.py
+	backend/tests/test_self_tuning_extraction.py
+	backend/tests/test_semantic_invariants.py
+	backend/tests/test_semantic_lifecycle.py
+	backend/tests/test_semantic_mapper.py
+	backend/tests/test_semantic_persistence.py
+	backend/tests/test_semantic_pipeline.py
+	backend/tests/test_semantic_segmentation.py
+	backend/tests/test_semantic_sharding.py
+	backend/tests/test_semantic_state.json.lock
+	backend/tests/test_semantic_stress.py
+	backend/tests/test_semantic_survivability.py
+	backend/tests/test_session_auth.py
+	backend/tests/test_session_bound_e2e.py
+	backend/tests/test_session_recovery.py
+	backend/tests/test_session_url_detector.py
+	backend/tests/test_sharded_federation.py
+	backend/tests/test_snapshot_desync_detector.py
+	backend/tests/test_sovereignty.py
+	backend/tests/test_ssrf_public_transport.py
+	backend/tests/test_state_ownership.py
+	backend/tests/test_state_store.py
+	backend/tests/test_storage_endpoints.py
+	backend/tests/test_storage_migrations.py
+	backend/tests/test_storage_split_v4.py
+	backend/tests/test_strategy_evolution.py
+	backend/tests/test_substrate_branching.py
+	backend/tests/test_substrate_plugins.py
+	backend/tests/test_substrate_self_evolution.py
+	backend/tests/test_summary_dto_contract.py
+	backend/tests/test_targeted_reads.py
+	backend/tests/test_telegram_notifier.py
+	backend/tests/test_telemetry_state.py
+	backend/tests/test_thermodynamic_reasoning.py
+	backend/tests/test_three_way_acquisition.py
+	backend/tests/test_topological_query.py
+	backend/tests/test_topology_key_parser.py
+	backend/tests/test_topology_refactor.py
+	backend/tests/test_transaction_context.py
+	backend/tests/test_transactions.py
+	backend/tests/test_trend_analyzer.py
+	backend/tests/test_universal_search.py
+	backend/tests/test_url_analyzer_redirect.py
+	backend/tests/test_url_redirects_quarantine.py
+	backend/tests/test_url_safety.py
+	backend/tests/test_url_safety_self_check.py
+	backend/tests/test_worker_id.py
+	backend/tests/test_worker_queue.py
+	backend/tests/test_worker_queue_base_helpers.py
+	backend/tests/test_worker_queue_factory_dispatch.py
+	backend/tests/test_worker_queue_postgres.py
+	backend/tests/test_worker_queue_psycopg3_driver.py
+	backend/tests/test_worker_queue_psycopg3_import_smoke.py
+	backend/tests/test_zero_result_classifier.py
+	backend/tests/verify_symmetry.py
+
+Test results:
+	No issues identified.
+
+Code scanned:
+	Total lines of code: 56646
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 44
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+Files skipped (0):
