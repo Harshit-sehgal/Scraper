@@ -76,6 +76,9 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
+| GET | `/api/operator/denylist` | Operator or admin |
+| POST | `/api/operator/denylist` | Admin |
+| DELETE | `/api/operator/denylist` | Admin |
 | GET | `/api/system/status` | Operator or admin |
 | GET | `/api/system/storage/status` | Operator or admin |
 | GET | `/api/system/diagnostics/export` | Admin |
