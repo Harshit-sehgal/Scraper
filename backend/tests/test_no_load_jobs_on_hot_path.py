@@ -11,11 +11,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-# Paths are relative to the project root (where pytest is invoked)
+# Paths are relative to the project root (computed from this file's location)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ROUTER_FILES = [
-    Path("backend/app/routers/jobs_read.py"),
-    Path("backend/app/routers/jobs_write.py"),
-    Path("backend/app/routers/exports.py"),
+    _PROJECT_ROOT / "app/routers/jobs_read.py",
+    _PROJECT_ROOT / "app/routers/jobs_write.py",
+    _PROJECT_ROOT / "app/routers/exports.py",
 ]
 
 
@@ -49,7 +50,7 @@ def _walk_async_functions(tree: ast.Module) -> list[ast.AsyncFunctionDef]:
 
 class TestRoutersNoFullLoad:
     def test_jobs_read_router_has_no_load_jobs_call(self) -> None:
-        path = Path("backend/app/routers/jobs_read.py")
+        path = _PROJECT_ROOT / "app/routers/jobs_read.py"
         if not path.exists():
             return  # pragma: no cover
         tree = _load_module(path)
@@ -61,7 +62,7 @@ class TestRoutersNoFullLoad:
         assert not offenders, f"Router hot paths must not call repo.load_jobs() (full table load). Found: {offenders}"
 
     def test_jobs_write_router_has_no_load_jobs_call(self) -> None:
-        path = Path("backend/app/routers/jobs_write.py")
+        path = _PROJECT_ROOT / "app/routers/jobs_write.py"
         if not path.exists():
             return  # pragma: no cover
         tree = _load_module(path)
@@ -73,7 +74,7 @@ class TestRoutersNoFullLoad:
         assert not offenders, f"Router hot paths must not call repo.load_jobs() (full table load). Found: {offenders}"
 
     def test_exports_router_has_no_load_jobs_call(self) -> None:
-        path = Path("backend/app/routers/exports.py")
+        path = _PROJECT_ROOT / "app/routers/exports.py"
         if not path.exists():
             return  # pragma: no cover
         tree = _load_module(path)
