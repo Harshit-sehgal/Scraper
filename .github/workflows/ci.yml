@@ -345,7 +345,7 @@ jobs:
     needs: [ci-gates-fast, ci-gates-benchmarks, lint-type-checks, sbom]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: always()
+    if: always() && secrets.TELEGRAM_TOKEN != '' && secrets.TELEGRAM_TO != ''
     steps:
       - name: Send Telegram Message
         # Pinned to a specific commit SHA for supply-chain integrity.
