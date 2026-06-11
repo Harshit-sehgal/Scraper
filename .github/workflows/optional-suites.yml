@@ -112,7 +112,7 @@ jobs:
     needs: [postgres, browser-e2e, golden-dataset]
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: always()
+    if: always() && secrets.TELEGRAM_TOKEN != '' && secrets.TELEGRAM_TO != ''
     steps:
       - name: Send Telegram Message
         uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
