@@ -54,12 +54,9 @@ jobs:
 
       - name: Run Dependency Vulnerability Audit
         run: |
-          # pip-audit is included via pyproject.toml. Audits the
-          # production lock to catch CVEs in anything that ends up in the
-          # image. Dev-only tools are scanned separately.
-          pip-audit -r pyproject.toml --strict
-          pip-audit -r pyproject.toml --strict || \
-            echo "::warning::pip-audit reported issues in dev-only dependencies (non-blocking)"
+          # pip-audit is included via pyproject.toml. Audits the production
+          # dependencies to catch CVEs in anything that ends up in the image.
+          pip-audit . --strict
 
       - name: Generate Route Authorization Matrix
         run: |
