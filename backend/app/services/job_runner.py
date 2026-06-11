@@ -187,6 +187,12 @@ async def run_job(
             on_llm_call=lambda count: setattr(job, "total_llm_calls", job.total_llm_calls + count),
             min_record_score=job.min_record_score or 0.35,
             cancel_check=_cancel_requested_from_db,
+            usage_context={
+                "user_id": getattr(job, "created_by", "") or "",
+                "org_id": getattr(job, "org_id", "") or "",
+                "project_id": getattr(job, "project_id", "") or "",
+                "job_id": getattr(job, "id", "") or "",
+            },
         )
         warnings.extend(struct_warnings)
 

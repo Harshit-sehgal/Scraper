@@ -39,7 +39,9 @@ TRACKED_PREFIXES: tuple[str, ...] = (
     "/api/scraper",
     "/api/operator",
     "/api/system",
+    "/api/saas",
     "/api/session",
+    "/api/exports",
 )
 
 # Markdown pipe rows that look like:
@@ -50,11 +52,13 @@ ROUTE_ROW_RE = re.compile(
 )
 
 
-def _declared_routes_in_doc() -> set[tuple[str, str]]:
+def _declared_routes_in_doc(*, include_experimental: bool) -> set[tuple[str, str]]:
     """Parse ``docs/API.md`` for declared (method, path) tuples
     that fall under one of the tracked prefixes.
     """
     text = API_DOC.read_text(encoding="utf-8")
+    if not include_experimental:
+        text = text.split("## Experimental / Research Routes (Gated)", maxsplit=1)[0]
     out: set[tuple[str, str]] = set()
     for m, p in ROUTE_ROW_RE.findall(text):
         if any(p.startswith(prefix) for prefix in TRACKED_PREFIXES):
@@ -120,7 +124,7 @@ def main() -> int:
     if not API_DOC.exists():
         print(f"docs file missing: {API_DOC}", file=sys.stderr)
         return 2
-    declared = _declared_routes_in_doc()
+    declared = _declared_routes_in_doc(include_experimental=args.include_experimental)
     if not declared:
         print(f"no routes declared in {API_DOC}", file=sys.stderr)
         return 2

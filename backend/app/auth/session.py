@@ -12,7 +12,10 @@ import hashlib
 import hmac
 import json
 import os
+import sqlite3
 import time
+import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from app.config import settings
@@ -22,6 +25,117 @@ if TYPE_CHECKING:
 
 SESSION_COOKIE = "dataforge_session"
 SESSION_MAX_AGE = 86400  # 24 hours
+
+
+def _session_db_path() -> Path:
+    """Resolve the server-side session registry path."""
+    identity_path = getattr(settings, "IDENTITY_DB_PATH", "")
+    if identity_path:
+        path = Path(identity_path).expanduser().with_name("session.db")
+    else:
+        from app.job_store import _get_db_path
+
+        path = _get_db_path().with_name("session.db")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _connect_session_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(_session_db_path()), timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _ensure_session_schema() -> None:
+    with _connect_session_db() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                sid TEXT PRIMARY KEY,
+                role TEXT NOT NULL,
+                user_id TEXT NOT NULL DEFAULT '',
+                created_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL,
+                revoked_at INTEGER DEFAULT NULL
+            )
+            """,
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at)")
+        conn.commit()
+
+
+def _create_server_session(role: str, user_id: str, *, issued_at: int, max_age: int) -> str:
+    """Persist a revocable server-side session and return its opaque ID."""
+    sid = str(uuid.uuid4())
+    try:
+        _ensure_session_schema()
+        with _connect_session_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO auth_sessions (sid, role, user_id, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (sid, role, user_id or "", issued_at, issued_at + max_age),
+            )
+            conn.commit()
+    except (OSError, sqlite3.Error):
+        # Fail closed: an unregistered session id will not verify.
+        return ""
+    return sid
+
+
+def _server_session_is_active(sid: str, role: str, user_id: str, *, now: int) -> bool:
+    """Return True only for a known, unrevoked, unexpired session."""
+    if not sid:
+        return False
+    try:
+        _ensure_session_schema()
+        with _connect_session_db() as conn:
+            row = conn.execute(
+                """
+                SELECT role, user_id, expires_at, revoked_at
+                FROM auth_sessions
+                WHERE sid = ?
+                """,
+                (sid,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return False
+    if row is None:
+        return False
+    return (
+        str(row["role"]) == role
+        and str(row["user_id"] or "") == (user_id or "")
+        and row["revoked_at"] is None
+        and int(row["expires_at"]) >= now
+    )
+
+
+def revoke_session_cookie(cookie_value: str) -> bool:
+    """Revoke the server-side session referenced by a signed cookie."""
+    payload = _unsign(cookie_value)
+    if payload is None:
+        return False
+    try:
+        raw = base64.urlsafe_b64decode(payload + "==")
+        data = json.loads(raw.decode("utf-8"))
+        sid = str(data.get("sid", ""))
+    except (TypeError, json.JSONDecodeError, ValueError, UnicodeDecodeError):
+        return False
+    if not sid:
+        return False
+    try:
+        _ensure_session_schema()
+        with _connect_session_db() as conn:
+            cursor = conn.execute(
+                "UPDATE auth_sessions SET revoked_at = ? WHERE sid = ? AND revoked_at IS NULL",
+                (int(time.time()), sid),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except (OSError, sqlite3.Error):
+        return False
 
 
 def _derive_secret() -> bytes:
@@ -61,8 +175,14 @@ def _unsign(signed: str) -> str | None:
 
 def create_session_cookie(role: str, user_id: str = "") -> str:
     """Create a signed session cookie value embedding role and identity."""
+    issued_at = int(time.time())
+    max_age = SESSION_MAX_AGE
+    sid = _create_server_session(role, user_id, issued_at=issued_at, max_age=max_age)
+    if not sid:
+        msg = "failed to create server-side session"
+        raise RuntimeError(msg)
     data = json.dumps(
-        {"role": role, "user_id": user_id, "iat": int(time.time()), "max_age": SESSION_MAX_AGE},
+        {"role": role, "user_id": user_id, "iat": issued_at, "max_age": max_age, "sid": sid},
         separators=(",", ":"),
     )
     payload = base64.urlsafe_b64encode(data.encode("utf-8")).decode("ascii").rstrip("=")
@@ -88,10 +208,14 @@ def verify_session_payload(cookie_value: str) -> dict[str, object] | None:
 
     role = str(data.get("role", ""))
     user_id = str(data.get("user_id", ""))
+    sid = str(data.get("sid", ""))
 
-    if role not in {"admin", "operator", "user"} or max_age < 0 or time.time() > iat + max_age:
+    now = int(time.time())
+    if role not in {"admin", "operator", "user"} or max_age < 0 or now > iat + max_age:
         return None
-    return {"role": role, "user_id": user_id, "iat": iat, "max_age": max_age}
+    if not _server_session_is_active(sid, role, user_id, now=now):
+        return None
+    return {"role": role, "user_id": user_id, "iat": iat, "max_age": max_age, "sid": sid}
 
 
 def verify_session_cookie(cookie_value: str) -> str | None:

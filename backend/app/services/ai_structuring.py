@@ -25,6 +25,41 @@ logger = logging.getLogger(__name__)
 AiStructuringReport = dict
 
 
+def _record_ai_structuring_usage(
+    usage_context: dict[str, Any] | None,
+    *,
+    llm_calls: int,
+    report: AiStructuringReport,
+) -> None:
+    """Record AI-structuring usage without breaking the extraction pipeline."""
+    context = usage_context or {}
+    user_id = str(context.get("user_id") or "")
+    job_id = str(context.get("job_id") or "")
+    if not user_id:
+        return
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        get_usage_ledger().record_usage(
+            user_id,
+            UsageType.AI_STRUCTURING,
+            quantity=max(1, int(llm_calls or 0)),
+            metadata={
+                "job_id": job_id,
+                "input_records": int(report.get("input_records", 0) or 0),
+                "output_records": int(report.get("output_records", 0) or 0),
+                "model_fallback_mode": bool(report.get("model_fallback_mode", False)),
+            },
+            idempotency_key=f"ai-structuring:{job_id}" if job_id else "",
+            org_id=str(context.get("org_id") or ""),
+            project_id=str(context.get("project_id") or ""),
+        )
+    except ValueError:
+        logger.warning("AI-structuring quota exceeded for job %s", job_id)
+    except Exception as exc:
+        logger.debug("AI-structuring metering skipped: %s", exc)
+
+
 def _should_run_global_ai_structuring(
     all_raw_results: list[dict],
     schema_fields: list[Any],
@@ -81,6 +116,7 @@ async def apply_global_ai_structuring(
     on_llm_call,
     min_record_score: float = 0.35,
     cancel_check: Callable | None = None,
+    usage_context: dict[str, Any] | None = None,
 ) -> tuple[list[dict], AiStructuringReport, list[str]]:
     """Apply global AI structuring to scraped records.
 
@@ -138,6 +174,7 @@ async def apply_global_ai_structuring(
         )
         llm_calls = get_llm_call_count()
         on_llm_call(llm_calls)
+        _record_ai_structuring_usage(usage_context, llm_calls=llm_calls, report=report)
 
         # Check for cancellation before running semantic pipeline
         if cancel_check and await cancel_check():

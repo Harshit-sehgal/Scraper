@@ -283,6 +283,7 @@ class TestRealWorkerHandler:
             max_recovery_attempts=3,
             selectors_map=None,
             search_params=None,
+            usage_context=None,
         ):
             sample_records = [
                 {

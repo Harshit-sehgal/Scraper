@@ -35,6 +35,47 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _record_scheduled_job_usage(
+    *,
+    task_id: str,
+    task_type: str,
+    payload: dict | None,
+    scheduled_at: str | None,
+    usage_context: dict[str, Any] | None = None,
+) -> None:
+    """Record one scheduled worker task when caller attribution is available."""
+    context = dict(usage_context or {})
+    payload = payload or {}
+    user_id = str(context.get("user_id") or payload.get("user_id") or payload.get("created_by") or "")
+    if not user_id:
+        return
+
+    org_id = str(context.get("org_id") or payload.get("org_id") or "")
+    project_id = str(context.get("project_id") or payload.get("project_id") or "")
+    job_id = str(context.get("job_id") or payload.get("job_id") or "")
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        get_usage_ledger().record_usage(
+            user_id,
+            UsageType.SCHEDULED_JOB,
+            quantity=1,
+            metadata={
+                "task_id": task_id,
+                "task_type": task_type,
+                "job_id": job_id,
+                "scheduled_at": scheduled_at or "",
+            },
+            idempotency_key=f"scheduled-job:{task_id}",
+            org_id=org_id,
+            project_id=project_id,
+        )
+    except ValueError:
+        raise
+    except Exception as exc:
+        logger.debug("Scheduled-job metering skipped: %s", exc)
+
+
 class Priority(IntEnum):
     """Task priority levels. Lower number = higher priority."""
 
@@ -363,6 +404,7 @@ class WorkerQueue:
         timeout_seconds: int = 300,
         task_id: str | None = None,
         scheduled_at: str | None = None,
+        usage_context: dict[str, Any] | None = None,
     ) -> str:
         """Add a new task to the queue. Returns the task ID."""
         task = QueueTask(
@@ -373,6 +415,13 @@ class WorkerQueue:
             timeout_seconds=timeout_seconds,
             task_id=task_id,
             scheduled_at=scheduled_at,
+        )
+        _record_scheduled_job_usage(
+            task_id=task.id,
+            task_type=task.type,
+            payload=task.payload,
+            scheduled_at=task.scheduled_at,
+            usage_context=usage_context,
         )
 
         async with self._in_flight_lock:

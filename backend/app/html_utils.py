@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
 import time
 from typing import TYPE_CHECKING, Any, Literal
@@ -36,6 +37,51 @@ from app.models import FieldType, SchemaField
 from app.url_safety import validate_public_http_url as _validate_url_safe
 
 logger = logging.getLogger(__name__)
+
+
+def _record_browser_minutes(
+    *,
+    usage_context: dict[str, Any] | None,
+    url: str,
+    method: str,
+    quantity: int,
+    phase: str,
+    duration_ms: float | None = None,
+) -> bool:
+    """Record billable Playwright browser minutes when caller attribution exists."""
+    if quantity <= 0:
+        return True
+    context = usage_context or {}
+    user_id = str(context.get("user_id") or "")
+    if not user_id:
+        return True
+
+    metadata: dict[str, Any] = {
+        "url": url,
+        "method": method,
+        "job_id": str(context.get("job_id") or ""),
+        "phase": phase,
+    }
+    if duration_ms is not None:
+        metadata["duration_ms"] = round(duration_ms, 3)
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        get_usage_ledger().record_usage(
+            user_id,
+            UsageType.BROWSER_MINUTE,
+            quantity=quantity,
+            metadata=metadata,
+            org_id=str(context.get("org_id") or ""),
+            project_id=str(context.get("project_id") or ""),
+        )
+        return True
+    except ValueError:
+        logger.warning("Browser-minute quota exceeded for job %s URL %s", metadata["job_id"], url)
+        return False
+    except Exception as exc:
+        logger.debug("Browser-minute metering skipped: %s", exc)
+        return True
 
 
 EMPTY_TOKENS = {"-", "n / a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
@@ -337,6 +383,7 @@ async def fetch_page_content(
     scroll_attempts: int | None = None,
     anti_bot_stealth: bool = False,
     extra_headers: dict[str, str] | None = None,
+    usage_context: dict[str, Any] | None = None,
 ) -> tuple[str, float, str, int]:
     """Load a URL in a pooled headless browser context or via plain HTTP.
 
@@ -407,8 +454,26 @@ async def fetch_page_content(
     network_payloads = []  # Pre-initialize for safety
     js_render_delay_ms = 0.0
     method_used = strategy.value
+    browser_meter_started_at: float | None = None
+    browser_metered_initial = False
 
     try:
+        browser_meter_started_at = time.monotonic()
+        if not _record_browser_minutes(
+            usage_context=usage_context,
+            url=url,
+            method=method_used,
+            quantity=1,
+            phase="initial",
+        ):
+            logger.warning("[Scraper] Browser-minute quota exhausted for %s. Falling back to httpx_basic", url)
+            return await _fetch_with_httpx(
+                url,
+                strategy=FetchStrategy.HTTPX_BASIC,
+                extra_headers=extra_headers,
+                timeout_ms=timeout_ms,
+            )
+        browser_metered_initial = True
         pool = get_browser_pool()
         # Pass strategy to get_context for specialized setup
         context = await pool.get_context(domain, strategy=strategy)
@@ -645,6 +710,19 @@ async def fetch_page_content(
             timeout_ms=timeout_ms,
         )
     finally:
+        if browser_metered_initial and browser_meter_started_at is not None:
+            elapsed_seconds = max(0.0, time.monotonic() - browser_meter_started_at)
+            billable_minutes = max(1, math.ceil(elapsed_seconds / 60.0))
+            extra_minutes = billable_minutes - 1
+            if extra_minutes > 0:
+                _record_browser_minutes(
+                    usage_context=usage_context,
+                    url=url,
+                    method=method_used,
+                    quantity=extra_minutes,
+                    phase="additional",
+                    duration_ms=elapsed_seconds * 1000,
+                )
         if page:
             with suppress(Exception):
                 await page.close()

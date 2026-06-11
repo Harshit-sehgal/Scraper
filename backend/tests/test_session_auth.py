@@ -79,6 +79,26 @@ def test_session_delete_clears_cookie(client, monkeypatch) -> None:
     assert r3.json()["authenticated"] is False
 
 
+def test_session_delete_revokes_previous_cookie(client, monkeypatch) -> None:
+    """DELETE /api/session invalidates the old signed cookie server-side."""
+    _set_api_key(monkeypatch, key="test-key")
+
+    r = client.post("/api/session", headers={"X-API-Key": "test-key"})
+    assert r.status_code == 200
+    old_cookie = r.cookies.get("dataforge_session")
+    assert old_cookie
+
+    r2 = client.delete("/api/session", cookies={"dataforge_session": old_cookie})
+    assert r2.status_code == 200
+
+    r3 = client.get("/api/session/me", cookies={"dataforge_session": old_cookie})
+    assert r3.status_code == 200
+    assert r3.json()["authenticated"] is False
+
+    protected = client.get("/api/jobs", cookies={"dataforge_session": old_cookie})
+    assert protected.status_code == 403
+
+
 def test_session_cookie_authenticates_api_requests(client, monkeypatch) -> None:
     """A valid session cookie authenticates API requests without X-API-Key header."""
     _set_api_key(monkeypatch, key="test-key")

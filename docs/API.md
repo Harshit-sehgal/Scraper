@@ -93,6 +93,13 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | DELETE | `/api/session` | Authenticated user (clears session cookie) |
 | GET | `/api/session/me` | Authenticated user (returns current role) |
 
+## SaaS / Compliance Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/saas/aup/status` | Authenticated user |
+| POST | `/api/saas/aup/accept` | Authenticated user |
+
 ## Batch Export
 
 | Method | Path | Intended Access |

@@ -25,16 +25,16 @@ logger = logging.getLogger(__name__)
 ScrapeResult = tuple[int, list[dict], bool, dict]
 
 
-def _record_page_fetch(job: Any, url: str) -> None:
+def _record_page_fetch(job: Any, url: str) -> bool:
     """Record a page-fetch usage event for billing/quota enforcement.
 
     Called once per attempted URL scrape (not for domain-cooldown skips).
-    Failures are logged but never block the scraper — a broken usage ledger
-    must not prevent extraction.
+    Returns ``False`` only when the user's page-fetch quota is exhausted.
+    Other ledger failures are logged but do not block extraction.
     """
     user_id = getattr(job, "created_by", None) or getattr(job, "user_id", None) or ""
     if not user_id:
-        return
+        return True
     try:
         from app.utils.usage_ledger import UsageType, get_usage_ledger
 
@@ -46,10 +46,13 @@ def _record_page_fetch(job: Any, url: str) -> None:
             org_id=getattr(job, "org_id", "") or "",
             project_id=getattr(job, "project_id", "") or "",
         )
+        return True
     except ValueError:
         logger.warning("Page-fetch quota exceeded for job %s URL %s", getattr(job, "id", ""), url)
+        return False
     except Exception as exc:
         logger.debug("Page-fetch metering skipped: %s", exc)
+        return True
 
 
 async def run_scraping_phase(
@@ -149,6 +152,11 @@ async def run_scraping_phase(
 
         async with semaphore, domain_sem:
             await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
+            if not _record_page_fetch(job, url):
+                await _safe_log(f"Skipping ({idx}/{len(job.urls)}): {url} — page-fetch quota exceeded", level="warning")
+                await _safe_warning(f"URL skipped due to page-fetch quota ({idx}/{len(job.urls)}): {url}")
+                await _mark_completed()
+                return idx, [], False, {"attempted": False, "quota_exceeded": True}
 
             from app.semantic_world_state import get_world_state
 
@@ -168,6 +176,12 @@ async def run_scraping_phase(
                         max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
                         selectors_map=job.selectors_map,
                         search_params=job.search_params,
+                        usage_context={
+                            "user_id": getattr(job, "created_by", "") or getattr(job, "user_id", "") or "",
+                            "org_id": getattr(job, "org_id", "") or "",
+                            "project_id": getattr(job, "project_id", "") or "",
+                            "job_id": getattr(job, "id", "") or "",
+                        },
                     ),
                     timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                 )
@@ -221,7 +235,6 @@ async def run_scraping_phase(
                 await run_in_threadpool(persist_job_state_fn)
                 async with job_lock:
                     pass
-                _record_page_fetch(job, url)
                 await _mark_completed()
                 return idx, results, True, url_meta
             except asyncio.CancelledError:
@@ -233,7 +246,6 @@ async def run_scraping_phase(
                 await _safe_log(f"Timeout on {url}", level="warning")
                 logger.warning("Timeout for %s", url)
                 await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
-                _record_page_fetch(job, url)
                 await _mark_completed()
                 return idx, [], False, {}
             except Exception as e:
@@ -241,7 +253,6 @@ async def run_scraping_phase(
                 logger.exception("URL scrape failed: %s", url)
                 await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
                 await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
-                _record_page_fetch(job, url)
                 await _mark_completed()
                 return idx, [], False, {}
 

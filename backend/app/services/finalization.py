@@ -21,6 +21,34 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _record_job_completed_usage(job: Any) -> None:
+    """Record terminal job usage without letting billing failures break finalization."""
+    user_id = getattr(job, "created_by", "") or getattr(job, "user_id", "") or ""
+    if not user_id:
+        return
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        get_usage_ledger().record_usage(
+            user_id,
+            UsageType.JOB_COMPLETED,
+            quantity=1,
+            metadata={
+                "job_id": getattr(job, "id", ""),
+                "status": getattr(getattr(job, "status", ""), "value", str(getattr(job, "status", ""))),
+                "total_records": getattr(job, "total_records", 0),
+                "filtered_records": getattr(job, "filtered_records", 0),
+            },
+            idempotency_key=f"job-completed:{getattr(job, 'id', '')}",
+            org_id=getattr(job, "org_id", "") or "",
+            project_id=getattr(job, "project_id", "") or "",
+        )
+    except ValueError:
+        logger.warning("Job-completion quota exceeded for job %s", getattr(job, "id", ""))
+    except Exception as exc:
+        logger.debug("Job-completion metering skipped: %s", exc)
+
+
 async def run_finalization(
     job: Any,
     *,
@@ -65,6 +93,7 @@ async def run_finalization(
     job.cancel_requested = False
     job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
     job.progress_current = job.progress_total
+    _record_job_completed_usage(job)
 
     from app.services.job_runner import save_semantic_state
 

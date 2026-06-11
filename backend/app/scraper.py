@@ -441,6 +441,7 @@ async def scrape_url_attempt(
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
     attempt_ctx: AttemptContext | None = None,
+    usage_context: dict[str, Any] | None = None,
 ) -> ScrapeAttemptResult:
     """Scrape a single URL and return an enriched ScrapeAttemptResult
     with full metadata (HTML, telemetry, acquisition lineage, zero-result
@@ -464,6 +465,7 @@ async def scrape_url_attempt(
         selectors_map=selectors_map,
         search_params=search_params,
         attempt_ctx=attempt_ctx,
+        usage_context=usage_context,
     )
 
     records = list(raw)
@@ -519,6 +521,7 @@ async def scrape_url(
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
     attempt_ctx: AttemptContext | None = None,
+    usage_context: dict[str, Any] | None = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL.
 
@@ -618,6 +621,7 @@ async def scrape_url(
             scroll_attempts=attempt_ctx.scroll_attempts if attempt_ctx else None,
             anti_bot_stealth=attempt_ctx.anti_bot_stealth if attempt_ctx else False,
             extra_headers=attempt_ctx.extra_headers if attempt_ctx else None,
+            usage_context=usage_context,
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True

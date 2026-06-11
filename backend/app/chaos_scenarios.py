@@ -208,7 +208,7 @@ class FailureScenarios:
                     "use_js_rendering",
                     "try_alternative_endpoints",
                     "increase_wait_time",
-                    "use_captcha_solver",
+                    "surface_authorized_access_required",
                 ],
                 validation_checks=[
                     "captchas_detected",

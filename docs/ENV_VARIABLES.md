@@ -14,6 +14,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `postgres` |
 | `DATAFORGE_DATABASE_URL` | - | PostgreSQL connection URL (required for postgres backend) |
 | `DATAFORGE_STATE_FILE` | `data/state.json` | Path to state file |
+| `DATAFORGE_JOB_STORE_PATH` | - | Override SQLite job-store database path |
 | `DATAFORGE_SEMANTIC_STATE_PATH` | `data/semantic_state.json` | Path to semantic state file |
 
 ## Authentication
@@ -56,6 +57,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_METRICS_TOKEN` | - | Token for metrics endpoint |
 | `DATAFORGE_TRUSTED_PROXIES` | - | Comma-separated list of trusted proxies |
 | `DATAFORGE_ALLOWED_INTERNAL_HOSTS` | - | Comma-separated list of allowed internal hosts |
+| `DATAFORGE_DENYLIST_DB_PATH` | - | Optional SQLite path for the operator-managed domain denylist |
 
 ## Experimental Features
 

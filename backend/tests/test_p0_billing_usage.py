@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from app.config import settings
@@ -302,7 +305,7 @@ def test_record_page_fetch_skips_when_created_by_missing(monkeypatch) -> None:
     monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
 
     job = Job(id="anon-fetch", name="anon-test", urls=["https://example.com"], status=JobStatus.RUNNING)
-    _record_page_fetch(job, "https://example.com/page")
+    assert _record_page_fetch(job, "https://example.com/page") is True
 
     assert ledger.get_usage("", UsageType.PAGE_FETCHED) == []
 
@@ -315,7 +318,330 @@ def test_record_page_fetch_quota_exceeded_logs_warning(monkeypatch) -> None:
     monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
 
     job = Job(id="quota-job", name="quota-test", created_by="user-quota", urls=["https://example.com"], status=JobStatus.RUNNING)
-    _record_page_fetch(job, "https://example.com/page")
+    assert _record_page_fetch(job, "https://example.com/page") is False
 
     records = ledger.get_usage("user-quota", UsageType.PAGE_FETCHED)
     assert len(records) == 0
+
+
+def test_worker_queue_enqueue_records_scheduled_job_usage(tmp_path, monkeypatch) -> None:
+    from app.worker_queue import WorkerQueue
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+    queue = WorkerQueue(db_path=tmp_path / "worker_queue.db")
+
+    task_id = asyncio.run(
+        queue.enqueue(
+            "scrape_job",
+            {"job_id": "scheduled-job-1"},
+            task_id="scheduled-job-1",
+            usage_context={
+                "user_id": "user-scheduled",
+                "org_id": "org-scheduled",
+                "project_id": "project-scheduled",
+                "job_id": "scheduled-job-1",
+            },
+        ),
+    )
+
+    assert task_id == "scheduled-job-1"
+    assert queue.get_status()["pending"] == 1
+    records = ledger.get_usage("user-scheduled", UsageType.SCHEDULED_JOB)
+    assert len(records) == 1
+    assert records[0].quantity == 1
+    assert records[0].org_id == "org-scheduled"
+    assert records[0].project_id == "project-scheduled"
+    assert records[0].metadata["task_id"] == "scheduled-job-1"
+    assert records[0].metadata["task_type"] == "scrape_job"
+
+
+def test_worker_queue_enqueue_enforces_scheduled_job_quota(tmp_path, monkeypatch) -> None:
+    from app.worker_queue import WorkerQueue
+
+    ledger = UsageLedger()
+    ledger.set_quota("user-scheduled", UsageType.SCHEDULED_JOB, limit=0, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+    queue = WorkerQueue(db_path=tmp_path / "worker_queue.db")
+
+    with pytest.raises(ValueError, match="scheduled_job"):
+        asyncio.run(
+            queue.enqueue(
+                "scrape_job",
+                {"job_id": "blocked-scheduled-job"},
+                task_id="blocked-scheduled-job",
+                usage_context={"user_id": "user-scheduled", "job_id": "blocked-scheduled-job"},
+            ),
+        )
+
+    assert queue.get_status()["pending"] == 0
+    assert ledger.get_usage("user-scheduled", UsageType.SCHEDULED_JOB) == []
+
+
+def test_create_job_enforces_scheduled_job_quota_in_worker_mode(client, tmp_path, monkeypatch) -> None:
+    from app.main import jobs_store
+    from app.worker_queue import get_worker_queue, reset_worker_queue
+
+    reset_worker_queue()
+    monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+    queue = get_worker_queue(db_path=tmp_path / "worker_queue.db")
+
+    ledger = UsageLedger()
+    ledger.set_quota("dev-admin", UsageType.SCHEDULED_JOB, limit=0, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "name": "quota-blocked-worker-job",
+            "mode": "manual",
+            "urls": ["https://example.com"],
+        },
+    )
+
+    assert response.status_code == 429
+    assert "scheduled_job" in response.json()["detail"]
+    assert queue.get_status()["pending"] == 0
+    assert jobs_store == {}
+    assert ledger.get_usage("dev-admin", UsageType.SCHEDULED_JOB) == []
+    monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "false")
+    reset_worker_queue()
+
+
+def test_browser_minute_metering_records_tenant_context(monkeypatch) -> None:
+    from app.html_utils import _record_browser_minutes
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    allowed = _record_browser_minutes(
+        usage_context={
+            "user_id": "user-browser",
+            "org_id": "org-browser",
+            "project_id": "project-browser",
+            "job_id": "browser-job",
+        },
+        url="https://example.com/page",
+        method="playwright_full",
+        quantity=2,
+        phase="additional",
+        duration_ms=121_000.4,
+    )
+
+    assert allowed is True
+    records = ledger.get_usage("user-browser", UsageType.BROWSER_MINUTE)
+    assert len(records) == 1
+    assert records[0].quantity == 2
+    assert records[0].org_id == "org-browser"
+    assert records[0].project_id == "project-browser"
+    assert records[0].metadata["job_id"] == "browser-job"
+    assert records[0].metadata["method"] == "playwright_full"
+    assert records[0].metadata["phase"] == "additional"
+    assert records[0].metadata["duration_ms"] == 121000.4
+
+
+def test_browser_minute_metering_enforces_quota(monkeypatch) -> None:
+    from app.html_utils import _record_browser_minutes
+
+    ledger = UsageLedger()
+    ledger.set_quota("user-browser", UsageType.BROWSER_MINUTE, limit=0, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    allowed = _record_browser_minutes(
+        usage_context={"user_id": "user-browser", "job_id": "browser-job"},
+        url="https://example.com/page",
+        method="playwright_full",
+        quantity=1,
+        phase="initial",
+    )
+
+    assert allowed is False
+    assert ledger.get_usage("user-browser", UsageType.BROWSER_MINUTE) == []
+
+
+@pytest.mark.asyncio
+async def test_page_fetch_quota_blocks_scrape_before_network_call(monkeypatch) -> None:
+    from app.services.scraping import run_scraping_phase
+
+    ledger = UsageLedger()
+    ledger.set_quota("user-quota", UsageType.PAGE_FETCHED, limit=0, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    mock_policy = MagicMock()
+    mock_policy.can_fetch.return_value = True
+    mock_policy.get_or_create.return_value = MagicMock(max_parallel=1)
+    monkeypatch.setattr("app.domain_runtime_policy.get_domain_runtime_policy", lambda: mock_policy)
+
+    scrape_url = AsyncMock(return_value=([{"name": "should-not-run"}], {"recovery_attempts": 0}))
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", scrape_url)
+
+    async def no_cancel() -> bool:
+        return False
+
+    job = Job(
+        id="quota-block-job",
+        name="quota-block-test",
+        created_by="user-quota",
+        urls=["https://example.com"],
+        status=JobStatus.RUNNING,
+    )
+
+    all_raw, urls_with_records, warnings, scraped = await run_scraping_phase(
+        job,
+        max_job_runtime_seconds=60,
+        per_url_scrape_timeout_seconds=10,
+        persist_fn=lambda: None,
+        cancel_check=no_cancel,
+    )
+
+    scrape_url.assert_not_awaited()
+    assert all_raw == []
+    assert urls_with_records == 0
+    assert warnings == ["URL skipped due to page-fetch quota (1/1): https://example.com"]
+    assert scraped == [(1, [], False, {"attempted": False, "quota_exceeded": True})]
+    assert job.progress_current == 1
+    assert ledger.get_usage("user-quota", UsageType.PAGE_FETCHED) == []
+
+
+@pytest.mark.asyncio
+async def test_scraping_phase_passes_usage_context_to_recovery(monkeypatch) -> None:
+    from app.services.scraping import run_scraping_phase
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    mock_policy = MagicMock()
+    mock_policy.can_fetch.return_value = True
+    mock_policy.get_or_create.return_value = MagicMock(max_parallel=1)
+    monkeypatch.setattr("app.domain_runtime_policy.get_domain_runtime_policy", lambda: mock_policy)
+
+    scrape_url = AsyncMock(return_value=([], {"recovery_attempts": 0}))
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", scrape_url)
+
+    mock_ws = MagicMock()
+    mock_ws.transaction.return_value.__enter__ = MagicMock()
+    mock_ws.transaction.return_value.__exit__ = MagicMock(return_value=False)
+    monkeypatch.setattr("app.semantic_world_state.get_world_state", lambda: mock_ws)
+
+    async def no_cancel() -> bool:
+        return False
+
+    job = Job(
+        id="usage-context-job",
+        name="usage-context-test",
+        created_by="user-context",
+        org_id="org-context",
+        project_id="project-context",
+        urls=["https://example.com"],
+        status=JobStatus.RUNNING,
+    )
+
+    await run_scraping_phase(
+        job,
+        max_job_runtime_seconds=60,
+        per_url_scrape_timeout_seconds=10,
+        persist_fn=lambda: None,
+        cancel_check=no_cancel,
+    )
+
+    assert scrape_url.await_args is not None
+    assert scrape_url.await_args.kwargs["usage_context"] == {
+        "user_id": "user-context",
+        "org_id": "org-context",
+        "project_id": "project-context",
+        "job_id": "usage-context-job",
+    }
+
+
+@pytest.mark.asyncio
+async def test_finalization_records_job_completed_usage(monkeypatch) -> None:
+    from app.services.finalization import run_finalization
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+    monkeypatch.setattr("app.services.job_runner.save_semantic_state", lambda: None)
+
+    job = Job(
+        id="complete-meter-job",
+        name="complete-meter-test",
+        created_by="user-complete",
+        urls=["https://example.com"],
+        status=JobStatus.RUNNING,
+        results=[{"name": "Acme"}],
+    )
+    job.progress_total = 1
+    job.total_records = 1
+    job.filtered_records = 1
+
+    await run_finalization(
+        job,
+        all_raw_results=[{"name": "Acme"}],
+        urls_with_records=1,
+        persist_fn=lambda: None,
+    )
+    await run_finalization(
+        job,
+        all_raw_results=[{"name": "Acme"}],
+        urls_with_records=1,
+        persist_fn=lambda: None,
+    )
+
+    records = ledger.get_usage("user-complete", UsageType.JOB_COMPLETED)
+    assert len(records) == 1
+    assert records[0].quantity == 1
+    assert records[0].metadata["job_id"] == "complete-meter-job"
+    assert records[0].metadata["status"] == JobStatus.COMPLETED.value
+
+
+@pytest.mark.asyncio
+async def test_ai_structuring_records_usage_when_phase_runs(monkeypatch) -> None:
+    from app.services.ai_structuring import apply_global_ai_structuring
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    ai_clean = AsyncMock(
+        return_value=(
+            [{"company": "Acme"}],
+            {
+                "applied": True,
+                "input_records": 1,
+                "output_records": 1,
+                "model_fallback_mode": False,
+            },
+        ),
+    )
+    monkeypatch.setattr("app.scraper.ai_clean_and_align_records", ai_clean)
+    monkeypatch.setattr("app.semantic_pipeline.run_pipeline", lambda records, _fields: records)
+
+    mock_ws = MagicMock()
+    mock_ws.transaction.return_value.__enter__ = MagicMock()
+    mock_ws.transaction.return_value.__exit__ = MagicMock(return_value=False)
+    monkeypatch.setattr("app.semantic_world_state.get_world_state", lambda: mock_ws)
+
+    llm_counts: list[int] = []
+    structured, report, warnings = await apply_global_ai_structuring(
+        all_raw_results=[{"company": "Acme", "_extraction_method": "regex"}],
+        schema_fields=[SimpleNamespace(name="company")],
+        ai_source_prediction={"sources_with_ai_structuring": 0},
+        ai_structuring_timeout_seconds=10,
+        add_job_log=lambda *_args, **_kwargs: None,
+        on_llm_call=llm_counts.append,
+        usage_context={
+            "user_id": "user-ai",
+            "org_id": "org-ai",
+            "project_id": "project-ai",
+            "job_id": "ai-meter-job",
+        },
+    )
+
+    assert structured == [{"company": "Acme"}]
+    assert report["applied"] is True
+    assert warnings == []
+    records = ledger.get_usage("user-ai", UsageType.AI_STRUCTURING)
+    assert len(records) == 1
+    assert records[0].quantity == 1
+    assert records[0].metadata["job_id"] == "ai-meter-job"
+    assert records[0].metadata["input_records"] == 1
+    assert records[0].org_id == "org-ai"
+    assert records[0].project_id == "project-ai"

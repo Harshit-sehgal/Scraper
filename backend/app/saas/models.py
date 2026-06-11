@@ -62,6 +62,10 @@ class User(BaseModel):
         default=None,
         description="ISO timestamp at which the user accepted the Acceptable Use Policy. None = not yet accepted.",
     )
+    aup_version_accepted: str | None = Field(
+        default=None,
+        description="AUP version accepted by this user. None = not yet accepted.",
+    )
 
     @field_validator("email")
     @classmethod

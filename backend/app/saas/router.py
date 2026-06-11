@@ -101,7 +101,7 @@ async def accept_aup(
             details={"aup_version": body.aup_version, "shadow_user": True},
         )
         return _aup_response_for(user_id=user_id, accepted_at=None, accepted_version=None)
-    updated = get_identity_store().mark_aup_accepted(user_id)
+    updated = get_identity_store().mark_aup_accepted(user_id, aup_version=body.aup_version)
     if updated is None:
         raise HTTPException(status_code=500, detail="failed to record AUP acceptance")
     log_job_event(
@@ -114,7 +114,7 @@ async def accept_aup(
     return _aup_response_for(
         user_id=user_id,
         accepted_at=updated.aup_accepted_at,
-        accepted_version=body.aup_version,
+        accepted_version=updated.aup_version_accepted,
     )
 
 
@@ -132,5 +132,5 @@ async def aup_status(
     return _aup_response_for(
         user_id=user_id,
         accepted_at=user.aup_accepted_at,
-        accepted_version=CURRENT_AUP_VERSION if user.aup_accepted_at else None,
+        accepted_version=user.aup_version_accepted,
     )

@@ -267,11 +267,31 @@ def register_jobs_write_routes(
                 queue = get_worker_queue()
                 task_id = await queue.enqueue(
                     task_type="scrape_job",
-                    payload={"job_id": job.id},
+                    payload={
+                        "job_id": job.id,
+                        "user_id": user_id,
+                        "org_id": _owner_org_id,
+                        "project_id": _owner_project_id,
+                    },
                     priority=Priority.NORMAL,
                     task_id=job.id,
+                    usage_context={
+                        "user_id": user_id,
+                        "org_id": _owner_org_id,
+                        "project_id": _owner_project_id,
+                        "job_id": job.id,
+                    },
                 )
                 logger.info("Job %s enqueued to worker queue (task=%s)", job.id, task_id)
+            except ValueError as e:
+                with manager.lock:
+                    manager.jobs_store.pop(job.id, None)
+                try:
+                    repo = get_job_repository()
+                    repo.hard_delete(job.id)
+                except (AttributeError, ImportError, RuntimeError):
+                    logger.warning("Failed to hard-delete job %s after scheduled-job quota rejection", job.id)
+                raise HTTPException(status_code=429, detail=str(e)) from e
             except Exception as e:
                 if settings.ENV.lower() == "production":
                     logger.exception(
