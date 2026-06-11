@@ -664,9 +664,7 @@ async def scrape_url(
     # ── Solidified motifs count pre-extraction ────────────────────
     solidified_motifs_count = 0
     if world_state and hasattr(world_state, "solidified_motifs"):
-        from contextlib import suppress
-
-        with suppress(TypeError, AttributeError):
+        with contextlib.suppress(TypeError):
             solidified_motifs_count = len(world_state.solidified_motifs)
 
     # ── Step 4: Extraction Cascade ─────────────────────────────────

@@ -181,7 +181,7 @@ class DatabaseSlidingWindowCounter:
                     )
                     _execute(conn, "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
                 self._initialized = True
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("Failed to initialize Postgres rate limit table: %s", e)
         else:
             try:
@@ -201,7 +201,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 self._initialized = True
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("Failed to initialize SQLite rate limit table: %s", e)
 
     def allow(self) -> bool:
@@ -460,7 +460,7 @@ class DatabaseSlidingWindowCounter:
                     _execute(conn, "DELETE FROM rate_limits WHERE timestamp <= %s", (cutoff,))
                     remaining = _fetch_one(conn, "SELECT COUNT(*) AS c FROM rate_limits")
                     return remaining["c"] if remaining else 0
-            except Exception:
+            except (OSError, RuntimeError, ImportError, ValueError):
                 logger.debug("Postgres rate_limits prune_all failed")
                 return 0
         else:
@@ -476,7 +476,7 @@ class DatabaseSlidingWindowCounter:
                         conn.commit()
                     finally:
                         conn.close()
-            except Exception:
+            except (OSError, RuntimeError, ImportError, ValueError):
                 logger.debug("SQLite rate_limits prune_all failed")
                 return 0
             else:
