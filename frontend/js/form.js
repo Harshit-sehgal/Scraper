@@ -4,7 +4,7 @@
 
 import { esc, attrStr, toast } from "./utils.js";
 import { API, apiFetch } from "./api.js";
-import { currentMode, setMode } from "./views.js";
+import { currentMode, setMode, switchView } from "./views.js";
 
 // ─── Field Counter ───
 
@@ -456,7 +456,6 @@ export async function submitJob(e) {
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Failed");
     toast("Job started", "success");
-    const { switchView } = await import("./views.js");
     switchView("jobs");
   } catch (err) {
     toast(`Error: ${err.message}`, "error");

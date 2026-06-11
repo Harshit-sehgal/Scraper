@@ -5,6 +5,7 @@
 import { esc, attrStr, toast, showConfirm } from "./utils.js";
 import { API, apiFetch } from "./api.js";
 import { switchView } from "./views.js";
+import { refreshJobs } from "./jobs.js";
 
 // ─── State ───
 
@@ -423,7 +424,6 @@ export async function recleanCurrentJob() {
 
       toast(`Re-cleaned rows: ${data.before_records || 0} -> ${data.after_records || 0}`, "success");
       await viewResults(id);
-      const { refreshJobs } = await import("./jobs.js");
       await refreshJobs();
     } catch (err) {
       toast(`Re-clean error: ${err.message}`, "error");

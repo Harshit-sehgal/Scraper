@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════ */
 
 import { toast, attachFocusTrapTo, detachFocusTrapFrom } from "./utils.js";
+import { refreshSystemStatus, refreshJobs } from "./jobs.js";
 
 // ─── API Base URL ───
 
@@ -204,12 +205,8 @@ function saveKeyFromModal() {
       .then((ok) => {
         if (!ok) return;
         toast("Session cookie set", "success");
-        import("./jobs.js")
-          .then((m) => {
-            m.refreshSystemStatus();
-            m.refreshJobs();
-          })
-          .catch((e) => console.warn("Failed to refresh after auth:", e));
+        refreshSystemStatus().catch((e) => console.warn("Failed to refresh status after auth:", e));
+        refreshJobs().catch((e) => console.warn("Failed to refresh jobs after auth:", e));
       })
       .catch((e) => console.warn("Login flow error:", e));
   }

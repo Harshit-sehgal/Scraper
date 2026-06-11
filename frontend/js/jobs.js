@@ -1,8 +1,6 @@
 /* ═══════════════════════════════════════════
    DataForge — Jobs Management
-   ═══════════════════════════════════════════ */
-
-import {
+   ═══════════════════════════════════════════ */ import {
   esc,
   attrStr,
   toast,
@@ -14,6 +12,7 @@ import {
 } from "./utils.js";
 import { API, apiFetch } from "./api.js";
 import { currentView } from "./views.js";
+import { currentJobId, renderLogs, viewResults } from "./results.js";
 
 // ─── State ───
 
@@ -173,12 +172,10 @@ async function pollJob(id) {
 
     // If looking at this job's results, refresh logs/progress
     if (currentView === "results") {
-      const { currentJobId } = await import("./results.js");
       if (currentJobId === id) {
         const logsPanel = document.getElementById("logs-panel");
         if (logsPanel && Array.isArray(j.logs) && j.logs.length) {
           logsPanel.classList.remove("hidden");
-          const { renderLogs } = await import("./results.js");
           renderLogs(j.logs);
         }
 
@@ -195,7 +192,6 @@ async function pollJob(id) {
         }
 
         if (["completed", "degraded", "empty_result", "failed", "canceled"].includes(j.status)) {
-          const { viewResults } = await import("./results.js");
           viewResults(id).catch((e) => console.warn("Auto-refresh results failed:", e));
         }
       }

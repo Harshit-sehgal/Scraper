@@ -1,20 +1,7 @@
 /* ═══════════════════════════════════════════
    DataForge — Frontend App Entry Point (ES Module)
    ═══════════════════════════════════════════
-   Re-exports all public APIs and initializes the app.
    ═══════════════════════════════════════════ */
-
-// ─── Re-export public APIs for debugging / devtools ───
-export * from "./js/utils.js";
-export * from "./js/api.js";
-export * from "./js/views.js";
-export * from "./js/jobs.js";
-export * from "./js/recycle.js";
-export * from "./js/results.js";
-export * from "./js/analyzer.js";
-export * from "./js/form.js";
-export * from "./js/cognition.js";
-export * from "./js/dashboard.js";
 
 // ─── Init ───
 import {
@@ -30,12 +17,13 @@ import {
   toast,
 } from "./js/utils.js";
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from "./js/jobs.js";
-import { onGlobalKeydown, switchView } from "./js/views.js";
+import { onGlobalKeydown, switchView, currentView } from "./js/views.js";
 import {
   onResultsSliderInput,
   onResultsTableScroll,
   onResultsCellDoubleClick,
   renderFilteredResults,
+  syncResultsScrollSlider,
 } from "./js/results.js";
 import { analyzeURL, toggleAllFields, applyAnalyzedFields, clearAnalysis } from "./js/analyzer.js";
 import {
@@ -191,9 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // synthetic ``scroll`` event on the table wrap — that would mix input
   // and resize handling and could fire onResultsTableScroll() with a
   // stale state.
-  import("./js/results.js").then(({ syncResultsScrollSlider }) => {
-    window.addEventListener("resize", () => syncResultsScrollSlider());
-  });
+  window.addEventListener("resize", () => syncResultsScrollSlider());
 
   // ── Init theme ──
   initTheme();
@@ -434,9 +420,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Expose currentView for dashboard polling via a getter
   window.__DATAFORGE_VIEW = {};
-  const viewsMod = await import("./js/views.js");
   Object.defineProperty(window.__DATAFORGE_VIEW, "currentView", {
-    get: () => viewsMod.currentView,
+    get: () => currentView,
     enumerable: true,
   });
 });
