@@ -1,0 +1,704 @@
+FF....FF.F.FFFFF..FF.F.FFFFFFFFFFF.                                      [100%]
+=================================== FAILURES ===================================
+___________ test_operator_session_cookie_reaches_rbac_system_status ____________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7e8ddf0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b8746750>
+
+    def test_operator_session_cookie_reaches_rbac_system_status(client, monkeypatch) -> None:
+        _configure_keys(monkeypatch)
+
+        login = client.post("/api/session", headers={"X-API-Key": "operator-key"})
+        assert login.status_code == 200
+        cookie = login.cookies.get("dataforge_session")
+        assert cookie
+
+        response = client.get("/api/system/status", cookies={"dataforge_session": cookie})
+
+>       assert response.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:63: AssertionError
+_____________ test_operator_session_cookie_reaches_storage_status ______________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7deed50>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7dee870>
+
+    def test_operator_session_cookie_reaches_storage_status(client, monkeypatch) -> None:
+        _configure_keys(monkeypatch)
+
+        login = client.post("/api/session", headers={"X-API-Key": "operator-key"})
+        assert login.status_code == 200
+        cookie = login.cookies.get("dataforge_session")
+        assert cookie
+
+        response = client.get("/api/system/storage/status", cookies={"dataforge_session": cookie})
+
+>       assert response.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:76: AssertionError
+________ test_api_routes_fail_closed_without_configured_keys[/api/jobs] ________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7eb6db0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7def410>
+path = '/api/jobs'
+
+    @pytest.mark.parametrize("path", ["/api/jobs", "/api/recycle_bin", "/api/system/status"])
+    def test_api_routes_fail_closed_without_configured_keys(client, monkeypatch, path: str) -> None:
+        _configure_keys(monkeypatch, api_key="", operator_key="", admin_key="", env="test", allow_dev_auth=False)
+
+        response = client.get(path)
+
+>       assert response.status_code == 403
+E       assert 200 == 403
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:129: AssertionError
+____ test_api_routes_fail_closed_without_configured_keys[/api/recycle_bin] _____
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7deb740>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7de9790>
+path = '/api/recycle_bin'
+
+    @pytest.mark.parametrize("path", ["/api/jobs", "/api/recycle_bin", "/api/system/status"])
+    def test_api_routes_fail_closed_without_configured_keys(client, monkeypatch, path: str) -> None:
+        _configure_keys(monkeypatch, api_key="", operator_key="", admin_key="", env="test", allow_dev_auth=False)
+
+        response = client.get(path)
+
+>       assert response.status_code == 403
+E       assert 200 == 403
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:129: AssertionError
+_______ test_explicit_test_dev_auth_allows_protected_route_without_keys ________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7d1d190>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7de8530>
+
+    def test_explicit_test_dev_auth_allows_protected_route_without_keys(client, monkeypatch) -> None:
+        _configure_keys(monkeypatch, api_key="", operator_key="", admin_key="", env="test", allow_dev_auth=True)
+
+        response = client.get("/api/system/status")
+
+>       assert response.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:137: AssertionError
+___________________ test_user_cannot_list_another_users_jobs ___________________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7d1eab0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7d1d8b0>
+
+    def test_user_cannot_list_another_users_jobs(client, monkeypatch) -> None:
+        _configure_keys(monkeypatch, api_key="user-b-key")
+        _seed_job("tenant-job-a", owner_key="user-a-key")
+
+        response = client.get("/api/jobs", headers={"X-API-Key": "user-b-key"})
+
+        assert response.status_code == 200
+        ids = {job["id"] for job in response.json()["jobs"]}
+>       assert "tenant-job-a" not in ids
+E       AssertionError: assert 'tenant-job-a' not in {'tenant-job-a'}
+
+backend/tests/test_p0_auth_tenant.py:157: AssertionError
+_ test_user_cannot_read_another_users_job_detail_results_or_events[/api/jobs/tenant-job-a] _
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7d1d760>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7d1f110>
+path = '/api/jobs/tenant-job-a'
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/jobs/tenant-job-a",
+            "/api/jobs/tenant-job-a/results",
+            "/api/jobs/tenant-job-a/events",
+        ],
+    )
+    def test_user_cannot_read_another_users_job_detail_results_or_events(client, monkeypatch, path: str) -> None:
+        _configure_keys(monkeypatch, api_key="user-b-key")
+        _seed_job("tenant-job-a", owner_key="user-a-key")
+
+        response = client.get(path, headers={"X-API-Key": "user-b-key"})
+
+>       assert response.status_code in {403, 404}
+E       assert 200 in {403, 404}
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:174: AssertionError
+_ test_user_cannot_read_another_users_job_detail_results_or_events[/api/jobs/tenant-job-a/results] _
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7c7eae0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7c7daf0>
+path = '/api/jobs/tenant-job-a/results'
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/jobs/tenant-job-a",
+            "/api/jobs/tenant-job-a/results",
+            "/api/jobs/tenant-job-a/events",
+        ],
+    )
+    def test_user_cannot_read_another_users_job_detail_results_or_events(client, monkeypatch, path: str) -> None:
+        _configure_keys(monkeypatch, api_key="user-b-key")
+        _seed_job("tenant-job-a", owner_key="user-a-key")
+
+        response = client.get(path, headers={"X-API-Key": "user-b-key"})
+
+>       assert response.status_code in {403, 404}
+E       assert 200 in {403, 404}
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:174: AssertionError
+_ test_user_cannot_read_another_users_job_detail_results_or_events[/api/jobs/tenant-job-a/events] _
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7d1fdd0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7d1fd10>
+path = '/api/jobs/tenant-job-a/events'
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/jobs/tenant-job-a",
+            "/api/jobs/tenant-job-a/results",
+            "/api/jobs/tenant-job-a/events",
+        ],
+    )
+    def test_user_cannot_read_another_users_job_detail_results_or_events(client, monkeypatch, path: str) -> None:
+        _configure_keys(monkeypatch, api_key="user-b-key")
+        _seed_job("tenant-job-a", owner_key="user-a-key")
+
+        response = client.get(path, headers={"X-API-Key": "user-b-key"})
+
+>       assert response.status_code in {403, 404}
+E       assert 200 in {403, 404}
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:174: AssertionError
+____________ test_user_cannot_list_another_users_recycle_bin_items _____________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b7d1f440>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7d1dd00>
+
+    def test_user_cannot_list_another_users_recycle_bin_items(client, monkeypatch) -> None:
+        _configure_keys(monkeypatch, api_key="user-b-key")
+        _seed_job("tenant-recycled-a", owner_key="user-a-key", in_recycle_bin=True)
+
+        response = client.get("/api/recycle_bin", headers={"X-API-Key": "user-b-key"})
+
+        assert response.status_code == 200
+        ids = {job["id"] for job in response.json()["jobs"]}
+>       assert "tenant-recycled-a" not in ids
+E       AssertionError: assert 'tenant-recycled-a' not in {'tenant-recycled-a'}
+
+backend/tests/test_p0_auth_tenant.py:185: AssertionError
+______________ test_denied_cross_tenant_job_read_is_audit_logged _______________
+
+client = <tests.conftest.LocalASGIClient object at 0x7e44b8747380>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b8746ff0>
+
+    def test_denied_cross_tenant_job_read_is_audit_logged(client, monkeypatch) -> None:
+        import app.routers.jobs_read as jobs_read
+
+        _configure_keys(monkeypatch, api_key="user-b-key")
+        _seed_job("tenant-job-a", owner_key="user-a-key")
+        events: list[dict] = []
+
+        def capture_event(**kwargs) -> None:
+            events.append(kwargs)
+
+        monkeypatch.setattr(jobs_read, "log_rbac_event", capture_event, raising=False)
+
+        response = client.get("/api/jobs/tenant-job-a", headers={"X-API-Key": "user-b-key"})
+
+>       assert response.status_code in {403, 404}
+E       assert 200 in {403, 404}
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_auth_tenant.py:223: AssertionError
+_______ test_generate_invoice_due_date_uses_timedelta[now0-30-expected0] _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7deaa20>
+now = datetime.datetime(2026, 1, 31, 12, 0, tzinfo=datetime.timezone.utc)
+due_days = 30
+expected = datetime.datetime(2026, 3, 2, 12, 0, tzinfo=datetime.timezone.utc)
+
+    @pytest.mark.parametrize(
+        ("now", "due_days", "expected"),
+        [
+            (datetime(2026, 1, 31, 12, 0, tzinfo=UTC), 30, datetime(2026, 3, 2, 12, 0, tzinfo=UTC)),
+            (datetime(2024, 2, 28, 8, 15, tzinfo=UTC), 1, datetime(2024, 2, 29, 8, 15, tzinfo=UTC)),
+            (datetime(2026, 6, 11, 9, 30, tzinfo=UTC), 30, datetime(2026, 7, 11, 9, 30, tzinfo=UTC)),
+            (datetime(2026, 6, 11, 9, 30, tzinfo=UTC), 0, datetime(2026, 6, 11, 9, 30, tzinfo=UTC)),
+        ],
+    )
+    def test_generate_invoice_due_date_uses_timedelta(monkeypatch, now: datetime, due_days: int, expected: datetime) -> None:
+        _freeze_billing_now(monkeypatch, now)
+        generator = InvoiceGenerator()
+
+>       invoice = generator.generate_invoice(
+            "user-1",
+            [InvoiceItem(description="usage", quantity=1, unit_price=10, total=10)],
+            due_days=due_days,
+        )
+
+backend/tests/test_p0_billing_usage.py:39:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.utils.billing.InvoiceGenerator object at 0x7e44b7debc50>
+user_id = 'user-1'
+items = [InvoiceItem(id='0c8a371e-37f7-483d-be4e-192f0803a650', description='usage', quantity=1, unit_price=10, total=10, metadata={})]
+due_days = 30
+
+    def generate_invoice(
+        self,
+        user_id: str,
+        items: list[InvoiceItem],
+        due_days: int = 30,
+    ) -> Invoice:
+        """Generate a new invoice."""
+        invoice = Invoice(
+            user_id=user_id,
+            items=items,
+>           due_date=datetime.now(UTC).replace(
+                day=datetime.now(UTC).day + due_days,
+            ),
+        )
+E       ValueError: day is out of range for month
+
+backend/app/utils/billing.py:99: ValueError
+_______ test_generate_invoice_due_date_uses_timedelta[now2-30-expected2] _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7d1e6f0>
+now = datetime.datetime(2026, 6, 11, 9, 30, tzinfo=datetime.timezone.utc)
+due_days = 30
+expected = datetime.datetime(2026, 7, 11, 9, 30, tzinfo=datetime.timezone.utc)
+
+    @pytest.mark.parametrize(
+        ("now", "due_days", "expected"),
+        [
+            (datetime(2026, 1, 31, 12, 0, tzinfo=UTC), 30, datetime(2026, 3, 2, 12, 0, tzinfo=UTC)),
+            (datetime(2024, 2, 28, 8, 15, tzinfo=UTC), 1, datetime(2024, 2, 29, 8, 15, tzinfo=UTC)),
+            (datetime(2026, 6, 11, 9, 30, tzinfo=UTC), 30, datetime(2026, 7, 11, 9, 30, tzinfo=UTC)),
+            (datetime(2026, 6, 11, 9, 30, tzinfo=UTC), 0, datetime(2026, 6, 11, 9, 30, tzinfo=UTC)),
+        ],
+    )
+    def test_generate_invoice_due_date_uses_timedelta(monkeypatch, now: datetime, due_days: int, expected: datetime) -> None:
+        _freeze_billing_now(monkeypatch, now)
+        generator = InvoiceGenerator()
+
+>       invoice = generator.generate_invoice(
+            "user-1",
+            [InvoiceItem(description="usage", quantity=1, unit_price=10, total=10)],
+            due_days=due_days,
+        )
+
+backend/tests/test_p0_billing_usage.py:39:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.utils.billing.InvoiceGenerator object at 0x7e44b7d1f950>
+user_id = 'user-1'
+items = [InvoiceItem(id='9e1b69a9-14a6-47fa-b90d-a79bd199f0a6', description='usage', quantity=1, unit_price=10, total=10, metadata={})]
+due_days = 30
+
+    def generate_invoice(
+        self,
+        user_id: str,
+        items: list[InvoiceItem],
+        due_days: int = 30,
+    ) -> Invoice:
+        """Generate a new invoice."""
+        invoice = Invoice(
+            user_id=user_id,
+            items=items,
+>           due_date=datetime.now(UTC).replace(
+                day=datetime.now(UTC).day + due_days,
+            ),
+        )
+E       ValueError: day is out of range for month
+
+backend/app/utils/billing.py:99: ValueError
+_______________ test_generate_invoice_rejects_negative_due_days ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7c7fb60>
+
+    def test_generate_invoice_rejects_negative_due_days(monkeypatch) -> None:
+        _freeze_billing_now(monkeypatch, datetime(2026, 6, 11, 9, 30, tzinfo=UTC))
+        generator = InvoiceGenerator()
+
+>       with pytest.raises(ValueError, match="due_days"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+backend/tests/test_p0_billing_usage.py:54: Failed
+_____________ test_record_usage_increments_quota_and_checks_amount _____________
+
+    def test_record_usage_increments_quota_and_checks_amount() -> None:
+        ledger = UsageLedger()
+        ledger.set_quota("user-1", UsageType.API_REQUEST, limit=2, period=QuotaPeriod.MONTHLY)
+
+        ledger.record_usage("user-1", UsageType.API_REQUEST, quantity=1)
+
+        quota = ledger.get_quota("user-1", UsageType.API_REQUEST)
+        assert quota is not None
+>       assert quota.current_usage == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = Quota(id='d063aeb5-042c-462f-bb5e-65c29a0fe241', user_id='user-1', usage_type=<UsageType.API_REQUEST: 'api_request'>, limit=2, period=<QuotaPeriod.MONTHLY: 'monthly'>, current_usage=0, reset_date=None).current_usage
+
+backend/tests/test_p0_billing_usage.py:66: AssertionError
+_________________ test_record_usage_rejects_usage_above_quota __________________
+
+    def test_record_usage_rejects_usage_above_quota() -> None:
+        ledger = UsageLedger()
+        ledger.set_quota("user-1", UsageType.API_REQUEST, limit=1, period=QuotaPeriod.MONTHLY)
+
+>       with pytest.raises(ValueError, match="quota"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+backend/tests/test_p0_billing_usage.py:75: Failed
+______________ test_usage_idempotency_key_does_not_double_charge _______________
+
+    def test_usage_idempotency_key_does_not_double_charge() -> None:
+        ledger = UsageLedger()
+        ledger.set_quota("user-1", UsageType.EXPORT_GENERATED, limit=1, period=QuotaPeriod.MONTHLY)
+
+>       first = ledger.record_usage(
+            "user-1",
+            UsageType.EXPORT_GENERATED,
+            quantity=1,
+            idempotency_key="export-123",
+        )
+E       TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+backend/tests/test_p0_billing_usage.py:88: TypeError
+______________ test_usage_ledger_persists_events_and_quota_state _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-harshit/pytest-93/test_usage_ledger_persists_eve0')
+
+    def test_usage_ledger_persists_events_and_quota_state(tmp_path) -> None:
+        db_path = tmp_path / "usage.db"
+>       ledger = UsageLedger(storage_path=db_path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: UsageLedger.__init__() got an unexpected keyword argument 'storage_path'
+
+backend/tests/test_p0_billing_usage.py:110: TypeError
+__________________ test_concurrent_usage_cannot_exceed_quota ___________________
+
+    def test_concurrent_usage_cannot_exceed_quota() -> None:
+        ledger = UsageLedger()
+        ledger.set_quota("user-1", UsageType.PAGE_FETCHED, limit=5, period=QuotaPeriod.MONTHLY)
+        barrier = threading.Barrier(10)
+        successes: list[str] = []
+        failures: list[str] = []
+
+        def worker(idx: int) -> None:
+            barrier.wait(timeout=5)
+            try:
+                ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+                successes.append(str(idx))
+            except ValueError:
+                failures.append(str(idx))
+
+        threads = [threading.Thread(target=worker, args=(idx,)) for idx in range(10)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=5)
+
+        quota = ledger.get_quota("user-1", UsageType.PAGE_FETCHED)
+        assert quota is not None
+>       assert len(successes) == 5
+E       assert 0 == 5
+E        +  where 0 = len([])
+
+backend/tests/test_p0_billing_usage.py:148: AssertionError
+________ TestPostgresSerialization.test_job_to_row_preserves_created_by ________
+
+self = <tests.test_postgres_repository.TestPostgresSerialization object at 0x7e44b876a5a0>
+
+    def test_job_to_row_preserves_created_by(self) -> None:
+        _job_to_row, _ = self._import_postgres_module()
+        if _job_to_row is None:
+            return
+
+        job = Job(
+            id="test-owner",
+            name="Owned Job",
+            urls=["https://example.com"],
+            created_by="owner-fingerprint",
+        )
+
+        row = _job_to_row(job)
+
+>       assert row["created_by"] == "owner-fingerprint"
+               ^^^^^^^^^^^^^^^^^
+E       KeyError: 'created_by'
+
+backend/tests/test_postgres_repository.py:277: KeyError
+________ TestPostgresSerialization.test_row_to_job_preserves_created_by ________
+
+self = <tests.test_postgres_repository.TestPostgresSerialization object at 0x7e44b7e54500>
+
+    def test_row_to_job_preserves_created_by(self) -> None:
+        _job_to_row, _row_to_job = self._import_postgres_module()
+        if _job_to_row is None:
+            return
+
+        row = _job_to_row(
+            Job(
+                id="rt-owner",
+                name="Owner Round Trip",
+                urls=["https://example.com"],
+            ),
+        )
+        row["created_by"] = "owner-fingerprint"
+
+        restored = _row_to_job(row)
+
+        assert restored is not None
+>       assert restored.created_by == "owner-fingerprint"
+E       AssertionError: assert '' == 'owner-fingerprint'
+E
+E         - owner-fingerprint
+
+backend/tests/test_postgres_repository.py:362: AssertionError
+_____ TestPostgresSchemaRepair.test_shared_jobs_schema_includes_created_by _____
+
+self = <tests.test_postgres_repository.TestPostgresSchemaRepair object at 0x7e44ee77e5d0>
+
+    def test_shared_jobs_schema_includes_created_by(self) -> None:
+        from app.storage_interface import _JOBS_COLUMNS_SQL
+
+>       assert any(col.startswith("created_by TEXT") for col in _JOBS_COLUMNS_SQL)
+E       assert False
+E        +  where False = any(<generator object TestPostgresSchemaRepair.test_shared_jobs_schema_includes_created_by.<locals>.<genexpr> at 0x7e44b7c6f440>)
+
+backend/tests/test_postgres_repository.py:420: AssertionError
+__ TestPostgresSchemaRepair.test_build_create_jobs_includes_created_by_column __
+
+self = <tests.test_postgres_repository.TestPostgresSchemaRepair object at 0x7e44b876a870>
+
+    def test_build_create_jobs_includes_created_by_column(self) -> None:
+        _, build_jobs, build_recycle = self._import()
+        if build_jobs is None or build_recycle is None:
+            return
+
+>       assert "created_by TEXT" in build_jobs()
+E       assert 'created_by TEXT' in "CREATE TABLE IF NOT EXISTS jobs (\n        id TEXT PRIMARY KEY,\n        name TEXT NOT NULL,\n        status TEXT NOT...  results_file_path TEXT DEFAULT '',\n        updated_at TEXT DEFAULT '',\n        deleted_at TEXT DEFAULT NULL\n    )"
+E        +  where "CREATE TABLE IF NOT EXISTS jobs (\n        id TEXT PRIMARY KEY,\n        name TEXT NOT NULL,\n        status TEXT NOT...  results_file_path TEXT DEFAULT '',\n        updated_at TEXT DEFAULT '',\n        deleted_at TEXT DEFAULT NULL\n    )" = <function build_create_jobs_sql at 0x7e44b7b3cfe0>()
+
+backend/tests/test_postgres_repository.py:427: AssertionError
+_ TestPostgresSchemaRepair.test_ensure_required_tables_creates_created_by_index _
+
+self = <tests.test_postgres_repository.TestPostgresSchemaRepair object at 0x7e44b876b200>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e44b7b673e0>
+
+    def test_ensure_required_tables_creates_created_by_index(self, monkeypatch) -> None:
+        import app.postgres_repository_base as pg_base
+
+        statements: list[str] = []
+
+        def capture_execute(_conn, sql: str, _params=None):
+            statements.append(sql)
+
+        monkeypatch.setattr(pg_base, "execute", capture_execute)
+
+        pg_base.ensure_required_tables(object())
+
+>       assert any("idx_jobs_created_by" in statement for statement in statements)
+E       assert False
+E        +  where False = any(<generator object TestPostgresSchemaRepair.test_ensure_required_tables_creates_created_by_index.<locals>.<genexpr> at 0x7e44b7d92810>)
+
+backend/tests/test_postgres_repository.py:442: AssertionError
+=============================== warnings summary ===============================
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-9 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-11 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-6 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-10 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-5 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-7 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-3 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-4 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-8 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-2 (worker)
+
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/harshit/Documents/Work/Money/scraper/backend/tests/test_p0_billing_usage.py", line 135, in worker
+      ledger.record_usage("user-1", UsageType.PAGE_FETCHED, quantity=1, idempotency_key=f"fetch-{idx}")
+  TypeError: UsageLedger.record_usage() got an unexpected keyword argument 'idempotency_key'
+
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_p0_auth_tenant.py::test_operator_session_cookie_reaches_rbac_system_status
+FAILED backend/tests/test_p0_auth_tenant.py::test_operator_session_cookie_reaches_storage_status
+FAILED backend/tests/test_p0_auth_tenant.py::test_api_routes_fail_closed_without_configured_keys[/api/jobs]
+FAILED backend/tests/test_p0_auth_tenant.py::test_api_routes_fail_closed_without_configured_keys[/api/recycle_bin]
+FAILED backend/tests/test_p0_auth_tenant.py::test_explicit_test_dev_auth_allows_protected_route_without_keys
+FAILED backend/tests/test_p0_auth_tenant.py::test_user_cannot_list_another_users_jobs
+FAILED backend/tests/test_p0_auth_tenant.py::test_user_cannot_read_another_users_job_detail_results_or_events[/api/jobs/tenant-job-a]
+FAILED backend/tests/test_p0_auth_tenant.py::test_user_cannot_read_another_users_job_detail_results_or_events[/api/jobs/tenant-job-a/results]
+FAILED backend/tests/test_p0_auth_tenant.py::test_user_cannot_read_another_users_job_detail_results_or_events[/api/jobs/tenant-job-a/events]
+FAILED backend/tests/test_p0_auth_tenant.py::test_user_cannot_list_another_users_recycle_bin_items
+FAILED backend/tests/test_p0_auth_tenant.py::test_denied_cross_tenant_job_read_is_audit_logged
+FAILED backend/tests/test_p0_billing_usage.py::test_generate_invoice_due_date_uses_timedelta[now0-30-expected0]
+FAILED backend/tests/test_p0_billing_usage.py::test_generate_invoice_due_date_uses_timedelta[now2-30-expected2]
+FAILED backend/tests/test_p0_billing_usage.py::test_generate_invoice_rejects_negative_due_days
+FAILED backend/tests/test_p0_billing_usage.py::test_record_usage_increments_quota_and_checks_amount
+FAILED backend/tests/test_p0_billing_usage.py::test_record_usage_rejects_usage_above_quota
+FAILED backend/tests/test_p0_billing_usage.py::test_usage_idempotency_key_does_not_double_charge
+FAILED backend/tests/test_p0_billing_usage.py::test_usage_ledger_persists_events_and_quota_state
+FAILED backend/tests/test_p0_billing_usage.py::test_concurrent_usage_cannot_exceed_quota
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSerialization::test_job_to_row_preserves_created_by
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSerialization::test_row_to_job_preserves_created_by
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSchemaRepair::test_shared_jobs_schema_includes_created_by
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSchemaRepair::test_build_create_jobs_includes_created_by_column
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSchemaRepair::test_ensure_required_tables_creates_created_by_index

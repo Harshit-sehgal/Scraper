@@ -287,9 +287,7 @@ async def test_extraction_accuracy_books(benchmark_server, accuracy_schema, expe
     expected = expected_data["books"]
     fields = ["title", "price", "rating"]
 
-    start = time.time()
     results = await scrape_url(url=url, schema_fields=schema)
-    _latency_ms = (time.time() - start) * 1000
 
     metrics = calculate_metrics(results, expected, fields)
 

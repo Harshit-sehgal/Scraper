@@ -1,0 +1,2 @@
+...............................                                          [100%]Task was destroyed but it is pending!
+task: <Task pending name='Task-405' coro=<client.<locals>.fake_run_job() running at /home/harshit/Documents/Work/Money/scraper/backend/tests/conftest.py:502> wait_for=<Future pending cb=[Task.task_wakeup()]>>

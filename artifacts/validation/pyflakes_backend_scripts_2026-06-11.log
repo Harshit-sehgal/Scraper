@@ -1,0 +1,959 @@
+backend/benchmarks/test_benchmark_enforceable.py:292:5: local variable '_latency_ms' is assigned to but never used
+backend/benchmarks/conftest.py:10:1: 'conftest.pytest_addoption' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.pytest_collection_modifyitems' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.pytest_configure' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.pytest_runtest_logreport' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.pytest_sessionfinish' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.pytest_sessionstart' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.reset_failure_injection' imported but unused
+backend/benchmarks/conftest.py:10:1: 'conftest.reset_semantic_world_state' imported but unused
+backend/benchmarks/test_benchmark_smoke.py:530:9: local variable '_fields_display' is assigned to but never used
+backend/benchmarks/test_benchmark_smoke.py:533:13: local variable '_sample_display' is assigned to but never used
+backend/benchmarks/benchmark_replay.py:40:5: local variable '_gen_elapsed' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pylint/typing.py:23:5: 'pylint.config.callback_actions._CallbackAction' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pylint/typing.py:26:5: 'pylint.reporters.ureports.nodes.Section' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pylint/typing.py:28:5: 'pylint.utils.LinterStats' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pylint/lint/run.py:30:5: 'multiprocessing.synchronize' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AnnAssign as _DEPRECATED_AnnAssign' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Arguments as _DEPRECATED_Arguments' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Assert as _DEPRECATED_Assert' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Assign as _DEPRECATED_Assign' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AssignAttr as _DEPRECATED_AssignAttr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AssignName as _DEPRECATED_AssignName' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AsyncFor as _DEPRECATED_AsyncFor' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AsyncFunctionDef as _DEPRECATED_AsyncFunctionDef' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AsyncWith as _DEPRECATED_AsyncWith' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Attribute as _DEPRECATED_Attribute' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.AugAssign as _DEPRECATED_AugAssign' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Await as _DEPRECATED_Await' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.BinOp as _DEPRECATED_BinOp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.BoolOp as _DEPRECATED_BoolOp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Break as _DEPRECATED_Break' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Call as _DEPRECATED_Call' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.ClassDef as _DEPRECATED_ClassDef' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Compare as _DEPRECATED_Compare' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Comprehension as _DEPRECATED_Comprehension' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.ComprehensionScope as _DEPRECATED_ComprehensionScope' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Const as _DEPRECATED_Const' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Continue as _DEPRECATED_Continue' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Decorators as _DEPRECATED_Decorators' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.DelAttr as _DEPRECATED_DelAttr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Delete as _DEPRECATED_Delete' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.DelName as _DEPRECATED_DelName' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Dict as _DEPRECATED_Dict' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.DictComp as _DEPRECATED_DictComp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.DictUnpack as _DEPRECATED_DictUnpack' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.EmptyNode as _DEPRECATED_EmptyNode' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.EvaluatedObject as _DEPRECATED_EvaluatedObject' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.ExceptHandler as _DEPRECATED_ExceptHandler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Expr as _DEPRECATED_Expr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.For as _DEPRECATED_For' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.FormattedValue as _DEPRECATED_FormattedValue' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.FunctionDef as _DEPRECATED_FunctionDef' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.GeneratorExp as _DEPRECATED_GeneratorExp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Global as _DEPRECATED_Global' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.If as _DEPRECATED_If' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.IfExp as _DEPRECATED_IfExp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Import as _DEPRECATED_Import' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.ImportFrom as _DEPRECATED_ImportFrom' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Interpolation as _DEPRECATED_Interpolation' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.JoinedStr as _DEPRECATED_JoinedStr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Keyword as _DEPRECATED_Keyword' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Lambda as _DEPRECATED_Lambda' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.List as _DEPRECATED_List' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.ListComp as _DEPRECATED_ListComp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Match as _DEPRECATED_Match' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchAs as _DEPRECATED_MatchAs' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchCase as _DEPRECATED_MatchCase' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchClass as _DEPRECATED_MatchClass' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchMapping as _DEPRECATED_MatchMapping' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchOr as _DEPRECATED_MatchOr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchSequence as _DEPRECATED_MatchSequence' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchSingleton as _DEPRECATED_MatchSingleton' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchStar as _DEPRECATED_MatchStar' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.MatchValue as _DEPRECATED_MatchValue' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Module as _DEPRECATED_Module' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Name as _DEPRECATED_Name' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.NamedExpr as _DEPRECATED_NamedExpr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.NodeNG as _DEPRECATED_NodeNG' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Nonlocal as _DEPRECATED_Nonlocal' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.ParamSpec as _DEPRECATED_ParamSpec' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Pass as _DEPRECATED_Pass' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Raise as _DEPRECATED_Raise' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Return as _DEPRECATED_Return' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Set as _DEPRECATED_Set' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.SetComp as _DEPRECATED_SetComp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Slice as _DEPRECATED_Slice' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Starred as _DEPRECATED_Starred' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Subscript as _DEPRECATED_Subscript' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.TemplateStr as _DEPRECATED_TemplateStr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Try as _DEPRECATED_Try' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.TryStar as _DEPRECATED_TryStar' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Tuple as _DEPRECATED_Tuple' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.TypeAlias as _DEPRECATED_TypeAlias' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.TypeVar as _DEPRECATED_TypeVar' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.TypeVarTuple as _DEPRECATED_TypeVarTuple' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.UnaryOp as _DEPRECATED_UnaryOp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Unknown as _DEPRECATED_Unknown' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.While as _DEPRECATED_While' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.With as _DEPRECATED_With' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.Yield as _DEPRECATED_Yield' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/__init__.py:81:1: 'astroid.nodes.YieldFrom as _DEPRECATED_YieldFrom' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/interpreter/objectmodel.py:429:17: `nonlocal func` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/interpreter/objectmodel.py:931:17: `nonlocal func` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/astroid/interpreter/objectmodel.py:983:17: `nonlocal func_setter` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/typing_extensions.py:1791:5: redefinition of unused '_ConcatenateGenericAlias' from line 1741
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:49:20: undefined name 'basestring'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:50:27: undefined name 'long'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:52:17: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:674:16: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:766:37: undefined name 'basestring'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:769:32: undefined name 'file'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:770:38: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:780:32: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:786:32: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:794:36: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:798:23: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/six.py:799:21: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/core.py:5:1: 'typing.Optional' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/__init__.py:1:1: '.package_data.__version__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/codec.py:4:1: 'typing.Optional' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/compat.py:1:1: 'from .core import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/compat.py:2:1: 'from .codec import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/compat.py:6:12: 'encode' may be undefined, or defined from star imports: .codec, .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/idna/compat.py:9:12: 'decode' may be undefined, or defined from star imports: .codec, .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:2:1: 'from .core import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:154:26: 'token_map' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:159:24: 'token_map' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:164:15: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:164:20: 'nums' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:168:9: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:168:14: 'hexnums' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:168:64: 'token_map' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:173:9: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:188:37: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:188:41: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:194:9: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:201:9: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:213:9: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:219:18: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:219:23: 'identchars' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:219:35: 'identbodychars' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:222:20: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:227:18: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:232:9: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:234:11: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:240:20: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:247:19: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:275:23: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:302:23: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:306:20: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:311:24: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:316:12: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:322:49: 'ParseResults' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:340:9: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:341:13: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:342:18: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:343:20: 'LineEnd' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:344:19: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:344:24: 'printables' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:345:19: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:345:23: 'White' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:345:39: 'FollowedBy' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:345:50: 'LineEnd' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:352:9: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:352:13: 'quoted_string' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:356:34: 'token_map' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:359:36: 'token_map' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:363:11: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/common.py:431:65: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:4:1: 'sys' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:8:1: 'from .core import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:21:11: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:22:31: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:24:30: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:25:6: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:62:18: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:67:45: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:72:19: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:72:24: 'nums' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:80:34: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:80:52: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:95:11: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:104:24: 'And' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:104:28: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:106:20: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:113:31: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:113:49: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:128:11: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:138:23: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:150:11: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:157:6: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:194:30: 'str_type' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:197:9: 'warnings' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:206:29: 'CaselessKeyword' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:206:63: 'CaselessLiteral' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:210:29: 'Keyword' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:210:55: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:212:14: 'List' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:213:25: 'str_type' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:216:27: 'Iterable' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:221:16: 'NoMatch' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:254:19: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:265:13: 'warnings' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:270:12: 'MatchFirst' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:275:18: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:275:40: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:275:58: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:312:12: 'Dict' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:312:17: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:312:27: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:316:11: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:317:6: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:351:17: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:364:32: 'Diagnostics' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:368:19: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:368:37: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:372:12: 'TokenConverter' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:375:23: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:375:41: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:402:15: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:403:12: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:411:13: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:411:24: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:412:13: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:412:24: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:413:30: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:414:18: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:414:34: 'quoted_string' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:416:17: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:416:33: 'quoted_string' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:417:6: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:486:51: 'quoted_string' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:490:31: 'str_type' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:490:64: 'str_type' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:495:31: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:496:25: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:498:31: 'CharsNotIn' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:499:51: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:505:31: 'empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:505:46: 'CharsNotIn' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:506:43: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:510:31: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:511:25: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:513:32: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:514:32: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:515:31: 'CharsNotIn' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:515:42: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:519:31: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:520:25: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:521:30: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:522:32: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:523:31: 'CharsNotIn' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:523:42: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:530:11: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:532:17: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:533:13: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:533:32: 'ZeroOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:533:73: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:536:17: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:536:23: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:536:42: 'ZeroOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:536:70: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:541:40: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:541:67: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:543:27: 'str_type' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:545:18: 'Keyword' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:549:19: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:549:24: 'alphas' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:549:32: 'alphanums' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:551:24: 'dbl_quoted_string' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:551:66: 'remove_quotes' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:555:15: 'Dict' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:555:20: 'ZeroOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:555:31: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:555:51: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:556:15: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:562:24: 'quoted_string' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:562:62: 'remove_quotes' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:562:79: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:563:13: 'printables' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:568:15: 'Dict' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:569:17: 'ZeroOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:570:21: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:572:27: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:572:31: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:576:15: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:581:16: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:581:24: 'Literal' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:595:24: 'SkipTo' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:600:14: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:600:25: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:601:6: 'Tuple' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:601:12: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:601:27: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:627:14: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:627:25: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:628:6: 'Tuple' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:628:12: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:628:27: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:637:15: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:638:16: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:640:5: 'Word' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:640:10: 'alphas' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:640:18: 'alphanums' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:644:22: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:654:15: 'Enum' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:662:32: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:663:5: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:663:25: 'Tuple' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:663:31: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:663:37: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:663:58: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:663:64: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:665:29: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:666:5: 'Tuple' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:670:25: 'ParseAction' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:672:5: 'Tuple' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:681:16: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:682:14: 'List' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:683:11: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:683:22: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:683:39: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:684:11: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:684:22: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:684:39: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:685:6: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:766:15: 'FollowedBy' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:773:11: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:775:16: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:777:16: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:780:30: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:780:61: 'Suppress' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:781:32: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:787:25: 'ParseAction' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:788:14: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:789:14: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:792:31: 'str_type' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:793:22: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:794:30: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:794:30: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:811:19: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:811:35: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:812:32: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:812:32: 'Forward' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:815:54: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:818:69: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:822:60: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:826:21: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:826:38: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:830:43: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:831:30: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:832:59: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:835:69: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:839:60: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:845:21: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:951:18: 'col' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:954:23: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:955:19: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:958:18: 'col' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:962:19: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:967:18: 'col' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:969:19: 'ParseException' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:973:10: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:973:20: 'LineEnd' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:974:15: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:974:25: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:975:12: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:976:14: 'Empty' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:978:18: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:979:13: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:981:15: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:981:32: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:981:60: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:985:18: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:986:13: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:987:15: 'OneOrMore' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:987:32: 'Group' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:987:60: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:988:15: 'Opt' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:996:41: 'LineEnd' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1001:19: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1001:27: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1006:16: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1009:16: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1010:21: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1013:21: 'Combine' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1014:5: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1021:24: 'Regex' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1027:17: 'List' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1027:22: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1028:49: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1034:11: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1034:22: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1035:12: 'Union' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1035:23: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1041:6: 'ParserElement' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1043:12: 'DelimitedList' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1062:19: 'DelimitedList' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1065:19: 'DelimitedList' may be undefined, or defined from star imports: .core
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/helpers.py:1066:1: redefinition of unused 'delimited_list' from line 1033
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:36:1: '.util._bslash' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:48:1: 'from .exceptions import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:49:1: 'from .actions import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:343:16: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:343:50: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:360:57: 'lineno' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:360:81: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:361:18: 'line' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:362:25: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:781:24: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:807:9: local variable 'TRY' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:807:14: local variable 'MATCH' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:807:21: local variable 'FAIL' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:825:31: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:847:27: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:863:35: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:886:31: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:916:16: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:919:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:924:17: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:961:9: local variable 'TRY' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:961:14: local variable 'MATCH' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:961:21: local variable 'FAIL' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:970:24: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1185:16: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1254:24: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1278:16: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1324:16: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1364:16: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1774:9: 'typing' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1950:16: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:1990:16: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2131:46: 'replace_with' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2150:20: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2151:53: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2151:17: local variable 'fatal' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2396:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2449:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2473:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2585:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2621:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2733:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2952:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2978:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:2985:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3108:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3121:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3130:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3341:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3439:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3448:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3516:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3525:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3547:12: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3554:21: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3560:19: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3562:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3610:12: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3612:15: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3631:23: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3635:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3651:23: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3666:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3672:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3697:23: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:3724:23: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4000:52: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4028:24: 'ParseSyntaxException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4030:24: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4032:27: 'ParseSyntaxException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4034:27: 'ParseSyntaxException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4112:20: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4118:20: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4126:36: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4153:24: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4183:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4277:20: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4281:20: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4287:36: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4299:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4467:24: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4472:24: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4494:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4549:20: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4553:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4593:19: 'RecursiveGrammarException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4634:48: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4640:48: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4661:22: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4705:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4737:12: 'col' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4738:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4837:23: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4844:25: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4851:24: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4938:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:4990:17: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5081:17: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5215:17: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5345:21: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5354:19: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5520:21: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5529:28: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5549:36: 'ParseException' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5911:57: 'line' may be undefined, or defined from star imports: .actions, .exceptions
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/core.py:5985:5: local variable 'e' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:129:1: 'from .util import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:130:1: 'from .exceptions import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:131:1: 'from .actions import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:133:1: 'from .results import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:134:1: 'from .core import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:136:1: 'from .helpers import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:139:1: '.unicode.UnicodeRangeList' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'And' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'AtLineStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'AtStringStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'CaselessKeyword' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'CaselessLiteral' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'CharsNotIn' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'CloseMatch' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Combine' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'DelimitedList' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Dict' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Each' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Empty' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'FollowedBy' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Forward' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'GoToColumn' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Group' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'IndentedBlock' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Keyword' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'LineEnd' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'LineStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Literal' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Located' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'PrecededBy' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'MatchFirst' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'NoMatch' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'NotAny' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'OneOrMore' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'OnlyOnce' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'OpAssoc' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Opt' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Optional' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Or' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseBaseException' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseElementEnhance' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseException' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseExpression' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseFatalException' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseResults' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParseSyntaxException' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ParserElement' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'PositionToken' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'QuotedString' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'RecursiveGrammarException' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Regex' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'SkipTo' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'StringEnd' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'StringStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Suppress' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Token' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'TokenConverter' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'White' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Word' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'WordEnd' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'WordStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ZeroOrMore' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'Char' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'alphanums' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'alphas' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'alphas8bit' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'any_close_tag' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'any_open_tag' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'autoname_elements' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'c_style_comment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'col' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'common_html_entity' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'condition_as_parse_action' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'counted_array' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'cpp_style_comment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'dbl_quoted_string' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'dbl_slash_comment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'delimited_list' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'dict_of' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'empty' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'hexnums' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'html_comment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'identchars' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'identbodychars' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'infix_notation' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'java_style_comment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'line' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'line_end' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'line_start' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'lineno' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'make_html_tags' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'make_xml_tags' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'match_only_at_col' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'match_previous_expr' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'match_previous_literal' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'nested_expr' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'null_debug_action' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'nums' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'one_of' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'original_text_for' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'printables' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'punc8bit' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'python_style_comment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'quoted_string' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'remove_quotes' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'replace_with' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'replace_html_entity' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'rest_of_line' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'sgl_quoted_string' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'srange' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'string_end' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'string_start' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'token_map' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'trace_parse_action' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'ungroup' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'unicode_string' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'with_attribute' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'with_class' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'anyCloseTag' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'anyOpenTag' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'cStyleComment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'commonHTMLEntity' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'conditionAsParseAction' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'countedArray' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'cppStyleComment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'dblQuotedString' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'dblSlashComment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'delimitedList' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'dictOf' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'htmlComment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'indentedBlock' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'infixNotation' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'javaStyleComment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'lineEnd' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'lineStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'locatedExpr' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'makeHTMLTags' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'makeXMLTags' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'matchOnlyAtCol' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'matchPreviousExpr' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'matchPreviousLiteral' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'nestedExpr' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'nullDebugAction' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'oneOf' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'opAssoc' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'originalTextFor' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'pythonStyleComment' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'quotedString' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'removeQuotes' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'replaceHTMLEntity' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'replaceWith' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'restOfLine' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'sglQuotedString' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'stringEnd' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'stringStart' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'tokenMap' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'traceParseAction' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'unicodeString' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'withAttribute' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/__init__.py:157:1: 'withClass' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/results.py:2:1: 'collections.abc.Sequence' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/util.py:207:9: redefinition of unused 'escape_re_range_char' from line 200
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:2:1: '.initialise.init' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:2:1: '.initialise.deinit' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:2:1: '.initialise.reinit' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:2:1: '.initialise.colorama_text' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:2:1: '.initialise.just_fix_windows_console' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:3:1: '.ansi.Fore' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:3:1: '.ansi.Back' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:3:1: '.ansi.Style' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:3:1: '.ansi.Cursor' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/__init__.py:4:1: '.ansitowin32.AnsiToWin32' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/win32.py:121:9: local variable 'success' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/win32.py:153:9: local variable 'success' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/colorama/tests/ansitowin32_test.py:45:51: local variable 'excinfo' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/adapters.py:10:1: 'socket' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:64:19: redefinition of unused 'patch' from line 162
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:149:1: '.packages' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:149:1: '.utils' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__author__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__author_email__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__build__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__cake__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__copyright__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__description__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__license__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__title__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__url__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:150:1: '.__version__.__version__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.delete' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.get' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.head' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.options' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.patch' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.post' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.put' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:162:1: '.api.request' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.ConnectionError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.ConnectTimeout' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.HTTPError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.JSONDecodeError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.ReadTimeout' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.RequestException' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.Timeout' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.TooManyRedirects' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:163:1: '.exceptions.URLRequired' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:175:1: '.models.PreparedRequest' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:175:1: '.models.Request' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:175:1: '.models.Response' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:176:1: '.sessions.Session' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:176:1: '.sessions.session' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/__init__.py:177:1: '.status_codes.codes' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/models.py:13:1: 'encodings.idna' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:10:1: 'pip._vendor.chardet' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:29:1: 'json' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:30:1: 'json.JSONDecodeError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:33:1: 'collections.OrderedDict' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:34:1: 'collections.abc.Callable' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:34:1: 'collections.abc.Mapping' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:34:1: 'collections.abc.MutableMapping' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:35:1: 'http.cookiejar as cookielib' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:36:1: 'http.cookies.Morsel' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:37:1: 'io.StringIO' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.quote' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.quote_plus' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.unquote' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.unquote_plus' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.urldefrag' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.urlencode' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.urljoin' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.urlparse' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.urlsplit' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:42:1: 'urllib.parse.urlunparse' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:54:1: 'urllib.request.getproxies' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:54:1: 'urllib.request.getproxies_environment' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:54:1: 'urllib.request.parse_http_list' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:54:1: 'urllib.request.proxy_bypass' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/compat.py:54:1: 'urllib.request.proxy_bypass_environment' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/utils.py:28:1: '._internal_utils.HEADER_VALIDATORS' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/utils.py:28:1: '._internal_utils.to_native_string' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/utils.py:112:5: redefinition of unused 'proxy_bypass' from line 43
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/sessions.py:33:1: '.models.REDIRECT_STATI' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/requests/sessions.py:41:1: '.utils.should_bypass_proxies' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pygments/lexers/python.py:11:1: 're' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pygments/lexers/python.py:14:1: 'pip._vendor.pygments.lexer.Lexer' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pygments/lexers/python.py:14:1: 'pip._vendor.pygments.lexer.do_insertions' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/pygments/lexers/python.py:14:1: 'pip._vendor.pygments.lexer.line_re' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/table.py:925:5: redefinition of unused 'Console' from line 28
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/table.py:927:5: redefinition of unused 'Table' from line 151
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/text.py:1283:5: redefinition of unused 'Console' from line 32
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/align.py:291:5: redefinition of unused 'Console' from line 17
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/pretty.py:215:14: undefined name 'get_ipython'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/color.py:598:5: redefinition of unused 'Text' from line 15
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/__init__.py:6:1: '._extension.load_ipython_extension' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/_log_render.py:90:5: redefinition of unused 'Console' from line 8
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/live.py:279:5: redefinition of unused 'Live' from line 35
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/progress.py:1252:17: f-string is missing placeholders
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/console.py:523:15: undefined name 'get_ipython'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/console.py:2502:19: f-string is missing placeholders
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/screen.py:9:5: '.console.Group' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/screen.py:34:9: redefinition of unused 'Group' from line 9
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/control.py:218:5: redefinition of unused 'Console' from line 13
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/syntax.py:833:5: redefinition of unused 'sys' from line 4
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/logging.py:278:9: local variable 'foos' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/jupyter.py:11:5: redefinition of unused 'ConsoleRenderable' from line 4
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/emoji.py:85:5: redefinition of unused 'Console' from line 17
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/panel.py:292:5: redefinition of unused 'Console' from line 14
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/panel.py:297:5: redefinition of unused 'Padding' from line 8
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/traceback.py:165:14: undefined name 'get_ipython'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/traceback.py:727:5: redefinition of unused 'sys' from line 6
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/traceback.py:734:9: local variable '_rich_traceback_guard' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/traceback.py:735:9: local variable 'zed' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/traceback.py:752:17: undefined name 'slfkjsldkfj'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/rich/segment.py:709:5: redefinition of unused 'Console' from line 30
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/__init__.py:27:5: 'urllib3_secure_extra' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/connection.py:14:1: '.packages.six.moves.http_client.HTTPException' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/connection.py:46:1: '._collections.HTTPHeaderDict' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/connection.py:569:5: redefinition of unused 'HTTPSConnection' from line 286
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:49:21: undefined name 'basestring'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:50:27: undefined name 'long'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:52:17: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:722:16: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:824:37: undefined name 'basestring'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:828:32: undefined name 'file'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:829:38: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:841:32: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:847:32: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:855:36: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:859:23: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/six.py:860:21: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/util/ssl_match_hostname.py:82:15: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/urllib3/util/queue.py:8:5: 'Queue as _unused_module_Queue' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/platformdirs/windows.py:244:9: 'winreg' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/__init__.py:2:1: 'from .exceptions import *' used; unable to detect undefined names
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/__init__.py:2:1: '.exceptions.*' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/__init__.py:3:1: '.ext.ExtType' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/__init__.py:3:1: '.ext.Timestamp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/__init__.py:19:9: '.fallback.Unpacker' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/ext.py:11:23: undefined name 'long'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/msgpack/fallback.py:9:23: undefined name 'long'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/truststore/__init__.py:10:5: undefined name '_api'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/certifi/core.py:113:1: redefinition of unused 'where' from line 103
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/certifi/core.py:117:1: redefinition of unused 'contents' from line 108
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/metadata.py:954:9: local variable 'author' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/metadata.py:955:9: local variable 'maintainer' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:11:1: 'shutil' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:21:20: undefined name 'basestring'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:22:17: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:31:26: undefined name 'unicode'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:46:17: undefined name 'raw_input'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:64:5: 'io.StringIO' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:67:5: 'io.TextIOWrapper as file_type' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:68:5: 'builtins' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:69:5: 'configparser' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.urlparse' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.urlunparse' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.urljoin' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.urlsplit' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.urlunsplit' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.unquote' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.splittype' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:70:5: 'urllib.parse.quote' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.urlretrieve' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.url2pathname' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.pathname2url' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.Request' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.urlopen' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.HTTPBasicAuthHandler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.HTTPPasswordMgr' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.HTTPHandler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.HTTPRedirectHandler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:72:5: 'urllib.request.build_opener' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:77:9: 'urllib.request.HTTPSHandler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:78:5: 'urllib.error.ContentTooShortError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:78:5: 'urllib.error.URLError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:78:5: 'urllib.error.HTTPError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:79:5: 'http.client as httplib' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:80:5: 'urllib.request as urllib2' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:81:5: 'xmlrpc.client as xmlrpclib' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:82:5: 'queue' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:84:5: 'html.entities as htmlentitydefs' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:86:5: 'itertools.filterfalse' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:319:1: 'sysconfig' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:480:5: 'cgi.escape' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:484:5: 'html.unescape' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_vendor/distlib/compat.py:505:37: undefined name 'get_ident'
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/vcs/__init__.py:8:1: 'pip._internal.vcs.subversion' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/vcs/__init__.py:9:1: 'pip._internal.vcs.versioncontrol.RemoteNotFoundError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/vcs/__init__.py:9:1: 'pip._internal.vcs.versioncontrol.RemoteNotValidError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/vcs/__init__.py:9:1: 'pip._internal.vcs.versioncontrol.is_url' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/vcs/__init__.py:9:1: 'pip._internal.vcs.versioncontrol.make_vcs_requirement_url' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/vcs/__init__.py:9:1: 'pip._internal.vcs.versioncontrol.vcs' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/operations/build/build_tracker.py:6:1: 'typing.Set' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/operations/build/build_tracker.py:8:1: 'pip._internal.models.link.Link' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/utils/unpacking.py:28:5: 'bz2' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/utils/unpacking.py:36:5: 'lzma' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/pip/_internal/utils/compat.py:16:9: '_ssl' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/platformdirs/windows.py:365:9: 'ctypes' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/platformdirs/windows.py:371:9: 'winreg' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/platformdirs/android.py:181:28: undefined name 'android'
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:42:1: '.logger.trace as _trace' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:69:1: 'types.TracebackType' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:69:1: 'types.FrameType' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:69:1: 'types.BuiltinMethodType' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:89:1: 'enum.Enum' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:144:1: 'types.MethodWrapperType' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:187:1: 'socket.socket as SocketType' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:1429:5: redefinition of unused 'save_file' from line 1421
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:1439:5: redefinition of unused 'save_file' from line 1429
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:1447:9: redefinition of unused 'save_file' from line 1439
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_dill.py:2260:26: undefined name 'pickler'
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:18:5: 'version.__version__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:18:5: 'version.__author__' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.dump' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.dumps' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.load' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.loads' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.copy' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.Pickler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.Unpickler' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.register' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.pickle' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.pickles' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.check' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.DEFAULT_PROTOCOL' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.HIGHEST_PROTOCOL' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.HANDLE_FMODE' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.CONTENTS_FMODE' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.FILE_FMODE' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.PickleError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.PickleWarning' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.PicklingError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.PicklingWarning' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.UnpicklingError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:26:1: '._dill.UnpicklingWarning' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:33:1: '.session.dump_module' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:33:1: '.session.load_module' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:33:1: '.session.load_module_asdict' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:33:1: '.session.dump_session' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:33:1: '.session.load_session' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:37:1: '.detect' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:37:1: '.session' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:37:1: '.source' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:37:1: '.temp' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/__init__.py:40:1: '.settings.settings' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/logger.py:52:1: 'functools.partial' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/source.py:138:33: undefined name 'get_ipython'
+backend/.pylint_venv/lib/python3.12/site-packages/dill/source.py:413:20: local variable 'lnum' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/source.py:489:5: local variable 'nspaces' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/source.py:546:16: undefined name '_'
+backend/.pylint_venv/lib/python3.12/site-packages/dill/detect.py:15:1: '.pointers.parent' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/detect.py:15:1: '.pointers.reference' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/detect.py:15:1: '.pointers.at' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/detect.py:15:1: '.pointers.parents' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/detect.py:15:1: '.pointers.children' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/detect.py:131:17: local variable 'cell_contents' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_objects.py:40:1: 'zipfile' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_objects.py:53:1: 'contextvars' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/_shims.py:52:1: 'inspect' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_objects.py:19:1: 'dill.extend' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_functions.py:10:1: 'sys' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_functions.py:61:5: 'pickletools' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_functions.py:86:5: local variable 'globalvar' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_functions.py:87:5: local variable 'dumped_func_cache' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_functions.py:115:5: 'dill._dill.CODE_VERSION' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_source.py:169:5: local variable 'source' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_registered.py:20:13: local variable 'z' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_abc.py:124:5: local variable 'e' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_restricted.py:20:5: local variable 'a' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_restricted.py:23:5: local variable 'deserialized' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_recursive.py:152:5: local variable 'fib' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:68:1: 'json' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:69:1: 'urllib as url' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:70:1: 'xml.sax' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:71:1: 'xml.dom.minidom as dom' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:75:1: 'calendar.isleap' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:76:1: 'cmath.log as complex_log' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:123:9: `global Person` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:123:9: `global person` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:123:9: `global Calendar` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:123:9: `global CalendarSubclass` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:123:9: `global cal` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:123:9: `global selfref` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_session.py:256:9: `global names` is unused: name is never assigned in scope
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_detect.py:12:1: 'pickle.PicklingError' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_detect.py:110:5: 'dill.loads' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_detect.py:122:5: 'math.pi' imported but unused
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_moduledict.py:37:5: local variable 'serialized' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_pycapsule.py:19:5: redefinition of unused 'test_pycapsule' from line 15
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_nested.py:75:5: local variable '_pbasic2' is assigned to but never used
+backend/.pylint_venv/lib/python3.12/site-packages/dill/tests/test_nested.py:77:5: local variable '_pbasic' is assigned to but never used
+backend/.pylint_venv/bin/get_gprof:56:5: 'dill' imported but unused
+scripts/check_prod_env.py:417:13: 'psycopg2' imported but unused

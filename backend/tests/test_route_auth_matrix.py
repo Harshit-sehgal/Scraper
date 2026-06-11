@@ -309,12 +309,13 @@ async def test_admin_via_x_admin_key(client) -> None:
 
 @pytest.mark.asyncio
 async def test_no_keys_no_auth_required(client, monkeypatch) -> None:
-    """When no API keys are configured, /api/* routes should not require auth."""
+    """When no API keys are configured, protected /api/* routes fail closed."""
     from app.config import settings
 
     monkeypatch.setattr(settings, "API_KEY", "")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
+    monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", False)
 
     response = await client.get("/api/jobs")
-    assert response.status_code in (200, 422), f"Expected 200 or 422 (no auth, no keys), got {response.status_code}"
+    assert response.status_code == 403, f"Expected 403 (fail closed with no keys), got {response.status_code}"

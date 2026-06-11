@@ -1,0 +1,27 @@
+.................................F.                                      [100%]
+=================================== FAILURES ===================================
+_ TestPostgresSchemaRepair.test_ensure_required_tables_creates_created_by_index _
+
+self = <tests.test_postgres_repository.TestPostgresSchemaRepair object at 0x7ba7e8dcc560>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ba7e8d48f80>
+
+    def test_ensure_required_tables_creates_created_by_index(self, monkeypatch) -> None:
+        import app.postgres_repository_base as pg_base
+
+        statements: list[str] = []
+
+        def capture_execute(_conn, sql: str, _params=None):
+            statements.append(sql)
+
+        monkeypatch.setattr(pg_base, "execute", capture_execute)
+
+        pg_base.ensure_required_tables(object())
+
+        assert any("idx_jobs_created_by" in statement for statement in statements)
+>       assert "cancel_requested" in sql
+                                     ^^^
+E       NameError: name 'sql' is not defined
+
+backend/tests/test_postgres_repository.py:443: NameError
+=========================== short test summary info ============================
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSchemaRepair::test_ensure_required_tables_creates_created_by_index

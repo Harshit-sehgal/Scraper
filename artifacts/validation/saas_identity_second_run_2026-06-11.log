@@ -1,0 +1,30 @@
+============================= test session starts ==============================
+collected 21 items
+
+backend/tests/test_saas_identity.py .................F...                [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_removed_member_loses_org_access _____________________
+
+membership_service = <app.saas.service.MembershipService object at 0x78a20e367e60>
+signup = <app.saas.service.SignupService object at 0x78a20e3800e0>
+identity_store = <app.saas.identity_store.SQLiteIdentityStore object at 0x78a20e367f50>
+
+    def test_removed_member_loses_org_access(membership_service, signup, identity_store) -> None:
+        owner = signup.signup("owner@example.com", "hunter2")
+        member_user = identity_store.create_user(_make_user(email="member@example.com"))
+
+        membership_service.add_member(owner.organization.id, member_user.id, role=MembershipRole.MEMBER)
+        assert membership_service.is_active_member(member_user.id, owner.organization.id) is True
+
+        removed = membership_service.remove_user_from_org(member_user.id, owner.organization.id)
+        assert removed is True
+        assert membership_service.is_active_member(member_user.id, owner.organization.id) is False
+>       assert identity_store.list_org_memberships(owner.organization.id, include_removed=True)[0].removed_at is not None
+E       AssertionError: assert None is not None
+E        +  where None = Membership(id='78344b49-505d-43eb-a4fb-87e9237ec248', user_id='4ff45cd7-6050-4ac0-85f9-d4ad629930df', org_id='8da1f0bb...b5-1356ffae203d', role=<MembershipRole.OWNER: 'owner'>, created_at='2026-06-11T14:35:02.811737+00:00', removed_at=None).removed_at
+
+backend/tests/test_saas_identity.py:247: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_saas_identity.py::test_removed_member_loses_org_access
+========================= 1 failed, 20 passed in 4.32s =========================

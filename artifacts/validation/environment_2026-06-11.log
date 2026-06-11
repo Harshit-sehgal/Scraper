@@ -1,0 +1,27 @@
+2026-06-11T18:01:34+05:30
+81a3c2f5e1f44a315a1e20c2a806ab315bf36d74
+## main...origin/main
+ M backend/app/benchmark_reporter.py
+ M backend/app/cleaning_engine.py
+ M backend/app/crawl_frontier.py
+ M backend/app/lifespan.py
+ M backend/app/llm_bridge.py
+ M backend/app/postgres_repository_base.py
+ M backend/app/rate_limiter.py
+ M backend/app/scraper.py
+ M backend/app/selector_decay_predictor.py
+ M backend/app/worker_queue_postgres_base.py
+ M backend/tests/test_db_rate_limiter.py
+ M backend/tests/test_llm_bridge.py
+ M backend/tests/test_worker_queue_postgres.py
+Python 3.12.3
+pip 26.1.2 from /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/pip (python 3.12)
+v24.12.0
+11.12.1
+pytest 9.0.3
+ruff 0.15.15
+mypy 2.1.0 (compiled: yes)
+3.4.0 Python 3.12.3 on Linux
+bandit 1.9.4
+  python version = 3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]
+pip-audit 2.10.0

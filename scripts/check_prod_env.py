@@ -414,7 +414,7 @@ def check_queue_driver_compatibility(env: dict[str, str]) -> bool:
         print("  [OK]    queue module app.worker_queue_postgres_psycopg3 is importable")
     elif pg_driver == "psycopg2":
         try:
-            import psycopg2  # noqa: F401
+            __import__("psycopg2")
         except ImportError:
             print(
                 "  [FAIL]  psycopg2 is not installed but DATAFORGE_PG_DRIVER=psycopg2. "

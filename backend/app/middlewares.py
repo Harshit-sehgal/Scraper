@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-import secrets
 import time
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 from app.audit_logger import log_auth_event
@@ -52,19 +52,6 @@ def _get_client_ip(request: Request) -> str:
     if request.client and request.client.host:
         return request.client.host
     return "unknown"
-
-
-def _is_match(provided: str, expected: str) -> bool:
-    """Constant-time API-key comparison.
-
-    Hoisted to module scope so we don't allocate a new function object
-    on every request. The empty-string short-circuit keeps the constant
-    time characteristic for unequal-length inputs (one branch returns
-    immediately; the other compares two known-non-empty strings).
-    """
-    if not expected or not provided:
-        return False
-    return secrets.compare_digest(provided, expected)
 
 
 logger = logging.getLogger(__name__)
@@ -126,9 +113,7 @@ async def body_size_middleware(request: Request, call_next):
 
 
 async def api_key_middleware(request: Request, call_next):
-    if (settings.API_KEY or settings.ADMIN_API_KEY or getattr(settings, "OPERATOR_API_KEY", "")) and request.url.path.startswith(
-        "/api/",
-    ):
+    if request.url.path.startswith("/api/"):
         if request.method == "OPTIONS" and request.headers.get("Origin") and request.headers.get("Access-Control-Request-Method"):
             return await call_next(request)
         # CSP violation reports are sent by browsers, which cannot carry API keys.
@@ -141,68 +126,58 @@ async def api_key_middleware(request: Request, call_next):
         # returning session state from the cookie itself).
         if request.url.path in ("/api/session", "/api/session/me"):
             return await call_next(request)
-        # Use exact-match / prefix-match on the docs / openapi paths.
-        # Substring matching (e.g. ``"/docs" in path``) would falsely
-        # exempt any path containing those letters, including a
-        # future ``/api/dossier`` or ``/api/some-openapi-redirect``.
-        docs_paths = ("/docs", "/openapi.json")
-        is_docs_path = request.url.path in docs_paths or request.url.path.startswith(("/docs/", "/redoc", "/openapi"))
-        if not is_docs_path or settings.ENV.lower() == "production":
-            api_key = request.headers.get("X-API-Key", "")
-            admin_key_header = request.headers.get("X-Admin-Key", "")
-            auth_header = request.headers.get("Authorization", "")
-            auth_scheme, _, auth_token = auth_header.partition(" ")
-            bearer_token = auth_token.strip() if auth_scheme.lower() == "bearer" else ""
+        bearer_token = None
+        auth_header = request.headers.get("Authorization", "")
+        auth_scheme, _, auth_token = auth_header.partition(" ")
+        if auth_scheme.lower() == "bearer":
+            bearer_token = auth_token.strip()
+        has_api_key_header = bool(request.headers.get("X-API-Key") or request.headers.get("X-Admin-Key"))
 
-            matched_role: str | None = None
-            # Match the HIGHEST privilege first so a request that
-            # successfully authenticates against the admin key is
-            # attributed to the admin role, even if it also carries a
-            # user or operator key. A *wrong* admin key falls through
-            # to the operator/user checks (no early 403).
-            if settings.ADMIN_API_KEY and (
-                _is_match(api_key, settings.ADMIN_API_KEY)
-                or _is_match(bearer_token, settings.ADMIN_API_KEY)
-                or _is_match(admin_key_header, settings.ADMIN_API_KEY)
-            ):
-                matched_role = "admin"
-            elif getattr(settings, "OPERATOR_API_KEY", "") and (
-                _is_match(api_key, settings.OPERATOR_API_KEY) or _is_match(bearer_token, settings.OPERATOR_API_KEY)
-            ):
-                matched_role = "operator"
-            elif settings.API_KEY and (_is_match(api_key, settings.API_KEY) or _is_match(bearer_token, settings.API_KEY)):
-                matched_role = "user"
+        try:
+            from app.utils.rbac import resolve_auth_context
 
-            # Fall back to session cookie check if no API key matched.
-            # This allows browser clients to authenticate via HTTP-only
-            # session cookie after the initial key exchange (G2).
-            if not matched_role:
-                from app.auth.session import get_session_role
+            auth_context = resolve_auth_context(request)
+        except HTTPException as exc:
+            log_auth_event(
+                actor=_get_client_ip(request),
+                action="api_key_auth" if has_api_key_header else "api_auth",
+                resource=request.url.path,
+                outcome="failure",
+                details={"method": request.method, "has_bearer": bool(bearer_token)},
+            )
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+            )
 
-                session_role = get_session_role(request)
-                if session_role:
-                    matched_role = session_role
+        try:
+            from app.utils.usage_ledger import UsageType, get_usage_ledger
 
-            if not matched_role:
-                log_auth_event(
-                    actor=_get_client_ip(request),
-                    action="api_key_auth",
-                    resource=request.url.path,
-                    outcome="failure",
-                    details={"method": request.method, "has_bearer": bool(bearer_token)},
-                )
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Invalid or missing API key. Provide X-API-Key or Authorization Bearer token."},
-                )
-            if request.method != "GET":
-                log_auth_event(
-                    actor=f"{matched_role}:{_get_client_ip(request)}",
-                    action="api_key_auth",
-                    resource=request.url.path,
-                    outcome="success",
-                    details={"role": matched_role, "method": request.method},
-                )
+            get_usage_ledger().record_usage(
+                auth_context.user_id,
+                UsageType.API_REQUEST,
+                quantity=1,
+                metadata={
+                    "path": request.url.path,
+                    "method": request.method,
+                    "role": auth_context.role.value,
+                    "source": auth_context.source,
+                },
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": str(exc)},
+            )
+
+        if request.method != "GET":
+            log_auth_event(
+                actor=f"{auth_context.role.value}:{auth_context.user_id}:{_get_client_ip(request)}",
+                action="api_auth",
+                resource=request.url.path,
+                outcome="success",
+                details={"role": auth_context.role.value, "method": request.method, "source": auth_context.source},
+            )
     return await call_next(request)
 
 

@@ -12,14 +12,44 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 
+from app.audit_logger import log_rbac_event
 from app.models import JobStatus
 from app.routers.jobs_state import JobStoreManager, is_worker_mode
 from app.storage_interface import get_job_repository
+from app.utils.rbac import UserRole, require_role_with_user
 
 logger = logging.getLogger(__name__)
+
+
+def _can_access_owner(role: UserRole, user_id: str, owner_id: str | None) -> bool:
+    if role in {UserRole.ADMIN, UserRole.OPERATOR}:
+        return True
+    return bool(owner_id) and owner_id == user_id
+
+
+def _summary_visible(summary: dict, role: UserRole, user_id: str) -> bool:
+    return _can_access_owner(role, user_id, str(summary.get("created_by") or ""))
+
+
+def _public_summary(summary: dict) -> dict:
+    return {key: value for key, value in summary.items() if key != "created_by"}
+
+
+def _ensure_job_access(job, role: UserRole, user_id: str, action: str) -> None:
+    if _can_access_owner(role, user_id, getattr(job, "created_by", "")):
+        return
+    log_rbac_event(
+        actor=user_id,
+        action=action,
+        resource=f"job:{job.id}",
+        role=role.value,
+        outcome="denied",
+        details={"owner_id": getattr(job, "created_by", ""), "policy": "mvp_created_by_owner"},
+    )
+    raise HTTPException(status_code=404, detail="Job not found")
 
 
 def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> None:
@@ -27,6 +57,10 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
 
     @router.get("/api/jobs")
     async def list_jobs(
+        auth: Annotated[
+            tuple[UserRole, str],
+            Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         cursor: Annotated[str | None, Query()] = None,
     ):
@@ -39,6 +73,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         field contains the ``created_at`` of the last returned item;
         when the result set is exhausted it is ``None``.
         """
+        role, user_id = auth
         # In worker mode, refresh from repo using a summary projection.
         if is_worker_mode():
             try:
@@ -48,6 +83,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     limit,
                     cursor,
                 )
+                summaries = [s for s in summaries if _summary_visible(s, role, user_id)]
                 next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
                 with manager.lock:
                     summary_ids = {s["id"] for s in summaries}
@@ -59,12 +95,16 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     stale_ids = [jid for jid in manager.jobs_store if jid not in summary_ids]
                     for jid in stale_ids:
                         manager.jobs_store.pop(jid, None)
-                    return {"jobs": summaries, "next_cursor": next_cursor}
+                    return {"jobs": [_public_summary(s) for s in summaries], "next_cursor": next_cursor}
             except (AttributeError, ImportError, RuntimeError):
                 logger.debug("Failed to refresh jobs list from repo")
 
         with manager.lock:
-            ordered = sorted(manager.jobs_store.values(), key=lambda j: j.created_at, reverse=True)
+            ordered = [
+                job
+                for job in sorted(manager.jobs_store.values(), key=lambda j: j.created_at, reverse=True)
+                if _can_access_owner(role, user_id, job.created_by)
+            ]
             if cursor:
                 ordered = [j for j in ordered if (j.created_at or "") < cursor]
             ordered = ordered[:limit]
@@ -93,8 +133,17 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             return {"jobs": summaries, "next_cursor": next_cursor}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):
+    async def get_job(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str],
+            Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        include_results: Annotated[bool, Query()] = False,
+    ):
+        role, user_id = auth
         job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, "read_job")
 
         results_list = []
         if include_results:
@@ -112,6 +161,10 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
     @router.get("/api/jobs/{job_id}/results")
     async def get_job_results(
         job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str],
+            Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ):
@@ -123,7 +176,9 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         (storage-split v4) and only fall back to ``job.results``
         for back-compat with v3 deployments.
         """
+        role, user_id = auth
         job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, "read_job_results")
 
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
@@ -171,6 +226,10 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
     @router.get("/api/jobs/{job_id}/events")
     async def get_job_events(
         job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str],
+            Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
         offset: Annotated[int, Query(ge=0)] = 0,
         level: Annotated[str | None, Query()] = None,
@@ -183,7 +242,9 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         response shape is stable for clients that poll a long-running
         job for progress.
         """
+        role, user_id = auth
         job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, "read_job_events")
 
         events: list[dict] = []
         try:
@@ -241,9 +302,14 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
 
     @router.get("/api/recycle_bin")
     async def list_recycle_bin(
+        auth: Annotated[
+            tuple[UserRole, str],
+            Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         cursor: str | None = None,
     ):
+        role, user_id = auth
         if is_worker_mode():
             repo = get_job_repository()
             summaries = await run_in_threadpool(
@@ -251,10 +317,15 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                 limit=limit,
                 cursor=cursor,
             )
-            return {"jobs": summaries}
+            summaries = [s for s in summaries if _summary_visible(s, role, user_id)]
+            return {"jobs": [_public_summary(s) for s in summaries]}
 
         with manager.lock:
-            ordered = sorted(manager.recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
+            ordered = [
+                job
+                for job in sorted(manager.recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
+                if _can_access_owner(role, user_id, job.created_by)
+            ]
             summaries = []
             for job in ordered:
                 dumped = job.model_dump()

@@ -1,0 +1,129 @@
+........................................................................ [  2%]
+........................................................................ [  4%]
+.......................................................................F [  6%]
+........................................................................ [  8%]
+........................................................................ [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+................................................................s....... [ 19%]
+........................................................................ [ 21%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 30%]
+.....................................................ssssssss........... [ 32%]
+........................................................................ [ 34%]
+...................................s.................s.................. [ 36%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 43%]
+........................................................................ [ 45%]
+........................................................................ [ 47%]
+..........................................................ssssssssssssss [ 49%]
+ssssssss.........................ss..................................... [ 51%]
+................................ss...........................F.......... [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+...............................................sssssssssssss............ [ 60%]
+.......................s................................................ [ 62%]
+........................................................................ [ 64%]
+......................F................................................. [ 67%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 75%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+...........................................sssssss...................... [ 84%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+............................s...................ss..sssssssssssssssssss. [ 97%]
+........................................................................ [ 99%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+________ TestAuthFailureLogging.test_invalid_api_key_logs_auth_failure _________
+
+self = <tests.test_audit_logger_integration.TestAuthFailureLogging object at 0x75c0111b9bb0>
+client = <tests.conftest.LocalASGIClient object at 0x75c00bae6f90>
+_setup_log_dir = PosixPath('/tmp/tmp6fmygc_7')
+
+    def test_invalid_api_key_logs_auth_failure(self, client, _setup_log_dir) -> None:
+        """Invalid API key should log an auth failure event."""
+        response = client.get("/api/jobs", headers={"X-API-Key": "invalid_key"})
+        assert response.status_code == 403
+
+        events = _read_audit_log(_setup_log_dir)
+        assert len(events) >= 1
+        failure_events = [e for e in events if e["outcome"] == "failure"]
+        assert len(failure_events) >= 1
+        assert failure_events[0]["event_type"] == "auth"
+>       assert failure_events[0]["action"] == "api_key_auth"
+E       AssertionError: assert 'api_auth' == 'api_key_auth'
+E
+E         - api_key_auth
+E         ?    ----
+E         + api_auth
+
+backend/tests/test_audit_logger_integration.py:94: AssertionError
+______________ test_postgres_repository_base_is_psycopg_agnostic _______________
+
+    def test_postgres_repository_base_is_psycopg_agnostic() -> None:
+        """app.postgres_repository_base must NOT import psycopg2 or psycopg.
+
+        This base module is shared by both psycopg2 and psycopg3 repositories.
+        """
+        import app.postgres_repository_base as mod
+
+        src_file = Path(mod.__file__)
+        src = src_file.read_text()
+        src_compact = " ".join(src.split())
+
+        # The base must not import either driver at module load time. The
+        # drivers are imported lazily inside the concrete repository
+        # implementations, not in the shared base.
+>       assert "import psycopg2" not in src_compact, "postgres_repository_base must not import psycopg2 (driver-specific)"
+E       AssertionError: postgres_repository_base must not import psycopg2 (driver-specific)
+E       assert 'import psycopg2' not in '"""Shared P...A_VERSION, }'
+E
+E         'import psycopg2' is contained here:
+E           r, ) try: import psycopg2 _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, psycopg2.Error) # type: ignore[misc] except ImportError: pass try: import psycopg _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, psycopg.Error) # type: ignore[misc] except ImportError: pass # ─────────────────────────────────────────────────────────────────────── # Database URL resolution (shared between driver implementations) # ─────────────────────────────────────────────────────────────────────── def get_database_url() -> str: """Resolve the Postgres DSN from environment or settings. Priorit...
+E
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+backend/tests/test_psycopg3_import_smoke.py:89: AssertionError
+________________________ test_no_keys_no_auth_required _________________________
+
+client = <tests.test_route_auth_matrix.LocalASGIClient object at 0x75c0093daf90>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75bffb7251f0>
+
+    @pytest.mark.asyncio
+    async def test_no_keys_no_auth_required(client, monkeypatch) -> None:
+        """When no API keys are configured, /api/* routes should not require auth."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "")
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
+
+        response = await client.get("/api/jobs")
+>       assert response.status_code in (200, 422), f"Expected 200 or 422 (no auth, no keys), got {response.status_code}"
+E       AssertionError: Expected 200 or 422 (no auth, no keys), got 403
+E       assert 403 in (200, 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend/tests/test_route_auth_matrix.py:320: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_audit_logger_integration.py::TestAuthFailureLogging::test_invalid_api_key_logs_auth_failure
+FAILED backend/tests/test_psycopg3_import_smoke.py::test_postgres_repository_base_is_psycopg_agnostic
+FAILED backend/tests/test_route_auth_matrix.py::test_no_keys_no_auth_required

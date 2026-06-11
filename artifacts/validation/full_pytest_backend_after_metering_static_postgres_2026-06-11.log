@@ -1,0 +1,110 @@
+........................................................................ [  2%]
+........................................................................ [  4%]
+........................................................................ [  6%]
+........................................................................ [  8%]
+..................................................F..................... [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+................................................................s....... [ 19%]
+........................................................................ [ 21%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 30%]
+.....................................................ssssssss........... [ 32%]
+........................................................................ [ 34%]
+...................................s.................s.................. [ 36%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 43%]
+........................................................................ [ 45%]
+........................................................................ [ 47%]
+................................................................ssssssss [ 49%]
+ssssssssssssss.....................F...ss............................... [ 51%]
+......................................ss................................ [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+.....................................................sssssssssssss...... [ 60%]
+.............................s.......................................... [ 62%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 75%]
+........................................................................ [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+.................................................sssssss................ [ 84%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 94%]
+..................................s...................ss..ssssssssssssss [ 97%]
+sssss................................................................... [ 99%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+_ TestCheckQueueDriverCompatibility.test_psycopg2_fails_when_module_not_installed _
+
+self = <tests.test_check_prod_env.TestCheckQueueDriverCompatibility object at 0x7e6434af09e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e642c8e04a0>
+
+    def test_psycopg2_fails_when_module_not_installed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """psycopg2 + postgres queue fails if psycopg2 is not importable."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "psycopg2",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+
+        import builtins
+
+        original_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "psycopg2" or name.startswith("psycopg2."):
+                msg = "psycopg2 simulated not installed"
+                raise ImportError(msg)
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+>       assert mod.check_queue_driver_compatibility(env) is False
+E       AssertionError: assert True is False
+E        +  where True = <function check_queue_driver_compatibility at 0x7e642edca160>({'DATAFORGE_PG_DRIVER': 'psycopg2', 'DATAFORGE_QUEUE_BACKEND': 'postgres'})
+E        +    where <function check_queue_driver_compatibility at 0x7e642edca160> = <module 'check_prod_env' from '/home/harshit/Documents/Work/Money/scraper/scripts/check_prod_env.py'>.check_queue_driver_compatibility
+
+backend/tests/test_check_prod_env.py:670: AssertionError
+----------------------------- Captured stdout call -----------------------------
+  [OK]    psycopg2 importable for legacy queue driver
+_____ TestPostgresSchemaRepair.test_build_create_recycle_includes_columns ______
+
+self = <tests.test_postgres_repository.TestPostgresSchemaRepair object at 0x7e642fe06270>
+
+    def test_build_create_recycle_includes_columns(self) -> None:
+        _, _, build_recycle = self._import()
+        if build_recycle is None:
+            return
+        sql = build_recycle()
+        assert "CREATE TABLE IF NOT EXISTS recycle_bin" in sql
+        assert "id TEXT PRIMARY KEY" in sql
+        assert "name TEXT NOT NULL" in sql
+>       assert sql.count("mode TEXT") == 1
+E       assert 2 == 1
+E        +  where 2 = <built-in method count of str object at 0x138b2440>('mode TEXT')
+E        +    where <built-in method count of str object at 0x138b2440> = "CREATE TABLE IF NOT EXISTS recycle_bin (\n        id TEXT PRIMARY KEY,\n        name TEXT NOT NULL,\n        status T...  results_file_path TEXT DEFAULT '',\n        updated_at TEXT DEFAULT '',\n        deleted_at TEXT DEFAULT NULL\n    )".count
+
+backend/tests/test_postgres_repository.py:454: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_check_prod_env.py::TestCheckQueueDriverCompatibility::test_psycopg2_fails_when_module_not_installed
+FAILED backend/tests/test_postgres_repository.py::TestPostgresSchemaRepair::test_build_create_recycle_includes_columns

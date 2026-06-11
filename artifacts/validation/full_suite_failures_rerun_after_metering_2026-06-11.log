@@ -1,0 +1,39 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_ TestCheckQueueDriverCompatibility.test_psycopg2_fails_when_module_not_installed _
+
+self = <tests.test_check_prod_env.TestCheckQueueDriverCompatibility object at 0x7211c1645a30>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7211c1f95340>
+
+    def test_psycopg2_fails_when_module_not_installed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """psycopg2 + postgres queue fails if psycopg2 is not importable."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_PG_DRIVER": "psycopg2",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+        }
+
+        import builtins
+
+        original_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "psycopg2" or name.startswith("psycopg2."):
+                msg = "psycopg2 simulated not installed"
+                raise ImportError(msg)
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+>       assert mod.check_queue_driver_compatibility(env) is False
+E       AssertionError: assert True is False
+E        +  where True = <function check_queue_driver_compatibility at 0x7211c1498cc0>({'DATAFORGE_PG_DRIVER': 'psycopg2', 'DATAFORGE_QUEUE_BACKEND': 'postgres'})
+E        +    where <function check_queue_driver_compatibility at 0x7211c1498cc0> = <module 'check_prod_env' from '/home/harshit/Documents/Work/Money/scraper/scripts/check_prod_env.py'>.check_queue_driver_compatibility
+
+backend/tests/test_check_prod_env.py:670: AssertionError
+----------------------------- Captured stdout call -----------------------------
+  [OK]    psycopg2 importable for legacy queue driver
+=========================== short test summary info ============================
+FAILED backend/tests/test_check_prod_env.py::TestCheckQueueDriverCompatibility::test_psycopg2_fails_when_module_not_installed

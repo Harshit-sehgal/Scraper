@@ -1,0 +1,12 @@
+
+> dataforge-frontend@0.1.0 test
+> vitest run --config frontend/vitest.config.js
+
+
+ RUN  v4.1.8 /home/harshit/Documents/Work/Money/scraper
+
+
+ Test Files  15 passed (15)
+      Tests  269 passed (269)
+   Start at  18:30:53
+   Duration  1.19s (transform 557ms, setup 0ms, import 970ms, tests 1.11s, environment 11.33s)

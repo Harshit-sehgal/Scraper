@@ -1,5 +1,7 @@
 # Project Status - DataForge Scraper
 
+> Current agent truth source: [`docs/AGENT_TRUTH.md`](docs/AGENT_TRUTH.md). The claims below are historical unless reproduced by fresh command output in the current checkout.
+
 **Last refreshed:** 2026-06-10
 **Commit inspected:** working tree (post-refresh)
 **GitHub Actions status:** CI verified locally — all fast gates, lint, and test suite pass 100% cleanly.

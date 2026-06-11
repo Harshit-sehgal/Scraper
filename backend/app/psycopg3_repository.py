@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from app.postgres_repository_base import (
     PostgresRepositoryBase,
     get_database_url,
+    register_db_error_class,
 )
 
 if TYPE_CHECKING:
@@ -132,6 +133,12 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
     backend = "postgres-psycopg3"
 
     def __init__(self, auto_ensure_schema: bool = True) -> None:
+        try:
+            import psycopg
+        except ImportError:
+            pass
+        else:
+            register_db_error_class(psycopg.Error)
         super().__init__(auto_ensure_schema=auto_ensure_schema)
 
     @contextmanager

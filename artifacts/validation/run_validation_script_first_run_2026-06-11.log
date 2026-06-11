@@ -1,0 +1,31 @@
+── compileall ──
+   pass  → artifacts/validation/run_validation_compileall_2026-06-11.log
+── architecture ──
+--- ARCHITECTURE VALIDATION START ---
+
+VALIDATION PASSED: Architecture is lawful.
+   pass  → artifacts/validation/run_validation_architecture_2026-06-11.log
+── research_boundary ──
+VALIDATION PASSED: 128 product-kernel files are free of top-level research imports.
+   pass  → artifacts/validation/run_validation_research_boundary_2026-06-11.log
+── dep_bounds ──
+Dependency validation OK: 25 prod packages, 13 dev packages.
+   pass  → artifacts/validation/run_validation_dep_bounds_2026-06-11.log
+── url_safety_smoke ──
+................................                                         [100%]
+   pass  → artifacts/validation/run_validation_url_safety_smoke_2026-06-11.log
+── p0_auth_tenant ──
+...................                                                      [100%]
+   pass  → artifacts/validation/run_validation_p0_auth_tenant_2026-06-11.log
+── p0_billing_usage ──
+................                                                         [100%]
+   pass  → artifacts/validation/run_validation_p0_billing_usage_2026-06-11.log
+── full_pytest ──
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/harshit/Documents/Work/Money/scraper/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+   pass  → artifacts/validation/run_validation_full_pytest_2026-06-11.log
+
+✅ All checks passed. Logs: artifacts/validation/

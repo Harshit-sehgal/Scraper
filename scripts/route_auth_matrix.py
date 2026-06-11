@@ -51,7 +51,7 @@ def _dependency_roles(route: Any) -> list[str]:
                 role_values = []
                 for role in value:
                     role_value = getattr(role, "value", None)
-                    if role_value in {"admin", "operator", "viewer"}:
+                    if role_value in {"admin", "operator", "user", "viewer"}:
                         role_values.append(role_value)
                 if role_values:
                     roles.extend(role_values)
@@ -87,6 +87,8 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
         return ("admin", "require_role([admin])", notes)
 
     if "admin" in roles and "operator" in roles:
+        if "user" in roles:
+            return ("authenticated-user", "require_role([admin, operator, user])", "")
         return ("operator-or-admin", "require_role([admin, operator])", "")
 
     if "operator" in roles:

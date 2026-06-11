@@ -1,0 +1,24 @@
+DataForge Production Environment Check
+  Env file: /home/harshit/Documents/Work/Money/scraper/.env.production.local
+  Source priority: process environment overrides env-file values
+
+  [OK]    DATAFORGE_API_KEY = cXaM****eXmh
+  [OK]    DATAFORGE_CORS_ORIGINS = ["https://dataforge.local"]
+  [OK]    DATAFORGE_DB_PASSWORD = MCgC****thZG
+  [OK]    DATAFORGE_STORAGE_BACKEND = postgres
+  [OK]    DATAFORGE_DATABASE_URL = postgresql://dataforge:****@127.0.0.1:32769/dataforge
+  [OK]    DATAFORGE_WORKER_QUEUE = true
+  [OK]    DATAFORGE_QUEUE_BACKEND = postgres
+  [OK]    DATAFORGE_PG_DRIVER = psycopg3
+  [OK]    DATAFORGE_METRICS_TOKEN = DKnY****haEH
+  [OK]    DATAFORGE_ENV = production
+  [OK]    DATAFORGE_OPERATOR_API_KEY = XIgj****xyTA
+  [OK]    DATAFORGE_ADMIN_API_KEY = kXAc****EVN5
+  [OK]    GRAFANA_PASSWORD = az1w****oKil
+  [OK]    API role keys are distinct
+
+  [INFO]  Testing Postgres connectivity...
+  [OK]    Postgres is reachable and responding.
+  [OK]    queue module app.worker_queue_postgres_psycopg3 is importable
+
+Result: required production environment checks passed.

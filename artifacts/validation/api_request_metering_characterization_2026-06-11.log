@@ -1,0 +1,44 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_api_request_middleware_records_protected_requests ____________
+
+client = <tests.conftest.LocalASGIClient object at 0x71782194eb10>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717821978350>
+
+    def test_api_request_middleware_records_protected_requests(client, monkeypatch) -> None:
+        user_id = _configure_request_metering_keys(monkeypatch)
+        ledger = UsageLedger()
+        monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+        response = client.get("/api/jobs", headers={"X-API-Key": "user-key"})
+
+        assert response.status_code == 200
+        records = ledger.get_usage(user_id, UsageType.API_REQUEST)
+>       assert len(records) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+backend/tests/test_p0_billing_usage.py:174: AssertionError
+_______________ test_api_request_quota_is_enforced_by_middleware _______________
+
+client = <tests.conftest.LocalASGIClient object at 0x717820f4a6f0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717820f49880>
+
+    def test_api_request_quota_is_enforced_by_middleware(client, monkeypatch) -> None:
+        user_id = _configure_request_metering_keys(monkeypatch)
+        ledger = UsageLedger()
+        ledger.set_quota(user_id, UsageType.API_REQUEST, limit=1, period=QuotaPeriod.MONTHLY)
+        monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+        first = client.get("/api/jobs", headers={"X-API-Key": "user-key"})
+        second = client.get("/api/jobs", headers={"X-API-Key": "user-key"})
+
+        assert first.status_code == 200
+>       assert second.status_code == 429
+E       assert 200 == 429
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_billing_usage.py:189: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_p0_billing_usage.py::test_api_request_middleware_records_protected_requests
+FAILED backend/tests/test_p0_billing_usage.py::test_api_request_quota_is_enforced_by_middleware

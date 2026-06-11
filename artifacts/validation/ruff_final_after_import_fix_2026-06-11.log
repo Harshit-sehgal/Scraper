@@ -1,0 +1,16 @@
+I001 [*] Import block is un-sorted or un-formatted
+   --> backend/tests/test_postgres_repository.py:510:9
+    |
+508 |       def postgres_container(self):
+509 |           """Start a Postgres testcontainer or reuse a running one."""
+510 | /         from app.postgres_repository import _close_pool
+511 | |         from app.storage_interface import reset_repository
+512 | |         import socket
+    | |_____________________^
+513 |
+514 |           _close_pool()
+    |
+help: Organize imports
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.

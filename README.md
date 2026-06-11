@@ -1,5 +1,7 @@
 # DataForge Scraper
 
+> Current agent truth source: [`docs/AGENT_TRUTH.md`](docs/AGENT_TRUTH.md). Treat older status and roadmap claims as historical unless reproduced by fresh command output.
+
 DataForge Scraper is a pre-production FastAPI + Playwright web extraction platform for accessible websites. It provides configurable scraping jobs, browser-assisted loading, schema/selector-based extraction paths, result storage, exports, diagnostics, telemetry, API-key/RBAC utilities, SSRF-oriented URL checks, rate limiting, and an internal static dashboard.
 
 Do not claim this project is a universal scraper, anti-bot proof, fully autonomous, or production-ready without the deployment gates in `docs/PRODUCTION_READINESS.md`.

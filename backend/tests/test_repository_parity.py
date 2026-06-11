@@ -101,7 +101,11 @@ def postgres_repo(monkeypatch, tmp_path):
 
     if use_running:
         # Clean schema first to ensure clean state
-        from app.postgres_repository import PostgresJobRepository, _conn, _execute
+        from app.postgres_repository import PostgresJobRepository, _close_pool, _conn, _execute
+        from app.storage_interface import reset_repository
+
+        _close_pool()
+        reset_repository()
 
         try:
             with _conn() as conn:
@@ -112,7 +116,11 @@ def postgres_repo(monkeypatch, tmp_path):
         except Exception:  # noqa: RUF100, S110
             pass
         repo = PostgresJobRepository()
-        yield repo
+        try:
+            yield repo
+        finally:
+            _close_pool()
+            reset_repository()
     else:
         from testcontainers.postgres import PostgresContainer
 
@@ -124,11 +132,17 @@ def postgres_repo(monkeypatch, tmp_path):
             if url.startswith("postgresql+psycopg2://"):
                 url = "postgresql://" + url[len("postgresql+psycopg2://") :]
             monkeypatch.setenv("DATAFORGE_DATABASE_URL", url)
-            from app.postgres_repository import PostgresJobRepository
+            from app.postgres_repository import PostgresJobRepository, _close_pool
+            from app.storage_interface import reset_repository
+
+            _close_pool()
+            reset_repository()
 
             repo = PostgresJobRepository()
             yield repo
         finally:
+            _close_pool()
+            reset_repository()
             container.stop()
 
 
@@ -145,6 +159,16 @@ class TestGetJobContract:
         assert loaded.name == job.name
         assert loaded.status == job.status
         assert loaded.urls == job.urls
+
+    def test_get_job_preserves_owner_sqlite(self, sqlite_repo) -> None:
+        job = _make_job(4)
+        job.created_by = "owner-fingerprint"
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+
+        loaded = sqlite_repo.get_job(job.id)
+
+        assert loaded is not None
+        assert loaded.created_by == "owner-fingerprint"
 
     def test_get_job_returns_none_for_unknown_id_sqlite(self, sqlite_repo) -> None:
         assert sqlite_repo.get_job("does-not-exist") is None
@@ -339,6 +363,16 @@ class TestPostgresParity:
         assert loaded is not None
         assert loaded.id == job.id
         assert loaded.name == job.name
+
+    def test_get_job_preserves_owner_postgres(self, postgres_repo) -> None:
+        job = _make_job(105)
+        job.created_by = "owner-fingerprint"
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+        loaded = postgres_repo.get_job(job.id)
+
+        assert loaded is not None
+        assert loaded.created_by == "owner-fingerprint"
 
     def test_list_summaries_returns_all_persisted_jobs_postgres(self, postgres_repo) -> None:
         jobs = {f"parity-{idx}": _make_job(idx) for idx in range(101, 104)}

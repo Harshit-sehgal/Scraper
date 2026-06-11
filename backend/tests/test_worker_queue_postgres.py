@@ -881,9 +881,9 @@ class TestPostgresQueueMocked:
         """get_task_state returns None when task not found anywhere."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
+        q = PostgresWorkerQueue()
         self.mock_fetch_one.side_effect = [None, None]
 
-        q = PostgresWorkerQueue()
         state = q.get_task_state("nonexistent")
 
         assert state is None
@@ -971,7 +971,7 @@ class TestPostgresQueueMocked:
 
         # Mock _ensure_schema to no-op so construction doesn't hit failing _conn
         monkeypatch.setattr(PostgresWorkerQueue, "_ensure_schema", MagicMock())
-        monkeypatch.setattr(wqp, "_conn", MagicMock(side_effect=Exception("Connection failed")))
+        monkeypatch.setattr(wqp, "_conn", MagicMock(side_effect=RuntimeError("Connection failed")))
         monkeypatch.setattr(wqp, "_execute", MagicMock())
 
         q = PostgresWorkerQueue()
@@ -986,7 +986,7 @@ class TestPostgresQueueMocked:
 
         def failing_fetch_all(conn, sql, *args) -> NoReturn:
             msg = "Query failed"
-            raise Exception(msg)
+            raise RuntimeError(msg)
 
         monkeypatch.setattr(wqp, "_fetch_all", failing_fetch_all)
 

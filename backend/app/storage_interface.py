@@ -33,6 +33,7 @@ _JOBS_COLUMNS_SQL = [
     "progress_total INTEGER DEFAULT 0",
     "estimated_cost_usd REAL DEFAULT 0",
     "cancel_requested BOOLEAN DEFAULT FALSE",
+    "created_by TEXT DEFAULT ''",
     "created_at TEXT DEFAULT ''",
     "completed_at TEXT DEFAULT ''",
     "min_record_score REAL DEFAULT 0.35",
@@ -450,7 +451,7 @@ class SQLiteJobRepository(JobRepository):
             params.append(cursor)
         params.append(safe_limit)
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
+            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error, deleted_at "
             "FROM recycle_bin "
@@ -479,6 +480,7 @@ class SQLiteJobRepository(JobRepository):
                     "name": d.get("name"),
                     "mode": d.get("mode"),
                     "urls": urls_val,
+                    "created_by": d.get("created_by", "") or "",
                     "topic": d.get("topic", "") or "",
                     "status": d.get("status"),
                     "created_at": d.get("created_at"),
@@ -532,7 +534,7 @@ class SQLiteJobRepository(JobRepository):
             params.append(cursor)
         params.append(safe_limit)
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
+            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error "
             "FROM jobs "
@@ -562,6 +564,7 @@ class SQLiteJobRepository(JobRepository):
                     "name": d.get("name"),
                     "mode": d.get("mode"),
                     "urls": urls_val,
+                    "created_by": d.get("created_by", "") or "",
                     "topic": d.get("topic", "") or "",
                     "status": d.get("status"),
                     "created_at": d.get("created_at"),

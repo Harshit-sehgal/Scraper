@@ -1,0 +1,53 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+________________________ test_export_quota_is_enforced _________________________
+
+client = <tests.conftest.LocalASGIClient object at 0x7107e1a2cc20>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7107e23840b0>
+
+    def test_export_quota_is_enforced(client, monkeypatch) -> None:
+        _configure_request_metering_keys(monkeypatch)
+        operator_id = _fingerprint_key("operator-key")
+        job = _seed_export_job()
+        ledger = UsageLedger()
+        ledger.set_quota(operator_id, UsageType.EXPORT_GENERATED, limit=1, period=QuotaPeriod.MONTHLY)
+        monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+        first = client.get(f"/api/jobs/{job.id}/export/csv", headers={"X-API-Key": "operator-key"})
+        second = client.get(f"/api/jobs/{job.id}/export/csv", headers={"X-API-Key": "operator-key"})
+
+        assert first.status_code == 200
+>       assert second.status_code == 429
+E       assert 200 == 429
+E        +  where 200 = <Response [200 OK]>.status_code
+
+backend/tests/test_p0_billing_usage.py:234: AssertionError
+______________ test_export_idempotency_key_does_not_double_charge ______________
+
+client = <tests.conftest.LocalASGIClient object at 0x7107e1a12e10>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7107e1927080>
+
+    def test_export_idempotency_key_does_not_double_charge(client, monkeypatch) -> None:
+        _configure_request_metering_keys(monkeypatch)
+        operator_id = _fingerprint_key("operator-key")
+        job = _seed_export_job("export-idempotent-job")
+        ledger = UsageLedger()
+        ledger.set_quota(operator_id, UsageType.EXPORT_GENERATED, limit=1, period=QuotaPeriod.MONTHLY)
+        monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+        headers = {"X-API-Key": "operator-key", "Idempotency-Key": "export-retry-1"}
+
+        first = client.get(f"/api/jobs/{job.id}/export/json", headers=headers)
+        second = client.get(f"/api/jobs/{job.id}/export/json", headers=headers)
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        quota = ledger.get_quota(operator_id, UsageType.EXPORT_GENERATED)
+        assert quota is not None
+>       assert quota.current_usage == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = Quota(id='c09ab14c-6bce-4b95-a5ae-a76046f7d874', user_id='c9736463f555cdb7', usage_type=<UsageType.EXPORT_GENERATED: '...nthly'>, current_usage=0, reset_date=None, org_id='', project_id='', api_key_id='', period_start=None, period_end=None).current_usage
+
+backend/tests/test_p0_billing_usage.py:260: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_p0_billing_usage.py::test_export_quota_is_enforced
+FAILED backend/tests/test_p0_billing_usage.py::test_export_idempotency_key_does_not_double_charge

@@ -6,7 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.utils.export import safe_export_filename
-from app.utils.rbac import UserRole, require_role
+from app.utils.rbac import UserRole, require_role_with_user
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +108,33 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
         logger.debug("Failed to record export outcome metric for %s", fmt)
 
 
+def _export_idempotency_key(request: Request, fmt: str, job_ids: list[str]) -> str:
+    header = request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key") or ""
+    if not header:
+        return ""
+    return f"export:{fmt}:{','.join(sorted(job_ids))}:{header}"
+
+
+def _record_export_usage(user_id: str, fmt: str, job_ids: list[str], request: Request) -> None:
+    from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+    metadata: dict[str, Any] = {"format": fmt}
+    if len(job_ids) == 1:
+        metadata["job_id"] = job_ids[0]
+    else:
+        metadata["job_ids"] = list(job_ids)
+    try:
+        get_usage_ledger().record_usage(
+            user_id,
+            UsageType.EXPORT_GENERATED,
+            quantity=1,
+            metadata=metadata,
+            idempotency_key=_export_idempotency_key(request, fmt, job_ids),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+
+
 def create_exports_router(jobs_store: dict[str, Any]):
     router = APIRouter()
 
@@ -141,10 +168,12 @@ def create_exports_router(jobs_store: dict[str, Any]):
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        request: Request,
+        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
             result = await _export_csv_impl(job_id)
+            _record_export_usage(auth[1], "csv", [job_id], request)
         except HTTPException:
             _record_export_outcome("csv", False)
             raise
@@ -240,10 +269,12 @@ def create_exports_router(jobs_store: dict[str, Any]):
     @router.get("/api/jobs/{job_id}/export/json")
     async def export_json(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        request: Request,
+        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
             result = await _export_json_impl(job_id)
+            _record_export_usage(auth[1], "json", [job_id], request)
         except HTTPException:
             _record_export_outcome("json", False)
             raise
@@ -325,10 +356,12 @@ def create_exports_router(jobs_store: dict[str, Any]):
     @router.get("/api/jobs/{job_id}/export/excel")
     async def export_excel(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        request: Request,
+        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
             result = await _export_excel_impl(job_id)
+            _record_export_usage(auth[1], "excel", [job_id], request)
         except HTTPException:
             _record_export_outcome("excel", False)
             raise
@@ -459,11 +492,13 @@ def create_exports_router(jobs_store: dict[str, Any]):
 
     @router.post("/api/exports/batch")
     async def batch_export(
+        request: Request,
         body: BatchExportRequest,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         try:
             result = await _batch_export_impl(body)
+            _record_export_usage(auth[1], f"batch_{body.format}", body.job_ids, request)
         except HTTPException:
             _record_export_outcome(f"batch_{body.format}", False)
             raise

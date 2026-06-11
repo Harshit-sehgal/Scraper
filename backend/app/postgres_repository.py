@@ -19,12 +19,14 @@ from psycopg2.extras import RealDictCursor
 from app.postgres_repository_base import (
     PostgresRepositoryBase,
     get_database_url,
+    register_db_error_class,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
+register_db_error_class(psycopg2.Error)
 
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)

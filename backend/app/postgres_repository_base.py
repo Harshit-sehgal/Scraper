@@ -28,6 +28,26 @@ logger = logging.getLogger(__name__)
 
 _CURRENT_SCHEMA_VERSION = 6
 
+# Module-level exception tuple for DB operations so we don't swallow
+# programming errors with bare ``except Exception``.
+_DB_OPS_ERRORS: tuple[type[BaseException], ...] = (
+    OSError,
+    RuntimeError,
+    ValueError,
+    TypeError,
+    ImportError,
+)
+
+
+def register_db_error_class(error_class: type[BaseException]) -> None:
+    """Register a concrete driver error type without importing drivers here."""
+    global _DB_OPS_ERRORS
+    if not issubclass(error_class, BaseException):
+        return
+    if error_class not in _DB_OPS_ERRORS:
+        _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, error_class)
+
+
 # ───────────────────────────────────────────────────────────────────────
 # Database URL resolution (shared between driver implementations)
 # ───────────────────────────────────────────────────────────────────────
@@ -90,7 +110,6 @@ def build_create_recycle_bin_sql() -> str:
         "\n        id TEXT PRIMARY KEY,"
         "\n        name TEXT NOT NULL,"
         "\n        status TEXT NOT NULL DEFAULT 'pending',"
-        "\n        mode TEXT NOT NULL DEFAULT 'manual',"
         f"\n        {cols}"
         "\n    )"
     )
@@ -134,6 +153,7 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "progress_total": job.progress_total or 0,
         "estimated_cost_usd": job.estimated_cost_usd or 0,
         "cancel_requested": job.cancel_requested,
+        "created_by": job.created_by or "",
         "created_at": job.created_at or "",
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
@@ -195,6 +215,7 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "progress_total": row.get("progress_total", 0),
                 "estimated_cost_usd": row.get("estimated_cost_usd", 0),
                 "cancel_requested": bool(row.get("cancel_requested", False)),
+                "created_by": row.get("created_by", "") or "",
                 "created_at": row.get("created_at", ""),
                 "completed_at": row.get("completed_at") or None,
                 "min_record_score": row.get("min_record_score", 0.35),
@@ -243,7 +264,7 @@ def sync_job_events(conn, job_id: str, logs) -> None:
         if hasattr(entry, "model_dump"):
             try:
                 entry_dict = entry.model_dump()
-            except Exception:
+            except (ValueError, TypeError, AttributeError, RuntimeError):
                 entry_dict = {"timestamp": "", "level": "info", "message": str(entry)}
         elif isinstance(entry, dict):
             entry_dict = entry
@@ -272,22 +293,23 @@ def ensure_required_tables(conn) -> None:
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.debug("ALTER TABLE jobs ADD COLUMN %s failed (ignored)", col_def)
     execute(conn, build_create_recycle_bin_sql())
     for col_def in _columns_sql():
         try:
             execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.debug("ALTER TABLE recycle_bin ADD COLUMN %s failed (ignored)", col_def)
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)",
         "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC)",
     ]:
         try:
             execute(conn, idx_sql)
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
 
 
@@ -345,7 +367,7 @@ def _migrate_worker_heartbeats_v6(conn) -> None:
                 """,
             )
             cur.execute("DROP TABLE worker_heartbeats_v5_backup")
-        except Exception:
+        except _DB_OPS_ERRORS:
             cur.execute("ROLLBACK TO SAVEPOINT migrate_wh_v6")
             logger.exception(
                 "worker_heartbeats v5→v6 migration failed; the table is "
@@ -583,7 +605,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         safe_limit = max(1, min(int(limit), 500))
         params: list[object] = []
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "
+            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error "
             "FROM jobs WHERE deleted_at IS NULL"
@@ -608,6 +630,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "name": row.get("name"),
                     "mode": row.get("mode"),
                     "urls": urls_val,
+                    "created_by": row.get("created_by", "") or "",
                     "topic": row.get("topic", "") or "",
                     "status": row.get("status"),
                     "created_at": row.get("created_at"),
@@ -639,7 +662,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql)
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("count_jobs_by_status failed")
             return {}
         return {str(row["status"]): int(row["cnt"]) for row in rows}
@@ -660,7 +683,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         safe_limit = max(1, min(int(limit), 500))
         params: list[object] = []
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "
+            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error, deleted_at "
             "FROM recycle_bin WHERE 1=1"
@@ -685,6 +708,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "name": row.get("name"),
                     "mode": row.get("mode"),
                     "urls": urls_val,
+                    "created_by": row.get("created_by", "") or "",
                     "topic": row.get("topic", "") or "",
                     "status": row.get("status"),
                     "created_at": row.get("created_at"),
@@ -785,7 +809,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     # be released when the session ends.
                     try:
                         self._execute(conn, "SELECT pg_advisory_unlock(8675309)")
-                    except Exception:
+                    except _DB_OPS_ERRORS:
                         logger.debug("pg_advisory_unlock(8675309) failed; will be released at session end")
 
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
@@ -869,7 +893,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("read_results failed for job %s", job_id)
             return []
         out: list[dict] = []
@@ -896,7 +920,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (job_id,),
                 )
             return int(row["cnt"]) if row else 0
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("count_results failed for job %s", job_id)
             return 0
 
@@ -914,7 +938,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             with self._conn() as conn:
                 rows = self._fetch_all(conn, sql, tuple(params))
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("read_events failed for job %s", job_id)
             return []
         return [
@@ -938,7 +962,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (idem_key,),
                 )
                 return str(row["job_id"]) if row else None
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.debug("idempotency key lookup failed for %s", idem_key, exc_info=True)
             return None
 
@@ -954,7 +978,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (idem_key,),
                 )
                 return str(row["request_fingerprint"]) if row else None
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.debug("idempotency fingerprint lookup failed for %s", idem_key, exc_info=True)
             return None
 
@@ -974,7 +998,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                              created_at = NOW()""",
                     (idem_key, job_id, request_fingerprint),
                 )
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to record idempotency key %s", idem_key)
 
     def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
@@ -989,7 +1013,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     (f"{int(older_than_days)} days",),
                 )
                 return int(cur.rowcount) if cur.rowcount else 0
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("prune_idempotency_keys failed")
             return 0
 
@@ -999,7 +1023,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             with self._conn() as conn:
                 self._execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
                 self._execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to clean up companion data for job %s", job_id)
 
     def is_cancel_requested(self, job_id: str) -> bool:
@@ -1217,7 +1241,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "job_count": job_count or 0,
                     "recycle_bin_count": recycle_count or 0,
                 }
-        except Exception as e:
+        except _DB_OPS_ERRORS as e:
             logger.exception("Postgres health check failed")
             return {
                 "ok": False,

@@ -1,0 +1,1164 @@
+FFFFFFFFFFF.FFF                                                          [100%]
+=================================== FAILURES ===================================
+_____________ TestPostgresParity.test_get_job_round_trips_postgres _____________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b8500>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee74816e40>
+
+    def test_get_job_round_trips_postgres(self, postgres_repo) -> None:
+        job = _make_job(100)
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:347:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:575: in _ensure
+    ensure_schema(conn)
+backend/app/postgres_repository_base.py:391: in ensure_schema
+    ensure_required_tables(conn)
+backend/app/postgres_repository_base.py:298: in ensure_required_tables
+    execute(conn, build_create_recycle_bin_sql())
+backend/app/postgres_repository_base.py:522: in execute
+    return fn(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:109: in _execute
+    return _db_execute(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+conn = <connection object at 0x7aee74705d00; dsn: 'user=test password=xxx dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5', closed: 0>
+sql = "CREATE TABLE IF NOT EXISTS recycle_bin (\n        id TEXT PRIMARY KEY,\n        name TEXT NOT NULL,\n        status T...  results_file_path TEXT DEFAULT '',\n        updated_at TEXT DEFAULT '',\n        deleted_at TEXT DEFAULT NULL\n    )"
+params = None
+
+    def _db_execute(conn, sql: str, params=None):
+        with conn.cursor() as cur:
+>           cur.execute(sql, params or ())
+E           psycopg2.errors.DuplicateColumn: column "mode" specified more than once
+
+backend/app/postgres_repository.py:153: DuplicateColumn
+___________ TestPostgresParity.test_get_job_preserves_owner_postgres ___________
+
+    @contextmanager
+    def _db_conn() -> Iterator[psycopg2.extensions.connection]:
+        """Acquire a connection from the psycopg2 pool (context manager)."""
+        pool = _get_pool()
+        conn = pool.getconn()
+        try:
+>           yield conn
+
+backend/app/postgres_repository.py:123:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository.py:100: in _conn
+    yield conn
+backend/app/postgres_repository_base.py:575: in _ensure
+    ensure_schema(conn)
+backend/app/postgres_repository_base.py:384: in ensure_schema
+    execute(
+backend/app/postgres_repository_base.py:522: in execute
+    return fn(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:109: in _execute
+    return _db_execute(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+conn = <connection object at 0x7aee74705d00; dsn: 'user=test password=xxx dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5', closed: 2>
+sql = 'CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)'
+params = None
+
+    def _db_execute(conn, sql: str, params=None):
+        with conn.cursor() as cur:
+>           cur.execute(sql, params or ())
+E           psycopg2.OperationalError: server closed the connection unexpectedly
+E           	This probably means the server terminated abnormally
+E           	before or while processing the request.
+
+backend/app/postgres_repository.py:153: OperationalError
+
+During handling of the above exception, another exception occurred:
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b8e30>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee7474a360>
+
+    def test_get_job_preserves_owner_postgres(self, postgres_repo) -> None:
+        job = _make_job(105)
+        job.created_by = "owner-fingerprint"
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:356:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:158: in __exit__
+    self.gen.throw(value)
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextmanager
+    def _db_conn() -> Iterator[psycopg2.extensions.connection]:
+        """Acquire a connection from the psycopg2 pool (context manager)."""
+        pool = _get_pool()
+        conn = pool.getconn()
+        try:
+            yield conn
+            conn.commit()
+        except BaseException:
+>           conn.rollback()
+E           psycopg2.InterfaceError: connection already closed
+
+backend/app/postgres_repository.py:126: InterfaceError
+__ TestPostgresParity.test_list_summaries_returns_all_persisted_jobs_postgres __
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b92e0>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee747beed0>
+
+    def test_list_summaries_returns_all_persisted_jobs_postgres(self, postgres_repo) -> None:
+        jobs = {f"parity-{idx}": _make_job(idx) for idx in range(101, 104)}
+>       postgres_repo.save_all(jobs, {}, prune_missing=False)
+
+backend/tests/test_repository_parity.py:365:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+______ TestPostgresParity.test_read_events_returns_chronological_postgres ______
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b9790>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee75188cb0>
+
+    def test_read_events_returns_chronological_postgres(self, postgres_repo) -> None:
+        job = _make_job(200)
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:372:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+___________ TestPostgresParity.test_list_recycle_summaries_postgres ____________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b9c40>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee748155e0>
+
+    def test_list_recycle_summaries_postgres(self, postgres_repo) -> None:
+        job = _make_job(300)
+>       postgres_repo.save_all({}, {job.id: job}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:400:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+___________ TestPostgresParity.test_read_results_round_trip_postgres ___________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748ba0f0>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee748480e0>
+
+    def test_read_results_round_trip_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must return results in insertion order."""
+        job = _make_job(400)
+        job.results = [{"k": "v1", "n": 1}, {"k": "v2", "n": 2}]
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:410:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+_____________ TestPostgresParity.test_read_results_empty_postgres ______________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748ba5a0>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aeeab39c230>
+
+    def test_read_results_empty_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must return [] when no results exist."""
+        job = _make_job(401)
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:417:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+_________ TestPostgresParity.test_read_results_respects_limit_postgres _________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748a1070>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee74849b80>
+
+    def test_read_results_respects_limit_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must respect the limit parameter."""
+        job = _make_job(402)
+        job.results = [{"idx": i} for i in range(20)]
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:424:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+_____________ TestPostgresParity.test_read_results_offset_postgres _____________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748a2330>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aeeab3a42c0>
+
+    def test_read_results_offset_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must skip offset rows."""
+        job = _make_job(403)
+        job.results = [{"idx": i} for i in range(10)]
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:433:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+______ TestPostgresParity.test_read_results_updated_after_resave_postgres ______
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b9dc0>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee747bfcb0>
+
+    def test_read_results_updated_after_resave_postgres(self, postgres_repo) -> None:
+        """Re-saving must replace companion data, not append."""
+        job = _make_job(404)
+        job.results = [{"v": "first"}]
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:441:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+_________ TestPostgresParity.test_idempotency_key_round_trip_postgres __________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748b9310>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee746bfbf0>
+
+    def test_idempotency_key_round_trip_postgres(self, postgres_repo) -> None:
+        """Postgres record_idempotency_key + lookup_idempotency_key round-trip."""
+>       postgres_repo.record_idempotency_key("pg-key", "parity-410", "fp")
+
+backend/tests/test_repository_parity.py:449:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:988: in record_idempotency_key
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+___________ TestPostgresParity.test_cleanup_companion_data_postgres ____________
+
+self = <tests.test_repository_parity.TestPostgresParity object at 0x7aee748ba960>
+postgres_repo = <app.postgres_repository.PostgresJobRepository object at 0x7aee746bd3a0>
+
+    def test_cleanup_companion_data_postgres(self, postgres_repo) -> None:
+        """Postgres cleanup_companion_data must remove companion rows."""
+        job = _make_job(420)
+        job.results = [{"data": True}]
+>       postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+backend/tests/test_repository_parity.py:462:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:569: in _ensure
+    with self._conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:99: in _conn
+    with _db_conn() as conn:
+/usr/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:121: in _db_conn
+    conn = pool.getconn()
+           ^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:169: in getconn
+    return self._getconn(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:93: in _getconn
+    return self._connect(key)
+           ^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/psycopg2/pool.py:63: in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dsn = 'user=test password=test dbname=test host=127.0.0.1 port=32769 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5'
+connection_factory = None, cursor_factory = None
+kwargs = {'keepalives': 1, 'keepalives_count': 5, 'keepalives_idle': 30, 'keepalives_interval': 10}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+
+        The connection parameters can be specified as a string:
+
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+
+        or using a set of keyword arguments:
+
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+
+        Or as a mix of both. The basic connection parameters are:
+
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       psycopg2.OperationalError: connection to server at "127.0.0.1", port 32769 failed: Connection refused
+E       	Is the server running on that host and accepting TCP/IP connections?
+
+.venv/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+_ TestPostgresIntegration.test_postgres_repairs_missing_recycle_bin_when_schema_version_is_current _
+
+self = <tests.test_postgres_repository.TestPostgresIntegration object at 0x7aee748e4fb0>
+
+    def test_postgres_repairs_missing_recycle_bin_when_schema_version_is_current(self) -> None:
+        """When schema_version=1 and recycle_bin is missing, _ensure_schema() creates it."""
+        import psycopg2
+
+        dsn = os.environ["DATAFORGE_DATABASE_URL"]
+        if dsn.startswith("postgresql+psycopg2://"):
+            dsn = dsn.replace("postgresql+psycopg2://", "postgresql://")
+        conn = psycopg2.connect(dsn)
+        try:
+            self._setup_v1_schema(conn)
+        finally:
+            conn.close()
+
+        # Reset the module-level pool so the repo uses our container
+        from app.postgres_repository import _close_pool
+
+        _close_pool()
+        from app.storage_interface import reset_repository
+
+        reset_repository()
+
+        from app.postgres_repository import PostgresJobRepository
+
+        repo = PostgresJobRepository()
+
+        # Trigger schema ensure + health check
+        health = repo.health_check()
+>       assert health["ok"] is True, f"Health check failed: {health}"
+E       AssertionError: Health check failed: {'ok': False, 'backend': 'postgres', 'error': 'column "mode" specified more than once\n', 'schema_version': 0, 'expected_version': 6}
+E       assert False is True
+
+backend/tests/test_postgres_repository.py:588: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    app.postgres_repository_base:postgres_repository_base.py:1245 Postgres health check failed
+Traceback (most recent call last):
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository_base.py", line 1228, in health_check
+    self._ensure()
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository_base.py", line 575, in _ensure
+    ensure_schema(conn)
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository_base.py", line 391, in ensure_schema
+    ensure_required_tables(conn)
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository_base.py", line 298, in ensure_required_tables
+    execute(conn, build_create_recycle_bin_sql())
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository_base.py", line 522, in execute
+    return fn(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository.py", line 109, in _execute
+    return _db_execute(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository.py", line 153, in _db_execute
+    cur.execute(sql, params or ())
+psycopg2.errors.DuplicateColumn: column "mode" specified more than once
+_ TestPostgresIntegration.test_postgres_save_single_restores_soft_deleted_job_id _
+
+self = <tests.test_postgres_repository.TestPostgresIntegration object at 0x7aee748e5400>
+
+    def test_postgres_save_single_restores_soft_deleted_job_id(self) -> None:
+        """Saving an active job over a soft-deleted ID should restore visibility."""
+        import psycopg2
+
+        dsn = os.environ["DATAFORGE_DATABASE_URL"]
+        if dsn.startswith("postgresql+psycopg2://"):
+            dsn = dsn.replace("postgresql+psycopg2://", "postgresql://")
+        conn = psycopg2.connect(dsn)
+        try:
+            self._setup_v1_schema(conn)
+        finally:
+            conn.close()
+
+        from app.postgres_repository import _close_pool
+
+        _close_pool()
+        from app.storage_interface import reset_repository
+
+        reset_repository()
+
+        from app.postgres_repository import PostgresJobRepository
+
+        repo = PostgresJobRepository()
+
+        # Insert a job, then soft-delete it
+        from app.models import Job, JobStatus
+
+        job = Job(
+            id="soft-delete-test",
+            name="Will Be Deleted",
+            urls=["https://example.com"],
+            status=JobStatus.COMPLETED,
+        )
+>       repo.save_all({job.id: job}, {})
+
+backend/tests/test_postgres_repository.py:644:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend/app/postgres_repository_base.py:816: in save_all
+    self._ensure()
+backend/app/postgres_repository_base.py:575: in _ensure
+    ensure_schema(conn)
+backend/app/postgres_repository_base.py:391: in ensure_schema
+    ensure_required_tables(conn)
+backend/app/postgres_repository_base.py:298: in ensure_required_tables
+    execute(conn, build_create_recycle_bin_sql())
+backend/app/postgres_repository_base.py:522: in execute
+    return fn(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^
+backend/app/postgres_repository.py:109: in _execute
+    return _db_execute(conn, sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+conn = <connection object at 0x7aee74706980; dsn: 'user=test password=xxx dbname=test host=127.0.0.1 port=32783 keepalives=1 keepalives_idle=30 keepalives_interval=10 keepalives_count=5', closed: 0>
+sql = "CREATE TABLE IF NOT EXISTS recycle_bin (\n        id TEXT PRIMARY KEY,\n        name TEXT NOT NULL,\n        status T...  results_file_path TEXT DEFAULT '',\n        updated_at TEXT DEFAULT '',\n        deleted_at TEXT DEFAULT NULL\n    )"
+params = None
+
+    def _db_execute(conn, sql: str, params=None):
+        with conn.cursor() as cur:
+>           cur.execute(sql, params or ())
+E           psycopg2.errors.DuplicateColumn: column "mode" specified more than once
+
+backend/app/postgres_repository.py:153: DuplicateColumn
+=========================== short test summary info ============================
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_get_job_round_trips_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_get_job_preserves_owner_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_list_summaries_returns_all_persisted_jobs_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_read_events_returns_chronological_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_list_recycle_summaries_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_read_results_round_trip_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_read_results_empty_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_read_results_respects_limit_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_read_results_offset_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_read_results_updated_after_resave_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_idempotency_key_round_trip_postgres
+FAILED backend/tests/test_repository_parity.py::TestPostgresParity::test_cleanup_companion_data_postgres
+FAILED backend/tests/test_postgres_repository.py::TestPostgresIntegration::test_postgres_repairs_missing_recycle_bin_when_schema_version_is_current
+FAILED backend/tests/test_postgres_repository.py::TestPostgresIntegration::test_postgres_save_single_restores_soft_deleted_job_id
