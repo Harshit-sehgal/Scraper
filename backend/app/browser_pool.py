@@ -13,7 +13,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-from playwright.async_api import Browser, BrowserContext, async_playwright
+from playwright.async_api import Browser, BrowserContext, Error, async_playwright
 
 from app.config import settings
 from app.utils.log_redaction import mask_proxy_url
@@ -97,21 +97,21 @@ class BrowserPool:
                         headless=settings.PLAYWRIGHT_HEADLESS,
                         args=browser_args or None,
                     )
-                except Exception:
+                except (Error, OSError, RuntimeError):
                     self.crash_count += 1
                     logger.exception("[BrowserPool] Failed to launch browser")
                     try:
                         from app.metrics_collector import record_browser_launch
 
                         record_browser_launch(success=False)
-                    except Exception:
+                    except (ImportError, RuntimeError, ValueError):
                         logger.debug("[BrowserPool] Failed to record browser launch failure metric")
                     raise
                 try:
                     from app.metrics_collector import record_browser_launch
 
                     record_browser_launch(success=True)
-                except Exception:
+                except (ImportError, RuntimeError, ValueError):
                     logger.debug("[BrowserPool] Failed to record browser launch success metric")
 
                 # Ensure background cleanup is running
@@ -280,7 +280,7 @@ class BrowserPool:
             await page.close()
             await ctx.close()
             return True
-        except Exception as e:
+        except (Error, OSError, RuntimeError, ValueError) as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False
 
@@ -301,7 +301,7 @@ class BrowserPool:
             for ctx in list(self._contexts.values()):
                 try:
                     await ctx.close()
-                except Exception as e:
+                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                     logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
@@ -311,27 +311,27 @@ class BrowserPool:
             # in production).
             for task in list(self._background_tasks):
                 task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
+                with contextlib.suppress(asyncio.CancelledError, Error, OSError, RuntimeError, ValueError, TypeError):
                     await task
             self._background_tasks.clear()
 
             if self._browser:
                 try:
                     await self._browser.close()
-                except Exception as e:
+                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                     logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
 
             if self._cleanup_task and not self._cleanup_task.done():
                 self._cleanup_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
+                with contextlib.suppress(asyncio.CancelledError, Error, OSError, RuntimeError, ValueError, TypeError):
                     await self._cleanup_task
                 self._cleanup_task = None
 
             if self._playwright:
                 try:
                     await self._playwright.stop()
-                except Exception as e:
+                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                     logger.debug("[BrowserPool] Failed to stop playwright during close(): %s", e)
                 self._playwright = None
 
@@ -375,7 +375,7 @@ class BrowserPool:
         logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")
         try:
             await self._hard_recycle()
-        except Exception:
+        except (Error, OSError, RuntimeError, ValueError):
             logger.exception("[BrowserPool] Hard recycle failed")
         finally:
             async with self._lock:
@@ -386,7 +386,7 @@ class BrowserPool:
         for ctx in list(self._contexts.values()):
             try:
                 await ctx.close()
-            except Exception as e:
+            except (Error, OSError, RuntimeError, ValueError) as e:
                 logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
@@ -394,14 +394,14 @@ class BrowserPool:
         if self._browser:
             try:
                 await self._browser.close()
-            except Exception as e:
+            except (Error, OSError, RuntimeError, ValueError) as e:
                 logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
 
         if self._playwright:
             try:
                 await self._playwright.stop()
-            except Exception as e:
+            except (Error, OSError, RuntimeError, ValueError) as e:
                 logger.debug("[BrowserPool] Failed to stop playwright during hard recycle: %s", e)
             self._playwright = None
 
@@ -428,7 +428,7 @@ class BrowserPool:
                         break
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
+            except (Error, OSError, RuntimeError, ValueError) as e:
                 # Don't let a transient cleanup failure (e.g. ``check_health``
                 # raising) kill the watchdog loop — log and try again on the
                 # next tick.
