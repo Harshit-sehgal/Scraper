@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r pyproject.toml
+        run: pip install -e ".[dev]"
 
       - name: Run Ruff lint
         run: ruff check backend/app backend/tests backend/benchmarks scripts
@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
-          pip install -r pyproject.toml
+          pip install -e ".[dev]"
 
       - name: Run mypy
         run: python -m mypy backend/app --ignore-missing-imports
@@ -68,7 +68,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r pyproject.toml
+          pip install -e ".[dev]"
 
       - name: Run boundary check
         run: PYTHONPATH=backend python scripts/check_research_boundary.py
