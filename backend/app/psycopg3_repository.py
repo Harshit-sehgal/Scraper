@@ -148,8 +148,8 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
                     from app.metrics_collector import record_error
 
                     record_error("database")
-                except Exception:  # nosec B110  # noqa: RUF100, S110
-                    pass  # nosec B110
+                except Exception:  # noqa: RUF100, S110
+                    pass
                 raise
 
     def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:

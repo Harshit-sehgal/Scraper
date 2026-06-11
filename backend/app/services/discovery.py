@@ -68,7 +68,7 @@ async def run_discovery_phase(
                 safe_discovered.append(d)
                 safe_urls.append(url)
             except ValueError:
-                pass  # nosec B110
+                pass
     job.discovered_urls = safe_discovered
     job.urls = safe_urls
 

@@ -89,7 +89,7 @@ def _close_pool() -> None:
             if pool is not None:
                 try:
                     pool.close()
-                except Exception:  # nosec B110
+                except Exception:
                     logger.debug("Failed to close psycopg3 worker queue pool during shutdown")
                 logger.info("Closed psycopg3 worker queue pool")
 
@@ -107,14 +107,14 @@ def _conn() -> Iterator:
         try:
             yield conn
             conn.commit()
-        except BaseException:  # nosec B110
+        except BaseException:
             conn.rollback()
             try:
                 from app.metrics_collector import record_error
 
                 record_error("database")
-            except Exception:  # nosec B110  # noqa: RUF100, S110
-                pass  # nosec B110
+            except Exception:  # noqa: RUF100, S110
+                pass
             raise
 
 
@@ -165,14 +165,14 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
             try:
                 yield conn
                 conn.commit()
-            except BaseException:  # nosec B110
+            except BaseException:
                 conn.rollback()
                 try:
                     from app.metrics_collector import record_error
 
                     record_error("database")
-                except Exception:  # nosec B110  # noqa: RUF100, S110
-                    pass  # nosec B110
+                except Exception:  # noqa: RUF100, S110
+                    pass
                 raise
 
     def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:

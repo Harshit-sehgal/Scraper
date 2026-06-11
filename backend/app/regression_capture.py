@@ -361,7 +361,7 @@ class RegressionCapture:
                 fpath.unlink()
                 pruned += 1
             except OSError:
-                pass  # nosec B110
+                pass
 
         if pruned > 0:
             self._save_registry()

@@ -79,7 +79,7 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
     try:
         return float(raw)
     except (ValueError, TypeError):
-        pass  # nosec B110
+        pass
 
     # Try parsing as HTTP-date
     try:
@@ -89,7 +89,7 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
         delta = (retry_dt - datetime.datetime.now(datetime.UTC)).total_seconds()
         return max(0.0, delta)
     except Exception:  # nosec B110  # noqa: RUF100, S110
-        pass  # nosec B110
+        pass
 
     return None
 

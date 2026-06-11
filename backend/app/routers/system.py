@@ -165,7 +165,7 @@ async def system_status(
         worker_healths = await run_in_threadpool(repo.get_all_worker_healths, 60)
         if worker_healths:
             response["workers"] = worker_healths
-    except (AttributeError, ImportError, RuntimeError):  # nosec B110
+    except (AttributeError, ImportError, RuntimeError):
         pass
 
     # Queue status
@@ -179,7 +179,7 @@ async def system_status(
             "dead_letter": q_status.get("dead_letter", 0),
             "max_concurrency": q_status.get("max_concurrency", 0),
         }
-    except (AttributeError, ImportError, RuntimeError):  # nosec B110
+    except (AttributeError, ImportError, RuntimeError):
         pass
 
     if settings.ENV.lower() != "production":
@@ -400,7 +400,7 @@ async def csp_violations(request: Request):
         from app.metrics_collector import record_csp_violation
 
         record_csp_violation(directive_label)
-    except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
+    except (ImportError, AttributeError, TypeError, ValueError):
         pass
 
     # Sanitise log values: truncate and remove newlines to prevent log injection

@@ -235,7 +235,7 @@ async def scrape_url_with_recovery(
                     from app.metrics_collector import record_anti_bot_classification
 
                     record_anti_bot_classification("anti_bot_block")
-                except (ImportError, AttributeError, TypeError, ValueError):  # nosec B110
+                except (ImportError, AttributeError, TypeError, ValueError):
                     pass
             else:
                 state = AcquisitionState.DIRECT
@@ -266,7 +266,7 @@ async def scrape_url_with_recovery(
             )
             return results, recovery_stats
 
-        except Exception as e:  # nosec B110
+        except Exception as e:
             last_error = e
             error_msg = str(e)
 

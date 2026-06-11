@@ -63,7 +63,7 @@ def to_semantic_type(value: object) -> SemanticType:
         try:
             return SemanticType(value.value)
         except (ValueError, TypeError):
-            pass  # nosec B110
+            pass
     return candidate_type_to_semantic(str(value))
 
 

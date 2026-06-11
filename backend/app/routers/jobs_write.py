@@ -116,7 +116,7 @@ def register_jobs_write_routes(
                     validate_public_http_url(url)
                     safe_results.append(r)
                 except ValueError:
-                    pass  # nosec B110
+                    pass
         return {"urls": safe_results}
 
     @router.post("/api/schema/suggest")
