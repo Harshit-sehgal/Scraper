@@ -40,14 +40,14 @@ async def create_session(
     The API key can also be provided via the ``Authorization: Bearer`` header
     or the ``X-Admin-Key`` header (for admin-level sessions).
     """
-    from app.utils.rbac import get_current_role
+    from app.utils.rbac import resolve_auth_context
 
-    role = get_current_role(request)
-    set_session_cookie(response, role.value)
+    context = resolve_auth_context(request, allow_cookie=False)
+    set_session_cookie(response, context.role.value, context.user_id)
 
     return {
         "status": "ok",
-        "role": role.value,
+        "role": context.role.value,
         "message": "Session cookie set. Future requests will use the cookie automatically.",
     }
 
@@ -65,4 +65,7 @@ async def get_session(request: Request):
     role = get_session_role(request)
     if role is None:
         return {"authenticated": False}
-    return {"authenticated": True, "role": role}
+    from app.auth.session import get_session_payload
+
+    payload = get_session_payload(request) or {}
+    return {"authenticated": True, "role": role, "user_id": str(payload.get("user_id") or "")}

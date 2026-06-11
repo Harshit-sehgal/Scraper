@@ -127,7 +127,7 @@ def test_db_sliding_window_counter_fallback() -> None:
     # Force postgres storage backend and mock database connection to fail
     with (
         patch.dict(os.environ, {"DATAFORGE_STORAGE_BACKEND": "postgres"}),
-        patch("app.postgres_repository._conn", side_effect=Exception("Database connection failure")),
+        patch("app.postgres_repository._conn", side_effect=RuntimeError("Database connection failure")),
     ):
         counter = DatabaseSlidingWindowCounter(max_requests=2, window_seconds=2.0, key=test_key)
 

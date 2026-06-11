@@ -13,6 +13,8 @@ import inspect
 import logging
 from typing import TYPE_CHECKING, Any
 
+import httpx
+
 from app.config import settings
 from app.data_utils import _prepare_records_for_ai, normalize_scraped_record
 from app.llm_bridge import llm_json as _llm_json
@@ -23,6 +25,23 @@ if TYPE_CHECKING:
     from app.models import SchemaField
 
 logger = logging.getLogger(__name__)
+
+# Tuple of exceptions that LLM bridge calls (and downstream helpers) may raise.
+# Used to catch recoverable failures without masking bugs such as SyntaxError or
+# StopIteration.
+_LLM_CALL_ERRORS = (
+    RuntimeError,
+    OSError,
+    ValueError,
+    TypeError,
+    ImportError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    NameError,
+    httpx.HTTPError,
+    httpx.TimeoutException,
+)
 
 
 def _extract_list_from_json(data: Any) -> list[dict] | None:
@@ -95,7 +114,7 @@ Rules:
                     raw_response = await res_fast
                 else:
                     raw_response = res_fast
-            except Exception as e:
+            except _LLM_CALL_ERRORS as e:
                 logger.warning("Fast-path semantic inference failed for chunk %d/%d: %s", chunks_processed, len(chunks), e)
                 try:
                     from app.semantic_world_state import get_world_state
@@ -106,7 +125,7 @@ Rules:
                         severity="warning",
                         cause=f"Fast-path LLM inference failed for chunk {chunks_processed}: {e}",
                     )
-                except Exception as telemetry_err:
+                except _LLM_CALL_ERRORS as telemetry_err:
                     logger.debug("Telemetry failed: %s", telemetry_err)
 
             cleaned_list = _extract_list_from_json(raw_response)
@@ -137,7 +156,7 @@ Rules:
                     if norm["record_score"] >= min_record_score:
                         final_records.append(norm)
 
-        except Exception:
+        except _LLM_CALL_ERRORS:
             logger.exception("AI cleaning failed for chunk %d/%d", chunks_processed, len(chunks))
             consecutive_failures += 1
             fallback_chunks += 1

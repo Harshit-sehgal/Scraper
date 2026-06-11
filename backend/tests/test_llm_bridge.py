@@ -161,7 +161,7 @@ class TestRecordLlmDegradation:
             ws_mock.record_degradation.assert_called_once_with(subsystem="groq", severity="critical", cause="API timeout")
 
     def test_handles_world_state_unavailable(self) -> None:
-        with patch("app.semantic_world_state.get_world_state", side_effect=Exception("No WS")):
+        with patch("app.semantic_world_state.get_world_state", side_effect=RuntimeError("No WS")):
             _record_llm_degradation("test", "failure")  # Should not raise
 
 
@@ -329,9 +329,9 @@ class TestLlmJson:
     async def test_all_providers_fail_returns_empty_dict(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),  # No GROQ key
-            patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("API error")),
+            patch("app.llm_bridge._call_openai_compatible_json", side_effect=httpx.HTTPError("API error")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
-            patch("app.llm_bridge.asyncio.to_thread", side_effect=Exception("g4f error")),
+            patch("app.llm_bridge.asyncio.to_thread", side_effect=RuntimeError("g4f error")),
             patch("app.llm_bridge._record_llm_degradation"),
         ):
             result = await llm_json([{"role": "user", "content": "hi"}])
@@ -367,7 +367,7 @@ class TestLlmJsonFast:
     async def test_all_fail_returns_empty_dict(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("fail")),
+            patch("app.llm_bridge._call_openai_compatible_json", side_effect=httpx.HTTPError("fail")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
             patch("app.llm_bridge._record_llm_degradation"),
             patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
@@ -392,9 +392,9 @@ class TestLlmText:
     async def test_empty_response_when_all_fail(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("app.llm_bridge._call_openai_compatible_text", side_effect=Exception("fail")),
+            patch("app.llm_bridge._call_openai_compatible_text", side_effect=httpx.HTTPError("fail")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
-            patch("app.llm_bridge.asyncio.to_thread", side_effect=Exception("g4f fail")),
+            patch("app.llm_bridge.asyncio.to_thread", side_effect=RuntimeError("g4f fail")),
             patch("app.llm_bridge._record_llm_degradation"),
             patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
         ):

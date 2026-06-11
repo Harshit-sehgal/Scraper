@@ -260,6 +260,22 @@ class TestPostgresSerialization:
         assert row["warnings"] == "[]"
         assert json.loads(row["results"]) == []
 
+    def test_job_to_row_preserves_created_by(self) -> None:
+        _job_to_row, _ = self._import_postgres_module()
+        if _job_to_row is None:
+            return
+
+        job = Job(
+            id="test-owner",
+            name="Owned Job",
+            urls=["https://example.com"],
+            created_by="owner-fingerprint",
+        )
+
+        row = _job_to_row(job)
+
+        assert row["created_by"] == "owner-fingerprint"
+
     def test_job_to_row_bool_fields(self) -> None:
         _job_to_row, _ = self._import_postgres_module()
         if _job_to_row is None:
@@ -326,6 +342,25 @@ class TestPostgresSerialization:
         assert restored.total_records == original.total_records
         assert restored.error == original.error
 
+    def test_row_to_job_preserves_created_by(self) -> None:
+        _job_to_row, _row_to_job = self._import_postgres_module()
+        if _job_to_row is None:
+            return
+
+        row = _job_to_row(
+            Job(
+                id="rt-owner",
+                name="Owner Round Trip",
+                urls=["https://example.com"],
+            ),
+        )
+        row["created_by"] = "owner-fingerprint"
+
+        restored = _row_to_job(row)
+
+        assert restored is not None
+        assert restored.created_by == "owner-fingerprint"
+
     def test_row_to_job_invalid_row_returns_none(self) -> None:
         _, _row_to_job = self._import_postgres_module()
         if _row_to_job is None:
@@ -381,6 +416,33 @@ class TestPostgresSchemaRepair:
         assert "cancel_requested" in sql
         assert "source_policy" in sql
 
+    def test_shared_jobs_schema_includes_created_by(self) -> None:
+        from app.storage_interface import _JOBS_COLUMNS_SQL
+
+        assert any(col.startswith("created_by TEXT") for col in _JOBS_COLUMNS_SQL)
+
+    def test_build_create_jobs_includes_created_by_column(self) -> None:
+        _, build_jobs, build_recycle = self._import()
+        if build_jobs is None or build_recycle is None:
+            return
+
+        assert "created_by TEXT" in build_jobs()
+        assert "created_by TEXT" in build_recycle()
+
+    def test_ensure_required_tables_creates_created_by_index(self, monkeypatch) -> None:
+        import app.postgres_repository_base as pg_base
+
+        statements: list[str] = []
+
+        def capture_execute(_conn, sql: str, _params=None):
+            statements.append(sql)
+
+        monkeypatch.setattr(pg_base, "execute", capture_execute)
+
+        pg_base.ensure_required_tables(object())
+
+        assert any("idx_jobs_created_by" in statement for statement in statements)
+
     def test_build_create_recycle_includes_columns(self) -> None:
         _, _, build_recycle = self._import()
         if build_recycle is None:
@@ -389,6 +451,7 @@ class TestPostgresSchemaRepair:
         assert "CREATE TABLE IF NOT EXISTS recycle_bin" in sql
         assert "id TEXT PRIMARY KEY" in sql
         assert "name TEXT NOT NULL" in sql
+        assert sql.count("\n        mode TEXT DEFAULT 'manual'") == 1
         assert "deleted_at" in sql
 
     def test_ensure_required_tables_syntax_valid(self) -> None:
@@ -446,6 +509,12 @@ class TestPostgresIntegration:
         """Start a Postgres testcontainer or reuse a running one."""
         import socket
 
+        from app.postgres_repository import _close_pool
+        from app.storage_interface import reset_repository
+
+        _close_pool()
+        reset_repository()
+
         use_running = False
         dsn = os.environ.get("DATAFORGE_DATABASE_URL")
         if dsn:
@@ -461,11 +530,15 @@ class TestPostgresIntegration:
                 pass
 
         if use_running:
-            yield
-            if not dsn:
-                os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-                os.environ.pop("DATAFORGE_DATABASE_URL", None)
-                os.environ.pop("PGPASSWORD", None)
+            try:
+                yield
+            finally:
+                _close_pool()
+                reset_repository()
+                if not dsn:
+                    os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+                    os.environ.pop("DATAFORGE_DATABASE_URL", None)
+                    os.environ.pop("PGPASSWORD", None)
         else:
             from testcontainers.postgres import PostgresContainer
 
@@ -473,10 +546,14 @@ class TestPostgresIntegration:
                 os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
                 os.environ["DATAFORGE_DATABASE_URL"] = pg.get_connection_url().replace("+psycopg2", "")
                 os.environ["PGPASSWORD"] = pg.password
-                yield
-                os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-                os.environ.pop("DATAFORGE_DATABASE_URL", None)
-                os.environ.pop("PGPASSWORD", None)
+                try:
+                    yield
+                finally:
+                    _close_pool()
+                    reset_repository()
+                    os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+                    os.environ.pop("DATAFORGE_DATABASE_URL", None)
+                    os.environ.pop("PGPASSWORD", None)
 
     def _setup_v1_schema(self, conn) -> None:
         """Create a minimal v1 schema (jobs table but no recycle_bin)."""
@@ -524,7 +601,11 @@ class TestPostgresIntegration:
         # Trigger schema ensure + health check
         health = repo.health_check()
         assert health["ok"] is True, f"Health check failed: {health}"
-        assert health["schema_version"] == 4, f"Expected schema_version=4, got {health['schema_version']}"
+        from app.postgres_repository_base import _CURRENT_SCHEMA_VERSION
+
+        assert health["schema_version"] == _CURRENT_SCHEMA_VERSION, (
+            f"Expected schema_version={_CURRENT_SCHEMA_VERSION}, got {health['schema_version']}"
+        )
 
         # Verify recycle_bin table exists
         health2 = repo.health_check()

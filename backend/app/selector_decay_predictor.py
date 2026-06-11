@@ -29,6 +29,10 @@ from app.selector_memory import SelectorConfidenceScore, get_selector_memory
 
 logger = logging.getLogger(__name__)
 
+# Exceptions that file I/O and JSON persistence operations may raise.
+# Used to catch recoverable failures without masking programming bugs.
+_PERSISTENCE_ERRORS = (OSError, RuntimeError, ValueError, TypeError)
+
 
 @dataclass
 class DecayPrediction:
@@ -89,7 +93,7 @@ class SelectorDecayPredictor:
                 json.dump(data, f)
             os.replace(tmp_path, path)
             tmp_path = None  # ownership transferred via rename
-        except Exception:
+        except _PERSISTENCE_ERRORS:
             logger.exception("Failed to persist selector decay snapshots")
             with contextlib.suppress(OSError):
                 if fd is not None:
@@ -116,7 +120,7 @@ class SelectorDecayPredictor:
                 self._confidence_snapshots.clear()
                 for domain, snapshots in data.items():
                     self._confidence_snapshots[domain] = [(float(t), float(c)) for t, c in snapshots]
-            except Exception:
+            except (*_PERSISTENCE_ERRORS, json.JSONDecodeError):
                 logger.exception("Failed to load selector decay snapshots")
 
     def record_observation(self, domain: str, confidence: float) -> None:

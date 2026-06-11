@@ -18,6 +18,45 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ─── Exception narrowing tuples ───────────────────────────────────────
+# Retry loops in _call_openai_compatible_json / _call_openai_compatible_text
+# catch httpx errors (HTTPStatusError, RequestError, TimeoutException, etc.)
+# plus common runtime errors.  They do NOT mask SyntaxError, NameError, or
+# StopIteration.
+_LLM_RETRY_ERRORS = (httpx.HTTPError, ValueError, TypeError, RuntimeError, OSError)
+
+# Telemetry helpers (metrics recording, world-state degradation) may fail
+# because the collector is optional.  We catch only recoverable errors.
+_TELEMETRY_ERRORS = (RuntimeError, OSError, ValueError, TypeError, ImportError, AttributeError)
+
+# Model fallback blocks (Groq → Pollinations → g4f) catch the same retry
+# errors plus ImportError / AttributeError when optional libraries are missing.
+_MODEL_FALLBACK_ERRORS = (
+    httpx.HTTPError,
+    RuntimeError,
+    OSError,
+    ValueError,
+    TypeError,
+    ImportError,
+    AttributeError,
+)
+
+# Tool execution wrapper in SubstratePluginManager.call_tool re-raises after
+# recording telemetry.  We catch common execution errors but let
+# SyntaxError / StopIteration / GeneratorExit propagate.
+_TOOL_EXEC_ERRORS = (
+    RuntimeError,
+    OSError,
+    ValueError,
+    TypeError,
+    ImportError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    NameError,
+    PermissionError,
+)
+
 # ─── Token Usage Tracking ─────────────────────────────────────────────
 
 _token_usage_lock = threading.Lock()
@@ -130,7 +169,7 @@ async def _call_openai_compatible_json(
                 _record_token_usage(data)
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
-        except Exception as error:
+        except _LLM_RETRY_ERRORS as error:
             logger.exception("API call failed")
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
@@ -178,7 +217,7 @@ async def _call_openai_compatible_text(
                 data = response.json()
                 _record_token_usage(data)
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
-        except Exception as error:
+        except _LLM_RETRY_ERRORS as error:
             logger.exception("API call failed")
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
@@ -216,7 +255,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 
         ws = get_world_state()
         ws.record_degradation(subsystem=subsystem, severity=severity, cause=cause)
-    except Exception as e:
+    except _TELEMETRY_ERRORS as e:
         # Fallback to debug logging if world state is unavailable
         logger.debug("Telemetry skipped (WS unavailable): %s", e)
 
@@ -231,7 +270,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:
+    except _TELEMETRY_ERRORS:
         logger.debug("Failed to record LLM call metric", exc_info=True)
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
@@ -255,7 +294,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if parsed is not None:
                     return parsed
-            except Exception as e:
+            except _MODEL_FALLBACK_ERRORS as e:
                 logger.exception("LLM JSON call failed")
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
                 logger.exception("%s failed: %s", stage, model)
@@ -272,7 +311,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             parsed = await _call_openai_compatible_json(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
             if parsed is not None:
                 return parsed
-        except Exception as e:
+        except _MODEL_FALLBACK_ERRORS as e:
             logger.exception("Pollinations JSON call failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
@@ -301,7 +340,10 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             parsed = _extract_json_payload(content)
             if parsed is not None:
                 return parsed
-        except Exception as e:
+        except _MODEL_FALLBACK_ERRORS as e:
+            logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
+            _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
+        except Exception as e:  # g4f may raise arbitrary exception types
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
@@ -314,7 +356,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:
+    except _TELEMETRY_ERRORS:
         logger.debug("Failed to record LLM call metric (fast path)", exc_info=True)
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
@@ -338,7 +380,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
                 )
                 if parsed is not None:
                     return parsed
-            except Exception as e:
+            except _MODEL_FALLBACK_ERRORS as e:
                 logger.exception("Groq fast JSON call failed")
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
                 logger.exception("%s failed: %s", stage, model)
@@ -359,7 +401,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
             )
             if parsed is not None:
                 return parsed
-        except Exception as e:
+        except _MODEL_FALLBACK_ERRORS as e:
             logger.exception("Pollinations fast JSON call failed")
             _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
@@ -371,7 +413,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:
+    except _TELEMETRY_ERRORS:
         logger.debug("Failed to record LLM call metric (text path)", exc_info=True)
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
@@ -395,7 +437,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if text:
                     return text
-            except Exception:
+            except _MODEL_FALLBACK_ERRORS:
                 logger.exception("Groq text call failed")
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
                 logger.exception("%s failed: %s", stage, model)
@@ -410,7 +452,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
             text = await _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
             if text:
                 return text
-        except Exception:
+        except _MODEL_FALLBACK_ERRORS:
             logger.exception("Pollinations text call failed")
 
         try:
@@ -436,7 +478,9 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
             if result is None:
                 return ""
             return result  # type: ignore[no-any-return]
-        except Exception:
+        except _MODEL_FALLBACK_ERRORS:
+            logger.exception("g4f text fallback failed")
+        except Exception:  # g4f may raise arbitrary exception types
             logger.exception("g4f text fallback failed")
         return ""
 
@@ -561,7 +605,7 @@ class SubstratePluginManager:
                 self._execution_history = self._execution_history[-self._max_history // 2 :]
             return result
 
-        except Exception as e:
+        except _TOOL_EXEC_ERRORS as e:
             self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})
             if len(self._execution_history) > self._max_history:
                 self._execution_history = self._execution_history[-self._max_history // 2 :]

@@ -527,11 +527,6 @@ def print_report(results: list[SiteResult]) -> None:
     # Detailed per-site results
 
     for _i, r in enumerate(results, 1):
-        _fields_display = ", ".join(r.fields_found) if r.fields_found else "*none*"
-
-        if r.sample:
-            _sample_display = {k: v for k, v in r.sample.items() if not k.startswith("_")}
-
         if r.warnings:
             for _w in r.warnings:
                 pass

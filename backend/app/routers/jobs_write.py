@@ -47,6 +47,7 @@ from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.utils.rbac import UserRole, get_current_user, require_role
+from app.utils.usage_ledger import UsageType, get_usage_ledger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -221,6 +222,16 @@ def register_jobs_write_routes(
             min_record_score=job_data.min_record_score,
             created_by=user_id,
         )
+        try:
+            get_usage_ledger().record_usage(
+                user_id,
+                UsageType.JOB_CREATED,
+                quantity=1,
+                metadata={"job_id": job.id},
+                idempotency_key=idem_key or f"job-created:{job.id}",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=429, detail=str(exc)) from exc
         with manager.lock:
             manager.jobs_store[job.id] = job
         await save_job(job)

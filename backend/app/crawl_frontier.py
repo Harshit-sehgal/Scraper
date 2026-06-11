@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import heapq
 import logging
+import sqlite3
 import threading
 import time
 from dataclasses import dataclass, field
@@ -25,6 +26,10 @@ from app.config import settings
 from app.crawl_policy import get_crawl_policy
 
 logger = logging.getLogger(__name__)
+
+# Exceptions that SQLite / threadpool DB operations may raise.
+# Used to catch recoverable failures without masking programming bugs.
+_DB_FALLBACK_ERRORS = (OSError, RuntimeError, ValueError, TypeError, ImportError, sqlite3.Error)
 
 
 # ─── SQLite DB helper functions for threadpool-safe execution ─────────
@@ -164,7 +169,7 @@ class CrawlFrontier:
 
                 # Heapify to establish priority invariant
                 heapq.heapify(self._queue)
-        except Exception:
+        except _DB_FALLBACK_ERRORS:
             logger.exception("Failed to load frontier state from SQLite")
 
     async def add_url(self, url: str, priority: int = 10, depth: int = 0, source_url: str | None = None) -> bool:
@@ -209,7 +214,7 @@ class CrawlFrontier:
                     source_url,
                     item.added_at,
                 )
-            except Exception:
+            except _DB_FALLBACK_ERRORS:
                 logger.exception("Failed to insert URL into SQLite")
 
             logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
@@ -242,7 +247,7 @@ class CrawlFrontier:
                                     item.source_url,
                                     item.added_at,
                                 )
-                            except Exception:
+                            except _DB_FALLBACK_ERRORS:
                                 logger.exception("Failed to restore URL to SQLite")
                     return None
 
@@ -252,7 +257,7 @@ class CrawlFrontier:
 
                 try:
                     await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
-                except Exception:
+                except _DB_FALLBACK_ERRORS:
                     logger.exception("Failed to delete URL from SQLite queue")
 
             # 2. Release lock and evaluate policy check asynchronously outside
@@ -273,7 +278,7 @@ class CrawlFrontier:
                             item.source_url,
                             item.added_at,
                         )
-                    except Exception:
+                    except _DB_FALLBACK_ERRORS:
                         logger.exception("Failed to restore URL to SQLite: %s", item.url)
                     # Restore other tried items under the lock
                     for t_item in tried:
@@ -290,7 +295,7 @@ class CrawlFrontier:
                                     t_item.source_url,
                                     t_item.added_at,
                                 )
-                            except Exception:
+                            except _DB_FALLBACK_ERRORS:
                                 logger.exception("Failed to restore tried URL to SQLite")
                 return item.url
             # Blocked! Restore pending status and track in tried list
@@ -306,7 +311,7 @@ class CrawlFrontier:
                         item.source_url,
                         item.added_at,
                     )
-                except Exception:
+                except _DB_FALLBACK_ERRORS:
                     logger.exception("Failed to save blocked URL")
             tried.append(item)
 
@@ -330,7 +335,7 @@ class CrawlFrontier:
                             item.source_url,
                             item.added_at,
                         )
-                    except Exception:
+                    except _DB_FALLBACK_ERRORS:
                         logger.exception("Failed to restore tried URLs")
         return None
 
@@ -349,14 +354,14 @@ class CrawlFrontier:
                 self._failed.pop(url, None)
                 try:
                     await run_in_threadpool(_db_mark_completed, self._db_path, url)
-                except Exception:
+                except _DB_FALLBACK_ERRORS:
                     logger.exception("Failed to mark completed in SQLite")
             else:
                 count = self._failed.get(url, 0) + 1
                 self._failed[url] = count
                 try:
                     await run_in_threadpool(_db_mark_failed, self._db_path, url, count)
-                except Exception:
+                except _DB_FALLBACK_ERRORS:
                     logger.exception("Failed to update failed count in SQLite")
 
                 # Retry logic: if not too many failures, put back in queue with
@@ -376,7 +381,7 @@ class CrawlFrontier:
                             item.source_url,
                             item.added_at,
                         )
-                    except Exception:
+                    except _DB_FALLBACK_ERRORS:
                         logger.exception("Failed to insert retry URL in SQLite")
                 else:
                     # Move to completed to stop retrying
@@ -387,7 +392,7 @@ class CrawlFrontier:
                     self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                     try:
                         await run_in_threadpool(_db_finalize_failed_as_completed, self._db_path, url)
-                    except Exception:
+                    except _DB_FALLBACK_ERRORS:
                         logger.exception("Failed to finalize failed URL as completed in SQLite")
 
     async def add_discovered_links(self, links: list[str], source_url: str, source_depth: int = 0) -> int:
@@ -456,7 +461,7 @@ class CrawlFrontier:
 
                     try:
                         await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
-                    except Exception:
+                    except _DB_FALLBACK_ERRORS:
                         logger.exception("Failed to delete domain URL from SQLite")
                 else:
                     remaining.append(item)

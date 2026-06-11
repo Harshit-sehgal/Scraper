@@ -314,7 +314,7 @@ async def _rate_limit_prune_loop() -> None:
             DatabaseSlidingWindowCounter.prune_all()
         except asyncio.CancelledError:
             break
-        except Exception:
+        except _SHUTDOWN_EXCEPTIONS:
             logger.exception("Rate limit table pruning background task failed (non-blocking)")
 
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 
 
@@ -93,12 +93,15 @@ class InvoiceGenerator:
         due_days: int = 30,
     ) -> Invoice:
         """Generate a new invoice."""
+        if due_days < 0:
+            msg = "due_days must be non-negative"
+            raise ValueError(msg)
+        now = datetime.now(UTC)
         invoice = Invoice(
             user_id=user_id,
             items=items,
-            due_date=datetime.now(UTC).replace(
-                day=datetime.now(UTC).day + due_days,
-            ),
+            created_at=now,
+            due_date=now + timedelta(days=due_days),
         )
         invoice.calculate_totals()
 

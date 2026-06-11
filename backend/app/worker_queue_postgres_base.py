@@ -35,6 +35,44 @@ logger = logging.getLogger(__name__)
 
 _CURRENT_QUEUE_SCHEMA_VERSION = 3
 
+# Module-level exception tuple for DB operations so we don't swallow
+# programming errors with bare ``except Exception``.
+_DB_OPS_ERRORS: tuple[type[BaseException], ...] = (
+    OSError,
+    RuntimeError,
+    ValueError,
+    TypeError,
+    ImportError,
+)
+
+try:
+    import psycopg2
+
+    _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, psycopg2.Error)  # type: ignore[misc]
+except ImportError:
+    pass
+
+try:
+    import psycopg
+
+    _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, psycopg.Error)  # type: ignore[misc]
+except ImportError:
+    pass
+
+# Exceptions that a task handler might raise (everything except
+# BaseException subclasses like SystemExit / KeyboardInterrupt).
+_TASK_HANDLER_ERRORS: tuple[type[BaseException], ...] = (
+    RuntimeError,
+    OSError,
+    ValueError,
+    TypeError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    ImportError,
+    NameError,
+)
+
 
 def _add_column_if_missing(conn, table: str, column: str, col_type: str) -> None:
     """Run ``ALTER TABLE ADD COLUMN`` safely inside a SAVEPOINT.
@@ -49,7 +87,7 @@ def _add_column_if_missing(conn, table: str, column: str, col_type: str) -> None
         cur.execute("SAVEPOINT add_col_sp")
         try:
             cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-        except Exception:
+        except _DB_OPS_ERRORS:
             cur.execute("ROLLBACK TO SAVEPOINT add_col_sp")
         else:
             cur.execute("RELEASE SAVEPOINT add_col_sp")
@@ -83,7 +121,7 @@ def _ensure_schema_via(conn, fetch_one, execute) -> None:
             try:
                 cur.execute("SELECT id FROM queue_schema_version LIMIT 1")
                 old_row = cur.fetchone()
-            except Exception:
+            except _DB_OPS_ERRORS:
                 old_row = None
                 cur.execute("ROLLBACK TO SAVEPOINT schema_check_sp")
             else:
@@ -389,7 +427,7 @@ class PostgresWorkerQueueBase(ABC):
                         "payload": json.loads(row["payload"]),
                     },
                 )
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Postgres dequeue error")
             return None
 
@@ -660,7 +698,7 @@ class PostgresWorkerQueueBase(ABC):
                         "WHERE status = 'running'",
                     )
                     logger.info("Recovered %d stuck task(s) from previous worker crash", count)
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to recover stuck tasks")
 
     async def stop(self, drain: bool = True) -> None:
@@ -745,7 +783,7 @@ class PostgresWorkerQueueBase(ABC):
 
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except _DB_OPS_ERRORS:
                 logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callbacks.
@@ -775,7 +813,7 @@ class PostgresWorkerQueueBase(ABC):
                 await self.complete(task.id, result)
         except TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
-        except Exception as e:
+        except _TASK_HANDLER_ERRORS as e:
             await self.fail(task.id, f"{type(e).__name__}: {e}", retry=True)
 
     async def _cleanup_in_flight(self, task_id: str) -> None:
@@ -819,7 +857,7 @@ class PostgresWorkerQueueBase(ABC):
                 if row:
                     return row
                 return None
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to get task state for %s", task_id)
             return None
 
@@ -872,7 +910,7 @@ class PostgresWorkerQueueBase(ABC):
                     "in_flight": len(self._in_flight),
                     "next_tasks": top_pending,
                 }
-        except Exception as e:
+        except _DB_OPS_ERRORS as e:
             logger.exception("Failed to get Postgres queue status")
             return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
@@ -891,7 +929,7 @@ class PostgresWorkerQueueBase(ABC):
                        ORDER BY finished_at DESC LIMIT %s""",
                     (limit,),
                 )
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to get dead letter queue")
             return []
 
@@ -935,7 +973,7 @@ class PostgresWorkerQueueBase(ABC):
                     (task_id,),
                 )
                 return True
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to retry dead letter task %s", task_id)
             return False
 
@@ -958,7 +996,7 @@ class PostgresWorkerQueueBase(ABC):
                        AND status IN ('completed', 'dead_letter')""",
                     (older_than_days,),
                 )
-        except Exception:
+        except _DB_OPS_ERRORS:
             logger.exception("Failed to clear completed history")
 
     async def clear_completed_history_async(self, older_than_days: int = 7) -> None:

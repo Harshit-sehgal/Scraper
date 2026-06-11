@@ -22,6 +22,8 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+import httpx
+
 from app.config import settings
 from app.crawl_policy import get_crawl_policy
 from app.extraction_orchestrator import orchestrate_extraction
@@ -158,7 +160,7 @@ async def _try_profile_extraction(
         matched_profile = match_profile_for_url(url)
         try:
             profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
-        except Exception:
+        except (RuntimeError, OSError, TypeError, ValueError):
             get_crawl_policy().record_result(url, success=False)
             raise
 
@@ -250,7 +252,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     logger.warning("[SessionRecovery] Recovery failed: %s", recovery_result.get("error", "unknown"))
                 else:
                     logger.info("[SessionRecovery] No search form detected on %s", redact_url(url))
-        except Exception as recovery_err:
+        except (RuntimeError, OSError, TypeError, ValueError) as recovery_err:
             logger.warning("[SessionRecovery] Recovery attempt failed for %s: %s", redact_url(url), recovery_err)
     elif not search_params:
         try:
@@ -262,7 +264,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     "[SessionRecovery] URL %s is session-bound but no search_params provided",
                     redact_url(url),
                 )
-        except Exception:  # nosec B110  # noqa: RUF100, S110
+        except (RuntimeError, OSError, TypeError, ValueError):  # nosec B110  # noqa: RUF100, S110
             pass
     return None
 
@@ -619,7 +621,16 @@ async def scrape_url(
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
-    except Exception as e:
+    except (
+        RuntimeError,
+        OSError,
+        TypeError,
+        ValueError,
+        ImportError,
+        AttributeError,
+        httpx.HTTPError,
+        httpx.TimeoutException,
+    ) as e:
         fetch_ms = (time.time() - fetch_start) * 1000
         strategy_engine.record_fetch_attempt(
             intel.domain,

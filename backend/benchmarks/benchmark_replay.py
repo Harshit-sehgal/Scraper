@@ -30,14 +30,11 @@ def benchmark_replay(transaction_count: int = 10000) -> bool:
     roles = [f"role_{i}" for i in range(20)]
 
     # 1. Generation Phase
-    start_gen = time.time()
     for i in range(transaction_count):
         with ws.transaction(f"tx_{i}"):
             # 3 mutations per tx
             for _ in range(3):
                 ws.set_manifold_vector(random.choice(roles), [random.random() for _ in range(16)])  # nosec B311 — synthetic load generator, no security need
-
-    _gen_elapsed = time.time() - start_gen
 
     # 2. Replay Phase
     journal = ws.trace_causality(limit=transaction_count + 100)

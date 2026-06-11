@@ -7,21 +7,21 @@ Generated from the registered FastAPI app. This is route-registration evidence, 
 | `GET` | `/` | public | no API route auth | Dashboard/static/probe route; review before public exposure. |
 | `POST` | `/api/discover` | operator-or-admin | require_role([admin, operator]) |  |
 | `POST` | `/api/exports/batch` | operator-or-admin | require_role([admin, operator]) |  |
-| `GET` | `/api/jobs` | authenticated-user | global /api/* API-key middleware |  |
+| `GET` | `/api/jobs` | authenticated-user | require_role([admin, operator, user]) |  |
 | `POST` | `/api/jobs` | operator-or-admin | require_role([admin, operator]) |  |
 | `DELETE` | `/api/jobs/cleanup/terminal` | admin | require_role([admin]) |  |
 | `DELETE` | `/api/jobs/{job_id}` | admin | require_role([admin]) |  |
-| `GET` | `/api/jobs/{job_id}` | authenticated-user | global /api/* API-key middleware |  |
+| `GET` | `/api/jobs/{job_id}` | authenticated-user | require_role([admin, operator, user]) |  |
 | `POST` | `/api/jobs/{job_id}/backfill-metadata` | operator-or-admin | require_role([admin, operator]) |  |
 | `POST` | `/api/jobs/{job_id}/cancel` | operator-or-admin | require_role([admin, operator]) |  |
-| `GET` | `/api/jobs/{job_id}/events` | authenticated-user | global /api/* API-key middleware |  |
+| `GET` | `/api/jobs/{job_id}/events` | authenticated-user | require_role([admin, operator, user]) |  |
 | `GET` | `/api/jobs/{job_id}/export/csv` | operator-or-admin | require_role([admin, operator]) |  |
 | `GET` | `/api/jobs/{job_id}/export/excel` | operator-or-admin | require_role([admin, operator]) |  |
 | `GET` | `/api/jobs/{job_id}/export/json` | operator-or-admin | require_role([admin, operator]) |  |
 | `POST` | `/api/jobs/{job_id}/reclean` | operator-or-admin | require_role([admin, operator]) |  |
-| `GET` | `/api/jobs/{job_id}/results` | authenticated-user | global /api/* API-key middleware |  |
+| `GET` | `/api/jobs/{job_id}/results` | authenticated-user | require_role([admin, operator, user]) |  |
 | `DELETE` | `/api/recycle_bin` | admin | require_role([admin]) |  |
-| `GET` | `/api/recycle_bin` | authenticated-user | global /api/* API-key middleware |  |
+| `GET` | `/api/recycle_bin` | authenticated-user | require_role([admin, operator, user]) |  |
 | `DELETE` | `/api/recycle_bin/{job_id}` | admin | require_role([admin]) |  |
 | `POST` | `/api/recycle_bin/{job_id}/restore` | admin | require_role([admin]) |  |
 | `POST` | `/api/schema/suggest` | operator-or-admin | require_role([admin, operator]) |  |

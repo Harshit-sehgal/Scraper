@@ -1,5 +1,9 @@
 # Roadmap
 
+> ⚠️ **Historical plan document.** The active backlog and remaining-work
+> list live in [`AGENT_TRUTH.md`](AGENT_TRUTH.md). Numbers and dates below
+> reflect the plan as written, not the verified current state.
+
 This document tracks the phased plan for DataForge (`Harshit-sehgal/Scraper`) and
 the current state of each workstream. It is a living artifact — last updated
 after the deep-research remediation pass (2026-06).

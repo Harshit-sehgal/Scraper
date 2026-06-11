@@ -1,5 +1,9 @@
 # Production Readiness
 
+> ⚠️ **Historical readiness checklist.** Live readiness evidence is
+> in [`AGENT_TRUTH.md`](AGENT_TRUTH.md) and `artifacts/validation/`.
+> This file is a planning checklist, not a current claim.
+
 **Last refreshed:** 2026-06-08
 **Allowed statuses:** Not started, In progress, Validated, Failed, Unknown
 

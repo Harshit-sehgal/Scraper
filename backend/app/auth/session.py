@@ -59,16 +59,19 @@ def _unsign(signed: str) -> str | None:
     return payload
 
 
-def create_session_cookie(role: str) -> str:
-    """Create a signed session cookie value embedding the authenticated role."""
-    data = json.dumps({"role": role, "iat": int(time.time()), "max_age": SESSION_MAX_AGE}, separators=(",", ":"))
+def create_session_cookie(role: str, user_id: str = "") -> str:
+    """Create a signed session cookie value embedding role and identity."""
+    data = json.dumps(
+        {"role": role, "user_id": user_id, "iat": int(time.time()), "max_age": SESSION_MAX_AGE},
+        separators=(",", ":"),
+    )
     payload = base64.urlsafe_b64encode(data.encode("utf-8")).decode("ascii").rstrip("=")
     sig = _sign(payload)
     return f"{payload}.{sig}"
 
 
-def verify_session_cookie(cookie_value: str) -> str | None:
-    """Verify a signed session cookie and return the embedded role, or None.
+def verify_session_payload(cookie_value: str) -> dict[str, object] | None:
+    """Verify a signed session cookie and return its payload, or None.
 
     Also rejects expired sessions.
     """
@@ -78,21 +81,30 @@ def verify_session_cookie(cookie_value: str) -> str | None:
     try:
         raw = base64.urlsafe_b64decode(payload + "==")  # padding may have been stripped
         data = json.loads(raw.decode("utf-8"))
-    except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
+        iat = int(data.get("iat", 0))
+        max_age = int(data.get("max_age", SESSION_MAX_AGE))
+    except (TypeError, json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return None
 
-    role: str = data.get("role", "")
-    iat: int = data.get("iat", 0)
-    max_age: int = data.get("max_age", SESSION_MAX_AGE)
+    role = str(data.get("role", ""))
+    user_id = str(data.get("user_id", ""))
 
-    if not role or time.time() > iat + max_age:
+    if role not in {"admin", "operator", "user"} or max_age < 0 or time.time() > iat + max_age:
         return None
-    return role
+    return {"role": role, "user_id": user_id, "iat": iat, "max_age": max_age}
 
 
-def set_session_cookie(response: Response, role: str) -> None:
-    """Set the session cookie on *response* for the authenticated *role*."""
-    cookie_value = create_session_cookie(role)
+def verify_session_cookie(cookie_value: str) -> str | None:
+    """Verify a signed session cookie and return the embedded role, or None."""
+    payload = verify_session_payload(cookie_value)
+    if payload is None:
+        return None
+    return str(payload["role"])
+
+
+def set_session_cookie(response: Response, role: str, user_id: str = "") -> None:
+    """Set the session cookie on *response* for the authenticated principal."""
+    cookie_value = create_session_cookie(role, user_id=user_id)
     response.set_cookie(
         key=SESSION_COOKIE,
         value=cookie_value,
@@ -121,3 +133,11 @@ def get_session_role(request: Request) -> str | None:
     if not cookie:
         return None
     return verify_session_cookie(cookie)
+
+
+def get_session_payload(request: Request) -> dict[str, object] | None:
+    """Extract the verified session payload from the cookie, if present."""
+    cookie = request.cookies.get(SESSION_COOKIE)
+    if not cookie:
+        return None
+    return verify_session_payload(cookie)

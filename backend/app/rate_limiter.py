@@ -21,6 +21,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import sqlite3
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -32,6 +33,30 @@ if TYPE_CHECKING:
     from fastapi import Request, Response
 
 logger = logging.getLogger(__name__)
+
+# Collect DB exception types for fallback handling in rate-limit counter
+# operations so we don't swallow programming errors with bare except Exception.
+_DB_FALLBACK_ERRORS: tuple[type[BaseException], ...] = (
+    OSError,
+    RuntimeError,
+    ImportError,
+    ValueError,
+    sqlite3.Error,  # type: ignore[misc]
+)
+
+try:
+    from psycopg2 import Error as _Psycopg2Error
+
+    _DB_FALLBACK_ERRORS = (*_DB_FALLBACK_ERRORS, _Psycopg2Error)
+except ImportError:
+    pass
+
+try:
+    from psycopg import Error as _Psycopg3Error
+
+    _DB_FALLBACK_ERRORS = (*_DB_FALLBACK_ERRORS, _Psycopg3Error)
+except ImportError:
+    pass
 
 # ─── Trusted-proxy allowlist ──────────────────────────────────────────
 # Only TCP peers whose address is in this list may inject X-Forwarded-For
@@ -181,7 +206,7 @@ class DatabaseSlidingWindowCounter:
                     )
                     _execute(conn, "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
                 self._initialized = True
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("Failed to initialize Postgres rate limit table: %s", e)
         else:
             try:
@@ -201,7 +226,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 self._initialized = True
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("Failed to initialize SQLite rate limit table: %s", e)
 
     def allow(self) -> bool:
@@ -273,7 +298,7 @@ class DatabaseSlidingWindowCounter:
                         (self.key, self.key, now, self.max_requests),
                     )
                 return bool(row and row.get("allowed"))
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
         else:
@@ -308,7 +333,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 return True
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
 
@@ -329,7 +354,7 @@ class DatabaseSlidingWindowCounter:
                     row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
                     count = row["count"] if row else 0
                     return max(0, self.max_requests - count)
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("Postgres rate limiter remaining() failed: %s", e)
                 return self._fallback_counter.remaining()
         else:
@@ -345,7 +370,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0, self.max_requests - count)
                     finally:
                         conn.close()
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("SQLite rate limiter remaining() failed: %s", e)
                 return self._fallback_counter.remaining()
 
@@ -366,7 +391,7 @@ class DatabaseSlidingWindowCounter:
                     if min_ts is None:
                         return 0.0
                     return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("Postgres rate limiter reset_in() failed: %s", e)
                 return self._fallback_counter.reset_in()
         else:
@@ -386,7 +411,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
                     finally:
                         conn.close()
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("SQLite rate limiter reset_in() failed: %s", e)
                 return self._fallback_counter.reset_in()
 
@@ -411,7 +436,7 @@ class DatabaseSlidingWindowCounter:
                         (self.key, cutoff),
                     )
                     return row is None
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("Postgres rate limiter is_expired() failed: %s", e)
                 return True
         else:
@@ -428,7 +453,7 @@ class DatabaseSlidingWindowCounter:
                         return row is None
                     finally:
                         conn.close()
-            except Exception as e:
+            except _DB_FALLBACK_ERRORS as e:
                 logger.warning("SQLite rate limiter is_expired() failed: %s", e)
                 return True
 
@@ -460,7 +485,7 @@ class DatabaseSlidingWindowCounter:
                     _execute(conn, "DELETE FROM rate_limits WHERE timestamp <= %s", (cutoff,))
                     remaining = _fetch_one(conn, "SELECT COUNT(*) AS c FROM rate_limits")
                     return remaining["c"] if remaining else 0
-            except Exception:
+            except _DB_FALLBACK_ERRORS:
                 logger.debug("Postgres rate_limits prune_all failed")
                 return 0
         else:
@@ -476,7 +501,7 @@ class DatabaseSlidingWindowCounter:
                         conn.commit()
                     finally:
                         conn.close()
-            except Exception:
+            except _DB_FALLBACK_ERRORS:
                 logger.debug("SQLite rate_limits prune_all failed")
                 return 0
             else:
@@ -696,7 +721,7 @@ class RateLimiterMiddleware:
                 deleted = DatabaseSlidingWindowCounter.prune_all()
                 if deleted:
                     logger.debug("Rate limiter: pruned %d stale rate_limits row(s)", deleted)
-        except Exception:
+        except _DB_FALLBACK_ERRORS:
             logger.debug("Rate limiter: rate_limits table prune_all failed (non-blocking)")
 
     # ── Rate-limit response builder ───────────────────────────────────
