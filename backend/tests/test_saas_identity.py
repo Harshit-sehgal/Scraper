@@ -36,6 +36,7 @@ from app.saas import (
     verify_password,
 )
 from app.saas.identity_store import IdentityStoreError, SQLiteIdentityStore
+from app.saas.models import Project, User
 from app.saas.service import ApiKeyService, MembershipService
 
 
@@ -165,7 +166,7 @@ def test_api_key_issue_stores_hash_not_raw(api_key_service, identity_store) -> N
 
 
 def test_api_key_authenticate_with_raw_key(api_key_service) -> None:
-    project = identity_store = get_identity_store()
+    identity_store = get_identity_store()
     project = identity_store.create_project(_make_project(org_id="org-1", user_id="u-1"))
     issued = api_key_service.issue(project_id=project.id, user_id="u-1", name="k")
 
@@ -291,13 +292,9 @@ def test_disabled_user_cannot_be_used_for_new_signups_action(signup, identity_st
 # ─── helpers ─────────────────────────────────────────────────────────
 
 
-def _make_user(email: str = "x@example.com") -> object:  # type: ignore[valid-type]
-    from app.saas.models import User
-
+def _make_user(email: str = "x@example.com") -> User:
     return User(email=email, password_hash=hash_password("placeholder"))
 
 
-def _make_project(org_id: str, user_id: str, name: str = "P") -> object:  # type: ignore[valid-type]
-    from app.saas.models import Project
-
+def _make_project(org_id: str, user_id: str, name: str = "P") -> Project:
     return Project(org_id=org_id, name=name, created_by_user_id=user_id)

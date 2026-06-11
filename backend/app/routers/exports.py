@@ -1,72 +1,46 @@
-import csv
-import datetime
-import io
-import json
+"""Thin FastAPI router for export endpoints.
+
+All pure formatting / streaming / sheet-collision logic lives in
+:mod:`app.services.exports`. This module owns only:
+
+* Route definitions (``/api/jobs/{id}/export/{csv,json,excel}`` and
+  ``/api/exports/batch``)
+* Auth dependency wiring (operator/admin required)
+* Usage-metering side effects (calls into
+  :func:`app.utils.usage_ledger.record_usage` and
+  :func:`app.metrics_collector.record_export_outcome`)
+* The repository-refresh hook that pulls a fresh job from the
+  repository in worker mode before exporting (so we never export a
+  stale in-memory copy)
+
+Keeping the router thin lets us unit-test the formatting logic in
+isolation and makes future changes (e.g. switching to a faster Excel
+library, adding new export formats) safe — they happen in the
+service module without touching FastAPI machinery.
+"""
+
+from __future__ import annotations
+
 import logging
-from collections.abc import AsyncIterator
+import threading
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from openpyxl import Workbook
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
+from app.services import exports as export_service
 from app.utils.export import safe_export_filename
 from app.utils.rbac import UserRole, require_role_with_user
 
 logger = logging.getLogger(__name__)
 
-_PAGINATION_CHUNK_SIZE = 500
 
-
-def _user_fieldnames(results_list: list[dict]) -> list[str]:
-    """Return field names from the first record, filtering out internal system fields (keys starting with ``_``).
-
-    When no schema is defined, we fall back to the keys of the first result
-    record.  Internal metadata fields (``_acquisition_lineage``,
-    ``_provenance``, …) are stripped so they never leak into user-facing
-    exports.
-    """
-    if not results_list:
-        return []
-    return [k for k in results_list[0] if not k.startswith("_")]
-
-
-def _strip_system_fields(records: list[dict]) -> list[dict]:
-    """Return a deep-ish copy of *records* with all keys starting with ``_`` removed."""
-    return [{k: v for k, v in r.items() if not k.startswith("_")} for r in records]
-
-
-def _flat_row(row: dict[str, Any], fieldnames: list[str]) -> dict[str, Any]:
-    """Flatten list values in a row to comma-separated strings and escape formula injection."""
-    flat = {}
-    for k in fieldnames:
-        v = row.get(k)
-        if isinstance(v, list):
-            flat[k] = _safe_cell(", ".join(str(i) for i in v))
-        else:
-            flat[k] = _safe_cell(v)
-    return flat
-
-
-_DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
-
-
-def _safe_cell(value):
-    """Escape spreadsheet formula-injection prefixes so exported CSV / Excel files
-    do not execute malicious formulas when opened in Excel, Sheets, or LibreOffice.
-
-    If *value* is a string that starts with a dangerous prefix (``=``, ``+``, ``-``,
-    ``@``, tab, or carriage return), prepend a single quote so the spreadsheet
-    software treats it as plain text.
-
-    Non-string values are returned unchanged.
-    """
-    if isinstance(value, str) and value.startswith(_DANGEROUS_PREFIXES):
-        return "'" + value
-    return value
+# ════════════════════════════════════════════════════════════════════
+# Request / response schemas
+# ════════════════════════════════════════════════════════════════════
 
 
 class BatchExportRequest(BaseModel):
@@ -89,16 +63,16 @@ class BatchExportRequest(BaseModel):
     )
 
 
-_SOURCE_JOB_FIELD = "_source_job"
-"""Field name injected into each result row to identify the source job."""
+# ════════════════════════════════════════════════════════════════════
+# Side-effect helpers
+# ════════════════════════════════════════════════════════════════════
 
 
 def _record_export_outcome(fmt: str, success: bool) -> None:
     """Record an export generation outcome for the metrics endpoint.
 
-    Mirrors :func:`app.metrics_collector.record_export_outcome`. The
-    function is intentionally tolerant: a broken metrics subsystem
-    must never turn a successful export into a 5xx.
+    A broken metrics subsystem must never turn a successful export
+    into a 5xx.
     """
     try:
         from app.metrics_collector import record_export_outcome
@@ -135,35 +109,110 @@ def _record_export_usage(user_id: str, fmt: str, job_ids: list[str], request: Re
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 
 
+def _log_export_access(
+    user_id: str,
+    fmt: str,
+    job_ids: list[str],
+    request: Request,
+    *,
+    success: bool,
+) -> None:
+    """P1-COMPLIANCE-001: log every export access to the audit log.
+
+    Best-effort: a broken audit logger must never turn a successful
+    export into a 5xx. Failures are swallowed and logged at DEBUG.
+    """
+    try:
+        from app.audit_logger import log_data_access
+
+        metadata: dict[str, Any] = {
+            "format": fmt,
+            "job_count": len(job_ids),
+            "client_ip": _get_client_ip_for_audit(request),
+        }
+        if len(job_ids) == 1:
+            metadata["job_id"] = job_ids[0]
+        else:
+            metadata["job_ids"] = list(job_ids)
+        # Surface org_id / project_id from the resolved auth context
+        # so the audit log carries tenant attribution.
+        org_id = ""
+        project_id = ""
+        try:
+            ctx = getattr(getattr(request, "state", None), "auth_context", None)
+            if ctx is not None:
+                org_id = getattr(ctx, "org_id", "") or ""
+                project_id = getattr(ctx, "project_id", "") or ""
+        except Exception:
+            org_id = ""
+            project_id = ""
+        log_data_access(
+            actor=user_id,
+            action=f"export_{fmt}",
+            resource=f"jobs:{','.join(job_ids)}" if job_ids else "jobs:",
+            details=metadata,
+            outcome="success" if success else "failure",
+            org_id=org_id,
+            project_id=project_id,
+        )
+    except Exception as e:  # pragma: no cover - defensive
+        logger.debug("Failed to log export access for %s: %s", fmt, e)
+
+
+def _get_client_ip_for_audit(request: Request) -> str:
+    """Best-effort client IP extraction for audit log lines."""
+    try:
+        return request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+            request.client.host if request.client else "unknown"
+        )
+    except Exception:
+        return "unknown"
+
+
+# ════════════════════════════════════════════════════════════════════
+# Router factory
+# ════════════════════════════════════════════════════════════════════
+
+
 def create_exports_router(jobs_store: dict[str, Any]):
+    """Build the export APIRouter.
+
+    The router exposes:
+
+    * ``GET /api/jobs/{job_id}/export/csv``
+    * ``GET /api/jobs/{job_id}/export/json``
+    * ``GET /api/jobs/{job_id}/export/excel``
+    * ``POST /api/exports/batch``
+
+    All endpoints require admin or operator role. Auth is resolved
+    through the shared :func:`app.utils.rbac.require_role_with_user`
+    dependency (the 2-tuple legacy form — exports predate the
+    org_id/project_id wiring and operate over the legacy owner
+    model).
+    """
     router = APIRouter()
 
-    # Single-process lock guarding refresh-from-repo writes into ``jobs_store``.
-    # Without this, two concurrent export requests can race and observe a
-    # partially-overwritten job (or worse, raise ``RuntimeError: dictionary
-    # changed size during iteration`` when a reader iterates ``jobs_store``).
-    import threading
-
+    # Single-process lock guarding refresh-from-repo writes into
+    # ``jobs_store``. Two concurrent export requests otherwise race
+    # and observe a partially-overwritten job.
     _store_lock = threading.Lock()
 
     def _refresh_job_for_export(job_id: str) -> None:
-        """Refresh job from repository in worker mode to avoid stale exports.
+        """Refresh job from repository in worker mode to avoid stale exports."""
+        if not settings.WORKER_QUEUE:
+            return
+        try:
+            from app.storage_interface import get_job_repository
 
-        Uses the targeted ``get_job()`` read instead of loading all jobs
-        and filtering client-side. This helper is synchronous; async
-        export routes call it via ``run_in_threadpool``.
-        """
-        if settings.WORKER_QUEUE:
-            try:
-                from app.storage_interface import get_job_repository
+            repo = get_job_repository()
+            fresh = repo.get_job(job_id)
+            if fresh is not None:
+                with _store_lock:
+                    jobs_store[job_id] = fresh
+        except Exception:
+            logger.debug("Failed to refresh job %s from repo for export", job_id)
 
-                repo = get_job_repository()
-                fresh = repo.get_job(job_id)
-                if fresh is not None:
-                    with _store_lock:
-                        jobs_store[job_id] = fresh
-            except Exception:
-                logger.debug("Failed to refresh job %s from repo for export", job_id)
+    # ─── Single-job exports ─────────────────────────────────────────
 
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(
@@ -176,12 +225,15 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_usage(auth[1], "csv", [job_id], request)
         except HTTPException:
             _record_export_outcome("csv", False)
+            _log_export_access(auth[1], "csv", [job_id], request, success=False)
             raise
         except Exception:
             _record_export_outcome("csv", False)
+            _log_export_access(auth[1], "csv", [job_id], request, success=False)
             raise
         else:
             _record_export_outcome("csv", True)
+            _log_export_access(auth[1], "csv", [job_id], request, success=True)
             return result
 
     async def _export_csv_impl(job_id: str):
@@ -191,77 +243,20 @@ def create_exports_router(jobs_store: dict[str, Any]):
             raise HTTPException(status_code=404, detail="Job not found")
 
         if job.results_on_disk:
-            from app.utils.job_results_store import (
-                load_paginated_job_results_from_disk,
-            )
-
-            # Load the first page to determine headers and total count
-            first_page, total = await run_in_threadpool(
-                load_paginated_job_results_from_disk,
-                job.id,
-                limit=_PAGINATION_CHUNK_SIZE,
-                offset=0,
-                file_path=job.results_file_path,
-            )
-            if not first_page:
-                raise HTTPException(status_code=400, detail="No results to export")
-
-            fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
-
-            async def _stream_csv_from_disk() -> AsyncIterator[str]:
-                output = io.StringIO()
-                writer = csv.DictWriter(output, fieldnames=fieldnames)
-                writer.writeheader()
-                yield output.getvalue()
-                output.seek(0)
-                output.truncate()
-
-                # Yield first page
-                for row in first_page:
-                    writer.writerow(_flat_row(row, fieldnames))
-                yield output.getvalue()
-                output.seek(0)
-                output.truncate()
-
-                # Stream remaining pages
-                offset = _PAGINATION_CHUNK_SIZE
-                while offset < total:
-                    page, _ = await run_in_threadpool(
-                        load_paginated_job_results_from_disk,
-                        job.id,
-                        limit=_PAGINATION_CHUNK_SIZE,
-                        offset=offset,
-                        file_path=job.results_file_path,
-                    )
-                    if not page:
-                        break
-                    for row in page:
-                        writer.writerow(_flat_row(row, fieldnames))
-                    yield output.getvalue()
-                    output.seek(0)
-                    output.truncate()
-                    offset += _PAGINATION_CHUNK_SIZE
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
 
             return StreamingResponse(
-                _stream_csv_from_disk(),
+                export_service.stream_csv_from_disk(job, load_paginated_job_results_from_disk),
                 media_type="text/csv",
                 headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"'},
             )
 
-        # In-memory results (small dataset)
-        if not job.results:
-            raise HTTPException(status_code=400, detail="No results to export")
-
-        output = io.StringIO()
-        fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(job.results)
-        writer = csv.DictWriter(output, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in job.results:
-            writer.writerow(_flat_row(row, fieldnames))
-
-        output.seek(0)
-        return Response(
-            content=output.getvalue(),
+        try:
+            body = export_service.build_csv_bytes(job)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return StreamingResponse(
+            iter([body]),
             media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"'},
         )
@@ -277,12 +272,15 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_usage(auth[1], "json", [job_id], request)
         except HTTPException:
             _record_export_outcome("json", False)
+            _log_export_access(auth[1], "json", [job_id], request, success=False)
             raise
         except Exception:
             _record_export_outcome("json", False)
+            _log_export_access(auth[1], "json", [job_id], request, success=False)
             raise
         else:
             _record_export_outcome("json", True)
+            _log_export_access(auth[1], "json", [job_id], request, success=True)
             return result
 
     async def _export_json_impl(job_id: str):
@@ -292,63 +290,20 @@ def create_exports_router(jobs_store: dict[str, Any]):
             raise HTTPException(status_code=404, detail="Job not found")
 
         if job.results_on_disk:
-            from app.utils.job_results_store import (
-                load_paginated_job_results_from_disk,
-            )
-
-            first_page, total = await run_in_threadpool(
-                load_paginated_job_results_from_disk,
-                job.id,
-                limit=_PAGINATION_CHUNK_SIZE,
-                offset=0,
-                file_path=job.results_file_path,
-            )
-            if not first_page:
-                raise HTTPException(status_code=400, detail="No results to export")
-
-            async def _stream_json_from_disk() -> AsyncIterator[str]:
-                yield "[\n"
-                # Yield first page
-                for i, row in enumerate(first_page):
-                    cleaned = _strip_system_fields([row])[0]
-                    prefix = "  " if i == 0 else ",  "
-                    yield prefix + json.dumps(cleaned, indent=2).replace("\n", "\n  ") + "\n"
-
-                # Stream remaining pages
-                offset = _PAGINATION_CHUNK_SIZE
-                idx = len(first_page)
-                while offset < total:
-                    page, _ = await run_in_threadpool(
-                        load_paginated_job_results_from_disk,
-                        job.id,
-                        limit=_PAGINATION_CHUNK_SIZE,
-                        offset=offset,
-                        file_path=job.results_file_path,
-                    )
-                    if not page:
-                        break
-                    for row in page:
-                        cleaned = _strip_system_fields([row])[0]
-                        prefix = ",  " if idx > 0 else "  "
-                        yield prefix + json.dumps(cleaned, indent=2).replace("\n", "\n  ") + "\n"
-                        idx += 1
-                    offset += _PAGINATION_CHUNK_SIZE
-                yield "]\n"
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
 
             return StreamingResponse(
-                _stream_json_from_disk(),
+                export_service.stream_json_from_disk(job, load_paginated_job_results_from_disk),
                 media_type="application/json",
                 headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"'},
             )
 
-        # In-memory results
-        if not job.results:
-            raise HTTPException(status_code=400, detail="No results to export")
-
-        cleaned = _strip_system_fields(list(job.results))
-        json_content = json.dumps(cleaned, indent=2)
-        return Response(
-            content=json_content,
+        try:
+            body = export_service.build_json_bytes(job)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return StreamingResponse(
+            iter([body]),
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"'},
         )
@@ -364,11 +319,14 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_usage(auth[1], "excel", [job_id], request)
         except HTTPException:
             _record_export_outcome("excel", False)
+            _log_export_access(auth[1], "excel", [job_id], request, success=False)
             raise
         except Exception:
             _record_export_outcome("excel", False)
+            _log_export_access(auth[1], "excel", [job_id], request, success=False)
             raise
         _record_export_outcome("excel", True)
+        _log_export_access(auth[1], "excel", [job_id], request, success=True)
         return result
 
     async def _export_excel_impl(job_id: str):
@@ -377,118 +335,30 @@ def create_exports_router(jobs_store: dict[str, Any]):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        def _build_excel_content():
-            wb = Workbook(write_only=True)
-            ws = wb.create_sheet(title="Scraped Data")
-
-            if job.results_on_disk:
-                from app.utils.job_results_store import (
-                    load_paginated_job_results_from_disk,
-                )
-
-                # Load the first page to determine headers and total count
-                first_page, total = load_paginated_job_results_from_disk(
-                    job.id,
-                    limit=_PAGINATION_CHUNK_SIZE,
-                    offset=0,
-                    file_path=job.results_file_path,
-                )
-                if not first_page:
-                    return None  # validated above or empty
-
-                fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
-
-                # Write headers
-                ws.append(fieldnames)
-
-                # Write first page data
-                for row in first_page:
-                    row_values = []
-                    for field in fieldnames:
-                        value = row.get(field)
-                        if isinstance(value, list):
-                            value = _safe_cell(", ".join(str(i) for i in value if i is not None))
-                        else:
-                            value = _safe_cell(value)
-                        row_values.append(value)
-                    ws.append(row_values)
-
-                # Stream remaining pages
-                offset = _PAGINATION_CHUNK_SIZE
-                while offset < total:
-                    page, _ = load_paginated_job_results_from_disk(
-                        job.id,
-                        limit=_PAGINATION_CHUNK_SIZE,
-                        offset=offset,
-                        file_path=job.results_file_path,
-                    )
-                    if not page:
-                        break
-                    for row in page:
-                        row_values = []
-                        for field in fieldnames:
-                            value = row.get(field)
-                            if isinstance(value, list):
-                                value = _safe_cell(", ".join(str(i) for i in value if i is not None))
-                            else:
-                                value = _safe_cell(value)
-                            row_values.append(value)
-                        ws.append(row_values)
-                    offset += _PAGINATION_CHUNK_SIZE
-            else:
-                # In-memory results
-                results_list = list(job.results)
-                if not results_list:
-                    return None  # no results to export
-
-                fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(results_list)
-
-                # Write headers
-                ws.append(fieldnames)
-
-                # Write data
-                for row in results_list:
-                    row_values = []
-                    for field in fieldnames:
-                        value = row.get(field)
-                        if isinstance(value, list):
-                            value = _safe_cell(", ".join(str(i) for i in value if i is not None))
-                        else:
-                            value = _safe_cell(value)
-                        row_values.append(value)
-                    ws.append(row_values)
-
-            # Save to bytes
-            output = io.BytesIO()
-            wb.save(output)
-            output.seek(0)
-            return output.getvalue()
-
-        # Validate data exists before entering threadpool
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
-            _first_page, _ = await run_in_threadpool(
-                load_paginated_job_results_from_disk,
-                job.id,
-                limit=1,
-                offset=0,
-                file_path=job.results_file_path,
-            )
-            if not _first_page:
-                raise HTTPException(status_code=400, detail="No results to export")
-        elif not job.results:
-            raise HTTPException(status_code=400, detail="No results to export")
+            try:
+                content_bytes = await run_in_threadpool(
+                    export_service.build_excel_bytes,
+                    job,
+                    load_paginated_job_results_from_disk,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        else:
+            try:
+                content_bytes = await run_in_threadpool(export_service.build_excel_bytes, job)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        content_bytes = await run_in_threadpool(_build_excel_content)
-
-        return Response(
-            content=content_bytes,
+        return StreamingResponse(
+            iter([content_bytes]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"'},
         )
 
-    # ─── Batch Export ────────────────────────────────────────────────────
+    # ─── Batch export ───────────────────────────────────────────────
 
     @router.post("/api/exports/batch")
     async def batch_export(
@@ -501,18 +371,24 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_usage(auth[1], f"batch_{body.format}", body.job_ids, request)
         except HTTPException:
             _record_export_outcome(f"batch_{body.format}", False)
+            _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=False)
             raise
         except Exception:
             _record_export_outcome(f"batch_{body.format}", False)
+            _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=False)
             raise
         else:
             _record_export_outcome(f"batch_{body.format}", True)
+            _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=True)
             return result
 
     async def _batch_export_impl(body: BatchExportRequest):
         fmt = body.format.lower()
         if fmt not in ("csv", "json", "xlsx"):
-            raise HTTPException(status_code=400, detail=f"Unsupported format '{fmt}'. Supported: csv, json, xlsx")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported format '{fmt}'. Supported: csv, json, xlsx",
+            )
 
         # Resolve all jobs — fail fast on any missing ID.
         missing: list[str] = []
@@ -528,7 +404,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
                 detail=f"Jobs not found: {', '.join(missing)}",
             )
 
-        # Resolve job metadata (name, on_disk, file_path) without loading results.
+        # Resolve job metadata (id, name, on_disk, file_path).
         job_meta: list[tuple[str, str, bool, str | None]] = []
         for _jid in body.job_ids:
             job = jobs_store.get(_jid)
@@ -537,150 +413,34 @@ def create_exports_router(jobs_store: dict[str, Any]):
             else:
                 job_meta.append((_jid, job.name or _jid, bool(job.results_on_disk), job.results_file_path))
 
-        # ── Build manifest with per-job status (E2) ────────────────────
-        manifest: list[dict[str, Any]] = []
-        for jid, jname, on_disk, fpath in job_meta:
-            entry: dict[str, Any] = {"job_id": jid, "job_name": jname, "status": "pending", "record_count": 0}
-            if on_disk:
-                from app.utils.job_results_store import (
-                    load_paginated_job_results_from_disk,
-                )
+        from app.utils.job_results_store import load_paginated_job_results_from_disk
 
-                first_page, total = await run_in_threadpool(
-                    load_paginated_job_results_from_disk,
-                    jid,
-                    limit=1,
-                    offset=0,
-                    file_path=fpath,
-                )
-                if first_page:
-                    entry["status"] = "included"
-                    entry["record_count"] = total
-                else:
-                    entry["status"] = "empty"
-            else:
-                job = jobs_store.get(jid)
-                if job and job.results:
-                    count = len(job.results)
-                    entry["status"] = "included"
-                    entry["record_count"] = count
-                    if count > 10000:
-                        entry["truncated"] = True
-                        entry["original_count"] = count
-                else:
-                    entry["status"] = "empty"
-            manifest.append(entry)
+        def _get_inmemory_results(jid: str) -> list[dict]:
+            job = jobs_store.get(jid)
+            return list(job.results) if job and job.results else []
+
+        def _get_inmemory_count(jid: str) -> int | None:
+            job = jobs_store.get(jid)
+            return len(job.results) if job and job.results else 0
+
+        manifest = await export_service.build_batch_manifest(
+            job_meta,
+            load_paginated_job_results_from_disk,
+            _get_inmemory_count,
+        )
+        fieldnames, has_any_data = await export_service.discover_fieldnames_union(
+            job_meta,
+            load_paginated_job_results_from_disk,
+            _get_inmemory_results,
+        )
+        if not has_any_data:
+            raise HTTPException(status_code=400, detail="None of the specified jobs have results to export")
 
         total_requested = len(manifest)
         total_included = sum(1 for e in manifest if e["status"] == "included")
         total_empty = sum(1 for e in manifest if e["status"] == "empty")
 
-        # ── Streaming fieldnames discovery ──────────────────────────────
-        # Load only the first page of each job to discover the union of
-        # fieldnames.  This avoids loading all results into memory.
-        fieldnames: list[str] = []
-        seen: set[str] = set()
-        has_any_data = False
-        for jid, _jname, on_disk, fpath in job_meta:
-            if on_disk:
-                from app.utils.job_results_store import (
-                    load_paginated_job_results_from_disk,
-                )
-
-                first_page, _ = await run_in_threadpool(
-                    load_paginated_job_results_from_disk,
-                    jid,
-                    limit=_PAGINATION_CHUNK_SIZE,
-                    offset=0,
-                    file_path=fpath,
-                )
-                if first_page:
-                    has_any_data = True
-                    cleaned = _strip_system_fields(first_page)
-                    for row in cleaned:
-                        for k in row:
-                            if k not in seen:
-                                seen.add(k)
-                                fieldnames.append(k)
-            else:
-                job = jobs_store.get(jid)
-                if job and job.results:
-                    has_any_data = True
-                    sample = list(job.results)[:_PAGINATION_CHUNK_SIZE]
-                    cleaned = _strip_system_fields(sample)
-                    for row in cleaned:
-                        for k in row:
-                            if k not in seen:
-                                seen.add(k)
-                                fieldnames.append(k)
-
-        if not has_any_data:
-            raise HTTPException(status_code=400, detail="None of the specified jobs have results to export")
-
-        # Also discover fieldnames from subsequent pages (small overhead).
-        for jid, _jname, on_disk, fpath in job_meta:
-            if on_disk:
-                from app.utils.job_results_store import (
-                    load_paginated_job_results_from_disk,
-                )
-
-                offset = _PAGINATION_CHUNK_SIZE
-                while True:
-                    page, total = await run_in_threadpool(
-                        load_paginated_job_results_from_disk,
-                        jid,
-                        limit=_PAGINATION_CHUNK_SIZE,
-                        offset=offset,
-                        file_path=fpath,
-                    )
-                    if not page:
-                        break
-                    cleaned = _strip_system_fields(page)
-                    for row in cleaned:
-                        for k in row:
-                            if k not in seen:
-                                seen.add(k)
-                                fieldnames.append(k)
-                    offset += _PAGINATION_CHUNK_SIZE
-                    if offset >= total:
-                        break
-
-        # ── Streaming page generator ────────────────────────────────────
-        # Yields (job_id, job_name, cleaned_page) tuples, streaming
-        # pages from disk one at a time so only one page is in memory.
-        async def _stream_pages():
-            for jid, jname, on_disk, fpath in job_meta:
-                if on_disk:
-                    from app.utils.job_results_store import (
-                        load_paginated_job_results_from_disk,
-                    )
-
-                    offset = 0
-                    while True:
-                        page, total = await run_in_threadpool(
-                            load_paginated_job_results_from_disk,
-                            jid,
-                            limit=_PAGINATION_CHUNK_SIZE,
-                            offset=offset,
-                            file_path=fpath,
-                        )
-                        if not page:
-                            break
-                        yield (jid, jname, _strip_system_fields(page))
-                        offset += _PAGINATION_CHUNK_SIZE
-                        if offset >= total:
-                            break
-                else:
-                    job = jobs_store.get(jid)
-                    if job and job.results:
-                        # Cap in-memory results to prevent OOM
-                        raw = list(job.results)[:10000]
-                        yield (jid, jname, _strip_system_fields(raw))
-
-        # ── Route to format-specific handler ────────────────────────────
-        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
-
-        # ── Common manifest headers (E2) ────────────────────────────────
+        ts = export_service.batch_export_timestamp()
         manifest_headers = {
             "X-Export-Total-Jobs": str(total_requested),
             "X-Export-Jobs-With-Data": str(total_included),
@@ -689,254 +449,43 @@ def create_exports_router(jobs_store: dict[str, Any]):
         }
 
         if fmt == "csv":
+            pages = export_service.iter_batch_pages(
+                job_meta,
+                load_paginated_job_results_from_disk,
+                _get_inmemory_results,
+            )
             return StreamingResponse(
-                _batch_csv_stream(_stream_pages(), fieldnames, body.flatten, ts),
+                export_service.batch_csv_stream(pages, fieldnames, body.flatten),
                 media_type="text/csv",
                 headers=manifest_headers,
             )
         if fmt == "json":
+            pages = export_service.iter_batch_pages(
+                job_meta,
+                load_paginated_job_results_from_disk,
+                _get_inmemory_results,
+            )
             return StreamingResponse(
-                _batch_json_stream(_stream_pages(), fieldnames, body.flatten, ts, manifest),
+                export_service.batch_json_stream(pages, body.flatten, manifest),
                 media_type="application/json",
                 headers=manifest_headers,
             )
-        # fmt == "xlsx"  # noqa: ERA001, RUF100
-        return await run_in_threadpool(_batch_xlsx, job_meta, fieldnames, body.flatten, manifest)
+        # Export as xlsx
+        content_bytes = await run_in_threadpool(
+            export_service.batch_xlsx,
+            job_meta,
+            fieldnames,
+            body.flatten,
+            manifest,
+            load_paginated_job_results_from_disk,
+            _get_inmemory_results,
+        )
+        from fastapi.responses import Response
 
-    def _batch_xlsx(
-        job_meta: list[tuple[str, str, bool, str | None]],
-        fieldnames: list[str],
-        flatten: bool,
-        manifest: list[dict[str, Any]] | None = None,
-    ) -> Response:
-        """Generate a batch Excel response.
-
-        When *flatten* is True, all rows go into a single "Combined"
-        sheet with a ``_source_job`` column. When False, each job gets
-        its own sheet named after the job (truncated to 31 chars).
-
-        A "Summary" sheet (E2) is added as the first sheet with
-        per-job status metadata.
-        """
-        wb = Workbook(write_only=True)
-
-        # E2: Add a Summary sheet with per-job manifest
-        ws_summary = wb.create_sheet(title="Summary")
-        ws_summary.append(["Job ID", "Job Name", "Status", "Record Count", "Truncated"])
-        for entry in manifest or []:
-            ws_summary.append(
-                [
-                    entry.get("job_id", ""),
-                    entry.get("job_name", ""),
-                    entry.get("status", ""),
-                    str(entry.get("record_count", 0)),
-                    str(entry.get("truncated", False)),
-                ],
-            )
-
-        def _row_values(row: dict[str, Any], fnames: list[str]) -> list[Any]:
-            vals: list[Any] = []
-            for f in fnames:
-                v = row.get(f)
-                if isinstance(v, list):
-                    vals.append(_safe_cell(", ".join(str(i) for i in v if i is not None)))
-                else:
-                    vals.append(_safe_cell(v))
-            return vals
-
-        def _stream_pages_sync():
-            for jid, jname, on_disk, fpath in job_meta:
-                rows_yielded = 0
-                if on_disk:
-                    from app.utils.job_results_store import (
-                        load_paginated_job_results_from_disk,
-                    )
-
-                    offset = 0
-                    while rows_yielded < 10000:
-                        limit = min(_PAGINATION_CHUNK_SIZE, 10000 - rows_yielded)
-                        page, total = load_paginated_job_results_from_disk(
-                            jid,
-                            limit=limit,
-                            offset=offset,
-                            file_path=fpath,
-                        )
-                        if not page:
-                            break
-                        yield jid, jname, _strip_system_fields(page)
-                        rows_yielded += len(page)
-                        offset += len(page)
-                        if offset >= total:
-                            break
-                else:
-                    job = jobs_store.get(jid)
-                    if job and job.results:
-                        raw = list(job.results)[:10000]
-                        yield jid, jname, _strip_system_fields(raw)
-
-        if flatten:
-            all_fnames = list(fieldnames)
-            all_fnames.append(_SOURCE_JOB_FIELD)
-            # Use the same collision-avoidance logic as the per-job
-            # branch below: a user-named job called exactly "Combined"
-            # would otherwise raise ``InvalidWorksheetTitle`` from
-            # openpyxl because the explicit title is duplicated with
-            # itself across the same export call. Pre-register the
-            # title in a one-element used-set so the loop is
-            # unambiguous.
-            used_flatten_names: set[str] = set()
-            base = "Combined"
-            sheet_name = base
-            suffix = 2
-            while sheet_name in used_flatten_names:
-                candidate = f"{base[: 31 - 4]} (2)" if suffix == 2 else f"{base[: 31 - 4]} ({suffix})"
-                sheet_name = candidate[:31]
-                suffix += 1
-                if suffix > 999:
-                    sheet_name = f"{base[: 31 - 4]}_x"
-                    break
-            used_flatten_names.add(sheet_name)
-            ws = wb.create_sheet(title=sheet_name)
-            ws.append(all_fnames)
-            for _, job_name, page in _stream_pages_sync():
-                for row in page:
-                    vals = _row_values(row, fieldnames)
-                    vals.append(job_name)
-                    ws.append(vals)
-        else:
-            # Track used sheet names to avoid ``InvalidWorksheetTitle`` from
-            # openpyxl when two jobs share the same 31-char prefix.
-            used_sheet_names: set[str] = set()
-            current_ws = None
-            current_jid = None
-            for jid, job_name, page in _stream_pages_sync():
-                if jid != current_jid:
-                    current_jid = jid
-                    base = (job_name or "Sheet")[:31] or "Sheet"
-                    sheet_name = base
-                    suffix = 2
-                    while sheet_name in used_sheet_names or sheet_name == "Sheet":
-                        candidate = f"{base[: 31 - 4]} (2)" if suffix == 2 and base != "Sheet" else f"{base[: 31 - 4]} ({suffix})"
-                        sheet_name = candidate[:31]
-                        suffix += 1
-                        if suffix > 999:
-                            sheet_name = f"{base[: 31 - 4]}_x"
-                            break
-                    used_sheet_names.add(sheet_name)
-                    current_ws = wb.create_sheet(title=sheet_name)
-                    current_ws.append(fieldnames)
-
-                if current_ws is not None:
-                    for row in page:
-                        current_ws.append(_row_values(row, fieldnames))
-
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
         return Response(
-            content=output.getvalue(),
+            content=content_bytes,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.xlsx"'},
         )
-
-    # ── Streaming batch generators (E1: memory-efficient) ────────────
-
-    async def _batch_csv_stream(
-        pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
-        fieldnames: list[str],
-        flatten: bool,
-        _ts: str,
-    ):
-        """Yield CSV chunks as a streaming generator.
-
-        Only one page of results is in memory at a time. The header is
-        written first (from the discovered fieldnames), then each page
-        is written row-by-row.
-        """
-        output = io.StringIO()
-        writer: csv.DictWriter | None = None
-
-        if flatten:
-            all_fieldnames = list(fieldnames)
-            all_fieldnames.append(_SOURCE_JOB_FIELD)
-            writer = csv.DictWriter(output, fieldnames=all_fieldnames)
-            writer.writeheader()
-            yield output.getvalue()
-            output.truncate(0)
-            output.seek(0)
-
-            async for _jid, job_name, page in pages:
-                for row in page:
-                    flat = _flat_row(row, fieldnames)
-                    flat[_SOURCE_JOB_FIELD] = job_name
-                    writer.writerow(flat)
-                # Yield periodically to keep memory bounded
-                chunk = output.getvalue()
-                if chunk:
-                    yield chunk
-                    output.truncate(0)
-                    output.seek(0)
-        else:
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-            yield output.getvalue()
-            output.truncate(0)
-            output.seek(0)
-
-            first_job = True
-            async for _jid, job_name, page in pages:
-                if not first_job:
-                    sep: dict[str, str] = dict.fromkeys(fieldnames, "")
-                    sep[fieldnames[0]] = f"--- {job_name} ---"
-                    writer.writerow(sep)
-                first_job = False
-                for row in page:
-                    writer.writerow(_flat_row(row, fieldnames))
-                chunk = output.getvalue()
-                if chunk:
-                    yield chunk
-                    output.truncate(0)
-                    output.seek(0)
-
-    async def _batch_json_stream(
-        pages: AsyncIterator[tuple[str, str, list[dict[str, Any]]]],
-        _fieldnames: list[str],
-        flatten: bool,
-        _ts: str,
-        manifest: list[dict[str, Any]] | None = None,
-    ):
-        """Yield JSON chunks as a streaming generator.
-
-        For flatten mode: yields a JSON array opening, then each row as
-        a JSON object, then the closing bracket.
-        For grouped mode: yields a JSON object with an ``exports`` array
-        and a ``manifest`` key (E2) with per-job status metadata.
-        """
-        if flatten:
-            yield "[\n"
-            first = True
-            async for _jid, job_name, page in pages:
-                for row in page:
-                    tagged = dict(row)
-                    tagged[_SOURCE_JOB_FIELD] = job_name
-                    if not first:
-                        yield ",\n"
-                    yield json.dumps(tagged)
-                    first = False
-            yield "\n]\n"
-        else:
-            yield '{\n  "manifest": '
-            yield json.dumps(manifest or [])
-            yield ',\n  "exports": [\n'
-            first_job = True
-            async for jid, job_name, page in pages:
-                if not first_job:
-                    yield ",\n"
-                first_job = False
-                # Stream each job's results as a JSON object
-                yield f"    {json.dumps({'job_id': jid, 'job_name': job_name, 'results': page})}"
-            yield "\n  ]\n}\n"
 
     return router

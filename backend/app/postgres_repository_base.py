@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 6
+_CURRENT_SCHEMA_VERSION = 7
 
 # Module-level exception tuple for DB operations so we don't swallow
 # programming errors with bare ``except Exception``.
@@ -154,6 +154,8 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "estimated_cost_usd": job.estimated_cost_usd or 0,
         "cancel_requested": job.cancel_requested,
         "created_by": job.created_by or "",
+        "org_id": job.org_id or "",
+        "project_id": job.project_id or "",
         "created_at": job.created_at or "",
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
@@ -216,6 +218,8 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "estimated_cost_usd": row.get("estimated_cost_usd", 0),
                 "cancel_requested": bool(row.get("cancel_requested", False)),
                 "created_by": row.get("created_by", "") or "",
+                "org_id": row.get("org_id", "") or "",
+                "project_id": row.get("project_id", "") or "",
                 "created_at": row.get("created_at", ""),
                 "completed_at": row.get("completed_at") or None,
                 "min_record_score": row.get("min_record_score", 0.35),
@@ -305,6 +309,8 @@ def ensure_required_tables(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_org_id ON jobs(org_id)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id)",
         "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC)",
     ]:
         try:
@@ -457,6 +463,30 @@ def ensure_schema(conn) -> None:
             # any historical collision (where the same worker_id had two
             # pids) is resolved by keeping the most recent row per pid.
             _migrate_worker_heartbeats_v6(conn)
+
+        if current < 7:
+            # v7 (P0-SAAS-001): add org_id and project_id columns for
+            # persistent API key tenant ownership. ``IF NOT EXISTS`` on
+            # the ALTER is idempotent and matches the SQLite v8
+            # migration. The indexes are created above in
+            # ``ensure_required_tables`` so they exist regardless of the
+            # ``current < _CURRENT_SCHEMA_VERSION`` branch.
+            try:
+                execute(conn, "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS org_id TEXT DEFAULT ''")
+            except _DB_OPS_ERRORS:
+                logger.debug("ALTER TABLE jobs ADD COLUMN org_id failed (ignored)")
+            try:
+                execute(conn, "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS project_id TEXT DEFAULT ''")
+            except _DB_OPS_ERRORS:
+                logger.debug("ALTER TABLE jobs ADD COLUMN project_id failed (ignored)")
+            try:
+                execute(conn, "ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS org_id TEXT DEFAULT ''")
+            except _DB_OPS_ERRORS:
+                logger.debug("ALTER TABLE recycle_bin ADD COLUMN org_id failed (ignored)")
+            try:
+                execute(conn, "ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS project_id TEXT DEFAULT ''")
+            except _DB_OPS_ERRORS:
+                logger.debug("ALTER TABLE recycle_bin ADD COLUMN project_id failed (ignored)")
 
         execute(conn, "DELETE FROM schema_version")
         execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))

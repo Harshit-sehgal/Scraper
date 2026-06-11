@@ -271,3 +271,51 @@ def test_failed_export_is_not_charged(client, monkeypatch) -> None:
 
     assert response.status_code == 404
     assert ledger.get_usage(operator_id, UsageType.EXPORT_GENERATED) == []
+
+
+def test_record_page_fetch_records_page_fetched_usage(monkeypatch) -> None:
+    from app.services.scraping import _record_page_fetch
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    job = Job(
+        id="fetch-test-job",
+        name="fetch-test",
+        created_by="user-page",
+        urls=["https://example.com"],
+        status=JobStatus.RUNNING,
+    )
+    _record_page_fetch(job, "https://example.com/page")
+
+    records = ledger.get_usage("user-page", UsageType.PAGE_FETCHED)
+    assert len(records) == 1
+    assert records[0].quantity == 1
+    assert records[0].metadata["url"] == "https://example.com/page"
+    assert records[0].metadata["job_id"] == "fetch-test-job"
+
+
+def test_record_page_fetch_skips_when_created_by_missing(monkeypatch) -> None:
+    from app.services.scraping import _record_page_fetch
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    job = Job(id="anon-fetch", name="anon-test", urls=["https://example.com"], status=JobStatus.RUNNING)
+    _record_page_fetch(job, "https://example.com/page")
+
+    assert ledger.get_usage("", UsageType.PAGE_FETCHED) == []
+
+
+def test_record_page_fetch_quota_exceeded_logs_warning(monkeypatch) -> None:
+    from app.services.scraping import _record_page_fetch
+
+    ledger = UsageLedger()
+    ledger.set_quota("user-quota", UsageType.PAGE_FETCHED, limit=0, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    job = Job(id="quota-job", name="quota-test", created_by="user-quota", urls=["https://example.com"], status=JobStatus.RUNNING)
+    _record_page_fetch(job, "https://example.com/page")
+
+    records = ledger.get_usage("user-quota", UsageType.PAGE_FETCHED)
+    assert len(records) == 0

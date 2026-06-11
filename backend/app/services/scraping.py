@@ -25,6 +25,33 @@ logger = logging.getLogger(__name__)
 ScrapeResult = tuple[int, list[dict], bool, dict]
 
 
+def _record_page_fetch(job: Any, url: str) -> None:
+    """Record a page-fetch usage event for billing/quota enforcement.
+
+    Called once per attempted URL scrape (not for domain-cooldown skips).
+    Failures are logged but never block the scraper — a broken usage ledger
+    must not prevent extraction.
+    """
+    user_id = getattr(job, "created_by", None) or getattr(job, "user_id", None) or ""
+    if not user_id:
+        return
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        get_usage_ledger().record_usage(
+            user_id,
+            UsageType.PAGE_FETCHED,
+            quantity=1,
+            metadata={"url": url, "job_id": getattr(job, "id", "")},
+            org_id=getattr(job, "org_id", "") or "",
+            project_id=getattr(job, "project_id", "") or "",
+        )
+    except ValueError:
+        logger.warning("Page-fetch quota exceeded for job %s URL %s", getattr(job, "id", ""), url)
+    except Exception as exc:
+        logger.debug("Page-fetch metering skipped: %s", exc)
+
+
 async def run_scraping_phase(
     job: Any,
     *,
@@ -194,6 +221,7 @@ async def run_scraping_phase(
                 await run_in_threadpool(persist_job_state_fn)
                 async with job_lock:
                     pass
+                _record_page_fetch(job, url)
                 await _mark_completed()
                 return idx, results, True, url_meta
             except asyncio.CancelledError:
@@ -205,6 +233,7 @@ async def run_scraping_phase(
                 await _safe_log(f"Timeout on {url}", level="warning")
                 logger.warning("Timeout for %s", url)
                 await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
+                _record_page_fetch(job, url)
                 await _mark_completed()
                 return idx, [], False, {}
             except Exception as e:
@@ -212,6 +241,7 @@ async def run_scraping_phase(
                 logger.exception("URL scrape failed: %s", url)
                 await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
                 await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
+                _record_page_fetch(job, url)
                 await _mark_completed()
                 return idx, [], False, {}
 

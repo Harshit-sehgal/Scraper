@@ -640,7 +640,7 @@ class TestExcelWorksheetCreation:
         # what we want for normal happy-path tests.
         transport = ASGITransport(app=test_app, raise_app_exceptions=False)
         async with AsyncClient(transport=transport, base_url="http://testserver") as c:
-            with mock_patch("app.routers.exports.Workbook") as mock_wb_cls:
+            with mock_patch("app.services.exports.Workbook") as mock_wb_cls:
                 mock_wb = mock_wb_cls.return_value
                 mock_wb.create_sheet.side_effect = RuntimeError("openpyxl rejected the sheet title")
                 resp = await c.get("/api/jobs/ws-broken/export/excel")

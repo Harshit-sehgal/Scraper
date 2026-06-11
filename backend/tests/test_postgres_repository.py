@@ -342,6 +342,85 @@ class TestPostgresSerialization:
         assert restored.total_records == original.total_records
         assert restored.error == original.error
 
+    def test_row_to_job_preserves_org_id_and_project_id(self) -> None:
+        """P0-SAAS-001: tenant ownership columns round-trip through the row mapping."""
+        from app.postgres_repository_base import row_to_job
+
+        row: dict[str, object] = {
+            "id": "saas-test-job",
+            "name": "SaaS tenant job",
+            "status": "completed",
+            "mode": "manual",
+            "topic": "",
+            "intent": "",
+            "urls": "[]",
+            "schema_fields": "[]",
+            "filters": "[]",
+            "results": "[]",
+            "logs": "[]",
+            "total_records": 0,
+            "filtered_records": 0,
+            "total_llm_calls": 0,
+            "error": "",
+            "warnings": "[]",
+            "quality_report": "{}",
+            "analysis": "",
+            "discovered_urls": "[]",
+            "selectors_map": "{}",
+            "search_params": "{}",
+            "max_pages": 0,
+            "progress_current": 0,
+            "progress_total": 0,
+            "estimated_cost_usd": 0,
+            "cancel_requested": False,
+            "created_by": "user-uuid-abc",
+            "org_id": "org-uuid-123",
+            "project_id": "project-uuid-456",
+            "created_at": "2026-06-11T10:00:00+00:00",
+            "completed_at": "",
+            "min_record_score": 0.35,
+            "acquisition_mode": "standard",
+            "location": "",
+            "preferred_domain": "",
+            "source_policy": "all_sources",
+            "max_per_domain": 4,
+            "origin_location": "",
+            "max_distance_km": None,
+            "pagination": False,
+            "deduplicate": True,
+            "deduplicate_field": "",
+            "started_at": "",
+            "results_on_disk": False,
+            "results_file_path": "",
+            "updated_at": "",
+            "deleted_at": None,
+        }
+        restored = row_to_job(row)
+        assert restored is not None
+        assert restored.org_id == "org-uuid-123"
+        assert restored.project_id == "project-uuid-456"
+        assert restored.created_by == "user-uuid-abc"
+
+    def test_job_to_row_includes_org_id_and_project_id(self) -> None:
+        """P0-SAAS-001: job_to_row must include the new tenant columns."""
+        from app.models import Job, JobStatus, ScrapeMode
+        from app.postgres_repository_base import job_to_row
+
+        job = Job(
+            id="saas-write-job",
+            name="SaaS write job",
+            mode=ScrapeMode.MANUAL,
+            urls=["https://example.com/data"],
+            status=JobStatus.COMPLETED,
+            created_by="user-uuid-xyz",
+            org_id="org-uuid-789",
+            project_id="project-uuid-012",
+        )
+        row = job_to_row(job)
+        assert row["org_id"] == "org-uuid-789"
+        assert row["project_id"] == "project-uuid-012"
+        assert row["created_by"] == "user-uuid-xyz"
+
     def test_row_to_job_preserves_created_by(self) -> None:
         _job_to_row, _row_to_job = self._import_postgres_module()
         if _job_to_row is None:

@@ -58,6 +58,10 @@ class User(BaseModel):
     password_hash: str = Field(default="", description="PBKDF2-SHA256 hash, never the raw password")
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     email_verified_at: str | None = None
+    aup_accepted_at: str | None = Field(
+        default=None,
+        description="ISO timestamp at which the user accepted the Acceptable Use Policy. None = not yet accepted.",
+    )
 
     @field_validator("email")
     @classmethod

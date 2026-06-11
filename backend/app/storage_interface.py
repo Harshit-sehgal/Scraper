@@ -34,6 +34,8 @@ _JOBS_COLUMNS_SQL = [
     "estimated_cost_usd REAL DEFAULT 0",
     "cancel_requested BOOLEAN DEFAULT FALSE",
     "created_by TEXT DEFAULT ''",
+    "org_id TEXT DEFAULT ''",
+    "project_id TEXT DEFAULT ''",
     "created_at TEXT DEFAULT ''",
     "completed_at TEXT DEFAULT ''",
     "min_record_score REAL DEFAULT 0.35",

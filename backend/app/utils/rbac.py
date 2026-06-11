@@ -23,11 +23,19 @@ class UserRole(StrEnum):
 
 @dataclass(frozen=True)
 class AuthContext:
-    """Authenticated request principal resolved from one shared decision path."""
+    """Authenticated request principal resolved from one shared decision path.
+
+    `org_id` and `project_id` are populated for persistent API keys (the
+    SaaS identity model in ``app.saas``). Env-backed API keys (legacy)
+    and dev bypass have empty values; ownership enforcement in routers
+    must fall back to ``user_id`` / ``created_by`` for those.
+    """
 
     role: UserRole
     user_id: str
     source: Literal["api_key", "session", "dev"]
+    org_id: str = ""
+    project_id: str = ""
 
 
 def _fingerprint_key(key: str) -> str:
@@ -66,6 +74,60 @@ def _extract_bearer_token(request: Request) -> str:
     return ""
 
 
+def _resolve_persistent_api_key_context(raw_key: str) -> AuthContext | None:
+    """Look up a raw API key in the persistent SaaS identity store.
+
+    Returns ``None`` if the key is empty, the store is unavailable, or
+    the key has not been issued. Successful lookups return an
+    ``AuthContext`` with ``user_id``, ``org_id``, and ``project_id``
+    populated from the issued key + project.
+
+    The role is derived from the key's scope: ``ADMIN`` → admin,
+    ``READ`` → user, ``WRITE`` → operator. ``user_id`` is the
+    key-issuing user so audit trails can attribute writes to the
+    human who created the key, not the project.
+    """
+    if not raw_key:
+        return None
+    try:
+        from app.saas.identity_store import get_identity_store
+        from app.saas.models import ApiKeyScope
+        from app.saas.service import ApiKeyService, hash_api_key
+    except ImportError:
+        return None
+    try:
+        store = get_identity_store()
+        service = ApiKeyService(store=store)
+        record = service.authenticate(raw_key)
+    except Exception as e:
+        logger.debug("Persistent API key lookup failed: %s", e)
+        return None
+    if record is None:
+        return None
+    role = {
+        ApiKeyScope.ADMIN: UserRole.ADMIN,
+        ApiKeyScope.WRITE: UserRole.OPERATOR,
+        ApiKeyScope.READ: UserRole.USER,
+    }.get(record.scope, UserRole.USER)
+    user_id = record.user_id or hash_api_key(record.key_hash)[:16]
+    return AuthContext(
+        role=role,
+        user_id=user_id,
+        source="api_key",
+        org_id=(record.project_id and _project_org(store, record.project_id)) or "",
+        project_id=record.project_id,
+    )
+
+
+def _project_org(store, project_id: str) -> str:
+    """Tiny helper to look up an org id for a project (lazy import)."""
+    try:
+        proj = store.get_project(project_id)
+    except Exception:
+        return ""
+    return proj.org_id if proj else ""
+
+
 def _resolve_api_key_context(request: Request) -> AuthContext | None:
     from app.config import settings
 
@@ -74,6 +136,14 @@ def _resolve_api_key_context(request: Request) -> AuthContext | None:
     bearer_token = _extract_bearer_token(request)
     operator_key = getattr(settings, "OPERATOR_API_KEY", "")
 
+    # 1. Try the persistent SaaS identity store first. This is the
+    #    forward path; env keys remain for self-hosted/internal mode.
+    for raw_key in (api_key_header, bearer_token, admin_key_header):
+        ctx = _resolve_persistent_api_key_context(raw_key)
+        if ctx is not None:
+            return ctx
+
+    # 2. Fall back to env-backed API keys (legacy / self-hosted).
     if (
         _is_match(api_key_header, settings.ADMIN_API_KEY)
         or _is_match(bearer_token, settings.ADMIN_API_KEY)
@@ -209,5 +279,27 @@ def require_role_with_user(allowed_roles: list[UserRole]):
                 detail=f"Permission denied. Required roles: {[r.value for r in allowed_roles]}. Your role: {role.value}.",
             )
         return role, user_id
+
+    return dependency
+
+
+def require_principal(allowed_roles: list[UserRole]):
+    """FastAPI route guard that returns the full P0-SAAS-001 principal.
+
+    Returns a 4-tuple ``(role, user_id, org_id, project_id)``. Use this
+    dependency on routes that need to enforce org/project ownership.
+    Env-backed API keys and dev bypass return empty ``org_id`` and
+    ``project_id`` so the caller falls back to the legacy
+    ``created_by``-based ownership check.
+    """
+
+    async def dependency(request: Request):
+        context = resolve_auth_context(request)
+        if context.role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied. Required roles: {[r.value for r in allowed_roles]}. Your role: {context.role.value}.",
+            )
+        return context.role, context.user_id, context.org_id, context.project_id
 
     return dependency

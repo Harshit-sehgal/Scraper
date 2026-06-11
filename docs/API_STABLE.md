@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-11 15:16:34 UTC
+**Generated:** 2026-06-11 17:20:43 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -76,10 +76,13 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 
 | Method | Path |
 | --- | --- |
+| DELETE | `/api/operator/denylist` |
+| GET | `/api/operator/denylist` |
 | GET | `/api/system/diagnostics/export` |
 | GET | `/api/system/rate-limit-stats` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
+| POST | `/api/operator/denylist` |
 | POST | `/api/system/csp-violations` |
 
 ## Session/Auth Routes
@@ -96,4 +99,11 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | --- | --- |
 | POST | `/api/exports/batch` |
 
-**Total routes:** 45
+## Other
+
+| Method | Path |
+| --- | --- |
+| GET | `/api/saas/aup/status` |
+| POST | `/api/saas/aup/accept` |
+
+**Total routes:** 50

@@ -59,6 +59,18 @@ logger = logging.getLogger(__name__)
 MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 
 
+def _extract_principal_attr(request: Request, attr: str) -> str:
+    """Best-effort extraction of a P0-SAAS-001 principal attribute for audit logs.
+
+    Reads from ``request.state.auth_context`` (set by
+    ``rbac.resolve_auth_context``) when present. Returns ``""`` if the
+    request has no resolved auth context (e.g. failed-auth events that
+    never got far enough to populate it).
+    """
+    cached = getattr(getattr(request, "state", None), "auth_context", None)
+    return str(getattr(cached, attr, "") or "")
+
+
 async def body_size_middleware(request: Request, call_next):
     """Limit request body size to prevent abuse.
 
@@ -144,6 +156,8 @@ async def api_key_middleware(request: Request, call_next):
                 resource=request.url.path,
                 outcome="failure",
                 details={"method": request.method, "has_bearer": bool(bearer_token)},
+                org_id=_extract_principal_attr(request, "org_id"),
+                project_id=_extract_principal_attr(request, "project_id"),
             )
             return JSONResponse(
                 status_code=exc.status_code,
@@ -163,6 +177,8 @@ async def api_key_middleware(request: Request, call_next):
                     "role": auth_context.role.value,
                     "source": auth_context.source,
                 },
+                org_id=auth_context.org_id,
+                project_id=auth_context.project_id,
             )
         except ValueError as exc:
             return JSONResponse(
@@ -177,6 +193,8 @@ async def api_key_middleware(request: Request, call_next):
                 resource=request.url.path,
                 outcome="success",
                 details={"role": auth_context.role.value, "method": request.method, "source": auth_context.source},
+                org_id=auth_context.org_id,
+                project_id=auth_context.project_id,
             )
     return await call_next(request)
 
