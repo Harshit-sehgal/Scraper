@@ -113,7 +113,7 @@ def _conn() -> Iterator:
                 from app.metrics_collector import record_error
 
                 record_error("database")
-            except Exception:  # noqa: RUF100, S110
+            except Exception:  # nosec B110  # noqa: RUF100, S110
                 pass
             raise
 
@@ -171,7 +171,7 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
                     from app.metrics_collector import record_error
 
                     record_error("database")
-                except Exception:  # noqa: RUF100, S110
+                except Exception:  # nosec B110  # noqa: RUF100, S110
                     pass
                 raise
 
