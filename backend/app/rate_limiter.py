@@ -273,7 +273,7 @@ class DatabaseSlidingWindowCounter:
                         (self.key, self.key, now, self.max_requests),
                     )
                 return bool(row and row.get("allowed"))
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
         else:
@@ -308,7 +308,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 return True
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
 
@@ -329,7 +329,7 @@ class DatabaseSlidingWindowCounter:
                     row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
                     count = row["count"] if row else 0
                     return max(0, self.max_requests - count)
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("Postgres rate limiter remaining() failed: %s", e)
                 return self._fallback_counter.remaining()
         else:
@@ -345,7 +345,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0, self.max_requests - count)
                     finally:
                         conn.close()
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("SQLite rate limiter remaining() failed: %s", e)
                 return self._fallback_counter.remaining()
 
@@ -366,7 +366,7 @@ class DatabaseSlidingWindowCounter:
                     if min_ts is None:
                         return 0.0
                     return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("Postgres rate limiter reset_in() failed: %s", e)
                 return self._fallback_counter.reset_in()
         else:
@@ -386,7 +386,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
                     finally:
                         conn.close()
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("SQLite rate limiter reset_in() failed: %s", e)
                 return self._fallback_counter.reset_in()
 
@@ -411,7 +411,7 @@ class DatabaseSlidingWindowCounter:
                         (self.key, cutoff),
                     )
                     return row is None
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("Postgres rate limiter is_expired() failed: %s", e)
                 return True
         else:
@@ -428,7 +428,7 @@ class DatabaseSlidingWindowCounter:
                         return row is None
                     finally:
                         conn.close()
-            except Exception as e:
+            except (OSError, RuntimeError, ImportError, ValueError) as e:
                 logger.warning("SQLite rate limiter is_expired() failed: %s", e)
                 return True
 
@@ -696,7 +696,7 @@ class RateLimiterMiddleware:
                 deleted = DatabaseSlidingWindowCounter.prune_all()
                 if deleted:
                     logger.debug("Rate limiter: pruned %d stale rate_limits row(s)", deleted)
-        except Exception:
+        except (OSError, RuntimeError, ImportError, ValueError):
             logger.debug("Rate limiter: rate_limits table prune_all failed (non-blocking)")
 
     # ── Rate-limit response builder ───────────────────────────────────

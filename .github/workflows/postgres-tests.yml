@@ -72,9 +72,13 @@ jobs:
     needs: [postgres-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: always() && secrets.TELEGRAM_TOKEN != '' && secrets.TELEGRAM_TO != ''
+    if: always()
     steps:
       - name: Send Telegram Message
+        if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_TO != ''
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
         uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
         with:
           to: ${{ secrets.TELEGRAM_TO }}
