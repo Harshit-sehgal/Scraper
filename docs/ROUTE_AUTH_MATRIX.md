@@ -4,7 +4,7 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 118
+**API route rows:** 125
 **Unknown auth rows:** 0
 **Unknown tenant-scope rows:** 0
 
@@ -16,6 +16,10 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/auth-profiles` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/auth-profiles/{profile_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/auth-profiles/{profile_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/complete-login` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/revoke` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/start-login` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/validate` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/intelligence/analyze-url` | protected | authenticated-user | none | yes | no | unknown | stable | protected by global /api middleware; no route-level role dependency |
@@ -57,6 +61,9 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/saas/plan` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/projects/{project_id}` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/projects/{project_id}/keys` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/projects/{project_id}/keys` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/saas/signup` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/scheduled` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/scheduled` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
