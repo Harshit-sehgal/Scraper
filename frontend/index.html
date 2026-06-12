@@ -523,6 +523,87 @@
 
             <!-- Analysis Results -->
             <div id="analyze-results" class="analyze-results hidden">
+              <!-- URL Intelligence Panel -->
+              <div id="url-intelligence-panel" class="url-intelligence-panel hidden">
+                <div class="intelligence-header">
+                  <span class="intelligence-title">🔍 URL Intelligence</span>
+                  <span class="intelligence-confidence" id="intelligence-confidence"></span>
+                </div>
+                <div class="intelligence-row">
+                  <span class="intelligence-label">Type:</span>
+                  <span class="intelligence-value" id="intelligence-classification">—</span>
+                </div>
+                <div class="intelligence-row">
+                  <span class="intelligence-label">Risk:</span>
+                  <span class="intelligence-value" id="intelligence-risk">—</span>
+                </div>
+                <div class="intelligence-row">
+                  <span class="intelligence-label">Recommended:</span>
+                  <span class="intelligence-value" id="intelligence-recommended-mode">—</span>
+                </div>
+                <div class="intelligence-row">
+                  <span class="intelligence-label">Reason:</span>
+                  <span class="intelligence-value" id="intelligence-reason">—</span>
+                </div>
+                <div class="intelligence-steps hidden" id="intelligence-steps-container">
+                  <div class="intelligence-label">Next Steps:</div>
+                  <ul id="intelligence-steps" class="intelligence-steps-list"></ul>
+                </div>
+                <div class="intelligence-actions hidden" id="intelligence-actions"></div>
+              </div>
+
+              <div id="workflow-builder-panel" class="workflow-builder-panel hidden">
+                <div class="workflow-builder-header">
+                  <span class="workflow-builder-title">Workflow Builder</span>
+                  <span class="workflow-builder-status" id="workflow-builder-status">draft</span>
+                </div>
+                <div class="workflow-builder-row">
+                  <label for="workflow-builder-start-url">Start URL</label>
+                  <input id="workflow-builder-start-url" type="url" readonly />
+                </div>
+                <div class="workflow-builder-meta">
+                  <div>
+                    <span>Original URL</span>
+                    <code id="workflow-builder-original-url">—</code>
+                  </div>
+                  <div>
+                    <span>Reason</span>
+                    <p id="workflow-builder-reason">—</p>
+                  </div>
+                </div>
+                <div class="workflow-builder-grid">
+                  <section>
+                    <h4>Detected Fields</h4>
+                    <div id="workflow-builder-fields" class="workflow-builder-fields">
+                      <div class="workflow-empty">No fields detected yet</div>
+                    </div>
+                  </section>
+                  <section>
+                    <h4>Manual Mapping</h4>
+                    <textarea id="workflow-builder-mapping" rows="8" spellcheck="false"></textarea>
+                  </section>
+                  <section>
+                    <h4>Preview</h4>
+                    <div id="workflow-builder-preview-table" class="workflow-builder-preview">
+                      <div class="workflow-empty">No preview run yet</div>
+                    </div>
+                  </section>
+                  <section>
+                    <h4>Step Timeline</h4>
+                    <ol id="workflow-builder-timeline" class="workflow-builder-timeline">
+                      <li>Draft created</li>
+                    </ol>
+                  </section>
+                </div>
+                <div id="workflow-builder-failure" class="workflow-builder-failure hidden"></div>
+                <div class="workflow-builder-actions">
+                  <button type="button" class="btn secondary small" disabled>Detect Fields</button>
+                  <button type="button" class="btn secondary small" disabled>Preview</button>
+                  <button type="button" class="btn primary small" disabled>Save Workflow</button>
+                  <button type="button" class="btn secondary small" disabled>Run Full Scrape</button>
+                </div>
+              </div>
+
               <!-- Page Info Bar -->
               <div class="analyze-info-bar" id="analyze-info-bar">
                 <span class="analyze-info-item" id="ai-structure">—</span>

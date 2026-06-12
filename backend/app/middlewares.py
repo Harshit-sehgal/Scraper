@@ -112,7 +112,7 @@ async def body_size_middleware(request: Request, call_next):
     async def replay_body():
         nonlocal replayed
         if replayed:
-            return {"type": "http.request", "body": b"", "more_body": False}
+            return {"type": "http.disconnect"}
         replayed = True
         return {"type": "http.request", "body": body, "more_body": False}
 
@@ -137,6 +137,10 @@ async def api_key_middleware(request: Request, call_next):
         # They use their own auth logic (exchanging key for cookie, or
         # returning session state from the cookie itself).
         if request.url.path in ("/api/session", "/api/session/me"):
+            return await call_next(request)
+        # Self-service account signup is intentionally public. It remains
+        # covered by body-size limits and the global rate limiter.
+        if request.url.path == "/api/saas/signup":
             return await call_next(request)
         bearer_token = None
         auth_header = request.headers.get("Authorization", "")

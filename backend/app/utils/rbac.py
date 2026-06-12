@@ -303,3 +303,35 @@ def require_principal(allowed_roles: list[UserRole]):
         return context.role, context.user_id, context.org_id, context.project_id
 
     return dependency
+
+
+def can_access_scoped_resource(
+    role: UserRole,
+    user_id: str,
+    org_id: str = "",
+    project_id: str = "",
+    *,
+    resource_owner_id: str | None = "",
+    resource_org_id: str | None = "",
+    resource_project_id: str | None = "",
+) -> bool:
+    """Return whether an authenticated principal can access a scoped resource.
+
+    Admins can access all resources. Env-backed operators also retain
+    all-access because they have no org/project scope. Persistent SaaS WRITE
+    keys map to operator but carry org/project ids, so they remain scoped.
+    """
+    if role == UserRole.ADMIN:
+        return True
+    if role == UserRole.OPERATOR and not org_id and not project_id:
+        return True
+
+    owner = str(resource_owner_id or "")
+    resource_org = str(resource_org_id or "")
+    resource_project = str(resource_project_id or "")
+
+    if project_id and resource_project:
+        return project_id == resource_project
+    if org_id and resource_org:
+        return org_id == resource_org
+    return bool(owner) and owner == user_id

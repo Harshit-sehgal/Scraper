@@ -32,6 +32,7 @@ from app.middlewares import (
     latency_tracking_middleware,
     rate_limiter,
 )
+from app.routers.auth_profiles import router as auth_profiles_router
 
 # NOTE: app.routers.experimental is intentionally NOT imported at module
 # load time. It is imported lazily inside configure_routes() so that the
@@ -39,11 +40,15 @@ from app.middlewares import (
 # loaded at startup when ENABLE_EXPERIMENTAL_ROUTES is False.
 from app.routers.exports import create_exports_router
 from app.routers.health import router as health_router
+from app.routers.intelligence import router as intelligence_router
 from app.routers.jobs import create_jobs_router
 from app.routers.operator import router as operator_router
+from app.routers.scheduled_monitoring import router as scheduled_monitoring_router
 from app.routers.scraper import router as scraper_router
 from app.routers.session import router as session_router
 from app.routers.system import router as system_router
+from app.routers.workflow import draft_router as workflow_draft_router
+from app.routers.workflow import router as workflow_router
 from app.saas.router import router as saas_router
 from app.services.job_runner import run_job
 from app.storage_interface import get_job_repository
@@ -146,6 +151,11 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(system_router)
     app.include_router(health_router)
     app.include_router(session_router)
+    app.include_router(intelligence_router)
+    app.include_router(workflow_router)
+    app.include_router(workflow_draft_router)
+    app.include_router(auth_profiles_router)
+    app.include_router(scheduled_monitoring_router)
 
     # Experimental / research routes — gated on the same flag that gates
     # the import-time subsystem initialization. Including this router
@@ -181,6 +191,24 @@ def create_app() -> FastAPI:
     _docs_url = None if settings.ENV.lower() == "production" else "/docs"
     _redoc_url = None if settings.ENV.lower() == "production" else "/redoc"
     _openapi_url = None if settings.ENV.lower() == "production" else "/openapi.json"
+
+    # ─── P0 safety: fail closed in production if unsafe settings are enabled ──────
+    if settings.ENV.lower() == "production":
+        if settings.ALLOW_INSECURE_DEV_AUTH:
+            msg = (
+                "ALLOW_INSECURE_DEV_AUTH must be False in production. "
+                "When enabled, any request is treated as admin. "
+                "Set DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false and restart."
+            )
+            raise RuntimeError(msg)
+        if not settings.SESSION_SECRET:
+            msg = (
+                "SESSION_SECRET must be set in production. "
+                "When empty, session signing falls back to ADMIN_API_KEY, "
+                "which is predictable and a session-forgery risk. "
+                "Set DATAFORGE_SESSION_SECRET to a long random value and restart."
+            )
+            raise RuntimeError(msg)
 
     app_instance = FastAPI(
         title="DataForge — Structured Data Extraction API",

@@ -11,6 +11,8 @@ import {
   renderAnalysisInfo,
   renderFieldList,
   renderAcquisitionBanner,
+  renderIntelligencePanel,
+  renderWorkflowDraftPanel,
 } from "./analyzer.js";
 
 // ─── Setup / Teardown ──────────────────────────────────────────────────────
@@ -28,6 +30,28 @@ beforeEach(() => {
     <div id="ai-antibot"></div>
     <div id="ai-fetch-time"></div>
     <div id="acquisition-banner" class="hidden"></div>
+    <div id="url-intelligence-panel" class="hidden">
+      <span id="intelligence-confidence"></span>
+      <span id="intelligence-classification"></span>
+      <span id="intelligence-risk"></span>
+      <span id="intelligence-recommended-mode"></span>
+      <span id="intelligence-reason"></span>
+      <div id="intelligence-steps-container" class="hidden">
+        <ul id="intelligence-steps"></ul>
+      </div>
+      <div id="intelligence-actions" class="hidden"></div>
+    </div>
+    <div id="workflow-builder-panel" class="hidden">
+      <span id="workflow-builder-status"></span>
+      <input id="workflow-builder-start-url" />
+      <code id="workflow-builder-original-url"></code>
+      <p id="workflow-builder-reason"></p>
+      <div id="workflow-builder-fields"></div>
+      <textarea id="workflow-builder-mapping"></textarea>
+      <div id="workflow-builder-preview-table"></div>
+      <ol id="workflow-builder-timeline"></ol>
+      <div id="workflow-builder-failure" class="hidden"></div>
+    </div>
   `;
 });
 
@@ -263,5 +287,86 @@ describe("renderAcquisitionBanner()", () => {
     const banner = document.getElementById("acquisition-banner");
     expect(banner.classList.contains("direct")).toBe(true);
     expect(banner.innerHTML).toContain("Page loaded successfully");
+  });
+});
+
+// ─── renderIntelligencePanel ───────────────────────────────────────────────
+
+describe("renderIntelligencePanel()", () => {
+  it("renders normal URL direct scrape recommendation", () => {
+    renderIntelligencePanel({
+      classifications: [{ type: "normal_static_page", confidence: 0.95, evidence: "No special signals detected." }],
+      risk_level: "low",
+      recommended_mode: "direct_scrape",
+      user_message: "This looks like a normal page. Recommended mode: Direct Scrape.",
+      next_steps: ["Preview extraction before full run."],
+    });
+
+    expect(document.getElementById("intelligence-classification").textContent).toContain("normal static page");
+    expect(document.getElementById("intelligence-recommended-mode").textContent).toContain("direct scrape");
+    expect(document.getElementById("intelligence-actions").innerHTML).toContain("Continue with Direct Scrape");
+  });
+
+  it("renders session URL workflow choices without raw token values", () => {
+    renderIntelligencePanel({
+      url: "https://example.com/search/results?sessionId=abc1...x789",
+      classifications: [{ type: "session_bound_url", confidence: 0.95, evidence: "sessionId detected" }],
+      risk_level: "high",
+      recommended_mode: "workflow_replay_recommended",
+      user_message: "This URL looks temporary because it contains sessionId. Direct scraping may fail later.",
+      technical_findings: ["Temporary parameter detected: sessionId=abc1...x789"],
+      suggested_start_urls: [{ url: "https://example.com/search", confidence: 0.72 }],
+    });
+
+    const panel = document.getElementById("url-intelligence-panel");
+    expect(panel.textContent).toContain("sessionId");
+    expect(panel.innerHTML).toContain("Try Direct Scrape Once");
+    expect(panel.innerHTML).toContain("Create Reliable Workflow");
+    expect(panel.innerHTML).not.toContain("abc123xyz789");
+  });
+
+  it("renders blocked URL state with disabled action", () => {
+    renderIntelligencePanel({
+      classifications: [{ type: "unsafe_url", confidence: 1, evidence: "Safety validation rejected this target." }],
+      risk_level: "blocked",
+      recommended_mode: "blocked_or_unsafe",
+      user_message: "This URL is blocked by the safety policy.",
+      next_steps: ["Choose a public http(s) URL."],
+    });
+
+    expect(document.getElementById("intelligence-risk").textContent).toBe("Blocked");
+    expect(document.getElementById("intelligence-actions").innerHTML).toContain("disabled");
+    expect(document.getElementById("intelligence-actions").innerHTML).toContain("Blocked by safety policy");
+  });
+});
+
+// ─── renderWorkflowDraftPanel ──────────────────────────────────────────────
+
+describe("renderWorkflowDraftPanel()", () => {
+  it("renders a workflow replay draft handoff with redacted original URL", () => {
+    renderWorkflowDraftPanel({
+      status: "draft",
+      original_url: "https://example.com/search/results?sessionId=abc1...x789",
+      selected_start_url: "https://example.com/search",
+      detected_reason: "This URL looks temporary because it contains sessionId.",
+      recommended_start_urls: [{ url: "https://example.com/search", confidence: 0.72 }],
+      detected_fields: [
+        {
+          label: "Keyword",
+          selector: "#q",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    const panel = document.getElementById("workflow-builder-panel");
+    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(document.getElementById("workflow-builder-status").textContent).toBe("draft");
+    expect(document.getElementById("workflow-builder-start-url").value).toBe("https://example.com/search");
+    expect(document.getElementById("workflow-builder-original-url").textContent).toContain("abc1...x789");
+    expect(document.getElementById("workflow-builder-original-url").textContent).not.toContain("abc123xyz789");
+    expect(document.getElementById("workflow-builder-fields").textContent).toContain("Keyword");
+    expect(document.getElementById("workflow-builder-mapping").value).toContain("suggested_start_urls");
+    expect(document.getElementById("workflow-builder-timeline").textContent).toContain("Draft created");
   });
 });

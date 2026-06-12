@@ -1,7 +1,15 @@
 # Testing
 
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> Current test health must be checked through `docs/AGENT_TRUTH.md`,
+> `docs/VALIDATION.md`, and the latest `artifacts/validation/` reports.
+
 **Last refreshed:** 2026-06-08
-**Status:** Current local testing truth
+**Status:** Historical local testing guide
 
 Use explicit environment variables so local `.env` files do not change results.
 
@@ -23,7 +31,7 @@ python3 -m coverage report --fail-under=60
 
 ## Latest Results
 
-For the latest verified test counts, test run statuses, and benchmark results across SQLite, Postgres, Playwright browser, and Golden Dataset live suites, see [PROJECT_STATUS.md](../PROJECT_STATUS.md).
+For the latest verified test counts and command results, see [AGENT_TRUTH.md](AGENT_TRUTH.md) and [latest_summary.md](../artifacts/validation/latest_summary.md).
 
 ## Optional Groups
 

@@ -25,7 +25,15 @@ import {
   renderFilteredResults,
   syncResultsScrollSlider,
 } from "./js/results.js";
-import { analyzeURL, toggleAllFields, applyAnalyzedFields, clearAnalysis } from "./js/analyzer.js";
+import {
+  analyzeURL,
+  toggleAllFields,
+  applyAnalyzedFields,
+  clearAnalysis,
+  continueWithDirectScrape,
+  createWorkflowDraftFromAnalysis,
+  showAuthProfileEntryNotice,
+} from "./js/analyzer.js";
 import {
   initForm,
   addField,
@@ -319,6 +327,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         break;
       case "clear-analysis":
         clearAnalysis();
+        break;
+      case "url-direct-scrape":
+        continueWithDirectScrape();
+        break;
+      case "url-create-workflow-draft":
+        createWorkflowDraftFromAnalysis();
+        break;
+      case "url-auth-profile":
+        showAuthProfileEntryNotice();
         break;
       case "set-mode":
         if (mode) setMode(mode);

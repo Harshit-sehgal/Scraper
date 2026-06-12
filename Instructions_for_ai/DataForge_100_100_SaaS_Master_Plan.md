@@ -1,5 +1,13 @@
 # DataForge Scraper - 100/100 SaaS Readiness Master Plan
 
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> 100/100 SaaS-readiness, production-readiness, and issue-count claims in this file are not automatically trusted.
+> Current readiness must be checked through `docs/AGENT_TRUTH.md` and the latest validation reports.
+
 **Prepared for:** Harshit Sehgal
 **Prepared on:** 2026-06-09
 **Repository inspected:** `/mnt/data/Scraper-main(18).zip`, extracted to `/mnt/data/scraper_analysis/Scraper-main`

@@ -1,5 +1,13 @@
 # Limitations
 
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> Test-count, benchmark, production, and deployment-readiness claims in this file are not automatically trusted.
+> Current readiness must be checked through `docs/AGENT_TRUTH.md` and the latest validation reports.
+
 **Last refreshed:** 2026-06-08
 
 DataForge Scraper is a configurable extraction platform, not an all-powerful scraper.
@@ -14,7 +22,7 @@ DataForge Scraper is a configurable extraction platform, not an all-powerful scr
 
 ## Validation Limits
 
-- Safe SQLite tests: `3025 passed, 78 skipped, 0 failed` (100% clean pass — see PROJECT_STATUS.md).
+- Safe SQLite tests: historical claim `3025 passed, 78 skipped, 0 failed`; see `docs/AGENT_TRUTH.md` for current validation.
 - Postgres tests passed in prior sessions under `--run-postgres` (rate-limiter collisions resolved).
 - Browser e2e tests were freshly validated passing: `10 passed, 0 failed in 10.11s` under `--run-browser`.
 - Benchmark pytest package has smoke/config tests: `1 passed, 2 skipped`.
