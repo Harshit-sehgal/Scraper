@@ -1099,6 +1099,10 @@ claimed.
 
 ### Action taken
 - Fixed compilation syntax error in `backend/app/saas/router.py` (unterminated string literal at line 726).
+- Resolved duplicate `PlanTier` and `PlanInfoResponse` class definitions in `backend/app/saas/router.py`.
+- Fixed type signature unpack and lookup issues in `ApiKeyService.issue` and key retrieval in `backend/app/saas/router.py`.
+- Cleaned up Ruff format & lint warnings across `backend/app/data_quality.py`, `backend/app/pagination_executor.py`, and `verify_compile.py`.
+- Regenerated route inventories (`docs/ROUTE_INVENTORY.md`, `artifacts/audit/ROUTE_INVENTORY.json`) and route auth matrices (`docs/ROUTE_AUTH_MATRIX.md`, `artifacts/audit/ROUTE_AUTH_MATRIX.json`).
 - Ran baseline validation suite to verify all checks pass.
 
 ### Command Evidence
@@ -1107,3 +1111,4 @@ claimed.
 | --- | ---: | --- |
 | `python3 scripts/validate_local.py --quick` (before fix) | 1 | FAIL (compileall & architecture_validator syntax error) |
 | `python3 scripts/validate_local.py --quick` (after fix) | 0 | PASS |
+| `python3 scripts/generate_route_inventory.py && python3 scripts/generate_route_auth_matrix.py` | 0 | PASS (matrix unknown_auth=0, unknown_tenant=0) |

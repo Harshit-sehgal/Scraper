@@ -2,22 +2,26 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-12 19:35:53 UTC
+**Generated:** 2026-06-12 21:39:05 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
 development docs/static routes, health/readiness routes, and session/auth routes.
 
-**Total route rows:** 128
+**Total route rows:** 135
 
 ## Stable Api Routes
 
 | Method | Path | Module | Handler | Boundary | Access | Role | Dependency | Request Model | Response Model | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `GET` | `/api/auth-profiles` | `app.routers.auth_profiles` | `list_auth_profiles` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/auth-profiles` | `app.routers.auth_profiles` | `create_auth_profile` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/auth-profiles` | `app.routers.auth_profiles` | `list_auth_profiles` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles` | `app.routers.auth_profiles` | `create_auth_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `DELETE` | `/api/auth-profiles/{profile_id}` | `app.routers.auth_profiles` | `delete_auth_profile` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/auth-profiles/{profile_id}` | `app.routers.auth_profiles` | `get_auth_profile` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/auth-profiles/{profile_id}` | `app.routers.auth_profiles` | `get_auth_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/complete-login` | `app.routers.auth_profiles` | `complete_login` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/revoke` | `app.routers.auth_profiles` | `revoke_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/start-login` | `app.routers.auth_profiles` | `start_login` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/auth-profiles/{profile_id}/validate` | `app.routers.auth_profiles` | `validate_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/discover` | `app.routers.jobs_write` | `discover` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | `app.routers.exports` | `batch_export` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/intelligence/analyze-url` | `app.routers.intelligence` | `analyze_url_endpoint` | stable | protected | authenticated-user |  |  |  | protected by global /api middleware; no route-level role dependency |
@@ -53,6 +57,9 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/saas/plan` | `app.saas.router` | `get_plan_info` | stable | protected | authenticated-user | require_role_with_user |  | PlanInfoResponse | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects` | `app.saas.router` | `create_project` | stable | protected | operator-or-admin | require_role_with_user |  | ProjectResponse | route dependency accepts admin/operator |
 | `GET` | `/api/saas/projects/{project_id}` | `app.saas.router` | `get_project` | stable | protected | authenticated-user | require_role_with_user |  | ProjectResponse | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/projects/{project_id}/keys` | `app.saas.router` | `list_project_api_keys` | stable | protected | authenticated-user | require_role_with_user |  | ApiKeyListResponse | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/projects/{project_id}/keys` | `app.saas.router` | `create_api_key` | stable | protected | operator-or-admin | require_role_with_user |  | ApiKeyCreateResponse | route dependency accepts admin/operator |
+| `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | `app.saas.router` | `revoke_api_key` | stable | protected | operator-or-admin | require_role_with_user |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/scheduled` | `app.routers.scheduled_monitoring` | `list_scheduled_jobs` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/scheduled` | `app.routers.scheduled_monitoring` | `create_scheduled_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `DELETE` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `delete_scheduled_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
