@@ -326,3 +326,283 @@ class Job(BaseModel):
     results_file_path: str | None = Field(default=None, description="Path to the compressed results file")
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
     acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan")
+
+
+# ─── Workflow System ──────────────────────────────────────────────────────
+
+
+class WorkflowStatus(StrEnum):
+    """Status of a saved workflow."""
+
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    FAILED = "failed"
+    ARCHIVED = "archived"
+    DISABLED = "disabled"
+
+
+class WorkflowStepType(StrEnum):
+    """Type of action in a workflow step."""
+
+    GOTO = "goto"
+    OPEN = "goto"
+    CLICK = "click"
+    FILL = "fill"
+    SELECT = "select"
+    CHECK = "check"
+    UNCHECK = "uncheck"
+    PRESS = "press"
+    SCROLL = "scroll"
+    WAIT = "wait_for_timeout_limited"
+    WAIT_FOR_URL = "wait_for_url"
+    WAIT_FOR_SELECTOR = "wait_for_selector"
+    WAIT_FOR_TEXT = "wait_for_text"
+    WAIT_FOR_TIMEOUT_LIMITED = "wait_for_timeout_limited"
+    EXTRACT = "extract"
+
+
+class WorkflowStep(BaseModel):
+    """A single step in a scraping workflow."""
+
+    step_type: WorkflowStepType = Field(..., description="Action type for this step")
+    selector: str = Field("", description="CSS or XPath selector for the target element", max_length=500)
+    value: str = Field("", description="Value to fill in or select", max_length=500)
+    description: str = Field("", description="Human-readable description of this step", max_length=255)
+    order: int = Field(0, ge=0, description="Execution order within the workflow")
+
+    @field_validator("selector")
+    @classmethod
+    def validate_selector(cls, v: str) -> str:
+        if v and len(v) > 500:
+            msg = "Selector must be at most 500 characters"
+            raise ValueError(msg)
+        return v
+
+
+class WorkflowPaginationConfig(BaseModel):
+    """Pagination configuration for a workflow."""
+
+    enabled: bool = Field(False, description="Whether pagination is enabled")
+    strategy: str = Field(
+        "next_button",
+        description="Pagination strategy: next_button, page_number, url_pattern, infinite_scroll",
+    )
+    max_pages: int = Field(10, ge=1, le=100, description="Maximum pages to follow")
+    stop_condition: str = Field("none", description="Stop condition: none, no_more_records, duplicate_threshold, custom")
+    selector: str = Field("", description="Selector for next button or page links", max_length=500)
+
+
+class Workflow(BaseModel):
+    """A saved scraping workflow that can be replayed."""
+
+    # Identity
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(..., description="Human-readable workflow name", max_length=255)
+    description: str = Field("", description="Optional workflow description", max_length=1000)
+
+    # Ownership
+    user_id: str = Field(default="", description="Creator user ID")
+    org_id: str = Field(default="", description="Organization ID for multi-tenant isolation")
+    project_id: str = Field(default="", description="Project ID for grouping")
+
+    # Target
+    mode: str = Field(default="workflow_replay", description="Workflow execution mode", max_length=64)
+    domain: str = Field(default="", description="Target domain for this workflow", max_length=255)
+    start_url: str = Field(default="", description="Starting URL for replay", max_length=2048)
+    original_url: str = Field(default="", description="Original URL that inspired this workflow", max_length=2048)
+
+    # Workflow definition
+    search_params: dict[str, str] = Field(default_factory=dict, description="Search parameters for form submission")
+    steps: list[WorkflowStep] = Field(default_factory=list, description="Ordered list of workflow steps")
+    extraction_schema: list[SchemaField] = Field(default_factory=list, description="Fields to extract after replay")
+    pagination_config: WorkflowPaginationConfig = Field(
+        default_factory=WorkflowPaginationConfig,
+        description="Pagination settings",
+    )
+
+    # Auth
+    auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
+
+    # Status
+    status: WorkflowStatus = Field(default=WorkflowStatus.DRAFT, description="Current workflow status")
+    version: int = Field(1, ge=1, description="Workflow version for change tracking")
+
+    # Timestamps
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    last_run_at: str | None = Field(default=None, description="When this workflow was last executed")
+    last_success_at: str | None = Field(default=None, description="When this workflow last completed successfully")
+    last_failure_reason: str | None = Field(default=None, description="Last workflow failure reason")
+    last_run_job_id: str | None = Field(default=None, description="ID of the last job created from this workflow")
+
+    # Statistics
+    total_runs: int = Field(0, ge=0, description="Total number of times this workflow has been run")
+    success_runs: int = Field(0, ge=0, description="Number of successful executions")
+
+    @model_validator(mode="after")
+    def validate_workflow(self):
+        if len(self.steps) > 100:
+            msg = "Workflow cannot have more than 100 steps"
+            raise ValueError(msg)
+        if len(self.search_params) > 50:
+            msg = "search_params cannot have more than 50 keys"
+            raise ValueError(msg)
+        return self
+
+
+class WorkflowCreate(BaseModel):
+    """Request body to create a new workflow."""
+
+    name: str = Field(..., description="Human-readable workflow name", max_length=255)
+    description: str = Field("", max_length=1000)
+    mode: str = Field(default="workflow_replay", max_length=64)
+    start_url: str = Field(default="", max_length=2048)
+    original_url: str = Field(default="", max_length=2048)
+    search_params: dict[str, str] = Field(default_factory=dict)
+    steps: list[WorkflowStep] = Field(default_factory=list)
+    extraction_schema: list[SchemaField] = Field(default_factory=list)
+    pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)
+
+    @model_validator(mode="after")
+    def validate_create(self):
+        if not self.name or not self.name.strip():
+            msg = "Workflow name is required"
+            raise ValueError(msg)
+        if len(self.steps) > 100:
+            msg = "Workflow cannot have more than 100 steps"
+            raise ValueError(msg)
+        if len(self.search_params) > 50:
+            msg = "search_params cannot have more than 50 keys"
+            raise ValueError(msg)
+        return self
+
+
+class WorkflowUpdate(BaseModel):
+    """Request body to update an existing workflow."""
+
+    name: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=1000)
+    mode: str | None = Field(default=None, max_length=64)
+    start_url: str | None = Field(default=None, max_length=2048)
+    original_url: str | None = Field(default=None, max_length=2048)
+    search_params: dict[str, str] | None = Field(default=None)
+    steps: list[WorkflowStep] | None = Field(default=None)
+    extraction_schema: list[SchemaField] | None = Field(default=None)
+    pagination_config: WorkflowPaginationConfig | None = Field(default=None)
+    status: WorkflowStatus | None = Field(default=None)
+
+
+# ─── Auth Profiles ────────────────────────────────────────────────────────
+
+
+class AuthProfileStatus(StrEnum):
+    """Status of an auth profile."""
+
+    PENDING_LOGIN = "pending_login"
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    REVOKED = "revoked"
+    FAILED = "failed"
+
+
+class AuthProfile(BaseModel):
+    """Stored browser session for authenticated scraping.
+
+    Encrypted ``storage_state`` is never exposed in API responses;
+    it is only decrypted inside the job runner when needed.
+    """
+
+    # Identity
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(..., description="Human-readable profile name", max_length=255)
+    description: str = Field("", max_length=1000)
+
+    # Ownership
+    user_id: str = Field(default="", description="Owner user ID")
+    org_id: str = Field(default="", description="Organization ID")
+    project_id: str = Field(default="", description="Project ID")
+
+    # Target domain (enforced to prevent cross-domain leakage)
+    domain: str = Field(..., description="Domain this auth profile is restricted to", max_length=255)
+
+    # Session state (opaque to the API; encrypted at rest)
+    encrypted_storage_state: str = Field(
+        "",
+        description="Base64-encoded encrypted Playwright storage state",
+        max_length=100000,
+    )
+    encryption_key_version: str = Field("", description="Version of the encryption key used")
+
+    # Status
+    status: AuthProfileStatus = AuthProfileStatus.PENDING_LOGIN
+    failure_reason: str = Field("", max_length=1000, description="Reason for failure if applicable")
+
+    # Timestamps
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    expires_at: str | None = Field(default=None, description="Optional expiration timestamp (ISO 8601)")
+    last_validated_at: str | None = None
+
+    # Statistics
+    last_used_at: str | None = None
+    usage_count: int = Field(0, ge=0)
+
+
+# ─── Scheduled Monitoring ────────────────────────────────────────────────
+
+
+class ScheduledJobFrequency(StrEnum):
+    """How often a scheduled job should run."""
+
+    HOURLY = "hourly"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+
+class ScheduledJob(BaseModel):
+    """A recurring scraping job that runs on a schedule.
+
+    Each scheduled job is linked to a base job template. When the
+    schedule fires, a new job is created from the template and
+    queued for execution.
+    """
+
+    # Identity
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(..., description="Human-readable schedule name", max_length=255)
+
+    # Ownership
+    user_id: str = Field(default="", description="Owner user ID")
+    org_id: str = Field(default="", description="Organization ID")
+    project_id: str = Field(default="", description="Project ID")
+
+    # Scheduling
+    frequency: ScheduledJobFrequency = Field(default=ScheduledJobFrequency.DAILY)
+    cron_expression: str = Field("", description="Optional custom cron expression", max_length=100)
+    timezone: str = Field("UTC", max_length=50)
+    next_run_at: str | None = Field(default=None, description="ISO 8601 timestamp of next scheduled execution")
+    last_run_at: str | None = None
+
+    # Job template (snapshot of a JobCreate payload)
+    job_name: str = Field(..., description="Name pattern for generated jobs", max_length=255)
+    mode: ScrapeMode = Field(ScrapeMode.MANUAL)
+    urls: list[str] = Field(default_factory=list)
+    topic: str = Field("", max_length=255)
+    location: str = Field("", max_length=255)
+    schema_fields: list[SchemaField] = Field(default_factory=list)
+    filters: list[FilterRule] = Field(default_factory=list)
+    pagination: bool = False
+    max_pages: int = 10
+    deduplicate: bool = True
+    min_record_score: float = 0.35
+
+    # Status
+    enabled: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+
+    # Statistics
+    total_executions: int = Field(0, ge=0)
+    successful_executions: int = Field(0, ge=0)

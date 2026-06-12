@@ -40,6 +40,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Run Reproducible Quick Validation
+        run: python scripts/validate_local.py --quick
+
+      - name: Upload Quick Validation Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-quick
+          path: artifacts/validation/
+          retention-days: 14
+
       - name: Python syntax check (compileall)
         run: python -m compileall -q backend/app scripts architecture_validator.py
 

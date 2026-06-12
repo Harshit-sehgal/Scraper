@@ -1,5 +1,13 @@
 # GitHub Actions CI/CD Status Report
 
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> Workflow success, production-readiness, and deployment-readiness claims in this file are not automatically trusted.
+> Current readiness must be checked through `docs/AGENT_TRUTH.md` and the latest validation reports.
+
 **Repository:** [Harshit-sehgal/Scraper](https://github.com/Harshit-sehgal/Scraper)
 **Last Updated:** 2026-06-08
 **Commit Inspected:** `6eeadb3` (HEAD of `main`)

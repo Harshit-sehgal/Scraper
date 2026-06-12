@@ -4,13 +4,15 @@
 
 import { esc, toast } from "./utils.js";
 import { API, apiFetch } from "./api.js";
-import { currentMode } from "./views.js";
+import { currentMode, setMode } from "./views.js";
 import { addField } from "./form.js";
 
 // ─── State ───
 
 let _analyzedFields = [];
 let _selectorsMap = null;
+let _lastIntelligence = null;
+let _lastWorkflowDraft = null;
 
 // ─── Analyze URL ───
 
@@ -42,7 +44,7 @@ export async function analyzeURL() {
     const res = await apiFetch(`${API}/api/url/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, fetch_preview: false }),
       signal: controller.signal,
     });
 
@@ -51,6 +53,9 @@ export async function analyzeURL() {
     if (!res.ok || data.error) {
       throw new Error(data.error || data.detail || "Analysis failed");
     }
+
+    const intelligence = data.url_intelligence || data;
+    _lastIntelligence = intelligence;
 
     _analyzedFields = Array.isArray(data.suggested_fields) ? data.suggested_fields : [];
 
@@ -70,9 +75,10 @@ export async function analyzeURL() {
     renderAnalysisInfo(data);
     renderFieldList();
     renderAcquisitionBanner(data, url);
+    renderIntelligencePanel(intelligence);
 
     results?.classList.remove("hidden");
-    toast(`Found ${_analyzedFields.length} fields on ${url}`, "success");
+    toast("URL analysis complete", "success");
   } catch (err) {
     if (error) error.classList.remove("hidden");
     const errorText = document.getElementById("analyze-error-text");
@@ -119,6 +125,203 @@ export function renderAnalysisInfo(data) {
     const ms = data.fetch_time_ms;
     fetchTimeEl.textContent = ms != null ? `\u23F1 ${(ms / 1000).toFixed(1)}s` : "\u23F1 ?s";
   }
+}
+
+// ─── Render URL Intelligence Panel ───
+
+export function renderIntelligencePanel(intel) {
+  const panel = document.getElementById("url-intelligence-panel");
+  if (!panel) return;
+
+  const classificationEl = document.getElementById("intelligence-classification");
+  const riskEl = document.getElementById("intelligence-risk");
+  const recommendedEl = document.getElementById("intelligence-recommended-mode");
+  const reasonEl = document.getElementById("intelligence-reason");
+  const confidenceEl = document.getElementById("intelligence-confidence");
+  const stepsContainer = document.getElementById("intelligence-steps-container");
+  const stepsList = document.getElementById("intelligence-steps");
+  const actionsEl = document.getElementById("intelligence-actions");
+  const primary = Array.isArray(intel.classifications) ? intel.classifications[0] : null;
+  const classification = primary?.type || intel.classification || "unknown";
+  const confidence = primary?.confidence ?? intel.confidence;
+  const risk = intel.risk_level || intel.risk || "low";
+  const recommendedMode = intel.recommended_mode || "unknown";
+  const reason = intel.user_message || intel.reason || primary?.evidence || "";
+
+  if (classificationEl) {
+    classificationEl.textContent = classification ? classification.replace(/_/g, " ") : "—";
+  }
+  if (riskEl) {
+    riskEl.textContent = risk ? risk.charAt(0).toUpperCase() + risk.slice(1) : "—";
+    riskEl.className = `intelligence-value risk-${risk || "low"}`;
+  }
+  if (recommendedEl) {
+    recommendedEl.textContent = recommendedMode ? recommendedMode.replace(/_/g, " ") : "—";
+  }
+  if (reasonEl) {
+    reasonEl.textContent = reason || "—";
+  }
+  if (confidenceEl) {
+    const conf = confidence != null ? `${(confidence * 100).toFixed(0)}% confident` : "";
+    confidenceEl.textContent = conf;
+  }
+  if (stepsContainer && stepsList) {
+    if (intel.next_steps && intel.next_steps.length) {
+      stepsList.innerHTML = intel.next_steps.map((s) => `<li>${esc(s)}</li>`).join("");
+      stepsContainer.classList.remove("hidden");
+    } else {
+      stepsList.innerHTML = "";
+      stepsContainer.classList.add("hidden");
+    }
+  }
+
+  if (actionsEl) {
+    actionsEl.innerHTML = renderIntelligenceActions(recommendedMode);
+    actionsEl.classList.toggle("hidden", !actionsEl.innerHTML);
+  }
+
+  panel.classList.remove("hidden");
+}
+
+function renderIntelligenceActions(recommendedMode) {
+  if (recommendedMode === "direct_scrape") {
+    return '<button type="button" class="btn primary small" data-action="url-direct-scrape">Continue with Direct Scrape</button>';
+  }
+  if (recommendedMode === "workflow_replay_recommended") {
+    return [
+      '<button type="button" class="btn secondary small" data-action="url-direct-scrape">Try Direct Scrape Once</button>',
+      '<button type="button" class="btn primary small" data-action="url-create-workflow-draft">Create Reliable Workflow</button>',
+    ].join("");
+  }
+  if (recommendedMode === "auth_profile_recommended") {
+    return '<button type="button" class="btn secondary small" data-action="url-auth-profile">Create Auth Profile</button>';
+  }
+  if (recommendedMode === "blocked_or_unsafe") {
+    return '<button type="button" class="btn secondary small" disabled>Blocked by safety policy</button>';
+  }
+  return '<button type="button" class="btn secondary small" data-action="url-direct-scrape">Review and Continue</button>';
+}
+
+export function continueWithDirectScrape() {
+  const urlInput = document.getElementById("inp-analyze-url");
+  const urlsTextarea = document.getElementById("inp-urls");
+  const url = urlInput?.value?.trim() || "";
+  if (!url) {
+    toast("Enter a URL first", "error");
+    return;
+  }
+  setMode("manual");
+  if (urlsTextarea && !urlsTextarea.value.includes(url)) {
+    const existing = urlsTextarea.value.trim();
+    urlsTextarea.value = existing ? `${existing}\n${url}` : url;
+  }
+  toast("Direct Scrape URL added", "success");
+}
+
+export async function createWorkflowDraftFromAnalysis() {
+  const urlInput = document.getElementById("inp-analyze-url");
+  const url = urlInput?.value?.trim() || "";
+  if (!url) {
+    toast("Enter a URL first", "error");
+    return;
+  }
+  const suggested = Array.isArray(_lastIntelligence?.suggested_start_urls)
+    ? _lastIntelligence.suggested_start_urls
+    : [];
+  const selected = suggested[0]?.url || "";
+  try {
+    const res = await apiFetch(`${API}/api/workflow-drafts/from-url-analysis`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        original_url: url,
+        selected_start_url: selected || undefined,
+        detected_reason: _lastIntelligence?.user_message || "",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "Could not create workflow draft");
+    if (selected) {
+      const urlsTextarea = document.getElementById("inp-urls");
+      if (urlsTextarea) urlsTextarea.value = selected;
+    }
+    _lastWorkflowDraft = data;
+    renderWorkflowDraftPanel(data);
+    toast("Workflow draft created", "success");
+    return data;
+  } catch (err) {
+    toast(`Workflow draft error: ${err.message}`, "error");
+    return null;
+  }
+}
+
+export function showAuthProfileEntryNotice() {
+  toast("Auth Profile setup is recommended for login-required pages", "info");
+}
+
+export function renderWorkflowDraftPanel(draft) {
+  const panel = document.getElementById("workflow-builder-panel");
+  if (!panel || !draft) return;
+
+  const startUrl = draft.selected_start_url || draft.start_url || "";
+  const originalUrl = draft.original_url || "";
+  const reason = draft.detected_reason || "";
+  const fields = Array.isArray(draft.detected_fields) ? draft.detected_fields : [];
+  const suggestions = Array.isArray(draft.recommended_start_urls) ? draft.recommended_start_urls : [];
+
+  const statusEl = document.getElementById("workflow-builder-status");
+  const startEl = document.getElementById("workflow-builder-start-url");
+  const originalEl = document.getElementById("workflow-builder-original-url");
+  const reasonEl = document.getElementById("workflow-builder-reason");
+  const fieldsEl = document.getElementById("workflow-builder-fields");
+  const mappingEl = document.getElementById("workflow-builder-mapping");
+  const previewEl = document.getElementById("workflow-builder-preview-table");
+  const timelineEl = document.getElementById("workflow-builder-timeline");
+  const failureEl = document.getElementById("workflow-builder-failure");
+
+  if (statusEl) statusEl.textContent = draft.status || "draft";
+  if (startEl) startEl.value = startUrl;
+  if (originalEl) originalEl.textContent = originalUrl || "—";
+  if (reasonEl) reasonEl.textContent = reason || "—";
+  if (fieldsEl) {
+    fieldsEl.innerHTML = fields.length
+      ? fields
+          .map(
+            (field) => `
+              <div class="workflow-field-row">
+                <span>${esc(field.label || field.selector || "Field")}</span>
+                <code>${esc(field.selector || "")}</code>
+                <strong>${Math.round((field.confidence || 0) * 100)}%</strong>
+              </div>
+            `,
+          )
+          .join("")
+      : '<div class="workflow-empty">No fields detected yet</div>';
+  }
+  if (mappingEl) {
+    mappingEl.value = JSON.stringify(
+      {
+        start_url: startUrl,
+        suggested_start_urls: suggestions.map((item) => item.url),
+        fields: [],
+        submit_action: { action: "click", selector: "" },
+      },
+      null,
+      2,
+    );
+  }
+  if (previewEl) {
+    previewEl.innerHTML = '<div class="workflow-empty">No preview run yet</div>';
+  }
+  if (timelineEl) {
+    timelineEl.innerHTML = "<li>Draft created</li>";
+  }
+  if (failureEl) {
+    failureEl.classList.add("hidden");
+    failureEl.textContent = "";
+  }
+
+  panel.classList.remove("hidden");
 }
 
 // ─── Render Field List ───
@@ -272,12 +475,18 @@ export async function applyAnalyzedFields() {
 export function clearAnalysis() {
   _analyzedFields = [];
   _selectorsMap = null;
+  _lastIntelligence = null;
+  _lastWorkflowDraft = null;
   const results = document.getElementById("analyze-results");
   if (results) results.classList.add("hidden");
   const error = document.getElementById("analyze-error");
   if (error) error.classList.add("hidden");
   const urlInput = document.getElementById("inp-analyze-url");
   if (urlInput) urlInput.value = "";
+  const intelPanel = document.getElementById("url-intelligence-panel");
+  if (intelPanel) intelPanel.classList.add("hidden");
+  const workflowPanel = document.getElementById("workflow-builder-panel");
+  if (workflowPanel) workflowPanel.classList.add("hidden");
 }
 
 // ─── Expose selectors map for form submission ───
@@ -287,4 +496,7 @@ export function getSelectorsMap() {
 }
 export function getAnalyzedFields() {
   return _analyzedFields;
+}
+export function getWorkflowDraft() {
+  return _lastWorkflowDraft;
 }

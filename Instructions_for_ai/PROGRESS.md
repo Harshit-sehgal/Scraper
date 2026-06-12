@@ -1,5 +1,13 @@
 # DataForge Scraper — 100/100 SaaS Readiness Progress
 
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> 100/100 SaaS-readiness, current-status, and all-tests-pass claims in this file are not automatically trusted.
+> Current readiness must be checked through `docs/AGENT_TRUTH.md` and the latest validation reports.
+
 This tracker is the running evidence file for the `stabilize/phase-0-truth` work.
 It is updated as each small, test-backed change lands. The goal is to move the
 project from **55/100 → 100/100 SaaS readiness** using the master plan in

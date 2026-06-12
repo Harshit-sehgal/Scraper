@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from app.config import settings
+from app.main import create_app
 from app.models import Job, JobStatus, LogEntry, ScrapeMode
 from app.utils.rbac import _fingerprint_key
 
@@ -47,6 +48,22 @@ def _seed_job(
     else:
         main_mod.jobs_store[job.id] = job
     return job
+
+
+def _setup_saas_accounts(tmp_path):
+    from app.saas import (
+        ApiKeyService,
+        SignupService,
+        reset_identity_store,
+    )
+    from app.saas.identity_store import SQLiteIdentityStore
+
+    reset_identity_store(SQLiteIdentityStore(storage_path=tmp_path / "identity.db"))
+    signup = SignupService()
+    keys = ApiKeyService()
+    org_a = signup.signup("alice@example.com", "hunter2", org_name="OrgA", project_name="ProjA")
+    org_b = signup.signup("bob@example.com", "hunter2", org_name="OrgB", project_name="ProjB")
+    return reset_identity_store, org_a, org_b, keys
 
 
 def test_operator_session_cookie_reaches_rbac_system_status(client, monkeypatch) -> None:
@@ -323,3 +340,280 @@ def test_denied_cross_tenant_job_read_is_audit_logged(client, monkeypatch) -> No
     assert response.status_code in {403, 404}
     assert events
     assert events[0]["outcome"] == "denied"
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "json_body"),
+    [
+        ("GET", "/api/jobs/saas-export-job-b/export/csv", None),
+        ("GET", "/api/jobs/saas-export-job-b/export/json", None),
+        ("GET", "/api/jobs/saas-export-job-b/export/excel", None),
+        ("POST", "/api/exports/batch", {"job_ids": ["saas-export-job-b"], "format": "json"}),
+    ],
+)
+def test_project_scoped_write_key_cannot_export_another_orgs_job(
+    client,
+    monkeypatch,
+    tmp_path,
+    method: str,
+    path: str,
+    json_body: dict | None,
+) -> None:
+    import app.main as main_mod
+    from app.saas import ApiKeyScope
+    from app.utils import usage_ledger as usage_mod
+    from app.utils.usage_ledger import UsageLedger, UsageType
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    job_b = _seed_job("saas-export-job-b", owner_key="user-b-key")
+    job_b.org_id = org_b.organization.id
+    job_b.project_id = org_b.project.id
+    job_b.created_by = org_b.user.id  # type: ignore[attr-defined]
+    main_mod.jobs_store[job_b.id] = job_b
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    try:
+        denied = client.request(method, path, headers={"X-API-Key": write_key_a.raw_key}, json=json_body)
+        assert denied.status_code in {403, 404}
+        assert ledger.get_usage(org_a.user.id, UsageType.EXPORT_GENERATED) == []
+
+        if method != "POST":
+            allowed = client.request(method, path, headers={"X-API-Key": write_key_b.raw_key}, json=json_body)
+            assert allowed.status_code == 200
+    finally:
+        reset_identity_store(None)
+        main_mod.jobs_store.pop(job_b.id, None)
+
+
+def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypatch, tmp_path) -> None:
+    from app.routers import workflow as workflow_router
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    workflow_router._workflows.clear()
+
+    try:
+        created = client.post(
+            "/api/workflows",
+            headers={"X-API-Key": write_key_b.raw_key},
+            json={"name": "Org B Workflow", "start_url": "https://example.com"},
+        )
+        assert created.status_code == 201
+        workflow_id = created.json()["id"]
+
+        listed = client.get("/api/workflows", headers={"X-API-Key": write_key_a.raw_key})
+        assert listed.status_code == 200
+        assert workflow_id not in {item["id"] for item in listed.json()["items"]}
+
+        denied_calls = [
+            client.get(f"/api/workflows/{workflow_id}", headers={"X-API-Key": write_key_a.raw_key}),
+            client.request(
+                "PUT",
+                f"/api/workflows/{workflow_id}",
+                headers={"X-API-Key": write_key_a.raw_key},
+                json={"name": "Stolen"},
+            ),
+            client.post(f"/api/workflows/{workflow_id}/run", headers={"X-API-Key": write_key_a.raw_key}),
+            client.post(f"/api/workflows/{workflow_id}/preview", headers={"X-API-Key": write_key_a.raw_key}),
+            client.delete(f"/api/workflows/{workflow_id}", headers={"X-API-Key": write_key_a.raw_key}),
+        ]
+        assert all(response.status_code in {403, 404} for response in denied_calls)
+
+        owner_get = client.get(f"/api/workflows/{workflow_id}", headers={"X-API-Key": write_key_b.raw_key})
+        assert owner_get.status_code == 200
+    finally:
+        reset_identity_store(None)
+        workflow_router._workflows.clear()
+
+
+def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monkeypatch, tmp_path) -> None:
+    from app.routers import auth_profiles as auth_profiles_router
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    auth_profiles_router._auth_profiles.clear()
+
+    try:
+        created = client.post(
+            "/api/auth-profiles?name=Org+B+Login&domain=example.com",
+            headers={"X-API-Key": write_key_b.raw_key},
+        )
+        assert created.status_code == 201
+        assert "encrypted_storage_state" not in created.json()
+        profile_id = created.json()["id"]
+
+        listed = client.get("/api/auth-profiles", headers={"X-API-Key": write_key_a.raw_key})
+        assert listed.status_code == 200
+        assert profile_id not in {item["id"] for item in listed.json()["items"]}
+        assert all("encrypted_storage_state" not in item for item in listed.json()["items"])
+
+        denied_get = client.get(f"/api/auth-profiles/{profile_id}", headers={"X-API-Key": write_key_a.raw_key})
+        denied_delete = client.delete(f"/api/auth-profiles/{profile_id}", headers={"X-API-Key": write_key_a.raw_key})
+        assert denied_get.status_code in {403, 404}
+        assert denied_delete.status_code in {403, 404}
+
+        owner_get = client.get(f"/api/auth-profiles/{profile_id}", headers={"X-API-Key": write_key_b.raw_key})
+        assert owner_get.status_code == 200
+        assert "encrypted_storage_state" not in owner_get.json()
+    finally:
+        reset_identity_store(None)
+        auth_profiles_router._auth_profiles.clear()
+
+
+def test_project_scoped_key_cannot_access_another_orgs_schedule(client, monkeypatch, tmp_path) -> None:
+    from app.routers import scheduled_monitoring as scheduled_router
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    scheduled_router._scheduled_jobs.clear()
+
+    try:
+        created = client.post(
+            "/api/scheduled?name=Org+B+Schedule&job_name=Org+B+Run",
+            headers={"X-API-Key": write_key_b.raw_key},
+        )
+        assert created.status_code == 201
+        schedule_id = created.json()["id"]
+
+        listed = client.get("/api/scheduled", headers={"X-API-Key": write_key_a.raw_key})
+        assert listed.status_code == 200
+        assert schedule_id not in {item["id"] for item in listed.json()["items"]}
+
+        denied_calls = [
+            client.get(f"/api/scheduled/{schedule_id}", headers={"X-API-Key": write_key_a.raw_key}),
+            client.request(
+                "PUT",
+                f"/api/scheduled/{schedule_id}?name=Stolen",
+                headers={"X-API-Key": write_key_a.raw_key},
+            ),
+            client.get(f"/api/scheduled/{schedule_id}/changes", headers={"X-API-Key": write_key_a.raw_key}),
+            client.delete(f"/api/scheduled/{schedule_id}", headers={"X-API-Key": write_key_a.raw_key}),
+        ]
+        assert all(response.status_code in {403, 404} for response in denied_calls)
+
+        owner_get = client.get(f"/api/scheduled/{schedule_id}", headers={"X-API-Key": write_key_b.raw_key})
+        assert owner_get.status_code == 200
+    finally:
+        reset_identity_store(None)
+        scheduled_router._scheduled_jobs.clear()
+
+
+def test_saas_signup_is_explicit_public_when_keys_are_not_configured(client, monkeypatch, tmp_path) -> None:
+    from app.saas import reset_identity_store
+    from app.saas.identity_store import SQLiteIdentityStore
+
+    _configure_keys(monkeypatch, api_key="", operator_key="", admin_key="", env="test", allow_dev_auth=False)
+    reset_identity_store(SQLiteIdentityStore(storage_path=tmp_path / "identity.db"))
+
+    try:
+        response = client.post(
+            "/api/saas/signup",
+            json={"email": "public-signup@example.com", "password": "securepassword123"},
+        )
+        assert response.status_code == 201
+    finally:
+        reset_identity_store(None)
+
+
+def test_user_level_saas_key_cannot_create_org_or_project(client, monkeypatch, tmp_path) -> None:
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, _org_b, keys = _setup_saas_accounts(tmp_path)
+    read_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-read",
+        scope=ApiKeyScope.READ,
+    )
+
+    try:
+        org_response = client.post(
+            "/api/saas/orgs",
+            headers={"X-API-Key": read_key_a.raw_key},
+            json={"name": "User Created Org"},
+        )
+        project_response = client.post(
+            "/api/saas/projects",
+            headers={"X-API-Key": read_key_a.raw_key},
+            json={"org_id": org_a.organization.id, "name": "User Created Project"},
+        )
+
+        assert org_response.status_code == 403
+        assert project_response.status_code == 403
+    finally:
+        reset_identity_store(None)
+
+
+# ── Startup safety tests ────────────────────────────────────────────────────
+
+
+def test_startup_fails_when_dev_auth_enabled_in_production(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", True)
+
+    with pytest.raises(RuntimeError, match="ALLOW_INSECURE_DEV_AUTH"):
+        create_app()
+
+
+def test_startup_fails_when_session_secret_missing_in_production(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "SESSION_SECRET", "")
+    # Ensure the dev auth flag is not also a reason to fail
+    monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", False)
+
+    with pytest.raises(RuntimeError, match="SESSION_SECRET"):
+        create_app()

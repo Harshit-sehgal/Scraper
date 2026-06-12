@@ -102,6 +102,9 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
     if path in {"/api/session", "/api/session/me"}:
         return ("public", "exempt from API-key middleware", "Session self-service auth; separate cookie-based flow.")
 
+    if path == "/api/saas/signup":
+        return ("public", "exempt from API-key middleware", "Self-service account signup.")
+
     if path.startswith("/api/"):
         mutation_note = "Mutation route lacks explicit require_role guard." if method != "GET" else ""
         return ("authenticated-user", "global /api/* API-key middleware", mutation_note)

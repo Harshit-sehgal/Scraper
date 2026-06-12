@@ -484,6 +484,12 @@ class LocalASGIClient:
     def post(self, url: str, **kwargs):
         return self.request("POST", url, **kwargs)
 
+    def put(self, url: str, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def patch(self, url: str, **kwargs):
+        return self.request("PATCH", url, **kwargs)
+
     def delete(self, url: str, **kwargs):
         return self.request("DELETE", url, **kwargs)
 

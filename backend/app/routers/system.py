@@ -23,6 +23,7 @@ from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
 from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
+from app.url_analyzer import analyze_url as _url_analyze
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
 
@@ -44,6 +45,10 @@ class AcquisitionMode(StrEnum):
 
 class URLPreviewRequest(BaseModel):
     url: str = Field(..., description="The URL to analyze for data extraction")
+    fetch_preview: bool = Field(
+        default=False,
+        description="When false, return URL-only guidance without fetching the target page.",
+    )
     search_params: dict[str, str] | None = Field(
         default=None,
         description="Optional search parameters to submit to the site's search form",
@@ -454,22 +459,18 @@ async def analyze_url(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
     """Analyze a URL and auto-detect what data fields can be extracted."""
+    intelligence = _url_analyze(req.url)
+    redacted_url = intelligence.to_dict()["url"]
     try:
         validate_public_http_url(req.url)
     except ValueError as e:
         return JSONResponse(
-            status_code=400,
-            content={
-                "url": req.url,
-                "error": f"URL failed security validation: {e}",
-                "page_structure": "unknown",
-                "structure_confidence": 0.0,
-                "estimated_record_count": 0,
-                "item_container": None,
-                "suggested_fields": [],
-                "anti_bot_score": 0.0,
-            },
+            status_code=200,
+            content=intelligence.to_guided_dict(safe_to_fetch=False, safety_error=str(e)),
         )
+
+    if not req.fetch_preview:
+        return intelligence.to_guided_dict(safe_to_fetch=True)
 
     URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
 
@@ -479,11 +480,11 @@ async def analyze_url(
             timeout=URL_ANALYZER_TIMEOUT,
         )
     except TimeoutError:
-        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, req.url)
+        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, redacted_url)
         return JSONResponse(
             status_code=408,
             content={
-                "url": req.url,
+                "url": redacted_url,
                 "error": (
                     f"Analysis timed out after {URL_ANALYZER_TIMEOUT} seconds. "
                     "The page may be too slow, heavy, or protected by anti-bot measures."
@@ -501,6 +502,8 @@ async def analyze_url(
 
     if result.get("error"):
         return JSONResponse(status_code=422, content=result)
+
+    result["url_intelligence"] = intelligence.to_guided_dict(safe_to_fetch=True)
 
     return result
 

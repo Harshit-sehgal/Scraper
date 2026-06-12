@@ -33,12 +33,14 @@ Status: pre-production candidate.
 
 | Gate | Status |
 |------|--------|
-| Ruff lint | ✅ 0 errors |
-| Mypy | ✅ 0 errors (196 source files) |
-| Tests (SQLite) | Run tests dynamically using `pytest` (see docs/TESTING.md) |
-| Compile | ✅ Clean |
+| Quick validation | Passes with `python3 scripts/validate_local.py --quick` |
+| Full backend tests | Currently failing; see `docs/AGENT_TRUTH.md` |
+| Ruff / pyflakes / mypy | Currently failing; see `docs/AGENT_TRUTH.md` |
+| Frontend tests | Passing in the latest full validation run |
+| Frontend lint | Currently failing on `frontend/styles.css` formatting |
+| Security scan | Bandit passes; pip-audit currently reports vulnerable installed packages |
 
-For the latest verified status, including exact compile results, collected/passed test counts (SQLite, Postgres, Playwright browser, and Golden Dataset live extraction), and other detailed validation evidence, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
+For the latest verified status, use [`docs/AGENT_TRUTH.md`](docs/AGENT_TRUTH.md) and [`artifacts/validation/latest_summary.md`](artifacts/validation/latest_summary.md). Treat older status files as historical until their claims reproduce in the current checkout.
 
 ## API and Dashboard Notes
 
@@ -79,25 +81,30 @@ Most `/api/*` routes require an API key once keys are configured. Development mo
 
 ## Validation Commands
 
-Use explicit local settings so `.env` does not accidentally change the result:
+Use the local validation runner. It sets safe test defaults, applies
+timeouts, redacts secrets from logs, and writes evidence under
+`artifacts/validation/`:
 
 ```bash
-python3 -m compileall -q backend scripts architecture_validator.py
-PYTHONPATH=backend python3 architecture_validator.py
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/benchmarks -o addopts=
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 scripts/route_auth_matrix.py --format markdown
-env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true python3 scripts/check_prod_env.py --env-file .env.production.example
+python3 scripts/validate_local.py --quick
+python3 scripts/validate_local.py --full
+python3 scripts/validate_local.py --backend
+python3 scripts/validate_local.py --frontend
+python3 scripts/validate_local.py --security
 ```
 
-Optional checks:
+Makefile shortcuts:
 
 ```bash
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres python3 -m pytest backend/tests --run-postgres -q -o addopts=
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests --run-browser -q -o addopts=
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=
+make validate
+make validate-full
+make validate-backend
+make validate-frontend
+make validate-security
 ```
+
+See [`docs/VALIDATION.md`](docs/VALIDATION.md) for setup,
+interpretation, stable checks, and opt-in experimental checks.
 
 ## Project Structure
 
@@ -132,7 +139,9 @@ Do not deploy publicly until the production checklist is validated in the target
 
 ## Documentation
 
-- `PROJECT_STATUS.md` - current truth source
+- `docs/AGENT_TRUTH.md` - current command-evidence truth source
+- `docs/VALIDATION.md` - reproducible validation commands and log locations
+- `PROJECT_STATUS.md` - historical status unless refreshed by current command output
 - `docs/ARCHITECTURE.md` - actual architecture map
 - `docs/API.md` - manually verified route summary
 - `docs/SECURITY.md` - security posture and remaining risks

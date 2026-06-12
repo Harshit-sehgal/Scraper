@@ -30,10 +30,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from app.audit_logger import log_rbac_event
 from app.config import settings
 from app.services import exports as export_service
 from app.utils.export import safe_export_filename
-from app.utils.rbac import UserRole, require_role_with_user
+from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 
 logger = logging.getLogger(__name__)
 
@@ -185,10 +186,9 @@ def create_exports_router(jobs_store: dict[str, Any]):
     * ``POST /api/exports/batch``
 
     All endpoints require admin or operator role. Auth is resolved
-    through the shared :func:`app.utils.rbac.require_role_with_user`
-    dependency (the 2-tuple legacy form — exports predate the
-    org_id/project_id wiring and operate over the legacy owner
-    model).
+    through the shared :func:`app.utils.rbac.require_principal`
+    dependency so export authorization can enforce org/project
+    ownership before any data is streamed.
     """
     router = APIRouter()
 
@@ -212,16 +212,54 @@ def create_exports_router(jobs_store: dict[str, Any]):
         except Exception:
             logger.debug("Failed to refresh job %s from repo for export", job_id)
 
+    def _ensure_export_job_access(job: Any, auth: tuple[UserRole, str, str, str], action: str) -> None:
+        role, user_id, org_id, project_id = auth
+        if can_access_scoped_resource(
+            role,
+            user_id,
+            org_id,
+            project_id,
+            resource_owner_id=getattr(job, "created_by", ""),
+            resource_org_id=getattr(job, "org_id", ""),
+            resource_project_id=getattr(job, "project_id", ""),
+        ):
+            return
+        log_rbac_event(
+            actor=user_id,
+            action=action,
+            resource=f"job:{getattr(job, 'id', '')}",
+            role=role.value,
+            outcome="denied",
+            details={
+                "owner_id": getattr(job, "created_by", ""),
+                "org_id": getattr(job, "org_id", ""),
+                "project_id": getattr(job, "project_id", ""),
+                "policy": "mvp_owner_org_project",
+            },
+        )
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    async def _get_export_job(job_id: str, auth: tuple[UserRole, str, str, str], action: str):
+        await run_in_threadpool(_refresh_job_for_export, job_id)
+        job = jobs_store.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        _ensure_export_job_access(job, auth, action)
+        return job
+
     # ─── Single-job exports ─────────────────────────────────────────
 
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(
         job_id: str,
         request: Request,
-        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         try:
-            result = await _export_csv_impl(job_id)
+            result = await _export_csv_impl(job_id, auth)
             _record_export_usage(auth[1], "csv", [job_id], request)
         except HTTPException:
             _record_export_outcome("csv", False)
@@ -236,12 +274,8 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _log_export_access(auth[1], "csv", [job_id], request, success=True)
             return result
 
-    async def _export_csv_impl(job_id: str):
-        await run_in_threadpool(_refresh_job_for_export, job_id)
-        job = jobs_store.get(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
+    async def _export_csv_impl(job_id: str, auth: tuple[UserRole, str, str, str]):
+        job = await _get_export_job(job_id, auth, "export_csv")
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
@@ -265,10 +299,13 @@ def create_exports_router(jobs_store: dict[str, Any]):
     async def export_json(
         job_id: str,
         request: Request,
-        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         try:
-            result = await _export_json_impl(job_id)
+            result = await _export_json_impl(job_id, auth)
             _record_export_usage(auth[1], "json", [job_id], request)
         except HTTPException:
             _record_export_outcome("json", False)
@@ -283,12 +320,8 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _log_export_access(auth[1], "json", [job_id], request, success=True)
             return result
 
-    async def _export_json_impl(job_id: str):
-        await run_in_threadpool(_refresh_job_for_export, job_id)
-        job = jobs_store.get(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
+    async def _export_json_impl(job_id: str, auth: tuple[UserRole, str, str, str]):
+        job = await _get_export_job(job_id, auth, "export_json")
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
@@ -312,10 +345,13 @@ def create_exports_router(jobs_store: dict[str, Any]):
     async def export_excel(
         job_id: str,
         request: Request,
-        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         try:
-            result = await _export_excel_impl(job_id)
+            result = await _export_excel_impl(job_id, auth)
             _record_export_usage(auth[1], "excel", [job_id], request)
         except HTTPException:
             _record_export_outcome("excel", False)
@@ -329,12 +365,8 @@ def create_exports_router(jobs_store: dict[str, Any]):
         _log_export_access(auth[1], "excel", [job_id], request, success=True)
         return result
 
-    async def _export_excel_impl(job_id: str):
-        await run_in_threadpool(_refresh_job_for_export, job_id)
-        job = jobs_store.get(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
+    async def _export_excel_impl(job_id: str, auth: tuple[UserRole, str, str, str]):
+        job = await _get_export_job(job_id, auth, "export_excel")
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
@@ -364,10 +396,13 @@ def create_exports_router(jobs_store: dict[str, Any]):
     async def batch_export(
         request: Request,
         body: BatchExportRequest,
-        auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         try:
-            result = await _batch_export_impl(body)
+            result = await _batch_export_impl(body, auth)
             _record_export_usage(auth[1], f"batch_{body.format}", body.job_ids, request)
         except HTTPException:
             _record_export_outcome(f"batch_{body.format}", False)
@@ -382,7 +417,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=True)
             return result
 
-    async def _batch_export_impl(body: BatchExportRequest):
+    async def _batch_export_impl(body: BatchExportRequest, auth: tuple[UserRole, str, str, str]):
         fmt = body.format.lower()
         if fmt not in ("csv", "json", "xlsx"):
             raise HTTPException(
@@ -393,10 +428,12 @@ def create_exports_router(jobs_store: dict[str, Any]):
         # Resolve all jobs — fail fast on any missing ID.
         missing: list[str] = []
         for _jid in body.job_ids:
-            if _jid not in jobs_store:
+            await run_in_threadpool(_refresh_job_for_export, _jid)
+            job = jobs_store.get(_jid)
+            if not job:
                 missing.append(_jid)
             else:
-                await run_in_threadpool(_refresh_job_for_export, _jid)
+                _ensure_export_job_access(job, auth, "batch_export")
 
         if missing:
             raise HTTPException(

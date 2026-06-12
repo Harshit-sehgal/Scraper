@@ -205,6 +205,14 @@ def test_root_payload_does_not_advertise_unavailable_urls_in_production(monkeypa
     monkeypatch.setattr(settings, "API_KEY", "")
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
+    # P0 safety: create_app() refuses to start in production when
+    # ALLOW_INSECURE_DEV_AUTH is true (conftest enables it for dev).
+    # Override to False so we can exercise the production contract.
+    monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", False)
+    # P0 safety: create_app() requires SESSION_SECRET in production.
+    # Provide one so the safety check passes and we can verify the
+    # production root payload contract.
+    monkeypatch.setattr(settings, "SESSION_SECRET", "test-session-secret-do-not-use")
 
     from app.main import create_app
 

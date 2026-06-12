@@ -16,7 +16,7 @@
 #   make boundary      Run the research-shell boundary check (CI invariant)
 #   make deps-check    Validate pyproject.toml dependency bounds
 #   make lint-all      Run lint + mypy + boundary + deps-check
-#   make validate      Run all CI checks locally (does not require Docker)
+#   make validate      Run quick local validation (does not require Docker)
 #   make prod          Start production stack
 #   make clean         Remove containers, volumes, and dangling images
 # =============================================================================
@@ -27,7 +27,7 @@ DC := docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 
-.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate validate-full validate-backend validate-frontend validate-security doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -131,8 +131,21 @@ deps-check: ## Validate pyproject.toml dependency bounds (single source of truth
 
 lint-all: lint mypy boundary deps-check ## Run full lint + type + boundary + deps suite
 
-# Local validation that mirrors CI (does not require Docker)
-validate: ## Run all CI checks locally (verify_all.sh)
+# Local validation with bounded logs (does not require Docker)
+validate: ## Run quick local validation and write artifacts/validation logs
+	python3 scripts/validate_local.py --quick
+
+validate-full: ## Run full local validation and write artifacts/validation logs
+	python3 scripts/validate_local.py --full
+
+validate-backend: ## Run backend validation and full backend tests
+	python3 scripts/validate_local.py --backend
+
+validate-frontend: ## Run frontend install, tests, and lint
+	python3 scripts/validate_local.py --frontend
+
+validate-security: ## Run local security-oriented checks
+	python3 scripts/validate_local.py --security
 
 # ─── Bootstrap gate (Phase 0) ───────────────────────────────────────────────
 
@@ -149,9 +162,6 @@ api-docs: ## Regenerate stable vs experimental API inventory docs
 
 api-docs-check: ## Diff-check stable API inventory without writing
 	python3 scripts/route_inventory_split.py > /dev/null
-
-
-	bash scripts/verify_all.sh
 
 # ─── Production ─────────────────────────────────────────────────────────────
 

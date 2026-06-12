@@ -1,10 +1,18 @@
 # DataForge Release Checklist
 
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> All-tests-pass, release, staging, and production claims in this file are not automatically trusted.
+> Current readiness must be checked through `docs/AGENT_TRUTH.md` and the latest validation reports.
+
 Use this checklist before every production release.
 
 ## Pre-Release Verification
 
-- [ ] All tests pass: `pytest --timeout=30 -q` (3174+ passed, 0 failed)
+- [ ] All tests pass: run `python3 scripts/validate_local.py --full` and record the current artifact path
 - [ ] Frontend tests pass: `npm run test` (269+ passed)
 - [ ] Lint clean: `ruff check backend/app/ backend/tests/`
 - [ ] Format clean: `ruff format --check backend/app/ backend/tests/`

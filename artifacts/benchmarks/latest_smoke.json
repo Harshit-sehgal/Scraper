@@ -1,0 +1,27 @@
+{
+  "artifacts": {
+    "json": "artifacts/benchmarks/latest_smoke.json",
+    "markdown": "artifacts/benchmarks/latest_smoke.md"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-m",
+    "pytest",
+    "backend/tests/test_benchmark_fixtures.py",
+    "backend/benchmarks/test_benchmark_smoke.py",
+    "-q",
+    "-m",
+    "not live_benchmark and not browser and not golden_dataset",
+    "-o",
+    "addopts="
+  ],
+  "duration_seconds": 1.993,
+  "ended_at": "2026-06-12T17:46:21.833810+00:00",
+  "exit_code": 0,
+  "generated_at": "2026-06-12T17:46:21.833810+00:00",
+  "live_sites_used": false,
+  "started_at": "2026-06-12T17:46:19.840766+00:00",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "........                                                                 [100%]\n8 passed, 1 deselected in 0.24s\n"
+}

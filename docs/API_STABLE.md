@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-11 22:22:07 UTC
+**Generated:** 2026-06-12 18:47:09 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -103,7 +103,40 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 
 | Method | Path |
 | --- | --- |
+| DELETE | `/api/auth-profiles/{profile_id}` |
+| DELETE | `/api/saas/memberships/{membership_id}` |
+| DELETE | `/api/scheduled/{job_id}` |
+| DELETE | `/api/workflows/{workflow_id}` |
+| GET | `/api/auth-profiles` |
+| GET | `/api/auth-profiles/{profile_id}` |
+| GET | `/api/intelligence/analyze-url` |
 | GET | `/api/saas/aup/status` |
+| GET | `/api/saas/me` |
+| GET | `/api/saas/orgs` |
+| GET | `/api/saas/orgs/{org_id}` |
+| GET | `/api/saas/orgs/{org_id}/members` |
+| GET | `/api/saas/orgs/{org_id}/projects` |
+| GET | `/api/saas/plan` |
+| GET | `/api/saas/projects/{project_id}` |
+| GET | `/api/scheduled` |
+| GET | `/api/scheduled/{job_id}` |
+| GET | `/api/scheduled/{job_id}/changes` |
+| GET | `/api/workflows` |
+| GET | `/api/workflows/{workflow_id}` |
+| PATCH | `/api/workflows/{workflow_id}` |
+| POST | `/api/auth-profiles` |
 | POST | `/api/saas/aup/accept` |
+| POST | `/api/saas/orgs` |
+| POST | `/api/saas/projects` |
+| POST | `/api/saas/signup` |
+| POST | `/api/scheduled` |
+| POST | `/api/workflow-drafts/from-url-analysis` |
+| POST | `/api/workflow-drafts/{draft_id}/detect-fields` |
+| POST | `/api/workflow-drafts/{draft_id}/manual-mapping` |
+| POST | `/api/workflows` |
+| POST | `/api/workflows/{workflow_id}/preview` |
+| POST | `/api/workflows/{workflow_id}/run` |
+| PUT | `/api/scheduled/{job_id}` |
+| PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 50
+**Total routes:** 83

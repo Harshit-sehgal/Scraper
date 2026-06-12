@@ -1,14 +1,22 @@
 # Project Status - DataForge Scraper
 
 > Current agent truth source: [`docs/AGENT_TRUTH.md`](docs/AGENT_TRUTH.md). The claims below are historical unless reproduced by fresh command output in the current checkout.
+>
+> Historical note:
+> This document may contain older project status claims.
+> For current verified status, see `docs/AGENT_TRUTH.md`.
+>
+> Verification warning:
+> Production, SaaS readiness, all-tests-pass, and deployment-readiness claims in this file are not automatically trusted.
+> Current readiness must be checked through `docs/AGENT_TRUTH.md` and the latest validation reports.
 
 **Last refreshed:** 2026-06-10
 **Commit inspected:** working tree (post-refresh)
-**GitHub Actions status:** CI verified locally — all fast gates, lint, and test suite pass 100% cleanly.
-**Status:** CI/CD stabilized. Prettier JS/CSS formatting and Dependabot lockfile management added. Rate limiter observability extended with stats endpoint, Prometheus hit counters, DB-backed table pruning cron, Grafana dashboard panels, Prometheus alert rules, and frontend rate limit dashboard panel. Alert rules and Grafana panels documented in API docs.
+**GitHub Actions status:** Historical claim; not current evidence. See `docs/AGENT_TRUTH.md`.
+**Status:** Historical 2026-06-10 status snapshot. See `docs/AGENT_TRUTH.md` for the current checkout.
 **Maturity:** about 75–80% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
 
-This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
+This file is historical context. Current truth lives in `docs/AGENT_TRUTH.md` and the latest validation artifacts.
 
 ## Current Description
 
