@@ -17,11 +17,18 @@ class TestApiKeyManagement:
             },
         )
         assert signup.status_code == 201
-        project_id = signup.json()["project_id"]
+        data_signup = signup.json()
+        project_id = data_signup["project_id"]
+        user_id = data_signup["user_id"]
+        # Authenticate as the newly signed-up user
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        cookies = {SESSION_COOKIE: create_session_cookie(role="admin", user_id=user_id)}
 
         create = client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "Test Key", "scope": "read"},
+            cookies=cookies,
         )
         assert create.status_code == 201
         data = create.json()
@@ -39,15 +46,22 @@ class TestApiKeyManagement:
                 "password": "password123",
             },
         )
-        project_id = signup.json()["project_id"]
+        data_signup = signup.json()
+        project_id = data_signup["project_id"]
+        user_id = data_signup["user_id"]
+
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        cookies = {SESSION_COOKIE: create_session_cookie(role="admin", user_id=user_id)}
 
         # Create a key
         client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "List Test", "scope": "write"},
+            cookies=cookies,
         )
 
-        list_resp = client.get(f"/api/saas/projects/{project_id}/keys")
+        list_resp = client.get(f"/api/saas/projects/{project_id}/keys", cookies=cookies)
         assert list_resp.status_code == 200
         data = list_resp.json()
         assert data["total"] >= 1
@@ -61,19 +75,26 @@ class TestApiKeyManagement:
                 "password": "password123",
             },
         )
-        project_id = signup.json()["project_id"]
+        data_signup = signup.json()
+        project_id = data_signup["project_id"]
+        user_id = data_signup["user_id"]
+
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        cookies = {SESSION_COOKIE: create_session_cookie(role="admin", user_id=user_id)}
 
         create = client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "Revoke Test", "scope": "read"},
+            cookies=cookies,
         )
         key_id = create.json()["id"]
 
-        revoke = client.delete(f"/api/saas/projects/{project_id}/keys/{key_id}")
+        revoke = client.delete(f"/api/saas/projects/{project_id}/keys/{key_id}", cookies=cookies)
         assert revoke.status_code == 204
 
         # List should show revoked status
-        list_resp = client.get(f"/api/saas/projects/{project_id}/keys")
+        list_resp = client.get(f"/api/saas/projects/{project_id}/keys", cookies=cookies)
         for key in list_resp.json()["items"]:
             if key["id"] == key_id:
                 assert key["revoked_at"] is not None
@@ -87,7 +108,7 @@ class TestApiKeyManagement:
                 "password": "password123",
             },
         )
-        signup1.json()["project_id"]
+        user1_id = signup1.json()["user_id"]
 
         signup2 = client.post(
             "/api/saas/signup",
@@ -98,8 +119,11 @@ class TestApiKeyManagement:
         )
         project2 = signup2.json()["project_id"]
 
+        # Authenticate as user1
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        cookies = {SESSION_COOKIE: create_session_cookie(role="admin", user_id=user1_id)}
+
         # User1 tries to list keys for user2's project
-        list_resp = client.get(f"/api/saas/projects/{project2}/keys")
-        # Should get 403 since we're not in a real multi-user session context
-        # but at minimum should not succeed
-        assert list_resp.status_code != 200 or list_resp.json()["total"] == 0
+        list_resp = client.get(f"/api/saas/projects/{project2}/keys", cookies=cookies)
+        assert list_resp.status_code == 403
