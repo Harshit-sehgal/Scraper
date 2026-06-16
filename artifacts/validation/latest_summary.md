@@ -1,16 +1,16 @@
 # Latest Validation Summary
 
-- generated_at: 2026-06-16T17:01:18.452948+00:00
-- mode: quick
-- run_id: 20260616T170102Z_quick
-- archive_dir: `artifacts/validation/runs/20260616T170102Z_quick`
-- overall_status: passed
-- passed: 12
-- failed: 0
+- generated_at: 2026-06-16T18:57:08.872464+00:00
+- mode: full
+- run_id: 20260616T185211Z_full
+- archive_dir: `artifacts/validation/runs/20260616T185211Z_full`
+- overall_status: failed
+- passed: 21
+- failed: 1
 - skipped: 0
 - timed_out: 0
 - not_installed: 0
-- next_recommended_action: Proceed with the requested change after reviewing logs for warnings.
+- next_recommended_action: Inspect failed command logs under artifacts/validation/commands/ and fix or document the failures.
 
 ## Commands
 
@@ -28,3 +28,13 @@
 | passed | true | dependency_bounds | 0 | `artifacts/validation/commands/09_dependency_bounds.md` |
 | passed | true | url_and_research_smoke_tests | 0 | `artifacts/validation/commands/10_url_and_research_smoke_tests.md` |
 | passed | true | p0_regression_tests | 0 | `artifacts/validation/commands/11_p0_regression_tests.md` |
+| passed | true | backend_full_tests | 0 | `artifacts/validation/commands/12_backend_full_tests.md` |
+| passed | true | ruff_check | 0 | `artifacts/validation/commands/13_ruff_check.md` |
+| passed | true | pyflakes | 0 | `artifacts/validation/commands/14_pyflakes.md` |
+| failed | true | mypy | 1 | `artifacts/validation/commands/15_mypy.md` |
+| passed | true | bandit_backend | 0 | `artifacts/validation/commands/16_bandit_backend.md` |
+| passed | true | pip_audit | 0 | `artifacts/validation/commands/17_pip_audit.md` |
+| passed | true | prod_env_example_placeholder_check | 1 | `artifacts/validation/commands/18_prod_env_example_placeholder_check.md` |
+| passed | true | npm_ci | 0 | `artifacts/validation/commands/19_npm_ci.md` |
+| passed | true | frontend_tests | 0 | `artifacts/validation/commands/20_frontend_tests.md` |
+| passed | true | frontend_lint_js | 0 | `artifacts/validation/commands/21_frontend_lint_js.md` |

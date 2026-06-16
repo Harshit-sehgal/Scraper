@@ -274,7 +274,7 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 logger.debug("Anti-bot detection failed during cold start", exc_info=True)
 
             return StrategyRecommendation(
@@ -313,7 +313,7 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             logger.debug("Anti-bot feedback check failed for %s", domain, exc_info=True)
 
         best_strategy = state.get_best_strategy()

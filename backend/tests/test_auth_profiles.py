@@ -84,8 +84,9 @@ class TestAuthProfileEncryption:
         assert complete_resp.status_code == 200
 
         # Verify the stored state is encrypted
-        profiles = auth_profiles_router._auth_profiles
-        stored = profiles[profile_id]
+        profiles_store = auth_profiles_router._auth_profiles
+        stored = profiles_store.get(profile_id)
+        assert stored is not None
         assert "encrypted_storage_state" in stored
         encrypted = stored["encrypted_storage_state"]
         assert encrypted != ""
@@ -163,7 +164,8 @@ class TestAuthProfileRevoke:
         assert revoke_resp.json()["status"] == "revoked"
 
         # Storage state should be cleared
-        stored = auth_profiles_router._auth_profiles[profile_id]
+        stored = auth_profiles_router._auth_profiles.get(profile_id)
+        assert stored is not None
         assert stored["encrypted_storage_state"] == ""
 
 
@@ -191,7 +193,10 @@ class TestAuthProfileValidation:
         )
 
         # Manually set an expired timestamp
-        auth_profiles_router._auth_profiles[profile_id]["expires_at"] = "2000-01-01T00:00:00+00:00"
+        stored_for_expiry = auth_profiles_router._auth_profiles.get(profile_id)
+        assert stored_for_expiry is not None
+        stored_for_expiry["expires_at"] = "2000-01-01T00:00:00+00:00"
+        auth_profiles_router._auth_profiles.upsert(profile_id, stored_for_expiry)
 
         validate_resp = client.post(f"/api/auth-profiles/{profile_id}/validate")
         assert validate_resp.status_code == 200
@@ -218,7 +223,8 @@ class TestAuthProfileSecurity:
         )
 
         # The raw state should NOT be in the stored profile
-        stored = auth_profiles_router._auth_profiles[profile_id]
+        stored = auth_profiles_router._auth_profiles.get(profile_id)
+        assert stored is not None
         encrypted = stored.get("encrypted_storage_state", "")
         import json
 

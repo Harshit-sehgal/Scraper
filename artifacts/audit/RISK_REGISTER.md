@@ -1,6 +1,6 @@
 # DataForge Scraper - Risk Register
 
-Date: 2026-06-12
+Date: 2026-06-17
 
 | Risk ID | Severity | Status | Risk | Evidence | Mitigation | Owner Area |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -24,3 +24,11 @@ Date: 2026-06-12
 3. Restore full backend validation.
 4. Clean lint/frontend formatting after behavioral safety is covered.
 5. Re-run and record all command evidence.
+
+## Resolved Items (2026-06-17)
+
+| Item | Status | Resolution |
+| --- | --- | --- |
+| Auth-profile in-memory (per-process) data-loss in multi-worker deployments. | Resolved | `backend/app/utils/auth_profile_store.py` (subclass of `JSONFileStore`) is now file-backed (fcntl.flock-serialised atomic rename). The CRITICAL startup warning that previously surfaced in production / staging ENVs has been deleted. Cross-worker visibility proven via 9 tests in `backend/tests/test_auth_profile_store_cross_process.py`. |
+| Scheduled-monitoring across sibling workers. | Resolved | `backend/app/routers/scheduled_monitoring.py` migrated to `JSONFileStore(path=backend/data/scheduled_jobs.json)`; deletes/updates are now visible to all sibling workers. |
+| Encryption key rotation gap. | Resolved | `backend/app/utils/encryption.py` already provides `DATAFORGE_ENCRYPTION_KEY_V1..VN` + `DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION` + fallback decryption across all configured keys + `reencrypt_payload()` for migration. Tested by 12 cases in `backend/tests/test_encryption_rotation.py`.

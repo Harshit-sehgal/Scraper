@@ -471,7 +471,7 @@ def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monk
         name="org-b-write",
         scope=ApiKeyScope.WRITE,
     )
-    auth_profiles_router._auth_profiles.clear()
+    auth_profiles_router._auth_profiles.clear_all()
 
     try:
         created = client.post(
@@ -497,7 +497,7 @@ def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monk
         assert "encrypted_storage_state" not in owner_get.json()
     finally:
         reset_identity_store(None)
-        auth_profiles_router._auth_profiles.clear()
+        auth_profiles_router._auth_profiles.clear_all()
 
 
 def test_project_scoped_key_cannot_access_another_orgs_schedule(client, monkeypatch, tmp_path) -> None:
@@ -518,7 +518,7 @@ def test_project_scoped_key_cannot_access_another_orgs_schedule(client, monkeypa
         name="org-b-write",
         scope=ApiKeyScope.WRITE,
     )
-    scheduled_router._scheduled_jobs.clear()
+    scheduled_router._scheduled_jobs.clear_all()
 
     try:
         created = client.post(
@@ -548,7 +548,7 @@ def test_project_scoped_key_cannot_access_another_orgs_schedule(client, monkeypa
         assert owner_get.status_code == 200
     finally:
         reset_identity_store(None)
-        scheduled_router._scheduled_jobs.clear()
+        scheduled_router._scheduled_jobs.clear_all()
 
 
 def test_saas_signup_is_explicit_public_when_keys_are_not_configured(client, monkeypatch, tmp_path) -> None:

@@ -11,12 +11,14 @@ live in the workflow/job runner.
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.models import AuthProfile, AuthProfileStatus
+from app.utils.auth_profile_store import AuthProfileStore
 from app.utils.encryption import decrypt as encryption_decrypt
 from app.utils.encryption import encrypt as encryption_encrypt
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
@@ -24,37 +26,8 @@ from app.utils.rbac import UserRole, can_access_scoped_resource, require_princip
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth-profiles", tags=["auth-profiles"])
 
-# In-memory auth profile store (replace with DB in production)
-_auth_profiles: dict[str, dict[str, Any]] = {}
-
-
-def _warn_about_inmemory_auth_profile_store() -> None:
-    """Log a CRITICAL warning if production-like ENV is using the in-memory store.
-
-    The auth-profile store is a per-process ``dict`` (the source code
-    carries a ``replace with DB in production`` comment to that effect).
-    In a multi-worker uvicorn/gunicorn deployment, each worker keeps
-    its own in-process copy, so auth-profile writes performed by
-    worker A are invisible to worker B and lost on every worker
-    restart. Surface this loudly so operators cannot deploy to
-    production without acknowledging the limitation.
-    """
-    try:
-        from app.config import settings
-    except ImportError:
-        return
-    env_value = str(getattr(settings, "ENV", "") or "").strip().lower()
-    if env_value in {"production", "staging"}:
-        logger.critical(
-            "Auth profile store is in-memory (per-process dict). "
-            "Multi-worker deployments will see divergent profile state "
-            "and data will not survive worker restarts. Migrate to a "
-            "DB-backed store before deploying %s.",
-            env_value,
-        )
-
-
-_warn_about_inmemory_auth_profile_store()
+# File-backed auth profile store shared across uvicorn/gunicorn workers.
+_auth_profiles = AuthProfileStore()
 
 
 def _now_iso() -> str:
@@ -84,6 +57,21 @@ def _get_visible_profile(profile_id: str, auth: tuple[UserRole, str, str, str]) 
     if item is None or not _can_access_profile(item, auth):
         raise HTTPException(status_code=404, detail="Auth profile not found")
     return item
+
+
+def _write_back(profile: dict[str, Any]) -> None:
+    """Persist a (possibly-mutated) local copy of a profile record.
+
+    The store returns deep copies on every read so direct mutation
+    of the dict the caller holds does NOT persist; this helper is
+    what makes mutations on those copies visible to subsequent
+    reads and to sibling workers.
+    """
+    profile_id = str(profile.get("id") or "")
+    if not profile_id:
+        msg = "auth profile dict missing 'id' before write-back"
+        raise RuntimeError(msg)
+    _auth_profiles.upsert(profile_id, profile)
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +104,7 @@ async def create_auth_profile(
         project_id=project_id,
         status=AuthProfileStatus.PENDING_LOGIN,
     )
-    _auth_profiles[profile.id] = profile.model_dump()
+    _auth_profiles.upsert(profile.id, profile.model_dump())
     logger.info("Auth profile created: %s for domain %s", profile.name, profile.domain)
     return _safe_profile(profile.model_dump())
 
@@ -155,8 +143,8 @@ async def delete_auth_profile(
 ) -> None:
     """Delete an auth profile permanently."""
     _get_visible_profile(profile_id, auth)
-    del _auth_profiles[profile_id]
-    logger.info("Auth profile deleted: %s", profile_id)
+    if _auth_profiles.delete(profile_id):
+        logger.info("Auth profile deleted: %s", profile_id)
 
 
 # ---------------------------------------------------------------------------
@@ -204,8 +192,6 @@ async def complete_login(
     captured after the user has logged in. It is encrypted before storage.
     """
     profile = _get_visible_profile(profile_id, auth)
-    import json
-
     plaintext = json.dumps(storage_state)
     encrypted = encryption_encrypt(plaintext)
 
@@ -214,6 +200,7 @@ async def complete_login(
     profile["status"] = AuthProfileStatus.ACTIVE.value
     profile["updated_at"] = now
     profile["last_validated_at"] = now
+    _write_back(profile)
 
     logger.info("Auth profile login completed: %s for domain %s", profile_id, profile.get("domain"))
     return _safe_profile(profile)
@@ -245,8 +232,6 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     try:
-        import json
-
         plaintext = encryption_decrypt(encrypted)
         storage_state = json.loads(plaintext)
     except (ValueError, TypeError):
@@ -349,11 +334,13 @@ async def validate_profile(
     if expires_at and _now_iso() > expires_at:
         profile["status"] = AuthProfileStatus.EXPIRED.value
         profile["updated_at"] = _now_iso()
+        _write_back(profile)
         return {"valid": False, "status": "expired", "reason": "Session has expired.", "profile": _safe_profile(profile)}
 
     if not has_state:
         profile["status"] = AuthProfileStatus.FAILED.value
         profile["updated_at"] = _now_iso()
+        _write_back(profile)
         return {"valid": False, "status": "failed", "reason": "No stored session state.", "profile": _safe_profile(profile)}
 
     # Optional live HTTP check
@@ -363,6 +350,7 @@ async def validate_profile(
             if not live_result["valid"]:
                 profile["status"] = AuthProfileStatus.EXPIRED.value
                 profile["updated_at"] = _now_iso()
+                _write_back(profile)
                 return {
                     "valid": False,
                     "status": "expired",
@@ -371,10 +359,12 @@ async def validate_profile(
                 }
             # Live check confirmed valid
             profile["last_validated_at"] = _now_iso()
+            _write_back(profile)
             return {"valid": True, "status": "active", "reason": "Live HTTP check passed.", "profile": _safe_profile(profile)}
 
     # Local-only check passed
     profile["last_validated_at"] = _now_iso()
+    _write_back(profile)
     return {"valid": True, "status": "active", "profile": _safe_profile(profile)}
 
 
@@ -396,6 +386,7 @@ async def revoke_profile(
     profile["status"] = AuthProfileStatus.REVOKED.value
     profile["encrypted_storage_state"] = ""
     profile["updated_at"] = _now_iso()
+    _write_back(profile)
     logger.info("Auth profile revoked: %s", profile_id)
     return _safe_profile(profile)
 
@@ -435,10 +426,9 @@ def get_decrypted_storage_state(profile_id: str, expected_domain: str) -> dict[s
     if not encrypted:
         raise HTTPException(status_code=403, detail="No stored session state")
 
-    import json
-
     plaintext = encryption_decrypt(encrypted)
     # Update usage stats
     profile["last_used_at"] = _now_iso()
-    profile["usage_count"] = profile.get("usage_count", 0) + 1
+    profile["usage_count"] = int(profile.get("usage_count", 0) or 0) + 1
+    _write_back(profile)
     return json.loads(plaintext)
