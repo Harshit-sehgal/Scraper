@@ -161,12 +161,28 @@ def _log_export_access(
 
 
 def _get_client_ip_for_audit(request: Request) -> str:
-    """Best-effort client IP extraction for audit log lines."""
+    """Best-effort client IP extraction for audit log lines.
+
+    Delegates to ``app.middlewares._get_client_ip`` so audit logs
+    trust the ``X-Forwarded-For`` header only when the direct client
+    is a configured trusted proxy (nginx). Reading XFF unconditionally
+    would let an unauthenticated caller forge the IP recorded in the
+    audit log via a spoofed header — a direct audit-log-forgery
+    vector for compliance-sensitive export endpoints.
+
+    A broken IP extraction must never turn a successful export into
+    a 5xx, so failures fall back to ``"unknown"``.
+    """
     try:
-        return request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-            request.client.host if request.client else "unknown"
-        )
-    except Exception:
+        from app.middlewares import _get_client_ip
+
+        return _get_client_ip(request)
+    except (ImportError, AttributeError, TypeError):
+        # Catch only the realistic failure modes where audit-fallback
+        # to "unknown" is the safer behaviour than crashing the export.
+        # Other exceptions propagate so regressions in
+        # ``app.middlewares._get_client_ip`` surface in tests rather
+        # than silently degrading audit fidelity.
         return "unknown"
 
 
