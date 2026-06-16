@@ -49,7 +49,7 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
                 await page.goto(step.value or workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
                 try:
                     await page.wait_for_load_state("networkidle", timeout=5000)
-                except Exception:
+                except (RuntimeError, OSError, ValueError):
                     logger.debug("networkidle timeout during goto step %d, continuing", step.order)
                 await asyncio.sleep(PAGE_SETTLE_SECONDS)
                 event["url"] = page.url
@@ -103,7 +103,7 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
                 # EXTRACT is handled separately by the extraction schema
                 event["status"] = "deferred"
 
-        except Exception as exc:
+        except (RuntimeError, OSError, ValueError, TypeError) as exc:
             logger.warning("Workflow step %d (%s) failed: %s", step.order, step.step_type.value, exc)
             event["status"] = "failed"
             event["error"] = str(exc)
@@ -184,7 +184,7 @@ async def _extract_records_from_page(
             }""",
             [{"name": f.name, "field_type": f.field_type.value} for f in workflow.extraction_schema],
         )
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.warning("Page extraction failed: %s", exc)
 
     return records
@@ -255,10 +255,10 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
             await page.goto(workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
             try:
                 await page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
+            except (RuntimeError, OSError, TimeoutError):
                 logger.debug("networkidle timeout during initial navigation")
             await asyncio.sleep(PAGE_SETTLE_SECONDS)
-        except Exception as exc:
+        except (RuntimeError, OSError, ValueError) as exc:
             logger.warning("Failed to navigate to start URL: %s", exc)
             return {
                 "workflow_id": workflow.id,
@@ -277,7 +277,7 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
         try:
             final_url = page.url
             page_title = await page.title()
-        except Exception:
+        except (RuntimeError, OSError, ValueError):
             final_url = workflow.start_url
             page_title = ""
 
@@ -296,7 +296,7 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
             "timestamp": start_time.isoformat(),
         }
 
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.exception("Workflow execution failed for %s", workflow.id)
         return {
             "workflow_id": workflow.id,
@@ -308,7 +308,7 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
         if page is not None:
             try:
                 await page.close()
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.debug("Failed to close Playwright page after workflow execution")
 
 
@@ -359,7 +359,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
             "warnings": [] if sample_records else ["No sample rows matched the extraction schema."],
         }
 
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.exception("Workflow preview failed for %s", workflow.id)
         return {
             "workflow_id": workflow.id,
@@ -371,5 +371,5 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
         if page is not None:
             try:
                 await page.close()
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.debug("Failed to close Playwright page after workflow preview")

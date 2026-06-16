@@ -50,7 +50,7 @@ def _record_page_fetch(job: Any, url: str) -> bool:
     except ValueError:
         logger.warning("Page-fetch quota exceeded for job %s URL %s", getattr(job, "id", ""), url)
         return False
-    except Exception as exc:
+    except (RuntimeError, OSError, TypeError) as exc:
         logger.debug("Page-fetch metering skipped: %s", exc)
         return True
 

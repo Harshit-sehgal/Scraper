@@ -148,7 +148,7 @@ async def delete_my_data(
                 schedule_ids_to_delete.append(sid)
                 del schedule_store[sid]
         summary["scheduled_jobs_deleted"] = len(schedule_ids_to_delete)
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete scheduled jobs for user %s: %s", user_id, e)
 
     # 6. Revoke API keys and remove SaaS identity records
@@ -174,7 +174,7 @@ async def delete_my_data(
                                 if key.user_id == user.id:
                                     api_key_service.revoke(key.id)
                                     summary["api_keys_revoked"] += 1
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError) as e:
             logger.debug("Failed to revoke API keys: %s", e)
 
         # Remove memberships
@@ -195,12 +195,12 @@ async def delete_my_data(
                 for membership in memberships:
                     membership_service.remove_member(membership.id)
                     summary["memberships_removed"] += 1
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError) as e:
             logger.debug("Failed to remove memberships: %s", e)
 
     except ImportError:
         logger.debug("SaaS identity store not available")
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, TypeError) as e:
         logger.warning("Failed to clean up SaaS identity for user %s: %s", user_id, e)
 
     logger.info(

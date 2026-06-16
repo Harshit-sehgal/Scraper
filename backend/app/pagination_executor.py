@@ -118,7 +118,7 @@ async def _extract_current_page(page: Any, extract_fn: Callable[[Any], Awaitable
         return []
     try:
         return await extract_fn(page)
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.warning("Extraction function failed during pagination: %s", exc)
         return []
 

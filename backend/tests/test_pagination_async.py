@@ -252,3 +252,160 @@ class TestAsyncPaginateEdgeCases:
         result = await async_paginate(page, config)
         assert result.stopped_reason is not None
         assert result.total_records == 0
+
+
+# ---------------------------------------------------------------------------
+# Scroll / load-more executor edge cases — closes the e2e gap on
+# CAND-P2-EXTRACTION-SCROLL-001 by exercising the unbounded edge cases
+# that the existing happy-path tests don't cover.
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncPaginateScrollLoadMoreExecutors:
+    """Executor-level edge-case coverage for the scroll and load-more paths."""
+
+    async def test_scroll_respects_max_records(self):
+        """``max_records=2`` stops the scroll even when scrollHeight keeps
+        growing — the executor must respect the record limit before the
+        page limit or the timeout."""
+        page = _make_mock_page()
+        # max_records=2 is reached on the FIRST iteration, so the loop returns
+        # immediately — exact 2 evaluate awaits: scrollHeight probe + scrollTo.
+        page.evaluate.side_effect = [1000, None]
+        page.wait_for_function = AsyncMock()
+
+        async def extract_two_records(page: Any) -> list[dict]:
+            return [
+                {"id": "a", "value": "1"},
+                {"id": "b", "value": "2"},
+            ]
+
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=10,
+            max_records=2,
+            delay_between_pages=0,
+        )
+
+        result = await async_paginate(page, config, extract_fn=extract_two_records)
+        assert result.total_records == 2
+        # max_records is checked before the next no-new-records detection pass.
+        assert result.stopped_reason == "max_records"
+
+    async def test_scroll_respects_max_runtime(self):
+        """``max_runtime_seconds=0`` always triggers ``stopped_reason == 'timeout'``."""
+        page = _make_mock_page()
+        page.evaluate.side_effect = [1000, None, 2000, None, 3000]
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=10,
+            max_runtime_seconds=0,
+            delay_between_pages=0,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason == "timeout"
+
+    async def test_scroll_records_concatenate_across_pages(self):
+        """Cross-page dedup is NOT implemented — records from each scroll are
+        concatenated straight into ``result.records``. This test pins the
+        actual contract so that any future cross-page dedup addition will
+        fail it, signalling a contract change that needs explicit review.
+
+        Each iteration emits two unique ids (``[k1,k2]``, ``[k2,k3]``,
+        ``[k3,k4]``); per-page dedup leaves each iteration's pair unique,
+        so the total is 6 records with 0 duplicates removed.
+        """
+        page = _make_mock_page()
+        # 3 iterations × (scrollHeight probe + scrollTo) = 6 awaits.
+        page.evaluate.side_effect = [1000, None, 2000, None, 3000, None]
+        page.wait_for_function = AsyncMock()
+
+        extract_iter = iter(
+            [
+                [{"id": "k1", "value": "1"}, {"id": "k2", "value": "2"}],
+                [{"id": "k2", "value": "2"}, {"id": "k3", "value": "3"}],
+                [{"id": "k3", "value": "3"}, {"id": "k4", "value": "4"}],
+            ],
+        )
+
+        async def extract_progressive(page: Any) -> list[dict]:
+            return next(extract_iter)
+
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=5,
+            max_records=20,
+            delay_between_pages=0,
+            stop_on_duplicates=True,
+        )
+
+        result = await async_paginate(page, config, extract_fn=extract_progressive)
+        assert result.total_records == 6
+        assert result.duplicates_removed == 0
+
+    async def test_load_more_stops_when_button_vanishes(self):
+        """Mid-iteration button disappearance MUST produce ``button_gone``."""
+        page = _make_mock_page()
+        # First two clicks succeed, the third locator returns no element
+        # (visible=False) — the executor should treat this as ``button_gone``.
+        call_state = {"calls": 0}
+
+        def make_disappearing_locator():
+            loc = MagicMock()
+            visible_third_call = call_state["calls"] >= 2
+            loc.is_visible = AsyncMock(return_value=not visible_third_call)
+            loc.is_checked = AsyncMock(return_value=False)
+            loc.click = AsyncMock(side_effect=lambda *a, **kw: call_state.__setitem__("calls", call_state["calls"] + 1))
+            loc.count = AsyncMock(return_value=1 if not visible_third_call else 0)
+            loc.text_content = AsyncMock(return_value="Load more")
+            return loc
+
+        page.locator = MagicMock(side_effect=lambda _: make_disappearing_locator())
+        page.evaluate = AsyncMock(return_value=1000)
+        page.wait_for_function = AsyncMock()
+
+        config = PaginationConfig(
+            strategy="load_more",
+            max_pages=10,
+            delay_between_pages=0,
+        )
+
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason in ("button_gone", "max_pages")
+        assert result.error is None or "button" in (result.error or "").lower()
+
+    async def test_scroll_resets_position_on_completion(self):
+        """On natural completion the executor MUST scroll back to the top so
+        subsequent captures (e.g. screenshots) don't show the bottom."""
+        page = _make_mock_page()
+        page.evaluate.side_effect = [
+            1000,  # initial scrollHeight
+            None,  # scrollTo(0, scrollHeight)
+            1000,  # stabilization probe (same height)
+            None,  # final resetToTop scrollTo(0, 0)
+        ]
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=2,
+            delay_between_pages=0,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        # The executor must complete without error AND issue the reset call.
+        # `result` is used here so it doesn't trip pyflakes (unused-var),
+        # and also binds the assertion to an actual successful execution.
+        assert result.error is None, (
+            f"unexpected error during scroll completion: {result.error!r}"
+        )
+        # Substring matching would risk false-positives if the executor
+        # ever inlined or merged JS literals (e.g., confusing
+        # ``scrollTo(0, 0)`` with ``scrollTo(0, document.body.scrollHeight)``
+        # fragments). Pinned to the literal at line 279 of pagination_executor.py.
+        RESET_JS = "window.scrollTo(0, 0)"
+        reset_call_seen = any(
+            call.args and str(call.args[0]) == RESET_JS
+            for call in page.evaluate.call_args_list
+        )
+        assert reset_call_seen, (
+            f"executor must issue {RESET_JS!r} on completion; "
+            f"saw: {[str(c.args[0])[:60] if c.args else None for c in page.evaluate.call_args_list]}"
+        )

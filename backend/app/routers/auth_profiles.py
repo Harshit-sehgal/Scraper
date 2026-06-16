@@ -28,6 +28,35 @@ router = APIRouter(prefix="/api/auth-profiles", tags=["auth-profiles"])
 _auth_profiles: dict[str, dict[str, Any]] = {}
 
 
+def _warn_about_inmemory_auth_profile_store() -> None:
+    """Log a CRITICAL warning if production-like ENV is using the in-memory store.
+
+    The auth-profile store is a per-process ``dict`` (the source code
+    carries a ``replace with DB in production`` comment to that effect).
+    In a multi-worker uvicorn/gunicorn deployment, each worker keeps
+    its own in-process copy, so auth-profile writes performed by
+    worker A are invisible to worker B and lost on every worker
+    restart. Surface this loudly so operators cannot deploy to
+    production without acknowledging the limitation.
+    """
+    try:
+        from app.config import settings
+    except ImportError:
+        return
+    env_value = str(getattr(settings, "ENV", "") or "").strip().lower()
+    if env_value in {"production", "staging"}:
+        logger.critical(
+            "Auth profile store is in-memory (per-process dict). "
+            "Multi-worker deployments will see divergent profile state "
+            "and data will not survive worker restarts. Migrate to a "
+            "DB-backed store before deploying %s.",
+            env_value,
+        )
+
+
+_warn_about_inmemory_auth_profile_store()
+
+
 def _now_iso() -> str:
     return datetime.datetime.now(datetime.UTC).isoformat()
 
@@ -220,7 +249,7 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
 
         plaintext = encryption_decrypt(encrypted)
         storage_state = json.loads(plaintext)
-    except Exception:
+    except (ValueError, TypeError):
         logger.debug("Could not decrypt storage state for live check", exc_info=True)
         return None
 
@@ -289,7 +318,7 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
     except httpx.TimeoutException:
         logger.debug("Timeout connecting to %s for live session check", target_url)
         return None
-    except Exception:
+    except (RuntimeError, ValueError, TypeError):
         logger.debug("Live session check failed for %s", target_url, exc_info=True)
         return None
 
