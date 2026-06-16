@@ -3,6 +3,17 @@
 Provides authenticated encryption (AES-256-GCM) for auth profile
 storage_state and other sensitive payloads. Keys are versioned and
 loaded from environment variables — never committed.
+
+Key rotation is supported through versioned env vars:
+
+    DATAFORGE_ENCRYPTION_KEY_V1=<base64-key>
+    DATAFORGE_ENCRYPTION_KEY_V2=<base64-key>   # new key for rotation
+    DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION=v2
+
+Old keys remain available for decryption; new encryptions use the
+active key version.
+
+Generate a key with: python -c "import base64, secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
 """
 
 from __future__ import annotations
@@ -19,10 +30,13 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-# Primary encryption key from environment. Must be a base64-encoded 32-byte key.
-# Generate with: python -c "import base64, secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+# Single-key fallback (legacy, same as before)
 _ENCRYPTION_KEY_ENV = "DATAFORGE_ENCRYPTION_KEY"
 _ENCRYPTION_KEY_VERSION_ENV = "DATAFORGE_ENCRYPTION_KEY_VERSION"
+
+# Multi-key rotation: versioned keys and active version selector
+_ENCRYPTION_KEY_V_PREFIX = "DATAFORGE_ENCRYPTION_KEY_"
+_ACTIVE_KEY_VERSION_ENV = "DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION"
 
 # Default key version for new encryptions
 DEFAULT_KEY_VERSION = "v1"
@@ -51,29 +65,91 @@ class EncryptedPayload(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
-# Key management
+# Key management — multi-version support
 # ---------------------------------------------------------------------------
 
 
 def _get_key(key_version: str = DEFAULT_KEY_VERSION) -> bytes | None:
     """Retrieve the encryption key for a given version.
 
-    In production, the key must be set via the ``DATAFORGE_ENCRYPTION_KEY``
-    environment variable. In development/test, a predictable key is derived
-    from the version string so tests can run without env configuration.
+    Resolution order:
+    1. DATAFORGE_ENCRYPTION_KEY_V{version} (e.g., DATAFORGE_ENCRYPTION_KEY_V1)
+    2. DATAFORGE_ENCRYPTION_KEY (legacy single key)
+    3. Development/test: derive predictable key from version string
+
+    In production, at least one key must be configured. In development/test,
+    a predictable key is derived so tests can run without env configuration.
     """
+    # Try versioned key: DATAFORGE_ENCRYPTION_KEY_V1, _V2, etc.
+    versioned_env_name = f"{_ENCRYPTION_KEY_V_PREFIX}{key_version.upper()}"
+    env_key = os.environ.get(versioned_env_name, "")
+    if env_key:
+        try:
+            return base64.b64decode(env_key)
+        except Exception as exc:
+            logger.warning("Failed to decode encryption key from %s: %s", versioned_env_name, exc)
+            return None
+
+    # Fall back to legacy single key
     env_key = os.environ.get(_ENCRYPTION_KEY_ENV, "")
     if env_key:
         try:
             return base64.b64decode(env_key)
         except Exception as exc:
-            logger.warning("Failed to decode encryption key from env: %s", exc)
+            logger.warning("Failed to decode encryption key from %s: %s", _ENCRYPTION_KEY_ENV, exc)
             return None
+
     # Development fallback: derive predictable key from version
-    # This is NOT secure — only for tests / local dev.
     if os.environ.get("DATAFORGE_ENV", "development").lower() in {"development", "test"}:
         return _derive_test_key(key_version)
     return None
+
+
+def _get_all_available_keys() -> dict[str, bytes]:
+    """Discover all available encryption keys from the environment.
+
+    Scans for DATAFORGE_ENCRYPTION_KEY_V1, _V2, etc. and falls back
+    to the legacy DATAFORGE_ENCRYPTION_KEY (mapped to the version
+    returned by _get_key_version()).
+
+    Returns a dict of {version_string: key_bytes}.
+    """
+    keys: dict[str, bytes] = {}
+
+    # Scan for versioned keys (V1, V2, V3, ...)
+    for env_name, env_value in os.environ.items():
+        if env_name.startswith(_ENCRYPTION_KEY_V_PREFIX) and env_value.strip():
+            version_suffix = env_name[len(_ENCRYPTION_KEY_V_PREFIX) :].lower()
+            if version_suffix:
+                try:
+                    key_bytes = base64.b64decode(env_value)
+                    version = f"v{version_suffix}" if version_suffix.isdigit() else version_suffix
+                    keys[version] = key_bytes
+                except Exception:
+                    logger.debug("Skipping invalid key in %s", env_name)
+                    continue
+
+    # Legacy single key
+    legacy_raw = os.environ.get(_ENCRYPTION_KEY_ENV, "")
+    if legacy_raw:
+        try:
+            legacy_key = base64.b64decode(legacy_raw)
+            # Only add if not already present under its version
+            legacy_version = os.environ.get(_ENCRYPTION_KEY_VERSION_ENV, DEFAULT_KEY_VERSION)
+            if legacy_version not in keys:
+                keys[legacy_version] = legacy_key
+        except Exception:
+            logger.debug("Skipping invalid legacy encryption key")
+
+    # Development/test fallback: ensure at least one key exists
+    if not keys:
+        env = os.environ.get("DATAFORGE_ENV", "development").lower()
+        if env in {"development", "test"}:
+            test_key = _derive_test_key(DEFAULT_KEY_VERSION)
+            keys[DEFAULT_KEY_VERSION] = test_key
+
+    logger.debug("Available encryption keys: %s", list(keys.keys()))
+    return keys
 
 
 def _derive_test_key(version: str) -> bytes:
@@ -84,7 +160,28 @@ def _derive_test_key(version: str) -> bytes:
 
 
 def _get_key_version() -> str:
+    """Return the active key version for NEW encryptions.
+
+    Resolution order:
+    1. DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION env var
+    2. DATAFORGE_ENCRYPTION_KEY_VERSION env var (legacy)
+    3. 'v1' (default)
+    """
+    active = os.environ.get(_ACTIVE_KEY_VERSION_ENV, "")
+    if active:
+        return active
     return os.environ.get(_ENCRYPTION_KEY_VERSION_ENV, DEFAULT_KEY_VERSION)
+
+
+def list_available_key_versions() -> dict[str, bool]:
+    """Return a dict of {version: is_active} for all configured keys.
+
+    The active key version (used for new encryptions) is marked as
+    ``is_active=True``. This is a diagnostic/management function.
+    """
+    active_version = _get_key_version()
+    all_keys = _get_all_available_keys()
+    return {v: (v == active_version) for v in all_keys}
 
 
 # ---------------------------------------------------------------------------
@@ -156,21 +253,31 @@ def encrypt(plaintext: str) -> str:
     ciphertext, nonce, tag, and key version. This format is self-contained
     and versioned for future key rotation.
 
+    Uses the *active* key version for encryption.
+
     Raises:
         EncryptionError: If encryption fails (missing key, library error).
     """
-    key = _get_key()
-    if key is None:
-        env = os.environ.get("DATAFORGE_ENV", "development").lower()
-        if env == "production":
-            msg = f"Encryption key not configured. Set {_ENCRYPTION_KEY_ENV} environment variable."
-            raise EncryptionError(
-                msg,
-            )
-        # In dev/test, derive a test key
-        key = _derive_test_key(DEFAULT_KEY_VERSION)
-
     key_version = _get_key_version()
+    key = _get_key(key_version)
+    if key is None:
+        # Try discovering any available key
+        all_keys = _get_all_available_keys()
+        if all_keys:
+            # Use the first available key
+            key_version = next(iter(all_keys))
+            key = all_keys[key_version]
+        else:
+            # Last resort: dev-only fallback
+            env = os.environ.get("DATAFORGE_ENV", "development").lower()
+            if env == "production":
+                env_var = f"{_ENCRYPTION_KEY_V_PREFIX}{key_version.upper()}"
+                msg = f"Encryption key not configured. Set {env_var} environment variable."
+                raise EncryptionError(msg)
+            # In dev/test, derive a test key
+            key = _derive_test_key(DEFAULT_KEY_VERSION)
+            key_version = DEFAULT_KEY_VERSION
+
     ciphertext, tag, nonce = _aes_gcm_encrypt(plaintext.encode("utf-8"), key)
 
     payload = {
@@ -187,11 +294,16 @@ def encrypt(plaintext: str) -> str:
 def decrypt(encrypted_payload: str) -> str:
     """Decrypt an encrypted payload back to the original plaintext string.
 
+    Attempts to decrypt using the key version stored in the payload.
+    If that key is not available or decryption fails, falls back to
+    trying ALL available keys — supporting key rotation where data
+    encrypted with old keys can still be decrypted.
+
     Args:
         encrypted_payload: The base64-encoded payload returned by :func:`encrypt`.
 
     Raises:
-        DecryptionError: If decryption fails.
+        DecryptionError: If decryption fails with all known keys.
     """
     try:
         import json
@@ -202,22 +314,73 @@ def decrypt(encrypted_payload: str) -> str:
         msg = "Invalid encrypted payload format"
         raise DecryptionError(msg) from exc
 
-    key_version = payload.get("v", DEFAULT_KEY_VERSION)
-    key = _get_key(key_version)
-    if key is None:
-        msg = f"Encryption key not available for version {key_version}"
-        raise DecryptionError(msg)
+    stored_key_version = payload.get("v", DEFAULT_KEY_VERSION)
+
+    # Try the stored key version first
+    key = _get_key(stored_key_version)
+    if key is not None:
+        try:
+            ciphertext = base64.b64decode(payload["c"])
+            nonce = base64.b64decode(payload["n"])
+            tag = base64.b64decode(payload["t"])
+            return _aes_gcm_decrypt(ciphertext, tag, nonce, key).decode("utf-8")
+        except (KeyError, ValueError, DecryptionError) as exc:
+            logger.debug("Decryption with version %s failed: %s", stored_key_version, exc)
+
+    # Fall back to trying all available keys (key rotation support)
+    all_keys = _get_all_available_keys()
+    for version, fallback_key in all_keys.items():
+        if version == stored_key_version:
+            continue  # already tried above
+        try:
+            ciphertext = base64.b64decode(payload["c"])
+            nonce = base64.b64decode(payload["n"])
+            tag = base64.b64decode(payload["t"])
+            result = _aes_gcm_decrypt(ciphertext, tag, nonce, fallback_key)
+            logger.info("Decrypted payload with fallback key version %s (stored: %s)", version, stored_key_version)
+            return result.decode("utf-8")
+        except (KeyError, ValueError, DecryptionError):
+            continue
+
+    msg = f"Decryption failed — no available key for version {stored_key_version} and no fallback key succeeded"
+    raise DecryptionError(msg)
+
+
+def reencrypt_payload(encrypted_payload: str, target_key_version: str | None = None) -> str:
+    """Decrypt and re-encrypt a payload, migrating it to the active key version.
+
+    This is the key rotation migration function: it decrypts using
+    whatever key was used originally (including fallback keys), then
+    re-encrypts using the *active* key version (or *target_key_version*
+    if specified).
+
+    Args:
+        encrypted_payload: Existing encrypted payload to migrate.
+        target_key_version: Target version for re-encryption. Defaults to
+            the active key version from environment.
+
+    Returns:
+        Newly encrypted payload string.
+
+    Raises:
+        DecryptionError: If the input cannot be decrypted.
+        EncryptionError: If re-encryption fails.
+    """
+    plaintext = decrypt(encrypted_payload)
+
+    # Temporarily override the active key version for re-encryption
+    original_active_value = os.environ.get(_ACTIVE_KEY_VERSION_ENV)
+    if target_key_version:
+        os.environ[_ACTIVE_KEY_VERSION_ENV] = target_key_version
 
     try:
-        ciphertext = base64.b64decode(payload["c"])
-        nonce = base64.b64decode(payload["n"])
-        tag = base64.b64decode(payload["t"])
-    except (KeyError, ValueError) as exc:
-        msg = "Malformed encrypted payload"
-        raise DecryptionError(msg) from exc
-
-    plaintext = _aes_gcm_decrypt(ciphertext, tag, nonce, key)
-    return plaintext.decode("utf-8")
+        return encrypt(plaintext)
+    finally:
+        if target_key_version:
+            if original_active_value:
+                os.environ[_ACTIVE_KEY_VERSION_ENV] = original_active_value
+            else:
+                os.environ.pop(_ACTIVE_KEY_VERSION_ENV, None)
 
 
 def is_encrypted(value: str) -> bool:

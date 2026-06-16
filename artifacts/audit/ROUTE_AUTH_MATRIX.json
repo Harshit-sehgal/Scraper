@@ -1,5 +1,5 @@
 {
-  "route_count": 125,
+  "route_count": 129,
   "routes": [
     {
       "method": "GET",
@@ -98,6 +98,42 @@
       "test_coverage": "yes"
     },
     {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/billing/subscriptions",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/billing/subscriptions/{customer_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed",
+      "path": "/api/billing/webhook",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "none",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
       "method": "POST",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
@@ -152,7 +188,7 @@
       "path": "/api/jobs",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role",
+      "route_dependency": "require_plan_limit.<locals>.dependency, require_role",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -1367,6 +1403,18 @@
       "route_dependency": "require_role",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "DELETE",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/user/data",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
       "test_coverage": "yes"
     },
     {

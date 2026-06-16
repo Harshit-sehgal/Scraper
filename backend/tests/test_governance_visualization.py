@@ -6,7 +6,6 @@ import contextlib
 import os
 
 import pytest
-from app.config import settings
 from app.visualization import MAP_PATH, OperatorMode, SystemGovernorDashboard
 
 
@@ -25,16 +24,17 @@ def clean_gov_env():
 
 def test_operator_mode_adjustments() -> None:
     dashboard = SystemGovernorDashboard(mode=OperatorMode.PRODUCTION)
-    assert settings.PLAYWRIGHT_TIMEOUT == 30000
-
-    # Switch to Stealth
+    # _apply_mode_settings should return mode-specific values WITHOUT
+    # mutating global settings (avoids race conditions in concurrent requests).
     adjustments = dashboard.set_operator_mode(OperatorMode.STEALTH)
-    assert settings.PLAYWRIGHT_TIMEOUT == 60000
+    assert adjustments["timeout"] == 60000
+    assert adjustments["settle"] == 6.0
     assert adjustments["stealth"] is True
 
     # Switch to Low-cost
     adjustments_lc = dashboard.set_operator_mode(OperatorMode.LOW_COST)
-    assert settings.PLAYWRIGHT_TIMEOUT == 20000
+    assert adjustments_lc["timeout"] == 20000
+    assert adjustments_lc["settle"] == 2.0
     assert adjustments_lc["stealth"] is False
 
 

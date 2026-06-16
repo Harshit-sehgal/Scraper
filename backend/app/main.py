@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import runtime_deps
+from app.billing.webhooks import router as billing_webhook_router
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
 from app.lifespan import (
@@ -31,6 +32,7 @@ from app.middlewares import (
     csp_report_only_middleware,
     latency_tracking_middleware,
     rate_limiter,
+    security_headers_middleware,
 )
 from app.routers.auth_profiles import router as auth_profiles_router
 
@@ -47,6 +49,7 @@ from app.routers.scheduled_monitoring import router as scheduled_monitoring_rout
 from app.routers.scraper import router as scraper_router
 from app.routers.session import router as session_router
 from app.routers.system import router as system_router
+from app.routers.user_data import router as user_data_router
 from app.routers.workflow import draft_router as workflow_draft_router
 from app.routers.workflow import router as workflow_router
 from app.saas.router import router as saas_router
@@ -104,6 +107,7 @@ def configure_middleware(app: FastAPI) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.middleware("http")(security_headers_middleware)
     app.middleware("http")(csp_report_only_middleware)
     app.middleware("http")(body_size_middleware)
     app.middleware("http")(api_key_middleware)
@@ -156,6 +160,8 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(workflow_draft_router)
     app.include_router(auth_profiles_router)
     app.include_router(scheduled_monitoring_router)
+    app.include_router(user_data_router)
+    app.include_router(billing_webhook_router)
 
     # Experimental / research routes — gated on the same flag that gates
     # the import-time subsystem initialization. Including this router

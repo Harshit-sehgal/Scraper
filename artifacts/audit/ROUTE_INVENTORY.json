@@ -1,5 +1,5 @@
 {
-  "route_count": 135,
+  "route_count": 139,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -148,6 +148,54 @@
     {
       "auth_dependency_if_known": "require_role",
       "category": "stable API routes",
+      "handler_function": "list_subscriptions",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/billing/subscriptions",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.billing.webhooks",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "get_subscription",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/billing/subscriptions/{customer_id}",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.billing.webhooks",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "",
+      "category": "stable API routes",
+      "handler_function": "billing_webhook",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed",
+      "path": "/api/billing/webhook",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "dict",
+      "router_module": "app.billing.webhooks",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
       "handler_function": "discover",
       "method": "POST",
       "middleware_protected": "yes",
@@ -210,7 +258,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_plan_limit.<locals>.dependency, require_role",
       "category": "stable API routes",
       "handler_function": "create_job",
       "method": "POST",
@@ -1840,6 +1888,22 @@
       "router_module": "app.routers.system",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "delete_my_data",
+      "method": "DELETE",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/user/data",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.user_data",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
     },
     {
       "auth_dependency_if_known": "require_principal",

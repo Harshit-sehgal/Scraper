@@ -133,6 +133,11 @@ def classify_zero_result(
 
     html_length = len(html)
 
+    # Stage 0: hard access blocks. Challenge pages can be tiny and may
+    # contain incidental text that generic extractors mistake for data.
+    if _has_anti_bot_patterns(html, visible_text):
+        return _build("anti_bot_block", 0.85)
+
     # Stage 1: Empty response from the detector
     if empty_check.get("is_empty") and empty_check.get("confidence", 0.0) >= settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD:
         return _build("empty_response", empty_check.get("confidence", 0.5))
@@ -203,6 +208,29 @@ def _has_auth_patterns(text: str) -> bool:
 
     text_lower = text.lower()
     return any(re.search(r"\b" + re.escape(pattern) + r"\b", text_lower) for pattern in settings.ZERO_RESULT_AUTH_PATTERNS)
+
+
+def _has_anti_bot_patterns(html: str, visible_text: str) -> bool:
+    """Check source and visible text for access challenge markers."""
+    content = f"{html} {visible_text}".lower()
+    patterns = (
+        "g-recaptcha",
+        "h-captcha",
+        "recaptcha",
+        "hcaptcha",
+        "captcha",
+        "cloudflare",
+        "cf-browser-verification",
+        "checking your browser",
+        "verify you are human",
+        "verify that you are human",
+        "access denied",
+        "security challenge",
+        "bot protection",
+        "dd-captcha",
+        "px-captcha",
+    )
+    return any(pattern in content for pattern in patterns)
 
 
 def _any_field_matches_page(

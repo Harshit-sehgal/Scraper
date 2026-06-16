@@ -117,8 +117,8 @@ class DiscoveryRequest(BaseModel):
     """Request body for auto-discovery mode."""
 
     topic: str = Field(..., description="What topic / data to search for")
-    location: str = Field("", description="Geographic focus, e.g. 'Chennai, India'")
-    domain: str = Field("", description="Preferred domain to search, e.g. 'justdial.com'")
+    location: str = Field("", description="Geographic focus, e.g. 'New York, USA'")
+    domain: str = Field("", description="Preferred domain to search, e.g. 'example.com'")
     num_results: int = Field(8, ge=1, le=50, description="How many URLs to discover")
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum URLs allowed per domain in discovery")
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Source inclusion policy for discovery")
@@ -198,6 +198,7 @@ class JobCreate(BaseModel):
     selectors_map: dict[str, Any] = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
+    auth_profile_id: str | None = Field(default=None, description="Optional auth profile ID to use for authenticated scraping")
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -416,13 +417,11 @@ class Workflow(BaseModel):
     search_params: dict[str, str] = Field(default_factory=dict, description="Search parameters for form submission")
     steps: list[WorkflowStep] = Field(default_factory=list, description="Ordered list of workflow steps")
     extraction_schema: list[SchemaField] = Field(default_factory=list, description="Fields to extract after replay")
+    auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
     pagination_config: WorkflowPaginationConfig = Field(
         default_factory=WorkflowPaginationConfig,
         description="Pagination settings",
     )
-
-    # Auth
-    auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
 
     # Status
     status: WorkflowStatus = Field(default=WorkflowStatus.DRAFT, description="Current workflow status")
@@ -462,6 +461,7 @@ class WorkflowCreate(BaseModel):
     search_params: dict[str, str] = Field(default_factory=dict)
     steps: list[WorkflowStep] = Field(default_factory=list)
     extraction_schema: list[SchemaField] = Field(default_factory=list)
+    auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
     pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)
 
     @model_validator(mode="after")

@@ -1,2 +1,12 @@
 [bandit]
-exclude = backend/tests,backend/benchmarks
+# Excluded from bandit scanning:
+#  - backend/tests: pytest tests legitimately use HTTP smoke calls and
+#    subprocess; the strict posture is enforced on backend/app instead.
+#  - backend/benchmarks: live benchmark scripts bypass some checks by design.
+#  - backend/manual: hand-run exploratory scripts that hit a live DataForge
+#    API server and a target website (see backend/manual/README.md). They
+#    are intentionally excluded from CI linting: they are not part of the
+#    pytest suite, they are not part of the production image, and they are
+#    not covered by ``[tool.bandit]`` in pyproject.toml. This exclusion is
+#    mirrored by ``[tool.ruff.lint.per-file-ignores]`` for ruff.
+exclude = backend/tests,backend/benchmarks,backend/manual

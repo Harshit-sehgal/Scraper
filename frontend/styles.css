@@ -732,6 +732,42 @@ body::after {
   background: var(--danger-soft);
 }
 
+[data-theme="dark"] .badge.pending {
+  background: #3d2d10;
+  color: #e6a020;
+}
+
+[data-theme="dark"] .badge.discovering,
+[data-theme="dark"] .badge.running {
+  background: #142d3d;
+  color: #4aa3d4;
+}
+
+[data-theme="dark"] .badge.completed {
+  background: #143d24;
+  color: #2ecc71;
+}
+
+[data-theme="dark"] .badge.degraded {
+  background: #3d2d10;
+  color: #e6a020;
+}
+
+[data-theme="dark"] .badge.empty_result {
+  background: #3d2d10;
+  color: #e6a020;
+}
+
+[data-theme="dark"] .badge.canceled {
+  background: #2d1a3d;
+  color: #b388ff;
+}
+
+[data-theme="dark"] .badge.failed {
+  background: #3d1818;
+  color: #e74c4c;
+}
+
 .job-records {
   font-family: var(--mono);
   color: var(--ink-soft);
@@ -1983,14 +2019,17 @@ kbd {
   color: var(--danger);
   font-weight: 600;
 }
+
 .intelligence-value.risk-medium {
   color: var(--warning);
   font-weight: 600;
 }
+
 .intelligence-value.risk-low {
   color: var(--success);
   font-weight: 600;
 }
+
 .intelligence-value.risk-blocked {
   color: var(--danger);
   font-weight: 700;
@@ -2202,6 +2241,7 @@ kbd {
   .workflow-builder-grid {
     grid-template-columns: 1fr;
   }
+
   .workflow-builder-row {
     flex-direction: column;
   }
@@ -2557,6 +2597,16 @@ kbd {
   color: var(--danger);
 }
 
+/* ─── Auth Profiles ─── */
+.auth-profiles-list-head {
+  grid-template-columns: 1fr 1fr 1fr 128px !important;
+}
+
+.auth-profiles-row {
+  grid-template-columns: 1fr 1fr 1fr 128px !important;
+}
+
+/* ─── Dashboard Loading ─── */
 .dash-loading {
   padding: 1.5rem;
   text-align: center;

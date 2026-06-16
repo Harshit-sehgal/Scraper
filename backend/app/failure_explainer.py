@@ -176,6 +176,8 @@ def explain_failure(failure_type: str) -> FailureExplanation:
         FailureExplanation with user-friendly message and action.
     """
     info = _FAILURE_MAP.get(failure_type, _FAILURE_MAP["unknown_error"])
+    if failure_type not in _FAILURE_MAP:
+        failure_type = "unknown_error"
     return FailureExplanation(
         failure_type=failure_type,
         user_message=info["user_message"],

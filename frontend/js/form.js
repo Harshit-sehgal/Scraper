@@ -53,6 +53,32 @@ export async function initForm() {
   const { clearAnalysis } = await import("./analyzer.js");
   clearAnalysis();
   addField();
+
+  // Refresh auth profile dropdown
+  _refreshAuthProfileDropdown();
+}
+
+async function _refreshAuthProfileDropdown() {
+  const select = document.getElementById("inp-auth-profile");
+  if (!select) return;
+  try {
+    const res = await apiFetch(`${API}/api/auth-profiles`, { method: "GET" });
+    if (!res.ok) {
+      select.innerHTML = '<option value="">Unable to load profiles</option>';
+      return;
+    }
+    const data = await res.json();
+    const items = data.items || [];
+    const options = ['<option value="">None (public access)</option>'];
+    for (const profile of items) {
+      if (profile.status === "active") {
+        options.push(`<option value="${profile.id}">${profile.name} (${profile.domain})</option>`);
+      }
+    }
+    select.innerHTML = options.join("");
+  } catch {
+    select.innerHTML = '<option value="">Unable to load profiles</option>';
+  }
 }
 
 // ─── Add Schema Field ───
@@ -420,6 +446,8 @@ export async function submitJob(e) {
     }
   }
 
+  const authProfileId = document.getElementById("inp-auth-profile")?.value?.trim() || "";
+
   const payload = {
     name,
     mode: currentMode,
@@ -440,6 +468,7 @@ export async function submitJob(e) {
     pagination: document.getElementById("chk-pagination")?.checked ?? false,
     max_pages: maxPages,
     min_record_score: minScore,
+    auth_profile_id: authProfileId || undefined,
   };
 
   const btn = document.getElementById("btn-submit");

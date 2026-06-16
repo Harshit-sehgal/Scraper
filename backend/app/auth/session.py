@@ -226,6 +226,11 @@ def verify_session_cookie(cookie_value: str) -> str | None:
     return str(payload["role"])
 
 
+def _session_cookie_secure() -> bool:
+    """Require HTTPS-only session cookies in production-like environments."""
+    return (settings.ENV or "").strip().lower() in {"production", "staging"}
+
+
 def set_session_cookie(response: Response, role: str, user_id: str = "") -> None:
     """Set the session cookie on *response* for the authenticated principal."""
     cookie_value = create_session_cookie(role, user_id=user_id)
@@ -235,7 +240,7 @@ def set_session_cookie(response: Response, role: str, user_id: str = "") -> None
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="strict",
-        secure=True,
+        secure=_session_cookie_secure(),
         path="/",
     )
 
@@ -247,7 +252,7 @@ def clear_session_cookie(response: Response) -> None:
         path="/",
         httponly=True,
         samesite="strict",
-        secure=True,
+        secure=_session_cookie_secure(),
     )
 
 

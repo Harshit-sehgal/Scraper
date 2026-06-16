@@ -95,6 +95,8 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
         ("DELETE", "/api/session"),  # self-service auth — any authenticated user can clear their session
         ("POST", "/api/saas/signup"),  # self-service account creation
         ("POST", "/api/saas/aup/accept"),  # P1-COMPLIANCE-001: AUP acceptance (idempotent, any authenticated user)
+        ("DELETE", "/api/user/data"),  # self-service data deletion — any authenticated user can delete their own data
+        ("POST", "/api/billing/webhook"),  # billing webhook called by Autumn/Stripe (no API key)
     }
 
     unsafe = [

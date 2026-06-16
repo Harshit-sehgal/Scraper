@@ -57,8 +57,191 @@ import {
   checkSession,
 } from "./js/api.js";
 import { setMode } from "./js/views.js";
+import { initAuthProfiles } from "./js/auth-profiles.js";
+
+function onDocumentClick(e) {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+
+  const action = btn.getAttribute("data-action");
+  const id = btn.getAttribute("data-id") || "";
+  const mode = btn.getAttribute("data-mode") || "";
+  const view = btn.getAttribute("data-view") || "";
+
+  switch (action) {
+    case "view-results":
+      if (id) viewResults(id);
+      break;
+    case "cancel-job":
+      if (id) cancelJob(id);
+      break;
+    case "delete-job":
+      if (id) deleteJob(id);
+      break;
+    case "restore-job":
+      if (id) restoreJob(id);
+      break;
+    case "hard-delete-job":
+      if (id) hardDeleteJob(id);
+      break;
+    case "remove-field":
+      btn.closest(".field-row")?.remove();
+      break;
+    case "remove-filter":
+      btn.closest(".filter-row")?.remove();
+      break;
+    case "toast-info": {
+      const msg = btn.getAttribute("data-message");
+      if (msg) toast(msg, "info");
+      break;
+    }
+    case "save-apikey":
+      saveKeyFromModal();
+      break;
+    case "close-apikey":
+      closeKeyModal();
+      break;
+    case "show-api-key":
+      showApiKeyPrompt();
+      break;
+    case "show-admin-key":
+      showAdminKeyPrompt();
+      break;
+    case "switch-view":
+      if (view) switchView(view);
+      break;
+    case "clear-terminal-jobs":
+      clearTerminalJobs();
+      break;
+    case "refresh-jobs":
+      refreshJobsManual();
+      break;
+    case "clear-recycle-bin":
+      clearRecycleBin();
+      break;
+    case "refresh-dashboard":
+      refreshDashboard();
+      break;
+    case "switch-operator-mode":
+      if (mode) switchOperatorMode(mode);
+      break;
+    case "analyze-url":
+      analyzeURL();
+      break;
+    case "toggle-all-fields":
+      toggleAllFields(btn.getAttribute("data-select") === "true");
+      break;
+    case "apply-fields":
+      applyAnalyzedFields();
+      break;
+    case "clear-analysis":
+      clearAnalysis();
+      break;
+    case "url-direct-scrape":
+      continueWithDirectScrape();
+      break;
+    case "url-create-workflow-draft":
+      createWorkflowDraftFromAnalysis();
+      break;
+    case "url-auth-profile":
+      showAuthProfileEntryNotice();
+      break;
+    case "set-mode":
+      if (mode) setMode(mode);
+      break;
+    case "suggest-schema":
+      suggestSchemaFromIntent();
+      break;
+    case "preview-discovery":
+      previewDiscovery();
+      break;
+    case "add-field":
+      addField();
+      break;
+    case "add-filter":
+      addFilter();
+      break;
+    case "reclean-job":
+      recleanCurrentJob();
+      break;
+    case "export-csv":
+      exportCSV();
+      break;
+    case "export-json":
+      exportJSON();
+      break;
+    case "export-excel":
+      exportExcel();
+      break;
+    case "toggle-theme":
+      toggleTheme();
+      break;
+    case "show-shortcuts":
+      showShortcuts();
+      break;
+    case "close-shortcuts":
+      hideShortcuts();
+      break;
+    case "close-confirm":
+      closeConfirm();
+      break;
+    case "confirm-action":
+      executeConfirm();
+      break;
+    case "copy-job-id":
+      if (id)
+        navigator.clipboard
+          ?.writeText?.(id)
+          ?.then?.(() => {
+            btn.textContent = "✓";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              btn.textContent = "📋";
+              btn.classList.remove("copied");
+            }, 2000);
+          })
+          ?.catch?.(() => {});
+      break;
+    case "refresh-cognition":
+      refreshCognition();
+      break;
+    case "toggle-field-item": {
+      // If the user clicked the checkbox itself, the change handler
+      // below will already have toggled the `selected` class. Skip
+      // here to avoid double-toggling (which would silently undo the
+      // user's click).
+      if (e.target.matches(".analyze-field-checkbox")) {
+        break;
+      }
+      const checkbox = btn.querySelector(".analyze-field-checkbox");
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        btn.classList.toggle("selected", checkbox.checked);
+      }
+      break;
+    }
+  }
+}
+
+function onDocumentChange(e) {
+  const sel = e.target.closest(".ff-op");
+  if (sel) {
+    onFilterOpChange(sel);
+  }
+
+  const checkbox = e.target.closest(".analyze-field-checkbox");
+  if (checkbox) {
+    const item = checkbox.closest(".analyze-field-item");
+    if (item) item.classList.toggle("selected", checkbox.checked);
+  }
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
+  // Attach delegated handlers before the first network await so early
+  // user clicks on visible controls are not dropped during startup.
+  document.addEventListener("click", onDocumentClick);
+  document.addEventListener("change", onDocumentChange);
+
   // G2: Try session auth first — if the browser already has a valid
   // session cookie, no API key prompt is needed.
   await checkSession();
@@ -192,8 +375,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Init theme ──
   initTheme();
 
+  // ── Init auth profiles module ──
+  initAuthProfiles();
+
   // ── Initial view ──
-  let initialView = ["jobs", "new", "recycle", "cognition", "dashboard"].includes(String(uiState.view || ""))
+  let initialView = ["jobs", "new", "recycle", "cognition", "dashboard", "auth-profiles"].includes(
+    String(uiState.view || ""),
+  )
     ? String(uiState.view)
     : "jobs";
   // H2: Guard initial view restoration for cognition
@@ -202,232 +390,64 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   switchView(initialView);
 
-  // ── Polling intervals (recursive setTimeout to prevent overlapping calls) ──
+  // ── Polling Intervals (refactored to use setInterval with cleanup) ──
+  class JobStatusPoller {
+    constructor(callback, interval, name = "poller") {
+      this.callback = callback;
+      this.interval = interval;
+      this.name = name;
+      this.timer = null;
+      this.isRunning = false;
+    }
+
+    async _tick() {
+      if (document.hidden) return; // Skip if tab is not visible to save resources
+      this.isRunning = true;
+      setEnginePolling(true);
+      try {
+        await this.callback();
+      } catch (e) {
+        console.warn(`"Polling error in ${this.name}:"`, e);
+      } finally {
+        setEnginePolling(false);
+        this.isRunning = false;
+      }
+    }
+
+    start() {
+      if (this.timer) return;
+      this.timer = setInterval(() => this._tick(), this.interval);
+    }
+
+    stop() {
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = null;
+      }
+    }
+  }
+
   const refreshInterval =
     typeof window.DATAFORGE_REFRESH_INTERVAL === "number" ? window.DATAFORGE_REFRESH_INTERVAL : 10000;
   const statusInterval =
     typeof window.DATAFORGE_STATUS_INTERVAL === "number" ? window.DATAFORGE_STATUS_INTERVAL : 10000;
-  const scheduleJobsRefresh = () => {
-    setTimeout(async () => {
-      setEnginePolling(true);
-      try {
-        await refreshJobs();
-      } finally {
-        setEnginePolling(false);
-        updateJobsLastUpdatedLabel();
-        scheduleJobsRefresh();
-      }
-    }, refreshInterval);
-  };
-  const scheduleStatusRefresh = () => {
-    setTimeout(async () => {
-      try {
-        await refreshSystemStatus();
-      } finally {
-        scheduleStatusRefresh();
-      }
-    }, statusInterval);
-  };
-  const scheduleDashboardRefresh = () => {
-    setTimeout(async () => {
-      const { currentView } = window.__DATAFORGE_VIEW || {};
-      if (currentView === "dashboard") {
-        try {
-          await refreshDashboard();
-        } catch (e) {
-          console.warn("Dashboard refresh failed:", e);
-        }
-      }
-      scheduleDashboardRefresh();
-    }, 30000);
-  };
-  scheduleJobsRefresh();
-  scheduleStatusRefresh();
-  scheduleDashboardRefresh();
+
+  // Initialize pollers
+  const jobsPoller = new JobStatusPoller(refreshJobs, refreshInterval, "jobs");
+  const statusPoller = new JobStatusPoller(refreshSystemStatus, statusInterval, "status");
+
+  jobsPoller.start();
+  statusPoller.start();
+
+  // Cleanup on page unload
+  window.addEventListener("beforeunload", () => {
+    jobsPoller.stop();
+    statusPoller.stop();
+  });
 
   // Engine connection check
   window.addEventListener("online", () => setEnginePolling(true));
   window.addEventListener("offline", () => setEnginePolling(false));
-
-  // ── Central event delegation for all data-action elements ──
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-action]");
-    if (!btn) return;
-
-    const action = btn.getAttribute("data-action");
-    const id = btn.getAttribute("data-id") || "";
-    const mode = btn.getAttribute("data-mode") || "";
-    const view = btn.getAttribute("data-view") || "";
-
-    switch (action) {
-      case "view-results":
-        if (id) viewResults(id);
-        break;
-      case "cancel-job":
-        if (id) cancelJob(id);
-        break;
-      case "delete-job":
-        if (id) deleteJob(id);
-        break;
-      case "restore-job":
-        if (id) restoreJob(id);
-        break;
-      case "hard-delete-job":
-        if (id) hardDeleteJob(id);
-        break;
-      case "remove-field":
-        btn.closest(".field-row")?.remove();
-        break;
-      case "remove-filter":
-        btn.closest(".filter-row")?.remove();
-        break;
-      case "toast-info": {
-        const msg = btn.getAttribute("data-message");
-        if (msg) toast(msg, "info");
-        break;
-      }
-      case "save-apikey":
-        saveKeyFromModal();
-        break;
-      case "close-apikey":
-        closeKeyModal();
-        break;
-      case "show-api-key":
-        showApiKeyPrompt();
-        break;
-      case "show-admin-key":
-        showAdminKeyPrompt();
-        break;
-      case "switch-view":
-        if (view) switchView(view);
-        break;
-      case "clear-terminal-jobs":
-        clearTerminalJobs();
-        break;
-      case "refresh-jobs":
-        refreshJobsManual();
-        break;
-      case "clear-recycle-bin":
-        clearRecycleBin();
-        break;
-      case "refresh-dashboard":
-        refreshDashboard();
-        break;
-      case "switch-operator-mode":
-        if (mode) switchOperatorMode(mode);
-        break;
-      case "analyze-url":
-        analyzeURL();
-        break;
-      case "toggle-all-fields":
-        toggleAllFields(btn.getAttribute("data-select") === "true");
-        break;
-      case "apply-fields":
-        applyAnalyzedFields();
-        break;
-      case "clear-analysis":
-        clearAnalysis();
-        break;
-      case "url-direct-scrape":
-        continueWithDirectScrape();
-        break;
-      case "url-create-workflow-draft":
-        createWorkflowDraftFromAnalysis();
-        break;
-      case "url-auth-profile":
-        showAuthProfileEntryNotice();
-        break;
-      case "set-mode":
-        if (mode) setMode(mode);
-        break;
-      case "suggest-schema":
-        suggestSchemaFromIntent();
-        break;
-      case "preview-discovery":
-        previewDiscovery();
-        break;
-      case "add-field":
-        addField();
-        break;
-      case "add-filter":
-        addFilter();
-        break;
-
-      case "reclean-job":
-        recleanCurrentJob();
-        break;
-      case "export-csv":
-        exportCSV();
-        break;
-      case "export-json":
-        exportJSON();
-        break;
-      case "export-excel":
-        exportExcel();
-        break;
-      case "toggle-theme":
-        toggleTheme();
-        break;
-      case "show-shortcuts":
-        showShortcuts();
-        break;
-      case "close-shortcuts":
-        hideShortcuts();
-        break;
-      case "close-confirm":
-        closeConfirm();
-        break;
-      case "confirm-action":
-        executeConfirm();
-        break;
-      case "copy-job-id":
-        if (id)
-          navigator.clipboard
-            ?.writeText?.(id)
-            ?.then?.(() => {
-              btn.textContent = "✓";
-              btn.classList.add("copied");
-              setTimeout(() => {
-                btn.textContent = "📋";
-                btn.classList.remove("copied");
-              }, 2000);
-            })
-            ?.catch?.(() => {});
-        break;
-      case "refresh-cognition":
-        refreshCognition();
-        break;
-      case "toggle-field-item": {
-        // If the user clicked the checkbox itself, the change handler
-        // below will already have toggled the `selected` class. Skip
-        // here to avoid double-toggling (which would silently undo the
-        // user's click).
-        if (e.target.matches(".analyze-field-checkbox")) {
-          break;
-        }
-        const checkbox = btn.querySelector(".analyze-field-checkbox");
-        if (checkbox) {
-          checkbox.checked = !checkbox.checked;
-          btn.classList.toggle("selected", checkbox.checked);
-        }
-        break;
-      }
-    }
-  });
-
-  // ── Delegated change handler for filter operation select ──
-  document.addEventListener("change", (e) => {
-    const sel = e.target.closest(".ff-op");
-    if (sel) {
-      onFilterOpChange(sel);
-    }
-
-    const checkbox = e.target.closest(".analyze-field-checkbox");
-    if (checkbox) {
-      const item = checkbox.closest(".analyze-field-item");
-      if (item) item.classList.toggle("selected", checkbox.checked);
-    }
-  });
 
   // ── Job form submit ──
   const jobForm = document.getElementById("job-form");

@@ -131,11 +131,19 @@ deps-check: ## Validate pyproject.toml dependency bounds (single source of truth
 
 lint-all: lint mypy boundary deps-check ## Run full lint + type + boundary + deps suite
 
-# Local validation with bounded logs (does not require Docker)
-validate: ## Run quick local validation and write artifacts/validation logs
+# Local validation with bounded logs (does not require Docker).
+# `make validate` is the default quality gate and runs the full suite so
+# that no "quick passed" / "full failed" gap can sneak in locally. If
+# you only want the bounded gate (faster, no full backend pytest / ruff
+# / bandit), call `validate-quick` explicitly. Both write fresh
+# artifacts under ``artifacts/validation/`` and ``artifacts/validation/runs/``.
+validate: ## Run full local validation and write artifacts/validation logs (default gate)
+	python3 scripts/validate_local.py --full
+
+validate-quick: ## Run quick local validation only (subset of the full gate)
 	python3 scripts/validate_local.py --quick
 
-validate-full: ## Run full local validation and write artifacts/validation logs
+validate-full: ## Alias for ``validate`` — explicit form for clarity
 	python3 scripts/validate_local.py --full
 
 validate-backend: ## Run backend validation and full backend tests

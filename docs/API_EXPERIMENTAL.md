@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-12 18:47:09 UTC
+**Generated:** 2026-06-15 23:39:19 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -144,10 +144,14 @@ For the diff between stable and experimental, see
 | --- | --- |
 | DELETE | `/api/auth-profiles/{profile_id}` |
 | DELETE | `/api/saas/memberships/{membership_id}` |
+| DELETE | `/api/saas/projects/{project_id}/keys/{key_id}` |
 | DELETE | `/api/scheduled/{job_id}` |
+| DELETE | `/api/user/data` |
 | DELETE | `/api/workflows/{workflow_id}` |
 | GET | `/api/auth-profiles` |
 | GET | `/api/auth-profiles/{profile_id}` |
+| GET | `/api/billing/subscriptions` |
+| GET | `/api/billing/subscriptions/{customer_id}` |
 | GET | `/api/intelligence/analyze-url` |
 | GET | `/api/saas/aup/status` |
 | GET | `/api/saas/me` |
@@ -157,6 +161,7 @@ For the diff between stable and experimental, see
 | GET | `/api/saas/orgs/{org_id}/projects` |
 | GET | `/api/saas/plan` |
 | GET | `/api/saas/projects/{project_id}` |
+| GET | `/api/saas/projects/{project_id}/keys` |
 | GET | `/api/scheduled` |
 | GET | `/api/scheduled/{job_id}` |
 | GET | `/api/scheduled/{job_id}/changes` |
@@ -164,9 +169,15 @@ For the diff between stable and experimental, see
 | GET | `/api/workflows/{workflow_id}` |
 | PATCH | `/api/workflows/{workflow_id}` |
 | POST | `/api/auth-profiles` |
+| POST | `/api/auth-profiles/{profile_id}/complete-login` |
+| POST | `/api/auth-profiles/{profile_id}/revoke` |
+| POST | `/api/auth-profiles/{profile_id}/start-login` |
+| POST | `/api/auth-profiles/{profile_id}/validate` |
+| POST | `/api/billing/webhook` |
 | POST | `/api/saas/aup/accept` |
 | POST | `/api/saas/orgs` |
 | POST | `/api/saas/projects` |
+| POST | `/api/saas/projects/{project_id}/keys` |
 | POST | `/api/saas/signup` |
 | POST | `/api/scheduled` |
 | POST | `/api/workflow-drafts/from-url-analysis` |
@@ -178,4 +189,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 118
+**Total routes:** 129

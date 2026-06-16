@@ -363,7 +363,7 @@ class TestPostgresSchemaRepairIntegration:
     def test_recycle_bin_created_when_missing_from_v1(self, postgres_container) -> None:
         """Given: schema_version=1, jobs table exists, recycle_bin is missing.
         When: PostgresJobRepository is created and health_check() called.
-        Then: recycle_bin table is created, schema upgraded to version 2.
+        Then: recycle_bin table is created and schema is upgraded to the current version.
         """
         import psycopg2
         from app.postgres_repository import (
@@ -372,6 +372,7 @@ class TestPostgresSchemaRepairIntegration:
             _conn,
             _fetch_one,
         )
+        from app.postgres_repository_base import _CURRENT_SCHEMA_VERSION
         from app.storage_interface import reset_repository
 
         dsn = os.environ["DATAFORGE_DATABASE_URL"]
@@ -401,7 +402,9 @@ class TestPostgresSchemaRepairIntegration:
         health = repo.health_check()
 
         assert health["ok"] is True, f"Health check failed: {health}"
-        assert health["schema_version"] == 4, f"Expected schema_version=4 after repair, got {health['schema_version']}"
+        assert health["schema_version"] == _CURRENT_SCHEMA_VERSION, (
+            f"Expected schema_version={_CURRENT_SCHEMA_VERSION} after repair, got {health['schema_version']}"
+        )
 
         # Verify recycle_bin table now exists
         _close_pool()

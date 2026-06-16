@@ -4,7 +4,7 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 125
+**API route rows:** 129
 **Unknown auth rows:** 0
 **Unknown tenant-scope rows:** 0
 
@@ -20,11 +20,14 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/auth-profiles/{profile_id}/revoke` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/start-login` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/validate` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/intelligence/analyze-url` | protected | authenticated-user | none | yes | no | unknown | stable | protected by global /api middleware; no route-level role dependency |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/jobs` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/cleanup/terminal` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `DELETE` | `/api/jobs/{job_id}` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/jobs/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
@@ -126,6 +129,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/system/storage/status` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/system/topology` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `POST` | `/api/url/analyze` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/user/data` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/workflow-drafts/from-url-analysis` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/workflow-drafts/{draft_id}/detect-fields` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/workflow-drafts/{draft_id}/manual-mapping` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |

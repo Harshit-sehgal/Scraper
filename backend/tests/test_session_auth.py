@@ -41,6 +41,28 @@ def test_session_create_and_verify(client, monkeypatch) -> None:
     assert me_data["role"] == "user"
 
 
+def test_session_cookie_is_http_compatible_outside_production(client, monkeypatch) -> None:
+    """Local HTTP app sessions must work without weakening production cookies."""
+    _set_api_key(monkeypatch, key="test-api-key-123")
+    monkeypatch.setattr(settings, "ENV", "test")
+
+    r = client.post("/api/session", headers={"X-API-Key": "test-api-key-123"})
+
+    assert r.status_code == 200
+    assert "secure" not in r.headers.get("set-cookie", "").lower()
+
+
+def test_session_cookie_is_secure_in_production(client, monkeypatch) -> None:
+    """Production session cookies must require HTTPS transport."""
+    _set_api_key(monkeypatch, key="test-api-key-123")
+    monkeypatch.setattr(settings, "ENV", "production")
+
+    r = client.post("/api/session", headers={"X-API-Key": "test-api-key-123"})
+
+    assert r.status_code == 200
+    assert "secure" in r.headers.get("set-cookie", "").lower()
+
+
 def test_session_rejects_invalid_key(client, monkeypatch) -> None:
     """POST /api/session with an invalid API key returns 403."""
     _set_api_key(monkeypatch, key="real-key")

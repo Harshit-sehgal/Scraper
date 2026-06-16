@@ -25,6 +25,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ADMIN_API_KEY` | - | Admin API key |
 | `DATAFORGE_SESSION_SECRET` | - | Session signing secret (auto-generated if not set) |
 | `DATAFORGE_ALLOW_INSECURE_DEV_AUTH` | `false` | Allow insecure auth in development |
+| `DATAFORGE_BILLING_WEBHOOK_SECRET` | - | Shared secret for billing webhook HMAC/shared-secret verification |
 
 ## Rate Limiting
 
@@ -58,6 +59,9 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_TRUSTED_PROXIES` | - | Comma-separated list of trusted proxies |
 | `DATAFORGE_ALLOWED_INTERNAL_HOSTS` | - | Comma-separated list of allowed internal hosts |
 | `DATAFORGE_DENYLIST_DB_PATH` | - | Optional SQLite path for the operator-managed domain denylist |
+| `DATAFORGE_ENCRYPTION_KEY` | - | Base64 AES-GCM key for auth-profile storage state encryption |
+| `DATAFORGE_ENCRYPTION_KEY_` | - | Prefix for versioned encryption keys such as `DATAFORGE_ENCRYPTION_KEY_V1` |
+| `DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION` | `v1` | Active version used for new encrypted payloads |
 
 ## Experimental Features
 

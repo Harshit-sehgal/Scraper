@@ -293,3 +293,72 @@ class TestOrchestrateExtraction:
             min_record_score=0.1,
         )
         assert isinstance(result, ExtractionResult)
+
+    @pytest.mark.asyncio
+    async def test_regex_supersedes_sparse_visible_text_records(self, monkeypatch) -> None:
+        """Structural extraction should beat sparse visible-text guesses."""
+        from types import SimpleNamespace
+
+        import app.extraction_orchestrator as orchestrator
+
+        class DummyMemory:
+            def get_selectors(self, _url):
+                return None
+
+            def record_success(self, *_args, **_kwargs) -> None:
+                return None
+
+            def record_failure(self, *_args, **_kwargs) -> None:
+                return None
+
+        async def no_selectors(*_args, **_kwargs):
+            return None
+
+        async def no_containers(*_args, **_kwargs):
+            return SimpleNamespace(all_passed=False, final_records=[], total_records=0, best_selector="")
+
+        monkeypatch.setattr(orchestrator, "get_selector_memory", DummyMemory)
+        monkeypatch.setattr(orchestrator, "extract_from_network", lambda *_args, **_kwargs: [])
+        monkeypatch.setattr(orchestrator, "discover_selectors", no_selectors)
+        monkeypatch.setattr(orchestrator, "multi_pass_container_extraction", no_containers)
+        monkeypatch.setattr(orchestrator, "classify_container_failure", lambda _result: {"failure_class": "no_containers"})
+        monkeypatch.setattr(
+            orchestrator,
+            "extract_from_visible_blocks",
+            lambda *_args, **_kwargs: [
+                {"text": "Oscar Wilde", "author": "Frank Zappa", "record_score": 0.65},
+                {"text": "Oscar Wilde", "author": "Frank Zappa", "record_score": 0.65},
+            ],
+        )
+
+        html = """
+        <html>
+          <body>
+            <div class="quote">
+              <p class="text">"Be yourself; everyone else is already taken."</p>
+              <small class="author">Oscar Wilde</small>
+            </div>
+            <div class="quote">
+              <p class="text">"So many books, so little time."</p>
+              <small class="author">Frank Zappa</small>
+            </div>
+          </body>
+        </html>
+        """
+        fields = [
+            SchemaField(name="text", field_type=FieldType.STRING, description="Quote text", required=True),
+            SchemaField(name="author", field_type=FieldType.STRING, description="Quote author", required=True),
+        ]
+
+        result = await orchestrator.orchestrate_extraction(
+            url="https://example.com/quotes",
+            html=html,
+            schema_fields=fields,
+            min_record_score=0.1,
+        )
+
+        assert result.method == "regex"
+        assert [{field: row.get(field) for field in ("text", "author")} for row in result.records] == [
+            {"text": "Be yourself; everyone else is already taken.", "author": "Oscar Wilde"},
+            {"text": "So many books, so little time.", "author": "Frank Zappa"},
+        ]
