@@ -278,9 +278,9 @@ class StrategyEvolutionEngine:
                 logger.debug("Anti-bot detection failed during cold start", exc_info=True)
 
             return StrategyRecommendation(
-                recommended_strategy=FetchStrategy.PLAYWRIGHT_FULL,
-                alternatives=[FetchStrategy.HYBRID],
-                reason="Cold start: using default safe strategy",
+                recommended_strategy=FetchStrategy.HYBRID,
+                alternatives=[FetchStrategy.PLAYWRIGHT_FULL],
+                reason="Cold start: trying safe HTTP first with browser fallback",
                 confidence=0.4,
                 estimated_success_rate=0.6,
             )

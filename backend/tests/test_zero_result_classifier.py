@@ -48,6 +48,13 @@ class TestZeroResultClassification:
         result = classify_zero_result(anti_bot_score=0.95)
         assert result.failure_class == "anti_bot_block"
 
+    def test_captcha_html_pattern(self) -> None:
+        result = classify_zero_result(
+            html='<html><body><h1>Please complete CAPTCHA</h1><div class="g-recaptcha"></div></body></html>',
+            visible_text="Please complete CAPTCHA",
+        )
+        assert result.failure_class == "anti_bot_block"
+
     def test_anti_bot_score_at_threshold(self) -> None:
         result = classify_zero_result(anti_bot_score=0.80)
         assert result.failure_class == "anti_bot_block"

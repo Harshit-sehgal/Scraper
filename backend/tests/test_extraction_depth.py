@@ -182,7 +182,7 @@ class TestFailureExplainer:
 
     def test_detect_selector_not_found(self):
         explanation = detect_failure(selector_found=False, records_found=0)
-        assert explanation.failure_type == "no_records_found"
+        assert explanation.failure_type == "selector_not_found"
 
     def test_detect_no_records(self):
         explanation = detect_failure(records_found=0, selector_found=True)

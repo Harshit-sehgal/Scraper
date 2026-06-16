@@ -84,6 +84,17 @@ def _workflow_to_dict(wf: Workflow) -> dict[str, Any]:
     return wf.model_dump()
 
 
+def _serialize_pagination_config(pc: Any) -> dict[str, Any]:
+    """Serialize a pagination config to a plain dict for JSON storage."""
+    if pc is None:
+        return {}
+    if hasattr(pc, "model_dump"):
+        return pc.model_dump()
+    if isinstance(pc, dict):
+        return pc
+    return {}
+
+
 def _workflow_store_path() -> Path:
     configured = os.environ.get("DATAFORGE_WORKFLOW_STORE_FILE", "")
     if configured:
@@ -91,8 +102,115 @@ def _workflow_store_path() -> Path:
     return Path("backend/data/workflows.json")
 
 
+def _load_workflows_from_db() -> None:
+    """Seed the in-memory ``_workflows`` dict from the SQLite workflows table.
+
+    Called once at module import time. If the DB is unavailable (e.g. during
+    test collection before the app is fully initialized), the dict stays empty
+    and is populated by route handlers at runtime.
+    """
+    try:
+        from app.job_store import _DB_LOCK, _get_connection
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                rows = conn.execute("SELECT * FROM workflows").fetchall()
+                for row in rows:
+                    wf = dict(row)
+                    # Deserialise JSON columns back to Python objects.
+                    _list_cols = {"steps", "extraction_schema"}
+                    for col in ("search_params", "steps", "extraction_schema", "pagination_config"):
+                        raw_val = wf.get(col)
+                        empty_default = "[]" if col in _list_cols else "{}"
+                        try:
+                            wf[col] = json.loads(raw_val if isinstance(raw_val, str) else empty_default)
+                        except (json.JSONDecodeError, TypeError):
+                            wf[col] = [] if col in _list_cols else {}
+                    _workflows[wf["id"]] = wf
+                if rows:
+                    logger.info("Loaded %d workflows from SQLite", len(rows))
+                return
+            finally:
+                conn.close()
+    except (ImportError, Exception) as exc:
+        logger.debug("SQLite workflow load unavailable: %s", exc)
+
+    # ── Best-effort JSON file fallback (only when DB returned nothing) ─
+    if _workflows:
+        return
+    path = _workflow_store_path()
+    try:
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            _workflows.update(data.get("workflows", {}))
+            logger.info("Loaded %d workflows from JSON fallback", len(_workflows))
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        logger.warning("Failed to load workflows from JSON: %s", exc)
+
+
+_load_workflows_from_db()
+
+
 def _persist_workflows() -> None:
-    """Best-effort JSON persistence for workflow definitions."""
+    """Persist workflow definitions to SQLite (v9 schema).
+
+    Falls back to best-effort JSON file if the SQLite connection is
+    unavailable (e.g. during test setup before the DB is initialized).
+    """
+    try:
+        from app.job_store import _DB_LOCK, _get_connection
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                for wf_id, wf in _workflows.items():
+                    conn.execute(
+                        """INSERT OR REPLACE INTO workflows
+                           (id, name, description, user_id, org_id, project_id,
+                            mode, domain, start_url, original_url,
+                            search_params, steps, extraction_schema, pagination_config,
+                            auth_profile_id, status, version,
+                            created_at, updated_at, last_run_at, last_success_at,
+                            last_failure_reason, last_run_job_id, total_runs)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            wf_id,
+                            str(wf.get("name") or ""),
+                            str(wf.get("description") or ""),
+                            str(wf.get("user_id") or ""),
+                            str(wf.get("org_id") or ""),
+                            str(wf.get("project_id") or ""),
+                            str(wf.get("mode") or "workflow_replay"),
+                            str(wf.get("domain") or ""),
+                            str(wf.get("start_url") or ""),
+                            str(wf.get("original_url") or ""),
+                            json.dumps(wf.get("search_params") or {}),
+                            json.dumps([s.model_dump() if hasattr(s, "model_dump") else s for s in (wf.get("steps") or [])]),
+                            json.dumps(
+                                [f.model_dump() if hasattr(f, "model_dump") else f for f in (wf.get("extraction_schema") or [])],
+                            ),
+                            json.dumps(_serialize_pagination_config(wf.get("pagination_config"))),
+                            wf.get("auth_profile_id"),
+                            str(wf.get("status") or "draft"),
+                            int(wf.get("version") or 1),
+                            str(wf.get("created_at") or ""),
+                            str(wf.get("updated_at") or ""),
+                            str(wf.get("last_run_at") or ""),
+                            str(wf.get("last_success_at") or ""),
+                            str(wf.get("last_failure_reason") or ""),
+                            str(wf.get("last_run_job_id") or ""),
+                            int(wf.get("total_runs") or 0),
+                        ),
+                    )
+                conn.commit()
+                return
+            finally:
+                conn.close()
+    except (ImportError, Exception) as exc:
+        logger.debug("SQLite workflow persistence unavailable: %s", exc)
+
+    # ── Best-effort JSON fallback ───────────────────────────────────────
     path = _workflow_store_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -279,6 +397,7 @@ async def create_workflow(
         search_params=req.search_params,
         steps=req.steps,
         extraction_schema=req.extraction_schema,
+        auth_profile_id=req.auth_profile_id,
         pagination_config=req.pagination_config,
         user_id=user_id,
         org_id=org_id,

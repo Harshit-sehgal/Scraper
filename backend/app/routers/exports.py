@@ -80,7 +80,7 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
 
         record_export_outcome(fmt, success)
     except Exception:
-        logger.debug("Failed to record export outcome metric for %s", fmt)
+        logger.exception("Failed to record export outcome metric for %s", fmt)
 
 
 def _export_idempotency_key(request: Request, fmt: str, job_ids: list[str]) -> str:

@@ -173,6 +173,45 @@ def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     return None
 
 
+def _infer_string_field_semantic_type(field_name: str, description: str = "") -> FieldType | None:
+    """Infer narrow semantic types for string fields when the label is explicit."""
+    inferred = _infer_field_type_from_name(field_name)
+    if inferred == FieldType.RATING:
+        return FieldType.RATING
+
+    desc = (description or "").lower()
+    if re.search(r"\b(rating|rated|score|stars?|grade)\b", desc):
+        return FieldType.RATING
+    return None
+
+
+def _find_field_named_node(container, field_name: str):
+    variants = {
+        field_name,
+        field_name.replace("_", "-"),
+        field_name.replace("_", " "),
+    }
+    if "_" in field_name:
+        variants.add(field_name.rsplit("_", 1)[-1])
+    pattern = re.compile(rf"(^|[^a-z0-9])(?:{'|'.join(re.escape(v) for v in variants)})(?:$|[^a-z0-9])", re.IGNORECASE)
+    return container.find(True, class_=pattern)
+
+
+def _sanitize_regex_string_value(field: SchemaField, value: Any, base_url: str = ""):
+    clean = _sanitize_field_value(field, value, base_url=base_url)
+    if not isinstance(clean, str) or field.field_type != FieldType.STRING:
+        return clean
+
+    field_hint = f"{field.name} {field.description}".lower()
+    if "quote" not in field_hint:
+        return clean
+
+    quote_pairs = {('"', '"'), ("\u201c", "\u201d"), ("\u2018", "\u2019")}
+    while len(clean) >= 2 and (clean[0], clean[-1]) in quote_pairs:
+        clean = clean[1:-1].strip()
+    return clean or None
+
+
 def _extract_field_by_pattern(
     node,
     sel_entry,
@@ -209,6 +248,8 @@ def _extract_field_by_pattern(
 
     if ftype is None:
         ftype = _infer_field_type_from_name(field_name)
+    elif ftype == FieldType.STRING:
+        ftype = _infer_string_field_semantic_type(field_name)
 
     def _is_span_used(match_start: int, match_end: int) -> bool:
         return any(match_start < ue and match_end > us for us, ue in used_spans)
@@ -575,9 +616,9 @@ def apply_selectors(
 def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:
     """Fallback extraction path when selector generation fails.
 
-    Dispatches extraction logic purely by FieldType — no field-name matching.
-    The user declaratively sets the type on each field in their schema;
-    the code respects that choice without guessing based on field names.
+    Dispatches extraction logic primarily by FieldType, with narrow semantic
+    inference for string fields whose name or description explicitly describes
+    ratings.
     """
     soup = BeautifulSoup(html, "html.parser")
 
@@ -589,7 +630,10 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
     # Priority 1: Common data container classes
     containers = list(
-        soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"item|card|listing|row|result|entry", re.IGNORECASE)),
+        soup.find_all(
+            ["article", "li", "tr", "div"],
+            class_=re.compile(r"item|card|listing|row|result|entry|quote", re.IGNORECASE),
+        ),
     )
 
     # Priority 2: Headings and their parents
@@ -635,6 +679,8 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
         for field in schema_fields:
             ft = field.field_type
+            if ft == FieldType.STRING:
+                ft = _infer_string_field_semantic_type(field.name, field.description) or ft
             val = None
 
             if ft == FieldType.URL:
@@ -727,7 +773,63 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
-            # STRING, DATE, or unknown — extract the most prominent text
+            elif ft == FieldType.STRING:
+                named_node = _find_field_named_node(container, field.name)
+                if named_node:
+                    val = _sanitize_regex_string_value(field, named_node.get_text(" ", strip=True), base_url=base_url)
+                elif field.name == desc_field:
+                    # Primary entity: get the most specific identifying text
+                    # Strategy 1: Look for heading / link elements
+                    heading = container.find(["h1", "h2", "h3", "h4", "strong"])
+                    if not heading:
+                        link = container.find("a")
+                        if link and not re.search(r"visit|click|more|details|select|here|book", link.get_text(), re.IGNORECASE):
+                            heading = link
+                    if not heading and container.name == "tr":
+                        heading = container.find("td")
+
+                    # Strategy 2: Look for img alt text (e.g. company logo)
+                    if not heading:
+                        img = container.find("img", alt=True)
+                        if img:
+                            alt_val = img.get("alt")
+                            alt_str = alt_val[0] if isinstance(alt_val, list) else str(alt_val) if alt_val else ""
+                            if alt_str.strip() and len(alt_str.strip()) > 2:
+                                heading = img
+
+                    # Strategy 3: Look for elements with identifying class
+                    # patterns
+                    if not heading:
+                        named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.IGNORECASE))
+                        if named_el:
+                            heading = named_el
+
+                    # Strategy 4: First element with short, meaningful text
+                    # (not a full sentence)
+                    if not heading:
+                        for child in container.find_all(["span", "div", "p", "b", "i"], recursive=True, limit=10):
+                            child_text = child.get_text(strip=True)
+                            if (
+                                child_text
+                                and len(child_text) < 60
+                                and child_text != text
+                                and re.match(r"^[A-Za-z]\w+(\s+[A-Za-z]\w+){0,4}$", child_text)
+                            ):
+                                heading = child
+                                break
+
+                    candidate = (
+                        heading.get("alt")
+                        if heading and heading.name == "img"
+                        else (heading.get_text(" ", strip=True) if heading else text[: settings.SELECTOR_HEADING_FALLBACK_LEN])
+                    )
+                    val = _sanitize_regex_string_value(field, candidate, base_url=base_url)
+                else:
+                    # Secondary string fields: prefer a field-specific child,
+                    # otherwise fall back to compact container text.
+                    val = _sanitize_regex_string_value(field, text[:200], base_url=base_url) if text else None
+
+            # DATE or unknown — extract the most prominent text
             elif field.name == desc_field:
                 # Primary entity: get the most specific identifying text
                 # Strategy 1: Look for heading / link elements

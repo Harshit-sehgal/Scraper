@@ -295,7 +295,7 @@ def security_checks(py: str) -> list[Check]:
     prod_env_path = ROOT / ".env.production.example"
     checks = [
         Check("bandit_backend", [py, "-m", "bandit", "-r", "backend", "-q"], 300),
-        Check("pip_audit", [py, "-m", "pip_audit"], 300),
+        Check("pip_audit", [py, "-m", "pip_audit", "--progress-spinner", "off", "--desc", "off", "."], 300),
     ]
     if prod_env_path.exists():
         checks.append(

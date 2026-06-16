@@ -80,6 +80,17 @@
             >
               Dashboard
             </button>
+            <button
+              type="button"
+              class="tab auth-profiles-tab"
+              data-action="switch-view"
+              data-view="auth-profiles"
+              id="tab-auth-profiles"
+              role="tab"
+              aria-selected="false"
+            >
+              Auth Profiles 🔑
+            </button>
           </nav>
         </div>
         <div class="topbar-right">
@@ -881,6 +892,21 @@
               </div>
             </details>
 
+            <!-- Auth Profile Selector -->
+            <div class="section" id="section-auth-profile">
+              <div class="section-head-row">
+                <label class="section-label">Authentication Profile</label>
+                <span class="hint">optional</span>
+              </div>
+              <p class="hint-block">Select an existing auth profile if the target site requires login.</p>
+              <select id="inp-auth-profile" aria-label="Authentication profile">
+                <option value="">None (public access)</option>
+              </select>
+              <p class="hint-block" style="margin-top: 0.3rem">
+                <a href="#" data-action="switch-view" data-view="auth-profiles" class="hint">Manage auth profiles →</a>
+              </p>
+            </div>
+
             <!-- Actions -->
             <div class="form-actions">
               <button type="button" class="btn ghost" data-action="switch-view" data-view="jobs">Cancel</button>
@@ -1067,6 +1093,113 @@
               <h4 class="insight-title">Active Field Basins (High Entropy Zones)</h4>
               <div class="list" id="basin-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto">
                 <div class="empty"><p>No active conflict basins</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- VIEW: Auth Profiles                 -->
+      <!-- ═══════════════════════════════════ -->
+      <section class="view" id="view-auth-profiles">
+        <div class="container">
+          <div class="page-head">
+            <div>
+              <h1>Auth Profiles</h1>
+              <p class="subtle">Manage stored browser sessions for authenticated scraping</p>
+            </div>
+            <button
+              type="button"
+              class="btn primary"
+              data-action="switch-view"
+              data-view="new"
+              id="btn-auth-profiles-create-new"
+            >
+              Create Job
+            </button>
+          </div>
+
+          <div class="jobs-toolbar">
+            <div class="jobs-toolbar-left">
+              <input
+                type="text"
+                id="auth-profiles-search"
+                placeholder="Search profiles..."
+                aria-label="Search auth profiles"
+              />
+            </div>
+            <div class="jobs-toolbar-right">
+              <span class="jobs-last-updated" id="auth-profiles-last-updated">Never updated</span>
+              <button
+                type="button"
+                class="btn ghost small"
+                data-action="refresh-auth-profiles"
+                id="btn-refresh-auth-profiles"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- Mini Stats -->
+          <div class="kpi-row" id="auth-profiles-kpi-row">
+            <div class="kpi">
+              <span class="kpi-val" id="kpi-total-auth-profiles">0</span><span class="kpi-label">Total</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-val" id="kpi-active-auth-profiles">0</span><span class="kpi-label">Active</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-val" id="kpi-pending-auth-profiles">0</span><span class="kpi-label">Pending</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-val" id="kpi-expired-auth-profiles">0</span><span class="kpi-label">Expired</span>
+            </div>
+          </div>
+
+          <div class="list-head">
+            <span>Profile</span>
+            <span>Domain</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
+
+          <!-- Auth Profiles List -->
+          <div class="list" id="auth-profiles-list">
+            <div class="empty-state-illustration" id="auth-profiles-empty-state">
+              <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect
+                  x="30"
+                  y="20"
+                  width="100"
+                  height="90"
+                  rx="8"
+                  stroke="var(--ink-faint)"
+                  stroke-width="1.5"
+                  fill="none"
+                  class="empty-svg-line"
+                />
+                <circle
+                  cx="80"
+                  cy="55"
+                  r="18"
+                  stroke="var(--ink-faint)"
+                  stroke-width="1.5"
+                  fill="none"
+                  class="empty-svg-line"
+                />
+                <path
+                  d="M60 85 Q70 75, 80 85 T100 85"
+                  stroke="var(--ink-faint)"
+                  stroke-width="1.5"
+                  fill="none"
+                  class="empty-svg-line"
+                />
+              </svg>
+              <div class="empty-state-title">No auth profiles</div>
+              <div class="empty-state-desc">
+                Create an auth profile to store a browser session for authenticated scraping.
               </div>
             </div>
           </div>

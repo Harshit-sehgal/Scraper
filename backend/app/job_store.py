@@ -30,7 +30,7 @@ from app.models import Job, JobStatus, SourcePolicy
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 8
+_CURRENT_SCHEMA_VERSION = 9
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -601,6 +601,53 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 if "project_id" not in v8_cols:
                     conn.execute(f"ALTER TABLE {table_name} ADD COLUMN project_id TEXT DEFAULT ''")
             current = 8
+
+        if current < 9:
+            # v9: workflow persistence (Prompt 9 — CAND-P1-WORKFLOW-STORAGE-001).
+            # Workflows were previously stored in-memory with best-effort JSON
+            # file backup. This table provides durable, transactional persistence
+            # with owner/org/project isolation matching the jobs table.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS workflows (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL DEFAULT '',
+                    description TEXT DEFAULT '',
+                    user_id TEXT DEFAULT '',
+                    org_id TEXT DEFAULT '',
+                    project_id TEXT DEFAULT '',
+                    mode TEXT DEFAULT 'workflow_replay',
+                    domain TEXT DEFAULT '',
+                    start_url TEXT DEFAULT '',
+                    original_url TEXT DEFAULT '',
+                    search_params TEXT DEFAULT '{}',
+                    steps TEXT DEFAULT '[]',
+                    extraction_schema TEXT DEFAULT '[]',
+                    pagination_config TEXT DEFAULT '{}',
+                    auth_profile_id TEXT DEFAULT NULL,
+                    status TEXT DEFAULT 'draft',
+                    version INTEGER DEFAULT 1,
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT '',
+                    last_run_at TEXT DEFAULT '',
+                    last_success_at TEXT DEFAULT '',
+                    last_failure_reason TEXT DEFAULT '',
+                    last_run_job_id TEXT DEFAULT '',
+                    total_runs INTEGER DEFAULT 0
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id)",
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_workflows_org_id ON workflows(org_id)",
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)",
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_workflows_project_id ON workflows(project_id)",
+            )
+            current = 9
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))

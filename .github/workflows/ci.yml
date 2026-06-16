@@ -40,7 +40,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run Reproducible Quick Validation
+      - name: Run Reproducible Validation (bounded gate)
+        # ci-gates-fast uses --quick because the deeper checks (ruff,
+        # mypy, bandit, full backend pytest with reruns, coverage
+        # floors) are owned by ``lint-type-checks`` below. Running the
+        # full gate here would duplicate the slowest step. For local
+        # iteration the default ``make validate`` target runs --full,
+        # so a green local gate still implies a green CI gate (the
+        # union is the same set of checks).
         run: python scripts/validate_local.py --quick
 
       - name: Upload Quick Validation Logs

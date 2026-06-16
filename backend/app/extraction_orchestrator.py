@@ -48,6 +48,49 @@ class ExtractionResult:
         self.network_diagnostics = network_diagnostics or []
 
 
+def _average_record_score(records: list[dict]) -> float:
+    if not records:
+        return 0.0
+    return sum(r.get("record_score", 0.0) for r in records) / len(records)
+
+
+def _unique_record_value_count(records: list[dict]) -> int:
+    unique_values = {
+        tuple(
+            sorted(
+                (key, str(value).strip())
+                for key, value in record.items()
+                if value not in (None, "") and key != "record_score" and not key.startswith("_")
+            ),
+        )
+        for record in records
+    }
+    return len(unique_values)
+
+
+def _should_prefer_structural_candidate(
+    current_records: list[dict],
+    candidate_records: list[dict],
+    min_candidate_avg: float = 0.50,
+) -> bool:
+    """Prefer structural extraction when it is at least as complete and credible."""
+    if not candidate_records:
+        return False
+    if not current_records:
+        return True
+
+    current_avg = _average_record_score(current_records)
+    candidate_avg = _average_record_score(candidate_records)
+    if (
+        _unique_record_value_count(candidate_records) > _unique_record_value_count(current_records)
+        and candidate_avg >= min_candidate_avg
+    ):
+        return True
+    if len(candidate_records) > len(current_records) and candidate_avg >= min_candidate_avg:
+        return True
+    return len(candidate_records) >= len(current_records) and candidate_avg >= current_avg + 0.05
+
+
 def _merge_composite_records(
     records_list: list[list[dict]],
     schema_fields: list[SchemaField],
@@ -705,6 +748,17 @@ async def orchestrate_extraction(
         scores = [r.get("record_score", 0.0) for r in visible_results]
         avg_score = sum(scores) / len(scores) if scores else 0.0
         if avg_score >= gate_threshold:
+            regex_candidate = extract_with_regex(html, schema_fields, base_url=url)
+            if _should_prefer_structural_candidate(visible_results, regex_candidate, min_candidate_avg=gate_threshold):
+                logger.info(
+                    "[Orchestrator] Regex extraction superseded visible-text candidate (%d vs %d records)",
+                    len(regex_candidate),
+                    len(visible_results),
+                )
+                _record_field_provenance(regex_candidate, ExtractionMethod.REGEX)
+                if provenance_builder:
+                    provenance_builder.add_fallback_step("visible_text_superseded_by_regex")
+                return _arbitrate_and_return(ExtractionResult(regex_candidate, "regex", selector_success=False))
             logger.info(
                 "[Orchestrator] Visible-text extraction SUCCESS (%d records, avg score: %.2f)",
                 len(visible_results),

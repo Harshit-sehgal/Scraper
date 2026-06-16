@@ -48,6 +48,7 @@ This route list was generated from the FastAPI app during the audit. Production 
 | POST | `/api/discover` | Operator or admin |
 | POST | `/api/schema/suggest` | Operator or admin |
 | POST | `/api/url/analyze` | Operator or admin |
+| GET | `/api/intelligence/analyze-url` | Authenticated user |
 
 ## Scraper/Telemetry Routes
 
@@ -93,12 +94,75 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | DELETE | `/api/session` | Authenticated user (clears session cookie) |
 | GET | `/api/session/me` | Authenticated user (returns current role) |
 
+## Auth Profile Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/auth-profiles` | Operator or admin |
+| POST | `/api/auth-profiles` | Operator or admin |
+| GET | `/api/auth-profiles/{profile_id}` | Operator or admin |
+| DELETE | `/api/auth-profiles/{profile_id}` | Operator or admin |
+| POST | `/api/auth-profiles/{profile_id}/start-login` | Operator or admin |
+| POST | `/api/auth-profiles/{profile_id}/complete-login` | Operator or admin |
+| POST | `/api/auth-profiles/{profile_id}/validate` | Operator or admin |
+| POST | `/api/auth-profiles/{profile_id}/revoke` | Operator or admin |
+
 ## SaaS / Compliance Routes
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
+| POST | `/api/saas/signup` | Public signup |
+| GET | `/api/saas/me` | Authenticated user |
+| GET | `/api/saas/plan` | Authenticated user |
 | GET | `/api/saas/aup/status` | Authenticated user |
 | POST | `/api/saas/aup/accept` | Authenticated user |
+| GET | `/api/saas/orgs` | Authenticated user |
+| POST | `/api/saas/orgs` | Operator or admin |
+| GET | `/api/saas/orgs/{org_id}` | Authenticated user |
+| GET | `/api/saas/orgs/{org_id}/members` | Authenticated user |
+| GET | `/api/saas/orgs/{org_id}/projects` | Authenticated user |
+| DELETE | `/api/saas/memberships/{membership_id}` | Operator or admin |
+| POST | `/api/saas/projects` | Operator or admin |
+| GET | `/api/saas/projects/{project_id}` | Authenticated user |
+| GET | `/api/saas/projects/{project_id}/keys` | Authenticated user |
+| POST | `/api/saas/projects/{project_id}/keys` | Operator or admin |
+| DELETE | `/api/saas/projects/{project_id}/keys/{key_id}` | Operator or admin |
+
+## Workflow Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/workflows` | Operator or admin |
+| POST | `/api/workflows` | Operator or admin |
+| GET | `/api/workflows/{workflow_id}` | Operator or admin |
+| PUT | `/api/workflows/{workflow_id}` | Operator or admin |
+| PATCH | `/api/workflows/{workflow_id}` | Operator or admin |
+| DELETE | `/api/workflows/{workflow_id}` | Operator or admin |
+| POST | `/api/workflows/{workflow_id}/preview` | Operator or admin |
+| POST | `/api/workflows/{workflow_id}/run` | Operator or admin |
+| POST | `/api/workflow-drafts/from-url-analysis` | Operator or admin |
+| POST | `/api/workflow-drafts/{draft_id}/detect-fields` | Operator or admin |
+| POST | `/api/workflow-drafts/{draft_id}/manual-mapping` | Operator or admin |
+
+## Scheduled Monitoring Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/scheduled` | Operator or admin |
+| POST | `/api/scheduled` | Operator or admin |
+| GET | `/api/scheduled/{job_id}` | Operator or admin |
+| PUT | `/api/scheduled/{job_id}` | Operator or admin |
+| DELETE | `/api/scheduled/{job_id}` | Operator or admin |
+| GET | `/api/scheduled/{job_id}/changes` | Operator or admin |
+
+## Billing and User Data Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| POST | `/api/billing/webhook` | Billing webhook secret or HMAC signature |
+| GET | `/api/billing/subscriptions` | Operator or admin |
+| GET | `/api/billing/subscriptions/{customer_id}` | Operator or admin |
+| DELETE | `/api/user/data` | Authenticated user (self-service deletion) |
 
 ## Batch Export
 

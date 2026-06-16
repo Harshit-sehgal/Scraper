@@ -80,6 +80,23 @@ def is_safe_ip(ip_str: str) -> bool:
         return False
 
 
+def _is_smoke_allowed_internal_host(hostname: str | None) -> bool:
+    if not hostname or not settings.SMOKE_TEST_MODE:
+        return False
+
+    host = hostname.strip("[]").lower()
+    for raw_entry in settings.ALLOWED_INTERNAL_HOSTS.split(","):
+        entry = raw_entry.strip().lower()
+        if not entry:
+            continue
+        if entry.strip("[]") == host:
+            return True
+        parsed = urlparse(f"http://{entry}")
+        if parsed.hostname and parsed.hostname.strip("[]").lower() == host:
+            return True
+    return False
+
+
 def _normalize_ip_literal(hostname: str) -> str | None:
     """Recognise non-canonical IPv4 literal forms and return the canonical dotted-decimal string.
 
@@ -146,10 +163,8 @@ def validate_public_http_url(url: str) -> None:
     hostname_lower = hostname.lower()
 
     # 1. Allowlist override check (for local integration / Docker smoke test)
-    if settings.SMOKE_TEST_MODE:
-        allowed_hosts = [h.strip().lower() for h in settings.ALLOWED_INTERNAL_HOSTS.split(",") if h.strip()]
-        if hostname_lower in allowed_hosts:
-            return
+    if _is_smoke_allowed_internal_host(hostname_lower):
+        return
 
     # 2. Reject explicit loopback / internal names
     if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104
@@ -278,6 +293,15 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
     ) -> httpcore.AsyncNetworkStream:
         import asyncio
 
+        if _is_smoke_allowed_internal_host(host):
+            return await self._backend.connect_tcp(
+                host,
+                port,
+                timeout=timeout,
+                local_address=local_address,
+                socket_options=socket_options,
+            )
+
         loop = asyncio.get_running_loop()
         infos = await loop.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
         safe_ip: str | None = None
@@ -332,6 +356,15 @@ class SafeNetworkBackend(httpcore.NetworkBackend):
         local_address: str | None = None,
         socket_options: Any = None,
     ) -> httpcore.NetworkStream:
+        if _is_smoke_allowed_internal_host(host):
+            return self._backend.connect_tcp(
+                host,
+                port,
+                timeout=timeout,
+                local_address=local_address,
+                socket_options=socket_options,
+            )
+
         infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
         safe_ip: str | None = None
         for _family, _type, _proto, _canonname, sockaddr in infos:
@@ -439,7 +472,7 @@ class _UrlValidatingAsyncTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         host = urlparse(str(request.url)).hostname
-        if host:
+        if host and not _is_smoke_allowed_internal_host(host):
             try:
                 # We deliberately do NOT call validate_public_http_url here
                 # because that raises ValueError on smoke-test allowlist
@@ -471,7 +504,7 @@ class _UrlValidatingSyncTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         host = urlparse(str(request.url)).hostname
-        if host:
+        if host and not _is_smoke_allowed_internal_host(host):
             try:
                 infos = socket.getaddrinfo(host, None)
                 for _family, _type, _proto, _canonname, sockaddr in infos:

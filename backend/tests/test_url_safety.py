@@ -1,4 +1,6 @@
+import http.server
 import socket
+import threading
 from typing import Never
 
 import httpx
@@ -371,6 +373,34 @@ async def test_get_safe_async_client_blocks_private_ip() -> None:
         # is only reached if the wrapper is bypassed.
         with pytest.raises(ValueError, match="(Transport rejected|Rejected connection)"):
             await client.get("http://127.0.0.1:8000")
+
+
+@pytest.mark.asyncio
+async def test_get_safe_async_client_allows_smoke_internal_host(monkeypatch) -> None:
+    from app.url_safety import get_safe_async_client
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format, *args) -> None:
+            return None
+
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
+    monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", f"127.0.0.1:{port}")
+    try:
+        async with get_safe_async_client() as client:
+            response = await client.get(f"http://127.0.0.1:{port}")
+        assert response.status_code == 200
+        assert response.text == "ok"
+    finally:
+        server.shutdown()
 
 
 @pytest.mark.asyncio

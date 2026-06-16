@@ -154,3 +154,21 @@ unless staging deployment, TLS, secrets, backups, restore drill,
 monitoring, alerting, load tests, auth, tenant isolation,
 billing / usage enforcement, benchmark gates, and incident runbooks
 are proven in the current checkout and target environment.
+
+## Latest Tasks Completed (2026-06-13)
+
+| # | Task | Status |
+|---|------|--------|
+| 14 | Regenerate route inventory and auth matrix | ✅ Done |
+| 15 | Add Frontend Auth Profiles page | ✅ Done |
+| 16 | Wire auth profiles into workflow runner | ✅ Done |
+| 17 | Add plan enforcement middleware | ✅ Done |
+| 18 | Run benchmark smoke test | ✅ Done |
+| 19 | pip-audit triage and security hardening | ✅ Done |
+| 20 | Update AGENTS.md and final docs | ✅ Done |
+
+## Active Risks
+
+- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres`
+- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more
+- `CAND-P2-PAYMENT-001`: Payment provider not integrated

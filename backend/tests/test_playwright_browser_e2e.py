@@ -361,6 +361,7 @@ async def test_playwright_pipeline_integration(browser_server, monkeypatch) -> N
 
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "127.0.0.1,localhost")
 
+    from app.recovery_strategies import AttemptContext
     from app.scraper import scrape_url_attempt
 
     schema = [
@@ -384,6 +385,7 @@ async def test_playwright_pipeline_integration(browser_server, monkeypatch) -> N
             url=url,
             schema_fields=schema,
             min_record_score=0.1,
+            attempt_ctx=AttemptContext(fetch_strategy="playwright_full"),
         )
     finally:
         await pool.close()

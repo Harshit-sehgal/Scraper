@@ -7,9 +7,10 @@ product-relevant categories and returns a structured recommendation.
 Example::
 
     from app.url_analyzer import analyze_url
-    result = analyze_url("https://example.com/search?q=laptop")
-    print(result.classification)      # "normal_static_page"
-    print(result.recommended_mode)  # "direct_scrape"
+    # Example usage (for testing only)
+    # result = analyze_url("https://example.com/search?q=laptop")
+    # logger.debug("Classification: %s", result.classification)
+    # logger.debug("Recommended mode: %s", result.recommended_mode)
 
 Design goals
 ------------
@@ -593,6 +594,31 @@ class UrlAnalysisResult:
             UrlClassification.SEARCH_RESULT_PAGE,
         }
 
+        # ── Auth profile wiring (Prompt 8 gap) ──────────────────────────
+        # When the URL looks login-protected, include an action the frontend
+        # can use to guide the user through creating and completing an auth
+        # profile for the target domain.
+        auth_profile_action = None
+        if self.recommended_mode == ScrapingMode.AUTH_PROFILE_RECOMMENDED:
+            parsed = urlparse(self.url)
+            parsed_domain = parsed.hostname or ""
+            auth_profile_action = {
+                "action": "create_auth_profile",
+                "endpoint": "/api/auth-profiles",
+                "method": "POST",
+                "payload": {
+                    "name": f"Login for {parsed_domain}" if parsed_domain else "Login profile",
+                    "domain": parsed_domain,
+                },
+                "description": "An Auth Profile stores encrypted browser session data so DataForge can extract data behind a login wall.",
+                "next_action": {
+                    "action": "complete_login",
+                    "endpoint": "/api/auth-profiles/{profile_id}/complete-login",
+                    "method": "POST",
+                    "description": "After the profile is created and you have logged in through the controlled browser, call this endpoint to store the encrypted session.",
+                },
+            }
+
         return {
             "url": redacted_url,
             "safe_to_fetch": safe_to_fetch,
@@ -603,6 +629,7 @@ class UrlAnalysisResult:
             "technical_findings": technical_findings,
             "suggested_start_urls": suggested_start_urls(self.url) if needs_start else [],
             "next_steps": self.next_steps,
+            "auth_profile_action": auth_profile_action,
             "redactions_applied": redactions_applied,
         }
 

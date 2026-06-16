@@ -55,29 +55,22 @@ class SystemGovernorDashboard:
         return adjustments
 
     def _apply_mode_settings(self, mode: OperatorMode) -> dict[str, Any]:
-        """Modify runtime settings configurations based on the selected mode profile."""
-        from app.config import settings
+        """Return mode-specific timing configuration without mutating global state.
 
-        adjustments = {}
+        The returned dictionary can be passed to callers that need
+        mode-specific tuning.  Global ``settings`` are intentionally NOT
+        modified so concurrent requests are not affected.
+        """
+        adjustments: dict[str, Any] = {}
         if mode == OperatorMode.PRODUCTION:
-            settings.PLAYWRIGHT_TIMEOUT = 30000
-            settings.PAGE_SETTLE_DELAY = 3.0
             adjustments = {"timeout": 30000, "settle": 3.0, "stealth": False}
         elif mode == OperatorMode.BENCHMARK:
-            settings.PLAYWRIGHT_TIMEOUT = 45000
-            settings.PAGE_SETTLE_DELAY = 5.0
             adjustments = {"timeout": 45000, "settle": 5.0, "stealth": False}
         elif mode == OperatorMode.FORENSIC:
-            settings.PLAYWRIGHT_TIMEOUT = 60000
-            settings.PAGE_SETTLE_DELAY = 8.0
             adjustments = {"timeout": 60000, "settle": 8.0, "stealth": True}
         elif mode == OperatorMode.STEALTH:
-            settings.PLAYWRIGHT_TIMEOUT = 60000
-            settings.PAGE_SETTLE_DELAY = 6.0
             adjustments = {"timeout": 60000, "settle": 6.0, "stealth": True}
         elif mode == OperatorMode.LOW_COST:
-            settings.PLAYWRIGHT_TIMEOUT = 20000
-            settings.PAGE_SETTLE_DELAY = 2.0
             adjustments = {"timeout": 20000, "settle": 2.0, "stealth": False}
 
         return adjustments

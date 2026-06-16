@@ -31,6 +31,7 @@ TENANT_SCOPED_PREFIXES = (
     "/api/workflow-drafts",
     "/api/auth-profiles",
     "/api/scheduled",
+    "/api/user",
     "/api/saas/aup",
     "/api/saas/me",
     "/api/saas/orgs",
@@ -47,6 +48,8 @@ GLOBAL_OR_NOT_TENANT_PREFIXES = (
     "/api/url",
     "/api/intelligence",
     "/api/saas/plan",
+    "/api/billing/subscriptions",
+    "/api/billing/webhook",
 )
 
 

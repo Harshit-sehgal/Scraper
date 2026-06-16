@@ -1,23 +1,232 @@
-"""Workflow Executor — replay saved scraping workflows.
+"""Workflow Executor — replay saved scraping workflows with Playwright.
 
 Provides the execution engine for saved workflows. Each workflow is a
 sequence of steps (open, fill, click, etc.) that are replayed against
-a live browser. After the steps complete, the configured extraction
-schema is applied to the final page state.
+a live Playwright browser. After the steps complete, the configured
+extraction schema is applied to the final page state.
+
+Pagination strategies (infinite scroll, load more, next button) are
+handled via ``app.pagination_executor.async_paginate``.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import datetime
 import logging
 from typing import Any
 
-from app.models import Workflow
+from app.models import Workflow, WorkflowStepType
 
 logger = logging.getLogger(__name__)
 
+# Cap on how long a single step can wait
+MAX_STEP_TIMEOUT_MS = 15_000
+# Extra time after clicking/loading for JS rendering
+PAGE_SETTLE_SECONDS = 1.5
 
-async def execute_workflow(workflow: Workflow, _headless: bool = True) -> dict[str, Any]:
+
+async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
+    """Replay workflow steps against a live Playwright page.
+
+    Returns a timeline of step events with status (ok, failed, skipped).
+    """
+    timeline: list[dict[str, Any]] = []
+
+    for step in sorted(workflow.steps, key=lambda x: x.order):
+        event: dict[str, Any] = {
+            "order": step.order,
+            "action": step.step_type.value,
+            "selector": step.selector,
+            "value": step.value,
+            "status": "ok",
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+        }
+
+        try:
+            if step.step_type in (WorkflowStepType.GOTO, WorkflowStepType.OPEN):
+                await page.goto(step.value or workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=5000)
+                except Exception:
+                    logger.debug("networkidle timeout during goto step %d, continuing", step.order)
+                await asyncio.sleep(PAGE_SETTLE_SECONDS)
+                event["url"] = page.url
+
+            elif step.step_type == WorkflowStepType.CLICK:
+                await page.click(step.selector, timeout=MAX_STEP_TIMEOUT_MS)
+                await asyncio.sleep(PAGE_SETTLE_SECONDS)
+
+            elif step.step_type == WorkflowStepType.FILL:
+                await page.fill(step.selector, step.value, timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.SELECT:
+                await page.select_option(step.selector, step.value, timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.CHECK:
+                locator = page.locator(step.selector)
+                if await locator.is_visible() and not await locator.is_checked():
+                    await locator.check(timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.UNCHECK:
+                locator = page.locator(step.selector)
+                if await locator.is_visible() and await locator.is_checked():
+                    await locator.uncheck(timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.PRESS:
+                await page.press(step.selector, step.value or "Enter", timeout=MAX_STEP_TIMEOUT_MS)
+                await asyncio.sleep(PAGE_SETTLE_SECONDS)
+
+            elif step.step_type == WorkflowStepType.SCROLL:
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(PAGE_SETTLE_SECONDS)
+
+            elif step.step_type == WorkflowStepType.WAIT:
+                wait_ms = int(step.value or "1000")
+                await asyncio.sleep(min(wait_ms, MAX_STEP_TIMEOUT_MS) / 1000.0)
+
+            elif step.step_type == WorkflowStepType.WAIT_FOR_URL:
+                await page.wait_for_url(step.value, timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.WAIT_FOR_SELECTOR:
+                await page.wait_for_selector(step.selector, timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.WAIT_FOR_TEXT:
+                await page.wait_for_selector(f"text={step.value}", timeout=MAX_STEP_TIMEOUT_MS)
+
+            elif step.step_type == WorkflowStepType.WAIT_FOR_TIMEOUT_LIMITED:
+                max_wait = min(int(step.value or "1000"), MAX_STEP_TIMEOUT_MS)
+                await asyncio.sleep(max_wait / 1000.0)
+
+            elif step.step_type == WorkflowStepType.EXTRACT:
+                # EXTRACT is handled separately by the extraction schema
+                event["status"] = "deferred"
+
+        except Exception as exc:
+            logger.warning("Workflow step %d (%s) failed: %s", step.order, step.step_type.value, exc)
+            event["status"] = "failed"
+            event["error"] = str(exc)
+            # Continue with remaining steps
+
+        timeline.append(event)
+
+    return timeline
+
+
+async def _extract_records_from_page(
+    page: Any,
+    workflow: Workflow,
+) -> list[dict[str, Any]]:
+    """Extract records from the current page using the workflow's extraction schema.
+
+    Uses Playwright's ``page.evaluate()`` to run the selectors defined
+    in ``workflow.extraction_schema`` against the page DOM.
+    """
+    if not workflow.extraction_schema:
+        return []
+
+    records: list[dict[str, Any]] = []
+    try:
+        # Try to find repeating containers first
+        records = await page.evaluate(
+            """(schema) => {
+                const results = [];
+                // Try common container selectors
+                const containers = document.querySelectorAll(
+                    'table tbody tr, .result, .item, article, [class*="card"], [class*="item"], li'
+                );
+                for (const container of containers) {
+                    const row = {};
+                    let hasData = false;
+                    for (const field of schema) {
+                        const name = field.name;
+                        const selectors = [
+                            `[data-field="${name}"]`,
+                            `[itemprop="${name}"]`,
+                            `[name="${name}"]`,
+                            `.${name}`,
+                            `[class*="${name}"]`,
+                        ];
+                        let value = '';
+                        for (const sel of selectors) {
+                            const el = container.querySelector(sel);
+                            if (el) {
+                                value = (el.textContent || el.value || '').trim();
+                                if (value) break;
+                            }
+                        }
+                        // Fallback: try matching by field type
+                        if (!value && field.field_type === 'email') {
+                            const emailEl = container.querySelector('a[href^="mailto:"]');
+                            if (emailEl) {
+                                const href = emailEl.getAttribute('href') || '';
+                                value = href.replace('mailto:', '').split('?')[0];
+                            }
+                        }
+                        if (!value && field.field_type === 'phone') {
+                            const telEl = container.querySelector('a[href^="tel:"]');
+                            if (telEl) {
+                                const href = telEl.getAttribute('href') || '';
+                                value = href.replace('tel:', '').split('?')[0];
+                            }
+                        }
+                        if (!value && field.field_type === 'url') {
+                            const link = container.querySelector('a[href]');
+                            if (link) value = link.getAttribute('href') || '';
+                        }
+                        row[name] = value;
+                        if (value) hasData = true;
+                    }
+                    if (hasData) results.push(row);
+                }
+                return results;
+            }""",
+            [{"name": f.name, "field_type": f.field_type.value} for f in workflow.extraction_schema],
+        )
+    except Exception as exc:
+        logger.warning("Page extraction failed: %s", exc)
+
+    return records
+
+
+async def _paginate_and_extract(
+    page: Any,
+    workflow: Workflow,
+) -> tuple[list[dict[str, Any]], str]:
+    """Handle pagination if configured and extract all records.
+
+    Returns (all_records, pagination_stopped_reason).
+    """
+    pagination_config = workflow.pagination_config
+    if not pagination_config or not pagination_config.enabled:
+        # No pagination, just extract from current page
+        records = await _extract_records_from_page(page, workflow)
+        return records, "no_pagination"
+
+    from app.pagination_executor import PaginationConfig, async_paginate
+
+    config = PaginationConfig(
+        strategy=pagination_config.strategy,
+        max_pages=pagination_config.max_pages,
+        selector=pagination_config.selector or None,
+        stop_on_duplicates=True,
+    )
+
+    async def _extract(page: Any) -> list[dict[str, Any]]:
+        return await _extract_records_from_page(page, workflow)
+
+    result = await async_paginate(
+        page,
+        config,
+        extract_fn=_extract,
+        base_url=workflow.start_url,
+    )
+
+    return result.records, result.stopped_reason
+
+
+async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[str, Any]:  # noqa: ARG001
     """Execute a workflow and return extraction results.
 
     Args:
@@ -29,43 +238,138 @@ async def execute_workflow(workflow: Workflow, _headless: bool = True) -> dict[s
     """
     logger.info("Executing workflow %s (%s)", workflow.name, workflow.id)
 
-    # Placeholder implementation — full Playwright integration would go here.
-    # Steps:
-    #   1. Launch browser (respecting headless setting)
-    #   2. Navigate to start_url
-    #   3. Replay each step in order (fill, click, scroll, etc.)
-    #   4. Handle pagination if configured
-    #   5. Extract data using extraction_schema
-    #   6. Return results + metadata
-    #
-    # For now, return a preview result indicating the workflow was queued.
-    return {
-        "workflow_id": workflow.id,
-        "status": "queued",
-        "message": "Workflow execution is queued. The full execution engine with Playwright will be implemented in a future milestone.",
-        "step_count": len(workflow.steps),
-        "extraction_fields": [f.name for f in workflow.extraction_schema],
-        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-    }
+    start_time = datetime.datetime.now(datetime.UTC)
+    page = None
+    context = None
+
+    try:
+        from app.browser_pool import get_browser_pool
+
+        pool = get_browser_pool()
+        domain = workflow.domain or "default"
+        context = await pool.get_context(domain)
+        page = await context.new_page()
+
+        # Navigate to start URL
+        try:
+            await page.goto(workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                logger.debug("networkidle timeout during initial navigation")
+            await asyncio.sleep(PAGE_SETTLE_SECONDS)
+        except Exception as exc:
+            logger.warning("Failed to navigate to start URL: %s", exc)
+            return {
+                "workflow_id": workflow.id,
+                "status": "failed",
+                "error": f"Failed to load start URL: {exc}",
+                "timestamp": start_time.isoformat(),
+            }
+
+        # Replay workflow steps
+        timeline = await _replay_steps(page, workflow)
+
+        # Handle pagination and extraction
+        all_records, pagination_reason = await _paginate_and_extract(page, workflow)
+
+        # Final page info
+        try:
+            final_url = page.url
+            page_title = await page.title()
+        except Exception:
+            final_url = workflow.start_url
+            page_title = ""
+
+        duration = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+
+        return {
+            "workflow_id": workflow.id,
+            "status": "succeeded" if all_records or pagination_reason == "no_pagination" else "completed_empty",
+            "records": all_records,
+            "record_count": len(all_records),
+            "timeline": timeline,
+            "pagination_stopped_reason": pagination_reason,
+            "final_url": final_url,
+            "page_title": page_title,
+            "duration_seconds": round(duration, 2),
+            "timestamp": start_time.isoformat(),
+        }
+
+    except Exception as exc:
+        logger.exception("Workflow execution failed for %s", workflow.id)
+        return {
+            "workflow_id": workflow.id,
+            "status": "failed",
+            "error": str(exc),
+            "timestamp": start_time.isoformat(),
+        }
+    finally:
+        if page is not None:
+            try:
+                await page.close()
+            except Exception:
+                logger.debug("Failed to close Playwright page after workflow execution")
 
 
 async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
     """Preview a workflow by running a single-page test.
 
-    Returns sample data or an error if the workflow cannot be previewed.
+    Opens the start URL, replays steps, and returns sample data
+    without full pagination.
     """
     logger.info("Previewing workflow %s (%s)", workflow.name, workflow.id)
 
-    # Placeholder — preview would open the start URL and return
-    # the first few records without full pagination.
-    return {
-        "workflow_id": workflow.id,
-        "preview_status": "not_implemented",
-        "message": "Preview mode is not yet implemented. Use /run to execute the workflow.",
-        "workflow": {
-            "name": workflow.name,
-            "start_url": workflow.start_url,
-            "steps": workflow.steps,
-            "extraction_schema": workflow.extraction_schema,
-        },
-    }
+    page = None
+    context = None
+
+    try:
+        from app.browser_pool import get_browser_pool
+
+        pool = get_browser_pool()
+        domain = workflow.domain or "default"
+        context = await pool.get_context(domain)
+        page = await context.new_page()
+
+        # Navigate to start URL
+        await page.goto(workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
+        with contextlib.suppress(Exception):
+            await page.wait_for_load_state("networkidle", timeout=5000)
+        await asyncio.sleep(PAGE_SETTLE_SECONDS)
+
+        # Replay steps
+        timeline = await _replay_steps(page, workflow)
+
+        # Extract first page only (no pagination)
+        sample_records = await _extract_records_from_page(page, workflow)
+        sample_records = sample_records[:5]  # Limit to 5 for preview
+
+        page_title = ""
+        with contextlib.suppress(Exception):
+            page_title = await page.title()
+
+        return {
+            "workflow_id": workflow.id,
+            "preview_status": "succeeded",
+            "sample_rows": sample_records,
+            "record_count": len(sample_records),
+            "timeline": timeline,
+            "last_url": page.url if hasattr(page, "url") else workflow.start_url,
+            "page_title": page_title,
+            "warnings": [] if sample_records else ["No sample rows matched the extraction schema."],
+        }
+
+    except Exception as exc:
+        logger.exception("Workflow preview failed for %s", workflow.id)
+        return {
+            "workflow_id": workflow.id,
+            "preview_status": "failed",
+            "error": str(exc),
+            "message": "Preview failed. The start URL may be unreachable or the workflow steps may be invalid.",
+        }
+    finally:
+        if page is not None:
+            try:
+                await page.close()
+            except Exception:
+                logger.debug("Failed to close Playwright page after workflow preview")

@@ -111,8 +111,8 @@ See `docs/AUDIT_LOGS.md`. Covers: auth events, RBAC decisions, admin actions, da
 ## 8. Dependency Security
 
 - Bandit: 0 issues (58,634 LOC scanned)
-- pip-audit: 60 vulnerability records in 21 packages (needs clean venv triage)
-- See `docs/CI_STATUS.md` and `artifacts/audit/SECURITY_REVIEW_BASELINE.md`
+- pip-audit: project-scoped online audit passes (`python3 -m pip_audit --progress-spinner off --desc off .`)
+- Historical global-environment audits included unrelated system/user packages; use `docs/AGENT_TRUTH.md` for current evidence
 
 ---
 
@@ -129,7 +129,7 @@ See `docs/AUDIT_LOGS.md`. Covers: auth events, RBAC decisions, admin actions, da
 | Risk | Severity | Status |
 |------|----------|--------|
 | Auth profile encryption not implemented | High | Open |
-| pip-audit: 60 vulnerability records | Medium | Needs triage |
+| Container/SBOM dependency audit not yet run | Medium | Open |
 | No email verification on signup | Medium | Open |
 | No password reset flow | Medium | Open |
 | Staging TLS not proven | High | Open |

@@ -108,6 +108,13 @@ ignore = [
 "__init__.py" = ["F401"]
 "backend/tests/*" = ["S101", "ARG001", "ARG002", "ARG005", "TRY003", "S108", "S106", "S105", "S311", "S113", "S310", "S603", "S104", "RUF059", "RUF043", "RUF012", "RUF003", "SIM117", "SIM102", "SIM118", "SIM105", "TRY300", "TRY301", "TRY002", "ASYNC240", "ASYNC230", "ASYNC109", "TC003", "TC002", "A002", "A003", "N805", "PLW1510", "DTZ005", "ERA001", "PT", "PERF102", "PERF402", "LOG015", "S107"]
 "backend/benchmarks/*" = ["S101", "ARG001", "ARG005", "S110", "S311"]
+# Hand-run exploratory scripts that intentionally make live HTTP calls
+# against a running DataForge API and target websites (see
+# ``backend/manual/README.md`` for the rationale). They are not part of
+# the pytest suite and they are excluded from bandit scans via
+# ``backend/.bandit``. The mirror exclusion here keeps ruff fast
+# without rolling back the strict lint posture on product code.
+"backend/manual/*" = ["S101", "ARG001", "ARG002", "ARG005", "S113", "S310", "S603", "S104", "S108", "S106", "S105", "S107", "S311", "ASYNC109", "ASYNC230", "ASYNC240", "LOG015", "TRY003", "TRY300", "TRY301", "TRY002", "BLE001", "PLW1510", "DTZ005", "PERF401", "PERF402", "SIM102", "SIM105", "SIM117", "SIM118", "PT", "PTH", "T201", "T203", "ERA001", "A002", "A003", "N805", "N806", "N802", "N811", "N813", "N817", "N818", "INP001"]
 "scripts/*" = [
     "S603",
     # CLI tools: legitimately use print() for stdout output, os.path for compat, etc.

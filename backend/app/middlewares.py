@@ -142,6 +142,11 @@ async def api_key_middleware(request: Request, call_next):
         # covered by body-size limits and the global rate limiter.
         if request.url.path == "/api/saas/signup":
             return await call_next(request)
+        # Billing webhooks are called by Autumn/Stripe, which do not carry
+        # DataForge API keys. The endpoint is rate-limited and body-size
+        # capped by other middlewares.
+        if request.url.path == "/api/billing/webhook":
+            return await call_next(request)
         bearer_token = None
         auth_header = request.headers.get("Authorization", "")
         auth_scheme, _, auth_token = auth_header.partition(" ")
@@ -256,6 +261,38 @@ async def csp_report_only_middleware(request: Request, call_next):
             "Content-Security-Policy-Report-Only",
             DEFAULT_CSP_REPORT_ONLY_POLICY,
         )
+    return response
+
+
+async def security_headers_middleware(request: Request, call_next):
+    """Add security headers to every response."""
+    response = await call_next(request)
+
+    # Prevent MIME type sniffing (XSS protection)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+
+    # Prevent clickjacking
+    response.headers.setdefault("X-Frame-Options", "DENY")
+
+    # Enable XSS filter in browsers
+    response.headers.setdefault("X-XSS-Protection", "1; mode=block")
+
+    # Referrer policy
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+
+    # Permissions policy (formerly Feature-Policy)
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()",
+    )
+
+    # Apply Strict-Transport-Security (HSTS) only in production
+    if settings.ENV.lower() == "production":
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=63072000; includeSubDomains; preload",
+        )
+
     return response
 
 

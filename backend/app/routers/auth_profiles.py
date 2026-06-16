@@ -195,6 +195,105 @@ async def complete_login(
 # ---------------------------------------------------------------------------
 
 
+def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
+    """Attempt a live HTTP check against the profile's target domain.
+
+    Uses the stored cookies (from Playwright storage_state) to make
+    a lightweight GET request to the target domain. If the request
+    succeeds without redirect to a login page, the session is
+    considered valid.
+
+    Returns a result dict with ``valid``, ``status``, and ``reason``
+    keys, or ``None`` if the check could not be performed (no state,
+    network error, etc.).
+    """
+    encrypted = profile.get("encrypted_storage_state", "")
+    if not encrypted:
+        return None
+
+    domain = str(profile.get("domain", ""))
+    if not domain:
+        return None
+
+    try:
+        import json
+
+        plaintext = encryption_decrypt(encrypted)
+        storage_state = json.loads(plaintext)
+    except Exception:
+        logger.debug("Could not decrypt storage state for live check", exc_info=True)
+        return None
+
+    # Extract cookies from Playwright storage state
+    cookies = storage_state.get("cookies", []) if isinstance(storage_state, dict) else []
+    if not cookies:
+        logger.debug("No cookies in storage state for live check")
+        return None
+
+    # Build a target URL from the domain
+    target_url = f"https://{domain}/"
+
+    try:
+        import httpx
+
+        # Build cookie jar from stored cookies
+        cookie_dict: dict[str, str] = {}
+        for c in cookies:
+            name = c.get("name", "")
+            value = c.get("value", "")
+            if name and value:
+                cookie_dict[name] = value
+
+        with httpx.Client(
+            cookies=cookie_dict,
+            follow_redirects=True,
+            timeout=15.0,
+            verify=False,  # noqa: S501  # nosec: target domains may use self-signed certs
+        ) as client:
+            response = client.get(
+                target_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                },
+            )
+
+            status_code = response.status_code
+            final_url = str(response.url)
+            content_lower = response.text[:2000].lower() if response.text else ""
+
+            # Detect login page redirects or login form indicators
+            login_keywords = ["login", "sign in", "log in", "signin", "auth", "authenticate", "session expired"]
+            redirected_to_login = any(kw in final_url.lower() for kw in login_keywords)
+            page_has_login_form = any(kw in content_lower for kw in login_keywords[:3])
+
+            if status_code == 200 and not redirected_to_login and not page_has_login_form:
+                return {"valid": True, "status": "active", "reason": "Live HTTP check passed."}
+            if status_code in (301, 302, 303, 307, 308) and redirected_to_login:
+                return {"valid": False, "status": "expired", "reason": f"Redirected to login page: {final_url}"}
+            if page_has_login_form:
+                return {"valid": False, "status": "expired", "reason": "Response contains login form — session expired."}
+            if status_code in (401, 403):
+                return {"valid": False, "status": "expired", "reason": f"HTTP {status_code} — authentication required."}
+            if status_code >= 500:
+                logger.debug("Live session check got %d for %s, treating as inconclusive", status_code, target_url)
+                return None
+
+            # Fall back to treating non-200 as inconclusive
+            logger.debug("Live session check got status %d for %s", status_code, target_url)
+            return None
+
+    except httpx.ConnectError:
+        logger.debug("Could not connect to %s for live session check", target_url)
+        return None
+    except httpx.TimeoutException:
+        logger.debug("Timeout connecting to %s for live session check", target_url)
+        return None
+    except Exception:
+        logger.debug("Live session check failed for %s", target_url, exc_info=True)
+        return None
+
+
 @router.post("/{profile_id}/validate", status_code=200)
 async def validate_profile(
     profile_id: str,
@@ -202,16 +301,19 @@ async def validate_profile(
         tuple[UserRole, str, str, str],
         Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
+    live: bool = False,
 ) -> dict[str, Any]:
     """Validate that the stored session is still active.
 
-    Returns the current status. If the session appears expired,
-    the profile status is updated to ``expired``.
+    By default, performs a local check on the stored state and
+    expiration timestamp. When ``live=true`` is set, also attempts
+    an actual HTTP request to the target domain using the stored
+    cookies to verify the session is still valid.
+
+    If the session appears expired or the live check fails,
+    the profile status is updated accordingly.
     """
     profile = _get_visible_profile(profile_id, auth)
-    # In a full implementation, this would attempt a lightweight
-    # request to the target domain using the stored session.
-    # For now, we do a basic check on the stored state.
     has_state = bool(profile.get("encrypted_storage_state"))
     expires_at = profile.get("expires_at")
 
@@ -225,7 +327,24 @@ async def validate_profile(
         profile["updated_at"] = _now_iso()
         return {"valid": False, "status": "failed", "reason": "No stored session state.", "profile": _safe_profile(profile)}
 
-    # If we had a real browser, we'd test the session here.
+    # Optional live HTTP check
+    if live and profile.get("status") == AuthProfileStatus.ACTIVE.value:
+        live_result = _try_live_session_check(profile)
+        if live_result is not None:
+            if not live_result["valid"]:
+                profile["status"] = AuthProfileStatus.EXPIRED.value
+                profile["updated_at"] = _now_iso()
+                return {
+                    "valid": False,
+                    "status": "expired",
+                    "reason": live_result["reason"],
+                    "profile": _safe_profile(profile),
+                }
+            # Live check confirmed valid
+            profile["last_validated_at"] = _now_iso()
+            return {"valid": True, "status": "active", "reason": "Live HTTP check passed.", "profile": _safe_profile(profile)}
+
+    # Local-only check passed
     profile["last_validated_at"] = _now_iso()
     return {"valid": True, "status": "active", "profile": _safe_profile(profile)}
 

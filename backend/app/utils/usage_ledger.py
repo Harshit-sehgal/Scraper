@@ -449,3 +449,12 @@ usage_ledger = UsageLedger()
 def get_usage_ledger() -> UsageLedger:
     """Get the global usage ledger."""
     return usage_ledger
+
+
+def reset_usage_ledger(user_id: str | None = None) -> int:
+    """Reset the global usage ledger for a specific user or all users.
+
+    Primarily used by test fixtures to ensure quota state does not leak
+    between tests. Returns the number of quotas reset.
+    """
+    return usage_ledger.reset_quotas(user_id=user_id)

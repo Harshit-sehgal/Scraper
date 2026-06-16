@@ -63,11 +63,12 @@ class JobRunnerSettings(BaseSettings):
         "facebook.com,twitter.com,x.com,instagram.com,linkedin.com,reddit.com,pinterest.com,tiktok.com,youtube.com"
     )
     """Comma-separated social root domains for source classification."""
-    DISCOVERY_DIRECTORY_DOMAINS: str = (
-        "yelp.com,yellowpages.com,justdial.com,sulekha.com,indiamart.com,"
-        "tripadvisor.com,glassdoor.com,angieslist.com,homeadvisor.com,houzz.com"
-    )
-    """Comma-separated directory domains for source classification."""
+    DISCOVERY_DIRECTORY_DOMAINS: str = "yelp.com,tripadvisor.com,glassdoor.com"
+    """Comma-separated directory domains for source classification.
+
+    These are generic global directories. Add or override via
+    DATAFORGE_DISCOVERY_DIRECTORY_DOMAINS env var for regional needs.
+    """
     DISCOVERY_SEARCH_DOMAINS: str = "google.com,bing.com,yahoo.com,duckduckgo.com,baidu.com"
     """Comma-separated search engine domains for source classification."""
     SOURCE_TRUST_OFFICIAL: float = 0.92
@@ -137,11 +138,18 @@ class JobRunnerSettings(BaseSettings):
     ACQUISITION_TELEMETRY_RECENT_DEFAULT: int = 20
 
     # ─── Location / Locale ────────────────────────────────────────────
+    # Default list of location keywords for geographic field detection.
+    # Override via DATAFORGE_LOCATION_WORDS env var or provide a custom file
+    # with DATAFORGE_LOCATION_WORDS_FILE to make the scraper location-agnostic.
     LOCATION_WORDS: str = (
-        "chennai,bangalore,delhi,mumbai,kolkata,hyderabad,pune,ahmedabad,"
-        "jaipur,lucknow,london,new york,los angeles,chicago,houston,phoenix,"
+        "london,new york,los angeles,chicago,houston,phoenix,"
         "paris,berlin,tokyo,singapore,sydney,toronto,melbourne,dubai,amsterdam,"
         "beijing,seoul,bangkok,madrid,rome,dublin,sao paulo,mexico city,"
         "buenos aires,cairo,nairobi,lagos,jakarta,manila"
     )
-    """Comma-separated location words for geographic field detection."""
+    """Comma-separated location words for geographic field detection.
+
+    Override with environment variable DATAFORGE_LOCATION_WORDS to customize
+    for your region. For large custom lists, use DATAFORGE_LOCATION_WORDS_FILE
+    to point to a file with one location per line.
+    """

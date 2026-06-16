@@ -314,6 +314,37 @@ async def _classify_and_capture_zero_result(
 
     warnings: list[str] = []
 
+    hard_zero_failure_classes = {"anti_bot_block", "auth_required"}
+    if potential_zero_classification and potential_zero_classification.failure_class in hard_zero_failure_classes:
+        if not classification:
+            classification = classify_failure(
+                telemetry={
+                    "fetch_method": fetch_method,
+                    "anti_bot_score": anti_bot_score,
+                    "selector_hit_rate": 0.0,
+                    "fallback_usage": ext_result.method,
+                },
+                html=html,
+                extraction_result={
+                    "method": ext_result.method,
+                    "records": ext_result.records,
+                    "selector_success": ext_result.selector_success,
+                },
+                fetch_method=fetch_method,
+            )
+            if classification:
+                from app.domain_intelligence import get_domain_intelligence
+
+                update_domain_with_failure(get_domain_intelligence(), url, classification)
+
+        logger.info(
+            "[ZeroResult] %s — %s (confidence=%.2f)",
+            potential_zero_classification.failure_class,
+            potential_zero_classification.user_message,
+            potential_zero_classification.confidence,
+        )
+        return potential_zero_classification, potential_zero_classification.failure_class, warnings
+
     if not ext_result.records or is_failure_page:
         zero_classification = potential_zero_classification
         if not classification:
@@ -777,6 +808,27 @@ async def scrape_url(
     )
 
     res_warnings = list(result_warnings)
+    if zero_result_failure_class in {"anti_bot_block", "auth_required"}:
+        logger.info(
+            "[Scraper] Hard zero-result failure for %s — failure_class=%s",
+            url,
+            zero_result_failure_class,
+        )
+        recommended_next_action = zero_classification.recommended_action if zero_classification else ""
+        return ScrapeAttemptResult(
+            [],
+            html=html,
+            final_url=url,
+            fetch_method=fetch_method,
+            telemetry=telemetry,
+            extraction_method=ext_result.method,
+            zero_result_classification=zero_classification,
+            anti_bot_score=anti_bot,
+            recommended_next_action=recommended_next_action,
+            warnings=res_warnings,
+            network_diagnostics=getattr(ext_result, "network_diagnostics", []),
+        )
+
     if not results and zero_result_failure_class:
         logger.info(
             "[Scraper] Zero records for %s — failure_class=%s",

@@ -34,6 +34,7 @@ from app.models import (
     SchemaSuggestionRequest,
     ScrapeMode,
 )
+from app.plan_enforcer import require_plan_limit
 from app.routers.jobs_state import (
     JobStoreManager,
     canonical_request_fingerprint,
@@ -137,6 +138,7 @@ def register_jobs_write_routes(
         job_data: JobCreate,
         request: Request,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        _plan_check: Annotated[dict[str, Any], Depends(require_plan_limit(UsageType.JOB_CREATED, quantity=1))],
     ):
         # Extract user identity for data isolation
         _role, user_id = get_current_user(request)

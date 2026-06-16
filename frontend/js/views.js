@@ -47,6 +47,7 @@ export function switchView(name) {
     recycle: "tab-recycle",
     cognition: "tab-cognition",
     dashboard: "tab-dashboard",
+    "auth-profiles": "tab-auth-profiles",
   };
   const tabEl = document.getElementById(tabMap[name]);
   if (tabEl) {
@@ -59,6 +60,7 @@ export function switchView(name) {
   if (name === "recycle") import("./recycle.js").then((m) => m.refreshRecycleBin()).catch(() => {});
   if (name === "cognition") import("./cognition.js").then((m) => m.refreshCognition()).catch(() => {});
   if (name === "dashboard") import("./dashboard.js").then((m) => m.refreshDashboard()).catch(() => {});
+  if (name === "auth-profiles") import("./auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
 
   writeUIState({ view: name });
 }
@@ -84,6 +86,7 @@ const TAB_KEYS = {
   3: "recycle",
   4: "cognition",
   5: "dashboard",
+  6: "auth-profiles",
 };
 
 export function onGlobalKeydown(e) {
@@ -91,8 +94,8 @@ export function onGlobalKeydown(e) {
   const jobsSearch = document.getElementById("jobs-search");
   const resultSearch = document.getElementById("inp-result-search");
 
-  // Number keys 1-5: switch between tabs (only when not typing)
-  if (!typing && e.key >= "1" && e.key <= "5") {
+  // Number keys 1-6: switch between tabs (only when not typing)
+  if (!typing && e.key >= "1" && e.key <= "6") {
     // H2: Guard keyboard shortcut for cognition tab
     if (e.key === "4" && window.DATAFORGE_EXPERIMENTAL !== true) {
       return;

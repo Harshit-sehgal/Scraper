@@ -76,6 +76,62 @@ def test_messy_blog_regex_extraction() -> None:
     assert "The Future of AI Agents" in titles
 
 
+def test_rating_named_string_field_uses_rating_node() -> None:
+    html = """
+    <html>
+      <body>
+        <div class="book">
+          <h2 class="title">The Great Gatsby</h2>
+          <span class="price">$15.99</span>
+          <span class="rating">5 stars</span>
+        </div>
+        <div class="book">
+          <h2 class="title">To Kill a Mockingbird</h2>
+          <span class="price">$12.49</span>
+          <span class="rating">4 stars</span>
+        </div>
+      </body>
+    </html>
+    """
+    fields = [
+        SchemaField(name="title", field_type=FieldType.STRING, description="Book title", required=True),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="Book price", required=True),
+        SchemaField(name="rating", field_type=FieldType.STRING, description="Star rating", required=False),
+    ]
+
+    results = cast("list[dict[str, Any]]", extract_with_regex(html, fields))
+
+    assert [r.get("rating") for r in results] == ["5 stars", "4 stars"]
+
+
+def test_quote_card_regex_extraction_uses_named_child_nodes() -> None:
+    html = """
+    <html>
+      <body>
+        <div class="quote">
+          <p class="text">"Be yourself; everyone else is already taken."</p>
+          <small class="author">Oscar Wilde</small>
+        </div>
+        <div class="quote">
+          <p class="text">"So many books, so little time."</p>
+          <small class="author">Frank Zappa</small>
+        </div>
+      </body>
+    </html>
+    """
+    fields = [
+        SchemaField(name="text", field_type=FieldType.STRING, description="Quote text", required=True),
+        SchemaField(name="author", field_type=FieldType.STRING, description="Quote author", required=True),
+    ]
+
+    results = cast("list[dict[str, Any]]", extract_with_regex(html, fields))
+
+    assert [{field: row.get(field) for field in ("text", "author")} for row in results] == [
+        {"text": "Be yourself; everyone else is already taken.", "author": "Oscar Wilde"},
+        {"text": "So many books, so little time.", "author": "Frank Zappa"},
+    ]
+
+
 def test_selector_application_precision() -> None:
     html = load_fixture("travel_site.html")
     fields = [

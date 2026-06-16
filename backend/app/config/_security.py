@@ -24,6 +24,8 @@ class SecuritySettings(BaseSettings):
     """If set, /metrics endpoint requires Authorization: Bearer <token>."""
     ALERT_WEBHOOK_URL: str | None = None
     """URL to send webhook alerts for domain anti-bot level shifts."""
+    BILLING_WEBHOOK_SECRET: str = ""
+    """Shared secret used to verify external billing webhook requests."""
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:8000",

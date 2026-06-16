@@ -143,7 +143,7 @@ async def get_scraper_diagnostics(
         raise HTTPException(status_code=400, detail="URL not allowed for diagnostics") from exc
     try:
         report = await run_diagnostics(req.url, req.fields, min_record_score=req.min_score)
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError) as e:
         # Never leak internal error details; log server-side instead.
         logger.exception("Diagnostics run failed for %s", req.url)
         raise HTTPException(status_code=500, detail="Diagnostics run failed") from e
@@ -168,7 +168,7 @@ async def get_regression_archive(
         # Trim recent captures to the requested limit
         stats["recent_captures"] = stats.get("recent_captures", [])[:limit]
         return stats
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError) as e:
         logger.exception("Failed to get regression archive")
         raise HTTPException(status_code=500, detail="Failed to get regression archive") from e
 
@@ -201,7 +201,7 @@ async def get_regression_detail(
         raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError) as e:
         logger.exception("Failed to get regression detail for entry %s", entry_id)
         raise HTTPException(status_code=500, detail="Failed to get regression detail") from e
 
@@ -223,7 +223,7 @@ async def generate_regression_replay_test(
         return {"entry_id": entry_id, "test_code": test_code}
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError) as e:
         logger.exception("Failed to generate regression replay test for entry %s", entry_id)
         raise HTTPException(status_code=500, detail="Failed to generate replay test") from e
 
@@ -238,7 +238,7 @@ async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_r
             "total_tests_generated": all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
             "test_code": all_tests,
         }
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError) as e:
         logger.exception("Failed to generate all regression replay tests")
         raise HTTPException(status_code=500, detail="Failed to generate replay tests") from e
 

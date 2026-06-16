@@ -13,7 +13,7 @@ class TestAuthProfileModel:
         p = AuthProfile(name="Login for example.com", domain="example.com")
         assert p.name == "Login for example.com"
         assert p.domain == "example.com"
-        assert p.status == AuthProfileStatus.ACTIVE
+        assert p.status == AuthProfileStatus.PENDING_LOGIN
         assert p.usage_count == 0
 
     def test_profile_id_generated(self):

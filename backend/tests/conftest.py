@@ -1,9 +1,12 @@
 import asyncio
 import contextlib
+import logging
 import os
 import socket
 import sys
 import time
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from types import ModuleType
 
@@ -411,6 +414,70 @@ def reset_queue():
 
 
 @pytest.fixture(autouse=True)
+def _disable_telegram_in_tests(monkeypatch):
+    """Force-disable Telegram notifications for every test.
+
+    This is a belt-and-suspenders guard. The notifier already
+    short-circuits when TELEGRAM_ENABLED is false or credentials are
+    missing, but this fixture ensures no test run can accidentally
+    trigger a real Telegram API call regardless of env-var leakage
+    or settings drift.
+
+    P1-TESTNET-001 (Prompt 0-4 remaining task): the Phase 0 audit
+    observed an SSL error to api.telegram.org during one full-suite
+    pytest run. That specific failure is not currently reproducible,
+    but this fixture makes the safeguard explicit and testable.
+    """
+    # Clear every Telegram env var that the notifier might read.
+    for var in (
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_ID",
+        "TELEGRAM_ENABLED",
+        "TELEGRAM_TOKEN",
+        "TELEGRAM_TO",
+        "TELEGRAM_NOTIFICATIONS_ENABLED",
+        "TELEGRAM_ENABLE_NOTIFICATIONS",
+        "DATAFORGE_TELEGRAM_BOT_TOKEN",
+        "DATAFORGE_TELEGRAM_CHAT_ID",
+        "DATAFORGE_TELEGRAM_ENABLED",
+        "DATAFORGE_TELEGRAM_API_BASE",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    # Reset the module-level notifier caches and patch the
+    # app.services.notifications singleton so both notifier
+    # modules see the cleared state. The app.utils.telegram_notifier
+    # module reads env vars directly via os.getenv (already cleared
+    # above), so only the app.services.notifications singleton needs
+    # explicit instance patching.
+    try:
+        from app.utils.telegram_notifier import reset_notifier
+
+        reset_notifier()
+    except ImportError:
+        pass
+    try:
+        from app.services.notifications import get_telegram_notifier
+
+        n = get_telegram_notifier()
+        monkeypatch.setattr(n, "enabled", False)
+        monkeypatch.setattr(n, "token", "")
+        monkeypatch.setattr(n, "chat_id", "")
+    except ImportError:
+        pass
+
+    yield
+
+    # Restore caches at teardown so the next test starts clean.
+    try:
+        from app.utils.telegram_notifier import reset_notifier
+
+        reset_notifier()
+    except ImportError:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def reset_lifespan_state_fixture():
     """Reset the module-level lifespan state before and after each test.
 
@@ -435,6 +502,54 @@ def reset_lifespan_state_fixture():
         reset_lifespan_state()
     except ImportError:
         pass
+
+
+@pytest.fixture(autouse=True)
+def reset_usage_ledger_fixture():
+    """Reset the global usage ledger before each test.
+
+    The usage ledger stores per-user quotas (e.g. job creation limits).
+    Without reset, an earlier test can exhaust a quota and cause false
+    429 failures in later tests.
+    """
+    try:
+        from app.utils.usage_ledger import reset_usage_ledger
+
+        reset_usage_ledger()
+    except ImportError:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_identity_store_fixture():
+    """Reset the SaaS identity store between tests.
+
+    The identity store's SQLite DB persists across test boundaries because
+    it is file-backed. Without clearing, earlier tests can create users or
+    orgs that cause unique-constraint or state conflicts in later tests.
+    """
+    try:
+        import sqlite3
+
+        from app.saas.identity_store import get_identity_store, reset_identity_store
+
+        try:
+            store = get_identity_store()
+            with store._connect() as conn:  # type: ignore[attr-defined]
+                for table in ("api_keys", "projects", "memberships", "organizations", "users"):
+                    with contextlib.suppress(sqlite3.OperationalError):
+                        conn.execute(f"DELETE FROM {table}")  # noqa: S608 — table is from hardcoded tuple
+                conn.commit()
+        except Exception:
+            logger.debug("Identity store cleanup failed (non-critical)", exc_info=True)
+
+        reset_identity_store()
+    except ImportError:
+        pass
+
+
+# ─── Helper functions ──────────────────────────────────────────────────────
 
 
 def make_schema_field_list(names: list[str], field_type: FieldType = FieldType.STRING) -> list[SchemaField]:
