@@ -179,8 +179,7 @@ def _multi_pass_extraction(
 
     # If pass1 is good enough, return it
     if pass1 and len(pass1) >= 3:
-        scores = [r.get("record_score", 0.0) for r in pass1]
-        avg_score = sum(scores) / len(scores)
+        avg_score = _average_record_score(pass1)
         if avg_score > 0.5:
             return pass1
 
@@ -479,8 +478,7 @@ async def orchestrate_extraction(
         network_payloads=evidence.network_json if evidence else None,
     )
     if network_results:
-        scores = [r.get("record_score", 0.0) for r in network_results]
-        avg_score = sum(scores) / len(scores) if scores else 0.0
+        avg_score = _average_record_score(network_results)
         if avg_score >= gate_threshold:
             logger.info(
                 "[Orchestrator] Network / JSON extraction SUCCESS (%d records, avg score: %.2f)",
@@ -519,13 +517,16 @@ async def orchestrate_extraction(
             user_intent=user_intent,
         )
         if provided_results:
-            scores = [r.get("record_score", 0.0) for r in provided_results]
-            avg_score = sum(scores) / len(scores) if scores else 0.0
+            avg_score = _average_record_score(provided_results)
             if avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, provided_selectors)
                 _record_field_provenance(
-                    provenance_builder, schema_fields, provided_results, ExtractionMethod.DISCOVERY, provided_selectors
+                    provenance_builder,
+                    schema_fields,
+                    provided_results,
+                    ExtractionMethod.DISCOVERY,
+                    provided_selectors,
                 )
                 return _arbitrate_and_return(
                     ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors),
@@ -578,8 +579,7 @@ async def orchestrate_extraction(
 
             raw_results = post_extract_validate_records(raw_results, schema_fields, warnings=warnings)
 
-            scores = [r.get("record_score", 0.0) for r in raw_results]
-            avg_score = sum(scores) / len(scores) if scores else 0.0
+            avg_score = _average_record_score(raw_results)
 
             # Downgrade memory extraction on session-bound URLs
             from app.session_url_detector import detect_session_params
@@ -606,7 +606,11 @@ async def orchestrate_extraction(
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, remembered_selectors)
                 _record_field_provenance(
-                    provenance_builder, schema_fields, raw_results, ExtractionMethod.MEMORY, remembered_selectors
+                    provenance_builder,
+                    schema_fields,
+                    raw_results,
+                    ExtractionMethod.MEMORY,
+                    remembered_selectors,
                 )
                 return _arbitrate_and_return(
                     ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors),
@@ -696,13 +700,16 @@ async def orchestrate_extraction(
         )
 
         if raw_results:
-            scores = [r.get("record_score", 0.0) for r in raw_results]
-            avg_score = sum(scores) / len(scores) if scores else 0.0
+            avg_score = _average_record_score(raw_results)
             if avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Discovery SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, discovered_selectors)
                 _record_field_provenance(
-                    provenance_builder, schema_fields, raw_results, ExtractionMethod.DISCOVERY, discovered_selectors
+                    provenance_builder,
+                    schema_fields,
+                    raw_results,
+                    ExtractionMethod.DISCOVERY,
+                    discovered_selectors,
                 )
                 return _arbitrate_and_return(
                     ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors),
@@ -756,8 +763,7 @@ async def orchestrate_extraction(
     logger.info("[Orchestrator] Trying rendered visible-text extraction for %s", url)
     visible_results = extract_from_visible_blocks(html, schema_fields, url=url)
     if visible_results:
-        scores = [r.get("record_score", 0.0) for r in visible_results]
-        avg_score = sum(scores) / len(scores) if scores else 0.0
+        avg_score = _average_record_score(visible_results)
         if avg_score >= gate_threshold:
             regex_candidate = extract_with_regex(html, schema_fields, base_url=url)
             if _should_prefer_structural_candidate(visible_results, regex_candidate, min_candidate_avg=gate_threshold):

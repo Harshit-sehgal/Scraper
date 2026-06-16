@@ -1,12 +1,12 @@
 # Latest Validation Summary
 
-- generated_at: 2026-06-16T19:27:10.056347+00:00
+- generated_at: 2026-06-16T19:37:24.404551+00:00
 - mode: full
-- run_id: 20260616T192226Z_full
-- archive_dir: `artifacts/validation/runs/20260616T192226Z_full`
+- run_id: 20260616T193221Z_full
+- archive_dir: `artifacts/validation/runs/20260616T193221Z_full`
 - overall_status: failed
-- passed: 21
-- failed: 1
+- passed: 19
+- failed: 3
 - skipped: 0
 - timed_out: 0
 - not_installed: 0
@@ -29,9 +29,9 @@
 | passed | true | url_and_research_smoke_tests | 0 | `artifacts/validation/commands/10_url_and_research_smoke_tests.md` |
 | passed | true | p0_regression_tests | 0 | `artifacts/validation/commands/11_p0_regression_tests.md` |
 | failed | true | backend_full_tests | 1 | `artifacts/validation/commands/12_backend_full_tests.md` |
-| passed | true | ruff_check | 0 | `artifacts/validation/commands/13_ruff_check.md` |
+| failed | true | ruff_check | 1 | `artifacts/validation/commands/13_ruff_check.md` |
 | passed | true | pyflakes | 0 | `artifacts/validation/commands/14_pyflakes.md` |
-| passed | true | mypy | 0 | `artifacts/validation/commands/15_mypy.md` |
+| failed | true | mypy | 1 | `artifacts/validation/commands/15_mypy.md` |
 | passed | true | bandit_backend | 0 | `artifacts/validation/commands/16_bandit_backend.md` |
 | passed | true | pip_audit | 0 | `artifacts/validation/commands/17_pip_audit.md` |
 | passed | true | prod_env_example_placeholder_check | 1 | `artifacts/validation/commands/18_prod_env_example_placeholder_check.md` |
