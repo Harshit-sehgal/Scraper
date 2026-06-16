@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import importlib
 import json
+from pathlib import Path
 
 import pytest
 from app.billing.models import PlanTierId
@@ -21,12 +23,26 @@ from app.billing.service import (
     reset_autumn_client,
 )
 from app.billing.webhooks import (
-    _customer_subscriptions,
     _process_webhook_event,
+    _subscription_store,
     get_customer_subscription,
     set_customer_subscription,
 )
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _isolate_billing_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Point the file-backed subscription store at a fresh per-test file.
+
+    Without this autouse fixture, tests in this module would share one
+    on-disk JSON file across the whole test session, so writes from a
+    subscription.created test would leak into subsequent tests. With
+    it, every test gets its own empty store.
+    """
+    target = tmp_path / "billing_subscriptions.json"
+    monkeypatch.setenv("DATAFORGE_BILLING_SUBSCRIPTIONS_FILE", str(target))
+    importlib.reload(importlib.import_module("app.billing.webhooks"))
 
 
 def _webhook_signature(secret: str, body: bytes) -> str:
@@ -127,9 +143,6 @@ class TestPlanLimits:
 class TestWebhookProcessing:
     """Tests for billing webhook event processing."""
 
-    def setup_method(self) -> None:
-        _customer_subscriptions.clear()
-
     def test_subscription_created(self) -> None:
         """subscription.created stores the customer's tier."""
         _process_webhook_event(
@@ -181,7 +194,7 @@ class TestWebhookProcessing:
     def test_event_without_customer_id_is_skipped(self) -> None:
         """Events without customer_id are skipped."""
         _process_webhook_event("subscription.created", {"plan": "pro"})
-        assert len(_customer_subscriptions) == 0
+        assert len(_subscription_store) == 0
 
     def test_subscription_updated_changes_tier(self) -> None:
         """subscription.updated upgrades the customer's tier."""
@@ -226,7 +239,6 @@ class TestBillingWebhookEndpoint:
 
     def test_webhook_valid_event(self, client: TestClient) -> None:
         """Valid webhook event is processed."""
-        _customer_subscriptions.clear()
         payload = {
             "event_type": "subscription.created",
             "data": {
@@ -282,7 +294,6 @@ class TestBillingWebhookEndpoint:
         """Configured billing webhooks accept a valid HMAC-SHA256 body signature."""
         secret = "test-webhook-secret"
         monkeypatch.setenv("AUTUMN_WEBHOOK_SECRET", secret)
-        _customer_subscriptions.clear()
         payload = {
             "event_type": "subscription.created",
             "data": {

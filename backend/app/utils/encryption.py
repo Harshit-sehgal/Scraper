@@ -86,7 +86,7 @@ def _get_key(key_version: str = DEFAULT_KEY_VERSION) -> bytes | None:
     if env_key:
         try:
             return base64.b64decode(env_key)
-        except Exception as exc:
+        except (ValueError, TypeError) as exc:
             logger.warning("Failed to decode encryption key from %s: %s", versioned_env_name, exc)
             return None
 
@@ -95,7 +95,7 @@ def _get_key(key_version: str = DEFAULT_KEY_VERSION) -> bytes | None:
     if env_key:
         try:
             return base64.b64decode(env_key)
-        except Exception as exc:
+        except (ValueError, TypeError) as exc:
             logger.warning("Failed to decode encryption key from %s: %s", _ENCRYPTION_KEY_ENV, exc)
             return None
 
@@ -125,7 +125,7 @@ def _get_all_available_keys() -> dict[str, bytes]:
                     key_bytes = base64.b64decode(env_value)
                     version = f"v{version_suffix}" if version_suffix.isdigit() else version_suffix
                     keys[version] = key_bytes
-                except Exception:
+                except (ValueError, TypeError):
                     logger.debug("Skipping invalid key in %s", env_name)
                     continue
 
@@ -138,7 +138,7 @@ def _get_all_available_keys() -> dict[str, bytes]:
             legacy_version = os.environ.get(_ENCRYPTION_KEY_VERSION_ENV, DEFAULT_KEY_VERSION)
             if legacy_version not in keys:
                 keys[legacy_version] = legacy_key
-        except Exception:
+        except (ValueError, TypeError):
             logger.debug("Skipping invalid legacy encryption key")
 
     # Development/test fallback: ensure at least one key exists

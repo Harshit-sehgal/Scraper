@@ -150,7 +150,7 @@ def register_jobs_write_routes(
             _ctx = resolve_auth_context(request, allow_cookie=True)
             _owner_org_id = _ctx.org_id
             _owner_project_id = _ctx.project_id
-        except Exception:
+        except (RuntimeError, ValueError, TypeError):
             _owner_org_id = ""
             _owner_project_id = ""
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
@@ -294,7 +294,7 @@ def register_jobs_write_routes(
                 except (AttributeError, ImportError, RuntimeError):
                     logger.warning("Failed to hard-delete job %s after scheduled-job quota rejection", job.id)
                 raise HTTPException(status_code=429, detail=str(e)) from e
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 if settings.ENV.lower() == "production":
                     logger.exception(
                         "Failed to enqueue job %s to worker queue in production",
@@ -365,7 +365,7 @@ def register_jobs_write_routes(
 
                 queue = get_worker_queue()
                 await queue.cancel(job_id)
-            except Exception as e:
+            except (RuntimeError, ValueError, OSError) as e:
                 cancel_task_success = False
                 logger.warning(
                     "Failed to cancel queued task for job %s: %s",
@@ -579,7 +579,7 @@ def register_jobs_write_routes(
             }
             job.quality_report = quality
             await save_job(job)
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception(
                 "Job %s: Reclean failed irrecoverably, restoring previous status %s",
                 job_id,
@@ -589,7 +589,7 @@ def register_jobs_write_routes(
             reclean_warnings.append(f"Reclean failed: {e}")
             try:
                 await save_job(job)
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.exception(
                     "Job %s: Failed to persist job state after reclean rollback",
                     job_id,
@@ -632,7 +632,7 @@ def register_jobs_write_routes(
         repo = get_job_repository()
         try:
             await run_in_threadpool(repo.move_to_recycle_bin, job_id)
-        except Exception:
+        except (RuntimeError, OSError, ValueError):
             logger.exception("Failed to move job %s to recycle bin in repository", job_id)
             raise HTTPException(
                 status_code=500,
@@ -680,7 +680,7 @@ def register_jobs_write_routes(
             try:
                 await run_in_threadpool(repo.move_to_recycle_bin, jid)
                 cleared_ids.append(jid)
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.exception("Failed to move terminal job %s to recycle bin during cleanup", jid)
                 failed_ids.append(jid)
 
@@ -725,7 +725,7 @@ def register_jobs_write_routes(
         repo = get_job_repository()
         try:
             await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
             raise HTTPException(
                 status_code=500,
@@ -751,7 +751,7 @@ def register_jobs_write_routes(
         repo = get_job_repository()
         try:
             await run_in_threadpool(repo.hard_delete, job_id)
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception("Failed to hard-delete job %s from repository", job_id)
             raise HTTPException(
                 status_code=500,
@@ -784,7 +784,7 @@ def register_jobs_write_routes(
             try:
                 await run_in_threadpool(repo.hard_delete, jid)
                 deleted_ids.append(jid)
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.exception("Failed to hard-delete job %s during recycle bin clear", jid)
                 failed_ids.append(jid)
         for jid, job in snapshot:

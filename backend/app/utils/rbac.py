@@ -99,7 +99,7 @@ def _resolve_persistent_api_key_context(raw_key: str) -> AuthContext | None:
         store = get_identity_store()
         service = ApiKeyService(store=store)
         record = service.authenticate(raw_key)
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError) as e:
         logger.debug("Persistent API key lookup failed: %s", e)
         return None
     if record is None:
@@ -123,7 +123,7 @@ def _project_org(store, project_id: str) -> str:
     """Tiny helper to look up an org id for a project (lazy import)."""
     try:
         proj = store.get_project(project_id)
-    except Exception:
+    except (RuntimeError, ValueError, TypeError):
         return ""
     return proj.org_id if proj else ""
 

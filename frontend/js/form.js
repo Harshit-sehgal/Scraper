@@ -54,8 +54,13 @@ export async function initForm() {
   clearAnalysis();
   addField();
 
-  // Refresh auth profile dropdown
-  _refreshAuthProfileDropdown();
+  // Bug-fix: previously non-awaited, so ``dataforge:form-ready`` could fire
+  // before the dropdown refresh was scheduled. Now ``await``ed so the event
+  // fires only AFTER the dropdown is fully resolved.
+  await _refreshAuthProfileDropdown();
+  // Dispatch a deterministic signal so E2E tests can await completion
+  // without relying on racy timeout(300).
+  document.dispatchEvent(new CustomEvent("dataforge:form-ready"));
 }
 
 async function _refreshAuthProfileDropdown() {
@@ -63,8 +68,17 @@ async function _refreshAuthProfileDropdown() {
   if (!select) return;
   try {
     const res = await apiFetch(`${API}/api/auth-profiles`, { method: "GET" });
+    // Auth-profiles endpoint requires ADMIN/OPERATOR, so user-level keys
+    // (USER role) receive 403. We deliberately tolerate 401/403 here so
+    // the form remains usable for ROLE-restricted users — they keep the
+    // "None (public access)" option and never block on the dropdown.
+    // For 5xx / network failures we log a warning so production outages
+    // are not silently hidden behind the same UI as an intentional 403.
     if (!res.ok) {
-      select.innerHTML = '<option value="">Unable to load profiles</option>';
+      if (res.status >= 500) {
+        console.warn("[form] auth-profiles unavailable:", res.status);
+      }
+      select.innerHTML = '<option value="">None (public access)</option>';
       return;
     }
     const data = await res.json();

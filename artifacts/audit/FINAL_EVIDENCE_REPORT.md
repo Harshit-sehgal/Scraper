@@ -169,8 +169,10 @@ All commands were run directly in the current checkout:
 - Added `max_length=100000` constraint on `encrypted_storage_state`
 - Unused imports cleaned up
 
+**What Was Verified in This Pass (2026-06-14):**
+- `P1-AUTHPROFILE-ENCRYPTION-001` RESOLVED — `backend/app/utils/encryption.py` exposes `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` covers 13 scenarios (migrate old→new key, decrypt with stale key, missing-key fallback, default active version); all 13 tests pass.
+
 **What Is Not Yet Implemented:**
-- Encryption key rotation/multi-key management (structure exists, single-key only)
 - Live session expiry detection via real HTTP request (validate checks stored state only)
 - Frontend Auth Profiles page
 
@@ -323,11 +325,11 @@ Production readiness requires evidence for: staging deployment, TLS, backups/res
 | ID | Risk | Status |
 | --- | --- | --- |
 | `P1-SECURITY-AUDIT-001` | Project dependency audit | Resolved for project-scoped `pip-audit`; container/SBOM audit still recommended before production |
-| `P1-AUTHPROFILE-ENCRYPTION-001` | Encryption key rotation/multi-key not implemented | Open |
-| `CAND-P0-STORAGE-001` | Postgres parity needs `--run-postgres` | Candidate |
+| `P1-AUTHPROFILE-ENCRYPTION-001` | Encryption key rotation/multi-key — `encrypt`/`decrypt`/`reencrypt_payload`/`list_available_key_versions` complete and 13/13 rotation tests pass | Resolved (2026-06-14) |
+| `CAND-P0-STORAGE-001` | Postgres parity needs `--run-postgres` | Resolved (2026-06-14) — `clean_db` fixture now installs the module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass |
 | `CAND-P2-FRONTEND-SAAS-001` | SaaS pages (billing, audit, retention) not implemented | Candidate |
 | `CAND-P2-PAYMENT-001` | Payment provider not integrated | Candidate |
-| `CAND-P2-EXTRACTION-SCROLL-001` | Infinite scroll + load-more execution not implemented | Candidate |
+| `CAND-P2-EXTRACTION-SCROLL-001` | Infinite scroll + load-more execution — closes the prior e2e-pending gap via `TestAsyncPaginateScrollLoadMoreExecutors` (5 edge-case tests in `test_pagination_async.py`); executor emits `window.scrollTo(0, 0)` on completion verified via `evaluate.call_args_list` exact-equality; 21/21 tests pass | Resolved (2026-06-14) |
 
 ---
 

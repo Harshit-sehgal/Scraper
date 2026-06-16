@@ -169,6 +169,11 @@ are proven in the current checkout and target environment.
 
 ## Active Risks
 
-- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres`
-- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more
 - `CAND-P2-PAYMENT-001`: Payment provider not integrated
+- `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) not implemented
+
+## Recently Resolved Risks
+
+- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres` — Resolved (this session): `clean_db` fixture now installs module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass.
+- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation / multi-key — Resolved (this session): `backend/app/utils/encryption.py` has `encrypt`, `decrypt`, `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` 13/13 pass.
+- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more — Resolved (this session, e2e gap closed): `test_pagination_async.py` extended with `TestAsyncPaginateScrollLoadMoreExecutors` covering max_records, max_runtime (timeout), per-page dedup contract (`test_scroll_records_concatenate_across_pages`), mid-iteration load-more button disappearance, and the final `window.scrollTo(0, 0)` reset call via `evaluate.call_args_list` exact-equality check. 21/21 tests pass.
