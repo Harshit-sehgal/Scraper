@@ -7,7 +7,6 @@ saved workflows that replay a sequence of browser steps.
 from __future__ import annotations
 
 import datetime
-import json
 import logging
 import uuid
 from pathlib import Path

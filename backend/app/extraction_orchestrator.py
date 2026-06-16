@@ -246,6 +246,31 @@ def _multi_pass_extraction(
     return _merge_composite_records(passes, schema_fields)
 
 
+def _record_field_provenance(
+    provenance_builder: ProvenanceBuilder | None,
+    schema_fields: list[SchemaField],
+    records: list[dict],
+    method: str,
+    selectors: dict | None = None,
+) -> None:
+    """Record provenance for all fields in all extracted records."""
+    if not provenance_builder:
+        return
+    fields_sel = (selectors or {}).get("fields", {})
+    for idx, record in enumerate(records):
+        for field in schema_fields:
+            val = record.get(field.name)
+            selector = fields_sel.get(field.name)
+            provenance_builder.add_field_provenance(
+                record_idx=idx,
+                field_name=field.name,
+                value=val,
+                method=method,
+                selector=selector,
+                confidence=record.get("record_score", 0.5),
+            )
+
+
 async def orchestrate_extraction(
     url: str,
     html: str,
@@ -272,27 +297,7 @@ async def orchestrate_extraction(
 
     gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
 
-    def _record_field_provenance(
-        records: list[dict],
-        method: str,
-        selectors: dict | None = None,
-    ) -> None:
-        """Record provenance for all fields in all extracted records."""
-        if not provenance_builder:
-            return
-        fields_sel = (selectors or {}).get("fields", {})
-        for idx, record in enumerate(records):
-            for field in schema_fields:
-                val = record.get(field.name)
-                selector = fields_sel.get(field.name)
-                provenance_builder.add_field_provenance(
-                    record_idx=idx,
-                    field_name=field.name,
-                    value=val,
-                    method=method,
-                    selector=selector,
-                    confidence=record.get("record_score", 0.5),
-                )
+    # Use module-level helper - defined after this function
 
     # ── Gather network diagnostics ──
     import json
@@ -482,7 +487,7 @@ async def orchestrate_extraction(
                 len(network_results),
                 avg_score,
             )
-            _record_field_provenance(network_results, ExtractionMethod.DISCOVERY)
+            _record_field_provenance(provenance_builder, schema_fields, network_results, ExtractionMethod.DISCOVERY)
             return _arbitrate_and_return(ExtractionResult(network_results, "network_json", selector_success=True))
         logger.info(
             "[Orchestrator] Network / JSON extraction LOW QUALITY (avg score: %.2f), falling through",
@@ -519,7 +524,9 @@ async def orchestrate_extraction(
             if avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, provided_selectors)
-                _record_field_provenance(provided_results, ExtractionMethod.DISCOVERY, provided_selectors)
+                _record_field_provenance(
+                    provenance_builder, schema_fields, provided_results, ExtractionMethod.DISCOVERY, provided_selectors
+                )
                 return _arbitrate_and_return(
                     ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors),
                 )
@@ -598,7 +605,9 @@ async def orchestrate_extraction(
             elif avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, remembered_selectors)
-                _record_field_provenance(raw_results, ExtractionMethod.MEMORY, remembered_selectors)
+                _record_field_provenance(
+                    provenance_builder, schema_fields, raw_results, ExtractionMethod.MEMORY, remembered_selectors
+                )
                 return _arbitrate_and_return(
                     ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors),
                     warnings=warnings,
@@ -692,7 +701,9 @@ async def orchestrate_extraction(
             if avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Discovery SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, discovered_selectors)
-                _record_field_provenance(raw_results, ExtractionMethod.DISCOVERY, discovered_selectors)
+                _record_field_provenance(
+                    provenance_builder, schema_fields, raw_results, ExtractionMethod.DISCOVERY, discovered_selectors
+                )
                 return _arbitrate_and_return(
                     ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors),
                 )
@@ -714,7 +725,7 @@ async def orchestrate_extraction(
             container_result.total_records,
             container_result.best_selector,
         )
-        _record_field_provenance(container_result.final_records, ExtractionMethod.DISCOVERY)
+        _record_field_provenance(provenance_builder, schema_fields, container_result.final_records, ExtractionMethod.DISCOVERY)
         return _arbitrate_and_return(
             ExtractionResult(
                 container_result.final_records,
@@ -729,7 +740,7 @@ async def orchestrate_extraction(
             container_result.total_records,
         )
         # Keep partial results as potential fallback
-        _record_field_provenance(container_result.final_records, ExtractionMethod.DISCOVERY)
+        _record_field_provenance(provenance_builder, schema_fields, container_result.final_records, ExtractionMethod.DISCOVERY)
         if provenance_builder:
             provenance_builder.add_fallback_step("container_discovery_partial")
     else:
@@ -755,7 +766,7 @@ async def orchestrate_extraction(
                     len(regex_candidate),
                     len(visible_results),
                 )
-                _record_field_provenance(regex_candidate, ExtractionMethod.REGEX)
+                _record_field_provenance(provenance_builder, schema_fields, regex_candidate, ExtractionMethod.REGEX)
                 if provenance_builder:
                     provenance_builder.add_fallback_step("visible_text_superseded_by_regex")
                 return _arbitrate_and_return(ExtractionResult(regex_candidate, "regex", selector_success=False))
@@ -764,7 +775,7 @@ async def orchestrate_extraction(
                 len(visible_results),
                 avg_score,
             )
-            _record_field_provenance(visible_results, ExtractionMethod.REGEX)
+            _record_field_provenance(provenance_builder, schema_fields, visible_results, ExtractionMethod.REGEX)
             return _arbitrate_and_return(ExtractionResult(visible_results, "visible_text", selector_success=False))
         logger.info(
             "[Orchestrator] Visible-text extraction LOW QUALITY (avg score: %.2f)",
@@ -780,7 +791,7 @@ async def orchestrate_extraction(
     # ── Layer 6: Regex Fallback ──────────────────────────────────────────
     logger.info("[Orchestrator] Falling back to regex extraction for %s", url)
     regex_results = extract_with_regex(html, schema_fields, base_url=url)
-    _record_field_provenance(regex_results, ExtractionMethod.REGEX)
+    _record_field_provenance(provenance_builder, schema_fields, regex_results, ExtractionMethod.REGEX)
 
     # If container discovery found partial results, prefer them over regex
     # (container discovery has better structural understanding)
