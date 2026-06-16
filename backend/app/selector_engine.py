@@ -529,7 +529,7 @@ def extract_raw_from_selectors(
                             except ValueError:
                                 node_ftype = None
                         val = _read_node_value(target, node_ftype, key)
-                except Exception as e:
+                except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
                     logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
             else:
                 val = _extract_field_by_pattern(node, sel_entry, key, used_spans, used_child_indices)

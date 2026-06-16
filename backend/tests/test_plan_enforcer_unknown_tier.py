@@ -75,6 +75,7 @@ def test_user_tier_falls_back_when_tier_missing() -> None:
 
 def test_user_tier_falls_back_on_unknown_tier_string() -> None:
     """An unrecognized PlanTierId value falls back to ``"free"``."""
+
     # Build a fake billing-service return whose ``.value`` is a string
     # outside the canonical allow-list. We bypass the enum so the test
     # is honest about what happens when billing data contains an
@@ -84,7 +85,7 @@ def test_user_tier_falls_back_on_unknown_tier_string() -> None:
 
     with patch(
         "app.billing.service.get_user_tier_from_billing",
-        _fake_get_user_tier_from_billing := lambda _uid: _FakeTier(),
+        lambda _uid: _FakeTier(),
     ):
         # Plan enforcer must NOT pass "platinum_max" through.
         assert _user_tier("user_unknown_tier") == "free"
@@ -92,6 +93,7 @@ def test_user_tier_falls_back_on_unknown_tier_string() -> None:
 
 def test_user_tier_falls_back_on_uppercase_variant() -> None:
     """Stray casing falls back to ``"free"`` (canonical set is lowercase)."""
+
     class _FakeTier:
         value = "PRO"  # uppercase vs canonical "pro"
 
@@ -104,6 +106,7 @@ def test_user_tier_falls_back_on_uppercase_variant() -> None:
 
 def test_user_tier_falls_back_on_empty_string() -> None:
     """A billing record with empty plan_tier does not slip through."""
+
     class _FakeTier:
         value = ""
 

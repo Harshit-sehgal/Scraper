@@ -267,7 +267,7 @@ def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     if job:
         try:
             get_job_repository().save_single(job)
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             logger.exception("Failed to persist single job %s", job_id)
             if critical:
                 raise

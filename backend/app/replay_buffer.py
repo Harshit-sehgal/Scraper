@@ -428,7 +428,7 @@ class ReplayBuffer:
                 for line in f:
                     if line.strip():
                         count += 1
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             logger.debug("Failed to count entries in segment %s", seg_path, exc_info=True)
         return count
 

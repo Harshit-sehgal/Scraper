@@ -9,22 +9,42 @@ from __future__ import annotations
 
 import datetime
 import logging
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.models import ScheduledJob, ScheduledJobFrequency
+from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scheduled", tags=["scheduled-monitoring"])
 
-# In-memory scheduled job store (mirrors _workflows pattern)
-_scheduled_jobs: dict[str, dict[str, Any]] = {}
+# File-backed scheduled-job store shared across uvicorn/gunicorn workers.
+# Reads always re-read disk; writes use flock-serialised atomic rename.
+_scheduled_jobs = JSONFileStore(
+    Path(__file__).resolve().parents[2] / "data" / "scheduled_jobs.json",
+)
 
 
 def _now_iso() -> str:
     return datetime.datetime.now(datetime.UTC).isoformat()
+
+
+def _write_back(record: dict[str, Any]) -> None:
+    """Persist a (possibly-mutated) local copy of a scheduled-job record.
+
+    The store returns deep copies on every read so direct mutation of the
+    dict the caller holds does NOT persist; this helper is what makes
+    mutations on those copies visible to subsequent reads and to sibling
+    workers.
+    """
+    job_id = str(record.get("id") or "")
+    if not job_id:
+        msg = "scheduled-job dict missing 'id' before write-back"
+        raise RuntimeError(msg)
+    _scheduled_jobs.upsert(job_id, record)
 
 
 def _can_access_scheduled_job(item: dict[str, Any], auth: tuple[UserRole, str, str, str]) -> bool:
@@ -68,7 +88,7 @@ async def create_scheduled_job(
         job_name=job_name.strip() or f"Scheduled: {name}",
         next_run_at=_now_iso(),
     )
-    _scheduled_jobs[job.id] = job.model_dump()
+    _scheduled_jobs.upsert(job.id, job.model_dump())
     logger.info("Scheduled job created: %s (%s)", job.name, job.id)
     return job.model_dump()
 
@@ -123,6 +143,7 @@ async def update_scheduled_job(
     if enabled is not None:
         existing["enabled"] = enabled
     existing["updated_at"] = _now_iso()
+    _write_back(existing)
     return existing
 
 
@@ -136,8 +157,8 @@ async def delete_scheduled_job(
 ):
     """Delete a scheduled job permanently."""
     _get_visible_scheduled_job(job_id, auth)
-    del _scheduled_jobs[job_id]
-    logger.info("Scheduled job deleted: %s", job_id)
+    if _scheduled_jobs.delete(job_id):
+        logger.info("Scheduled job deleted: %s", job_id)
 
 
 # ─── Change Detection ─────────────────────────────────────────────────────
