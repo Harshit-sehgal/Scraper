@@ -45,7 +45,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
                 cache.set(address, location.latitude, location.longitude, location.address)
                 return coords
             break  # If geocoding succeeded but returned no location, break early
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             if attempt < max_retries - 1:
                 logger.warning(
                     "Geocoding attempt %d failed for '%s' (retrying in %.1fs): %s",
@@ -138,7 +138,7 @@ def coerce_value(value: Any, field_type: FieldType):
 
         return str(value) if value is not None else None
 
-    except Exception:
+    except (ValueError, TypeError, AttributeError):
         logger.exception("Failed to coerce value")
         return str(value) if value is not None else None
 

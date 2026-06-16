@@ -88,7 +88,7 @@ class AutumnClient:
             logger.info("Autumn billing client initialized")
         except ImportError:
             logger.warning("autumn-sdk not installed — billing disabled, using free-tier defaults")
-        except Exception as e:
+        except (RuntimeError, ValueError, OSError) as e:
             logger.warning("Failed to initialize Autumn client: %s", e)
 
         return self._client
@@ -118,7 +118,7 @@ class AutumnClient:
             client.track(customer_id=customer_id, event_name=event_name, value=value, properties=kwargs)
             logger.debug("Tracked billing event: customer=%s event=%s value=%d", customer_id, event_name, value)
             return True
-        except Exception as e:
+        except (RuntimeError, ValueError, OSError) as e:
             logger.warning("Failed to track billing event %s for %s: %s", event_name, customer_id, e)
             return False
 
@@ -148,7 +148,7 @@ class AutumnClient:
                 if sub_status in SubscriptionStatus.__members__
                 else SubscriptionStatus.ACTIVE,
             )
-        except Exception as e:
+        except (RuntimeError, ValueError, OSError) as e:
             logger.warning("Failed to lookup customer %s: %s", customer_id, e)
             return None
 
@@ -181,7 +181,7 @@ class AutumnClient:
         try:
             result = client.check_balance(customer_id=customer_id, amount=amount)
             return bool(getattr(result, "sufficient", False))
-        except Exception as e:
+        except (RuntimeError, ValueError, OSError) as e:
             logger.warning("Failed to check balance for %s: %s", customer_id, e)
             return True  # Fail open in dev
 
