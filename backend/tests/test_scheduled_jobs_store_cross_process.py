@@ -119,7 +119,9 @@ def test_corrupt_store_recovers_to_empty(store_path: Path) -> None:
     s = JSONFileStore(path=store_path)
     assert s.values() == []
     s.upsert("after-corrupt", {"id": "after-corrupt", "name": "ok"})
-    assert s.get("after-corrupt")["name"] == "ok"
+    recovered = s.get("after-corrupt")
+    assert recovered is not None
+    assert recovered["name"] == "ok"
 
 
 def test_clear_all_is_total(store_path: Path) -> None:

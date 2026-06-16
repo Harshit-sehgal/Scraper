@@ -221,6 +221,26 @@ class JSONFileStore:
         self._read_modify_write(_mutate)
         return removed
 
+    def delete_many(self, record_ids: list[str]) -> int:
+        """Remove many records in a single flocked read-modify-write.
+
+        Batch API to avoid N-fold write amplification when a
+        caller wants to purge many records owned by a single
+        principal (e.g. ``delete-my-data`` purging all of a
+        user's workflows in one tick).
+        """
+        target_ids = set(record_ids)
+        removed: list[int] = [0]
+
+        def _mutate(s: dict[str, dict[str, Any]]) -> None:
+            for rid in target_ids:
+                if rid in s:
+                    del s[rid]
+                    removed[0] += 1
+
+        self._read_modify_write(_mutate)
+        return removed[0]  # post-write; closure-final read of removed[0] is safe
+
     def merge(
         self,
         record_id: str,

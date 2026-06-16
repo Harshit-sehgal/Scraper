@@ -978,7 +978,7 @@ def get_job_repository() -> JobRepository:
                     return repo
                 except RuntimeError:
                     raise
-                except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
+                except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, ImportError) as e:
                     msg = (
                         f"Failed to create Psycopg3JobRepository: {e}. "
                         "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
@@ -1007,7 +1007,7 @@ def get_job_repository() -> JobRepository:
                 return repo
             except RuntimeError:
                 raise
-            except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
+            except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, ImportError) as e:
                 msg = f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
                 raise RuntimeError(
                     msg,

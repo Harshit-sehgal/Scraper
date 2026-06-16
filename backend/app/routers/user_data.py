@@ -109,52 +109,49 @@ async def delete_my_data(
     except (OSError, ValueError, TypeError) as e:
         logger.debug("Failed to delete job results from disk: %s", e)
 
-    # 3. Delete workflows owned by the user
+    # 3. Delete workflows owned by the user (single flocked batch via delete_many).
     try:
-        from app.routers.workflow import _persist_workflows
         from app.routers.workflow import _workflows as workflow_store
 
-        workflow_ids_to_delete: list[str] = []
-        for wf in list(workflow_store.values()):
-            owner = str(wf.get("user_id", ""))
-            if owner == user_id:
-                wid = str(wf.get("id", ""))
-                if wid:
-                    workflow_ids_to_delete.append(wid)
-                    workflow_store.pop(wid, None)
+        workflow_ids_to_delete: list[str] = [
+            str(wf.get("id", "")) for wf in workflow_store.values() if str(wf.get("user_id", "")) == user_id and wf.get("id")
+        ]
         if workflow_ids_to_delete:
-            _persist_workflows()
-        summary["workflows_deleted"] = len(workflow_ids_to_delete)
+            summary["workflows_deleted"] = workflow_store.delete_many(workflow_ids_to_delete)
+        else:
+            summary["workflows_deleted"] = 0
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete workflows for user %s: %s", user_id, e)
 
-    # 4. Delete auth profiles owned by the user
+    # 4. Delete auth profiles owned by the user (single flocked batch via delete_many).
     try:
         from app.routers.auth_profiles import _auth_profiles as auth_profile_store
 
-        profile_ids_to_delete: list[str] = []
-        for prof in auth_profile_store.values():
-            if str(prof.get("user_id", "")) == user_id:
-                pid = str(prof.get("id", ""))
-                if pid:
-                    profile_ids_to_delete.append(pid)
-                    auth_profile_store.delete(pid)
-        summary["auth_profiles_deleted"] = len(profile_ids_to_delete)
+        profile_ids_to_delete: list[str] = [
+            str(prof.get("id", ""))
+            for prof in auth_profile_store.values()
+            if str(prof.get("user_id", "")) == user_id and prof.get("id")
+        ]
+        if profile_ids_to_delete:
+            summary["auth_profiles_deleted"] = auth_profile_store.delete_many(profile_ids_to_delete)
+        else:
+            summary["auth_profiles_deleted"] = 0
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete auth profiles for user %s: %s", user_id, e)
 
-    # 5. Delete scheduled monitoring jobs owned by the user
+    # 5. Delete scheduled monitoring jobs owned by the user (single flocked batch via delete_many).
     try:
         from app.routers.scheduled_monitoring import _scheduled_jobs as schedule_store
 
-        schedule_ids_to_delete: list[str] = []
-        for sched in schedule_store.values():
-            if str(sched.get("user_id", "")) == user_id:
-                sid = str(sched.get("id", ""))
-                if sid:
-                    schedule_ids_to_delete.append(sid)
-                    schedule_store.delete(sid)
-        summary["scheduled_jobs_deleted"] = len(schedule_ids_to_delete)
+        schedule_ids_to_delete: list[str] = [
+            str(sched.get("id", ""))
+            for sched in schedule_store.values()
+            if str(sched.get("user_id", "")) == user_id and sched.get("id")
+        ]
+        if schedule_ids_to_delete:
+            summary["scheduled_jobs_deleted"] = schedule_store.delete_many(schedule_ids_to_delete)
+        else:
+            summary["scheduled_jobs_deleted"] = 0
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete scheduled jobs for user %s: %s", user_id, e)
 

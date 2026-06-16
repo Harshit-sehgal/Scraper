@@ -417,7 +417,7 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
         name="org-b-write",
         scope=ApiKeyScope.WRITE,
     )
-    workflow_router._workflows.clear()
+    workflow_router._workflows.clear_all()
 
     try:
         created = client.post(
@@ -450,7 +450,7 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
         assert owner_get.status_code == 200
     finally:
         reset_identity_store(None)
-        workflow_router._workflows.clear()
+        workflow_router._workflows.clear_all()
 
 
 def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monkeypatch, tmp_path) -> None:
