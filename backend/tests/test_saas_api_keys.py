@@ -1,6 +1,26 @@
 """Tests for SaaS API key management endpoints."""
 
+import pytest
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def reset_identity_store_fixture():
+    """Reset the identity store before each SaaS API key test."""
+    import os
+    import tempfile
+
+    from app.saas.identity_store import SQLiteIdentityStore, reset_identity_store
+
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        store = SQLiteIdentityStore(storage_path=f.name)
+        reset_identity_store(store)
+        yield
+        reset_identity_store(None)
+        try:
+            os.remove(f.name)
+        except OSError:
+            pass
 
 
 class TestApiKeyManagement:

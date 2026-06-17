@@ -1,11 +1,11 @@
-# pyflakes
+# mypy
 
 - status: passed
-- command: `/usr/bin/python3 -m pyflakes backend/app backend/tests scripts`
+- command: `/usr/bin/python3 -m mypy backend`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:12.948635+00:00
-- end_time: 2026-06-17T11:11:15.329338+00:00
-- duration_seconds: 2.38
+- start_time: 2026-06-17T10:31:59.176484+00:00
+- end_time: 2026-06-17T10:31:59.420087+00:00
+- duration_seconds: 0.24
 - exit_code: 0
 - timeout_seconds: 300
 - required: true
@@ -14,6 +14,7 @@
 ## stdout
 
 ```text
+Success: no issues found in 556 source files
 
 ```
 

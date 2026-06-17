@@ -3,9 +3,9 @@
 - status: passed
 - command: `npm run lint:css`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:41.586703+00:00
-- end_time: 2026-06-17T11:11:42.083632+00:00
-- duration_seconds: 0.50
+- start_time: 2026-06-17T10:32:22.263950+00:00
+- end_time: 2026-06-17T10:32:22.743074+00:00
+- duration_seconds: 0.48
 - exit_code: 0
 - timeout_seconds: 120
 - required: true

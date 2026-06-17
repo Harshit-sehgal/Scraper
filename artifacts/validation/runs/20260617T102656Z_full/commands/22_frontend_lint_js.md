@@ -3,8 +3,8 @@
 - status: passed
 - command: `npm run lint:js`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:40.622261+00:00
-- end_time: 2026-06-17T11:11:41.586230+00:00
+- start_time: 2026-06-17T10:32:21.300278+00:00
+- end_time: 2026-06-17T10:32:22.263537+00:00
 - duration_seconds: 0.96
 - exit_code: 0
 - timeout_seconds: 300

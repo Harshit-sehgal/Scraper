@@ -1,19 +1,20 @@
-# compileall
+# ruff_check
 
 - status: passed
-- command: `/usr/bin/python3 -m compileall -q backend scripts architecture_validator.py`
+- command: `/usr/bin/python3 -m ruff check backend scripts`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:15.838818+00:00
-- end_time: 2026-06-17T11:06:15.879889+00:00
+- start_time: 2026-06-17T10:31:56.597879+00:00
+- end_time: 2026-06-17T10:31:56.633638+00:00
 - duration_seconds: 0.04
 - exit_code: 0
-- timeout_seconds: 60
+- timeout_seconds: 300
 - required: true
 - redaction_applied: false
 
 ## stdout
 
 ```text
+All checks passed!
 
 ```
 

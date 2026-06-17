@@ -1,20 +1,20 @@
-# python_version
+# node_version
 
 - status: passed
-- command: `/usr/bin/python3 --version`
+- command: `node --version`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:15.756490+00:00
-- end_time: 2026-06-17T11:06:15.757808+00:00
+- start_time: 2026-06-17T10:26:56.295737+00:00
+- end_time: 2026-06-17T10:26:56.298439+00:00
 - duration_seconds: 0.00
 - exit_code: 0
 - timeout_seconds: 30
-- required: true
+- required: false
 - redaction_applied: false
 
 ## stdout
 
 ```text
-Python 3.12.3
+v24.12.0
 
 ```
 

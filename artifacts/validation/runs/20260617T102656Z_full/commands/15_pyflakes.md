@@ -3,9 +3,9 @@
 - status: passed
 - command: `/usr/bin/python3 -m pyflakes backend/app backend/tests scripts`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:12.948635+00:00
-- end_time: 2026-06-17T11:11:15.329338+00:00
-- duration_seconds: 2.38
+- start_time: 2026-06-17T10:31:56.633899+00:00
+- end_time: 2026-06-17T10:31:59.176205+00:00
+- duration_seconds: 2.54
 - exit_code: 0
 - timeout_seconds: 300
 - required: true

@@ -1,21 +1,20 @@
-# python_version
+# required_paths
 
 - status: passed
-- command: `/usr/bin/python3 --version`
+- command: `internal check`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:15.756490+00:00
-- end_time: 2026-06-17T11:06:15.757808+00:00
+- start_time: 2026-06-17T10:26:56.281488+00:00
+- end_time: 2026-06-17T10:26:56.281488+00:00
 - duration_seconds: 0.00
 - exit_code: 0
-- timeout_seconds: 30
+- timeout_seconds: 0
 - required: true
 - redaction_applied: false
 
 ## stdout
 
 ```text
-Python 3.12.3
-
+Required paths present.
 ```
 
 ## stderr

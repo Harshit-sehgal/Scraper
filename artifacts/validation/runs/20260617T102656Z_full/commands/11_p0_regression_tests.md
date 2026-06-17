@@ -3,9 +3,9 @@
 - status: passed
 - command: `/usr/bin/python3 -m pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py -q`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:19.865532+00:00
-- end_time: 2026-06-17T11:06:31.623154+00:00
-- duration_seconds: 11.76
+- start_time: 2026-06-17T10:27:00.371555+00:00
+- end_time: 2026-06-17T10:27:13.066242+00:00
+- duration_seconds: 12.69
 - exit_code: 0
 - timeout_seconds: 180
 - required: true

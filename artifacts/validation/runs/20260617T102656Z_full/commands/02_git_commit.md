@@ -1,20 +1,20 @@
-# python_version
+# git_commit
 
 - status: passed
-- command: `/usr/bin/python3 --version`
+- command: `git rev-parse --short HEAD`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:15.756490+00:00
-- end_time: 2026-06-17T11:06:15.757808+00:00
+- start_time: 2026-06-17T10:26:56.283562+00:00
+- end_time: 2026-06-17T10:26:56.285626+00:00
 - duration_seconds: 0.00
 - exit_code: 0
 - timeout_seconds: 30
-- required: true
+- required: false
 - redaction_applied: false
 
 ## stdout
 
 ```text
-Python 3.12.3
+6b13d70f
 
 ```
 

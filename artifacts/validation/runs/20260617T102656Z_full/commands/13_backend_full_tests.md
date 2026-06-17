@@ -1,15 +1,15 @@
 # backend_full_tests
 
-- status: passed
+- status: failed
 - command: `/usr/bin/python3 -m pytest backend/tests -q`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:32.668697+00:00
-- end_time: 2026-06-17T11:11:12.921011+00:00
-- duration_seconds: 280.25
-- exit_code: 0
+- start_time: 2026-06-17T10:27:14.131473+00:00
+- end_time: 2026-06-17T10:31:56.597086+00:00
+- duration_seconds: 282.47
+- exit_code: 1
 - timeout_seconds: 600
 - required: true
-- redaction_applied: false
+- redaction_applied: true
 
 ## stdout
 
@@ -47,7 +47,7 @@ sssssssssssssssssss...........................ss........................ [ 51%]
 ................................................................ssssssss [ 59%]
 sssss...................................s............................... [ 61%]
 ........................................................................ [ 63%]
-........................................................................ [ 65%]
+...................................................................F.... [ 65%]
 ........................................................................ [ 67%]
 ..........ss............................................................ [ 69%]
 ........................................................................ [ 70%]
@@ -67,12 +67,49 @@ sssss...................................s............................... [ 61%]
 ..ss..sssssssssssssssssss............................................... [ 97%]
 ........................................................................ [ 99%]
 ...........                                                              [100%]
+=================================== FAILURES ===================================
+___________________ TestApiKeyManagement.test_list_api_keys ____________________
+
+self = <tests.test_saas_api_keys.TestApiKeyManagement object at 0x78b66a3b5040>
+client = <tests.conftest.LocalASGIClient object at 0x78b6587ee660>
+
+    def test_list_api_keys(self, client: TestClient):
+        signup = client.post(
+            "/api/saas/signup",
+            json={
+                "email": "test-list@example.com",
+                "password": "password123",
+            },
+        )
+        data_signup = signup.json()
+        project_id = data_signup["project_id"]
+        user_id = data_signup["user_id"]
+    
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+    
+        cookies = {SESSION_COOKIE: [REDACTED]
+    
+        # Create a key
+        client.post(
+            f"/api/saas/projects/{project_id}/keys",
+            json={"name": "List Test", "scope": "write"},
+            cookies=cookies,
+        )
+    
+        list_resp = client.get(f"/api/saas/projects/{project_id}/keys", cookies=cookies)
+>       assert list_resp.status_code == 200
+E       assert 404 == 200
+E        +  where 404 = <Response [404 Not Found]>.status_code
+
+backend/tests/test_saas_api_keys.py:[REDACTED] AssertionError
 =============================== warnings summary ===============================
 backend/tests/test_pagination_async.py::TestCanonicalFiveStrategyContract::test_strategy_enum_strings_match_across_layers
   backend/tests/test_pagination_async.py:510: PytestWarning: The test <Function test_strategy_enum_strings_match_across_layers> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
     def test_strategy_enum_strings_match_across_layers(self) -> None:
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_saas_api_keys.py:[REDACTED]
 
 ```
 

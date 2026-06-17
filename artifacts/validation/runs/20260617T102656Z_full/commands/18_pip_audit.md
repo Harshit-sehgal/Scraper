@@ -3,9 +3,9 @@
 - status: passed
 - command: `/usr/bin/python3 -m pip_audit --progress-spinner off --desc off .`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:19.356644+00:00
-- end_time: 2026-06-17T11:11:37.037367+00:00
-- duration_seconds: 17.68
+- start_time: 2026-06-17T10:32:03.191083+00:00
+- end_time: 2026-06-17T10:32:17.894863+00:00
+- duration_seconds: 14.70
 - exit_code: 0
 - timeout_seconds: 300
 - required: true

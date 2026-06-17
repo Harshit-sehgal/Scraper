@@ -3,8 +3,8 @@
 - status: passed
 - command: `git status --short`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:15.760153+00:00
-- end_time: 2026-06-17T11:06:15.769741+00:00
+- start_time: 2026-06-17T10:26:56.285922+00:00
+- end_time: 2026-06-17T10:26:56.295441+00:00
 - duration_seconds: 0.01
 - exit_code: 0
 - timeout_seconds: 30
@@ -38,14 +38,7 @@
  D artifacts/validation/commands/21_frontend_tests.md
  D artifacts/validation/commands/22_frontend_lint_js.md
  D artifacts/validation/commands/23_frontend_lint_css.md
- M artifacts/validation/latest_summary.json
- M artifacts/validation/latest_summary.md
- M backend/tests/test_saas_api_keys.py
- M docs/API_EXPERIMENTAL.md
- M docs/API_EXPERIMENTAL_DIFF.md
- M docs/API_STABLE.md
 ?? artifacts/validation/runs/20260617T102656Z_full/
-?? artifacts/validation/runs/20260617T110615Z_full/
 
 ```
 

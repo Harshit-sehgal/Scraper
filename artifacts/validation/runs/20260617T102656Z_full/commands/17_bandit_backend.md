@@ -3,9 +3,9 @@
 - status: passed
 - command: `/usr/bin/python3 -m bandit -r backend -q`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:15.644134+00:00
-- end_time: 2026-06-17T11:11:19.355908+00:00
-- duration_seconds: 3.71
+- start_time: 2026-06-17T10:31:59.420333+00:00
+- end_time: 2026-06-17T10:32:03.190318+00:00
+- duration_seconds: 3.77
 - exit_code: 0
 - timeout_seconds: 300
 - required: true

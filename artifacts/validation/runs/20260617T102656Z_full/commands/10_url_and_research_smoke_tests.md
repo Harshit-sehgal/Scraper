@@ -3,9 +3,9 @@
 - status: passed
 - command: `/usr/bin/python3 -m pytest backend/tests/test_url_safety.py backend/tests/test_research_boundary.py -q`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:06:17.316455+00:00
-- end_time: 2026-06-17T11:06:19.865245+00:00
-- duration_seconds: 2.55
+- start_time: 2026-06-17T10:26:57.865882+00:00
+- end_time: 2026-06-17T10:27:00.371277+00:00
+- duration_seconds: 2.51
 - exit_code: 0
 - timeout_seconds: 120
 - required: true

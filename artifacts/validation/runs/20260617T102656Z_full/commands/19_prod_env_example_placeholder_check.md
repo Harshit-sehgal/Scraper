@@ -3,8 +3,8 @@
 - status: passed
 - command: `/usr/bin/python3 scripts/check_prod_env.py --env-file /home/harshit/Documents/Work/Money/scraper/.env.production.example`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-17T11:11:37.037715+00:00
-- end_time: 2026-06-17T11:11:37.065696+00:00
+- start_time: 2026-06-17T10:32:17.895179+00:00
+- end_time: 2026-06-17T10:32:17.925632+00:00
 - duration_seconds: 0.03
 - exit_code: 1
 - timeout_seconds: 120
