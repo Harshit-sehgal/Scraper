@@ -196,7 +196,10 @@ def test_manifold_merge_sovereignty() -> None:
     mock_req = MagicMock()
     mock_req.headers = {}
 
-    asyncio.run(merge_knowledge(mock_req, KnowledgeMergeRequest(**remote_data), UserRole.ADMIN))
+    import unittest.mock
+
+    with unittest.mock.patch("app.routers.experimental._require_admin_key"):
+        asyncio.run(merge_knowledge(mock_req, KnowledgeMergeRequest(**remote_data), UserRole.ADMIN))
 
     assert max(ws.role_manifold.get("price", [0])) > 0.5
     assert ws.learned_exclusions[("destination", "origin")] == 0.8

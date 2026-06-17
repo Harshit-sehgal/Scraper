@@ -792,7 +792,7 @@ class TestBatchExportErrors:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_batch_unsupported_format_returns_400(self) -> None:
+    async def test_batch_unsupported_format_returns_422(self) -> None:
         from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
@@ -806,7 +806,7 @@ class TestBatchExportErrors:
                 "/api/exports/batch",
                 json={"job_ids": ["j1"], "format": "xml"},
             )
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_batch_empty_job_ids_returns_422(self) -> None:
