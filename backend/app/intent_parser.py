@@ -1,5 +1,3 @@
-from typing import Any
-
 """Layer 1: Intent Parser.
 ======================
 
@@ -12,6 +10,7 @@ Core principle: Match by semantic need (price, date, rating), not by domain.
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Any
 
 from app.models import FieldType
 

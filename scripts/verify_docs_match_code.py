@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import logging
 import re
-
-logger = logging.getLogger(__name__)
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "backend"

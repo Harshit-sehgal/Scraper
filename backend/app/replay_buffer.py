@@ -1,5 +1,3 @@
-from typing import Any
-
 """Large-Scale Replay Buffer — streams historical deltas from persistent storage.
 
 The ReplayBuffer complements the in-memory EventJournal by providing:
@@ -18,6 +16,7 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,12 @@
+"""Ensure consistent schema order and basic normalization of values."""
+
 from typing import Any
 
+from app.html_utils import _is_empty_value
 from app.models import SchemaField
 
 
 def normalize_scraped_record(record: dict[str, Any], schema_fields: list[SchemaField]) -> dict[str, Any]:
-    """Ensure consistent schema order and basic normalization of values."""
-    from app.html_utils import _is_empty_value
 
     normalized: dict[str, Any] = {}
     for field in schema_fields:

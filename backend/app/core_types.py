@@ -1,5 +1,3 @@
-from typing import Any
-
 """Foundational Types for the Semantic Substrate.
 
 LAW: Physical truth is a topological property of the field.
@@ -8,6 +6,7 @@ Meaning is a geometric distance in the Role Manifold.
 
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from app.field_laws import (
     MAX_COUPLING_TRANSFER,

@@ -1,4 +1,6 @@
-"""Unit tests for semantic_segmentation — IR, extraction, classification, relationships, structural memory, noise detection, overlap resolution."""
+"""Unit tests for semantic_segmentation — IR, extraction, classification,
+relationships, structural memory, noise detection, overlap resolution.
+"""
 
 from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_segmentation import (

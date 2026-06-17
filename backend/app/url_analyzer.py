@@ -610,12 +610,17 @@ class UrlAnalysisResult:
                     "name": f"Login for {parsed_domain}" if parsed_domain else "Login profile",
                     "domain": parsed_domain,
                 },
-                "description": "An Auth Profile stores encrypted browser session data so DataForge can extract data behind a login wall.",
+                "description": (
+                    "An Auth Profile stores encrypted browser session data so DataForge can extract data behind a login wall."
+                ),
                 "next_action": {
                     "action": "complete_login",
                     "endpoint": "/api/auth-profiles/{profile_id}/complete-login",
                     "method": "POST",
-                    "description": "After the profile is created and you have logged in through the controlled browser, call this endpoint to store the encrypted session.",
+                    "description": (
+                        "After the profile is created and you have logged in through "
+                        "the controlled browser, call this endpoint to store the encrypted session."
+                    ),
                 },
             }
 

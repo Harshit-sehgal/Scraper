@@ -5,10 +5,11 @@ import os
 import socket
 import sys
 import time
-
-logger = logging.getLogger(__name__)
 from pathlib import Path
 from types import ModuleType
+
+import httpx
+import pytest
 
 # Setup test environment variables first, before importing any app modules.
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,9 +28,9 @@ os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
 os.environ.pop("DATAFORGE_DATABASE_URL", None)
 os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
 
-import httpx
-import pytest
 from app.models import FieldType, SchemaField
+
+logger = logging.getLogger(__name__)
 
 
 def pytest_addoption(parser) -> None:
@@ -88,7 +89,11 @@ def pytest_configure(config) -> None:
     )
     config.addinivalue_line(
         "markers",
-        "network: tests that intentionally make live DNS/HTTP calls. The autouse DNS stand-in fixture is bypassed for these tests. Skipped by default in CI sandboxes without network access.",
+        (
+            "network: tests that intentionally make live DNS/HTTP calls. "
+            "The autouse DNS stand-in fixture is bypassed for these tests. "
+            "Skipped by default in CI sandboxes without network access."
+        ),
     )
     config.addinivalue_line(
         "markers",

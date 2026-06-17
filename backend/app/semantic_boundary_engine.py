@@ -1,5 +1,3 @@
-from typing import Any
-
 """Semantic Boundary Engine.
 =========================
 
@@ -10,6 +8,7 @@ boundary decisions based on structural signals and learned history.
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 
 def get_world_state():

@@ -1,5 +1,3 @@
-from typing import Any
-
 """EnergyState — owns ALL energy and macro-state variables.
 
 True ownership boundary: NO external code should mutate global_energy directly.
@@ -15,6 +13,7 @@ _convergence, _temperature, _integrity, _smoothed_* smoothing caches.
 
 import math
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 

@@ -1,5 +1,3 @@
-from typing import Any
-
 """AbstractionState — owns hierarchical concept mappings and role envelopes.
 
 True ownership boundary: NO external code should mutate envelopes directly.
@@ -8,6 +6,7 @@ All changes go through this state object, which supports transactions.
 
 import time
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 

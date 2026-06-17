@@ -111,6 +111,19 @@ def _require_admin_key(request: Request) -> None:
             "falling back to the regular API key check. This is a "
             "configuration error in production.",
         )
+        # Fail-closed: require admin key in production or test
+        if settings.ENV.lower() not in ("development", "dev", "local"):
+            raise HTTPException(
+                status_code=403,
+                detail="ADMIN_API_KEY is not configured. Admin operations are disabled.",
+            )
+        # In development: fall back to regular API key check
+        api_key = request.headers.get("X-API-Key", "")
+        if not api_key or not settings.API_KEY or not secrets.compare_digest(api_key, settings.API_KEY):
+            raise HTTPException(
+                status_code=403,
+                detail="Admin API key not configured. Provide valid API key.",
+            )
         return
     provided = request.headers.get("X-Admin-Key", "")
     if not secrets.compare_digest(provided, settings.ADMIN_API_KEY):

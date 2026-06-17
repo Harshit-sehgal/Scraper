@@ -357,7 +357,9 @@ def test_save_and_load_job_from_sqlite(monkeypatch) -> None:
 
 
 def test_running_job_marked_failed_after_restart(monkeypatch) -> None:
-    """Verify that jobs in PENDING/DISCOVERING/RUNNING state are transitioned to FAILED with a restart error when loaded on restart."""
+    """Verify that jobs in PENDING/DISCOVERING/RUNNING state are transitioned to FAILED
+    with a restart error when loaded on restart."
+    """
     from app.config import settings
     from app.job_store import load_state, reset_job_store_for_tests, save_state
     from app.models import Job, JobStatus

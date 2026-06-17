@@ -10,6 +10,7 @@ import json
 from typing import Any
 from unittest.mock import patch
 
+import httpx
 import pytest
 import pytest_asyncio
 from app.models import FieldType, Job, JobStatus, SchemaField
@@ -144,8 +145,6 @@ class TestCSVInjectionProtection:
         # Verify it returns an Excel file (not a 500 error)
         assert resp.headers["content-type"].startswith("application/vnd.openxmlformats")
 
-
-import httpx
 
 # ─── Missing job / empty results ────────────────────────────────────
 

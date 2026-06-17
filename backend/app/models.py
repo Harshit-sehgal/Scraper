@@ -1,5 +1,3 @@
-from typing import Any, Literal
-
 """Pydantic models for the scraper API.
 
 Defines the data structures for jobs, schemas, filters, and results.
@@ -9,6 +7,7 @@ import datetime
 import re
 import uuid
 from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 

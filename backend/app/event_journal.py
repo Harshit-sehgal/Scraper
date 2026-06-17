@@ -1,5 +1,3 @@
-from typing import Any
-
 """Event Journal — mutation tracing and causality chain for the semantic field.
 
 Every mutation to the world state is recorded as a journal entry with:
@@ -16,6 +14,7 @@ large-scale ReplayBuffer for streaming replay from persistent storage.
 
 import logging
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

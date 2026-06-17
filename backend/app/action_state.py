@@ -1,5 +1,3 @@
-from typing import Any
-
 """ActionState — owns executable cognitive actions and their manifold anchors.
 
 True ownership boundary: NO external code should mutate active_actions directly.
@@ -8,6 +6,7 @@ All changes go through this state object, which supports transactions.
 
 import time
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 

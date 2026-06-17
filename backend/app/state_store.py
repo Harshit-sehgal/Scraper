@@ -1,5 +1,3 @@
-from typing import Any
-
 """Simple JSON persistence for job and recycle-bin state with safety guarantees.
 
 Storage safety features:
@@ -18,6 +16,7 @@ import logging
 import shutil
 from pathlib import Path
 from threading import Lock
+from typing import Any
 
 from app.models import Job, JobStatus
 

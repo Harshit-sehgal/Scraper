@@ -199,7 +199,8 @@ def register_jobs_write_routes(
                         detail="Conflict: Another request with a different payload was already sent for this Idempotency-Key.",
                     )
 
-                cached = manager.jobs_store.get(existing_job_id)
+                with manager.lock:
+                    cached = manager.jobs_store.get(existing_job_id)
                 if cached is not None:
                     return {
                         "job_id": cached.id,

@@ -1,5 +1,3 @@
-from typing import Any
-
 """AI structuring service — extracted from ``job_runner.run_job``.
 
 This module encapsulates the global AI structuring phase of the job
@@ -14,6 +12,7 @@ for the full extraction plan.
 import asyncio
 import logging
 from collections.abc import Callable
+from typing import Any
 
 from starlette.concurrency import run_in_threadpool
 

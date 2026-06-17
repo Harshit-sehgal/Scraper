@@ -105,7 +105,10 @@ def main() -> int:
         f"| Test collection | {total_tests} tests collected, exit 0 |",
         "| DNS isolation | URL safety tests pass in <1s (was hanging) |",
         f"| Stable API docs | {api_stable} routes (vs {api_full} with experimental: {api_diff} diff) |",
-        f"| Doctor health check | {doc_data.get('required_pass', 0)}/{doc_data.get('required_pass', 0) + doc_data.get('required_fail', 1)} required checks passed |",
+        (
+            f"| Doctor health check | {doc_data.get('required_pass', 0)}"
+            f"/{doc_data.get('required_pass', 0) + doc_data.get('required_fail', 1)} required checks passed |"
+        ),
         "",
         "## Section 2 — Frontend Verification",
         "",
@@ -141,16 +144,31 @@ def main() -> int:
         "",
         "## Section 4 — Readiness Estimate",
         "",
-        "This generator does not assign a 100/100 SaaS-readiness score. Production readiness requires fresh evidence for auth, tenant isolation, billing enforcement, benchmark gates, staging deployment, TLS, secrets, backups, restore drills, monitoring, alerting, load tests, and incident runbooks.",
+        (
+            "This generator does not assign a 100/100 SaaS-readiness score. "
+            "Production readiness requires fresh evidence for auth, tenant "
+            "isolation, billing enforcement, benchmark gates, staging "
+            "deployment, TLS, secrets, backups, restore drills, monitoring, "
+            "alerting, load tests, and incident runbooks."
+        ),
         "",
         "| Area | Current Evidence |",
         "| --- | --- |",
-        "| Test reliability | Generated from collection plus selected checks above; run the full validation suite before release claims. |",
-        "| Documentation truth | See `docs/AGENT_TRUTH.md`; old status files are historical unless regenerated from current commands. |",
+        (
+            "| Test reliability | Generated from collection plus selected checks above;"
+            " run the full validation suite before release claims. |"
+        ),
+        (
+            "| Documentation truth | See `docs/AGENT_TRUTH.md`; old status files"
+            " are historical unless regenerated from current commands. |"
+        ),
         "| Backend architecture | Architecture validator result shown above when doctor/checks complete. |",
         "| Core extraction value | Requires benchmark corpus and regression gates before product claims. |",
         "| Security/compliance | Requires security review, tenant isolation proof, and abuse/compliance controls. |",
-        "| Operations/deployment | Requires staging/prod deployment, backups, restore drill, monitoring, alerting, and load tests. |",
+        (
+            "| Operations/deployment | Requires staging/prod deployment, backups,"
+            " restore drill, monitoring, alerting, and load tests. |"
+        ),
         "| Billing/business | Requires persistent metering and plan enforcement across all paid usage paths. |",
         "",
         "---",

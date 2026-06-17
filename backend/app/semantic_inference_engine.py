@@ -1,5 +1,3 @@
-from typing import Any
-
 """Role Embedding Engine.
 =====================
 
@@ -12,6 +10,7 @@ import contextlib
 import logging
 import threading
 from dataclasses import dataclass
+from typing import Any
 
 from app.semantic_ir import (
     SemanticGraph,

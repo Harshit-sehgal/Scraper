@@ -39,21 +39,39 @@ export class ErrorBoundary {
     if (!element) return;
 
     const message = error.message || "An unexpected error occurred";
-    element.innerHTML = `
-      <div class="error-boundary" role="alert">
-        <div class="error-icon">⚠️</div>
-        <div class="error-message">${this.escapeHtml(message)}</div>
-        <div class="error-actions">
-          <button class="error-retry-btn" onclick="this.closest('.error-boundary').retry()">
-            Retry${this.retryCount > 0 ? ` (${this.retryCount}/${this.maxRetries})` : ""}
-          </button>
-          <button class="error-dismiss-btn" onclick="this.closest('.error-boundary').dismiss()">
-            Dismiss
-          </button>
-        </div>
-      </div>
-    `;
+    const errorBoundary = document.createElement("div");
+    errorBoundary.className = "error-boundary";
+    errorBoundary.setAttribute("role", "alert");
 
+    const iconDiv = document.createElement("div");
+    iconDiv.className = "error-icon";
+    iconDiv.textContent = "⚠️";
+
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "error-message";
+    msgDiv.textContent = message;
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "error-actions";
+
+    const retryBtn = document.createElement("button");
+    retryBtn.className = "error-retry-btn";
+    retryBtn.textContent = `Retry${this.retryCount > 0 ? ` (${this.retryCount}/${this.maxRetries})` : ""}`;
+    retryBtn.addEventListener("click", () => this.retry());
+
+    const dismissBtn = document.createElement("button");
+    dismissBtn.className = "error-dismiss-btn";
+    dismissBtn.textContent = "Dismiss";
+    dismissBtn.addEventListener("click", () => this.dismiss());
+
+    actionsDiv.appendChild(retryBtn);
+    actionsDiv.appendChild(dismissBtn);
+
+    errorBoundary.appendChild(iconDiv);
+    errorBoundary.appendChild(msgDiv);
+    errorBoundary.appendChild(actionsDiv);
+
+    element.appendChild(errorBoundary);
     element.style.display = "block";
   }
 
@@ -210,15 +228,29 @@ export class ToastManager {
     const toast = document.createElement("div");
     toast.className = `toast toast-${type}`;
     toast.setAttribute("role", "alert");
-    toast.innerHTML = `
-      <div class="toast-content">
-        <span class="toast-icon">${this.getIcon(type)}</span>
-        <span class="toast-message">${message}</span>
-      </div>
-      <button class="toast-close" onclick="this.parentElement.remove()" aria-label="Close">
-        ×
-      </button>
-    `;
+
+    const content = document.createElement("div");
+    content.className = "toast-content";
+
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "toast-icon";
+    iconSpan.textContent = this.getIcon(type);
+
+    const msgSpan = document.createElement("span");
+    msgSpan.className = "toast-message";
+    msgSpan.textContent = this.escapeHtml(message);
+
+    content.appendChild(iconSpan);
+    content.appendChild(msgSpan);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "toast-close";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", () => toast.remove());
+
+    toast.appendChild(content);
+    toast.appendChild(closeBtn);
 
     this.container.appendChild(toast);
 
@@ -258,12 +290,6 @@ export class ToastManager {
     this.show(message, "info", duration);
   }
 }
-
-// ─── Global Instances ───
-export const errorBoundary = new ErrorBoundary();
-export const loadingStates = new LoadingStates();
-export const retryHandler = new RetryHandler();
-export const toast = new ToastManager();
 
 // ─── Utility Functions ───
 export function withErrorBoundary(fn, errorElement) {

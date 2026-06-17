@@ -216,7 +216,11 @@ class TestLogFunctions:
 
 class TestParseFunctions:
     def test_parse_audit_log_line_standard(self) -> None:
-        line = '2026-05-30T12:00:00 [AUDIT] {"event_type":"auth","actor":"test","action":"login","resource":"/","outcome":"success","details":{}}'
+        line = (
+            "2026-05-30T12:00:00 [AUDIT] {"
+            '"event_type":"auth","actor":"test","action":"login",'
+            '"resource":"/","outcome":"success","details":{}}'
+        )
         parsed = _parse_audit_log_line(line)
         assert parsed is not None
         assert parsed["event_type"] == "auth"
