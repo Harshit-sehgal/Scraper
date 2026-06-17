@@ -328,6 +328,7 @@ def frontend_checks() -> list[Check]:
         Check("npm_ci", ["npm", "ci"], 600, needs_executable="npm"),
         Check("frontend_tests", ["npm", "run", "test"], 300, needs_executable="npm"),
         Check("frontend_lint_js", ["npm", "run", "lint:js"], 300, needs_executable="npm"),
+        Check("frontend_lint_css", ["npm", "run", "lint:css"], 120, needs_executable="npm"),
     ]
 
 

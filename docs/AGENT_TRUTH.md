@@ -4,13 +4,52 @@ _Truth source current as of 2026-06-17 from working tree.
 Last verified: OpenAPI spec generation + code-complexity gate
 wired into CI + health pill + system-info + recent-activity
 dashboard panels + /api/saas/me profile tests + health-router
-prefix regression fix — full validation 22/22 passes, 3671
-backend tests, 282 frontend tests, 143 routes (108 stable +
-35 experimental)._
+prefix regression fix + stylelint cleanup + frontend_lint_css
+gate — full validation 23/23 passes, 3671 backend tests, 282
+frontend tests, 143 routes (108 stable + 35 experimental)._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Stylelint Cleanup + Frontend Gate Pass — 2026-06-17 (continued)
+
+Scope: clear the 467-error stylelint backlog in ``frontend/styles.css``
+that was making ``docs/CURRENT_STATUS.md`` report a red check, and
+add a permanent ``frontend_lint_css`` step to the local validation
+script so the regression can't return.
+
+### What broke
+
+- ``frontend/styles.css`` had accumulated 467 stylelint errors
+  across multiple earlier sessions: 1 duplicate ``.badge``
+  selector (the Workflow Runs section re-declared the rule that
+  already existed ~2000 lines earlier), 463 ``rule-empty-line-before``
+  and 3 ``shorthand-property-no-redundant-values`` violations from
+  the auto-generated sections.
+
+### Fix
+
+- Merged the duplicate ``.badge`` block into the existing one by
+  promoting ``line-height: 1.4`` into the base rule.
+- Ran ``npx stylelint --fix`` which resolved 463 of the 467 errors
+  automatically (the only remaining 3 were inside
+  ``frontend/dist/``, which is the ignored build output).
+- ``scripts/validate_local.py``: added a fourth frontend check,
+  ``frontend_lint_css`` (120s timeout), so ``--full`` and
+  ``--frontend`` now run stylelint alongside prettier and vitest.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `npm run lint:css` | 0 | PASS (0 errors). |
+| `npm run lint:js` (prettier) | 0 | PASS. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 23/23 checks passed. |
+| `python3 scripts/generate_status.py` | 0 | Now reports "CSS syntax (stylelint) ✅ pass" instead of "❌ fail". |
+
+Validation count grew from 22/22 → 23/23 (added the new
+``frontend_lint_css`` step). All other counts unchanged.
 
 ## OpenAPI + Complexity Gate + Dashboard Panels Pass — 2026-06-17
 

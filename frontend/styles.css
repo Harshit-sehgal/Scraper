@@ -2740,35 +2740,31 @@ kbd {
   color: var(--ink-faint);
 }
 
-.badge {
-  display: inline-block;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
 .badge-pending {
   background: var(--info-soft);
   color: var(--info);
 }
+
 .badge-running {
   background: var(--warning-soft);
   color: var(--warning);
 }
+
 .badge-success {
   background: var(--success-soft);
   color: var(--success);
 }
+
 .badge-failed {
   background: var(--danger-soft);
   color: var(--danger);
 }
+
 .badge-canceled {
   background: var(--bg-muted);
   color: var(--ink-soft);
 }
+
 .badge-unknown {
   background: var(--bg-muted);
   color: var(--ink-soft);
@@ -2836,7 +2832,7 @@ kbd {
 }
 
 .billing-card h2 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2942,10 +2938,12 @@ kbd {
 .audit-outcome-success {
   color: var(--success);
 }
+
 .audit-outcome-failure,
 .audit-outcome-denied {
   color: var(--danger);
 }
+
 .audit-outcome-warning {
   color: var(--warning);
 }
@@ -2960,7 +2958,7 @@ kbd {
 }
 
 .retention-card h2 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3007,7 +3005,7 @@ kbd {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background: currentColor;
+  background: currentcolor;
   flex-shrink: 0;
 }
 
@@ -3075,7 +3073,7 @@ kbd {
 }
 
 .sysinfo-workers {
-  padding: 0 0.7rem 0.5rem 0.7rem;
+  padding: 0 0.7rem 0.5rem;
   overflow-x: auto;
 }
 
@@ -3147,22 +3145,27 @@ kbd {
   background: var(--info-soft);
   color: var(--info);
 }
+
 .activity-cat-rbac {
   background: var(--warning-soft);
   color: var(--warning);
 }
+
 .activity-cat-admin {
   background: var(--danger-soft);
   color: var(--danger);
 }
+
 .activity-cat-data_access {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
 .activity-cat-job {
   background: var(--success-soft);
   color: var(--success);
 }
+
 .activity-cat-system {
   background: var(--bg-muted);
   color: var(--ink-soft);
@@ -3185,13 +3188,16 @@ kbd {
 .activity-outcome-success {
   color: var(--success);
 }
+
 .activity-outcome-failure,
 .activity-outcome-denied {
   color: var(--danger);
 }
+
 .activity-outcome-warning {
   color: var(--warning);
 }
+
 .activity-outcome-error {
   color: var(--danger);
 }
