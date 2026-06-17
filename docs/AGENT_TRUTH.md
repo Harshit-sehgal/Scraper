@@ -5,8 +5,11 @@ Last verified: OpenAPI spec generation + code-complexity gate
 wired into CI + health pill + system-info + recent-activity
 dashboard panels + /api/saas/me profile tests + health-router
 prefix regression fix + stylelint cleanup + frontend_lint_css
-gate — full validation 23/23 passes, 3671 backend tests, 282
-frontend tests, 143 routes (108 stable + 35 experimental)._
+gate + complete tab-key shortcuts (8/9/0) + tab highlights for
+billing/audit/retention + identity-store isolation in
+test_saas_api_keys.py — full validation 23/23 passes, 3671
+backend tests, 289 frontend tests, 143 routes (108 stable +
+35 experimental)._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are

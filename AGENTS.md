@@ -186,6 +186,9 @@ are proven in the current checkout and target environment.
 | 45 | Final validation: 22/22 checks pass, 3671 backend tests, 282 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
 | 46 | Fix 467 stylelint errors in `frontend/styles.css` (duplicate `.badge` block in Workflow Runs section) + add `frontend_lint_css` to validation script | ✅ Done |
 | 47 | Final validation: 23/23 checks pass, 3671 backend tests, 282 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
+| 48 | Complete tab-key shortcuts (8/9/0) + tabMap for billing/audit/retention; add `refresh-auth-profiles` action handler; 7 new views.test.js tests | ✅ Done |
+| 49 | Fix inter-test flake in `test_saas_api_keys.py` by adding `reset_identity_store_fixture` autouse fixture (matching `test_saas_router.py`) | ✅ Done |
+| 50 | Final validation: 23/23 checks pass, 3671 backend tests, 289 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
 
 ## Active Risks
 
