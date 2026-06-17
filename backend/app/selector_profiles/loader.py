@@ -1,5 +1,3 @@
-from typing import Any
-
 """Selector Profile Loader — domain-specific extraction via JSON configs.
 
 Design:
@@ -37,6 +35,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from playwright.async_api import async_playwright
 

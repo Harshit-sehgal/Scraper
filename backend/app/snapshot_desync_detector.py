@@ -1,5 +1,3 @@
-from typing import Any
-
 """Snapshot Desync Detector — identifies divergent state across instances.
 
 Compares serialized world state snapshots from different nodes to detect
@@ -10,6 +8,7 @@ Phase 47: Distributed Resilience — detecting divergent state in multi-node clu
 """
 
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

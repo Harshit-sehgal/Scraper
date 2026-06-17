@@ -119,7 +119,14 @@ export function renderAnalysisInfo(data) {
     const score = data.anti_bot_score || 0;
     const riskLabel = score < 0.3 ? "Low" : score < 0.6 ? "Medium" : "High";
     const color = score < 0.3 ? "#1f9a5f" : score < 0.6 ? "#c7851b" : "#d24646";
-    antibotEl.innerHTML = `🛡️ Anti-bot: <span style="color:${color};font-weight:700;">${riskLabel}</span> (${(score * 100).toFixed(0)}%)`;
+    antibotEl.textContent = "🛡️ Anti-bot: ";
+    const badge = document.createElement("span");
+    badge.style.color = color;
+    badge.style.fontWeight = "700";
+    badge.textContent = riskLabel;
+    const suffix = document.createTextNode(` (${(score * 100).toFixed(0)}%)`);
+    antibotEl.appendChild(badge);
+    antibotEl.appendChild(suffix);
   }
   if (fetchTimeEl) {
     const ms = data.fetch_time_ms;
@@ -389,25 +396,56 @@ export function renderAcquisitionBanner(data, url) {
   const isSessionBound =
     state !== "recovered" && (sessionBound || (data.session_detection?.ephemeral_params || []).length > 0);
 
-  let bannerHTML = `<strong>${esc(bannerText)}</strong>`;
+  const frag = document.createDocumentFragment();
+
+  const b = document.createElement("strong");
+  b.textContent = bannerText;
+  frag.appendChild(b);
+
   if (canonicalUrl && canonicalUrl !== url) {
-    bannerHTML += `<br><small style="opacity:0.7">Canonical: ${esc(canonicalUrl)}</small>`;
+    const line = document.createElement("br");
+    const small = document.createElement("small");
+    small.style.opacity = "0.7";
+    small.textContent = `Canonical: ${canonicalUrl}`;
+    frag.appendChild(line);
+    frag.appendChild(small);
   }
   if (state === "recovered") {
-    bannerHTML += `<br><small style="opacity:0.7">Recovered fresh results via search form submission</small>`;
+    const line = document.createElement("br");
+    const small = document.createElement("small");
+    small.style.opacity = "0.7";
+    small.textContent = "Recovered fresh results via search form submission";
+    frag.appendChild(line);
+    frag.appendChild(sadj);
   }
   if (isSessionBound) {
-    bannerHTML += `<br><small style="opacity:0.7">Original URL contained ephemeral session parameters</small>`;
+    const line = document.createElement("br");
+    const small = document.createElement("small");
+    small.style.opacity = "0.7";
+    small.textContent = "Original URL contained ephemeral session parameters";
+    frag.appendChild(line);
+    frag.appendChild(small);
   }
   if (emptyCheck.is_empty) {
-    bannerHTML += `<br><small style="opacity:0.7">${esc(emptyCheck.message || "Page returned 200 but contained no useful data")}</small>`;
+    const line = document.createElement("br");
+    const small = document.createElement("small");
+    small.style.opacity = "0.7";
+    small.textContent = emptyCheck.message || "Page returned 200 but contained no useful data";
+    frag.appendChild(line);
+    frag.appendChild(small);
     if (emptyCheck.suggestions && emptyCheck.suggestions.length) {
-      bannerHTML += `<br><small style="opacity:0.7">Suggestion: ${esc(emptyCheck.suggestions[0])}</small>`;
+      const line2 = document.createElement("br");
+      const small2 = document.createElement("small");
+      small2.style.opacity = "0.7";
+      small2.textContent = `Suggestion: ${emptyCheck.suggestions[0]}`;
+      frag.appendChild(line2);
+      frag.appendChild(small2);
     }
   }
 
   acqBanner.className = `acquisition-banner ${bannerClass}`;
-  acqBanner.innerHTML = bannerHTML;
+  acqBanner.innerHTML = "";
+  acqBanner.appendChild(frag);
   acqBanner.classList.remove("hidden");
 }
 

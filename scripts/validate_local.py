@@ -422,7 +422,8 @@ def write_summary(summary: dict[str, Any], archive_dir: Path) -> None:
     for result in summary["results"]:
         log_path = Path(result["log_path"]).relative_to(ROOT) if result.get("log_path") else ""
         lines.append(
-            f"| {result['status']} | {str(result['required']).lower()} | {result['name']} | {result['exit_code']} | `{log_path}` |",
+            f"| {result['status']} | {str(result['required']).lower()} | {result['name']} | "
+            f"{result['exit_code']} | `{log_path}` |",
         )
     lines.append("")
     SUMMARY_MD.write_text("\n".join(lines), encoding="utf-8")

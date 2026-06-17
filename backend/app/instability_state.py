@@ -1,5 +1,3 @@
-from typing import Any
-
 """InstabilityState — owns learned exclusions and controls all tension mutations.
 
 True ownership boundary: NO external code should mutate learned_exclusions directly.
@@ -8,6 +6,7 @@ All tension changes go through this state object, which validates invariants.
 
 import logging
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 

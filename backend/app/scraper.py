@@ -54,14 +54,13 @@ if TYPE_CHECKING:
     from app.models import SchemaField
     from app.recovery_strategies import AttemptContext
 
-logger = logging.getLogger(__name__)
-
-# ─── Re-exports for backward compatibility ────────────────────────────
-# These symbols are imported by callers throughout the codebase.
+# Re-exports for backward compatibility
 from app.cleaning_engine import ai_clean_and_align_records
 from app.crawl_frontier import get_crawl_frontier
 from app.data_utils import _limit_source_records, process_raw_records
 from app.html_utils import _boost_contacts_with_page_html
+
+logger = logging.getLogger(__name__)
 
 # Avoid pyflakes unused import errors for backward-compatibility re-exports
 _ = (get_crawl_frontier, _boost_contacts_with_page_html, _limit_source_records)

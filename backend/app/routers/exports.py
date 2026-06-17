@@ -27,7 +27,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_rbac_event
@@ -57,6 +57,15 @@ class BatchExportRequest(BaseModel):
         "csv",
         description="Export format: csv, json, or xlsx",
     )
+
+    @field_validator("format")
+    @classmethod
+    def _validate_format(cls, value: str) -> str:
+        if value not in ("csv", "json", "xlsx"):
+            msg = "format must be one of: csv, json, xlsx"
+            raise ValueError(msg)
+        return value
+
     flatten: bool = Field(
         True,
         description="When True, all results are combined into a single output. "

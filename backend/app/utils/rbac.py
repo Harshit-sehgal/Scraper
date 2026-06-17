@@ -200,12 +200,33 @@ def _resolve_dev_context() -> AuthContext | None:
     return None
 
 
+def _auth_was_attempted(request: Request) -> bool:
+    """Return True if the request carries any auth signals (attempted auth)."""
+    if request.headers.get("X-API-Key"):
+        return True
+    if request.headers.get("X-Admin-Key"):
+        return True
+    if request.headers.get("Authorization"):
+        return True
+    try:
+        if request.cookies.get("dataforge_session"):
+            return True
+    except (AttributeError, TypeError):
+        pass
+    return False
+
+
 def resolve_auth_context(request: Request, *, allow_cookie: bool = True) -> AuthContext:
     """Resolve API-key, bearer, session-cookie, or explicit dev auth.
 
     This is the single authentication decision engine used by middleware
     and route-level RBAC dependencies. Authorization checks should consume
     the returned role/user identity rather than re-reading headers.
+
+    Security invariant: dev auth is NEVER used as a fallback when the
+    client has already presented credentials. This prevents the dev
+    fallback from silently granting admin access to requests with
+    invalid (but present) keys or expired sessions.
     """
     cached = getattr(getattr(request, "state", None), "auth_context", None)
     if cached is not None and (allow_cookie or cached.source != "session"):
@@ -214,7 +235,11 @@ def resolve_auth_context(request: Request, *, allow_cookie: bool = True) -> Auth
     context = _resolve_api_key_context(request)
     if context is None and allow_cookie:
         context = _resolve_session_context(request)
-    if context is None:
+
+    # If no auth was even attempted, we may fall through to the insecure
+    # dev bypass.  If a key / cookie / bearer token was present but
+    # failed to validate, we MUST NOT grant admin via dev auth.
+    if context is None and not _auth_was_attempted(request):
         context = _resolve_dev_context()
 
     if context is None:

@@ -1,5 +1,3 @@
-from typing import Any
-
 """SQLite-backed job storage with transactional safety and schema migrations.
 
 Replaces JSON persistence with durable SQLite storage. Provides:
@@ -24,6 +22,7 @@ import logging
 import sqlite3
 from pathlib import Path
 from threading import Lock
+from typing import Any
 
 from app.models import Job, JobStatus, SourcePolicy
 

@@ -33,7 +33,9 @@ _FAILURE_MAP = {
     "login_required": {
         "user_message": "This page requires a login. Please create an Auth Profile to access it.",
         "technical_details": "The target page returned a login form or redirect to an authentication endpoint.",
-        "recommended_action": "Create an Auth Profile: go to Auth Profiles, click 'Create', enter the domain, and complete the login flow.",
+        "recommended_action": (
+            "Create an Auth Profile: go to Auth Profiles, click 'Create', enter the domain, and complete the login flow."
+        ),
     },
     "session_expired": {
         "user_message": "Your session for this website has expired. Please reconnect this Auth Profile.",
@@ -48,17 +50,21 @@ _FAILURE_MAP = {
     "selector_not_found": {
         "user_message": "The page structure has changed and the expected data cannot be found.",
         "technical_details": "Configured CSS selectors or heuristics did not match any elements on the page.",
-        "recommended_action": "Use the URL Analyzer to re-detect fields, or manually update the selector mapping in the workflow.",
+        "recommended_action": (
+            "Use the URL Analyzer to re-detect fields, or manually update the selector mapping in the workflow."
+        ),
     },
     "blocked_or_challenge": {
         "user_message": "The website is showing a challenge or blocking automated access.",
         "technical_details": "Anti-bot signals detected: CAPTCHA, rate-limit response, or bot challenge page.",
-        "recommended_action": "Pause and retry later, reduce request frequency, or request permission from the site owner.",
+        "recommended_action": ("Pause and retry later, reduce request frequency, or request permission from the site owner."),
     },
     "timeout": {
         "user_message": "The page took too long to load.",
         "technical_details": "The request exceeded the configured timeout threshold.",
-        "recommended_action": "Increase the wait timeout in the job settings, or reduce the scope of the extraction (fewer pages).",
+        "recommended_action": (
+            "Increase the wait timeout in the job settings, or reduce the scope of the extraction (fewer pages)."
+        ),
     },
     "network_error": {
         "user_message": "Could not reach the website.",

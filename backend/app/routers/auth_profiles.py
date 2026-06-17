@@ -17,6 +17,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.config import settings
 from app.models import AuthProfile, AuthProfileStatus
 from app.utils.auth_profile_store import AuthProfileStore
 from app.utils.encryption import decrypt as encryption_decrypt
@@ -211,7 +212,7 @@ async def complete_login(
 # ---------------------------------------------------------------------------
 
 
-def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
+async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
     """Attempt a live HTTP check against the profile's target domain.
 
     Uses the stored cookies (from Playwright storage_state) to make
@@ -258,13 +259,13 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
             if name and value:
                 cookie_dict[name] = value
 
-        with httpx.Client(
+        async with httpx.AsyncClient(
             cookies=cookie_dict,
             follow_redirects=True,
             timeout=15.0,
-            verify=False,  # noqa: S501  # nosec: target domains may use self-signed certs
+            verify=settings.VERIFY_SSL if hasattr(settings, "VERIFY_SSL") else True,
         ) as client:
-            response = client.get(
+            response = await client.get(
                 target_url,
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -345,7 +346,7 @@ async def validate_profile(
 
     # Optional live HTTP check
     if live and profile.get("status") == AuthProfileStatus.ACTIVE.value:
-        live_result = _try_live_session_check(profile)
+        live_result = await _try_live_session_check(profile)
         if live_result is not None:
             if not live_result["valid"]:
                 profile["status"] = AuthProfileStatus.EXPIRED.value

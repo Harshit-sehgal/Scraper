@@ -1,5 +1,3 @@
-from typing import Any
-
 """TransitionState — owns all transition probability state.
 
 True ownership boundary: NO external code should mutate transition_probs
@@ -11,6 +9,7 @@ Owns:
 """
 
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 

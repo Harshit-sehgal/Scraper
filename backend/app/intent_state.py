@@ -1,5 +1,3 @@
-from typing import Any
-
 """IntentState — owns user-defined cognitive goals and field biasing vectors.
 
 True ownership boundary: NO external code should mutate active_intents directly.
@@ -7,6 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 
