@@ -75,6 +75,112 @@ class TestScheduledMonitoringEndpoints:
         assert resp.status_code == 200
         assert resp.json()["job_id"] == job_id
 
+    def test_change_detection_with_no_summaries(self, client: TestClient):
+        """A brand-new job with no runs has nothing to diff against."""
+        create = client.post("/api/scheduled?name=Fresh&job_name=Fresh&target_url=https://example.com")
+        assert create.status_code == 201
+        job_id = create.json()["id"]
+        resp = client.get(f"/api/scheduled/{job_id}/changes")
+        body = resp.json()
+        assert body["changes_detected"] is False
+        assert body["last_records_count"] == 0
+        assert body["previous_records_count"] == 0
+        assert body["record_count_delta"] == 0
+        assert body["summary_count"] == 0
+        assert "first run" in body["message"].lower()
+
+    def test_change_detection_diffs_two_runs(self, client: TestClient, tmp_path, monkeypatch):
+        """Two runs in recent_run_summaries yield a real diff."""
+
+        from app.utils.json_file_store import JSONFileStore
+
+        jobs_file = tmp_path / "scheduled_jobs.json"
+        monkeypatch.setattr(
+            "app.routers.scheduled_monitoring._scheduled_jobs",
+            JSONFileStore(path=jobs_file),
+        )
+
+        # Seed a job with two run summaries directly through the store.
+        job = {
+            "id": "sched-diff-1",
+            "name": "Diff Job",
+            "job_name": "Diff",
+            "target_url": "https://example.com",
+            "frequency": "daily",
+            "user_id": "tester",
+            "org_id": "org-x",
+            "project_id": "proj-x",
+            "enabled": True,
+            "recent_run_summaries": [
+                {
+                    "ran_at": "2026-06-15T00:00:00+00:00",
+                    "status": "succeeded",
+                    "records_count": 50,
+                },
+                {
+                    "ran_at": "2026-06-16T00:00:00+00:00",
+                    "status": "succeeded",
+                    "records_count": 75,
+                },
+            ],
+        }
+        from app.routers import scheduled_monitoring as sm_router
+
+        sm_router._scheduled_jobs.upsert("sched-diff-1", job)
+
+        resp = client.get("/api/scheduled/sched-diff-1/changes")
+        body = resp.json()
+        assert resp.status_code == 200
+        assert body["changes_detected"] is True
+        assert body["last_records_count"] == 75
+        assert body["previous_records_count"] == 50
+        assert body["record_count_delta"] == 25
+        assert body["status_changed"] is False
+        # 86400s = 24h, gap is exactly 24h so frequency_met is True.
+        assert body["frequency_met"] is True
+
+    def test_change_detection_flags_status_flip(self, client: TestClient, tmp_path, monkeypatch):
+        from app.utils.json_file_store import JSONFileStore
+
+        jobs_file = tmp_path / "scheduled_jobs.json"
+        monkeypatch.setattr(
+            "app.routers.scheduled_monitoring._scheduled_jobs",
+            JSONFileStore(path=jobs_file),
+        )
+        from app.routers import scheduled_monitoring as sm_router
+
+        sm_router._scheduled_jobs.upsert(
+            "sched-flip",
+            {
+                "id": "sched-flip",
+                "name": "Flip",
+                "job_name": "Flip",
+                "target_url": "https://example.com",
+                "frequency": "hourly",
+                "user_id": "tester",
+                "org_id": "org-x",
+                "project_id": "proj-x",
+                "enabled": True,
+                "recent_run_summaries": [
+                    {
+                        "ran_at": "2026-06-16T00:00:00+00:00",
+                        "status": "succeeded",
+                        "records_count": 10,
+                    },
+                    {
+                        "ran_at": "2026-06-16T01:00:00+00:00",
+                        "status": "failed",
+                        "records_count": 0,
+                    },
+                ],
+            },
+        )
+        resp = client.get("/api/scheduled/sched-flip/changes")
+        body = resp.json()
+        assert body["status_changed"] is True
+        assert body["record_count_delta"] == -10
+        assert body["changes_detected"] is True
+
     def test_404_on_missing(self, client: TestClient):
         resp = client.get("/api/scheduled/nonexistent-id")
         assert resp.status_code == 404

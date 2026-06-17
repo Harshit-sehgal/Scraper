@@ -49,6 +49,7 @@ class ManifoldState:
         self._obs_ref: Any = None
 
         # ─── Transaction Staging ──────────────────────────────────────
+        self._staging: Any = None
 
     @property
     def _staging(self) -> dict | None:

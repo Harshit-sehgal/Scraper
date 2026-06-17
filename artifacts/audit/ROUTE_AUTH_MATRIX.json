@@ -1,5 +1,5 @@
 {
-  "route_count": 129,
+  "route_count": 133,
   "routes": [
     {
       "method": "GET",
@@ -1181,6 +1181,18 @@
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "require_role/admin-only dependency",
+      "path": "/api/system/audit-log",
+      "public_protected_unknown": "protected",
+      "required_role": "admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
       "path": "/api/system/crystalline",
       "public_protected_unknown": "protected",
       "required_role": "admin",
@@ -1246,6 +1258,18 @@
       "required_role": "admin",
       "route_dependency": "require_role, verify_experimental_enabled",
       "stable_or_experimental": "experimental",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/system/manifest",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
       "tenant_scoped": "no",
       "test_coverage": "yes"
     },
@@ -1542,6 +1566,30 @@
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
       "path": "/api/workflows/{workflow_id}/run",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/workflows/{workflow_id}/runs",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/workflows/{workflow_id}/runs/{run_id}",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
       "route_dependency": "require_principal",

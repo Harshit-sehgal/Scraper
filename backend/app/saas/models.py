@@ -177,3 +177,12 @@ class ApiKey(BaseModel):
 
     def is_active(self) -> bool:
         return self.revoked_at is None
+
+
+class SelectedContext(BaseModel):
+    """The currently-selected organization and project for a user."""
+
+    user_id: str
+    org_id: str
+    project_id: str
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

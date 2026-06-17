@@ -331,6 +331,44 @@ jobs:
             coverage.json
           retention-days: 30
 
+  # ── Chaos engineering (resilience contract) ─────────────────────
+  chaos-engineering:
+    name: Chaos Engineering
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Chaos tests are fast (they inject failure modes via the in-process
+    # chaos simulator) but the chaos module imports a lot of the
+    # recovery stack. Keep this job separate from the lint-type-checks
+    # full suite so a chaos-only flake does not mask the main suite's
+    # pass signal, and so chaos failures show up as a distinct status
+    # check on the PR.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-chaos-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run Chaos Engineering Test Suite
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m pytest -q backend/tests/test_chaos_engineering.py \
+            -o addopts= --tb=short
+
   sbom:
     name: SBOM Generation
     runs-on: ubuntu-latest
@@ -360,7 +398,7 @@ jobs:
 
   notify:
     name: Telegram Notification
-    needs: [ci-gates-fast, ci-gates-benchmarks, lint-type-checks, sbom]
+    needs: [ci-gates-fast, ci-gates-benchmarks, lint-type-checks, chaos-engineering, sbom]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: always()

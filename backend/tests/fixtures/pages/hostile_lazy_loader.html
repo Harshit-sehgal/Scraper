@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Hostile Lazy Loader — setInterval-driven</title>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            margin: 0;
+            padding: 1.5rem;
+            background: #f6f7fb;
+        }
+        h1 {
+            font-size: 1.1rem;
+            margin: 0 0 1rem 0;
+            color: #111;
+        }
+        #feed {
+            display: grid;
+            gap: 0.5rem;
+            grid-template-columns: 1fr;
+            max-width: 640px;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #d8dde6;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            color: #1c2330;
+        }
+        #load-more-btn {
+            margin-top: 1rem;
+            display: none;
+            padding: 0.6rem 1.2rem;
+            font-size: 1rem;
+            background: #2563eb;
+            color: #fff;
+            border: 0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #load-more-btn.is-visible {
+            display: inline-block;
+        }
+        footer {
+            margin-top: 2rem;
+            color: #4a5260;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hostile Lazy Loader</h1>
+    <div id="feed">
+        <div class="card">Seed card 1</div>
+        <div class="card">Seed card 2</div>
+        <div class="card">Seed card 3</div>
+        <div class="card">Seed card 4</div>
+        <div class="card">Seed card 5</div>
+    </div>
+
+    <!--
+        MODE TOGGLE — read by the test driver to decide which behaviour to wire.
+        #mode == "scroll": the setInterval-driven infinite-scroll arm fires.
+        #mode == "loadmore": the setInterval-driven button reveal fires.
+    -->
+    <input id="mode" type="hidden" value="scroll" />
+
+    <button id="load-more-btn" type="button">Load more results</button>
+
+    <footer>
+        JavaScript-resident lazy loader &mdash; items are appended on a setInterval timer (NOT a scroll listener), so the executor must observe <code>document.body.scrollHeight</code> growth over multiple ticks and ultimately plateau.
+    </footer>
+
+    <script>
+        (function () {
+            // ─── Observability hooks ─────────────────────────────────────
+            // The test driver reads these to verify execution semantics.
+            window.__lazyState = {
+                mode: (document.getElementById('mode') || {}).value || 'scroll',
+                cardCount: 5,
+                scrollIntervalTicks: 0,
+                scrollButtonClicks: 0,
+                loadMoreTickAt: null,
+                firstClickAt: null,
+            };
+
+            // ─── ScrollTo shim (records every window.scrollTo call) ────
+            // Without this shim the executor's scroll attempts leave no
+            // observable trace beyond DOM mutation. The shim makes the
+            // executor's window.scrollTo invocations directly countable.
+            window.__scrollToLog = [];
+            const __origScrollTo = window.scrollTo.bind(window);
+            window.scrollTo = function () {
+                window.__scrollToLog.push(Array.prototype.slice.call(arguments));
+                return __origScrollTo.apply(window, arguments);
+            };
+
+            // ─── Infinite-scroll arm ────────────────────────────────────
+            // Adds 2 cards every 700 ms, then stops after 3 batches (= 11 total).
+            // The executor's per-tick scrollHeight probe sees growth for the
+            // first ~2.1 s, then stabilisation; "no_new_records" is the
+            // expected stop reason.
+            let scrollIterations = 0;
+            const SCROLL_MAX_BATCHES = 3;
+            const SCROLL_INTERVAL_MS = 700;
+
+            const scrollInterval = setInterval(function () {
+                if (window.__lazyState.mode !== 'scroll') {
+                    clearInterval(scrollInterval);
+                    return;
+                }
+                if (scrollIterations >= SCROLL_MAX_BATCHES) {
+                    clearInterval(scrollInterval);
+                    return;
+                }
+                const feed = document.getElementById('feed');
+                for (let i = 0; i < 2; i++) {
+                    window.__lazyState.cardCount++;
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.textContent = 'Lazy scroll card ' + window.__lazyState.cardCount;
+                    feed.appendChild(card);
+                }
+                scrollIterations++;
+                window.__lazyState.scrollIntervalTicks++;
+                // The fixture does NOT auto-scroll — that is the executor's job.
+            }, SCROLL_INTERVAL_MS);
+
+            // ─── Load-more arm ──────────────────────────────────────────
+            // The "Load more" button is hidden until a setInterval reveals it
+            // at ~2.4 s. The executor must NOT conclude "button_gone" on the
+            // first locator.is_visible() failure — it must spin and retry.
+            const LOADMORE_DELAY_MS = 2400;
+
+            const loadMoreInterval = setInterval(function () {
+                if (window.__lazyState.mode !== 'loadmore') {
+                    clearInterval(loadMoreInterval);
+                    return;
+                }
+                const btn = document.getElementById('load-more-btn');
+                if (!btn) {
+                    return;
+                }
+                if (!window.__lazyState.loadMoreTickAt) {
+                    // First tick: reveal the button — that proves the
+                    // button wasn't present at page-load and only appeared
+                    // because setInterval fired.
+                    window.__lazyState.loadMoreTickAt = Date.now();
+                    btn.classList.add('is-visible');
+                    btn.addEventListener('click', function () {
+                        if (window.__lazyState.firstClickAt === null) {
+                            window.__lazyState.firstClickAt = Date.now();
+                        }
+                        window.__lazyState.scrollButtonClicks++;
+                        const feed = document.getElementById('feed');
+                        for (let i = 0; i < 3; i++) {
+                            window.__lazyState.cardCount++;
+                            const card = document.createElement('div');
+                            card.className = 'card';
+                            card.textContent = 'Lazy loadmore card ' + window.__lazyState.cardCount;
+                            feed.appendChild(card);
+                        }
+                    });
+                    clearInterval(loadMoreInterval);
+                }
+            }, LOADMORE_DELAY_MS);
+        })();
+    </script>
+</body>
+</html>

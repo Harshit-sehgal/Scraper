@@ -7,14 +7,16 @@ import contextlib
 import io
 import json
 import logging
+import os
 import re
 import secrets
 import threading
 import zipfile
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -82,6 +84,48 @@ async def storage_status(
     from app.job_store import get_storage_status
 
     return await run_in_threadpool(get_storage_status)
+
+
+@router.get("/api/system/manifest")
+async def system_manifest(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))],
+):
+    """Live module/version manifest for the dashboard help section.
+
+    Returns the project's metadata, runtime configuration, and the
+    currently-active AUP version so the help panel can show
+    version-aware information without hardcoding values in JS.
+    """
+    from app.config import settings
+    from app.saas.router import CURRENT_AUP_VERSION
+    from app.utils.encryption import _get_key_version
+
+    pyproject_path = Path(__file__).resolve().parents[3] / "pyproject.toml"  # noqa: ASYNC240
+    project_version = "unknown"
+    if pyproject_path.exists():
+        try:
+            import tomllib  # type: ignore[import-not-found]
+
+            with pyproject_path.open("rb") as f:
+                data = tomllib.load(f)
+            project_version = str(
+                data.get("project", {}).get("version") or data.get("tool", {}).get("poetry", {}).get("version") or "unknown",
+            )
+        except (OSError, KeyError, ValueError):
+            project_version = "unknown"
+
+    return {
+        "project": "DataForge Scraper",
+        "version": project_version,
+        "env": str(getattr(settings, "ENV", "development")),
+        "aup_version": CURRENT_AUP_VERSION,
+        "encryption_key_version": _get_key_version(),
+        "experimental_routes_enabled": bool(
+            getattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False),
+        ),
+        "storage_backend": str(getattr(settings, "STORAGE_BACKEND", "sqlite")),
+        "pg_driver": os.environ.get("DATAFORGE_PG_DRIVER", "psycopg2"),
+    }
 
 
 @router.get("/api/system/status")
@@ -354,7 +398,37 @@ async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_r
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
 
 
-# ─── CSP Violations Endpoint ───────────────────────────────────────────
+# ─── Audit Log Endpoint ────────────────────────────────────────────────
+
+
+@router.get("/api/system/audit-log")
+async def get_audit_log(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    category: Annotated[
+        str | None,
+        Query(description="Filter by event category: auth, rbac, admin, data_access, job, system"),
+    ] = None,
+) -> dict[str, Any]:
+    """Return recent audit-log events parsed from the log file.
+
+    Admin-only because the audit log can include user IDs, IP addresses,
+    and admin-action payloads. ``limit`` caps the number of events
+    returned; ``category`` is a coarse filter on the event ``category``
+    field. Events that fail to parse are silently skipped (the logger
+    falls back to the original line).
+    """
+    from app.audit_logger import get_recent_events
+
+    events = get_recent_events(count=limit)
+    if category:
+        events = [e for e in events if str(e.get("category") or "").lower() == category.lower()]
+    return {
+        "total": len(events),
+        "limit": limit,
+        "category": category or "",
+        "items": events,
+    }
 
 
 @router.post("/api/system/csp-violations")

@@ -114,7 +114,7 @@ def build_selector_prompt(
     patterns = page_analysis.get("patterns_detected", {})
 
     # Generate motif feedback context if available
-    motif_context = ""
+    motif_context: str = ""
     if solidified_motifs:
         feedback_engine = _get_feedback_engine()
         motif_hint = feedback_engine.build_motif_context(solidified_motifs, schema_fields)
@@ -135,7 +135,7 @@ PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confid
         if detected:
             structure_context += f"\nVALUE PATTERNS DETECTED: {', '.join(detected)}"
 
-    header_context = ""
+    header_context: str = ""
     if headers:
         header_context = f"\nDETECTED HEADERS: {headers[:8]}"
 

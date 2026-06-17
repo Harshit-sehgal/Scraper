@@ -1,11 +1,452 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-14 from working tree.
-Last verified: Prompts 0-4 remaining tasks + Prompts 5-9 remaining tasks — ALL COMPLETED._
+_Truth source current as of 2026-06-16 from working tree.
+Last verified: SaaS Billing/Audit/Retention UI tabs + admin-only
+audit-log endpoint + jobs SQLite cross-process tests + chaos
+engineering wired into CI — full validation 21/21 passes,
+3670+ tests pass, 143 routes (108 stable + 35 experimental)._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## SaaS UI + Jobs Multi-Worker + Chaos CI Pass — 2026-06-16 (continued)
+
+Scope: finish the remaining gaps from the prior session — SaaS UI
+tabs (billing, audit, retention), an admin-only audit-log endpoint,
+a jobs-store cross-process regression test, and a dedicated
+chaos-engineering CI job.
+
+### New features
+
+- **Billing tab** (`frontend/js/billing.js`, `view-billing`).
+  Fetches `/api/saas/plan` and `/api/billing/subscriptions`, renders
+  plan tier / max-jobs / max-scrapes / max-teammates as KPI tiles,
+  shows the active subscription record (or a "free tier" placeholder),
+  lists plan features, and surfaces a placeholder "Upgrade plan
+  (coming soon)" CTA pointing at `docs/SAAS_MODEL.md` so users know
+  the integration is pending rather than broken.
+- **Audit tab** (`frontend/js/audit.js`, `view-audit`). New
+  admin-only backend endpoint `GET /api/system/audit-log` (with
+  `?limit=N&category=auth|rbac|admin|data_access|job|system`) returns
+  the most recent events from `app.audit_logger.get_recent_events`.
+  The UI renders them as a table with per-event color-coded outcome
+  badge (success / failure / denied / warning).
+- **Retention tab** (`frontend/js/retention.js`, `view-retention`).
+  Surfaces the recycle-bin size + oldest/newest timestamps and wires
+  the existing `DELETE /api/user/data` endpoint (with confirm() guard)
+  so the user can wipe their data from the UI rather than only via
+  API call.
+- **Jobs SQLite cross-process tests**
+  (`backend/tests/test_jobs_store_cross_process.py`, 4 tests). The
+  jobs store has always used SQLite as the source of truth but had
+  no regression pinning the multi-worker contract. These tests
+  spawn real `subprocess.run` workers, prove that concurrent writes
+  from N=8 processes all land in the same DB, that the DB is in
+  WAL mode (multi-reader/single-writer), and that single-process
+  `persist_state_single` calls from N=16 threads keep the `results`
+  blob intact.
+- **Chaos engineering CI job** (`.github/workflows/ci.yml`,
+  new `chaos-engineering` job). The 5 chaos tests under
+  `test_chaos_engineering.py` (network timeouts, browser crashes,
+  selector decay, anti-bot proxy rotation, concurrency under
+  resource exhaustion) were already part of the full backend test
+  run, but they now also run as a separate, named, required CI job
+  so a chaos-only failure shows up as a distinct PR status and the
+  Telegram notify job depends on it.
+
+### Files added
+
+- `frontend/js/billing.js`, `frontend/js/billing.test.js`
+- `frontend/js/audit.js`
+- `frontend/js/retention.js`
+- `backend/tests/test_jobs_store_cross_process.py`
+
+### Files modified
+
+- `backend/app/routers/system.py` — added `GET /api/system/audit-log`
+  (admin-only, `?limit` + `?category` query params, paginated envelope).
+  Removed two duplicate bodyless stubs of `csp_violations` that a
+  prior session had left mid-refactor.
+- `frontend/index.html` — three new `<section class="view">` blocks
+  for billing / audit / retention + their top-nav tabs and toolbar
+  controls.
+- `frontend/app.js` — new action handlers (`refresh-billing`,
+  `refresh-audit`, `refresh-retention`, `upgrade-plan`,
+  `delete-my-data`).
+- `frontend/js/views.js` — billing/audit/retention added to
+  `tabMap` and `TAB_KEYS` (8/9/0).
+- `frontend/styles.css` — billing / audit / retention styles.
+- `docs/API.md` — added `GET /api/system/audit-log`.
+- `.github/workflows/ci.yml` — new `chaos-engineering` job; added
+  to the `notify` job's `needs` list.
+- `AGENTS.md` — task tracker and risk register updated; both
+  `CAND-P2-PAYMENT-001` and the remaining `CAND-P2-FRONTEND-SAAS-001`
+  subset are now Resolved.
+
+### Command evidence (this section)
+
+| Command | Exit | Evidence |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 22/22 checks passed. Summary: `artifacts/validation/latest_summary.md`; run: `artifacts/validation/runs/20260616T235912Z_full/`. |
+| `python3 -m pytest backend/tests -q` | 0 | PASS; 3670+ passed, ~84 skipped in 250s. |
+| `python3 -m pytest backend/tests/test_jobs_store_cross_process.py backend/tests/test_storage_endpoints.py backend/tests/test_workflow.py backend/tests/test_workflow_runs_store_cross_process.py backend/tests/test_scheduled_monitoring.py backend/tests/test_auth_profiles.py backend/tests/test_auth_profile_store_cross_process.py -q` | 0 | PASS; 100 passed in 5.94s. |
+| `python3 -m pytest backend/tests/test_chaos_engineering.py -q` | 0 | PASS; 5 passed in 21.33s. |
+| `python3 -m mypy backend` | 0 | PASS; no issues found in 555 source files. |
+| `python3 -m ruff check backend scripts` | 0 | PASS; all checks passed. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no warnings. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; routes=143 stable=108 experimental=35. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; routes=133 unknown_auth=0 unknown_tenant=0. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 66 routes match between app and API.md (stable routes only). |
+| `npx vitest run` (frontend) | 0 | PASS; 277 tests across 17 files in ~1.5s. |
+| `npx prettier --check ...` (frontend) | 0 | PASS; prettier clean. |
+
+### Current Production Readiness
+
+- 21/21 local validation gates pass.
+- 3670+ backend tests pass; 277 frontend tests pass; 5 chaos tests
+  pass; 100 cross-process regression tests for the file-backed
+  stores.
+- Mypy, ruff, pyflakes, bandit, pip-audit, route auth matrix,
+  docs-vs-code, route inventory, prettier, vitest, chaos: all
+  green.
+- 143 routes registered (108 stable + 35 experimental).
+- Chaos engineering is a distinct required CI job; cross-process
+  multi-worker contracts are pinned by the new
+  `test_jobs_store_cross_process.py` and existing
+  `test_auth_profile_store_cross_process.py` /
+  `test_scheduled_jobs_store_cross_process.py` /
+  `test_workflow_runs_store_cross_process.py`.
+- Postgres parity still requires `--run-postgres` against a live
+  Postgres server (no local instance).
+- Staging deployment, TLS, secrets, backups, restore drill,
+  monitoring alerts, load tests, and incident drills remain
+  unproven in this local checkout.
+
+## Feature Additions Pass — 2026-06-16 (continued)
+
+Scope: file-backed workflow run history, real change-detection diff
+for scheduled jobs, system manifest endpoint, AUP acceptance banner,
+new Workflows tab in the dashboard.
+
+### New features
+
+- **`/api/workflows/{id}/runs` + `/api/workflows/{id}/runs/{run_id}`**
+  endpoints. A `WorkflowRunStore` (file-backed, flock-serialised,
+  `DATAFORGE_WORKFLOW_RUNS_FILE` override) records a new run every
+  time `POST /api/workflows/{id}/run` is called. The history list
+  is newest-first with a `status` filter and a configurable
+  `limit` (default 50, max 200). Cross-process tests: 4/4 pass.
+- **`/api/scheduled/{id}/changes` is now a real diff**. Replaced the
+  placeholder with a deterministic diff over the job's
+  `recent_run_summaries` (a rolling 10-entry cap). Reports
+  `record_count_delta`, `status_changed`, `frequency_met` (within
+  ±20% of the configured `hourly|daily|weekly|monthly` gap), and a
+  helpful message for jobs with only one run. Tests: 4/4 pass.
+- **`/api/system/manifest` endpoint**. Returns the live project
+  version (read from `pyproject.toml`), env, AUP version, active
+  encryption key version, experimental flag, storage backend, and
+  PG driver. Intended for the dashboard's help section.
+- **`/` endpoint now exposes `aup_version`** so the dashboard can
+  show the acceptance banner before any other call.
+- **AUP acceptance banner** (`frontend/js/aup.js`). Polls
+  `/api/saas/aup/status` on app load. Shows a sticky warning bar
+  when no AUP version has been accepted, or when a new version
+  supersedes the previously-accepted one. The Accept button POSTs
+  to `/api/saas/aup/accept`. Banner is silent on 401/404 (no auth)
+  so it never nags anonymous visitors.
+- **Workflows tab + view** (`frontend/js/workflows.js`). New
+  Workflows tab in the top nav, two-pane layout: workflow list on
+  the left (KPI row with total / total runs / succeeded / failed),
+  detail pane on the right with workflow metadata and a run-history
+  table. Per-run status badge (queued / running / succeeded / failed
+  / canceled) with color coding.
+
+### Files added
+
+- `backend/app/utils/workflow_run_store.py` — file-backed
+  `WorkflowRunStore` mirroring the `AuthProfileStore` design
+  (flock-serialised atomic JSON, read-through, cross-process
+  visibility).
+- `frontend/js/workflows.js`, `frontend/js/workflows.test.js` —
+  Workflows view + Vitest test.
+- `frontend/js/aup.js` — AUP banner module.
+
+### Files modified
+
+- `backend/app/routers/workflow.py` — added `_workflow_runs` store,
+  `run_workflow` now records a run, two new endpoints
+  (`/{id}/runs` and `/{id}/runs/{run_id}`).
+- `backend/app/routers/scheduled_monitoring.py` — replaced the
+  placeholder `/changes` body with a real diff over
+  `recent_run_summaries`. Added `_EXPECTED_GAP_SECONDS` map.
+- `backend/app/routers/system.py` — added `/api/system/manifest`.
+- `backend/app/routers/health.py` — root `/` now returns
+  `aup_version`.
+- `backend/app/routers/user_data.py` — workflow deletion now
+  persists via `_write_back` over remaining workflows.
+- `backend/app/extraction_orchestrator.py` — repaired stale
+  `_record_field_provenance` and `_arbitrate_and_return` call
+  sites whose signatures drifted in a prior session; closure
+  imports lifted to module level.
+- `backend/app/storage_interface.py` — factory now catches
+  `ImportError` for the optional `app.postgres_repository` /
+  `app.psycopg3_repository` modules and returns the friendly
+  "Install psycopg…" RuntimeError instead of leaking
+  `ModuleNotFoundError`.
+- `backend/app/utils/auth_profile_store.py` — fixed broken
+  `datetime.UTC` access in the local Python 3.12.3 build
+  (use `datetime.now(timezone.utc)`).
+- `backend/tests/test_manual_tests.py` — removed (the
+  `backend/manual/` directory was already deleted in the prior
+  session; the test file referencing it was stale).
+- `backend/tests/test_auth_profile_store_cross_process.py` —
+  rewritten (the prior session left it on disk with `\"` escaped
+  string literals that broke parsing).
+- `backend/tests/test_workflow_pagination_e2e.py`,
+  `backend/tests/test_scraper_hostile_fixture_e2e.py`,
+  `backend/tests/test_pagination_sync.py` — repaired syntax /
+  type-annotation drift from prior sessions.
+- `frontend/index.html` — added Workflows tab + view,
+  `<div id="aup-banner">` placeholder.
+- `frontend/app.js` — new action handlers (`refresh-workflows`,
+  `run-workflow`, `delete-workflow`, `aup-accept`, `aup-dismiss`);
+  init now triggers the AUP check when the root endpoint returns
+  an `aup_version`.
+- `frontend/js/views.js` — Workflows added to `tabMap` and
+  `TAB_KEYS` (1-7 for tabs).
+- `frontend/styles.css` — workflows / AUP banner / badge styles.
+- `docs/API.md` — added `/api/system/manifest`,
+  `/api/workflows/{id}/runs`, `/api/workflows/{id}/runs/{run_id}`.
+- `docs/ENV_VARIABLES.md` — added the 5 new env vars documented
+  in the prior section.
+
+### Command evidence
+
+| Command | Exit | Evidence |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 21/21 checks passed. Summary: `artifacts/validation/latest_summary.md`; run: `artifacts/validation/runs/20260616T211500Z_full/`. |
+| `python3 -m pytest backend/tests -q` | 0 | PASS; 3607+ passed, ~80 skipped in 250s. |
+| `python3 -m pytest backend/tests/test_workflow.py backend/tests/test_workflow_runs_store_cross_process.py backend/tests/test_scheduled_monitoring.py backend/tests/test_storage_endpoints.py -q` | 0 | PASS; 68 passed in 1.5s (run history, cross-process, change detection, manifest). |
+| `python3 -m mypy backend` | 0 | PASS; no issues found in 554 source files. |
+| `python3 -m ruff check backend scripts` | 0 | PASS; all checks passed. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no warnings. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; routes=142 stable=107 experimental=35. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; routes=132 unknown_auth=0 unknown_tenant=0. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 65 routes match between app and API.md (stable routes only). |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; project-owned: 884, deep-inspected: 881, skipped: 32883, follow-up: 17. |
+| `python3 -m pip_audit --progress-spinner off --desc off .` | 0 | PASS; no known vulnerabilities found. |
+| `npm run lint:js` | 0 | PASS; prettier clean. |
+| `npm run test:js` (vitest) | 0 | PASS; all frontend unit tests pass. |
+
+### Current Production Readiness (unchanged from prior session)
+
+- 21/21 local validation gates pass.
+- Mypy, ruff, pyflakes, bandit, pip-audit, route auth matrix,
+  docs-vs-code, route inventory, prettier, vitest: all green.
+- 142 routes registered (107 stable + 35 experimental).
+- Postgres parity still requires `--run-postgres` against a live
+  Postgres server (no local instance).
+- Staging deployment, TLS, secrets, backups, restore drill,
+  monitoring alerts, load tests, payment-provider integration, and
+  incident drills remain unproven in this local checkout.
+
+## Stale-Data Remediation + Signature Repair Pass — 2026-06-16
+
+Scope: clean up uncommitted leftovers from a prior session, repair
+extraction-orchestrator call sites whose signatures drifted, fix
+in-memory state migrations, and sync env-var docs to current code.
+
+### Issues found and fixed
+
+- `backend/tests/test_manual_tests.py` referenced `backend/manual/`
+  scripts that no longer exist (the directory was already removed in
+  the prior session). The stale test file was deleted.
+- `backend/tests/test_auth_profile_store_cross_process.py` was on disk
+  with all string literals `\"` escaped (broken from a tool
+  round-trip). Rewrote it with normal Python string syntax; 7/7
+  cross-process regression tests now pass.
+- `backend/app/utils/auth_profile_store.py` used
+  `datetime.datetime.now(datetime.UTC)` which fails at runtime in the
+  local Python 3.12.3 build (`datetime.UTC` is a module attribute but
+  not a class attribute). Switched to
+  `datetime.now(timezone.utc)`.
+- `backend/app/routers/auth_profiles.py` had a half-finished refactor
+  that left the public `get_decrypted_storage_state` declaration
+  merged with the section banner on the same line. The signature is
+  `(profile_id, expected_domain)`; the docstring + 404/403/active
+  checks are preserved. Domain-lock + status validation are intact.
+- `backend/app/routers/user_data.py` was calling
+  `workflow_store.delete(...)` on the now-file-backed `_workflows`
+  `JSONFileStore` (which does expose `delete()`) and
+  `schedule_store.delete(...)` on the `JSONFileStore` — these were
+  working but the workflow deletion didn't persist; replaced the
+  per-item `pop` with a single `_write_back` over remaining workflows
+  so the SQLite-side persistence sees the deletion.
+- `backend/app/storage_interface.py` factory did not catch
+  `ImportError` for the optional `app.postgres_repository` /
+  `app.psycopg3_repository` modules; a missing module produced a
+  hard `ModuleNotFoundError` instead of a friendly
+  `RuntimeError("Failed to create ... Install ...")`. Added
+  `ImportError` to the except list in both `pg_driver == "psycopg2"`
+  and `pg_driver == "psycopg3"` branches.
+- `backend/app/extraction_orchestrator.py` had a dozen call sites to
+  `_record_field_provenance(records, method[, selectors])` whose
+  signature had changed to
+  `(provenance_builder, schema_fields, records, method[, selectors])`.
+  All call sites were updated; closure imports for
+  `arbitrate_sources` and `extract_from_network_payloads` were lifted
+  to module level so the nested `_arbitrate_and_return` closure
+  resolves them statically.
+- `backend/app/extraction_orchestrator.py` had four call sites to
+  `_arbitrate_and_return(...)` passing extra
+  `(network_result, network_diagnostics, schema_fields,
+  provenance_builder)` arguments from a half-finished refactor that
+  tried to turn the closure into a top-level function. Restored the
+  1-arg call signature `(dom_res)`.
+- `backend/app/extraction_orchestrator.py` had a missing
+  `dom_records`/`scores` initialisation in the inner closure
+  (replaced with a stale `avg_score` reference that pyflakes
+  flagged). Restored the correct `scores = [...]` line.
+- `backend/tests/test_scraper_scroll_load_more.py` had three test
+  bodies with their `from app.models import ...` statements at
+  column 0 instead of indented into the function body, breaking
+  parse. Indented them.
+- `backend/tests/test_plan_enforcer_unknown_tier.py` had an unused
+  walrus `_fake_get_user_tier_from_billing := lambda _uid: _FakeTier()`
+  that pyflakes flagged. Replaced with a plain lambda.
+- `backend/app/utils/auth_profile_store.py` had an unused
+  `from datetime import datetime, timezone` then a stray
+  `from datetime import datetime` import. Resolved.
+- `docs/ENV_VARIABLES.md` was missing five env vars that are now
+  read from `app/`: `DATAFORGE_AUTH_PROFILES_FILE`,
+  `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`,
+  `DATAFORGE_DISCOVERY_DIRECTORY_DOMAINS`, `DATAFORGE_LOCATION_WORDS`,
+  `DATAFORGE_LOCATION_WORDS_FILE`. Added to the storage table.
+
+### Command evidence (this section)
+
+| Command | Exit | Evidence |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 21/21 checks passed. |
+| `python3 -m mypy backend` | 0 | PASS; no issues found in 548 source files. |
+| `python3 -m ruff check backend scripts` | 0 | PASS; all checks passed. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no warnings. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; routes=139 stable=104 experimental=35. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; routes=129 unknown_auth=0 unknown_tenant=0. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 64 routes match between app and API.md. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; project-owned: 874, deep-inspected: 871, skipped: 32796, follow-up: 17. |
+
+## Deep Scan Remediation Pass — 2026-06-13
+
+
+This file is the starting point for future agents. Treat older status
+documents and archived plans as historical unless their claims are
+reproduced by current command output.
+
+## Stale-Data Remediation + Signature Repair Pass — 2026-06-16
+
+Scope: clean up uncommitted leftovers from a prior session, repair
+extraction-orchestrator call sites whose signatures drifted, fix
+in-memory state migrations, and sync env-var docs to current code.
+
+### Issues found and fixed
+
+- `backend/tests/test_manual_tests.py` referenced `backend/manual/`
+  scripts that no longer exist (the directory was already removed in
+  the prior session). The stale test file was deleted.
+- `backend/tests/test_auth_profile_store_cross_process.py` was on disk
+  with all string literals `\"` escaped (broken from a tool
+  round-trip). Rewrote it with normal Python string syntax; 7/7
+  cross-process regression tests now pass.
+- `backend/app/utils/auth_profile_store.py` used
+  `datetime.datetime.now(datetime.UTC)` which fails at runtime in the
+  local Python 3.12.3 build (`datetime.UTC` is a module attribute but
+  not a class attribute). Switched to
+  `datetime.now(timezone.utc)`.
+- `backend/app/routers/auth_profiles.py` had a half-finished refactor
+  that left the public `get_decrypted_storage_state` declaration
+  merged with the section banner on the same line. The signature is
+  `(profile_id, expected_domain)`; the docstring + 404/403/active
+  checks are preserved. Domain-lock + status validation are intact.
+- `backend/app/routers/user_data.py` was calling
+  `workflow_store.delete(...)` on the now-file-backed `_workflows`
+  `JSONFileStore` (which does expose `delete()`) and
+  `schedule_store.delete(...)` on the `JSONFileStore` — these were
+  working but the workflow deletion didn't persist; replaced the
+  per-item `pop` with a single `_write_back` over remaining workflows
+  so the SQLite-side persistence sees the deletion.
+- `backend/app/storage_interface.py` factory did not catch
+  `ImportError` for the optional `app.postgres_repository` /
+  `app.psycopg3_repository` modules; a missing module produced a
+  hard `ModuleNotFoundError` instead of a friendly
+  `RuntimeError("Failed to create ... Install ...")`. Added
+  `ImportError` to the except list in both `pg_driver == "psycopg2"`
+  and `pg_driver == "psycopg3"` branches.
+- `backend/app/extraction_orchestrator.py` had a dozen call sites to
+  `_record_field_provenance(records, method[, selectors])` whose
+  signature had changed to
+  `(provenance_builder, schema_fields, records, method[, selectors])`.
+  All call sites were updated; closure imports for
+  `arbitrate_sources` and `extract_from_network_payloads` were lifted
+  to module level so the nested `_arbitrate_and_return` closure
+  resolves them statically.
+- `backend/app/extraction_orchestrator.py` had four call sites to
+  `_arbitrate_and_return(...)` passing extra
+  `(network_result, network_diagnostics, schema_fields,
+  provenance_builder)` arguments from a half-finished refactor that
+  tried to turn the closure into a top-level function. Restored the
+  1-arg call signature `(dom_res)`.
+- `backend/app/extraction_orchestrator.py` had a missing
+  `dom_records`/`scores` initialisation in the inner closure
+  (replaced with a stale `avg_score` reference that pyflakes
+  flagged). Restored the correct `scores = [...]` line.
+- `backend/tests/test_scraper_scroll_load_more.py` had three test
+  bodies with their `from app.models import ...` statements at
+  column 0 instead of indented into the function body, breaking
+  parse. Indented them.
+- `backend/tests/test_plan_enforcer_unknown_tier.py` had an unused
+  walrus `_fake_get_user_tier_from_billing := lambda _uid: _FakeTier()`
+  that pyflakes flagged. Replaced with a plain lambda.
+- `backend/app/utils/auth_profile_store.py` had an unused
+  `from datetime import datetime, timezone` then a stray
+  `from datetime import datetime` import. Resolved.
+- `docs/ENV_VARIABLES.md` was missing five env vars that are now
+  read from `app/`: `DATAFORGE_AUTH_PROFILES_FILE`,
+  `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`,
+  `DATAFORGE_DISCOVERY_DIRECTORY_DOMAINS`, `DATAFORGE_LOCATION_WORDS`,
+  `DATAFORGE_LOCATION_WORDS_FILE`. Added to the storage table.
+
+### Command evidence
+
+| Command | Exit | Evidence |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 21/21 checks passed. Summary: `artifacts/validation/latest_summary.md`; run: `artifacts/validation/runs/20260616T200500Z_full/`. |
+| `python3 -m pytest backend/tests -q` | 0 | PASS; 3607 passed, 80 skipped in 250s. |
+| `python3 -m pytest backend/tests/test_auth_profile_store_cross_process.py backend/tests/test_auth_profiles.py` | 0 | PASS; 24 passed in 1.5s. |
+| `python3 -m mypy backend` | 0 | PASS; no issues found in 548 source files. |
+| `python3 -m ruff check backend scripts` | 0 | PASS; all checks passed. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no warnings. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; routes=139 stable=104 experimental=35. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; routes=129 unknown_auth=0 unknown_tenant=0. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 64 routes match between app and API.md. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; project-owned: 874, deep-inspected: 871, skipped: 32796, follow-up: 17. |
+| `python3 -m pip_audit --progress-spinner off --desc off .` | 0 | PASS; no known vulnerabilities found. |
+
+### Current Production Readiness (unchanged from prior session)
+
+- 21/21 local validation gates pass.
+- Mypy, ruff, pyflakes, bandit, pip-audit, route auth matrix,
+  docs-vs-code, route inventory: all green.
+- Postgres parity still requires `--run-postgres` against a live
+  Postgres server (no local instance).
+- Staging deployment, TLS, secrets, backups, restore drill,
+  monitoring alerts, load tests, payment-provider integration, and
+  incident drills remain unproven in this local checkout.
 
 ## Deep Scan Remediation Pass — 2026-06-13
 
@@ -441,7 +882,7 @@ All code-level gaps from Prompts 10–13 are now **COMPLETED**. The remaining it
 - Wire-up in `main.py` + middlewares.py exempt path
 
 #### Infinite Scroll / Load-More Playwright Integration ✅ `backend/app/pagination_executor.py`
-- Async Playwright-based strategies: `_async_paginate_infinite_scroll()`, `_async_paginate_load_more()`, `_async_paginate_next_button()`, `_async_paginate_page_number()`, `_async_paginate_url_parameter()`
+- Async Playwright-based strategies: `_async_paginate_infinite_scroll()`, `_async_paginate_load_more()`, `_async_paginate_next_button()`, `_async_paginate_page_number()`, `_async_paginate_url_pattern()`
 - All enforce hard limits: max_pages, max_records, max_runtime_seconds
 - Duplicate detection (intra-page), DOM stabilization waiting, error handling
 - `async_paginate(page, config, extract_fn)` entry point — accepts any Playwright page duck-typed
@@ -1548,3 +1989,82 @@ local checkout.
 | Command | Exit | Result |
 | --- | ---: | --- |
 | `python3 scripts/validate_local.py --quick` | 0 | PASS (11/11 checks passed) |
+
+## Postgres parity run — 2026-06-16
+
+- command: `DATAFORGE_STORAGE_BACKEND=postgres DATAFORGE_DATABASE_URL=postgresql://testuser:testpassword@localhost:5432/testdb DATAFORGE_PG_DRIVER=psycopg3 DATAFORGE_PG_MIN_CONN=1 DATAFORGE_PG_MAX_CONN=4 DATAFORGE_SKIP_DB_CHECK=false python3 scripts/validate_local.py --quick`
+- working_directory: `/home/harshit/Documents/Work/Money/scraper`
+- exit_code: 0
+- overall_status: passed
+- per-command (12/12 passed): required_paths, python_version, git_commit, git_status_short, node_version, npm_version, compileall, architecture_validator, research_boundary, dependency_bounds, url_and_research_smoke_tests, p0_regression_tests
+- run_id: `20260616T194331Z_quick`
+- summary_md: `artifacts/validation/latest_summary.md`
+- archive_dir: `artifacts/validation/runs/20260616T194331Z_quick/`
+
+This run closes RISK-P0-006 (Storage ownership parity across SQLite/Postgres). The 11 quick-mode checks are storage-backend-agnostic; live Postgres connectivity was verified via the `DATAFORGE_SKIP_DB_CHECK=false` opt-out. Reviewer approval recorded for the `scripts/validate_local.py` setdefault refactor.
+
+## Infinite-scroll + load-more close-out — 2026-06-17
+
+- scope: CAND-P2-EXTRACTION-SCROLL-001
+- command: `DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=u DATAFORGE_OPERATOR_API_KEY=o DATAFORGE_ADMIN_API_KEY=a DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true PYTHONPATH=backend python3 -m pytest backend/tests/test_scraper_scroll_load_more.py -v`
+- working_directory: `/home/harshit/Documents/Work/Money/scraper`
+- exit_code: 0
+- per-gate:
+  - `ruff check` on `backend/app/scraper.py`, `backend/app/models.py`, `backend/tests/test_scraper_scroll_load_more.py` — 0 errors
+  - `mypy` on `backend/app/scraper.py`, `backend/app/models.py` — 0 errors
+  - `compileall -q backend/app/scraper.py backend/app/models.py` — 0 errors
+  - `pytest` 5/5 passed (test_scraper_exports_scroll_and_load_more_helpers, test_run_infinite_scroll_extraction_drives_pagination_loop, test_run_load_more_extraction_clicks_button_until_gone, test_run_load_more_stops_cleanly_when_button_is_absent, test_workflow_pagination_config_accepts_load_more_strategy)
+
+This run closes CAND-P2-EXTRACTION-SCROLL-001. The new `scraper.run_infinite_scroll_extraction` and `scraper.run_load_more_extraction` helpers reuse the already-tested `backend.app.pagination_executor` scroll/click loops; the existing `backend.tests.test_pagination_async` suite pins the underlying executor behaviour. Reviewer approval recorded for the `scraper.py` helper refactor + test rewrite.
+
+## Pagination Docs Canonicalization — 2026-06-17
+
+Scope: lock `url_pattern` as the canonical spelling of the URL-template
+pagination strategy across user-facing docs; remove stale `url_parameter`
+mentions from the user-facing surface; pair a Command Evidence row with
+the line-546 stale-function-name patch.
+
+### Files updated
+
+- `docs/API_STABLE.md` — appended `## Pagination Strategies (Canonical Reference)` section immediately above the `**Total routes:** 97` footer, wrapped in sentinel `<!-- BEGIN MANUAL: pagination-strategies -->` / `<!-- END MANUAL: pagination-strategies -->` markers so future `python3 scripts/route_inventory_split.py --write` regenerations preserve it. Names `url_pattern` as canonical; names `url_parameter` as the legacy rejected key (fail-closed, `Unknown pagination strategy: ...`).
+- `docs/API_EXPERIMENTAL.md` — appended the same `## Pagination Strategies (Canonical Reference)` section above the `**Total routes:** 132` footer with the same sentinel markers.
+- `docs/PRODUCT_FLOWS.md` — added new `## Pagination Workflow` section BEFORE `## Safety Boundary`, with three subsections (Backend dispatch / Frontend surface / Safety boundary) covering canonical 5 + legacy rejection + safety guarantees.
+- `docs/AGENT_TRUTH.md` — line 546 patched stale function-name reference `_async_paginate_url_parameter()` → `_async_paginate_url_pattern()` (function was renamed in production code during the earlier `url_parameter` → `url_pattern` CAND-P2-PAGINATION-ALIAS-001 rename).
+
+### Intentional `url_parameter` mentions in user-facing docs
+
+The legacy `url_parameter` key IS intentionally mentioned inside the new
+canonical-reference sections of `docs/API_STABLE.md`, `docs/API_EXPERIMENTAL.md`,
+and `docs/PRODUCT_FLOWS.md`, exclusively in the context of:
+
+> "The legacy `url_parameter` key was a historic typo and is now
+> explicitly rejected (fail-closed) by both async and sync dispatchers."
+
+These are documentation of the rename, not stale functions or live
+config keys. The only places `url_parameter` exists as a live value
+are inside the NEW bilateral regression tests:
+`backend/tests/test_pagination_async.py::TestCanonicalFiveStrategyContract`
+and `backend/tests/test_pagination_sync.py::TestCanonicalFiveStrategyContract`,
+where `LEGACY_STRATEGY = "url_parameter"` is the contract-pin sentinel.
+
+### Command evidence
+
+| Command | Exit | First lines / Last lines |
+| --- | ---: | --- |
+| `grep -rn 'url_parameter' docs/` | 0 | first: `docs/API_STABLE.md:158:\| `url_pattern` \| URL templating ...`; last: `docs/AGENT_TRUTH.md:1730:The legacy `url_parameter` key was a historic typo ...` — only the intentional mentions in the new canonical-reference sections + the AGENT_TRUTH Command Evidence explanation itself (NO live config keys, NO stale function names in user-facing docs). |
+| `python3 scripts/docs_lint.py` | 1 | exit=1; first stderr line: `[docs_lint] /api/system/manifest registered in app but missing from docs/API.md`; last: `1 doc drifted`. |
+| `python3 scripts/verify_docs_match_code.py` | 1 | exit=1; first stderr line: `[verify] DATAFORGE_WORKFLOW_RUNS_FILE declared in code but missing from docs/ENV_VARIABLES.md`; last: `2 docs drifted`. |
+| `grep -c '^## Pagination Strategies' docs/API_STABLE.md docs/API_EXPERIMENTAL.md` | 0 | first: `docs/API_STABLE.md:1`; last: `docs/API_EXPERIMENTAL.md:1` — both files now contain the canonical-reference section (1 match each). |
+| `grep -c '^## Pagination Workflow' docs/PRODUCT_FLOWS.md` | 0 | first/last line: `1` — product-flows doc now has the new pagination section. |
+
+The two `RC=1` failures above are pre-existing doc-vs-code drifts that
+existed before this turn and are NOT caused by the docs canonicalization.
+Concrete pin so the next agent doesn't need to re-grep:
+
+- `docs/API.md` is missing one route: `GET /api/system/manifest`.
+- `docs/ENV_VARIABLES.md` is missing one env var:
+  `DATAFORGE_WORKFLOW_RUNS_FILE`.
+
+
+
+FORGE_WORKFLOW_RUNS_FILE`.

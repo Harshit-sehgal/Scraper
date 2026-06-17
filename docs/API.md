@@ -82,6 +82,8 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | DELETE | `/api/operator/denylist` | Admin |
 | GET | `/api/system/status` | Operator or admin |
 | GET | `/api/system/storage/status` | Operator or admin |
+| GET | `/api/system/manifest` | User (any authenticated role) |
+| GET | `/api/system/audit-log` | Admin |
 | GET | `/api/system/diagnostics/export` | Admin |
 | GET | `/api/system/rate-limit-stats` | Operator or admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
@@ -140,6 +142,8 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | DELETE | `/api/workflows/{workflow_id}` | Operator or admin |
 | POST | `/api/workflows/{workflow_id}/preview` | Operator or admin |
 | POST | `/api/workflows/{workflow_id}/run` | Operator or admin |
+| GET | `/api/workflows/{workflow_id}/runs` | Operator or admin |
+| GET | `/api/workflows/{workflow_id}/runs/{run_id}` | Operator or admin |
 | POST | `/api/workflow-drafts/from-url-analysis` | Operator or admin |
 | POST | `/api/workflow-drafts/{draft_id}/detect-fields` | Operator or admin |
 | POST | `/api/workflow-drafts/{draft_id}/manual-mapping` | Operator or admin |

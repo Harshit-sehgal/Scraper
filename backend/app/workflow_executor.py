@@ -197,6 +197,11 @@ async def _paginate_and_extract(
     """Handle pagination if configured and extract all records.
 
     Returns (all_records, pagination_stopped_reason).
+
+    When ``pagination_config.strategy`` is ``load_more`` or ``infinite_scroll``,
+    dispatches through the new ``app.scraper`` helpers so all extraction paths
+    funnel through a single ``ScrapeAttemptResult`` surface. Other strategies
+    fall through to ``app.pagination_executor.async_paginate`` directly.
     """
     pagination_config = workflow.pagination_config
     if not pagination_config or not pagination_config.enabled:
@@ -204,17 +209,53 @@ async def _paginate_and_extract(
         records = await _extract_records_from_page(page, workflow)
         return records, "no_pagination"
 
+    async def _extract(page_arg: Any) -> list[dict[str, Any]]:
+        return await _extract_records_from_page(page_arg, workflow)
+
+    strategy = pagination_config.strategy
+
+    # Funnel scroll-style strategies through the new scraper helpers so the
+    # workflow extraction path shares its ScrapeAttemptResult surface with
+    # the public scrape_url() / run_infinite_scroll_extraction() / etc. APIs.
+    #
+    # ``workflow.pagination_config`` is the API-side model which intentionally
+    # omits executor-only fields like ``max_records``, so we materialise a
+    # full ``PaginationConfig`` here (mirroring the next_button / page_number
+    # fall-through) before passing it through the helper chain.
+    if strategy in ("load_more", "infinite_scroll"):
+        from app import scraper
+        from app.pagination_executor import PaginationConfig as ExecutorPaginationConfig
+        from app.scraper_models import ScrapeAttemptResult
+
+        executor_config = ExecutorPaginationConfig(
+            strategy=strategy,
+            max_pages=pagination_config.max_pages,
+            selector=pagination_config.selector or None,
+            stop_on_duplicates=True,
+        )
+
+        helper = scraper.run_load_more_extraction if strategy == "load_more" else scraper.run_infinite_scroll_extraction
+        # Run the helper under an isolated local so Mypy doesn't reuse this
+        # binding for the next ``sync_paginate`` branch below. ``ScrapeAttemptResult``
+        # subclasses ``list`` so it already satisfies the ``list[dict[str, Any]]`` slot.
+        scroll_result: ScrapeAttemptResult = await helper(
+            page,
+            workflow.start_url,
+            pagination_config=executor_config,
+            per_page_extract=_extract,
+        )
+        # ``stopped_reason`` is now a first-class attribute on ``ScrapeAttemptResult``
+        # (populated by ``_run_paginated_extraction`` from ``pagination_result.stopped_reason``).
+        return scroll_result, scroll_result.stopped_reason
+
     from app.pagination_executor import PaginationConfig, async_paginate
 
     config = PaginationConfig(
-        strategy=pagination_config.strategy,
+        strategy=strategy,
         max_pages=pagination_config.max_pages,
         selector=pagination_config.selector or None,
         stop_on_duplicates=True,
     )
-
-    async def _extract(page: Any) -> list[dict[str, Any]]:
-        return await _extract_records_from_page(page, workflow)
 
     result = await async_paginate(
         page,

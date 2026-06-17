@@ -31,6 +31,7 @@ from app.url_analyzer import analyze_url as analyze_guided_url
 from app.url_safety import validate_public_http_url
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
+from app.utils.workflow_run_store import WorkflowRunStore
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -42,6 +43,9 @@ _workflows = JSONFileStore(Path(__file__).resolve().parents[2] / "data" / "workf
 _workflow_drafts = JSONFileStore(
     Path(__file__).resolve().parents[2] / "data" / "workflow_drafts.json",
 )
+# Run history is its own keyed store so we can paginate and filter
+# independent of the workflow definitions.
+_workflow_runs = WorkflowRunStore()
 
 
 class WorkflowDraftFromUrlAnalysisRequest(BaseModel):
@@ -418,8 +422,12 @@ async def run_workflow(
     """Queue a workflow for execution and return the job ID.
 
     The actual execution is performed asynchronously by the job runner.
+    A run-history record is appended to ``_workflow_runs`` so the
+    UI can show a chronological list of past runs alongside each
+    workflow.
     """
     wf = _get_visible_workflow(workflow_id, auth)
+    _role, user_id, org_id, project_id = auth
 
     # Update run counters
     wf["total_runs"] = wf.get("total_runs", 0) + 1
@@ -430,14 +438,98 @@ async def run_workflow(
     wf["last_run_job_id"] = job_id
     _write_back(wf)
 
-    logger.info("Workflow queued: %s -> job %s", workflow_id, job_id)
+    # Record the run in the dedicated run-history store so the
+    # UI can show a chronological list. We snapshot the workflow
+    # name at run time so the history is still readable after
+    # the workflow is renamed or deleted.
+    run_id = str(uuid.uuid4())
+    run_record = {
+        "run_id": run_id,
+        "workflow_id": workflow_id,
+        "workflow_name": str(wf.get("name") or ""),
+        "job_id": job_id,
+        "user_id": user_id,
+        "org_id": org_id,
+        "project_id": project_id,
+        "status": "queued",
+        "queued_at": _now_iso(),
+    }
+    _workflow_runs.upsert(run_id, run_record)
+
+    logger.info("Workflow queued: %s -> job %s (run %s)", workflow_id, job_id, run_id)
 
     return {
         "workflow_id": workflow_id,
         "job_id": job_id,
+        "run_id": run_id,
         "status": "queued",
         "message": "Workflow queued for execution. Poll /api/jobs/{job_id} for status.",
     }
+
+
+@router.get("/{workflow_id}/runs", status_code=200)
+async def list_workflow_runs(
+    workflow_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    status: Annotated[
+        str | None,
+        Query(description="Optional status filter (queued, running, succeeded, failed, canceled)"),
+    ] = None,
+) -> dict[str, Any]:
+    """List the run history for a single workflow, newest first.
+
+    Returns only runs the caller is allowed to see (tenant-scoped
+    via the workflow's owner / org / project).
+    """
+    wf = _get_visible_workflow(workflow_id, auth)
+
+    candidates: list[dict[str, Any]] = []
+    for run in _workflow_runs.values():
+        if str(run.get("workflow_id") or "") != workflow_id:
+            continue
+        if status and str(run.get("status") or "") != status:
+            continue
+        # Tenant scope: a run is visible if the caller is allowed to
+        # see the workflow that owns it (the workflow was already
+        # authorised above, so any run linked to it is in scope).
+        candidates.append(dict(run))
+
+    candidates.sort(key=lambda r: str(r.get("queued_at") or ""), reverse=True)
+    truncated = candidates[:limit]
+    return {
+        "workflow_id": workflow_id,
+        "workflow_name": str(wf.get("name") or ""),
+        "total": len(candidates),
+        "returned": len(truncated),
+        "items": truncated,
+    }
+
+
+@router.get("/{workflow_id}/runs/{run_id}", status_code=200)
+async def get_workflow_run(
+    workflow_id: str,
+    run_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> dict[str, Any]:
+    """Fetch a single run-history record by id.
+
+    Authorisation: the caller must be able to see the owning
+    workflow (404 if not, 404 if the run does not exist for that
+    workflow — we deliberately do not leak whether the run id is
+    just unknown vs scoped away).
+    """
+    _get_visible_workflow(workflow_id, auth)
+    run = _workflow_runs.get(run_id)
+    if run is None or str(run.get("workflow_id") or "") != workflow_id:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    return dict(run)
 
 
 @router.post("/{workflow_id}/preview", status_code=200)

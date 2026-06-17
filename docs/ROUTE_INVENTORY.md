@@ -2,13 +2,13 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-13 18:52:00 UTC
+**Generated:** 2026-06-16 22:43:13 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
 development docs/static routes, health/readiness routes, and session/auth routes.
 
-**Total route rows:** 139
+**Total route rows:** 143
 
 ## Stable Api Routes
 
@@ -86,8 +86,10 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/scraper/stats` | `app.routers.scraper` | `get_scraper_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `DELETE` | `/api/scraper/telemetry` | `app.routers.scraper` | `clear_telemetry` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
 | `GET` | `/api/scraper/telemetry` | `app.routers.scraper` | `get_recent_telemetry` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/system/audit-log` | `app.routers.system` | `get_audit_log` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
 | `POST` | `/api/system/csp-violations` | `app.routers.system` | `csp_violations` | stable | public |  |  |  |  | explicit API middleware exemption |
 | `GET` | `/api/system/diagnostics/export` | `app.routers.system` | `export_system_diagnostics` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
+| `GET` | `/api/system/manifest` | `app.routers.system` | `system_manifest` | stable | protected | authenticated-user | require_role |  |  | route dependency accepts admin/operator/user |
 | `GET` | `/api/system/rate-limit-stats` | `app.routers.system` | `rate_limit_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/system/status` | `app.routers.system` | `system_status` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/system/storage/status` | `app.routers.system` | `storage_status` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
@@ -104,6 +106,8 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `PUT` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `update_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/workflows/{workflow_id}/preview` | `app.routers.workflow` | `preview_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/workflows/{workflow_id}/run` | `app.routers.workflow` | `run_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/workflows/{workflow_id}/runs` | `app.routers.workflow` | `list_workflow_runs` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/workflows/{workflow_id}/runs/{run_id}` | `app.routers.workflow` | `get_workflow_run` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 
 ## Experimental Api Routes
 

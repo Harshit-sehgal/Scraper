@@ -42,16 +42,23 @@ async def root():
 
     In production mode, /docs, /redoc, /openapi.json, and /app are disabled,
     so we omit them from the response to avoid confusing operators and clients.
+    The currently-active AUP version is also returned so the dashboard
+    can surface an acceptance banner before the user makes any calls.
     """
     from app.config import settings
+    from app.saas.router import CURRENT_AUP_VERSION
 
-    if settings.ENV.lower() == "production":
-        return {"message": "DataForge API v2", "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES}
-    return {
+    base = {
         "message": "DataForge API v2",
+        "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES,
+        "aup_version": CURRENT_AUP_VERSION,
+    }
+    if settings.ENV.lower() == "production":
+        return base
+    return {
+        **base,
         "docs": "/docs",
         "dashboard": "/app",
-        "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES,
     }
 
 

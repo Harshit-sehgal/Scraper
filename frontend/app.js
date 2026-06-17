@@ -18,6 +18,8 @@ import {
 } from "./js/utils.js";
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from "./js/jobs.js";
 import { onGlobalKeydown, switchView, currentView } from "./js/views.js";
+import { refreshWorkflows, onWorkflowAction } from "./js/workflows.js";
+import { checkAndRenderAupBanner, acceptAup, dismissAupBanner } from "./js/aup.js";
 import {
   onResultsSliderInput,
   onResultsTableScroll,
@@ -127,6 +129,36 @@ function onDocumentClick(e) {
       break;
     case "analyze-url":
       analyzeURL();
+      break;
+    case "refresh-workflows":
+      refreshWorkflows();
+      break;
+    case "run-workflow":
+    case "delete-workflow":
+      onWorkflowAction(action, id);
+      break;
+    case "aup-accept": {
+      const v = btn.getAttribute("data-version") || "";
+      acceptAup(v);
+      break;
+    }
+    case "aup-dismiss":
+      dismissAupBanner();
+      break;
+    case "refresh-billing":
+      refreshBilling();
+      break;
+    case "refresh-audit":
+      refreshAudit();
+      break;
+    case "refresh-retention":
+      refreshRetention();
+      break;
+    case "upgrade-plan":
+      upgradePlan();
+      break;
+    case "delete-my-data":
+      deleteMyData();
       break;
     case "toggle-all-fields":
       toggleAllFields(btn.getAttribute("data-select") === "true");
@@ -256,6 +288,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
           el.classList.add("visible");
         });
+      }
+      // Once we know the active AUP version, surface the
+      // acceptance banner if needed. The check is silent on
+      // 404/401 (no auth, no banner) so it never nags anonymous
+      // visitors.
+      if (data.aup_version) {
+        checkAndRenderAupBanner(data.aup_version);
       }
     })
     .catch(() => {});

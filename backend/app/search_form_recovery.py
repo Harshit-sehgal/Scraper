@@ -69,7 +69,7 @@ def _detect_search_form(html: str) -> dict[str, Any]:
         r"keyword|query",
     ]
 
-    best_form = None
+    best_form: Any = None
     best_fields: list[dict] = []
     best_search_inputs: list[dict] = []
     best_form_score = 0
