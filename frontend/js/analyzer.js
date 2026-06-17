@@ -416,7 +416,7 @@ export function renderAcquisitionBanner(data, url) {
     small.style.opacity = "0.7";
     small.textContent = "Recovered fresh results via search form submission";
     frag.appendChild(line);
-    frag.appendChild(sadj);
+    frag.appendChild(small);
   }
   if (isSessionBound) {
     const line = document.createElement("br");
