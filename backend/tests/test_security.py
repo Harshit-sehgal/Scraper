@@ -102,14 +102,14 @@ class TestAuthentication:
         response = client.get("/api/jobs")
         assert response.status_code == 200
 
-    def test_invalid_api_key_accepted_in_test_mode(self, client: TestClient):
-        """Test that invalid API keys are accepted in test mode."""
+    def test_invalid_api_key_rejected_when_dev_auth_disabled(self, client: TestClient):
+        """Invalid API keys are rejected when dev auth is bypassed by auth attempt."""
         response = client.get(
             "/api/jobs",
             headers={"X-API-Key": "invalid-key"},
         )
-        # In test mode, auth is disabled
-        assert response.status_code == 200
+        # When an auth header is sent but doesn't match, dev auth is not used as fallback
+        assert response.status_code == 403
 
     def test_admin_endpoint_accessible_in_test_mode(self, client: TestClient, operator_headers: dict):
         """Test that admin endpoints are accessible in test mode."""
