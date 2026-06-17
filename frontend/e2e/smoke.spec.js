@@ -8,10 +8,10 @@ test.describe("Dashboard UI smoke tests", () => {
 
   test("tabs are visible", async ({ page }) => {
     await page.goto("/app/");
-    await expect(page.locator("#tab-jobs")).toBeVisible();
-    await expect(page.locator("#tab-new")).toBeVisible();
-    await expect(page.locator("#tab-recycle")).toBeVisible();
-    await expect(page.locator("#tab-dashboard")).toBeVisible();
+    await expect(page.locator("#nav-jobs")).toBeVisible();
+    await expect(page.locator("#nav-new")).toBeVisible();
+    await expect(page.locator("#nav-recycle")).toBeVisible();
+    await expect(page.locator("#nav-dashboard")).toBeVisible();
   });
 
   test("clicking Create Job navigates to new job view", async ({ page }) => {
@@ -30,13 +30,13 @@ test.describe("Dashboard UI smoke tests", () => {
 
   test("dashboard tab navigates to dashboard view", async ({ page }) => {
     await page.goto("/app/");
-    await page.locator("#tab-dashboard").click();
+    await page.locator("#nav-dashboard").click();
     await expect(page.locator("#view-dashboard")).toBeVisible();
   });
 
   test("dashboard shows all panel containers", async ({ page }) => {
     await page.goto("/app/");
-    await page.locator("#tab-dashboard").click();
+    await page.locator("#nav-dashboard").click();
     await expect(page.locator("#view-dashboard")).toBeVisible();
 
     // All panel containers are present in the DOM (show "Loading..." initially)
@@ -49,7 +49,7 @@ test.describe("Dashboard UI smoke tests", () => {
 
   test("dashboard shows operator mode card and health KPIs", async ({ page }) => {
     await page.goto("/app/");
-    await page.locator("#tab-dashboard").click();
+    await page.locator("#nav-dashboard").click();
     await expect(page.locator("#view-dashboard")).toBeVisible();
 
     // Mode card elements

@@ -17,7 +17,7 @@ import {
   toast,
 } from "./js/utils.js";
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from "./js/jobs.js";
-import { onGlobalKeydown, switchView, currentView } from "./js/views.js";
+import { onGlobalKeydown, switchView, getViewFromPath } from "./js/views.js";
 import { refreshWorkflows, onWorkflowAction } from "./js/workflows.js";
 import { checkAndRenderAupBanner, acceptAup, dismissAupBanner } from "./js/aup.js";
 import { startHealthPill } from "./js/health-pill.js";
@@ -113,6 +113,11 @@ function onDocumentClick(e) {
     case "switch-view":
       if (view) switchView(view);
       break;
+    case "toggle-sidebar": {
+      const sidebar = document.getElementById("sidebar");
+      if (sidebar) sidebar.classList.toggle("open");
+      break;
+    }
     case "clear-terminal-jobs":
       clearTerminalJobs();
       break;
@@ -425,11 +430,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   initAuthProfiles();
 
   // ── Initial view ──
-  let initialView = ["jobs", "new", "recycle", "cognition", "dashboard", "auth-profiles"].includes(
-    String(uiState.view || ""),
-  )
-    ? String(uiState.view)
-    : "jobs";
+  // URL path takes precedence over localStorage state
+  let initialView = getViewFromPath(window.location.pathname);
+  // Fall back to saved state if URL is at root and we have a saved view
+  if (initialView === "jobs" && window.location.pathname === "/" && uiState.view) {
+    initialView = uiState.view;
+  }
   // H2: Guard initial view restoration for cognition
   if (initialView === "cognition" && window.DATAFORGE_EXPERIMENTAL !== true) {
     initialView = "jobs";

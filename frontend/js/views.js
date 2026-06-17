@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   DataForge — View Management
+   DataForge — View Management + Client-side Router
    ═══════════════════════════════════════════ */
 
 import {
@@ -25,6 +25,32 @@ export function setCurrentMode(mode) {
   currentMode = mode;
 }
 
+// ─── Router ───
+
+const VIEW_MAP = {
+  "/": "jobs",
+  "/jobs": "jobs",
+  "/new": "new",
+  "/recycle": "recycle",
+  "/cognition": "cognition",
+  "/dashboard": "dashboard",
+  "/auth-profiles": "auth-profiles",
+  "/workflows": "workflows",
+  "/billing": "billing",
+  "/audit": "audit",
+  "/retention": "retention",
+};
+
+export function getViewFromPath(path) {
+  const trimmed = path.replace(/\/+$/, "") || "/";
+  return VIEW_MAP[trimmed] || "jobs";
+}
+
+export function getPathFromView(view) {
+  if (view === "jobs") return "/jobs";
+  return `/${view}`;
+}
+
 // ─── View / Tab Switching ───
 
 export function switchView(name) {
@@ -33,30 +59,43 @@ export function switchView(name) {
     name = "jobs";
   }
   currentView = name;
+
+  // Update URL without full page reload
+  const newPath = getPathFromView(name);
+  if (window.location.pathname !== newPath) {
+    window.history.pushState({ view: name }, "", newPath);
+  }
+
+  // Hide all views
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-  document.querySelectorAll(".tab").forEach((t) => {
-    t.classList.remove("active");
-    t.setAttribute("aria-selected", "false");
+
+  // Update nav items (sidebar navigation)
+  document.querySelectorAll(".nav-item").forEach((n) => {
+    n.classList.remove("active");
   });
+
   const viewEl = document.getElementById(`view-${name}`);
   if (viewEl) viewEl.classList.add("active");
 
-  const tabMap = {
-    jobs: "tab-jobs",
-    new: "tab-new",
-    recycle: "tab-recycle",
-    cognition: "tab-cognition",
-    dashboard: "tab-dashboard",
-    "auth-profiles": "tab-auth-profiles",
-    workflows: "tab-workflows",
-    billing: "tab-billing",
-    audit: "tab-audit",
-    retention: "tab-retention",
+  // Close sidebar on mobile after navigating
+  const sidebar = document.getElementById("sidebar");
+  if (sidebar) sidebar.classList.remove("open");
+
+  const navMap = {
+    jobs: "nav-jobs",
+    new: "nav-new",
+    recycle: "nav-recycle",
+    cognition: "nav-cognition",
+    dashboard: "nav-dashboard",
+    "auth-profiles": "nav-auth-profiles",
+    workflows: "nav-workflows",
+    billing: "nav-billing",
+    audit: "nav-audit",
+    retention: "nav-retention",
   };
-  const tabEl = document.getElementById(tabMap[name]);
-  if (tabEl) {
-    tabEl.classList.add("active");
-    tabEl.setAttribute("aria-selected", "true");
+  const navEl = document.getElementById(navMap[name]);
+  if (navEl) {
+    navEl.classList.add("active");
   }
 
   if (name === "jobs") refreshJobs().catch(() => {});
@@ -76,6 +115,15 @@ export function switchView(name) {
 
   writeUIState({ view: name });
 }
+
+// ─── Popstate handler for back/forward buttons ───
+window.addEventListener("popstate", () => {
+  const path = window.location.pathname;
+  const view = getViewFromPath(path);
+  if (view && view !== currentView) {
+    switchView(view);
+  }
+});
 
 // ─── Mode Toggle ───
 
