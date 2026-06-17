@@ -20,6 +20,7 @@ import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChange
 import { onGlobalKeydown, switchView, currentView } from "./js/views.js";
 import { refreshWorkflows, onWorkflowAction } from "./js/workflows.js";
 import { checkAndRenderAupBanner, acceptAup, dismissAupBanner } from "./js/aup.js";
+import { startHealthPill } from "./js/health-pill.js";
 import {
   onResultsSliderInput,
   onResultsTableScroll,
@@ -277,6 +278,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // G2: Try session auth first — if the browser already has a valid
   // session cookie, no API key prompt is needed.
   await checkSession();
+
+  // Start the topbar health pill — periodic probe of /api/health + /api/ready.
+  startHealthPill();
 
   // Fetch experimental feature flag from the public root endpoint
   // and reveal experimental UI elements when enabled.

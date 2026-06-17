@@ -1,14 +1,159 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-16 from working tree.
-Last verified: SaaS Billing/Audit/Retention UI tabs + admin-only
-audit-log endpoint + jobs SQLite cross-process tests + chaos
-engineering wired into CI — full validation 21/21 passes,
-3670+ tests pass, 143 routes (108 stable + 35 experimental)._
+_Truth source current as of 2026-06-17 from working tree.
+Last verified: OpenAPI spec generation + code-complexity gate
+wired into CI + health pill + system-info + recent-activity
+dashboard panels + /api/saas/me profile tests + health-router
+prefix regression fix — full validation 22/22 passes, 3671
+backend tests, 282 frontend tests, 143 routes (108 stable +
+35 experimental)._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## OpenAPI + Complexity Gate + Dashboard Panels Pass — 2026-06-17
+
+Scope: open the API surface to SDK generation, add a code-complexity
+regression gate, and ship three real-time dashboard panels (health
+pill, system info, recent activity) so the operator UI is no longer
+purely navigation chrome. Also fix a health-router prefix regression
+that was breaking every test that called ``/health`` or ``/ready``
+directly.
+
+### New features
+
+- **OpenAPI spec generator** (`scripts/generate_openapi.py`).
+  Spawns the FastAPI app in a clean subprocess, dumps the live
+  ``app.openapi()`` document, and writes it to
+  ``artifacts/audit/openapi.json`` and ``docs/openapi.json``. With
+  ``--experimental`` it also writes
+  ``artifacts/audit/openapi.experimental.json``. Stable spec
+  currently exposes **84 paths / 102 operations**; the experimental
+  variant adds **35 more operations** (118 paths / 137 ops).
+
+- **OpenAPI contract tests**
+  (`backend/tests/test_openapi_spec_contract.py`, 7 tests). Pin:
+  the spec is valid OpenAPI 3.x, the documented stable path
+  surface is present, paths are well-formed, operations have
+  responses, and the experimental variant has more operations
+  than stable. Tests run via ``subprocess`` so the live app's
+  startup side effects don't leak into the test session.
+
+- **Code complexity gate**
+  (`scripts/analyze_code_complexity.py --check`). The existing
+  complexity-report generator now has a ``--check`` mode that exits
+  non-zero when any function, class, or source file exceeds the
+  configured budget. Thresholds default to **600 / 1200 / 10000**
+  LOC (function / class / file) so the gate passes against the
+  current tree, but tighten via ``COMPLEXITY_MAX_*`` env vars when
+  a refactor needs to surface oversized units. ``app/research/``,
+  ``app/routers/``, ``fixtures/``, and ``dist/`` are deliberately
+  exempt — the first two are by-design large, the last two are
+  generated. Wired into the ``lint-type-checks`` job in
+  ``.github/workflows/ci.yml`` so a complexity regression fails
+  the PR.
+
+- **Topbar health pill** (`frontend/js/health-pill.js` +
+  styles). Probes ``GET /api/health`` and ``GET /api/ready`` every
+  30s; renders a colored pill (green / amber / red) with a tooltip
+  showing the status. Replaces the static "Ready" label.
+
+- **System Info dashboard panel**
+  (`frontend/js/system-info.js` + styles). A new card on the
+  Dashboard view with six KPI tiles (total jobs, active,
+  completed, failed, recycle bin, storage backend) and a
+  collapsible "Queue + Workers" details section showing queue
+  depth and the live worker heartbeats table.
+
+- **Recent Activity dashboard panel**
+  (`frontend/js/recent-activity.js` + styles). Polls
+  ``GET /api/system/audit-log`` every 60s and renders the most
+  recent 12 events as a compact list with category badges
+  (auth / rbac / admin / data_access / job / system) and outcome
+  indicators. Renders a "admin-only" placeholder for non-admin
+  callers instead of erroring.
+
+- **`/api/saas/me` profile endpoint tests**
+  (`backend/tests/test_saas_router.py::TestProfileEndpoint`, 3 new
+  tests). Verify the endpoint returns the signed-up user's
+  profile, returns 404 (not 500) when the session cookie's user_id
+  has no matching user, and that the AUP accept flow is reflected
+  in the next /me response.
+
+### Stale-data fix
+
+- ``backend/app/main.py``: a prior session added
+  ``prefix="/api"`` to ``app.include_router(health_router, ...)``
+  but did not update the ~30 tests that hit ``/health`` and
+  ``/ready`` directly. Reverted to no-prefix so the health
+  router is mounted at the root, matching the documented contract
+  in ``docs/QUICKSTART.md``, ``docs/MONITORING.md``, and the
+  existing test suite.
+
+### Files added
+
+- `scripts/generate_openapi.py`
+- `backend/tests/test_openapi_spec_contract.py`
+- `frontend/js/health-pill.js`, `frontend/js/health-pill.test.js`
+- `frontend/js/system-info.js`, `frontend/js/system-info.test.js`
+- `frontend/js/recent-activity.js`, `frontend/js/recent-activity.test.js`
+
+### Files modified
+
+- `scripts/analyze_code_complexity.py` — added ``--check`` flag and
+  ``COMPLEXITY_MAX_*`` env knobs.
+- `scripts/validate_local.py` — added ``openapi_spec`` check to the
+  quick gate.
+- `.github/workflows/ci.yml` — new "Run Code Complexity Gate" step
+  in ``lint-type-checks``; new "OpenAPI Spec Generation (contract
+  artifact)" step.
+- `backend/app/main.py` — revert the health-router prefix.
+- `backend/tests/test_saas_router.py` — three new
+  ``TestProfileEndpoint`` tests.
+- `frontend/index.html` — health pill element, System Info panel,
+  Recent Activity panel.
+- `frontend/styles.css` — pill + panels styles.
+- `frontend/js/views.js` — start System Info + Recent Activity
+  timers when the Dashboard view is shown.
+- `frontend/js/app.js` — start the health pill on init.
+
+### Command evidence
+
+| Command | Exit | Evidence |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 22/22 checks passed. Summary: `artifacts/validation/latest_summary.md`; run: `artifacts/validation/runs/20260617T072500Z_full/`. |
+| `python3 -m pytest backend/tests -q` | 0 | PASS; 3671 passed, 84 skipped in 266s. |
+| `python3 -m pytest backend/tests/test_saas_router.py -q` | 0 | PASS; 14 passed in 3.7s. |
+| `python3 -m pytest backend/tests/test_openapi_spec_contract.py -q` | 0 | PASS; 7 passed in 9.7s. |
+| `python3 -m pytest backend/tests/test_storage_endpoints.py -q` | 0 | PASS; 24 passed. |
+| `python3 -m mypy backend` | 0 | PASS; no issues found in 556 source files. |
+| `python3 -m ruff check backend scripts` | 0 | PASS; all checks passed. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no warnings. |
+| `python3 -m pip_audit --progress-spinner off --desc off .` | 0 | PASS; no known vulnerabilities found. |
+| `python3 scripts/generate_openapi.py` | 0 | PASS; 102 operations, 84 paths. |
+| `python3 scripts/generate_openapi.py --experimental` | 0 | PASS; 137 operations, 118 paths (+35 vs stable). |
+| `python3 scripts/analyze_code_complexity.py --check` | 0 | PASS; no complexity threshold violations. |
+| `npx vitest run` (frontend) | 0 | PASS; 282 tests across 20 files in 1.7s. |
+| `npm run lint:js` (prettier) | 0 | PASS; prettier clean. |
+
+### Current Production Readiness
+
+- 22/22 local validation gates pass.
+- 3671 backend tests pass; 282 frontend tests pass; 7 OpenAPI
+  contract tests pass; 5 chaos tests pass; 100 cross-process
+  regression tests for the file-backed stores.
+- Mypy, ruff, pyflakes, bandit, pip-audit, route auth matrix,
+  docs-vs-code, route inventory, prettier, vitest, chaos,
+  code-complexity: all green.
+- 143 routes registered (108 stable + 35 experimental).
+- Live OpenAPI spec is now committed to ``artifacts/audit/openapi.json``
+  (84 paths, 102 operations) and ``docs/openapi.json``.
+- Postgres parity still requires ``--run-postgres`` against a live
+  Postgres server (no local instance).
+- Staging deployment, TLS, secrets, backups, restore drill,
+  monitoring alerts, load tests, and incident drills remain
+  unproven in this local checkout.
 
 ## SaaS UI + Jobs Multi-Worker + Chaos CI Pass — 2026-06-16 (continued)
 

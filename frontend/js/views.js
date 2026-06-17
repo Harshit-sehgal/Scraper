@@ -59,7 +59,11 @@ export function switchView(name) {
   if (name === "new") import("./form.js").then((m) => m.initForm()).catch(() => {});
   if (name === "recycle") import("./recycle.js").then((m) => m.refreshRecycleBin()).catch(() => {});
   if (name === "cognition") import("./cognition.js").then((m) => m.refreshCognition()).catch(() => {});
-  if (name === "dashboard") import("./dashboard.js").then((m) => m.refreshDashboard()).catch(() => {});
+  if (name === "dashboard") {
+    import("./dashboard.js").then((m) => m.refreshDashboard()).catch(() => {});
+    import("./system-info.js").then((m) => m.startSystemInfo()).catch(() => {});
+    import("./recent-activity.js").then((m) => m.startRecentActivity()).catch(() => {});
+  }
   if (name === "auth-profiles") import("./auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
   if (name === "workflows") import("./workflows.js").then((m) => m.refreshWorkflows()).catch(() => {});
   if (name === "billing") import("./billing.js").then((m) => m.refreshBilling()).catch(() => {});

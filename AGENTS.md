@@ -176,6 +176,14 @@ are proven in the current checkout and target environment.
 | 35 | Re-run full validation: 21/21 checks pass, 3670+ tests pass, 143 routes (108 stable + 35 experimental) | ✅ Done |
 | 36 | Reduce psycopg connect-timeout in tests to 1s via `DATAFORGE_DB_CONNECT_TIMEOUT` env var (cuts full-suite runtime by ~150s) | ✅ Done |
 | 37 | Final validation: 22/22 checks pass, backend tests 254s, no flakiness in the postgres-fallback path | ✅ Done |
+| 38 | Add OpenAPI spec generation script (``scripts/generate_openapi.py``) + 7 contract tests + wire into validation quick gate and CI | ✅ Done |
+| 39 | Add ``--check`` mode + ``COMPLEXITY_MAX_*`` env knobs to ``analyze_code_complexity.py``; wire into CI as a regression gate | ✅ Done |
+| 40 | Add topbar health pill (polls /api/health + /api/ready every 30s) | ✅ Done |
+| 41 | Add System Info panel on Dashboard (job counts, queue, workers) | ✅ Done |
+| 42 | Add Recent Activity panel on Dashboard (admin-only audit log preview) | ✅ Done |
+| 43 | Add ``TestProfileEndpoint`` tests for ``GET /api/saas/me`` (returns profile, 404 on unknown user_id, AUP accept reflects) | ✅ Done |
+| 44 | Revert health-router ``prefix="/api"`` regression that broke ~30 tests | ✅ Done |
+| 45 | Final validation: 22/22 checks pass, 3671 backend tests, 282 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
 
 ## Active Risks
 

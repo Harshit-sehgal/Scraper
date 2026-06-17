@@ -177,6 +177,9 @@
           <span class="engine-status" id="engine-status"
             ><span class="dot"></span><span id="engine-status-text">Ready</span></span
           >
+          <span class="health-pill" id="health-pill" data-state="unknown" aria-live="polite" title="API health status">
+            checking…
+          </span>
         </div>
       </header>
 
@@ -402,6 +405,65 @@
             </div>
             <div class="flex-row" style="gap: 0.5rem">
               <button type="button" class="btn primary small" data-action="refresh-dashboard">Refresh ↻</button>
+            </div>
+          </div>
+
+          <!-- System Info Panel -->
+          <div class="dash-card sysinfo-card">
+            <div class="dash-card-header">
+              <span class="dash-card-title">📊 System Info</span>
+              <span class="dash-badge" id="sysinfo-refreshed-at">loading…</span>
+            </div>
+            <div id="sysinfo-error" class="sysinfo-error"></div>
+            <div class="kpi-row" id="sysinfo-kpi-row">
+              <div class="kpi">
+                <span class="kpi-val" id="sysinfo-jobs-total">—</span><span class="kpi-label">Total jobs</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="sysinfo-jobs-active">—</span><span class="kpi-label">Active</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="sysinfo-jobs-completed">—</span><span class="kpi-label">Completed</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="sysinfo-jobs-failed">—</span><span class="kpi-label">Failed</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="sysinfo-recycle">—</span><span class="kpi-label">Recycle bin</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="sysinfo-backend">—</span><span class="kpi-label">Storage</span>
+              </div>
+            </div>
+            <details class="sysinfo-details">
+              <summary>Queue + Workers</summary>
+              <div class="kpi-row" id="sysinfo-queue-row">
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-queue-pending">—</span><span class="kpi-label">Queue pending</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-queue-running">—</span><span class="kpi-label">Queue running</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-queue-dead-letter">—</span
+                  ><span class="kpi-label">Dead letter</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-queue-max">—</span><span class="kpi-label">Max concurrency</span>
+                </div>
+              </div>
+              <div id="sysinfo-workers" class="sysinfo-workers"></div>
+            </details>
+          </div>
+
+          <!-- Recent Activity Panel -->
+          <div class="dash-card recent-activity-card">
+            <div class="dash-card-header">
+              <span class="dash-card-title">🕒 Recent Activity</span>
+              <span class="dash-badge" id="recent-activity-refreshed-at">loading…</span>
+            </div>
+            <div id="recent-activity-list">
+              <p class="subtle">Loading…</p>
             </div>
           </div>
 

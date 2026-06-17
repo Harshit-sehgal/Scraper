@@ -89,6 +89,72 @@ class TestAupEndpoints:
         assert resp.status_code in (200, 401)
 
 
+class TestProfileEndpoint:
+    """Tests for the self-service ``GET /api/saas/me`` endpoint."""
+
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        """Build the cookies dict carrying a session cookie for user_id."""
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
+    def test_me_returns_profile_for_authenticated_user(self, client: TestClient) -> None:
+        """A signed-up user with a valid session cookie can fetch their own profile."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={
+                "email": "profile-test@example.com",
+                "password": "securepassword123",
+                "display_name": "Profile Tester",
+            },
+        )
+        assert signup.status_code == 201, signup.text
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+
+        me = client.get("/api/saas/me", cookies=cookies)
+        assert me.status_code == 200, me.text
+        body = me.json()
+        assert body["user_id"] == user_id
+        assert body["email"] == "profile-test@example.com"
+        assert body["display_name"] == "Profile Tester"
+        # AUP not yet accepted.
+        assert body["aup_accepted_at"] is None
+        assert body["aup_version_accepted"] is None
+
+    def test_me_returns_404_for_session_with_unknown_user_id(self, client: TestClient) -> None:
+        """A session cookie whose user_id does not match a real user must 404, not 500."""
+        cookies = self._cookies_for("ghost-user-id")
+        resp = client.get("/api/saas/me", cookies=cookies)
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    def test_me_after_aup_accept_reflects_status(self, client: TestClient) -> None:
+        """Accepting the AUP must be reflected in the next /me response."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "aup-test@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+        from app.saas.router import CURRENT_AUP_VERSION
+
+        accept = client.post(
+            "/api/saas/aup/accept",
+            json={"aup_version": CURRENT_AUP_VERSION},
+            cookies=cookies,
+        )
+        assert accept.status_code == 200, accept.text
+
+        me = client.get("/api/saas/me", cookies=cookies)
+        assert me.status_code == 200
+        body = me.json()
+        assert body["aup_version_accepted"] == CURRENT_AUP_VERSION
+        assert body["aup_accepted_at"] is not None
+
+
 class TestPlanEndpoint:
     """Tests for the plan/limits endpoint."""
 
