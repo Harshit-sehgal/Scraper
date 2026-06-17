@@ -184,6 +184,8 @@ are proven in the current checkout and target environment.
 | 43 | Add ``TestProfileEndpoint`` tests for ``GET /api/saas/me`` (returns profile, 404 on unknown user_id, AUP accept reflects) | ✅ Done |
 | 44 | Revert health-router ``prefix="/api"`` regression that broke ~30 tests | ✅ Done |
 | 45 | Final validation: 22/22 checks pass, 3671 backend tests, 282 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
+| 46 | Fix 467 stylelint errors in `frontend/styles.css` (duplicate `.badge` block in Workflow Runs section) + add `frontend_lint_css` to validation script | ✅ Done |
+| 47 | Final validation: 23/23 checks pass, 3671 backend tests, 282 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
 
 ## Active Risks
 
