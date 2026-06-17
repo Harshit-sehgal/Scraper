@@ -1,9 +1,9 @@
 # Latest Validation Summary
 
-- generated_at: 2026-06-17T07:44:32.383634+00:00
+- generated_at: 2026-06-17T10:13:01.263485+00:00
 - mode: full
-- run_id: 20260617T073918Z_full
-- archive_dir: `artifacts/validation/runs/20260617T073918Z_full`
+- run_id: 20260617T100753Z_full
+- archive_dir: `artifacts/validation/runs/20260617T100753Z_full`
 - overall_status: passed
 - passed: 24
 - failed: 0

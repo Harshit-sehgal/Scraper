@@ -48,6 +48,10 @@ export function switchView(name) {
     cognition: "tab-cognition",
     dashboard: "tab-dashboard",
     "auth-profiles": "tab-auth-profiles",
+    workflows: "tab-workflows",
+    billing: "tab-billing",
+    audit: "tab-audit",
+    retention: "tab-retention",
   };
   const tabEl = document.getElementById(tabMap[name]);
   if (tabEl) {
@@ -106,8 +110,8 @@ export function onGlobalKeydown(e) {
   const jobsSearch = document.getElementById("jobs-search");
   const resultSearch = document.getElementById("inp-result-search");
 
-  // Number keys 1-7: switch between tabs (only when not typing)
-  if (!typing && e.key >= "1" && e.key <= "7") {
+  // Number keys 1-9, 0: switch between tabs (only when not typing)
+  if (!typing && ((e.key >= "1" && e.key <= "9") || e.key === "0")) {
     // H2: Guard keyboard shortcut for cognition tab
     if (e.key === "4" && window.DATAFORGE_EXPERIMENTAL !== true) {
       return;
