@@ -34,6 +34,7 @@ class ScrapeAttemptResult(list):
         anti_bot_score: float = 0.0,
         data_evidence_score: float = 0.0,
         recommended_next_action: str = "",
+        stopped_reason: str = "",
         warnings: list[str] | None = None,
         network_diagnostics: list[str] | None = None,
     ) -> None:
@@ -48,6 +49,12 @@ class ScrapeAttemptResult(list):
         self.anti_bot_score = anti_bot_score
         self.data_evidence_score = data_evidence_score
         self.recommended_next_action = recommended_next_action
+        # Pagination-stop reason ("button_gone", "max_pages", "max_records",
+        # "no_new_records", "timeout", "duplicate_page", "error", "no_pagination",
+        # or "" when pagination was not driven). First-class attribute so
+        # upstream workflow_executor + downstream consumers can read it
+        # without ``getattr`` fallbacks.
+        self.stopped_reason = stopped_reason
         self.warnings = warnings or []
         self.network_diagnostics = network_diagnostics or []
 
@@ -62,6 +69,7 @@ class ScrapeAttemptResult(list):
             "anti_bot_score": self.anti_bot_score,
             "data_evidence_score": self.data_evidence_score,
             "recommended_next_action": self.recommended_next_action,
+            "stopped_reason": self.stopped_reason,
             "zero_result_classification": (
                 self.zero_result_classification.to_dict() if self.zero_result_classification else None
             ),

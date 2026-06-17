@@ -505,9 +505,9 @@ def ensure_schema(conn) -> None:
 # dispatch. Instead they use the module-level variants below which raise
 # a clear error if called before __init__ has set the driver callbacks.
 
-_driver_fetch_all = None
-_driver_fetch_one = None
-_driver_execute = None
+_driver_fetch_all: Any = None
+_driver_fetch_one: Any = None
+_driver_execute: Any = None
 
 
 def _set_driver_functions(

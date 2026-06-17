@@ -4,7 +4,7 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 129
+**API route rows:** 133
 **Unknown auth rows:** 0
 **Unknown tenant-scope rows:** 0
 
@@ -110,12 +110,14 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/session/me` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/system/acquisition/telemetry` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/agency` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
+| `GET` | `/api/system/audit-log` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/system/crystalline` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `POST` | `/api/system/csp-violations` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/system/diagnostics/export` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/system/domain-policy` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/export/knowledge` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/history/topology` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
+| `GET` | `/api/system/manifest` | protected | authenticated-user | require_role | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/system/merge/knowledge` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/observability` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/rate-limit-stats` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
@@ -141,3 +143,5 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `PUT` | `/api/workflows/{workflow_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/workflows/{workflow_id}/preview` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/workflows/{workflow_id}/run` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/workflows/{workflow_id}/runs` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/workflows/{workflow_id}/runs/{run_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |

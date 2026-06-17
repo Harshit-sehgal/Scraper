@@ -61,6 +61,10 @@ export function switchView(name) {
   if (name === "cognition") import("./cognition.js").then((m) => m.refreshCognition()).catch(() => {});
   if (name === "dashboard") import("./dashboard.js").then((m) => m.refreshDashboard()).catch(() => {});
   if (name === "auth-profiles") import("./auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
+  if (name === "workflows") import("./workflows.js").then((m) => m.refreshWorkflows()).catch(() => {});
+  if (name === "billing") import("./billing.js").then((m) => m.refreshBilling()).catch(() => {});
+  if (name === "audit") import("./audit.js").then((m) => m.refreshAudit()).catch(() => {});
+  if (name === "retention") import("./retention.js").then((m) => m.refreshRetention()).catch(() => {});
 
   writeUIState({ view: name });
 }
@@ -87,6 +91,10 @@ const TAB_KEYS = {
   4: "cognition",
   5: "dashboard",
   6: "auth-profiles",
+  7: "workflows",
+  8: "billing",
+  9: "audit",
+  0: "retention",
 };
 
 export function onGlobalKeydown(e) {
@@ -94,8 +102,8 @@ export function onGlobalKeydown(e) {
   const jobsSearch = document.getElementById("jobs-search");
   const resultSearch = document.getElementById("inp-result-search");
 
-  // Number keys 1-6: switch between tabs (only when not typing)
-  if (!typing && e.key >= "1" && e.key <= "6") {
+  // Number keys 1-7: switch between tabs (only when not typing)
+  if (!typing && e.key >= "1" && e.key <= "7") {
     // H2: Guard keyboard shortcut for cognition tab
     if (e.key === "4" && window.DATAFORGE_EXPERIMENTAL !== true) {
       return;

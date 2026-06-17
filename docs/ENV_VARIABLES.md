@@ -14,6 +14,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `postgres` |
 | `DATAFORGE_DATABASE_URL` | - | PostgreSQL connection URL (required for postgres backend) |
 | `DATAFORGE_STATE_FILE` | `data/state.json` | Path to state file |
+| `DATAFORGE_DB_CONNECT_TIMEOUT` | `10` | Postgres connect timeout in seconds (used by `verify_postgres_connectivity` and pool init). The test suite sets this to `1` for fast-fail negative paths. |
 | `DATAFORGE_JOB_STORE_PATH` | - | Override SQLite job-store database path |
 | `DATAFORGE_SEMANTIC_STATE_PATH` | `data/semantic_state.json` | Path to semantic state file |
 
@@ -62,6 +63,11 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ENCRYPTION_KEY` | - | Base64 AES-GCM key for auth-profile storage state encryption |
 | `DATAFORGE_ENCRYPTION_KEY_` | - | Prefix for versioned encryption keys such as `DATAFORGE_ENCRYPTION_KEY_V1` |
 | `DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION` | `v1` | Active version used for new encrypted payloads |
+| `DATAFORGE_AUTH_PROFILES_FILE` | `data/auth_profiles.json` | Path to the file-backed auth-profile store (used by `AuthProfileStore` in `app/utils/auth_profile_store.py`) |
+| `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE` | `data/billing_subscriptions.json` | Path to the file-backed billing-subscription store |
+| `DATAFORGE_DISCOVERY_DIRECTORY_DOMAINS` | - | Comma-separated allowlist of domains for auto-discovery directory mode |
+| `DATAFORGE_LOCATION_WORDS` | - | Comma-separated extra location words to recognise when extracting location fields |
+| `DATAFORGE_LOCATION_WORDS_FILE` | - | Path to a file containing extra location words (one per line) |
 
 ## Experimental Features
 

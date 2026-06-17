@@ -17,6 +17,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
+os.environ.setdefault("DATAFORGE_DB_CONNECT_TIMEOUT", "1")
 os.environ["DATAFORGE_ENV"] = "development"
 os.environ["DATAFORGE_ALLOW_INSECURE_DEV_AUTH"] = "true"
 os.environ["DATAFORGE_API_KEY"] = ""
@@ -54,6 +55,14 @@ def pytest_addoption(parser) -> None:
             default=False,
             help="Run tests marked with @pytest.mark.browser (requires Playwright and local socket binding).",
         )
+    with contextlib.suppress(ValueError):
+        parser.addoption(
+            "--run-hostile-ci-smoke",
+            action="store_true",
+            default=False,
+            help="Run tests marked with @pytest.mark.hostile_ci_smoke against "
+            "backend/benchmarks/benchmark_hostile.py (requires Playwright and local socket binding).",
+        )
 
 
 def pytest_configure(config) -> None:
@@ -69,6 +78,13 @@ def pytest_configure(config) -> None:
     config.addinivalue_line(
         "markers",
         "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "hostile_ci_smoke: tests that exercise the live FastAPI benchmark_hostile.py "
+        "endpoints (/infinite, /lazy) alongside the JS-resident lazy fixture for "
+        "end-to-end hostile-path coverage on CI. Skipped by default "
+        "(use --run-hostile-ci-smoke to opt in).",
     )
     config.addinivalue_line(
         "markers",
@@ -122,6 +138,15 @@ def pytest_collection_modifyitems(config, items) -> None:
             item.add_marker(skip_golden)
         if "browser" in item.keywords and not config.getoption("--run-browser", default=False):
             item.add_marker(skip_browser)
+        if "hostile_ci_smoke" in item.keywords and not config.getoption(
+            "--run-hostile-ci-smoke",
+            default=False,
+        ):
+            item.add_marker(
+                pytest.mark.skip(
+                    reason="need --run-hostile-ci-smoke to run (benchmark_hostile.py FastAPI server + Playwright reader)",
+                ),
+            )
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:

@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-16 19:35:38 UTC
+**Generated:** 2026-06-17 00:10:44 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -103,11 +103,13 @@ For the diff between stable and experimental, see
 | GET | `/api/operator/predictions/{domain}` |
 | GET | `/api/system/acquisition/telemetry` |
 | GET | `/api/system/agency` |
+| GET | `/api/system/audit-log` |
 | GET | `/api/system/crystalline` |
 | GET | `/api/system/diagnostics/export` |
 | GET | `/api/system/domain-policy` |
 | GET | `/api/system/export/knowledge` |
 | GET | `/api/system/history/topology` |
+| GET | `/api/system/manifest` |
 | GET | `/api/system/observability` |
 | GET | `/api/system/rate-limit-stats` |
 | GET | `/api/system/replay/chain` |
@@ -167,6 +169,8 @@ For the diff between stable and experimental, see
 | GET | `/api/scheduled/{job_id}/changes` |
 | GET | `/api/workflows` |
 | GET | `/api/workflows/{workflow_id}` |
+| GET | `/api/workflows/{workflow_id}/runs` |
+| GET | `/api/workflows/{workflow_id}/runs/{run_id}` |
 | PATCH | `/api/workflows/{workflow_id}` |
 | POST | `/api/auth-profiles` |
 | POST | `/api/auth-profiles/{profile_id}/complete-login` |
@@ -189,4 +193,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 129
+**Total routes:** 133

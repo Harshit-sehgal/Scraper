@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 """Pydantic models for the scraper API.
 
@@ -385,9 +385,15 @@ class WorkflowPaginationConfig(BaseModel):
     """Pagination configuration for a workflow."""
 
     enabled: bool = Field(False, description="Whether pagination is enabled")
-    strategy: str = Field(
+    strategy: Literal[
         "next_button",
-        description="Pagination strategy: next_button, page_number, url_pattern, infinite_scroll",
+        "page_number",
+        "url_pattern",
+        "infinite_scroll",
+        "load_more",
+    ] = Field(
+        "next_button",
+        description="Pagination strategy: next_button, page_number, url_pattern, infinite_scroll, load_more",
     )
     max_pages: int = Field(10, ge=1, le=100, description="Maximum pages to follow")
     stop_condition: str = Field("none", description="Stop condition: none, no_more_records, duplicate_threshold, custom")

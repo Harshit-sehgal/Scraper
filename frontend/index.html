@@ -16,6 +16,7 @@
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div id="aup-banner" class="aup-banner" role="status" aria-live="polite" style="display: none"></div>
     <div id="app">
       <!-- ─── Top Bar ─── -->
       <header class="topbar">
@@ -90,6 +91,50 @@
               aria-selected="false"
             >
               Auth Profiles 🔑
+            </button>
+            <button
+              type="button"
+              class="tab workflows-tab"
+              data-action="switch-view"
+              data-view="workflows"
+              id="tab-workflows"
+              role="tab"
+              aria-selected="false"
+            >
+              Workflows
+            </button>
+            <button
+              type="button"
+              class="tab billing-tab"
+              data-action="switch-view"
+              data-view="billing"
+              id="tab-billing"
+              role="tab"
+              aria-selected="false"
+            >
+              Billing
+            </button>
+            <button
+              type="button"
+              class="tab audit-tab"
+              data-action="switch-view"
+              data-view="audit"
+              id="tab-audit"
+              role="tab"
+              aria-selected="false"
+            >
+              Audit
+            </button>
+            <button
+              type="button"
+              class="tab retention-tab"
+              data-action="switch-view"
+              data-view="retention"
+              id="tab-retention"
+              role="tab"
+              aria-selected="false"
+            >
+              Retention
             </button>
           </nav>
         </div>
@@ -1202,6 +1247,225 @@
                 Create an auth profile to store a browser session for authenticated scraping.
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Workflows + Run History ─── -->
+      <section class="view" id="view-workflows">
+        <div class="container">
+          <div class="page-head">
+            <div>
+              <h1>Workflows</h1>
+              <p class="subtle">Saved replay workflows and their execution history</p>
+            </div>
+            <div class="page-head-actions">
+              <button type="button" class="btn ghost small" data-action="refresh-workflows" id="btn-refresh-workflows">
+                Refresh
+              </button>
+              <button
+                type="button"
+                class="btn primary"
+                data-action="switch-view"
+                data-view="new"
+                id="btn-workflows-create-new"
+              >
+                New Job
+              </button>
+            </div>
+          </div>
+
+          <div class="workflows-layout">
+            <div class="workflows-list-pane">
+              <div class="kpi-row" id="workflows-kpi-row">
+                <div class="kpi">
+                  <span class="kpi-val" id="workflows-kpi-total">0</span><span class="kpi-label">Workflows</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="workflows-kpi-runs">0</span><span class="kpi-label">Total Runs</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="workflows-kpi-ok">0</span><span class="kpi-label">Succeeded</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="workflows-kpi-fail">0</span><span class="kpi-label">Failed</span>
+                </div>
+              </div>
+              <div class="list" id="workflows-list">
+                <div class="empty-state-illustration" id="workflows-empty-state">
+                  <p>No workflows yet.</p>
+                  <p class="subtle">
+                    Workflows are saved replay sequences you can re-run against the same target site.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="workflows-detail-pane" id="workflows-detail-pane">
+              <div class="empty-state-illustration" id="workflows-detail-empty">
+                <p>Select a workflow to see its details and run history.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Billing ─── -->
+      <section class="view" id="view-billing">
+        <div class="container">
+          <div class="page-head">
+            <div>
+              <h1>Billing</h1>
+              <p class="subtle">Subscription, plan tier, and usage limits</p>
+            </div>
+            <div class="page-head-actions">
+              <button type="button" class="btn ghost small" data-action="refresh-billing" id="btn-refresh-billing">
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="kpi-row" id="billing-kpi-row">
+            <div class="kpi">
+              <span class="kpi-val" id="billing-kpi-tier">—</span>
+              <span class="kpi-label">Plan tier</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-val" id="billing-kpi-jobs">—</span>
+              <span class="kpi-label">Max jobs</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-val" id="billing-kpi-scrapes">—</span>
+              <span class="kpi-label">Max scrapes</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-val" id="billing-kpi-teammates">—</span>
+              <span class="kpi-label">Teammates</span>
+            </div>
+          </div>
+
+          <div class="billing-grid">
+            <div class="billing-card">
+              <h2>Current subscription</h2>
+              <div id="billing-subscription" class="billing-subscription">
+                <p class="subtle">Loading subscription…</p>
+              </div>
+            </div>
+
+            <div class="billing-card">
+              <h2>Plan features</h2>
+              <ul id="billing-features" class="billing-features">
+                <li class="subtle">Loading…</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="billing-card billing-payment-method">
+            <h2>Payment method</h2>
+            <p class="subtle">
+              Payment provider integration is not enabled in this build.
+              <a href="docs/SAAS_MODEL.md" target="_blank" rel="noopener noreferrer"> See SAAS_MODEL.md </a>
+              for the integration plan. Webhook endpoint
+              <code>POST /api/billing/webhook</code> is live and HMAC-verified for when a provider is wired.
+            </p>
+            <div class="billing-payment-actions">
+              <button
+                type="button"
+                class="btn primary"
+                data-action="upgrade-plan"
+                id="btn-upgrade-plan"
+                disabled
+                title="Payment provider integration pending — see docs/SAAS_MODEL.md"
+              >
+                Upgrade plan (coming soon)
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Audit ─── -->
+      <section class="view" id="view-audit">
+        <div class="container">
+          <div class="page-head">
+            <div>
+              <h1>Audit log</h1>
+              <p class="subtle">Authentication, authorization, and admin events</p>
+            </div>
+            <div class="page-head-actions">
+              <button type="button" class="btn ghost small" data-action="refresh-audit" id="btn-refresh-audit">
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="audit-toolbar">
+            <label class="audit-filter">
+              <span>Filter by category:</span>
+              <select id="audit-category-filter">
+                <option value="">All</option>
+                <option value="auth">Auth</option>
+                <option value="rbac">RBAC</option>
+                <option value="admin">Admin</option>
+                <option value="data_access">Data access</option>
+                <option value="job">Job</option>
+                <option value="system">System</option>
+              </select>
+            </label>
+            <label class="audit-filter">
+              <span>Limit:</span>
+              <select id="audit-limit-filter">
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="audit-list" class="audit-list">
+            <p class="subtle">Loading…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Retention ─── -->
+      <section class="view" id="view-retention">
+        <div class="container">
+          <div class="page-head">
+            <div>
+              <h1>Data retention</h1>
+              <p class="subtle">Lifecycle, purge, and per-user data deletion</p>
+            </div>
+            <div class="page-head-actions">
+              <button type="button" class="btn ghost small" data-action="refresh-retention" id="btn-refresh-retention">
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="retention-card">
+            <h2>Recycle bin</h2>
+            <p class="subtle">
+              Soft-deleted jobs land here. Items in the recycle bin are permanently purged after 30 days by the
+              background sweep.
+            </p>
+            <div id="retention-recycle-summary" class="retention-summary">
+              <p class="subtle">Loading…</p>
+            </div>
+            <div class="retention-actions">
+              <button type="button" class="btn primary" data-action="delete-my-data" id="btn-delete-my-data">
+                Delete all my data
+              </button>
+            </div>
+          </div>
+
+          <div class="retention-card">
+            <h2>Audit log retention</h2>
+            <p class="subtle">
+              Audit events are retained indefinitely while their file is on disk. The <code>logs/audit.log</code> file
+              is rotated by the application log handler.
+            </p>
           </div>
         </div>
       </section>

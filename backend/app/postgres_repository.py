@@ -8,6 +8,7 @@ connection pool, query execution helpers, and connectivity verification.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -184,11 +185,18 @@ def verify_postgres_connectivity() -> dict[str, Any]:
     Uses a standalone connection (not the shared pool) so the pool is
     never leaked on failure or left open if the caller falls back to SQLite.
 
+    The connect timeout is configurable via ``DATAFORGE_DB_CONNECT_TIMEOUT``
+    (default 10s) so the test suite can shorten it for fast-fail
+    negative tests that don't expect a real Postgres server.
+
     Returns a dict with 'ok': True / False and optional 'error' message.
     """
     try:
         dsn = get_database_url()
-        conn = psycopg2.connect(dsn, connect_timeout=10)
+        connect_timeout = int(
+            os.environ.get("DATAFORGE_DB_CONNECT_TIMEOUT", "10") or "10",
+        )
+        conn = psycopg2.connect(dsn, connect_timeout=connect_timeout)
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")

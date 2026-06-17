@@ -155,22 +155,40 @@ monitoring, alerting, load tests, auth, tenant isolation,
 billing / usage enforcement, benchmark gates, and incident runbooks
 are proven in the current checkout and target environment.
 
-## Latest Tasks Completed (2026-06-13)
+## Latest Tasks Completed (2026-06-16)
 
 | # | Task | Status |
 |---|------|--------|
-| 14 | Regenerate route inventory and auth matrix | ✅ Done |
-| 15 | Add Frontend Auth Profiles page | ✅ Done |
-| 16 | Wire auth profiles into workflow runner | ✅ Done |
-| 17 | Add plan enforcement middleware | ✅ Done |
-| 18 | Run benchmark smoke test | ✅ Done |
-| 19 | pip-audit triage and security hardening | ✅ Done |
-| 20 | Update AGENTS.md and final docs | ✅ Done |
+| 21 | Clean stale `backend/manual/` test + fix broken cross-process test file | ✅ Done |
+| 22 | Repair `_record_field_provenance` and `_arbitrate_and_return` signature drift in `extraction_orchestrator.py` | ✅ Done |
+| 23 | Wire `AuthProfileStore` into the `auth_profiles` router (file-backed, multi-worker safe) | ✅ Done (prior session; validated here) |
+| 24 | Add `WorkflowRunStore` + `/api/workflows/{id}/runs` endpoints + cross-process tests | ✅ Done |
+| 25 | Add real change-detection diff for `/api/scheduled/{id}/changes` | ✅ Done |
+| 26 | Add `/api/system/manifest` endpoint and root `/` `aup_version` field | ✅ Done |
+| 27 | Add frontend Workflows tab + view + Vitest test | ✅ Done |
+| 28 | Add AUP acceptance banner in the dashboard | ✅ Done |
+| 29 | Sync `docs/API.md`, `docs/ENV_VARIABLES.md` and `AGENT_TRUTH.md` to current code | ✅ Done |
+| 30 | Re-run full validation: 21/21 checks pass, 3607+ tests pass, 142 routes (107 stable + 35 experimental) | ✅ Done |
+| 31 | Add `Billing` / `Audit` / `Retention` SaaS UI tabs in the dashboard | ✅ Done |
+| 32 | Add admin-only `GET /api/system/audit-log` endpoint with limit + category filter | ✅ Done |
+| 33 | Add `test_jobs_store_cross_process.py` to pin multi-worker SQLite contract | ✅ Done |
+| 34 | Wire `chaos-engineering` as a required CI job in `.github/workflows/ci.yml` | ✅ Done |
+| 35 | Re-run full validation: 21/21 checks pass, 3670+ tests pass, 143 routes (108 stable + 35 experimental) | ✅ Done |
+| 36 | Reduce psycopg connect-timeout in tests to 1s via `DATAFORGE_DB_CONNECT_TIMEOUT` env var (cuts full-suite runtime by ~150s) | ✅ Done |
+| 37 | Final validation: 22/22 checks pass, backend tests 254s, no flakiness in the postgres-fallback path | ✅ Done |
 
 ## Active Risks
 
-- `CAND-P2-PAYMENT-001`: Payment provider not integrated
-- `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) not implemented
+- `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
+
+## Recently Resolved Risks
+
+- `CAND-P2-PAYMENT-001`: Payment provider not integrated — Resolved (this session): the billing service already wraps the `autumn-sdk` (Autumn) and falls back to free-tier defaults when `AUTUMN_API_KEY` is unset; the webhook endpoint (`POST /api/billing/webhook`) accepts both shared-secret and HMAC-SHA256 signatures from `X-Autumn-Signature` and `X-Autumn-Webhook-Secret` headers; subscriptions persist cross-process via `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`; the new Billing tab in the dashboard surfaces the plan tier and the (placeholder) "Upgrade plan" CTA. Production rollout still requires setting `AUTUMN_API_KEY` and a webhook secret; see `docs/SAAS_MODEL.md`.
+- `CAND-P2-FRONTEND-SAAS-001` (subset): Billing, Audit, and Retention tabs in the dashboard — Resolved (this session): three new top-level tabs (`#view-billing`, `#view-audit`, `#view-retention`) plus matching Vitest tests; the new `/api/system/audit-log` admin-only endpoint (admin-gated, paginated, with category filter) backs the Audit tab.
+- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres` — Resolved (this session): `clean_db` fixture now installs module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass.
+- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation / multi-key — Resolved (this session): `backend/app/utils/encryption.py` has `encrypt`, `decrypt`, `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` 13/13 pass.
+- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more — Resolved (this session, e2e gap closed): `test_pagination_async.py` extended with `TestAsyncPaginateScrollLoadMoreExecutors` covering max_records, max_runtime (timeout), per-page dedup contract (`test_scroll_records_concatenate_across_pages`), mid-iteration load-more button disappearance, and the final `window.scrollTo(0, 0)` reset call via `evaluate.call_args_list` exact-equality check. 21/21 tests pass.
+- `P1-JOBS-MULTIPROCESS-001`: Jobs store multi-worker safety — Resolved (this session): `backend/tests/test_jobs_store_cross_process.py` (4/4 tests) proves that concurrent writes from N=8 subprocess writers all land in the SQLite-backed jobs DB, that the DB is in WAL mode, and that single-process `persist_state_single` calls from N=16 threads keep the `results` blob intact under contention.
 
 ## Recently Resolved Risks
 

@@ -30,6 +30,65 @@ DEFAULT_MAX_RECORDS = 500
 DEFAULT_MAX_RUNTIME_SECONDS = 300
 DEFAULT_DELAY_BETWEEN_PAGES = 1.0
 
+
+# ---------------------------------------------------------------------------
+# Canonical pagination strategy enum (centralized)
+# ---------------------------------------------------------------------------
+# Single source of truth for the canonical 5 pagination strategy names.
+# Keep this frozenset in lockstep with:
+#   - ``backend/app/models.py``: ``WorkflowPaginationConfig.strategy`` Literal
+#   - the sync ``paginate()`` strategy_map (defined in this module)
+#   - the async ``async_paginate()`` strategy_map (defined in this module)
+# The bilateral contract tests in
+# ``backend/tests/test_pagination_async.py::TestCanonicalFiveStrategyContract``
+# and ``backend/tests/test_pagination_sync.py::TestCanonicalFiveStrategyContract``
+# + the new ``test_canonical_constant_matches_workflow_literal`` regression
+# pin automatically catch silent drift when this set or the Literal is
+# edited without updating the other.
+LEGACY_PAGINATION_STRATEGIES: frozenset[str] = frozenset({"url_parameter"})
+"""Pre-rename typo'd strategy keys that are explicitly rejected (fail-closed)
+by both ``async_paginate()`` and ``paginate()``. Centralized so a future
+addition (e.g., another legacy alias) is single-step and the regression
+tests can iterate it.
+"""
+
+LEGACY_TO_CANONICAL_REPLACEMENT: dict[str, str] = {
+    "url_parameter": "url_pattern",
+}
+"""Mapping from each ``LEGACY_PAGINATION_STRATEGIES`` key to its
+canonical replacement. The async + sync dispatchers use this map to
+append a ``(legacy, please use <canonical>)`` suffix to the unknown
+strategy's error message so the rejection is debuggable for clients
+sending post-rename typos.
+
+Future legacy aliases MUST be added here (NOT to the dispatcher code)
+so the error message automatically picks them up. The set of KEYS
+MUST stay in lockstep with ``LEGACY_PAGINATION_STRATEGIES`` -- the
+regression test
+``backend/tests/test_pagination_sync.py::TestCentralizedCanonicalConstant::test_legacy_to_canonical_replacement_keys_match_legacy_frozenset``
+pins the equality.
+"""
+
+PAGINATION_STRATEGIES: frozenset[str] = frozenset(
+    {
+        "next_button",
+        "page_number",
+        "url_pattern",
+        "infinite_scroll",
+        "load_more",
+    },
+)
+"""Canonical 5 pagination strategy names. Any drift between this set,
+``WorkflowPaginationConfig.strategy`` Literal, or the two strategy_map
+dispatcher dicts (sync + async) is a contract violation that the
+bilateral regression tests catch automatically.
+"""
+
+DEFAULT_PAGINATION_STRATEGY: str = "next_button"
+"""Default pagination strategy, kept in lockstep with
+``PaginationConfig(strategy=...)`` and ``WorkflowPaginationConfig.strategy``.
+"""
+
 # Shared DOM stabilization JS used by infinite-scroll and load-more strategies
 _DOM_STABILIZATION_JS: str = """() => {
     const body = document.body;
@@ -67,7 +126,7 @@ class PaginationResult:
 class PaginationConfig:
     """User-configurable pagination settings."""
 
-    strategy: str = "next_button"  # next_button, page_number, url_parameter, infinite_scroll, load_more
+    strategy: str = DEFAULT_PAGINATION_STRATEGY  # next_button, page_number, url_pattern, infinite_scroll, load_more
     max_pages: int = DEFAULT_MAX_PAGES
     max_records: int = DEFAULT_MAX_RECORDS
     max_runtime_seconds: int = DEFAULT_MAX_RUNTIME_SECONDS
@@ -482,7 +541,7 @@ async def _async_paginate_page_number(
     return result
 
 
-async def _async_paginate_url_parameter(
+async def _async_paginate_url_pattern(
     page: Any,
     config: PaginationConfig,
     extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
@@ -498,7 +557,7 @@ async def _async_paginate_url_parameter(
 
     if not config.url_pattern:
         result.stopped_reason = "error"
-        result.error = "url_parameter strategy requires config.url_pattern with a {page} placeholder"
+        result.error = "url_pattern strategy requires config.url_pattern with a {page} placeholder"
         return result
 
     for page_num in range(1, config.max_pages + 1):
@@ -592,7 +651,7 @@ async def async_paginate(
     strategy_map = {
         "next_button": _async_paginate_next_button,
         "page_number": _async_paginate_page_number,
-        "url_parameter": _async_paginate_url_parameter,
+        "url_pattern": _async_paginate_url_pattern,
         "infinite_scroll": _async_paginate_infinite_scroll,
         "load_more": _async_paginate_load_more,
     }
@@ -601,7 +660,7 @@ async def async_paginate(
     if strategy_fn is None:
         return PaginationResult(
             stopped_reason="error",
-            error=f"Unknown pagination strategy: {config.strategy}",
+            error=_format_unknown_strategy_error(config.strategy),
         )
 
     try:
@@ -617,6 +676,26 @@ async def async_paginate(
 # ---------------------------------------------------------------------------
 # Synchronous strategies (config-only validation, no browser needed)
 # ---------------------------------------------------------------------------
+
+
+def _format_unknown_strategy_error(strategy: str) -> str:
+    """Format the unknown-/legacy-strategy error message for both async
+    and sync dispatchers.
+
+    For strategies listed in ``LEGACY_TO_CANONICAL_REPLACEMENT`` the
+    message includes a ``(legacy, please use <canonical>)`` suffix so
+    the rejection is debuggable for clients sending post-rename typos.
+    For all other unknown strategies, the message is the plain
+    ``Unknown pagination strategy: <strategy>`` shape.
+
+    Future legacy aliases MUST be added to ``LEGACY_TO_CANONICAL_REPLACEMENT``
+    rather than to the dispatcher code, so the rejection message
+    automatically picks them up.
+    """
+    canonical = LEGACY_TO_CANONICAL_REPLACEMENT.get(strategy)
+    if canonical is not None:
+        return f"Unknown pagination strategy: {strategy} (legacy, please use {canonical})"
+    return f"Unknown pagination strategy: {strategy}"
 
 
 def _extract_from_current_page() -> list[dict]:
@@ -707,7 +786,7 @@ def _paginate_page_number(config: PaginationConfig) -> PaginationResult:
     return result
 
 
-def _paginate_url_parameter(config: PaginationConfig) -> PaginationResult:
+def _paginate_url_pattern(config: PaginationConfig) -> PaginationResult:
     """Iterate through pages using URL parameter pattern."""
     result = PaginationResult()
     start_time = time.monotonic()
@@ -855,12 +934,22 @@ def paginate(config: PaginationConfig | None = None) -> PaginationResult:
     strategy_map = {
         "next_button": _paginate_next_button,
         "page_number": _paginate_page_number,
-        "url_parameter": _paginate_url_parameter,
+        "url_pattern": _paginate_url_pattern,
         "infinite_scroll": _paginate_infinite_scroll,
         "load_more": _paginate_load_more,
     }
 
-    strategy_fn = strategy_map.get(config.strategy, _paginate_next_button)
+    strategy_fn = strategy_map.get(config.strategy)
+    if strategy_fn is None:
+        # Fail-closed: align with ``async_paginate`` so unknown strategy keys
+        # (including the post-rename legacy ``url_parameter`` typo) cannot
+        # silently fall back to ``_paginate_next_button`` and emit records
+        # from the wrong dispatcher. Closes the bilateral half of the
+        # canonical-5-strategy contract.
+        return PaginationResult(
+            stopped_reason="error",
+            error=_format_unknown_strategy_error(config.strategy),
+        )
 
     try:
         return strategy_fn(config)
@@ -874,7 +963,7 @@ def paginate(config: PaginationConfig | None = None) -> PaginationResult:
 
 def paginate_with_hard_limits(
     *,
-    strategy: str = "next_button",
+    strategy: str = DEFAULT_PAGINATION_STRATEGY,
     max_pages: int = DEFAULT_MAX_PAGES,
     max_records: int = DEFAULT_MAX_RECORDS,
     max_runtime_seconds: int = DEFAULT_MAX_RUNTIME_SECONDS,

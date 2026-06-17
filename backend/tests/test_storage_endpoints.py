@@ -314,3 +314,70 @@ class TestReadyWithMockedPostgres:
         assert data["backend"] == "postgres"
         assert data["ok"] is False
         assert "error" in data
+
+
+class TestSystemManifest:
+    def test_manifest_returns_version_and_aup(self, client) -> None:
+        """The manifest endpoint should expose the project version and AUP version."""
+        response = client.get("/api/system/manifest")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["project"] == "DataForge Scraper"
+        assert "version" in body and body["version"] != "unknown"
+        assert body["aup_version"]  # non-empty
+        assert "storage_backend" in body
+        assert "encryption_key_version" in body
+
+
+class TestSystemAuditLog:
+    def test_audit_log_requires_admin(self, client, monkeypatch) -> None:
+        """Non-admin callers should not see the audit log."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "user-key", raising=False)
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-key", raising=False)
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key", raising=False)
+        # Operator is not enough.
+        response = client.get(
+            "/api/system/audit-log",
+            headers={"X-API-Key": "operator-key"},
+        )
+        assert response.status_code == 403
+
+    def test_audit_log_admin_returns_empty_or_recent(self, client, monkeypatch) -> None:
+        """Admin gets a JSON envelope (may be empty in test env)."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "user-key", raising=False)
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-key", raising=False)
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key", raising=False)
+        response = client.get(
+            "/api/system/audit-log",
+            headers={"X-API-Key": "admin-key"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert "items" in body
+        assert "limit" in body
+        assert "total" in body
+        assert isinstance(body["items"], list)
+
+    def test_audit_log_limit_is_capped(self, client, monkeypatch) -> None:
+        """Limit must be between 1 and 1000."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "user-key", raising=False)
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-key", raising=False)
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key", raising=False)
+        # 0 is rejected.
+        response = client.get(
+            "/api/system/audit-log?limit=0",
+            headers={"X-API-Key": "admin-key"},
+        )
+        assert response.status_code == 422
+        # 5000 is rejected.
+        response = client.get(
+            "/api/system/audit-log?limit=5000",
+            headers={"X-API-Key": "admin-key"},
+        )
+        assert response.status_code == 422

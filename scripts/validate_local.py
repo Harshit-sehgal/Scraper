@@ -35,7 +35,6 @@ SECRET_PATTERNS = [
 SAFE_ENV_DEFAULTS = {
     "DATAFORGE_DOTENV_PATH": "/dev/null",
     "DATAFORGE_ENV": "test",
-    "DATAFORGE_STORAGE_BACKEND": "sqlite",
     "DATAFORGE_API_KEY": "user-key",
     "DATAFORGE_OPERATOR_API_KEY": "operator-key",
     "DATAFORGE_ADMIN_API_KEY": "admin-key",
@@ -80,6 +79,11 @@ def command_text(command: list[str]) -> str:
 def safe_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy()
     env.update(SAFE_ENV_DEFAULTS)
+    # Storage backend is intentionally NOT in ``SAFE_ENV_DEFAULTS``: honour the
+    # caller / shell environment (e.g. ``DATAFORGE_STORAGE_BACKEND=postgres``
+    # for proof-of-parity runs against a real DB) and only fall back to the
+    # SQL default if it is unset.
+    env.setdefault("DATAFORGE_STORAGE_BACKEND", "sqlite")
     if overrides:
         env.update(overrides)
     return env

@@ -323,7 +323,7 @@ class TransactionalPriorityQueue:
 
 
 # Global singleton
-_queue: TransactionalPriorityQueue | None = None
+_queue: Any = None
 _queue_lock = threading.Lock()
 
 
