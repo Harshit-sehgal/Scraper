@@ -285,6 +285,15 @@ jobs:
       - name: Docs Lint
         run: python scripts/docs_lint.py --include-experimental
 
+      - name: OpenAPI Spec Generation (contract artifact)
+        # The artifact is used by SDK generation and the
+        # test_openapi_spec_contract test (which is in the full
+        # backend pytest run). Generating it here makes the latest
+        # spec available as a workflow artifact.
+        run: |
+          python scripts/generate_openapi.py
+          python scripts/generate_openapi.py --experimental --output artifacts/audit
+
       - name: Generate Route Inventory Artifact
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \

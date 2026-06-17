@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -166,7 +168,62 @@ def render_markdown(files: list[FileMetric], symbols: list[SymbolMetric]) -> str
     return "\n".join(lines)
 
 
+def _check_thresholds(payload: dict[str, int]) -> list[str]:
+    """Return a list of human-readable threshold violations.
+
+    The thresholds are intentionally generous: this is a regression
+    gate, not a hard style rule. We flag when the top-10 largest
+    Python function or class exceeds a soft cap, or when the
+    largest source file grows past a budget. Tune via env vars
+    so the CI gate can be calibrated without editing the script.
+
+    We deliberately skip:
+    * ``app/research/`` — research shell modules are by design larger
+      than product code; they are guarded by the
+      ``DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES`` flag.
+    * ``app/routers/*.py`` — FastAPI router registration functions
+      are long if/elif chains by design; splitting them hurts more
+      than it helps.
+    * ``fixtures/`` and ``vendor/`` paths.
+    * generated ``frontend/dist/`` artifacts.
+    """
+    max_function_loc = int(os.environ.get("COMPLEXITY_MAX_FUNCTION_LOC", "600"))
+    max_class_loc = int(os.environ.get("COMPLEXITY_MAX_CLASS_LOC", "1200"))
+    max_file_loc = int(os.environ.get("COMPLEXITY_MAX_FILE_LOC", "10000"))
+
+    violations: list[str] = []
+    for sym in payload["largest_symbols"]:
+        path = sym["path"]
+        if "/research/" in path or "/routers/" in path or "/fixtures/" in path:
+            continue
+        if sym["kind"] == "class" and sym["loc"] > max_class_loc:
+            violations.append(
+                f"class `{sym['name']}` in {path}:{sym['lineno']} is {sym['loc']} LOC (> {max_class_loc})",
+            )
+        elif sym["kind"] == "function" and sym["loc"] > max_function_loc:
+            violations.append(
+                f"function `{sym['name']}` in {path}:{sym['lineno']} is {sym['loc']} LOC (> {max_function_loc})",
+            )
+    for f in payload["largest_files"]:
+        path = f["path"]
+        if "/fixtures/" in path or "/vendor/" in path or "/dist/" in path:
+            continue
+        if f["loc"] > max_file_loc:
+            violations.append(
+                f"file `{path}` is {f['loc']} LOC (> {max_file_loc})",
+            )
+    return violations
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail with non-zero exit code if any symbol/file exceeds the configured complexity threshold.",
+    )
+    args = parser.parse_args()
+
     paths = iter_source_files()
     files = [
         FileMetric(path=path.relative_to(REPO).as_posix(), loc=count_loc(path), classification=classify(path)) for path in paths
@@ -187,6 +244,15 @@ def main() -> int:
     print(f"wrote {MD_OUT.relative_to(REPO)}")
     print(f"wrote {JSON_OUT.relative_to(REPO)}")
     print(f"files={len(files)} symbols={len(symbols)}")
+
+    if args.check:
+        violations = _check_thresholds(payload)
+        if violations:
+            print("\n[FAIL] Complexity threshold violations:")
+            for v in violations:
+                print(f"  - {v}")
+            return 1
+        print("\n[OK] No complexity threshold violations.")
     return 0
 
 

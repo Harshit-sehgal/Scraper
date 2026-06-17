@@ -2979,6 +2979,223 @@ kbd {
   margin-top: 0.6rem;
 }
 
+/* ─── Topbar health pill ─── */
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--line);
+  background: var(--bg-muted);
+  color: var(--ink-soft);
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    border-color 200ms ease;
+}
+
+.health-pill::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.health-pill[data-state="healthy"] {
+  background: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.health-pill[data-state="degraded"] {
+  background: var(--warning-soft);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.health-pill[data-state="down"] {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ─── System Info Panel (Dashboard) ─── */
+.sysinfo-card {
+  margin-bottom: 1rem;
+}
+
+.sysinfo-error {
+  display: none;
+  padding: 0.4rem 0.6rem;
+  margin: 0.4rem 0;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.sysinfo-details {
+  margin-top: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.sysinfo-details summary {
+  cursor: pointer;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  user-select: none;
+}
+
+.sysinfo-details summary:hover {
+  color: var(--ink-strong);
+}
+
+.sysinfo-details[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.sysinfo-details .kpi-row {
+  padding: 0.5rem 0.7rem;
+  margin: 0;
+}
+
+.sysinfo-workers {
+  padding: 0 0.7rem 0.5rem 0.7rem;
+  overflow-x: auto;
+}
+
+.sysinfo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.sysinfo-table th,
+.sysinfo-table td {
+  padding: 0.3rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.sysinfo-table th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+
+/* ─── Recent Activity (Dashboard) ─── */
+.recent-activity-card {
+  margin-bottom: 1rem;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
+.activity-item:last-child {
+  border-bottom: 0;
+}
+
+.activity-time {
+  color: var(--ink-faint);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.activity-cat {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--bg-muted);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.activity-cat-auth {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.activity-cat-rbac {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.activity-cat-admin {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.activity-cat-data_access {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.activity-cat-job {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.activity-cat-system {
+  background: var(--bg-muted);
+  color: var(--ink-soft);
+}
+
+.activity-action {
+  flex: 1;
+  color: var(--ink-strong);
+  min-width: 12rem;
+}
+
+.activity-outcome {
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.activity-outcome-success {
+  color: var(--success);
+}
+.activity-outcome-failure,
+.activity-outcome-denied {
+  color: var(--danger);
+}
+.activity-outcome-warning {
+  color: var(--warning);
+}
+.activity-outcome-error {
+  color: var(--danger);
+}
+
 /* ─── Dashboard Loading ─── */
 .dash-loading {
   padding: 1.5rem;

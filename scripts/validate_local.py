@@ -278,6 +278,12 @@ def backend_quick_checks(py: str) -> list[Check]:
             ],
             180,
         ),
+        Check(
+            "openapi_spec",
+            [py, "scripts/generate_openapi.py", "--no-docs-copy"],
+            120,
+            note="Generates artifacts/audit/openapi.json from the live FastAPI app.",
+        ),
     ]
 
 
