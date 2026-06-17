@@ -30,7 +30,6 @@ class MotifState:
         self._motif_counts: Counter = Counter()
         self._motif_timestamps: dict[tuple[str, ...], int] = {}
         self._motif_stability: dict[tuple[str, ...], float] = {}
-        self._staging: Any = None
 
     @property
     def _staging(self) -> dict | None:

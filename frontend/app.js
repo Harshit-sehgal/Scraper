@@ -125,6 +125,9 @@ function onDocumentClick(e) {
     case "refresh-dashboard":
       refreshDashboard();
       break;
+    case "refresh-auth-profiles":
+      import("./js/auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
+      break;
     case "switch-operator-mode":
       if (mode) switchOperatorMode(mode);
       break;

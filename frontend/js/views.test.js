@@ -102,6 +102,42 @@ describe("switchView()", () => {
     switchView("recycle");
     expect(currentView).toBe("recycle");
   });
+
+  it("highlights the workflows tab when switching to workflows", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-workflows"></section>
+      <div id="tab-workflows" class="tab">Workflows</div>
+    `;
+    switchView("workflows");
+    expect(document.getElementById("tab-workflows").classList.contains("active")).toBe(true);
+  });
+
+  it("highlights the billing tab when switching to billing", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-billing"></section>
+      <div id="tab-billing" class="tab">Billing</div>
+    `;
+    switchView("billing");
+    expect(document.getElementById("tab-billing").classList.contains("active")).toBe(true);
+  });
+
+  it("highlights the audit tab when switching to audit", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-audit"></section>
+      <div id="tab-audit" class="tab">Audit</div>
+    `;
+    switchView("audit");
+    expect(document.getElementById("tab-audit").classList.contains("active")).toBe(true);
+  });
+
+  it("highlights the retention tab when switching to retention", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-retention"></section>
+      <div id="tab-retention" class="tab">Retention</div>
+    `;
+    switchView("retention");
+    expect(document.getElementById("tab-retention").classList.contains("active")).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -167,6 +203,33 @@ describe("onGlobalKeydown()", () => {
     onGlobalKeydown(e);
     expect(e.preventDefault).toHaveBeenCalled();
     expect(document.getElementById("view-dashboard").classList.contains("active")).toBe(true);
+  });
+
+  it('key "8" switches to billing view', () => {
+    document.body.innerHTML += '<section class="view" id="view-billing"></section>';
+    const e = new KeyboardEvent("keydown", { key: "8" });
+    e.preventDefault = vi.fn();
+    onGlobalKeydown(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+    expect(document.getElementById("view-billing").classList.contains("active")).toBe(true);
+  });
+
+  it('key "9" switches to audit view', () => {
+    document.body.innerHTML += '<section class="view" id="view-audit"></section>';
+    const e = new KeyboardEvent("keydown", { key: "9" });
+    e.preventDefault = vi.fn();
+    onGlobalKeydown(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+    expect(document.getElementById("view-audit").classList.contains("active")).toBe(true);
+  });
+
+  it('key "0" switches to retention view', () => {
+    document.body.innerHTML += '<section class="view" id="view-retention"></section>';
+    const e = new KeyboardEvent("keydown", { key: "0" });
+    e.preventDefault = vi.fn();
+    onGlobalKeydown(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+    expect(document.getElementById("view-retention").classList.contains("active")).toBe(true);
   });
 
   it('key "n" switches to new view', () => {

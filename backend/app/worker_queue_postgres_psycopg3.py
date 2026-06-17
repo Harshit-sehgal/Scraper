@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings as _settings
 from app.postgres_repository_base import get_database_url
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Connection pool (thread-safe, synchronous, psycopg 3)
 # ───────────────────────────────────────────────────────────────────────
 
-_pool = None
+_pool: Any = None
 _pool_lock = threading.Lock()
 
 
