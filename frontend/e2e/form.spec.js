@@ -205,11 +205,11 @@ test.describe("New job form interaction", () => {
     await page.locator("#inp-name").fill("Persistent Test");
 
     // Switch to jobs tab
-    await page.locator("#tab-jobs").click();
+    await page.locator("#nav-jobs").click();
     await expect(page.locator("#view-jobs")).toBeVisible();
 
     // Switch back to new job
-    await page.locator("#tab-new").click();
+    await page.locator("#nav-new").click();
     await expect(page.locator("#view-new")).toBeVisible();
   });
 });

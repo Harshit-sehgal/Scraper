@@ -34,11 +34,11 @@ function setupDOM() {
     <div id="view-recycle" class="view">Recycle Bin</div>
     <div id="view-cognition" class="view">Cognition</div>
     <div id="view-dashboard" class="view">Dashboard</div>
-    <div id="tab-jobs" class="tab">Jobs</div>
-    <div id="tab-new" class="tab">New</div>
-    <div id="tab-recycle" class="tab">Recycle</div>
-    <div id="tab-cognition" class="tab">Cognition</div>
-    <div id="tab-dashboard" class="tab">Dashboard</div>
+    <div id="nav-jobs" class="nav-item">Jobs</div>
+    <div id="nav-new" class="nav-item">New</div>
+    <div id="nav-recycle" class="nav-item">Recycle</div>
+    <div id="nav-cognition" class="nav-item">Cognition</div>
+    <div id="nav-dashboard" class="nav-item">Dashboard</div>
     <div id="mode-toggle">
       <span class="toggle" data-mode="manual">Manual</span>
       <span class="toggle" data-mode="auto">Auto</span>
@@ -85,8 +85,8 @@ describe("switchView()", () => {
     switchView("new");
     expect(document.getElementById("view-new").classList.contains("active")).toBe(true);
     expect(document.getElementById("view-jobs").classList.contains("active")).toBe(false);
-    expect(document.getElementById("tab-new").classList.contains("active")).toBe(true);
-    expect(document.getElementById("tab-jobs").classList.contains("active")).toBe(false);
+    expect(document.getElementById("nav-new").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-jobs").classList.contains("active")).toBe(false);
   });
 
   it("deactivates all views and tabs before activating the target", () => {
@@ -94,8 +94,8 @@ describe("switchView()", () => {
     switchView("dashboard");
     expect(document.getElementById("view-dashboard").classList.contains("active")).toBe(true);
     expect(document.getElementById("view-jobs").classList.contains("active")).toBe(false);
-    expect(document.getElementById("tab-dashboard").classList.contains("active")).toBe(true);
-    expect(document.getElementById("tab-jobs").classList.contains("active")).toBe(false);
+    expect(document.getElementById("nav-dashboard").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-jobs").classList.contains("active")).toBe(false);
   });
 
   it("updates currentView state", () => {
@@ -106,37 +106,37 @@ describe("switchView()", () => {
   it("highlights the workflows tab when switching to workflows", () => {
     document.body.innerHTML += `
       <section class="view" id="view-workflows"></section>
-      <div id="tab-workflows" class="tab">Workflows</div>
+      <div id="nav-workflows" class="nav-item">Workflows</div>
     `;
     switchView("workflows");
-    expect(document.getElementById("tab-workflows").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-workflows").classList.contains("active")).toBe(true);
   });
 
   it("highlights the billing tab when switching to billing", () => {
     document.body.innerHTML += `
       <section class="view" id="view-billing"></section>
-      <div id="tab-billing" class="tab">Billing</div>
+      <div id="nav-billing" class="nav-item">Billing</div>
     `;
     switchView("billing");
-    expect(document.getElementById("tab-billing").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-billing").classList.contains("active")).toBe(true);
   });
 
   it("highlights the audit tab when switching to audit", () => {
     document.body.innerHTML += `
       <section class="view" id="view-audit"></section>
-      <div id="tab-audit" class="tab">Audit</div>
+      <div id="nav-audit" class="nav-item">Audit</div>
     `;
     switchView("audit");
-    expect(document.getElementById("tab-audit").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-audit").classList.contains("active")).toBe(true);
   });
 
   it("highlights the retention tab when switching to retention", () => {
     document.body.innerHTML += `
       <section class="view" id="view-retention"></section>
-      <div id="tab-retention" class="tab">Retention</div>
+      <div id="nav-retention" class="nav-item">Retention</div>
     `;
     switchView("retention");
-    expect(document.getElementById("tab-retention").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-retention").classList.contains("active")).toBe(true);
   });
 });
 
