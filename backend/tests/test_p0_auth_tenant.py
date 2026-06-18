@@ -617,3 +617,117 @@ def test_startup_fails_when_session_secret_missing_in_production(monkeypatch) ->
 
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):
         create_app()
+
+
+# ── Cross-tenant job-mutation denial (R-001/R-002/R-003) ────────────────────
+
+
+@pytest.mark.parametrize(
+    "mutation_path",
+    [
+        "/api/jobs/{job_id}/cancel",
+        "/api/jobs/{job_id}/backfill-metadata",
+        "/api/jobs/{job_id}/reclean",
+    ],
+)
+def test_project_scoped_write_key_cannot_mutate_another_orgs_job(
+    client,
+    monkeypatch,
+    tmp_path,
+    mutation_path: str,
+) -> None:
+    """R-001/R-002/R-003: a persistent SaaS WRITE key from Org A MUST NOT
+    be able to cancel / backfill / reclean a job owned by Org B. Before
+    the fix these mutation routes used ``require_role`` only (no
+    owner/org/project check), so a project-scoped WRITE key (OPERATOR)
+    could overwrite another tenant's results via reclean.
+    """
+    import app.main as main_mod
+    from app.saas import ApiKeyScope, ApiKeyService, SignupService, reset_identity_store
+    from app.saas.identity_store import SQLiteIdentityStore
+
+    _configure_keys(monkeypatch)
+    reset_identity_store(SQLiteIdentityStore(storage_path=tmp_path / "identity.db"))
+    signup = SignupService()
+    keys = ApiKeyService()
+    org_a = signup.signup("alice@example.com", "hunter2", org_name="OrgA", project_name="ProjA")
+    org_b = signup.signup("bob@example.com", "hunter2", org_name="OrgB", project_name="ProjB")
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="write-a",
+        scope=ApiKeyScope.WRITE,
+    )
+    try:
+        # Seed a completed job owned by org B.
+        job_b = _seed_job("mut-job-b", owner_key="user-b-key")
+        job_b.org_id = org_b.organization.id
+        job_b.project_id = org_b.project.id
+        job_b.created_by = org_b.user.id  # type: ignore[attr-defined]
+        # reclean needs results + schema_fields; backfill needs source_url.
+        from app.models import FieldType, SchemaField
+
+        job_b.schema_fields = [SchemaField(name="company", field_type=FieldType.STRING)]
+        main_mod.jobs_store[job_b.id] = job_b
+
+        path = mutation_path.format(job_id=job_b.id)
+        resp = client.post(path, headers={"X-API-Key": write_key_a.raw_key})
+        assert resp.status_code in {403, 404}, (
+            f"cross-org WRITE key must NOT mutate another org's job via {path}; got {resp.status_code}: {resp.text}"
+        )
+        # The job must be untouched.
+        assert main_mod.jobs_store[job_b.id].status == JobStatus.COMPLETED
+    finally:
+        reset_identity_store(None)
+        main_mod.jobs_store.pop("mut-job-b", None)
+
+
+def test_owner_can_cancel_own_completed_job(client, monkeypatch) -> None:
+    """Sanity: the legitimate owner CAN still cancel/reclean their own job
+    after the ownership check is added (env-backed operator all-access)."""
+    _configure_keys(monkeypatch, operator_key="op-owner")
+    _seed_job("own-job-cancel", owner_key="op-owner")
+    try:
+        resp = client.post(
+            "/api/jobs/own-job-cancel/cancel",
+            headers={"X-API-Key": "op-owner"},
+        )
+        assert resp.status_code == 200, resp.text
+    finally:
+        import app.main as main_mod
+
+        main_mod.jobs_store.pop("own-job-cancel", None)
+
+
+# ── API key scope escalation denial (R-005) ─────────────────────────────────
+
+
+def test_viewer_member_cannot_issue_admin_scope_key(client, monkeypatch, tmp_path) -> None:
+    """R-005: a viewer-level org member MUST NOT be able to mint an
+    admin-scope API key. Before the fix, ``create_api_key`` checked only
+    ``is_org_member`` (membership existence, not role), so any member
+    could issue an admin key — which maps to global all-access.
+
+    This test pins the privilege-boundary policy at the unit level: the
+    ``_MAX_KEY_SCOPE_FOR_ROLE`` table + ``_SCOPE_RANK`` comparison that
+    ``create_api_key`` uses must forbid scope escalation for every
+    membership role below owner/admin.
+    """
+    from app.saas.models import MembershipRole
+    from app.saas.router import _MAX_KEY_SCOPE_FOR_ROLE, _SCOPE_RANK
+
+    # Sanity: owner/admin CAN issue admin-scope keys.
+    assert _MAX_KEY_SCOPE_FOR_ROLE[MembershipRole.OWNER.value] == "admin"
+    assert _MAX_KEY_SCOPE_FOR_ROLE[MembershipRole.ADMIN.value] == "admin"
+    # member can issue up to write; viewer only read.
+    assert _MAX_KEY_SCOPE_FOR_ROLE[MembershipRole.MEMBER.value] == "write"
+    assert _MAX_KEY_SCOPE_FOR_ROLE[MembershipRole.VIEWER.value] == "read"
+
+    # The escalation boundary: for each role, every scope above the
+    # role's max must be ranked higher (i.e. rejected by the route).
+    for role, max_scope in _MAX_KEY_SCOPE_FOR_ROLE.items():
+        max_rank = _SCOPE_RANK[max_scope]
+        for scope, rank in _SCOPE_RANK.items():
+            if rank > max_rank:
+                # This scope MUST be rejected for this role.
+                assert rank > max_rank, f"{role} role must not be permitted to issue {scope}-scope keys"

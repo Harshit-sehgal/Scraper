@@ -293,6 +293,18 @@ async def create_workflow(
     authenticated context when available.
     """
     _role, user_id, org_id, project_id = auth
+    # URL-safety guard: validate start_url / original_url are public
+    # hosts before persisting. The draft routes already do this; create
+    # / update previously skipped it, allowing an operator to persist a
+    # workflow whose start_url points at an internal host. Once live
+    # Playwright replay lands, those persisted URLs would be fetched
+    # server-side with no guard.
+    for _url in (req.start_url, req.original_url):
+        if _url:
+            try:
+                validate_public_http_url(_url.strip())
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
     wf = Workflow(
         name=req.name.strip(),
         description=req.description.strip() if req.description else "",
@@ -371,6 +383,16 @@ async def update_workflow(
     """Update an existing workflow. Only provided fields are changed."""
     existing = _get_visible_workflow(workflow_id, auth)
     update_data = req.model_dump(exclude_unset=True)
+
+    # URL-safety guard (R-012): validate any new start_url / original_url
+    # before persisting, matching the create route and the draft routes.
+    for _url_field in ("start_url", "original_url"):
+        _new_url = update_data.get(_url_field)
+        if _new_url:
+            try:
+                validate_public_http_url(str(_new_url).strip())
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     for key, value in update_data.items():
         if value is not None:

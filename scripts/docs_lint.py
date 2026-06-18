@@ -30,6 +30,10 @@ MAIN_PY = REPO / "backend" / "app" / "main.py"
 # Track all /api route families that appear in docs/API.md as
 # route tables. Health/liveness endpoints and metrics are excluded
 # because they are documented narratively, not in tables.
+# D-009: previously omitted /api/workflows, /api/workflow-drafts,
+# /api/auth-profiles, /api/scheduled, /api/billing, /api/user —
+# exactly the families that saw the most recent churn — so docs drift
+# there was never gated.
 TRACKED_PREFIXES: tuple[str, ...] = (
     "/api/jobs",
     "/api/recycle_bin",
@@ -42,6 +46,12 @@ TRACKED_PREFIXES: tuple[str, ...] = (
     "/api/saas",
     "/api/session",
     "/api/exports",
+    "/api/workflows",
+    "/api/workflow-drafts",
+    "/api/auth-profiles",
+    "/api/scheduled",
+    "/api/billing",
+    "/api/user",
 )
 
 # Markdown pipe rows that look like:
@@ -77,9 +87,12 @@ def _live_routes(include_experimental: bool) -> set[tuple[str, str]]:
 
     code = (
         "import sys, json;"
-        "from app.main import app;"
+        "sys.path.insert(0, 'scripts');"
+        "from fastapi_route_iter import iter_app_routes;"
+        "from app.main import create_app;"
+        "app=create_app();"
         "out=set();"
-        "[out.add((m.upper(), r.path)) for r in app.routes "
+        "[out.add((m.upper(), r.path)) for r in iter_app_routes(app) "
         "if hasattr(r, 'methods') and r.path.startswith('/api/') "
         "for m in r.methods if m.upper() in {'GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'}];"
         "print(json.dumps(sorted(out)))"
@@ -130,8 +143,12 @@ def main() -> int:
         return 2
     live = _live_routes(include_experimental=args.include_experimental)
     if not live:
-        print("could not enumerate live routes (import failed); skipping", file=sys.stderr)
-        return 0
+        # D-003: previously this returned 0 (pass), which masked both a
+        # broken app import and any docs drift. A CI gate that turns
+        # green when it cannot run is worse than no gate. Fail non-zero
+        # so a broken import surfaces loudly.
+        print("could not enumerate live routes (app import failed); failing", file=sys.stderr)
+        return 2
     # Normalise paths by removing trailing slashes.
     norm_live = {(m, p.rstrip("/") or "/") for m, p in live if any(p.startswith(prefix) for prefix in TRACKED_PREFIXES)}
     norm_declared = {(m, p.rstrip("/") or "/") for m, p in declared}

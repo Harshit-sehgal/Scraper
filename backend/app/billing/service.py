@@ -139,14 +139,21 @@ class AutumnClient:
                 getattr(customer.subscription, "plan", {}).get("name", "free") if hasattr(customer, "subscription") else "free"
             )
             sub_status = getattr(customer.subscription, "status", "active") if hasattr(customer, "subscription") else "active"
+            # ``PlanTierId`` / ``SubscriptionStatus`` are StrEnums whose
+            # ``__members__`` keys are the UPPERCASE Python identifiers
+            # (``FREE``, ``STARTER``, ...) while their ``.value``s are
+            # lowercase strings (``free``, ``starter``). The provider
+            # returns the lowercase value, so compare against the set of
+            # ``.value``s — not ``__members__`` — otherwise every paid
+            # customer silently resolves to FREE.
+            _tier_values = {t.value for t in PlanTierId}
+            _status_values = {s.value for s in SubscriptionStatus}
             return CustomerInfo(
                 customer_id=customer_id,
                 email=getattr(customer, "email", ""),
                 name=getattr(customer, "name", ""),
-                plan_tier=PlanTierId(plan_name.lower()) if plan_name.lower() in PlanTierId.__members__ else PlanTierId.FREE,
-                subscription_status=SubscriptionStatus(sub_status)
-                if sub_status in SubscriptionStatus.__members__
-                else SubscriptionStatus.ACTIVE,
+                plan_tier=PlanTierId(plan_name.lower()) if plan_name.lower() in _tier_values else PlanTierId.FREE,
+                subscription_status=SubscriptionStatus(sub_status) if sub_status in _status_values else SubscriptionStatus.ACTIVE,
             )
         except (RuntimeError, ValueError, OSError) as e:
             logger.warning("Failed to lookup customer %s: %s", customer_id, e)

@@ -5,6 +5,7 @@ Tests based on OWASP Top 10 and security best practices.
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -60,22 +61,38 @@ class TestOWASPTop10:
         assert "traceback" not in response.text.lower()
         assert "stack" not in response.text.lower()
 
+    @pytest.mark.skip(reason="A06: process check — covered by pip-audit + dependency bounds gate, not a unit test")
     def test_a06_vulnerable_components(self, client: TestClient):
-        """A06:2021 - Vulnerable and Outdated Components."""
-        # This is more of a process check
-        # In real implementation, this would check dependency versions
+        """A06:2021 - Vulnerable and Outdated Components.
+
+        Superseded by the ``pip_audit`` validation gate (CVE scanning)
+        and ``scripts/validate_dependency_bounds.py`` (upper-bound
+        enforcement). Previously an empty body that always passed and
+        inflated the green count. Skipped explicitly so the test report
+        is honest about what is and isn't verified.
+        """
 
     def test_a07_auth_failures(self, client: TestClient):
-        """A07:2021 - Identification and Authentication Failures."""
-        # Test brute force protection (rate limiting)
+        """A07:2021 - Identification and Authentication Failures.
+
+        Asserts that repeated invalid-key requests eventually trigger
+        rate limiting (429) OR are consistently rejected (401/403).
+        Previously passed vacuously whether or not brute-force
+        protection existed because the loop only ``break``-ed on 429
+        and never asserted.
+        """
+        statuses = []
         for _ in range(10):
             response = client.get(
                 "/api/jobs",
                 headers={"X-API-Key": "invalid-key"},
             )
+            statuses.append(response.status_code)
             if response.status_code == 429:
-                # Rate limiting is working
                 break
+        # Every request must be rejected (never 200), and either a 429
+        # rate-limit fired or all were 401/403 (consistent denial).
+        assert all(s != 200 for s in statuses), f"invalid API key must never reach 200; got statuses={statuses}"
 
     def test_a08_data_integrity(self, client: TestClient, auth_headers: dict):
         """A08:2021 - Software and Data Integrity Failures."""
@@ -247,9 +264,15 @@ class TestInputValidation:
 class TestAuthenticationSecurity:
     """Test authentication security measures."""
 
+    @pytest.mark.skip(reason="password complexity not enforced in-app yet — tracked as a product gap, not a passing test")
     def test_password_complexity(self, client: TestClient):
-        """Test password complexity requirements."""
-        # This would test password validation if passwords are used
+        """Test password complexity requirements.
+
+        Previously an empty body that always passed. Skipped explicitly
+        so the test report is honest: password complexity is not yet
+        enforced at the application layer (signup accepts any password
+        length). Track as a product gap rather than a false-green.
+        """
 
     def test_session_management(self, client: TestClient, auth_headers: dict):
         """Test session management."""
@@ -257,9 +280,18 @@ class TestAuthenticationSecurity:
         response = client.post("/api/session", headers=auth_headers)
         assert response.status_code in (200, 401)
 
+    @pytest.mark.skip(
+        reason="token expiration not applicable — session cookies, not bearer tokens; covered by session-secret + expiry config"
+    )
     def test_token_expiration(self, client: TestClient):
-        """Test token expiration."""
-        # This would test token expiration if tokens are used
+        """Test token expiration.
+
+        Previously an empty body that always passed. The app uses
+        signed session cookies (not expiring bearer tokens), so token
+        expiration is governed by ``DATAFORGE_SESSION_SECRET`` and
+        cookie max-age config, not an in-app token store. Skipped
+        explicitly to avoid a false-green security assertion.
+        """
 
     def test_secure_cookie_attributes(self, client: TestClient, auth_headers: dict):
         """Test secure cookie attributes."""

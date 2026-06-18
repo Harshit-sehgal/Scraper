@@ -3,7 +3,7 @@
    ═══════════════════════════════════ */
 
 import { apiFetch } from "./api.js";
-import { toast } from "./utils.js";
+import { showConfirm, toast } from "./utils.js";
 
 function formatTime(iso) {
   if (!iso) return "";
@@ -71,29 +71,31 @@ export async function refreshRetention() {
 }
 
 export async function deleteMyData() {
-  if (
-    !confirm(
-      "This will permanently delete ALL your data: jobs, results, workflows, scheduled jobs, auth profiles, and SaaS identity records. This cannot be undone. Continue?",
-    )
-  ) {
-    return;
-  }
-  try {
-    const resp = await apiFetch("/api/user/data", { method: "DELETE" });
-    if (!resp.ok) {
-      const detail = (await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`;
-      toast(`Failed to delete data: ${detail}`, "error");
-      return;
-    }
-    const body = await resp.json();
-    const summary = body?.summary || {};
-    const cleaned = Object.entries(summary)
-      .filter(([_, v]) => typeof v === "number" && v > 0)
-      .map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`)
-      .join(", ");
-    toast(`Data deleted. Cleaned: ${cleaned || "nothing"}.`, "ok");
-    await refreshRetention();
-  } catch (err) {
-    toast(`Failed to delete data: ${err.message || err}`, "error");
-  }
+  // F-017: use the project's custom modal (with focus trap) instead of
+  // the raw blocking browser ``confirm()`` dialog, matching the rest of
+  // the app's destructive-action UX (e.g. recycle.js hardDeleteJob).
+  showConfirm(
+    "Delete ALL my data?",
+    "This will permanently delete ALL your data: jobs, results, workflows, scheduled jobs, auth profiles, and SaaS identity records. This cannot be undone.",
+    async () => {
+      try {
+        const resp = await apiFetch("/api/user/data", { method: "DELETE" });
+        if (!resp.ok) {
+          const detail = (await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`;
+          toast(`Failed to delete data: ${detail}`, "error");
+          return;
+        }
+        const body = await resp.json();
+        const summary = body?.summary || {};
+        const cleaned = Object.entries(summary)
+          .filter(([_, v]) => typeof v === "number" && v > 0)
+          .map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`)
+          .join(", ");
+        toast(`Data deleted. Cleaned: ${cleaned || "nothing"}.`, "success");
+        await refreshRetention();
+      } catch (err) {
+        toast(`Failed to delete data: ${err.message || err}`, "error");
+      }
+    },
+  );
 }

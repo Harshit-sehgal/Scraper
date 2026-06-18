@@ -275,10 +275,10 @@ def test_exclusion_persistence_invariant() -> None:
     ws.clear()
     ws._instability.set_exclusion(("a", "b"), 0.75)
 
-    old_path = os.environ.get("SEMANTIC_STATE_PATH")
+    old_path = os.environ.get("DATAFORGE_SEMANTIC_STATE_PATH")
     fd, tmp = tempfile.mkstemp(suffix=".json")  # nosec - bandit false positive
     os.close(fd)
-    os.environ["SEMANTIC_STATE_PATH"] = tmp
+    os.environ["DATAFORGE_SEMANTIC_STATE_PATH"] = tmp
 
     try:
         from app.semantic_persistence import load_semantic_state, save_semantic_state
@@ -290,9 +290,9 @@ def test_exclusion_persistence_invariant() -> None:
         assert ws2.learned_exclusions.get(("a", "b"), 0) == 0.75, "Exclusions must survive save/load"
     finally:
         if old_path:
-            os.environ["SEMANTIC_STATE_PATH"] = old_path
+            os.environ["DATAFORGE_SEMANTIC_STATE_PATH"] = old_path
         else:
-            os.environ.pop("SEMANTIC_STATE_PATH", None)
+            os.environ.pop("DATAFORGE_SEMANTIC_STATE_PATH", None)
         with contextlib.suppress(OSError):
             os.remove(tmp)
 

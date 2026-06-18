@@ -157,9 +157,17 @@ def steps_from_manual_mapping(
             ),
         )
     if submit_action:
+        # Map the submit action to a valid WorkflowStepType. ``"submit"``
+        # is the natural value (``detect_fields_from_html`` marks submit
+        # controls with ``type:"submit"``) but is NOT a valid
+        # WorkflowStepType — map it to ``click`` (the closest interactive
+        # step). Any other unknown action also falls back to ``click``
+        # so a bad API client cannot trigger an unhandled ValueError/500.
+        _submit_action_raw = str(submit_action.get("action") or "click").strip().lower()
+        _submit_step_type = _submit_action_raw if _submit_action_raw in WorkflowStepType._value2member_map_ else "click"
         steps.append(
             WorkflowStep(
-                step_type=WorkflowStepType(str(submit_action.get("action") or "click")),
+                step_type=WorkflowStepType(_submit_step_type),
                 selector=str(submit_action.get("selector") or ""),
                 value=str(submit_action.get("value") or ""),
                 description="Submit workflow form",

@@ -205,7 +205,8 @@ def test_migrate_missing_workflows_table_is_pre_v9_warning(tmp_path: Path, caplo
 
 
 def test_migrate_writes_correctly_deserialized_records(
-    legacy_workflows_db: Path, tmp_path: Path,
+    legacy_workflows_db: Path,
+    tmp_path: Path,
 ) -> None:
     """JSON columns are deserialized; auth_profile_id is coerced to None when NULL."""
     out_dir = tmp_path / "out"

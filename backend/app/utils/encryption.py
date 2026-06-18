@@ -268,15 +268,25 @@ def encrypt(plaintext: str) -> str:
             key_version = next(iter(all_keys))
             key = all_keys[key_version]
         else:
-            # Last resort: dev-only fallback
+            # Last resort: dev-only fallback. Only derive a predictable
+            # test key in development/test (matching ``_get_key``'s
+            # policy at the top of this module). Any other env value
+            # (staging, production, unknown) MUST fail closed — silently
+            # encrypting auth-profile session secrets with a publicly-
+            # known key in staging would be a plaintext-equivalent leak.
             env = os.environ.get("DATAFORGE_ENV", "development").lower()
-            if env == "production":
+            if env in {"development", "test"}:
+                key = _derive_test_key(DEFAULT_KEY_VERSION)
+                key_version = DEFAULT_KEY_VERSION
+            else:
                 env_var = f"{_ENCRYPTION_KEY_V_PREFIX}{key_version.upper()}"
-                msg = f"Encryption key not configured. Set {env_var} environment variable."
+                msg = (
+                    f"Encryption key not configured (env={env!r}). "
+                    f"Set {env_var} (or {env_var} / {_ENCRYPTION_KEY_ENV}) "
+                    f"environment variable. Test-key fallback is only "
+                    f"permitted in development/test."
+                )
                 raise EncryptionError(msg)
-            # In dev/test, derive a test key
-            key = _derive_test_key(DEFAULT_KEY_VERSION)
-            key_version = DEFAULT_KEY_VERSION
 
     ciphertext, tag, nonce = _aes_gcm_encrypt(plaintext.encode("utf-8"), key)
 

@@ -571,12 +571,8 @@ def test_create_job_enqueue_queue_exception_routing(
     monkeypatch.setattr("app.worker_queue.get_worker_queue", stub_queue)
 
     resp = client.post("/api/jobs", json=payload, headers=headers)
-    assert resp.status_code == expected_status, (
-        f"expected {expected_status}, got {resp.status_code}: {resp.json()!r}"
-    )
+    assert resp.status_code == expected_status, f"expected {expected_status}, got {resp.status_code}: {resp.json()!r}"
     assert expected_detail_fragment in resp.json()["detail"], (
         f"detail {resp.json()['detail']!r} does not contain {expected_detail_fragment!r}"
     )
-    assert len(main_mod.jobs_store) == 0, (
-        "orphaned job in in-memory store after queue-raised exception"
-    )
+    assert len(main_mod.jobs_store) == 0, "orphaned job in in-memory store after queue-raised exception"

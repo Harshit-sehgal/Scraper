@@ -3523,7 +3523,7 @@
     },
     "/api/saas/memberships/{membership_id}": {
       "delete": {
-        "description": "Remove a member from an organization (admin/operator only).",
+        "description": "Remove a member from an organization (admin/operator only).\n\nThe caller must be a member of the target membership's organization\n(env-backed admins retain all-access). Without this check, a\npersistent WRITE key from Org A could remove any member from Org B\nby guessing/obtaining a ``membership_id``.",
         "operationId": "remove_member_api_saas_memberships__membership_id__delete",
         "parameters": [
           {
@@ -3754,7 +3754,7 @@
     },
     "/api/saas/plan": {
       "get": {
-        "description": "Return the current user's plan and limits.\n\nStub \u2014 returns free tier defaults. Future: lookup from a billing table.",
+        "description": "Return the current user's plan and limits.\n\nLooks up the caller's tier via the billing service (falling back to\n``free`` when billing is unconfigured) and derives the usage limits\nfrom the same ``app.plan_enforcer`` source of truth that enforces\nthem at job-creation time, so the informational view and the\nenforcement gate can never drift.",
         "operationId": "get_plan_info_api_saas_plan_get",
         "responses": {
           "200": {

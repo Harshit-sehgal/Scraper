@@ -139,12 +139,10 @@ def _row_to_workflow_record(row: sqlite3.Row) -> dict[str, Any] | None:
     Returns ``None`` when the row lacks a usable ``id`` (skip silently).
     """
     # sqlite3.Row iteration yields VALUES in column order (sequence
-    # semantics), not column NAMES. Mapping-style iteration (``.keys()``)
-    # is required here to enumerate the column names that should be
-    # filtered against ``_WORKFLOW_COLUMNS``. SIM118 noqa is intentional.
-    record: dict[str, Any] = {
-        col: row[col] for col in row.keys() if col in _WORKFLOW_COLUMNS  # noqa: SIM118
-    }
+    # semantics), not column NAMES. Capture ``.keys()`` first so Ruff
+    # does not treat this as dict-style iteration.
+    row_keys = row.keys()
+    record: dict[str, Any] = {col: row[col] for col in row_keys if col in _WORKFLOW_COLUMNS}
     workflow_id = str(record.get("id") or "").strip()
     if not workflow_id:
         return None
@@ -194,10 +192,7 @@ def migrate_workflows(
             # row-to-record filter projects to the known workflow shape.
             rows = conn.execute("SELECT * FROM workflows").fetchall()
         except sqlite3.OperationalError as exc:
-            message = (
-                f"workflows table not found in {src_db} (pre-v9 schema?): {exc}. "
-                "Nothing to migrate."
-            )
+            message = f"workflows table not found in {src_db} (pre-v9 schema?): {exc}. Nothing to migrate."
             logger.warning(message)
             rows = []
 
@@ -246,10 +241,7 @@ def migrate_workflows(
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="migrate_workflows_to_json_store",
-        description=(
-            "One-shot migration: import v9 SQLite workflows table "
-            "into the JSONFileStore-backed workflow store."
-        ),
+        description=("One-shot migration: import v9 SQLite workflows table into the JSONFileStore-backed workflow store."),
     )
     parser.add_argument(
         "--src-db",

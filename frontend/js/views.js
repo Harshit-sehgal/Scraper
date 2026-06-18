@@ -17,6 +17,12 @@ import { renderFilteredResults } from "./results.js";
 export let currentView = "jobs";
 export let currentMode = "manual";
 
+// Track the previously-shown view so switchView can stop per-view
+// background timers (system-info / recent-activity polls) when the
+// user leaves a view. Without this, those 30s/60s polls run forever
+// after the first dashboard visit (F-008).
+let _previousView = null;
+
 export function setCurrentView(name) {
   currentView = name;
 }
@@ -70,6 +76,14 @@ export function switchView(name) {
   if (name === "cognition" && window.DATAFORGE_EXPERIMENTAL !== true) {
     name = "jobs";
   }
+  // F-008: stop dashboard background polls when leaving the dashboard
+  // so system-info (30s) and recent-activity (60s) timers don't run
+  // forever after the first dashboard visit.
+  if (_previousView === "dashboard" && name !== "dashboard") {
+    import("./system-info.js").then((m) => m.stopSystemInfo?.()).catch(() => {});
+    import("./recent-activity.js").then((m) => m.stopRecentActivity?.()).catch(() => {});
+  }
+  _previousView = currentView;
   currentView = name;
 
   // Update URL without full page reload

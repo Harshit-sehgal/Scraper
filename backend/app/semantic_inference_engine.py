@@ -17,6 +17,7 @@ from app.semantic_ir import (
     SemanticToken,
     SemanticType,
 )
+from app.semantic_roots import UNIVERSAL_ROOTS as _UNIVERSAL_ROOTS
 from app.semantic_world_state import get_world_state
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,6 @@ class RoleEmbeddingEngine:
         if self.manifold:
             return
         from app.field_laws import ROLE_EXCLUSIVITY
-        from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
 
         seeded = set()
         for ra, rb in ROLE_EXCLUSIVITY:

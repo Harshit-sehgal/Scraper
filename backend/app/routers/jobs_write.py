@@ -47,7 +47,13 @@ from app.scraper import ai_clean_and_align_records
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from app.utils.rbac import UserRole, get_current_user, require_role
+from app.utils.rbac import (
+    UserRole,
+    can_access_scoped_resource,
+    get_current_user,
+    require_principal,
+    require_role,
+)
 from app.utils.usage_ledger import UsageType, get_usage_ledger
 
 if TYPE_CHECKING:
@@ -68,6 +74,44 @@ def _schedule_job(job_id: str) -> None:
     from app.runtime_deps import schedule_task_fn as _stf
 
     _stf(_rjf(job_id))
+
+
+def _ensure_job_write_access(job, auth_tuple, action: str) -> None:
+    """Enforce tenant isolation on job-mutation routes.
+
+    Mirrors ``jobs_read._ensure_job_access`` but lives in the write
+    router so mutation routes (cancel / backfill / reclean) cannot
+    mutate a job from another org/project. Env-backed admin/operator
+    keys retain all-access; persistent SaaS WRITE keys are scoped to
+    their own org/project (via ``can_access_scoped_resource``).
+    """
+    role, user_id, org_id, project_id = auth_tuple
+    if can_access_scoped_resource(
+        role,
+        user_id,
+        org_id,
+        project_id,
+        resource_owner_id=getattr(job, "created_by", ""),
+        resource_org_id=getattr(job, "org_id", ""),
+        resource_project_id=getattr(job, "project_id", ""),
+    ):
+        return
+    from app.audit_logger import log_rbac_event
+
+    log_rbac_event(
+        actor=user_id,
+        action=action,
+        resource=f"job:{job.id}",
+        role=role.value,
+        outcome="denied",
+        details={
+            "owner_id": getattr(job, "created_by", ""),
+            "org_id": getattr(job, "org_id", ""),
+            "project_id": getattr(job, "project_id", ""),
+            "policy": "scoped_resource_or_saas_org_project",
+        },
+    )
+    raise HTTPException(status_code=404, detail="Job not found")
 
 
 def register_jobs_write_routes(
@@ -335,12 +379,16 @@ def register_jobs_write_routes(
     @router.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         with manager.lock:
             if job_id not in manager.jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
             job = manager.jobs_store[job_id]
+            _ensure_job_write_access(job, auth, "cancel_job")
             if job.status in {
                 JobStatus.COMPLETED,
                 JobStatus.DEGRADED,
@@ -386,10 +434,14 @@ def register_jobs_write_routes(
     @router.post("/api/jobs/{job_id}/backfill-metadata")
     async def backfill_job_metadata(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         """Explicitly backfill source metadata for manual-mode job results."""
         job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_write_access(job, auth, "backfill_metadata")
 
         results_list = list(job.results)
         if job.results_on_disk:
@@ -420,13 +472,17 @@ def register_jobs_write_routes(
     @router.post("/api/jobs/{job_id}/reclean")
     async def reclean_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         with manager.lock:
             if job_id not in manager.jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
             job = manager.jobs_store[job_id]
+            _ensure_job_write_access(job, auth, "reclean_job")
             if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                 raise HTTPException(
                     status_code=409,

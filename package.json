@@ -2,10 +2,13 @@
   "name": "dataforge-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "DataForge Studio — frontend tooling (CSS lint)",
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@vitest/ui": "^4.1.8",
+    "eslint": "^9.39.4",
+    "globals": "^17.6.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.8.3",
     "stylelint": "^16.26.1",
@@ -13,9 +16,11 @@
     "vitest": "^4.1.8"
   },
   "scripts": {
-    "lint": "npm run lint:css && npm run lint:js",
+    "lint": "npm run lint:css && npm run lint:eslint && npm run lint:js",
     "lint:css": "stylelint 'frontend/**/*.css' --ignore-pattern 'frontend/dist/**'",
     "lint:css:fix": "stylelint 'frontend/**/*.css' --fix --ignore-pattern 'frontend/dist/**'",
+    "lint:eslint": "eslint frontend/js/",
+    "lint:eslint:fix": "eslint frontend/js/ --fix",
     "lint:js": "prettier --check 'frontend/**/*.{js,css,html,mjs}' 'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'",
     "lint:js:fix": "prettier --write 'frontend/**/*.{js,css,html,mjs}' 'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'",
     "test": "vitest run --config frontend/vitest.config.js",

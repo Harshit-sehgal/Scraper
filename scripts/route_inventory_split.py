@@ -112,9 +112,12 @@ def _env(*, experimental: bool) -> dict:
 def _live_routes(*, experimental: bool):
     code = (
         "import sys, json;"
-        "from app.main import app;"
+        "sys.path.insert(0, 'scripts');"
+        "from fastapi_route_iter import iter_app_routes;"
+        "from app.main import create_app;"
+        "app=create_app();"
         "out=[];"
-        "[out.append([m.upper(), r.path]) for r in app.routes "
+        "[out.append([m.upper(), r.path]) for r in iter_app_routes(app) "
         "if hasattr(r, 'methods') and r.path.startswith('/api/') "
         "for m in r.methods if m.upper() in {'GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'}];"
         "print(json.dumps(sorted(out)))"

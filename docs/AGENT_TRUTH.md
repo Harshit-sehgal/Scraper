@@ -1,19 +1,241 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-17 from working tree.
-Last verified: OpenAPI spec generation + code-complexity gate
-wired into CI + health pill + system-info + recent-activity
-dashboard panels + /api/saas/me profile tests + health-router
-prefix regression fix + stylelint cleanup + frontend_lint_css
-gate + complete tab-key shortcuts (8/9/0) + tab highlights for
-billing/audit/retention + identity-store isolation in
-test_saas_api_keys.py — full validation 23/23 passes, 3671
-backend tests, 289 frontend tests, 143 routes (108 stable +
-35 experimental)._
+_Truth source current as of 2026-06-18 from working tree.
+Last verified: follow-up codebase cleanup and SaaS frontend
+professionalization fixes. Full validation is green at 24/24 checks,
+including backend full tests, ruff, pyflakes, mypy, bandit, pip_audit,
+npm ci, frontend tests, prettier, stylelint, and ESLint. Backend test
+collection is 3787 tests; frontend tests are 290/290 passing; current
+route inventory is 143 routes (108 stable + 35 experimental)._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Codebase Cleanup + SaaS Frontend Professionalization Follow-up - 2026-06-18
+
+Scope: continue the interrupted frontend/backend cleanup pass, find
+remaining concrete failures, fix them, then rerun the codebase gates.
+
+### Fresh Pre-Push Verification (2026-06-18)
+
+Before committing and pushing, reran the codebase gates from the
+current checkout rather than relying on the prior run:
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 24/24 checks passed. Summary: `artifacts/validation/latest_summary.md`; run id `20260618T152457Z_full`. |
+| `npm run lint:eslint` | 0 | PASS; ESLint reported no problems in `frontend/js/`. |
+| `python3 scripts/analyze_code_complexity.py --check` | 0 | PASS; `files=666 symbols=8440`, no threshold violations. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 97 stable routes match between app and `docs/API.md`. |
+| `npm audit --audit-level=moderate` | 0 | PASS; "found 0 vulnerabilities" after `npm audit fix` raised transitive `undici` from `7.27.2` to `7.28.0` under `jsdom`. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+| `python3 -m pytest backend/tests --co -q` | 0 | PASS; backend tests collected successfully. |
+
+### Remote CI Follow-up (2026-06-18)
+
+After pushing `codex/codebase-green-validation-20260618`, GitHub
+Actions `Pre-commit Checks` failed in job `Ruff Lint & Format` because
+`ruff format --check backend/app backend/tests backend/benchmarks scripts`
+reported one file: `scripts/migrate_workflows_to_json_store.py`.
+Local fix and verification:
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m ruff format scripts/migrate_workflows_to_json_store.py` | 0 | PASS; 1 file reformatted. |
+| `python3 -m ruff format --check backend/app backend/tests backend/benchmarks scripts` | 0 | PASS; 554 files already formatted. |
+
+The next GitHub Actions `CI` run reached `Fast CI Gates` and failed
+`p0_regression_tests` in `backend/tests/test_route_auth_matrix_generator.py`:
+`scripts/route_auth_matrix.py::build_matrix()` depended on the mutable
+`app.main.app` singleton, so a stale or mutated singleton could reduce
+the matrix to FastAPI's default docs routes only. Added
+`test_route_auth_matrix_uses_fresh_app_factory` and changed
+`build_matrix()` to call `app.main.create_app()` for a fresh registered
+app instance.
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `pytest backend/tests/test_route_auth_matrix_generator.py::test_route_auth_matrix_uses_fresh_app_factory -q` | 1 | FAIL before the fix; only `/docs`, `/redoc`, `/openapi.json` were present. |
+| `pytest backend/tests/test_route_auth_matrix_generator.py::test_route_auth_matrix_uses_fresh_app_factory -q` | 0 | PASS after `build_matrix()` switched to `create_app()`. |
+| `pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py -q` | 0 | PASS; 71 tests. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 checks passed. Summary run id `20260618T154105Z_quick`. |
+| `python3 -m ruff check scripts/route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py` | 0 | PASS. |
+| `python3 -m ruff format --check scripts/route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py` | 0 | PASS; 2 files already formatted. |
+
+The next CI run still failed under GitHub's fresher resolver. A local
+CI-like venv reproduced the dependency shape exactly enough to expose
+the gap: `fastapi=0.137.2`, `pytest=9.1.0`, `starlette=1.3.1`. In that
+FastAPI version, included routers appear in `app.routes` as internal
+`_IncludedRouter` wrappers, so every script that directly inspected
+`app.routes` saw only docs/static routes and missed the concrete API
+routes under `route.original_router.routes`. Added
+`scripts/fastapi_route_iter.py` and updated route inventory/auth/docs
+tooling to flatten included routers. Also made `app.audit_logger`
+install its RotatingFileHandler even when pytest/logging capture has
+already attached a non-file handler to the named `audit` logger; this
+removed full-suite order dependence in audit-log tests.
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `/tmp/dataforge-ci-venv/bin/python - <<'PY' ...` | 0 | PASS; confirmed `fastapi=0.137.2`, `pytest=9.1.0`, `starlette=1.3.1`. |
+| `/tmp/dataforge-ci-venv/bin/python -m pytest backend/tests/test_route_auth_matrix_generator.py -q` | 0 | PASS; 5 route-auth matrix tests. |
+| `/tmp/dataforge-ci-venv/bin/python -m pytest backend/tests/test_audit_logger.py backend/tests/test_audit_logger_integration.py backend/tests/test_p1_compliance_aup.py::test_accept_emits_audit_log -q` | 0 | PASS; 32 audit/compliance tests. |
+| `/tmp/dataforge-ci-venv/bin/python -m pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py -q` | 0 | PASS; 71 P0/auth/route matrix tests. |
+| `/tmp/dataforge-ci-venv/bin/python scripts/docs_lint.py` | 0 | PASS; 97 stable routes match between app and `docs/API.md`. |
+| `/tmp/dataforge-ci-venv/bin/python scripts/generate_route_inventory.py` | 0 | PASS; regenerated 143 routes (108 stable + 35 experimental). |
+| `/tmp/dataforge-ci-venv/bin/python scripts/generate_route_auth_matrix.py` | 0 | PASS; regenerated 133 API route rows, `unknown_auth=0`, `unknown_tenant=0`. |
+| `/tmp/dataforge-ci-venv/bin/python scripts/validate_local.py --full` | 0 | PASS; 24/24 checks passed. Summary run id `20260618T155729Z_full`. |
+
+### Confirmed Issues Fixed
+
+- `backend/tests/test_p0_auth_tenant.py`: interrupted P0 test used
+  nonexistent `FieldType.TEXT`; corrected to `FieldType.STRING`.
+- `backend/app/audit_logger.py`: full-suite audit logging could become
+  order-dependent when a non-file logging handler already existed on
+  the named `audit` logger. `_get_audit_logger()` now ensures the
+  active audit log path has a real file handler instead of treating
+  any existing handler as persistence.
+- `scripts/fastapi_route_iter.py` and route inventory/auth/docs
+  scripts: FastAPI 0.137 included-router wrappers are now flattened
+  before route inspection, preserving route/docs gates across local
+  and CI dependency resolutions.
+- `frontend/js/auth-profiles.js`: the raw `fetch` -> `apiFetch`
+  conversion missed the `apiFetch` import; ESLint caught five
+  `no-undef` errors. Added the import.
+- `frontend/js/auth-profiles.js` and `frontend/js/workflows.js`:
+  remaining destructive-action `window.confirm` / `confirm()` calls
+  now use the shared `showConfirm` modal with the app focus-trap UX.
+- `backend/app/semantic_world_state/core.py`: `SemanticWorldState`
+  exceeded the code-complexity class budget at 1302 LOC. Moved the
+  compatibility/proxy property block into
+  `backend/app/semantic_world_state/delegation.py` as `DelegationMixin`;
+  `scripts/analyze_code_complexity.py --check` is now green.
+- `package-lock.json`: `npm audit --audit-level=moderate` found a
+  high-severity transitive `undici` advisory via `jsdom`. Ran
+  `npm audit fix`, which updated `undici` from `7.27.2` to `7.28.0`;
+  npm audit now reports zero vulnerabilities.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 checks passed after the P0 enum fix. |
+| `/usr/bin/python3 -m pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py -q` | 0 | PASS; `...................................................................... [100%]` (70 tests). |
+| `npm run lint:eslint` | 0 | PASS after importing `apiFetch` in `auth-profiles.js`. |
+| `npm run test` | 0 | PASS; 20 frontend test files, 290 tests passed. |
+| `npm run lint:js` | 0 | PASS; "All matched files use Prettier code style!" |
+| `npm run lint:css` | 0 | PASS; stylelint reported no errors. |
+| `python3 scripts/analyze_code_complexity.py --check` | 0 | PASS; `files=666 symbols=8440`, no threshold violations. Before the mixin split this exited 1 on `SemanticWorldState` at 1302 LOC > 1200. |
+| `python3 -m mypy backend/app/semantic_world_state` | 0 | PASS; "Success: no issues found in 9 source files." |
+| `python3 -m pytest backend/tests/test_semantic_persistence.py backend/tests/test_semantic_invariants.py -q` | 0 | PASS; 25 tests passed after the mixin split. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 24/24 checks passed. Summary: `artifacts/validation/latest_summary.md`; run id `20260618T145814Z_full`. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 97 stable routes match between app and `docs/API.md`. |
+| `npm audit --audit-level=moderate` | 0 | PASS; "found 0 vulnerabilities". |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+| `python3 -m pytest backend/tests --co` | 0 | PASS; 3787 tests collected in 1.02s. |
+
+### Current Production Readiness
+
+- Local validation is green: 24/24 checks passed.
+- Additional non-gate scans above are green, including the complexity
+  check and npm audit.
+- Current route inventory regenerated at 143 routes (108 stable + 35
+  experimental).
+- Staging deployment, TLS, production secrets, backups, restore drill,
+  monitoring alerts, load tests, and incident drills remain unproven in
+  this checkout. Do not call the project production-ready without that
+  environment evidence.
+
+## pip_audit CVE Fix + SaaS Plan Endpoint Wired — 2026-06-18
+
+Scope: the prior ``AGENT_TRUTH.md`` header claimed ``23/23 passes``
+but the full validation was actually ``22/23`` — ``pip_audit`` (check
+18) was failing because ``pyproject.toml`` pinned
+``cryptography>=43.0.0,<44.0.0`` and ``43.0.3`` carries 5 known CVEs
+(CVE-2024-12797, CVE-2026-26007, PYSEC-2026-35, GHSA-537c-gmf6-5ccf).
+The lowest version that clears every CVE is ``48.0.1``. In the same
+pass the ``/api/saas/plan`` endpoint was a hardcoded "stub" returning
+free-tier defaults even though real tier enforcement already lived in
+``app.plan_enforcer`` (wired into job creation at
+``backend/app/routers/jobs_write.py:141``) — the informational view
+and the enforcement gate had drifted apart.
+
+### What was actually broken vs. stale
+
+- ``pip_audit``: real validation failure (5 CVEs in ``cryptography``).
+  Confirmed by re-running ``python3 -m pip_audit --desc off .`` which
+  exited 1 listing the CVE table.
+- ``backend/app/saas/router.py:586``: the section banner read
+  ``"Plan & Limits (stub — records tier, does not enforce)"`` and the
+  ``GET /api/saas/plan`` docstring read ``"Stub — returns free tier
+  defaults. Future: lookup from a billing table."`` This was **stale**:
+  enforcement already existed in ``app.plan_enforcer`` and was wired
+  into job creation. Only the informational endpoint was a stub.
+- ``artifacts/audit/ISSUE_LEDGER.md``: ``P1-AUTHPROFILE-002`` (duplicate
+  ``AuthProfile`` model) was marked ``verified`` but the duplicate is
+  already gone — there is now a single ``class AuthProfile`` at
+  ``backend/app/models.py:514`` (``AuthProfileStore`` in
+  ``app/utils/auth_profile_store.py`` is a store, not a model).
+  ``P1-SECURITY-AUDIT-001`` (pip_audit) was also still open.
+
+### Fix
+
+- ``pyproject.toml``: ``cryptography>=43.0.0,<44.0.0`` →
+  ``cryptography>=48.0.1,<50.0.0``. ``cryptography`` is only used in
+  ``backend/app/utils/encryption.py`` for ``AESGCM`` (a stable API
+  across versions), so the bump is behavior-preserving. The venv
+  already had ``49.0.0`` installed; pip_audit audits the declared
+  ``pyproject.toml`` range, which is why the constraint (not the
+  installed wheel) was the failing input.
+- ``backend/app/plan_enforcer.py``: added a public
+  ``get_user_tier(user_id)`` read-only accessor over the existing
+  private ``_user_tier`` so routers can report the current tier
+  without re-implementing the billing lookup + safe fallback.
+- ``backend/app/saas/router.py``: ``GET /api/saas/plan`` now looks up
+  the caller's tier via ``get_user_tier`` and derives ``max_jobs`` /
+  ``max_scrapes`` from ``get_plan_limits(tier)`` — the **same**
+  ``app.plan_enforcer`` source of truth that enforces limits at job
+  creation — so the informational view and the enforcement gate can
+  no longer drift. Added per-tier ``_TIER_FEATURES``,
+  ``_TIER_TEAMMATES``, ``_TIER_PROJECTS`` tables for the
+  non-usage-capped fields. Corrected the stale "stub — does not
+  enforce" section banner to state that enforcement lives in
+  ``app.plan_enforcer``.
+- ``backend/tests/test_saas_router.py``: added
+  ``test_plan_limits_match_enforcement_source_of_truth`` which asserts
+  the ``/plan`` response's ``max_jobs`` / ``max_scrapes`` equal
+  ``get_plan_limits("free")[UsageType.JOB_CREATED/PAGE_FETCHED]``,
+  locking the no-drift contract.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 23/23 checks passed (incl. `pip_audit`). Summary: `artifacts/validation/latest_summary.md`. |
+| `python3 -m pip_audit --progress-spinner off --desc off .` | 0 | PASS; "No known vulnerabilities found". |
+| `python3 -m pytest backend/tests/test_saas_router.py -q` | 0 | PASS; 15 passed (was 14, +1 new contract test). |
+| `python3 -m pytest backend/tests/test_plan_enforcer_unknown_tier.py -q` | 0 | PASS; 11 passed. |
+| `python3 -m ruff check backend scripts` | 0 | PASS. |
+| `python3 -m mypy backend` | 0 | PASS; no issues in 553 source files. |
+| `python3 -m pytest backend/tests --co -q` | 0 | 3756 collected (3672 pass + ~84 skipped). |
+
+### Current Production Readiness
+
+- 23/23 local validation gates pass — **genuinely green now**,
+  including ``pip_audit`` (previously 22/23).
+- 3672 backend tests pass (+1 vs. the prior 3671); 289 frontend
+  tests pass; 7 OpenAPI contract tests pass.
+- Mypy, ruff, pyflakes, bandit, pip-audit, route auth matrix,
+  docs-vs-code, route inventory, prettier, vitest, chaos,
+  code-complexity: all green.
+- 143 routes registered (108 stable + 35 experimental).
+- Postgres parity still requires ``--run-postgres`` against a live
+  Postgres server (no local instance).
+- Staging deployment, TLS, secrets, backups, restore drill,
+  monitoring alerts, load tests, and incident drills remain
+  unproven in this local checkout — do not call the project
+  production-ready without those.
 
 ## Stylelint Cleanup + Frontend Gate Pass — 2026-06-17 (continued)
 

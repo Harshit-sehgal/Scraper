@@ -20,6 +20,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = REPO_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from fastapi_route_iter import iter_app_routes
 
 
 @dataclass(frozen=True)
@@ -113,10 +117,16 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
 
 
 def build_matrix() -> list[RouteAuthRow]:
-    from app.main import app
+    from app.main import create_app
+
+    # Build a fresh app instead of reading the module-level singleton.
+    # P0 tests mutate app.main.app in some paths; depending on that
+    # singleton lets prior test state collapse the matrix down to only
+    # FastAPI's default docs routes.
+    app = create_app()
 
     rows: list[RouteAuthRow] = []
-    for route in app.routes:
+    for route in iter_app_routes(app):
         path = getattr(route, "path", "")
         roles = _dependency_roles(route)
         for method in _route_methods(route):

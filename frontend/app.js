@@ -61,6 +61,9 @@ import {
 } from "./js/api.js";
 import { setMode } from "./js/views.js";
 import { initAuthProfiles } from "./js/auth-profiles.js";
+import { refreshBilling, upgradePlan } from "./js/billing.js";
+import { refreshAudit } from "./js/audit.js";
+import { refreshRetention, deleteMyData } from "./js/retention.js";
 
 function onDocumentClick(e) {
   const btn = e.target.closest("[data-action]");
@@ -297,6 +300,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     .then((data) => {
       if (data.experimental_enabled) {
         document.body.dataset.experimental = "true";
+        // F-003: the cognition-view guards in views.js compare
+        // ``window.DATAFORGE_EXPERIMENTAL !== true``; without setting it
+        // here, the Cognition tab visibly appears (via the dataset class)
+        // but is functionally unreachable — clicking it redirects to Jobs.
+        window.DATAFORGE_EXPERIMENTAL = true;
         document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
           el.classList.add("visible");
         });

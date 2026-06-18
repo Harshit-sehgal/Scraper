@@ -8,11 +8,20 @@
  * ``GET /api/system/status``.
  */
 
-import { apiFetch } from "./api.js";
+import { apiFetch, getSessionRole } from "./api.js";
 
 const REFRESH_MS = 30_000;
 
 let timer = null;
+
+// ``GET /api/system/status`` requires ADMIN or OPERATOR. Non-admin
+// callers get 403, which (via apiFetch) pops the API-key modal every
+// 15s — so skip polling entirely for users whose session role is a
+// plain ``user`` (F-015).
+function _isAuthorizedViewer() {
+  const role = getSessionRole() || "";
+  return role === "admin" || role === "operator";
+}
 
 function _setText(id, value) {
   const el = document.getElementById(id);
@@ -20,11 +29,16 @@ function _setText(id, value) {
 }
 
 function _setKpis(status) {
-  const counts = status.counts || {};
-  _setText("sysinfo-jobs-total", status.total_jobs ?? "—");
-  _setText("sysinfo-jobs-active", status.active ?? "—");
-  _setText("sysinfo-jobs-completed", counts.completed ?? "—");
-  _setText("sysinfo-jobs-failed", counts.failed ?? "—");
+  // F-002: the backend ``GET /api/system/status`` returns the job counts
+  // under ``status.jobs.{total,active,completed,failed}`` — not the
+  // top-level ``status.total_jobs`` / ``status.active`` / ``status.counts``
+  // paths this function previously read (which left 4/6 KPIs stuck at
+  // "—" via the ``?? "—"`` fallback).
+  const jobs = status.jobs || {};
+  _setText("sysinfo-jobs-total", jobs.total ?? "—");
+  _setText("sysinfo-jobs-active", jobs.active ?? "—");
+  _setText("sysinfo-jobs-completed", jobs.completed ?? "—");
+  _setText("sysinfo-jobs-failed", jobs.failed ?? "—");
   _setText("sysinfo-recycle", status.recycle_bin_count ?? "—");
 
   const queue = status.queue || {};
@@ -106,6 +120,10 @@ export async function refreshSystemInfo() {
 
 export function startSystemInfo() {
   if (timer) return;
+  if (!_isAuthorizedViewer()) {
+    _setError("System status is admin/operator-only.");
+    return;
+  }
   void refreshSystemInfo();
   timer = setInterval(() => {
     void refreshSystemInfo();

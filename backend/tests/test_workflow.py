@@ -144,6 +144,25 @@ class TestWorkflowEndpoints:
         assert resp.status_code == 200
         assert resp.json()["name"] == "Integration Test"
 
+    @pytest.mark.parametrize(
+        "unsafe_url",
+        [
+            "http://localhost:9000",
+            "http://127.0.0.1/admin",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://0.0.0.0/",
+        ],
+    )
+    def test_create_rejects_unsafe_start_url(self, client: TestClient, unsafe_url: str):
+        """R-012: ``create_workflow`` MUST reject unsafe/private start URLs,
+        matching the draft routes. Without this, an operator could persist a
+        workflow whose start_url points at an internal host."""
+        resp = client.post(
+            "/api/workflows",
+            json={"name": "Unsafe", "start_url": unsafe_url},
+        )
+        assert resp.status_code == 400, f"unsafe start_url {unsafe_url!r} must be rejected; got {resp.status_code}"
+
     def test_list_workflows(self, client: TestClient):
         """List should return workflows."""
         resp = client.get("/api/workflows")

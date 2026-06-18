@@ -14,8 +14,14 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "backend"
+SCRIPTS = REPO / "scripts"
 DOC_OUT = REPO / "docs" / "ROUTE_INVENTORY.md"
 JSON_OUT = REPO / "artifacts" / "audit" / "ROUTE_INVENTORY.json"
+
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+from fastapi_route_iter import iter_app_routes
 
 PUBLIC_API_EXEMPT = {
     "/api/session",
@@ -199,10 +205,12 @@ def _collect_current_app_rows(
     stable_paths: set[tuple[str, str]],
     experimental_paths: set[tuple[str, str]],
 ) -> list[dict[str, str]]:
-    from app.main import app
+    from app.main import create_app
+
+    app = create_app()
 
     rows: list[dict[str, str]] = []
-    for route in app.routes:
+    for route in iter_app_routes(app):
         path = getattr(route, "path", "")
         methods = sorted(getattr(route, "methods", []) or [])
         endpoint = getattr(route, "endpoint", None)
@@ -268,10 +276,13 @@ def _current_rows_json() -> int:
 
 def _raw_method_paths(*, experimental: bool) -> list[tuple[str, str]]:
     code = (
-        "import json;"
-        "from app.main import app;"
+        "import sys, json;"
+        "sys.path.insert(0, 'scripts');"
+        "from fastapi_route_iter import iter_app_routes;"
+        "from app.main import create_app;"
+        "app=create_app();"
         "out=[];"
-        "[out.append([m.upper(), r.path]) for r in app.routes "
+        "[out.append([m.upper(), r.path]) for r in iter_app_routes(app) "
         "if hasattr(r, 'methods') for m in (r.methods or []) "
         "if m.upper() not in {'HEAD','OPTIONS'}];"
         "print(json.dumps(sorted(out)))"

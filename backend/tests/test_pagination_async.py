@@ -10,9 +10,6 @@ from app.models import WorkflowPaginationConfig
 from app.pagination_executor import PaginationConfig, async_paginate
 from pydantic import ValidationError
 
-pytestmark = pytest.mark.asyncio
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -81,6 +78,8 @@ async def _dummy_extract_fn(page: Any) -> list[dict]:
 class TestAsyncPaginateNextButton:
     """Tests for async next-button pagination strategy."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_single_page_no_next_button(self):
         """Should stop with button_gone when no next button is present."""
         page = _make_mock_page()
@@ -114,6 +113,8 @@ class TestAsyncPaginateNextButton:
 
 class TestAsyncPaginateInfiniteScroll:
     """Tests for async infinite-scroll pagination strategy."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_single_scroll_no_new_content(self):
         """Should stop with no_new_records when scroll height doesn't change."""
@@ -163,6 +164,8 @@ class TestAsyncPaginateInfiniteScroll:
 class TestAsyncPaginateLoadMore:
     """Tests for async load-more button pagination strategy."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_no_load_more_button(self):
         """Should stop with button_gone when no load-more button is present."""
         page = _make_mock_page()
@@ -181,6 +184,8 @@ class TestAsyncPaginateLoadMore:
 class TestAsyncPaginatePageNumber:
     """Tests for async page-number pagination strategy."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_single_page_no_pagination_links(self):
         """Should stop with button_gone when no page links exist."""
         page = _make_mock_page()
@@ -192,6 +197,8 @@ class TestAsyncPaginatePageNumber:
 
 class TestAsyncPaginateUrlPattern:
     """Tests for async URL-parameter pagination strategy."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_requires_url_pattern(self):
         """Should return error when no url_pattern is configured."""
@@ -217,6 +224,8 @@ class TestAsyncPaginateUrlPattern:
 
 class TestAsyncPaginateEdgeCases:
     """Tests for edge cases in async pagination."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_unknown_strategy(self):
         """Should return error for unknown strategy."""
@@ -265,6 +274,8 @@ class TestAsyncPaginateEdgeCases:
 
 class TestAsyncPaginateScrollLoadMoreExecutors:
     """Executor-level edge-case coverage for the scroll and load-more paths."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_scroll_respects_max_records(self):
         """``max_records=2`` stops the scroll even when scrollHeight keeps
@@ -434,6 +445,7 @@ class TestCanonicalFiveStrategyContract:
         "load_more",
     )
 
+    @pytest.mark.asyncio
     async def test_async_does_not_reject_canonical_strategy_as_unknown(
         self,
     ) -> None:
@@ -476,6 +488,7 @@ class TestCanonicalFiveStrategyContract:
                 f"result.stopped_reason={result.stopped_reason!r}"
             )
 
+    @pytest.mark.asyncio
     async def test_async_rejects_legacy_url_parameter_key(self) -> None:
         """Regression pin: after the CAND-P2-PAGINATION-ALIAS-001 rename,
         ``async_paginate`` MUST explicitly reject the legacy ``url_parameter``
@@ -516,12 +529,12 @@ class TestCanonicalFiveStrategyContract:
         """
         # The default config must use one of the canonical-5 keys,
         # not the legacy typo.
-        assert PaginationConfig().strategy in self.CANONICAL_STRATEGIES, (
-            f"PaginationConfig default strategy must be one of the canonical 5; got {PaginationConfig().strategy!r}"
+        assert PaginationConfig().strategy in self.CANONICAL_STRATEGIES, (  # pyright: ignore[reportCallIssue]
+            f"PaginationConfig default strategy must be one of the canonical 5; got {PaginationConfig().strategy!r}"  # pyright: ignore[reportCallIssue]
         )
         # WorkflowPaginationConfig must accept all 5 canonical keys.
         for strategy in self.CANONICAL_STRATEGIES:
-            wf = WorkflowPaginationConfig(strategy=strategy)
+            wf = WorkflowPaginationConfig(strategy=strategy)  # pyright: ignore[reportCallIssue]
             assert wf.strategy == strategy, (
                 f"WorkflowPaginationConfig.strategy={strategy!r} round-trip failed; got {wf.strategy!r}"
             )

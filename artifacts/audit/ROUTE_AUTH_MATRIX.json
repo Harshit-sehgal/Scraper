@@ -236,7 +236,7 @@
       "path": "/api/jobs/{job_id}/backfill-metadata",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -248,7 +248,7 @@
       "path": "/api/jobs/{job_id}/cancel",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -308,7 +308,7 @@
       "path": "/api/jobs/{job_id}/reclean",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"

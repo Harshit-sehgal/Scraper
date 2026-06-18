@@ -22,8 +22,9 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATAFORGE_API_KEYS` | - | Comma-separated list of API keys |
-| `DATAFORGE_ADMIN_API_KEY` | - | Admin API key |
+| `DATAFORGE_API_KEY` | - | User-level API key (read access) |
+| `DATAFORGE_OPERATOR_API_KEY` | - | Operator API key (write access; env-backed operators have all-access with no org/project scope) |
+| `DATAFORGE_ADMIN_API_KEY` | - | Admin API key (global all-access) |
 | `DATAFORGE_SESSION_SECRET` | - | Session signing secret (auto-generated if not set) |
 | `DATAFORGE_ALLOW_INSECURE_DEV_AUTH` | `false` | Allow insecure auth in development |
 | `DATAFORGE_BILLING_WEBHOOK_SECRET` | - | Shared secret for billing webhook HMAC/shared-secret verification |
@@ -49,7 +50,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATAFORGE_TELEGRAM_ENABLED` | `false` | Enable Telegram notifications |
-| `DATAFORGE_TELEGRAM_TOKEN` | - | Telegram bot token |
+| `DATAFORGE_TELEGRAM_BOT_TOKEN` | - | Telegram bot token |
 | `DATAFORGE_TELEGRAM_CHAT_ID` | - | Telegram chat ID |
 
 ## Security
@@ -58,6 +59,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 |----------|---------|-------------|
 | `DATAFORGE_METRICS_TOKEN` | - | Token for metrics endpoint |
 | `DATAFORGE_TRUSTED_PROXIES` | - | Comma-separated list of trusted proxies |
+| `DATAFORGE_CORS_ORIGINS` | - | Comma-separated list of allowed CORS origins |
 | `DATAFORGE_ALLOWED_INTERNAL_HOSTS` | - | Comma-separated list of allowed internal hosts |
 | `DATAFORGE_DENYLIST_DB_PATH` | - | Optional SQLite path for the operator-managed domain denylist |
 | `DATAFORGE_ENCRYPTION_KEY` | - | Base64 AES-GCM key for auth-profile storage state encryption |
@@ -68,6 +70,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_DISCOVERY_DIRECTORY_DOMAINS` | - | Comma-separated allowlist of domains for auto-discovery directory mode |
 | `DATAFORGE_LOCATION_WORDS` | - | Comma-separated extra location words to recognise when extracting location fields |
 | `DATAFORGE_LOCATION_WORDS_FILE` | - | Path to a file containing extra location words (one per line) |
+| `DATAFORGE_DB_PASSWORD` | - | Postgres password (fallback used by backup/restore scripts when `DATAFORGE_DATABASE_URL` is unset) |
 
 ## Experimental Features
 

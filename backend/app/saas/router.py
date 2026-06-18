@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.audit_logger import log_job_event
+from app.plan_enforcer import get_plan_limits, get_user_tier
 from app.saas.identity_store import IdentityStoreError, get_identity_store
 
 # Models & services
@@ -28,6 +29,7 @@ from app.saas.models import (
 )
 from app.saas.service import SignupService
 from app.utils.rbac import UserRole, require_role_with_user
+from app.utils.usage_ledger import UsageType
 
 logger = logging.getLogger(__name__)
 
@@ -555,14 +557,35 @@ async def remove_member(
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
 ) -> None:
-    """Remove a member from an organization (admin/operator only)."""
-    _role, user_id = auth
+    """Remove a member from an organization (admin/operator only).
+
+    The caller must be a member of the target membership's organization
+    (env-backed admins retain all-access). Without this check, a
+    persistent WRITE key from Org A could remove any member from Org B
+    by guessing/obtaining a ``membership_id``.
+    """
+    role, user_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
     membership = get_identity_store().get_membership(membership_id)
     if not membership:
         raise HTTPException(status_code=404, detail="membership not found")
+
+    # The caller must be a member of the target membership's organization
+    # (matching ``get_organization``'s convention). Without this check, a
+    # persistent WRITE key from Org A could remove any member from Org B
+    # by guessing/obtaining a ``membership_id``.
+    if not get_identity_store().is_org_member(user_id, membership.org_id):
+        log_job_event(
+            actor=user_id,
+            action="member_remove",
+            job_id="saas",
+            outcome="denied",
+            details={"membership_id": membership_id, "org_id": membership.org_id, "reason": "not_org_member"},
+        )
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+    _ = role
 
     # Cannot remove self if the last owner
     if membership.role == MembershipRole.OWNER and membership.user_id == user_id:
@@ -583,7 +606,10 @@ async def remove_member(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Plan & Limits (stub — records tier, does not enforce)
+# Plan & Limits — informational view of the caller's tier. Enforcement
+# of tier limits lives in ``app.plan_enforcer`` (wired into job creation
+# and other metered routes via ``require_plan_limit``); this endpoint
+# only reports the current tier and its derived limits to the UI.
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -596,6 +622,71 @@ class PlanTier(str):
     STARTER = "starter"
     PRO = "pro"
     ENTERPRISE = "enterprise"
+
+
+# Per-tier feature flags and teammate/project caps. Usage limits
+# (jobs/pages/scheduled/api) are sourced from ``app.plan_enforcer`` so
+# there is a single source of truth for the numeric limits.
+_TIER_FEATURES: dict[str, list[str]] = {
+    "free": ["basic_scraping", "scheduled_jobs", "aup_compliance"],
+    "starter": ["basic_scraping", "scheduled_jobs", "aup_compliance", "csv_export", "json_export"],
+    "pro": [
+        "basic_scraping",
+        "scheduled_jobs",
+        "aup_compliance",
+        "csv_export",
+        "json_export",
+        "excel_export",
+        "workflow_replay",
+        "auth_profiles",
+    ],
+    "enterprise": [
+        "basic_scraping",
+        "scheduled_jobs",
+        "aup_compliance",
+        "csv_export",
+        "json_export",
+        "excel_export",
+        "workflow_replay",
+        "auth_profiles",
+        "priority_support",
+        "custom_retention",
+    ],
+}
+
+_TIER_TEAMMATES: dict[str, int] = {
+    "free": 2,
+    "starter": 5,
+    "pro": 25,
+    "enterprise": -1,
+}
+
+_TIER_PROJECTS: dict[str, int] = {
+    "free": 2,
+    "starter": 10,
+    "pro": 100,
+    "enterprise": -1,
+}
+
+
+# Maximum API-key scope grantable per org membership role. Used by
+# ``create_api_key`` to enforce the privilege boundary: a viewer-level
+# member must not be able to mint an admin-scope key (which maps to
+# ``UserRole.ADMIN`` → global all-access). Kept at module level so the
+# policy is testable in isolation.
+_MAX_KEY_SCOPE_FOR_ROLE: dict[str, str] = {
+    "owner": "admin",
+    "admin": "admin",
+    "member": "write",
+    "viewer": "read",
+}
+
+# Rank order for scope comparison (higher = more privileged).
+_SCOPE_RANK: dict[str, int] = {
+    "read": 0,
+    "write": 1,
+    "admin": 2,
+}
 
 
 class PlanInfoResponse(BaseModel):
@@ -687,6 +778,37 @@ async def create_api_key(
         "admin": ApiKeyScope.ADMIN,
     }
     scope = scope_map.get(body.scope.lower(), ApiKeyScope.READ)
+
+    # Privilege boundary: the granted key scope MUST NOT exceed the
+    # caller's own membership role in the target org. Without this, a
+    # viewer-level member who holds a WRITE key (→ OPERATOR) could
+    # issue an admin-scope key for any project in the org, and because
+    # UserRole.ADMIN maps to global all-access, that key would grant
+    # access to every tenant's data.
+    _caller_memberships = get_identity_store().list_user_memberships(user_id)
+    _caller_role_in_org = next(
+        (m.role for m in _caller_memberships if m.org_id == project.org_id and m.is_active()),
+        None,
+    )
+    _caller_role_value = _caller_role_in_org.value if _caller_role_in_org else "viewer"
+    _caller_max_scope = _MAX_KEY_SCOPE_FOR_ROLE.get(_caller_role_value, "read")
+    if _SCOPE_RANK.get(body.scope.lower(), 0) > _SCOPE_RANK.get(_caller_max_scope, 0):
+        log_job_event(
+            actor=user_id,
+            action="api_key_create",
+            job_id="saas",
+            outcome="denied",
+            details={
+                "project_id": project_id,
+                "requested_scope": body.scope,
+                "caller_membership_role": _caller_role_value,
+                "reason": "scope_exceeds_membership_role",
+            },
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot issue a {body.scope}-scope key: your membership role in this org does not permit it.",
+        )
 
     svc = ApiKeyService(store=get_identity_store())
     issued = svc.issue(
@@ -801,20 +923,27 @@ async def revoke_api_key(
 
 @router.get("/plan", response_model=PlanInfoResponse)
 async def get_plan_info(
-    _auth: Annotated[
+    auth: Annotated[
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ) -> PlanInfoResponse:
     """Return the current user's plan and limits.
 
-    Stub — returns free tier defaults. Future: lookup from a billing table.
+    Looks up the caller's tier via the billing service (falling back to
+    ``free`` when billing is unconfigured) and derives the usage limits
+    from the same ``app.plan_enforcer`` source of truth that enforces
+    them at job-creation time, so the informational view and the
+    enforcement gate can never drift.
     """
+    _role, user_id = auth
+    tier = get_user_tier(user_id) if user_id else "free"
+    limits = get_plan_limits(tier)
     return PlanInfoResponse(
-        tier="free",
-        max_jobs=10,
-        max_scrapes=1000,
-        max_teammates=2,
-        max_projects=2,
-        features=["basic_scraping", "scheduled_jobs", "aup_compliance"],
+        tier=tier,
+        max_jobs=limits.get(UsageType.JOB_CREATED.value, 10),
+        max_scrapes=limits.get(UsageType.PAGE_FETCHED.value, 1000),
+        max_teammates=_TIER_TEAMMATES.get(tier, 2),
+        max_projects=_TIER_PROJECTS.get(tier, 2),
+        features=_TIER_FEATURES.get(tier, _TIER_FEATURES["free"]),
     )

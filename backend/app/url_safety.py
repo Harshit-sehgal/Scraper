@@ -229,6 +229,30 @@ def validate_public_http_url(url: str) -> None:
     # event loop when this function is called from async request handlers.
 
 
+def validate_public_domain(domain: str) -> None:
+    """Raise ValueError if ``domain`` resolves to or points to a private /
+    internal network target.
+
+    A thin wrapper over :func:`validate_public_http_url` that accepts a
+    bare hostname (as stored by the auth-profile feature) instead of a
+    full URL. Used to prevent SSRF via auth-profile live-session checks:
+    an operator must not be able to store ``domain="localhost"`` or an
+    internal host and then trigger a server-side fetch against it.
+    """
+    if not domain:
+        msg = "domain cannot be empty"
+        _record_ssrf_reject("empty_domain")
+        raise ValueError(msg)
+    stripped = domain.strip().lower()
+    # Reject anything that looks like it already carries a scheme.
+    if "://" in stripped:
+        validate_public_http_url(stripped)
+        return
+    # Construct an HTTPS URL and delegate to the canonical checker so the
+    # private-IP / loopback / cloud-metadata / internal-TLD rules all apply.
+    validate_public_http_url(f"https://{stripped}/")
+
+
 def _record_ssrf_reject(reason: str) -> None:
     """Record an SSRF reject with a structured reason for Prometheus export.
 
@@ -477,7 +501,7 @@ class _UrlValidatingAsyncTransport(httpx.AsyncBaseTransport):
                 # We deliberately do NOT call validate_public_http_url here
                 # because that raises ValueError on smoke-test allowlist
                 # bypass; we want a transport-layer hard fail.
-                infos = await asyncio.get_event_loop().getaddrinfo(host, None)
+                infos = await asyncio.get_running_loop().getaddrinfo(host, None)
                 for _family, _type, _proto, _canonname, sockaddr in infos:
                     if not is_safe_ip(str(sockaddr[0])):
                         msg = f"Transport rejected unsafe destination IP for host {host}"

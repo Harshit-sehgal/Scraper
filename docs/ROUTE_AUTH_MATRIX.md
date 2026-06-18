@@ -31,13 +31,13 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `DELETE` | `/api/jobs/cleanup/terminal` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `DELETE` | `/api/jobs/{job_id}` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/jobs/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/jobs/{job_id}/backfill-metadata` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/jobs/{job_id}/cancel` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/backfill-metadata` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/cancel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/events` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/jobs/{job_id}/export/csv` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/excel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/json` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/jobs/{job_id}/reclean` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/reclean` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/results` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/operator/dashboard` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `DELETE` | `/api/operator/denylist` | protected | admin | require_role_with_user | yes | no | yes | stable | require_role/admin-only dependency |

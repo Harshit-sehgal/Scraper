@@ -170,6 +170,28 @@ class TestPlanEndpoint:
             assert data["max_projects"] == 2
             assert isinstance(data["features"], list)
 
+    def test_plan_limits_match_enforcement_source_of_truth(self, client: TestClient):
+        """The /plan endpoint MUST derive usage limits from the same
+        ``app.plan_enforcer`` source of truth that enforces them at
+        job-creation time, so the informational view and the
+        enforcement gate can never drift.
+        """
+        from app.plan_enforcer import get_plan_limits
+        from app.utils.usage_ledger import UsageType
+
+        resp = client.get("/api/saas/plan")
+        assert resp.status_code in (200, 401)
+        if resp.status_code != 200:
+            return
+        data = resp.json()
+        # Billing is unconfigured in tests, so the tier resolves to free.
+        free_limits = get_plan_limits("free")
+        assert data["max_jobs"] == free_limits[UsageType.JOB_CREATED.value]
+        assert data["max_scrapes"] == free_limits[UsageType.PAGE_FETCHED.value]
+        # features must be a non-empty list and contain the free-tier baseline.
+        assert isinstance(data["features"], list)
+        assert data["features"], "free tier should expose at least one feature"
+
 
 class TestOrganizationEndpoints:
     """Tests for organization management."""
