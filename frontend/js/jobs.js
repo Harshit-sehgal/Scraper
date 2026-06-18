@@ -56,7 +56,7 @@ export async function refreshSystemStatus() {
     const data = await r.json();
     const active = Number((data.jobs || {}).active || 0);
     setEngineStatus(active > 0 ? `Online • ${active} active` : "Online • Idle");
-  } catch (e) {
+  } catch (_e) {
     setEngineStatus("Offline", true);
   }
 }
@@ -76,7 +76,7 @@ export async function refreshJobs() {
     syncPollers(jobsCache);
     setJobsUpdatedAt(Date.now());
     updateJobsLastUpdatedLabel();
-  } catch (e) {
+  } catch (_e) {
     setEngineStatus("Offline", true);
     updateJobsLastUpdatedLabel("Unable to refresh");
     // If cache is empty, show empty state on error

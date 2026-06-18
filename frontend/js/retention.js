@@ -5,13 +5,6 @@
 import { apiFetch } from "./api.js";
 import { toast } from "./utils.js";
 
-function escapeHtml(s) {
-  return String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
-  );
-}
-
 function formatTime(iso) {
   if (!iso) return "";
   try {

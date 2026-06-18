@@ -2,7 +2,7 @@
    DataForge — Topbar health pill
    ═══════════════════════════════════ */
 
-import { apiFetch, API } from "./api.js";
+import { API } from "./api.js";
 
 const REFRESH_MS = 30_000;
 const PROBE_TIMEOUT_MS = 5_000;
