@@ -505,7 +505,7 @@ export async function submitJob(e) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = "Start Scraping →";
+      btn.innerHTML = "Start scraping";
     }
   }
 }

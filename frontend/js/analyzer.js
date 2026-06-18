@@ -110,16 +110,16 @@ export function renderAnalysisInfo(data) {
   if (structureEl) {
     const structType = data.page_structure || "unknown";
     const structConf = data.structure_confidence ? ` (${(data.structure_confidence * 100).toFixed(0)}%)` : "";
-    structureEl.textContent = `📐 ${structType}${structConf}`;
+    structureEl.textContent = `${structType}${structConf}`;
   }
   if (recordsEl) {
-    recordsEl.textContent = `📊 ~${data.estimated_record_count || "?"} records`;
+    recordsEl.textContent = `~${data.estimated_record_count || "?"} records`;
   }
   if (antibotEl) {
     const score = data.anti_bot_score || 0;
     const riskLabel = score < 0.3 ? "Low" : score < 0.6 ? "Medium" : "High";
-    const color = score < 0.3 ? "#1f9a5f" : score < 0.6 ? "#c7851b" : "#d24646";
-    antibotEl.textContent = "🛡️ Anti-bot: ";
+    const color = score < 0.3 ? "var(--success)" : score < 0.6 ? "var(--warning)" : "var(--danger)";
+    antibotEl.textContent = "Anti-bot: ";
     const badge = document.createElement("span");
     badge.style.color = color;
     badge.style.fontWeight = "700";

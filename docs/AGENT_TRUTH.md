@@ -2477,3 +2477,46 @@ Concrete pin so the next agent doesn't need to re-grep:
 
 
 FORGE_WORKFLOW_RUNS_FILE`.
+
+### UI redesign — Notion-style neutral reskin (2026-06-19)
+
+Replaced the warm cream/sage theme + decorative glows + emoji chrome
+with a neutral, Notion-style palette and monochrome SVG line icons.
+Files touched (frontend only, no backend changes):
+`frontend/styles.css`, `frontend/index.html`, `frontend/favicon.svg`,
+`frontend/js/analyzer.js`, `frontend/js/error-boundary.js`,
+`frontend/js/form.js`, `frontend/js/jobs.js`, `frontend/app.js`.
+
+Design tokens flipped to neutral: light `--bg-main #fff` /
+`--ink-main #37352f` / `--line #ececeb` / `--accent #2383e2` (used
+sparingly); dark `--bg-main #191919` / `--ink-main #d4d4d3`.
+Radii reduced (`--radius 6px`, `--radius-sm 4px`, added `--radius-xs
+3px`). Removed all body radial gradients + blurred glows. Buttons are
+flat (no gradient/pill/lift/colored shadow); primary = near-black ink.
+Nav active state = subtle gray fill, no colored accent. Badges/banners
+switched from hardcoded warm hex to semantic tokens.
+
+Emojis removed from all chrome (sidebar nav, topbar, dashboard card
+titles, analyzer, modals, copy buttons, error icon) and replaced with
+inline 16px stroke SVGs. Button arrows (`→ ↓ ← ↻`) stripped. The
+theme-toggle `🌙`/`☀️` is intentionally KEPT — it is set by
+`frontend/js/utils.js:156` and pinned by `frontend/js/utils.test.js`
+(`toBe("☀️")`/`toBe("🌙")`), so changing it would break the test
+contract. Favicon replaced with a clean near-black "D" mark matching
+the topbar brand-icon.
+
+Compatibility: all `data-action`/`data-view`/IDs and class names
+preserved; the only text-content changes are emoji/arrow removals.
+Test-pinned text left intact: `.brand-name`="DataForge",
+`#res-tbody` "Select a job to view results", `#inp-result-search`
+placeholder /Filter rows/, `.ff-value-group label` "Max km/mi",
+`#results-scroll-pos` "0%".
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `npx stylelint 'frontend/**/*.css' --ignore-pattern 'frontend/dist/**'` | 0 | PASS (1 `value-keyword-case` fixed: `optimizeLegibility` -> `optimizelegibility`) |
+| `npx eslint frontend/js/` | 0 | PASS, no warnings |
+| `npx prettier --check 'frontend/**/*.{js,css,html,mjs}'` | 0 | PASS (after `prettier --write frontend/index.html` to wrap long SVG lines) |
+| `npx vitest run --config frontend/vitest.config.js` | 0 | PASS; 20 files, 290 tests |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 checks |
+| `python3 scripts/validate_local.py --frontend` | 0 | PASS; 9/9 checks (frontend_tests, frontend_lint_js, frontend_lint_css) |
