@@ -41,14 +41,26 @@ const VIEW_MAP = {
   "/retention": "retention",
 };
 
+// Detect the SPA base path from the initial page load (e.g. /app/ or /)
+function getBasePath() {
+  const path = window.location.pathname;
+  // If we're under /app/... or /app, treat /app as the base
+  const appIndex = path.indexOf("/app");
+  if (appIndex !== -1) return "/app";
+  return "";
+}
+
+const BASE_PATH = getBasePath();
+
 export function getViewFromPath(path) {
-  const trimmed = path.replace(/\/+$/, "") || "/";
-  return VIEW_MAP[trimmed] || "jobs";
+  // Strip base path (e.g. "/app/jobs" → "/jobs")
+  const normalized = path.replace(BASE_PATH, "").replace(/\/+$/, "") || "/";
+  return VIEW_MAP[normalized] || "jobs";
 }
 
 export function getPathFromView(view) {
-  if (view === "jobs") return "/jobs";
-  return `/${view}`;
+  const suffix = view === "jobs" ? "/jobs" : `/${view}`;
+  return BASE_PATH ? `${BASE_PATH}${suffix}` : suffix;
 }
 
 // ─── View / Tab Switching ───

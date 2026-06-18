@@ -108,7 +108,7 @@ export function initTheme() {
     applySystemTheme();
     // Listen for OS-level theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener("change", (e) => {
+    mq.addEventListener("change", (_e) => {
       if (!localStorage.getItem(THEME_KEY)) {
         applySystemTheme();
       }

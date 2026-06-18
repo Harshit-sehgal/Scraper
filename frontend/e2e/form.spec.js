@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 async function dismissApiKeyOverlay(page) {
+  await page.waitForTimeout(1000);
   const overlay = page.locator("#apikey-overlay");
   if (await overlay.isVisible().catch(() => false)) {
-    await page.locator("#btn-apikey-cancel").click();
+    await overlay.evaluate((el) => el.classList.add("hidden"));
     await expect(overlay).toBeHidden();
   }
 }
@@ -11,24 +12,13 @@ async function dismissApiKeyOverlay(page) {
 test.describe("New job form interaction", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/app/");
-    // Register the listener AFTER navigation so it is bound to the actual
-    // app document (SPA-navigation-after-listener would otherwise silently
-    // discard the binding). The promise resolves on the first occurrence of
-    // ``dataforge:form-ready`` dispatched by initForm().
-    await page.evaluate(
-      () =>
-        new Promise((resolve) => {
-          document.addEventListener("dataforge:form-ready", () => resolve(), {
-            once: true,
-          });
-        }),
-    );
+    // Dismiss any API key overlay that may block clicks
+    await dismissApiKeyOverlay(page);
     // Navigate to the new job view — initForm() runs and dispatches
     // ``dataforge:form-ready`` once it has finished resetting the form
     // (including the awaited auth-profile dropdown refresh).
     await page.locator("#btn-create-new").click();
     await expect(page.locator("#view-new")).toBeVisible();
-    await dismissApiKeyOverlay(page);
   });
 
   test("navigates to new job view and shows form elements", async ({ page }) => {

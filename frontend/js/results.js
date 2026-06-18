@@ -155,7 +155,7 @@ export async function viewResults(id) {
     if (resultSearch) resultSearch.value = "";
     renderFilteredResults();
     syncResultsScrollSlider();
-  } catch (e) {
+  } catch (_e) {
     toast("Failed to load results", "error");
     const thead = document.getElementById("res-thead");
     const tbody = document.getElementById("res-tbody");

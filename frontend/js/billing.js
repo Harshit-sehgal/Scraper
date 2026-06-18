@@ -12,13 +12,6 @@ const TIER_LABELS = {
   enterprise: "Enterprise",
 };
 
-function escapeHtml(s) {
-  return String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
-  );
-}
-
 function renderPlan(plan) {
   if (!plan) return;
   const setText = (id, val) => {
