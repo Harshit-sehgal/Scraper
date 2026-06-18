@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import settings
 from app.models import AuthProfile, AuthProfileStatus
+from app.url_safety import validate_public_domain
 from app.utils.auth_profile_store import AuthProfileStore
 from app.utils.encryption import decrypt as encryption_decrypt
 from app.utils.encryption import encrypt as encryption_encrypt
@@ -96,6 +97,15 @@ async def create_auth_profile(
     ``POST /auth-profiles/{id}/start-login``.
     """
     _role, user_id, org_id, project_id = auth
+    # SSRF guard: validate the target domain is a public host before
+    # storing it. Without this, an operator could store
+    # ``domain="localhost"`` and later trigger a server-side fetch
+    # (``_try_live_session_check``) against an internal service with
+    # the profile's attached cookies.
+    try:
+        validate_public_domain(domain)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     profile = AuthProfile(
         name=name.strip(),
         description=description.strip() if description else "",

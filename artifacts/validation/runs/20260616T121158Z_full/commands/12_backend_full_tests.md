@@ -82,11 +82,11 @@ client = <tests.conftest.LocalASGIClient object at 0x77b110628260>
         data_signup = signup.json()
         project_id = data_signup["project_id"]
         user_id = data_signup["user_id"]
-    
+
         from app.auth.session import SESSION_COOKIE, create_session_cookie
-    
+
         cookies = {SESSION_COOKIE: [REDACTED]
-    
+
         create = client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "Revoke Test", "scope": "read"},
@@ -112,7 +112,7 @@ client = <tests.conftest.LocalASGIClient object at 0x77b111402d20>
             },
         )
         user1_id = signup1.json()["user_id"]
-    
+
         signup2 = client.post(
             "/api/saas/signup",
             json={
@@ -121,12 +121,12 @@ client = <tests.conftest.LocalASGIClient object at 0x77b111402d20>
             },
         )
         project2 = signup2.json()["project_id"]
-    
+
         # Authenticate as user1
         from app.auth.session import SESSION_COOKIE, create_session_cookie
-    
+
         cookies = {SESSION_COOKIE: [REDACTED]
-    
+
         # User1 tries to list keys for user2's project
         list_resp = client.get(f"/api/saas/projects/{project2}/keys", cookies=cookies)
 >       assert list_resp.status_code == 403

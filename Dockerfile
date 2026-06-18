@@ -11,7 +11,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 0: Base — shared system dependencies
 # ─────────────────────────────────────────────────────────────────────────────
-FROM python:3.12-slim AS base
+# Image digest is pinned for reproducible builds. To update, run:
+#   docker pull python:3.12-slim
+#   docker inspect python:3.12-slim --format='{{index .RepoDigests 0}}'
+# Then replace the digest below with the new one.
+FROM python:3.12-slim@sha256:d764629ce0ddd8c71fd371e9901efb324a95789d2315a47db7e4d27e78f1b0e9 AS base
 
 WORKDIR /app
 

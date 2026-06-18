@@ -72,6 +72,7 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
         "semantic_segmentation",
         "semantic_boundary_engine",
         "semantic_allocation_engine",
+        "semantic_roots",
         # ── Topology / manifold / motif / energy / instability ──────────
         "topology_state",
         "topology_state_types",
@@ -252,6 +253,7 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
                     "segmentation",
                     "boundary_engine",
                     "allocation_engine",
+                    "roots",
                 )
             ),
             "core_types",

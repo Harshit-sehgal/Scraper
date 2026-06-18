@@ -81,7 +81,7 @@ Test results:
    CWE: CWE-400 (https://cwe.mitre.org/data/definitions/400.html)
    More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b113_request_without_timeout.html
    Location: backend/manual/manual_chennai.py:50:10
-49	
+49
 50	    res = requests.post("http://localhost:8000/api/jobs", json=payload)
 51	    res.raise_for_status()
 
@@ -113,7 +113,7 @@ Test results:
    Location: backend/manual/manual_workflow.py:26:4
 25	    time.sleep(1)
 26	    requests.delete(f"{API}/api/jobs/{job_id}")
-27	
+27
 
 --------------------------------------------------
 >> Issue: [B113:request_without_timeout] Call to requests without timeout
@@ -121,7 +121,7 @@ Test results:
    CWE: CWE-400 (https://cwe.mitre.org/data/definitions/400.html)
    More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b113_request_without_timeout.html
    Location: backend/manual/manual_workflow.py:28:9
-27	
+27
 28	    r3 = requests.get(f"{API}/api/recycle_bin")
 29	    [j["id"] for j in r3.json().get("jobs", [])]
 
@@ -131,9 +131,9 @@ Test results:
    CWE: CWE-400 (https://cwe.mitre.org/data/definitions/400.html)
    More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b113_request_without_timeout.html
    Location: backend/manual/manual_workflow.py:31:4
-30	
+30
 31	    requests.post(f"{API}/api/recycle_bin/{job_id}/restore")
-32	
+32
 
 --------------------------------------------------
 >> Issue: [B113:request_without_timeout] Call to requests without timeout
@@ -141,9 +141,9 @@ Test results:
    CWE: CWE-400 (https://cwe.mitre.org/data/definitions/400.html)
    More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b113_request_without_timeout.html
    Location: backend/manual/manual_workflow.py:33:4
-32	
+32
 33	    requests.delete(f"{API}/api/jobs/{job_id}")
-34	
+34
 
 --------------------------------------------------
 >> Issue: [B113:request_without_timeout] Call to requests without timeout
@@ -151,9 +151,9 @@ Test results:
    CWE: CWE-400 (https://cwe.mitre.org/data/definitions/400.html)
    More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b113_request_without_timeout.html
    Location: backend/manual/manual_workflow.py:35:4
-34	
+34
 35	    requests.delete(f"{API}/api/recycle_bin/{job_id}")
-36	
+36
 
 --------------------------------------------------
 >> Issue: [B113:request_without_timeout] Call to requests without timeout

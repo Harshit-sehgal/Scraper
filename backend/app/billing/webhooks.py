@@ -44,6 +44,7 @@ _SECRET_HEADERS = (
     "X-Webhook-Secret",
 )
 
+
 # Path is captured at module import time. Tests that need a per-run
 # store must set ``DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`` BEFORE the
 # module is imported (or before ``importlib.reload`` is called).
@@ -119,8 +120,7 @@ class _SubscriptionStore:
                     if _is_production_env():
                         raise
                     logger.debug(
-                        "flock unsupported on this filesystem; "
-                        "cross-process safety is not guaranteed (path=%s)",
+                        "flock unsupported on this filesystem; cross-process safety is not guaranteed (path=%s)",
                         lock_path,
                     )
                 else:
@@ -315,7 +315,12 @@ async def billing_webhook(request: Request) -> dict[str, str]:
 
     event_type: str = str(body.get("event_type", body.get("type", "")) or "")
     data: dict[str, Any] = body.get("data", {}) if isinstance(body, dict) else {}
-    customer_id: str = str(data.get("customer_id", data.get("customer", data.get("id", ""))) or "")
+    # Resolve the customer id from ``customer_id`` / ``customer`` only.
+    # Do NOT fall back to ``data["id"]`` — that is the event/object id
+    # in Stripe/Autumn payloads, not a customer id; using it would
+    # persist a subscription record keyed by the event id and let a
+    # later bogus event with the same id clobber a real customer.
+    customer_id: str = str(data.get("customer_id", data.get("customer", "")) or "")
 
     logger.info("Billing webhook received: event=%s customer=%s", event_type, customer_id)
 
@@ -334,7 +339,7 @@ def _process_webhook_event(event_type: str, data: dict[str, Any]) -> None:
     """
     customer_id: str = ""
     if isinstance(data, dict):
-        customer_id = str(data.get("customer_id", data.get("customer", data.get("id", ""))) or "")
+        customer_id = str(data.get("customer_id", data.get("customer", "")) or "")
 
     if not customer_id:
         logger.warning("Webhook event %s has no customer_id", event_type)

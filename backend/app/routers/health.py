@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.globals import jobs_store, recycle_bin_store
+from app.storage_interface import get_job_repository
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +29,6 @@ _PATH_PATTERN = re.compile(r"/[\w/.\-]+")
 
 def _sanitise_error(msg: str) -> str:
     return _PATH_PATTERN.sub("<path>", msg)
-
-
-def get_job_repository():
-    import app.main
-
-    return app.main.get_job_repository()
 
 
 @router.get("/")

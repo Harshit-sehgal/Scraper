@@ -8,10 +8,17 @@
  * callers rather than erroring out.
  */
 
-import { apiFetch } from "./api.js";
+import { apiFetch, getSessionRole } from "./api.js";
 
 const REFRESH_MS = 60_000;
 const MAX_EVENTS = 12;
+
+// ``GET /api/system/audit-log`` is admin-only. Non-admin callers get
+// 403, which (via apiFetch) pops the API-key modal every 15s — so skip
+// polling for non-admin users (F-015).
+function _isAdminViewer() {
+  return (getSessionRole() || "") === "admin";
+}
 
 let timer = null;
 
@@ -104,6 +111,11 @@ export async function refreshRecentActivity() {
 
 export function startRecentActivity() {
   if (timer) return;
+  if (!_isAdminViewer()) {
+    _renderError("Audit log is admin-only.");
+    _renderLastRefreshed();
+    return;
+  }
   void refreshRecentActivity();
   timer = setInterval(() => {
     void refreshRecentActivity();

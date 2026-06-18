@@ -81,7 +81,7 @@ client = <tests.conftest.LocalASGIClient object at 0x768ff328d610>
             },
         )
         user1_id = signup1.json()["user_id"]
-    
+
         signup2 = client.post(
             "/api/saas/signup",
             json={
@@ -90,12 +90,12 @@ client = <tests.conftest.LocalASGIClient object at 0x768ff328d610>
             },
         )
         project2 = signup2.json()["project_id"]
-    
+
         # Authenticate as user1
         from app.auth.session import SESSION_COOKIE, create_session_cookie
-    
+
         cookies = {SESSION_COOKIE: [REDACTED]
-    
+
         # User1 tries to list keys for user2's project
         list_resp = client.get(f"/api/saas/projects/{project2}/keys", cookies=cookies)
 >       assert list_resp.status_code == 403

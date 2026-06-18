@@ -2,8 +2,8 @@
    DataForge — Auth Profiles Management
    ═══════════════════════════════════════════ */
 
-import { API } from "./api.js";
-import { toast } from "./utils.js";
+import { API, apiFetch } from "./api.js";
+import { attrStr, esc, showConfirm, toast } from "./utils.js";
 
 // ─── State ───
 let _allProfiles = [];
@@ -23,18 +23,18 @@ function _authProfileRow(profile) {
   const statusLabel = profile.status.replace(/_/g, " ");
 
   return `
-    <div class="job-row" data-profile-id="${profile.id}">
+    <div class="job-row" data-profile-id="${attrStr(profile.id)}">
       <div class="job-name-col">
-        <div class="job-name">${profile.name}</div>
-        <div class="job-urls">${profile.description || ""}</div>
+        <div class="job-name">${esc(profile.name)}</div>
+        <div class="job-urls">${esc(profile.description || "")}</div>
       </div>
-      <div class="job-urls">${profile.domain}</div>
+      <div class="job-urls">${esc(profile.domain)}</div>
       <div>
-        <span class="${statusBadgeClass}">${statusLabel}</span>
+        <span class="${statusBadgeClass}">${esc(statusLabel)}</span>
       </div>
       <div class="job-actions">
-        ${profile.status === "active" || profile.status === "expired" ? `<button type="button" class="btn ghost small" data-action="reconnect-auth-profile" data-id="${profile.id}">🔗 Reconnect</button>` : ""}
-        <button type="button" class="btn danger-ghost small" data-action="revoke-auth-profile" data-id="${profile.id}">Revoke</button>
+        ${profile.status === "active" || profile.status === "expired" ? `<button type="button" class="btn ghost small" data-action="reconnect-auth-profile" data-id="${attrStr(profile.id)}">🔗 Reconnect</button>` : ""}
+        <button type="button" class="btn danger-ghost small" data-action="revoke-auth-profile" data-id="${attrStr(profile.id)}">Revoke</button>
       </div>
     </div>
   `;
@@ -109,7 +109,7 @@ export async function refreshAuthProfiles() {
   _isLoading = true;
 
   try {
-    const res = await fetch(`${API}/api/auth-profiles`, { credentials: "include" });
+    const res = await apiFetch(`${API}/api/auth-profiles`);
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         toast("Authentication required to view auth profiles.", "warning");
@@ -133,9 +133,8 @@ export async function createAuthProfile(name, domain, description = "") {
     const params = new URLSearchParams({ name, domain });
     if (description) params.append("description", description);
 
-    const res = await fetch(`${API}/api/auth-profiles?${params.toString()}`, {
+    const res = await apiFetch(`${API}/api/auth-profiles?${params.toString()}`, {
       method: "POST",
-      credentials: "include",
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -152,9 +151,8 @@ export async function createAuthProfile(name, domain, description = "") {
 
 export async function reconnectAuthProfile(profileId) {
   try {
-    const res = await fetch(`${API}/api/auth-profiles/${profileId}/start-login`, {
+    const res = await apiFetch(`${API}/api/auth-profiles/${profileId}/start-login`, {
       method: "POST",
-      credentials: "include",
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -172,33 +170,32 @@ export async function reconnectAuthProfile(profileId) {
 
 export async function revokeAuthProfile(profileId) {
   const profile = _allProfiles.find((p) => p.id === profileId);
-  const confirm = window.confirm(
+  showConfirm(
+    "Revoke Auth Profile?",
     `Revoke auth profile "${profile?.name || profileId}"? This will invalidate the stored session.`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API}/api/auth-profiles/${profileId}/revoke`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to revoke auth profile");
+        }
+        toast("Auth profile revoked successfully", "success");
+        await refreshAuthProfiles();
+      } catch (err) {
+        toast(err.message, "error");
+        throw err;
+      }
+    },
   );
-  if (!confirm) return;
-
-  try {
-    const res = await fetch(`${API}/api/auth-profiles/${profileId}/revoke`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to revoke auth profile");
-    }
-    toast("Auth profile revoked successfully", "success");
-    await refreshAuthProfiles();
-  } catch (err) {
-    toast(err.message, "error");
-    throw err;
-  }
 }
 
 export async function validateAuthProfile(profileId) {
   try {
-    const res = await fetch(`${API}/api/auth-profiles/${profileId}/validate`, {
+    const res = await apiFetch(`${API}/api/auth-profiles/${profileId}/validate`, {
       method: "POST",
-      credentials: "include",
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

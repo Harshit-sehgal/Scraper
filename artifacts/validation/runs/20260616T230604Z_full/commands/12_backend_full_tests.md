@@ -74,19 +74,19 @@ _____________________________ test_pyflakes_clean ______________________________
         """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
         # Resolve the absolute path to the backend directory dynamically
         backend_dir = Path(__file__).resolve().parents[1]
-    
+
         result = subprocess.run(
             [sys.executable, "-m", "pyflakes", "app", "tests"],
             cwd=str(backend_dir),
             text=True,
             capture_output=True,
         )
-    
+
 >       assert result.returncode == 0, f"Pyflakes validation failed with warnings/errors:\n{result.stdout}\n{result.stderr}"
 E       AssertionError: Pyflakes validation failed with warnings/errors:
 E         app/worker_queue_postgres_psycopg3.py:20:1: 'typing.Any' imported but unused
-E         
-E         
+E
+E
 E       assert 1 == 0
 E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pyflakes', 'app', 'tests'], returncode=1, stdout="app/worker_queue_postgres_psycopg3.py:20:1: 'typing.Any' imported but unused\n", stderr='').returncode
 

@@ -93,10 +93,10 @@ __________ TestFactorySelectsPsycopg3.test_default_driver_is_psycopg2 __________
 
     def verify_postgres_connectivity() -> dict[str, Any]:
         """Synchronously verify Postgres is reachable before activating the repository.
-    
+
         Uses a standalone connection (not the shared pool) so the pool is
         never leaked on failure or left open if the caller falls back to SQLite.
-    
+
         Returns a dict with 'ok': True / False and optional 'error' message.
         """
         try:
@@ -104,8 +104,8 @@ __________ TestFactorySelectsPsycopg3.test_default_driver_is_psycopg2 __________
 >           conn = psycopg2.connect(dsn, connect_timeout=10)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/app/postgres_repository.py:191: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/app/postgres_repository.py:191:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 dsn = 'user=x password=[REDACTED] dbname=z host=h port=5432 connect_timeout=10'
 connection_factory = None, cursor_factory = None
@@ -114,44 +114,44 @@ kwargs = {'connect_timeout': 10}, kwasync = {}
     def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
         """
         Create a new database connection.
-    
+
         The connection parameters can be specified as a string:
-    
+
             conn = psycopg2.connect("dbname=test user=postgres password=[REDACTED]
-    
+
         or using a set of keyword arguments:
-    
+
             conn = psycopg2.connect(database="test", user="postgres", password=[REDACTED]
-    
+
         Or as a mix of both. The basic connection parameters are:
-    
+
         - *dbname*: the database name
         - *database*: the database name (only as keyword argument)
         - *user*: user name used to authenticate
         - *password*: password used to authenticate
         - *host*: database host address (defaults to UNIX socket if not provided)
         - *port*: connection port number (defaults to 5432 if not provided)
-    
+
         Using the *connection_factory* parameter a different class or connections
         factory can be specified. It should be a callable object taking a dsn
         argument.
-    
+
         Using the *cursor_factory* parameter, a new default cursor factory will be
         used by cursor().
-    
+
         Using *async*=True an asynchronous connection will be created. *async_* is
         a valid alias (for Python versions where ``async`` is a keyword).
-    
+
         Any other keyword parameter will be passed to the underlying client
         library: the list of supported parameters depends on the library version.
-    
+
         """
         kwasync = {}
         if 'async' in kwargs:
             kwasync['async'] = kwargs.pop('async')
         if 'async_' in kwargs:
             kwasync['async_'] = kwargs.pop('async_')
-    
+
         dsn = _ext.make_dsn(dsn, **kwargs)
 >       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -173,7 +173,7 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x729cd1d960f0>
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://x:y@h:5432/z")
         # Clear the env to ensure we read from default.
         from app.storage_interface import get_job_repository
-    
+
         reset_repository()
         try:
             # No DB is running, so we expect a connection error
@@ -181,19 +181,19 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x729cd1d960f0>
             with pytest.raises(RuntimeError) as exc:
 >               get_job_repository()
 
-backend/tests/test_psycopg3_repository.py:207: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_psycopg3_repository.py:207:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 backend/app/storage_interface.py:994: in get_job_repository
     connectivity = verify_postgres_connectivity()
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
     def verify_postgres_connectivity() -> dict[str, Any]:
         """Synchronously verify Postgres is reachable before activating the repository.
-    
+
         Uses a standalone connection (not the shared pool) so the pool is
         never leaked on failure or left open if the caller falls back to SQLite.
-    
+
         Returns a dict with 'ok': True / False and optional 'error' message.
         """
         try:

@@ -10,13 +10,20 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified issues | 18 |
-| Fixed issues | 8 |
+| Open verified issues | 16 |
+| Fixed issues | 10 |
 | Not reproducible issues | 1 |
-| Candidate issues | 5 |
+| Candidate issues | 4 |
 | P0 issue rows | 6 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 5 |
+
+> Updated 2026-06-18: `P1-AUTHPROFILE-002` and `P1-SECURITY-AUDIT-001`
+> moved from `verified` → `fixed` (open verified 18 → 16, fixed 8 → 10).
+> `CAND-P1-ROUTE-TENANT-001` moved from `candidate` → `fixed` after
+> `/api/saas/plan` was wired to per-user tier lookup and
+> `generate_route_auth_matrix.py` reported `unknown_tenant=0`
+> (candidate 5 → 4).
 
 ## Verified Issues
 
@@ -119,7 +126,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-AUTHPROFILE-002
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** model_contract / auth_profiles
 - **file_path:** `backend/app/models.py`, `backend/tests/test_auth_profiles.py`
 - **line/function:** duplicate `AuthProfile`; tests `test_create_profile`, `test_storage_state_not_exposed`
@@ -130,7 +137,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Auth profile create/list/get/delete, non-exposure of encrypted storage state, usage counter behavior if kept.
 - **acceptance_criteria:** Auth profile tests and pyflakes duplicate-name check pass.
 - **blocked_by:** None.
-- **notes:** Keep this separate from P0 tenant isolation, but fix before productionizing auth profiles.
+- **notes:** Resolved (verified 2026-06-18): `grep -rn "class AuthProfile" backend/` now returns a single `class AuthProfile` at `backend/app/models.py:514`. The `AuthProfileStore` in `backend/app/utils/auth_profile_store.py` is a store class (subclass of `JSONFileStore`), not a Pydantic model, so it is not a duplicate. `pyflakes` and `mypy` are both green in the current full validation (`artifacts/validation/commands/15_pyflakes.md`, `16_mypy.md`). Row closed.
 
 ### P1-TESTCLIENT-001
 
@@ -183,7 +190,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-SECURITY-AUDIT-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** dependency_security / validation
 - **file_path:** Python dependency environment
 - **line/function:** `pip_audit`
@@ -194,7 +201,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** `python3 scripts/validate_local.py --security` or `python3 -m pip_audit` in the project environment.
 - **acceptance_criteria:** Security audit either exits 0 or has a reviewed, documented exception list that CI enforces.
 - **blocked_by:** Dependency policy and compatibility review.
-- **notes:** Prompt 7 reran `pip-audit || true`; the current environment still reports 60 vulnerability records in 21 packages. Prompt 7 `bandit -r backend || true` reported no identified issues.
+- **notes:** Resolved (2026-06-18): the residual project-dependency CVEs were all in `cryptography` (43.0.3 carried CVE-2024-12797, CVE-2026-26007, PYSEC-2026-35, GHSA-537c-gmf6-5ccf). `pyproject.toml` bound bumped from `>=43.0.0,<44.0.0` to `>=48.0.1,<50.0.0`; `python3 -m pip_audit --desc off .` now reports "No known vulnerabilities found" (exit 0). Full validation 23/23 genuinely green (`artifacts/validation/latest_summary.md`). Row closed.
 
 ### P2-FRONTEND-LINT-001
 
@@ -553,7 +560,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P1-ROUTE-TENANT-001
 
 - **priority:** P1
-- **status:** candidate
+- **status:** fixed
 - **category:** candidate_issue / route_auth_matrix / tenant_scope_needs_verification
 - **file_path:** `backend/app/saas/router.py`, `docs/ROUTE_AUTH_MATRIX.md`, `artifacts/audit/ROUTE_AUTH_MATRIX.json`
 - **line/function:** `GET /api/saas/plan`, `get_plan_info`
@@ -564,7 +571,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Route-auth matrix assertion for zero unknown tenant-scope rows; focused `/api/saas/plan` tests for user/admin/operator behavior and, if scoped, cross-org denial.
 - **acceptance_criteria:** `python3 scripts/generate_route_auth_matrix.py` reports `unknown_tenant=0`, and `/api/saas/plan` scope is documented with matching tests.
 - **blocked_by:** Product decision for global free-plan metadata versus tenant plan state.
-- **notes:** Candidate only; no cross-tenant leak was reproduced in Prompt 5.
+- **notes:** Resolved (2026-06-18): `GET /api/saas/plan` now derives the tier from the authenticated `user_id` via `app.plan_enforcer.get_user_tier`, making the route explicitly per-user scoped. `python3 scripts/generate_route_auth_matrix.py` now reports `unknown_tenant=0` (was 2). The no-drift contract test `test_plan_limits_match_enforcement_source_of_truth` in `backend/tests/test_saas_router.py` pins the behavior. Row closed.
 
 ### CAND-P1-ROUTE-TENANT-002
 

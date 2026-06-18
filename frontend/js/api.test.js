@@ -201,8 +201,10 @@ describe("apiFetch", () => {
 
     await apiFetch("/api/jobs");
 
+    // F-010: relative /api/... URLs are now resolved to ${API}/api/...
+    // before fetch so they reach the backend in dev mode.
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/jobs",
+      `${API}/api/jobs`,
       expect.objectContaining({
         headers: expect.objectContaining({ "X-API-Key": "test-key" }),
       }),
@@ -216,7 +218,7 @@ describe("apiFetch", () => {
     await apiFetch("/api/jobs", { admin: true });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/jobs",
+      `${API}/api/jobs`,
       expect.objectContaining({
         headers: expect.objectContaining({ "X-Admin-Key": "admin-key" }),
       }),
@@ -257,7 +259,7 @@ describe("apiFetch", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/jobs",
+      `${API}/api/jobs`,
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ "Content-Type": "application/json" }),

@@ -84,18 +84,18 @@ client = <tests.conftest.LocalASGIClient object at 0x78b6587ee660>
         data_signup = signup.json()
         project_id = data_signup["project_id"]
         user_id = data_signup["user_id"]
-    
+
         from app.auth.session import SESSION_COOKIE, create_session_cookie
-    
+
         cookies = {SESSION_COOKIE: [REDACTED]
-    
+
         # Create a key
         client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "List Test", "scope": "write"},
             cookies=cookies,
         )
-    
+
         list_resp = client.get(f"/api/saas/projects/{project_id}/keys", cookies=cookies)
 >       assert list_resp.status_code == 200
 E       assert 404 == 200

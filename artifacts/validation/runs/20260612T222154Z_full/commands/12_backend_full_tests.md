@@ -76,29 +76,29 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ff230d70>
     async def test_worker_picks_queued_job_and_updates_repo(self, client, tmp_queue_db, monkeypatch) -> None:
         """Worker should dequeue a job, process it, and update the repository."""
         import asyncio
-    
+
         from app.worker_queue import get_worker_queue, reset_worker_queue
-    
+
         reset_worker_queue()
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
-    
+
         queue = get_worker_queue(db_path=tmp_queue_db)
-    
+
         # Register a mock handler that simulates job completion
         async def mock_handler(task):
             from app.config import settings
             from app.services.job_runner import run_job
             from app.storage_interface import get_job_repository
-    
+
             job_id = task.payload.get("job_id")
             repo = get_job_repository()
             jobs_store, recycle_bin_store, _ = repo.load_all()
-    
+
             job = jobs_store.get(job_id)
             if not job:
                 msg = f"Job not found: {job_id}"
                 raise ValueError(msg)
-    
+
             await run_job(
                 job_id=job_id,
                 jobs_store=jobs_store,
@@ -116,9 +116,9 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ff230d70>
                 "status": job.status.value,
                 "total_records": job.total_records,
             }
-    
+
         queue.register_handler("scrape_job", mock_handler)
-    
+
         # Create a job via API
         response = await client.post(
             "/api/jobs",
@@ -144,7 +144,7 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ff253f80>
     @pytest.mark.asyncio
     async def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:
         """End-to-end test using the real scrape_job_handler from scripts/run_worker.
-    
+
         Flow:
         1. Import the real scrape_job_handler from scripts.run_worker
         2. Mock scrape_url_with_recovery to return sample records
@@ -155,16 +155,16 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ff253f80>
         """
         import asyncio
         import sys
-    
+
         from app.worker_queue import get_worker_queue, reset_worker_queue
-    
+
         # ── Ensure project root is on path for scripts.run_worker import ─
         project_root = str(Path(__file__).resolve().parents[2])
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
-    
+
         from scripts.run_worker import scrape_job_handler
-    
+
         # ── Mock scraped records ─────────────────────────────────────────
         async def mock_scrape_url_with_recovery(
             url,
@@ -188,7 +188,7 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ff253f80>
             ]
             recovery_stats = {"recovery_attempts": 0, "recovery_actions_taken": [], "acquisition_lineage": {}}
             return sample_records, recovery_stats
-    
+
         monkeypatch.setattr(
             "app.scraper_recovery_integration.scrape_url_with_recovery",
             mock_scrape_url_with_recovery,
@@ -197,37 +197,37 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ff253f80>
             "app.services.job_runner.scrape_url_with_recovery",
             mock_scrape_url_with_recovery,
         )
-    
+
         async def mock_generate_data_insight(results) -> str:
             return "Mock insight for worker integration test."
-    
+
         monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
-    
+
         # ── Setup: enable worker queue, point SQLite at temp path ───────
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
-    
+
         from app.config import settings
         from app.job_store import reset_job_store_for_tests
-    
+
         db_file = tmp_path / "test_real_handler_jobs.db"
         state_file = db_file.with_suffix(".json")
         monkeypatch.setenv("DATAFORGE_STATE_FILE", str(state_file))
         monkeypatch.setattr(settings, "STATE_FILE_PATH", str(state_file))
         reset_job_store_for_tests()
-    
+
         from app.main import jobs_store, recycle_bin_store
-    
+
         jobs_store.clear()
         recycle_bin_store.clear()
-    
+
         reset_worker_queue()
         queue = get_worker_queue(db_path=tmp_path / "test_real_handler_queue.db")
         queue.register_handler("scrape_job", scrape_job_handler)
-    
+
         from app.main import app as main_app
-    
+
         ac = LocalASGIClient(main_app)
-    
+
         # ── Step 1: Create job via API ──────────────────────────────────
         response = await ac.post(
             "/api/jobs",
@@ -255,7 +255,7 @@ self = <tests.test_auth_profiles.TestAuthProfileModel object at 0x754a05c12690>
         assert p.domain == "example.com"
 >       assert p.status == AuthProfileStatus.ACTIVE
 E       AssertionError: assert <AuthProfileS...ending_login'> == <AuthProfileS...IVE: 'active'>
-E         
+E
 E         - active
 E         + pending_login
 
@@ -268,7 +268,7 @@ self = <tests.test_extraction_depth.TestFailureExplainer object at 0x754a05749d9
         explanation = detect_failure(selector_found=False, records_found=0)
 >       assert explanation.failure_type == "no_records_found"
 E       AssertionError: assert 'selector_not_found' == 'no_records_found'
-E         
+E
 E         - no_records_found
 E         + selector_not_found
 
@@ -281,7 +281,7 @@ self = <tests.test_extraction_depth.TestFailureExplainer object at 0x754a0574aa8
         explanation = explain_failure("nonexistent_type")
 >       assert explanation.failure_type == "unknown_error"
 E       AssertionError: assert 'nonexistent_type' == 'unknown_error'
-E         
+E
 E         - unknown_error
 E         + nonexistent_type
 
@@ -376,12 +376,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549fcf2e390>
     def test_double_cancel_terminal_job_returns_early(client, monkeypatch) -> None:
         """Canceling a job that is already in a terminal status returns 'already in terminal'."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:47: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:47:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x754a0591ad20>
 name = 'lifecycle-test'
@@ -411,12 +411,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ffd6bf20>
     def test_cancel_active_job_sets_request_flag(client, monkeypatch) -> None:
         """Canceling a RUNNING job sets cancel_requested without changing status."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:68: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:68:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x7549ffd683e0>
 name = 'lifecycle-test'
@@ -446,12 +446,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ffee7530>
     def test_cancel_pending_job_auto_cancels(client, monkeypatch) -> None:
         """Canceling a PENDING job auto-cancels it to CANCELED status."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:85: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:85:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x7549ffee7950>
 name = 'lifecycle-test'
@@ -481,12 +481,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x754a04130d10>
     def test_delete_terminal_job_moves_to_recycle_bin(client, monkeypatch) -> None:
         """Deleting a terminal-status job moves it to the recycle bin."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:109: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:109:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x754a04132780>
 name = 'lifecycle-test'
@@ -516,12 +516,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549fd585550>
     def test_restore_job_from_recycle_bin(client, monkeypatch) -> None:
         """Restoring a job from recycle bin puts it back in active jobs."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:143: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:143:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x7549fd585850>
 name = 'lifecycle-test'
@@ -551,12 +551,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549fcf2d7c0>
     def test_list_recycle_bin_shows_moved_jobs(client, monkeypatch) -> None:
         """Listing the recycle bin shows jobs that were moved there."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client, name="list-rb-test")
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:171: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:171:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x7549fcf2cd70>
 name = 'list-rb-test'
@@ -586,12 +586,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7549ffd68080>
     def test_restore_and_re_delete_round_trip(client, monkeypatch) -> None:
         """A job can be restored from recycle bin and moved back again."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:187: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:187:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x7549ffd69280>
 name = 'lifecycle-test'
@@ -621,12 +621,12 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x754a04133d70>
     def test_hard_delete_removes_permanently(client, monkeypatch) -> None:
         """Hard deleting from recycle bin removes the job permanently."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:214: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:214:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x754a041339b0>
 name = 'lifecycle-test'
@@ -657,12 +657,12 @@ tmp_path = PosixPath('/tmp/pytest-of-harshit/pytest-472/test_hard_delete_cleans_
     def test_hard_delete_cleans_disk_results(client, monkeypatch, tmp_path) -> None:
         """Hard delete cleans up the results file on disk."""
         import app.main as main_mod
-    
+
 >       job_id = _create_job_in_store(client)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-backend/tests/test_job_lifecycle.py:245: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_job_lifecycle.py:245:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 client = <tests.conftest.LocalASGIClient object at 0x7549ffcac560>
 name = 'lifecycle-test'
@@ -750,7 +750,7 @@ client = <tests.conftest.LocalASGIClient object at 0x7549ef104080>
         )
         assert signup.status_code == 201
         project_id = signup.json()["project_id"]
-    
+
         create = client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "Test Key", "scope": "read"},
@@ -774,13 +774,13 @@ client = <tests.conftest.LocalASGIClient object at 0x7549ef1042c0>
             },
         )
         project_id = signup.json()["project_id"]
-    
+
         # Create a key
         client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "List Test", "scope": "write"},
         )
-    
+
         list_resp = client.get(f"/api/saas/projects/{project_id}/keys")
 >       assert list_resp.status_code == 200
 E       assert 403 == 200
@@ -801,7 +801,7 @@ client = <tests.conftest.LocalASGIClient object at 0x7549fc9c1a90>
             },
         )
         project_id = signup.json()["project_id"]
-    
+
         create = client.post(
             f"/api/saas/projects/{project_id}/keys",
             json={"name": "Revoke Test", "scope": "read"},
@@ -913,7 +913,7 @@ tmp_db = PosixPath('/tmp/pytest-of-harshit/pytest-472/test_v5_to_v6_migration_pr
     def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db) -> None:
         """Migration from v5 to v6 should rebuild worker_heartbeats with composite PK."""
         monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
-    
+
         # Create stub tables that _run_migrations expects at hot-path index creation
         conn = sqlite3.connect(str(tmp_db))
         conn.execute(
@@ -944,14 +944,14 @@ tmp_db = PosixPath('/tmp/pytest-of-harshit/pytest-472/test_v5_to_v6_migration_pr
         conn.execute("INSERT INTO schema_version (version) VALUES (5)")
         conn.commit()
         conn.close()
-    
+
         # Now run the full migration (v5 -> v6)
         from app.job_store import _run_migrations
-    
+
         conn = sqlite3.connect(str(tmp_db))
         conn.row_factory = sqlite3.Row
         _run_migrations(conn)
-    
+
         # Verify schema_version is now 8 (v8 adds org_id/project_id columns)
         ver_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
 >       assert ver_row[0] == 8, f"Expected schema version 8, got {ver_row[0]}"

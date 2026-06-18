@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "backend"
+SCRIPTS = REPO / "scripts"
 DOCS = REPO / "docs"
 
 
@@ -30,9 +31,13 @@ def get_routes_from_code() -> set[str]:
     try:
         # Import the app and get routes
         sys.path.insert(0, str(BACKEND))
-        from app.main import app
+        sys.path.insert(0, str(SCRIPTS))
+        from app.main import create_app
+        from fastapi_route_iter import iter_app_routes
 
-        for route in app.routes:
+        app = create_app()
+
+        for route in iter_app_routes(app):
             if hasattr(route, "path"):
                 methods = getattr(route, "methods", {"GET"})
                 for method in methods:

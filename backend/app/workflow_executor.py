@@ -1,12 +1,21 @@
 """Workflow Executor — replay saved scraping workflows with Playwright.
 
-Provides the execution engine for saved workflows. Each workflow is a
-sequence of steps (open, fill, click, etc.) that are replayed against
-a live Playwright browser. After the steps complete, the configured
-extraction schema is applied to the final page state.
+Experimental — not wired into the production job lifecycle.
+============================================================
+
+This module provides the execution engine for saved workflows. Each
+workflow is a sequence of steps (open, fill, click, etc.) that are
+replayed against a live Playwright browser. After the steps complete,
+the configured extraction schema is applied to the final page state.
 
 Pagination strategies (infinite scroll, load more, next button) are
 handled via ``app.pagination_executor.async_paginate``.
+
+**Status**: Tested but not yet integrated into the production scraper
+pipeline.  To activate, import and call from the job runner.  Until
+then, this module lives alongside the research shell but is not
+registered in ``RESEARCH_MODULES`` because it has a clear near-term
+promotion path (unlike the open-ended research experiments).
 """
 
 from __future__ import annotations

@@ -235,6 +235,13 @@ let lastApi403 = 0;
 
 export async function apiFetch(url, options = {}) {
   const { admin, ...rest } = options;
+  // F-010: prefix relative ``/api/...`` URLs with ``API`` so requests
+  // resolve to the backend (not the dev-server origin) when the frontend
+  // is served from a different port (localhost:3000/5173). Several
+  // modules (billing, audit, retention, workflows, aup, system-info,
+  // recent-activity) pass relative URLs; in production (same-origin SPA)
+  // the prefix is a no-op.
+  const resolvedUrl = url.startsWith("/api/") ? `${API}${url}` : url;
   const headers = { ...(rest.headers || {}) };
   // For session-authenticated clients, the cookie is sent automatically.
   // Only attach X-API-Key for non-session (legacy) mode, or for admin ops
@@ -251,7 +258,7 @@ export async function apiFetch(url, options = {}) {
       headers["X-API-Key"] = key;
     }
   }
-  const res = await fetch(url, { ...rest, headers, credentials: "include" });
+  const res = await fetch(resolvedUrl, { ...rest, headers, credentials: "include" });
   if (res.status === 403 && !admin) {
     const now = Date.now();
     if (now - lastApi403 > 15000 && !isKeyModalVisible()) {

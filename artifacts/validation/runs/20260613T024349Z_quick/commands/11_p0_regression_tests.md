@@ -26,9 +26,9 @@ tmp_path = PosixPath('/tmp/pytest-of-harshit/pytest-501/test_route_auth_matrix_h
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
         monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))
         monkeypatch.setenv("DATAFORGE_SEMANTIC_STATE_PATH", str(tmp_path / "semantic_state.json"))
-    
+
         matrix = _load_module().build_matrix()
-    
+
         # Endpoints that are intentionally unauthenticated mutation routes. Each
         # entry is a (method, path) pair that has a documented reason for being
         # open (e.g. browser-generated reports). The reason is enforced by the
@@ -40,7 +40,7 @@ tmp_path = PosixPath('/tmp/pytest-of-harshit/pytest-501/test_route_auth_matrix_h
             ("POST", "/api/saas/signup"),  # self-service account creation
             ("POST", "/api/saas/aup/accept"),  # P1-COMPLIANCE-001: AUP acceptance (idempotent, any authenticated user)
         }
-    
+
         unsafe = [
             row
             for row in matrix
@@ -51,10 +51,10 @@ tmp_path = PosixPath('/tmp/pytest-of-harshit/pytest-501/test_route_auth_matrix_h
                 and (row.method, row.path) not in UNAUTHENTICATED_MUTATIONS
             )
         ]
-    
+
 >       assert unsafe == []
 E       AssertionError: assert [RouteAuthRow...)', notes='')] == []
-E         
+E
 E         Left contains one more item: RouteAuthRow(method='DELETE', path='/api/user/data', access='authenticated-user', enforcement='require_role([admin, operator, user])', notes='')
 E         Use -v to get more diff
 

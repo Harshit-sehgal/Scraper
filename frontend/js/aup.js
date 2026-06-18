@@ -121,7 +121,7 @@ export async function acceptAup(version) {
     safeWriteAcceptedVersion(version);
     const banner = document.getElementById("aup-banner");
     if (banner) banner.remove();
-    toast("AUP accepted.", "ok");
+    toast("AUP accepted.", "success");
   } catch (err) {
     toast(`AUP acceptance failed: ${err.message || err}`, "error");
   }

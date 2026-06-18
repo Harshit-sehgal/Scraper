@@ -8,7 +8,7 @@ def test_layer7_semantic_memory() -> None:
     records = [{"company": "Google", "price": "100"}]
     schema = ["company_name", "price"]
 
-    os.environ["SEMANTIC_STATE_PATH"] = "/tmp/test_semantic_state.json"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+    os.environ["DATAFORGE_SEMANTIC_STATE_PATH"] = "/tmp/test_semantic_state.json"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
     if os.path.exists("/tmp/test_semantic_state.json"):  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         os.remove("/tmp/test_semantic_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 

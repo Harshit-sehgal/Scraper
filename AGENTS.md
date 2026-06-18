@@ -155,7 +155,7 @@ monitoring, alerting, load tests, auth, tenant isolation,
 billing / usage enforcement, benchmark gates, and incident runbooks
 are proven in the current checkout and target environment.
 
-## Latest Tasks Completed (2026-06-16)
+## Latest Tasks Completed (2026-06-18)
 
 | # | Task | Status |
 |---|------|--------|
@@ -189,6 +189,10 @@ are proven in the current checkout and target environment.
 | 48 | Complete tab-key shortcuts (8/9/0) + tabMap for billing/audit/retention; add `refresh-auth-profiles` action handler; 7 new views.test.js tests | ✅ Done |
 | 49 | Fix inter-test flake in `test_saas_api_keys.py` by adding `reset_identity_store_fixture` autouse fixture (matching `test_saas_router.py`) | ✅ Done |
 | 50 | Final validation: 23/23 checks pass, 3671 backend tests, 289 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
+| 51 | Fix `pip_audit` CVE failure: bump `cryptography` from `>=43.0.0,<44.0.0` to `>=48.0.1,<50.0.0` (clears CVE-2024-12797, CVE-2026-26007, PYSEC-2026-35, GHSA-537c-gmf6-5ccf); full validation was 22/23, now genuinely 23/23 | ✅ Done |
+| 52 | Wire `GET /api/saas/plan` to the real `app.plan_enforcer` source of truth (was a hardcoded free-tier stub while enforcement already existed); add public `get_user_tier` accessor + no-drift contract test; correct stale "stub — does not enforce" banner | ✅ Done |
+| 53 | Close stale issue-ledger rows: `P1-AUTHPROFILE-002` (duplicate `AuthProfile` model already gone) and `P1-SECURITY-AUDIT-001` (pip_audit now green); remove duplicate "Recently Resolved Risks" block in AGENTS.md | ✅ Done |
+| 54 | Final validation: 23/23 checks pass (incl. `pip_audit`), 3672 backend tests, 289 frontend tests, 143 routes (108 stable + 35 experimental) | ✅ Done |
 
 ## Active Risks
 
@@ -196,15 +200,12 @@ are proven in the current checkout and target environment.
 
 ## Recently Resolved Risks
 
-- `CAND-P2-PAYMENT-001`: Payment provider not integrated — Resolved (this session): the billing service already wraps the `autumn-sdk` (Autumn) and falls back to free-tier defaults when `AUTUMN_API_KEY` is unset; the webhook endpoint (`POST /api/billing/webhook`) accepts both shared-secret and HMAC-SHA256 signatures from `X-Autumn-Signature` and `X-Autumn-Webhook-Secret` headers; subscriptions persist cross-process via `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`; the new Billing tab in the dashboard surfaces the plan tier and the (placeholder) "Upgrade plan" CTA. Production rollout still requires setting `AUTUMN_API_KEY` and a webhook secret; see `docs/SAAS_MODEL.md`.
-- `CAND-P2-FRONTEND-SAAS-001` (subset): Billing, Audit, and Retention tabs in the dashboard — Resolved (this session): three new top-level tabs (`#view-billing`, `#view-audit`, `#view-retention`) plus matching Vitest tests; the new `/api/system/audit-log` admin-only endpoint (admin-gated, paginated, with category filter) backs the Audit tab.
-- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres` — Resolved (this session): `clean_db` fixture now installs module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass.
-- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation / multi-key — Resolved (this session): `backend/app/utils/encryption.py` has `encrypt`, `decrypt`, `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` 13/13 pass.
-- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more — Resolved (this session, e2e gap closed): `test_pagination_async.py` extended with `TestAsyncPaginateScrollLoadMoreExecutors` covering max_records, max_runtime (timeout), per-page dedup contract (`test_scroll_records_concatenate_across_pages`), mid-iteration load-more button disappearance, and the final `window.scrollTo(0, 0)` reset call via `evaluate.call_args_list` exact-equality check. 21/21 tests pass.
-- `P1-JOBS-MULTIPROCESS-001`: Jobs store multi-worker safety — Resolved (this session): `backend/tests/test_jobs_store_cross_process.py` (4/4 tests) proves that concurrent writes from N=8 subprocess writers all land in the SQLite-backed jobs DB, that the DB is in WAL mode, and that single-process `persist_state_single` calls from N=16 threads keep the `results` blob intact under contention.
-
-## Recently Resolved Risks
-
-- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres` — Resolved (this session): `clean_db` fixture now installs module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass.
-- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation / multi-key — Resolved (this session): `backend/app/utils/encryption.py` has `encrypt`, `decrypt`, `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` 13/13 pass.
+- `P1-SECURITY-AUDIT-001`: pip_audit failing on cryptography CVEs — Resolved (2026-06-18): `pyproject.toml` cryptography bound bumped to `>=48.0.1,<50.0.0`; `pip_audit` now reports "No known vulnerabilities found"; full validation 23/23 genuinely green.
+- `P1-AUTHPROFILE-002`: Duplicate `AuthProfile` model — Resolved (verified 2026-06-18): only one `class AuthProfile` remains at `backend/app/models.py:514`; `AuthProfileStore` is a store class, not a model. Issue-ledger row closed.
+- `CAND-P2-PAYMENT-001`: Payment provider not integrated — Resolved (prior session): the billing service already wraps the `autumn-sdk` (Autumn) and falls back to free-tier defaults when `AUTUMN_API_KEY` is unset; the webhook endpoint (`POST /api/billing/webhook`) accepts both shared-secret and HMAC-SHA256 signatures from `X-Autumn-Signature` and `X-Autumn-Webhook-Secret` headers; subscriptions persist cross-process via `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`; the new Billing tab in the dashboard surfaces the plan tier and the (placeholder) "Upgrade plan" CTA. Production rollout still requires setting `AUTUMN_API_KEY` and a webhook secret; see `docs/SAAS_MODEL.md`.
+- `CAND-P2-FRONTEND-SAAS-001` (subset): Billing, Audit, and Retention tabs in the dashboard — Resolved (prior session): three new top-level tabs (`#view-billing`, `#view-audit`, `#view-retention`) plus matching Vitest tests; the new `/api/system/audit-log` admin-only endpoint (admin-gated, paginated, with category filter) backs the Audit tab.
+- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres` — Resolved (prior session): `clean_db` fixture now installs module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass.
+- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation / multi-key — Resolved (prior session): `backend/app/utils/encryption.py` has `encrypt`, `decrypt`, `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` 13/13 pass.
+- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more — Resolved (prior session, e2e gap closed): `test_pagination_async.py` extended with `TestAsyncPaginateScrollLoadMoreExecutors` covering max_records, max_runtime (timeout), per-page dedup contract (`test_scroll_records_concatenate_across_pages`), mid-iteration load-more button disappearance, and the final `window.scrollTo(0, 0)` reset call via `evaluate.call_args_list` exact-equality check. 21/21 tests pass.
+- `P1-JOBS-MULTIPROCESS-001`: Jobs store multi-worker safety — Resolved (prior session): `backend/tests/test_jobs_store_cross_process.py` (4/4 tests) proves that concurrent writes from N=8 subprocess writers all land in the SQLite-backed jobs DB, that the DB is in WAL mode, and that single-process `persist_state_single` calls from N=16 threads keep the `results` blob intact under contention.
 - `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more — Resolved (this session, e2e gap closed): `test_pagination_async.py` extended with `TestAsyncPaginateScrollLoadMoreExecutors` covering max_records, max_runtime (timeout), per-page dedup contract (`test_scroll_records_concatenate_across_pages`), mid-iteration load-more button disappearance, and the final `window.scrollTo(0, 0)` reset call via `evaluate.call_args_list` exact-equality check. 21/21 tests pass.

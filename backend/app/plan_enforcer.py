@@ -103,8 +103,26 @@ def _user_tier(user_id: str) -> str:
     return tier_value if tier_value in KNOWN_TIERS else "free"
 
 
+def get_user_tier(user_id: str) -> str:
+    """Return the caller's normalized plan tier (one of ``KNOWN_TIERS``).
+
+    Public read-only accessor over ``_user_tier`` so routers and the
+    ``/api/saas/plan`` informational endpoint can report the current
+    tier without re-implementing the billing lookup + safe fallback.
+    """
+    return _user_tier(user_id)
+
+
 def _auto_set_quota(user_id: str, usage_type: UsageType) -> None:
-    """Ensure the user has a quota row matching their plan tier."""
+    """Ensure the user has a quota row matching their plan tier.
+
+    Also repairs a stale limit after a plan upgrade/downgrade: if a
+    quota row already exists but its ``limit`` no longer matches the
+    current plan's limit, the limit is updated (preserving the current
+    usage count) so a user who upgrades from free (10 jobs) to pro
+    (1000 jobs) mid-cycle actually gets the higher cap instead of
+    staying locked at the old lower limit until a worker restart.
+    """
     tier = _user_tier(user_id)
     limit = _PLAN_LIMITS.get((tier, usage_type))
     if limit is None or limit < 0:
@@ -112,6 +130,10 @@ def _auto_set_quota(user_id: str, usage_type: UsageType) -> None:
     ledger = get_usage_ledger()
     existing = ledger.get_quota(user_id, usage_type)
     if existing is None:
+        ledger.set_quota(user_id, usage_type, limit=limit, period=QuotaPeriod.MONTHLY)
+    elif existing.limit != limit:
+        # Plan changed since the quota row was created — sync the limit
+        # to the current plan while preserving the current usage count.
         ledger.set_quota(user_id, usage_type, limit=limit, period=QuotaPeriod.MONTHLY)
 
 

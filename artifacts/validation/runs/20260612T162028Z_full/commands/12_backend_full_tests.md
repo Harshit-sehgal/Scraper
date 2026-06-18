@@ -77,8 +77,8 @@ self = <tests.test_auth_profiles.TestAuthProfileModel object at 0x7c6687f5b590>
 >       assert p.usage_count == 0
                ^^^^^^^^^^^^^
 
-backend/tests/test_auth_profiles.py:17: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_auth_profiles.py:17:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = AuthProfile(id='1f125569-b411-4bf9-a8a1-8d6ab844086c', name='Login for example.com', description='', user_id='', org_i...at=None, status='active', created_at='2026-06-12T16:21:01.620432+00:00', updated_at='2026-06-12T16:21:01.620441+00:00')
 item = 'usage_count'
@@ -89,7 +89,7 @@ item = 'usage_count'
             attribute = private_attributes[item]
             if hasattr(attribute, '__get__'):
                 return attribute.__get__(self, type(self))  # type: ignore
-    
+
             try:
                 # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
                 return self.__pydantic_private__[item]  # type: ignore
@@ -102,7 +102,7 @@ item = 'usage_count'
                 pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
             except AttributeError:
                 pydantic_extra = None
-    
+
             if pydantic_extra and item in pydantic_extra:
                 return pydantic_extra[item]
             else:
@@ -133,14 +133,14 @@ _____________________________ test_pyflakes_clean ______________________________
         """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
         # Resolve the absolute path to the backend directory dynamically
         backend_dir = Path(__file__).resolve().parents[1]
-    
+
         result = subprocess.run(
             [sys.executable, "-m", "pyflakes", "app", "tests"],
             cwd=str(backend_dir),
             text=True,
             capture_output=True,
         )
-    
+
 >       assert result.returncode == 0, f"Pyflakes validation failed with warnings/errors:\n{result.stdout}\n{result.stderr}"
 E       AssertionError: Pyflakes validation failed with warnings/errors:
 E         app/models.py:566:1: redefinition of unused 'AuthProfile' from line 469
@@ -150,8 +150,8 @@ E         app/saas/router.py:24:1: 'app.saas.models.User' imported but unused
 E         app/saas/router.py:24:1: 'app.saas.models.UserStatus' imported but unused
 E         tests/test_scheduled_monitoring.py:3:1: 'pytest' imported but unused
 E         tests/test_auth_profiles.py:3:1: 'pytest' imported but unused
-E         
-E         
+E
+E
 E       assert 1 == 0
 E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pyflakes', 'app', 'tests'], returncode=1, stdout="app/models.py:566:...ring.py:3:1: 'pytest' imported but unused\ntests/test_auth_profiles.py:3:1: 'pytest' imported but unused\n", stderr='').returncode
 

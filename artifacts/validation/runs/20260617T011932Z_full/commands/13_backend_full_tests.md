@@ -127,9 +127,9 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74d2f7f70560>
     def test_metrics_request_latency_tracking(client, monkeypatch) -> None:
         """After making an API request, the latency histogram should capture it."""
         from app.metrics_collector import reset_for_testing
-    
+
         reset_for_testing()
-    
+
         # Make a request to an API endpoint to trigger latency tracking
         r = client.get("/health")
 >       assert r.status_code == 200
@@ -145,9 +145,9 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74d2f67c3830>
     def test_metrics_health_check_latency(client, monkeypatch) -> None:
         """Health check latency should be recorded when /ready is called."""
         from app.metrics_collector import reset_for_testing
-    
+
         reset_for_testing()
-    
+
         r = client.get("/ready")
 >       assert r.status_code == 200
 E       assert 404 == 200
@@ -182,7 +182,7 @@ E           AssertionError: path must not have a trailing slash (other than the 
 E           assert (not True or '/api/' == '/'
 E            +  where True = <built-in method endswith of str object at 0x74d2f793bd20>('/')
 E            +    where <built-in method endswith of str object at 0x74d2f793bd20> = '/api/'.endswith
-E             
+E
 E             - /
 E             + /api/)
 
@@ -207,19 +207,19 @@ _____________________________ test_pyflakes_clean ______________________________
         """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
         # Resolve the absolute path to the backend directory dynamically
         backend_dir = Path(__file__).resolve().parents[1]
-    
+
         result = subprocess.run(
             [sys.executable, "-m", "pyflakes", "app", "tests"],
             cwd=str(backend_dir),
             text=True,
             capture_output=True,
         )
-    
+
 >       assert result.returncode == 0, f"Pyflakes validation failed with warnings/errors:\n{result.stdout}\n{result.stderr}"
 E       AssertionError: Pyflakes validation failed with warnings/errors:
 E         tests/test_openapi_spec_contract.py:18:1: 'pytest' imported but unused
-E         
-E         
+E
+E
 E       assert 1 == 0
 E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pyflakes', 'app', 'tests'], returncode=1, stdout="tests/test_openapi_spec_contract.py:18:1: 'pytest' imported but unused\n", stderr='').returncode
 
@@ -585,7 +585,7 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74d2f7f73dd0>
         """/ready should report postgres backend when Postgres repository is active."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
-    
+
         response = await client.get("/ready")
 >       assert response.status_code == 200
 E       assert 404 == 200
@@ -602,7 +602,7 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74d2f7f73d10>
         """/ready should return 503 when Postgres repository is unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
-    
+
         response = await client.get("/ready")
 >       assert response.status_code == 503
 E       assert 404 == 503

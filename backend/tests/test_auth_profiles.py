@@ -66,6 +66,35 @@ class TestAuthProfileEndpoints:
         assert resp.status_code == 404
 
 
+class TestAuthProfileDomainSsrfGuard:
+    """R-011: ``create_auth_profile`` MUST reject private/internal domains
+    so the live-session check (``_try_live_session_check``) cannot be used
+    as an SSRF vector against internal services."""
+
+    @pytest.mark.parametrize(
+        "domain",
+        [
+            "localhost",
+            "127.0.0.1",
+            "169.254.169.254",  # cloud metadata
+            "0.0.0.0",
+        ],
+    )
+    def test_private_domain_rejected(self, client: TestClient, domain: str):
+        resp = client.post(
+            f"/api/auth-profiles?name=Ssrf&domain={domain}",
+        )
+        assert resp.status_code == 400, (
+            f"private/internal domain {domain!r} must be rejected; got {resp.status_code}: {resp.text}"
+        )
+
+    def test_public_domain_accepted(self, client: TestClient):
+        resp = client.post(
+            "/api/auth-profiles?name=Ok&domain=example.com",
+        )
+        assert resp.status_code == 201
+
+
 class TestAuthProfileEncryption:
     """Tests that auth profile storage state is encrypted."""
 

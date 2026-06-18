@@ -194,7 +194,7 @@ class TestSelectorDecayPredictorGlobal:
         """Test that confidence snapshots are persisted to JSON and successfully reloaded."""
         import os
 
-        monkeypatch.setenv("TEST_SELECTOR_DECAY_PERSISTENCE", "1")
+        monkeypatch.setenv("DATAFORGE_TEST_SELECTOR_DECAY_PERSISTENCE", "1")
         predictor = SelectorDecayPredictor()
         predictor._confidence_snapshots.clear()
         predictor.record_observation("persistent.com", 0.88)

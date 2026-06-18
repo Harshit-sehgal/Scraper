@@ -81,50 +81,50 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x779bde434200>
         command).
         """
         import sys
-    
+
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
         monkeypatch.setenv("DATAFORGE_PG_DRIVER", "psycopg3")
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://x:y@h:5432/z")
-    
+
         # Force import failure of the psycopg3 module.
         with patch.dict(sys.modules, {"app.psycopg3_repository": None}):
             from app.storage_interface import get_job_repository
-    
+
             reset_repository()
             try:
                 with pytest.raises(RuntimeError) as exc:
 >                   get_job_repository()
 
-backend/tests/test_psycopg3_repository.py:187: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_psycopg3_repository.py:187:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
     def get_job_repository() -> JobRepository:
         """Resolve the appropriate JobRepository based on configuration.
-    
+
         Returns:
             PostgresJobRepository if DATAFORGE_STORAGE_BACKEND=postgres is set
             (and DATAFORGE_DATABASE_URL points to a running instance),
             otherwise SQLiteJobRepository.
-    
+
         The repository is cached as a module-level singleton so that
         all callers share the same instance.
-    
+
         """
         # Fast-path check: avoid acquiring the lock on every call.
         global _repository_instance
         if _repository_instance is not None:
             return _repository_instance
-    
+
         with _REPOSITORY_LOCK:
             # Re-check under the lock to avoid duplicate initialisation when
             # two threads race the first call.
             if _repository_instance is not None:
                 return _repository_instance
-    
+
             from app.config import settings
-    
+
             storage_backend = settings.STORAGE_BACKEND
-    
+
             if storage_backend == "postgres":
                 database_url = settings.DATABASE_URL
                 if not database_url:
@@ -152,7 +152,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                         msg,
                     )
                 pg_driver = pg_driver_env or "psycopg2"
-    
+
                 if pg_driver == "psycopg3":
                     try:
 >                       from app.psycopg3_repository import (

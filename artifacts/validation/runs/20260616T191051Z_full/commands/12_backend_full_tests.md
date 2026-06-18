@@ -83,7 +83,7 @@ ______________________________ test_no_stale_pyc _______________________________
                     py_path = os.path.join(parent, py_name)
                     if not os.path.exists(py_path):
                         pyc_files.append(os.path.join(root, f))
-    
+
 >       assert not pyc_files, f"Stale .pyc files: {pyc_files}. These will be loaded instead of current source."
 E       AssertionError: Stale .pyc files: ['backend/app/utils/__pycache__/workflow_store.cpython-312.pyc']. These will be loaded instead of current source.
 E       assert not ['backend/app/utils/__pycache__/workflow_store.cpython-312.pyc']
@@ -99,54 +99,54 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7916031d1d00>
         reset_repository()
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://localhost:5432/test")
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
-    
+
         import sys
         import types
-    
+
         class _FakeModule(types.ModuleType):
             pass
-    
+
         fake_mod = _FakeModule("postgres_repository")
         sys.modules["app.postgres_repository"] = fake_mod
-    
+
         from app.storage_interface import get_job_repository as gjr
-    
+
         reset_repository()
-    
+
         try:
 >           repo = gjr()
                    ^^^^^
 
-backend/tests/test_postgres_repository.py:103: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_postgres_repository.py:103:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
     def get_job_repository() -> JobRepository:
         """Resolve the appropriate JobRepository based on configuration.
-    
+
         Returns:
             PostgresJobRepository if DATAFORGE_STORAGE_BACKEND=postgres is set
             (and DATAFORGE_DATABASE_URL points to a running instance),
             otherwise SQLiteJobRepository.
-    
+
         The repository is cached as a module-level singleton so that
         all callers share the same instance.
-    
+
         """
         # Fast-path check: avoid acquiring the lock on every call.
         global _repository_instance
         if _repository_instance is not None:
             return _repository_instance
-    
+
         with _REPOSITORY_LOCK:
             # Re-check under the lock to avoid duplicate initialisation when
             # two threads race the first call.
             if _repository_instance is not None:
                 return _repository_instance
-    
+
             from app.config import settings
-    
+
             storage_backend = settings.STORAGE_BACKEND
-    
+
             if storage_backend == "postgres":
                 database_url = settings.DATABASE_URL
                 if not database_url:
@@ -174,14 +174,14 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                         msg,
                     )
                 pg_driver = pg_driver_env or "psycopg2"
-    
+
                 if pg_driver == "psycopg3":
                     try:
                         from app.psycopg3_repository import (
                             Psycopg3JobRepository,
                             verify_psycopg3_connectivity,
                         )
-    
+
                         connectivity = verify_psycopg3_connectivity()
                         if not connectivity.get("ok"):
                             msg = (
@@ -203,7 +203,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                             "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
                         )
                         raise RuntimeError(msg) from e
-    
+
                 try:
 >                   from app.postgres_repository import (
                         PostgresJobRepository,
@@ -236,50 +236,50 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x791601950740>
         command).
         """
         import sys
-    
+
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
         monkeypatch.setenv("DATAFORGE_PG_DRIVER", "psycopg3")
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://x:y@h:5432/z")
-    
+
         # Force import failure of the psycopg3 module.
         with patch.dict(sys.modules, {"app.psycopg3_repository": None}):
             from app.storage_interface import get_job_repository
-    
+
             reset_repository()
             try:
                 with pytest.raises(RuntimeError) as exc:
 >                   get_job_repository()
 
-backend/tests/test_psycopg3_repository.py:187: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_psycopg3_repository.py:187:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
     def get_job_repository() -> JobRepository:
         """Resolve the appropriate JobRepository based on configuration.
-    
+
         Returns:
             PostgresJobRepository if DATAFORGE_STORAGE_BACKEND=postgres is set
             (and DATAFORGE_DATABASE_URL points to a running instance),
             otherwise SQLiteJobRepository.
-    
+
         The repository is cached as a module-level singleton so that
         all callers share the same instance.
-    
+
         """
         # Fast-path check: avoid acquiring the lock on every call.
         global _repository_instance
         if _repository_instance is not None:
             return _repository_instance
-    
+
         with _REPOSITORY_LOCK:
             # Re-check under the lock to avoid duplicate initialisation when
             # two threads race the first call.
             if _repository_instance is not None:
                 return _repository_instance
-    
+
             from app.config import settings
-    
+
             storage_backend = settings.STORAGE_BACKEND
-    
+
             if storage_backend == "postgres":
                 database_url = settings.DATABASE_URL
                 if not database_url:
@@ -307,7 +307,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                         msg,
                     )
                 pg_driver = pg_driver_env or "psycopg2"
-    
+
                 if pg_driver == "psycopg3":
                     try:
 >                       from app.psycopg3_repository import (
@@ -331,7 +331,7 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x791603fe74d0>
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://x:y@h:5432/z")
         # Clear the env to ensure we read from default.
         from app.storage_interface import get_job_repository
-    
+
         reset_repository()
         try:
             # No DB is running, so we expect a connection error
@@ -339,36 +339,36 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x791603fe74d0>
             with pytest.raises(RuntimeError) as exc:
 >               get_job_repository()
 
-backend/tests/test_psycopg3_repository.py:207: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_psycopg3_repository.py:207:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
     def get_job_repository() -> JobRepository:
         """Resolve the appropriate JobRepository based on configuration.
-    
+
         Returns:
             PostgresJobRepository if DATAFORGE_STORAGE_BACKEND=postgres is set
             (and DATAFORGE_DATABASE_URL points to a running instance),
             otherwise SQLiteJobRepository.
-    
+
         The repository is cached as a module-level singleton so that
         all callers share the same instance.
-    
+
         """
         # Fast-path check: avoid acquiring the lock on every call.
         global _repository_instance
         if _repository_instance is not None:
             return _repository_instance
-    
+
         with _REPOSITORY_LOCK:
             # Re-check under the lock to avoid duplicate initialisation when
             # two threads race the first call.
             if _repository_instance is not None:
                 return _repository_instance
-    
+
             from app.config import settings
-    
+
             storage_backend = settings.STORAGE_BACKEND
-    
+
             if storage_backend == "postgres":
                 database_url = settings.DATABASE_URL
                 if not database_url:
@@ -396,14 +396,14 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                         msg,
                     )
                 pg_driver = pg_driver_env or "psycopg2"
-    
+
                 if pg_driver == "psycopg3":
                     try:
                         from app.psycopg3_repository import (
                             Psycopg3JobRepository,
                             verify_psycopg3_connectivity,
                         )
-    
+
                         connectivity = verify_psycopg3_connectivity()
                         if not connectivity.get("ok"):
                             msg = (
@@ -425,7 +425,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                             "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
                         )
                         raise RuntimeError(msg) from e
-    
+
                 try:
 >                   from app.postgres_repository import (
                         PostgresJobRepository,

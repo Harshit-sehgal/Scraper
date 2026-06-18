@@ -75,7 +75,7 @@ self = <tests.test_exports_router.TestBatchExportErrors object at 0x7c7187bbc740
     @pytest.mark.asyncio
     async def test_batch_unsupported_format_returns_400(self) -> None:
         from httpx import ASGITransport, AsyncClient
-    
+
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)
         jobs_store["j1"] = _make_job("j1", results=[{"x": "1"}])
@@ -98,20 +98,20 @@ _____________________________ test_pyflakes_clean ______________________________
         """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
         # Resolve the absolute path to the backend directory dynamically
         backend_dir = Path(__file__).resolve().parents[1]
-    
+
         result = subprocess.run(
             [sys.executable, "-m", "pyflakes", "app", "tests"],
             cwd=str(backend_dir),
             text=True,
             capture_output=True,
         )
-    
+
 >       assert result.returncode == 0, f"Pyflakes validation failed with warnings/errors:\n{result.stdout}\n{result.stderr}"
 E       AssertionError: Pyflakes validation failed with warnings/errors:
 E         app/routers/auth_profiles.py:265:51: undefined name 'settings'
 E         app/routers/auth_profiles.py:265:20: undefined name 'settings'
-E         
-E         
+E
+E
 E       assert 1 == 0
 E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pyflakes', 'app', 'tests'], returncode=1, stdout="app/routers/auth_p...les.py:265:51: undefined name 'settings'\napp/routers/auth_profiles.py:265:20: undefined name 'settings'\n", stderr='').returncode
 

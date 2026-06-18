@@ -71,9 +71,7 @@ def test_subscription_persists_across_module_reload(subscriptions_file: Path) ->
     # but the persisted JSON on disk must still hold the record.
     webhooks_b = _reload_webhooks_module()
     record = webhooks_b.get_customer_subscription("cust_abc")
-    assert record is not None, (
-        "Subscription state was lost on module reload — the store is per-process."
-    )
+    assert record is not None, "Subscription state was lost on module reload — the store is per-process."
     assert record["plan_tier"] == "pro"
     assert record["status"] == "active"
     assert record["subscription_id"] == "sub_xyz"
@@ -158,8 +156,7 @@ def test_list_subscriptions_endpoint_sees_persisted_records(
 
     total = len(webhooks_b._subscription_store)
     assert total == 1, (
-        f"Admin list sees {total} records after a worker reload but a "
-        f"prior worker wrote 1 — the list is per-process."
+        f"Admin list sees {total} records after a worker reload but a prior worker wrote 1 — the list is per-process."
     )
     values = webhooks_b._subscription_store.values()
     assert values[0]["plan_tier"] == "enterprise"

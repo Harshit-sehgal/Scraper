@@ -27,6 +27,7 @@ from app.semantic_ir import (
     SemanticToken,
     SemanticType,
 )
+from app.semantic_roots import UNIVERSAL_ROOTS as _UNIVERSAL_ROOTS
 
 # SHARED role embedding engine instance (learned, not hardcoded)
 # Imported lazily to avoid circular deps
@@ -96,21 +97,6 @@ def _adaptive_runtime_exclusion_threshold() -> float:
     # Stress (temp) increases threshold; Convergence (trust) decreases it
     result = base + (temp - 0.5) * 0.15 - (conv - 0.5) * 0.1
     return max(0.15, min(0.5, result))
-
-
-# Bootstrap seeds for role-type compatibility.
-# These are TEMPORARY priors — learning overrides them over time.
-_UNIVERSAL_ROOTS = [
-    (["pric", "cost", "salar", "preci", "prix", "wert"], SemanticType.PRICE),
-    (["date", "time", "schedule", "fecha", "zeit", "horar"], SemanticType.DATE),
-    # Short codes / identifiers (product codes, SKUs, etc.)
-    (["code", "currenc", "ident", "id", "codig", "sku"], SemanticType.CODE),
-    (["loc", "city", "addr", "place", "dest", "orig", "ubica", "stadt"], SemanticType.LOCATION),
-    (["nam", "comp", "firm", "brand", "make", "model", "builder", "nombr", "title"], SemanticType.ORGANIZATION),
-    (["rat", "scor", "review", "calif", "bewert"], SemanticType.RATING),
-    (["count", "number", "year", "mileage", "age", "experien", "num", "jahr"], SemanticType.NUMBER),
-    (["avail", "stock", "status", "state"], SemanticType.TEXT),
-]
 
 
 def _name_similarity(a: str, b: str) -> float:

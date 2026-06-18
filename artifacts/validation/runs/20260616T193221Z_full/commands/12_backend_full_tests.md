@@ -73,20 +73,20 @@ _____________________________ test_pyflakes_clean ______________________________
         """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
         # Resolve the absolute path to the backend directory dynamically
         backend_dir = Path(__file__).resolve().parents[1]
-    
+
         result = subprocess.run(
             [sys.executable, "-m", "pyflakes", "app", "tests"],
             cwd=str(backend_dir),
             text=True,
             capture_output=True,
         )
-    
+
 >       assert result.returncode == 0, f"Pyflakes validation failed with warnings/errors:\n{result.stdout}\n{result.stderr}"
 E       AssertionError: Pyflakes validation failed with warnings/errors:
 E         app/extraction_orchestrator.py:438:5: 'app.network_payload_extractor.arbitrate_sources' imported but unused
 E         app/extraction_orchestrator.py:448:5: local variable 'network_diagnostics' is assigned to but never used
-E         
-E         
+E
+E
 E       assert 1 == 0
 E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pyflakes', 'app', 'tests'], returncode=1, stdout="app/extraction_orc...app/extraction_orchestrator.py:448:5: local variable 'network_diagnostics' is assigned to but never used\n", stderr='').returncode
 

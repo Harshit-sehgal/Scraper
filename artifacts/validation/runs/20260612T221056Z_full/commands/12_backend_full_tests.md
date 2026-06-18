@@ -75,7 +75,7 @@ self = <tests.test_auth_profiles.TestAuthProfileModel object at 0x7cfd951ee1b0>
         assert p.domain == "example.com"
 >       assert p.status == AuthProfileStatus.ACTIVE
 E       AssertionError: assert <AuthProfileS...ending_login'> == <AuthProfileS...IVE: 'active'>
-E         
+E
 E         - active
 E         + pending_login
 
@@ -88,7 +88,7 @@ self = <tests.test_extraction_depth.TestFailureExplainer object at 0x7cfd94b2576
         explanation = detect_failure(selector_found=False, records_found=0)
 >       assert explanation.failure_type == "no_records_found"
 E       AssertionError: assert 'selector_not_found' == 'no_records_found'
-E         
+E
 E         - no_records_found
 E         + selector_not_found
 
@@ -101,7 +101,7 @@ self = <tests.test_extraction_depth.TestFailureExplainer object at 0x7cfd94b2645
         explanation = explain_failure("nonexistent_type")
 >       assert explanation.failure_type == "unknown_error"
 E       AssertionError: assert 'nonexistent_type' == 'unknown_error'
-E         
+E
 E         - unknown_error
 E         + nonexistent_type
 
@@ -112,20 +112,20 @@ _____________________________ test_pyflakes_clean ______________________________
         """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
         # Resolve the absolute path to the backend directory dynamically
         backend_dir = Path(__file__).resolve().parents[1]
-    
+
         result = subprocess.run(
             [sys.executable, "-m", "pyflakes", "app", "tests"],
             cwd=str(backend_dir),
             text=True,
             capture_output=True,
         )
-    
+
 >       assert result.returncode == 0, f"Pyflakes validation failed with warnings/errors:\n{result.stdout}\n{result.stderr}"
 E       AssertionError: Pyflakes validation failed with warnings/errors:
 E         app/plan_enforcer.py:17:1: 'functools.lru_cache' imported but unused
 E         app/plan_enforcer.py:22:1: 'app.utils.rbac.AuthContext' imported but unused
-E         
-E         
+E
+E
 E       assert 1 == 0
 E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pyflakes', 'app', 'tests'], returncode=1, stdout="app/plan_enforcer...._cache' imported but unused\napp/plan_enforcer.py:22:1: 'app.utils.rbac.AuthContext' imported but unused\n", stderr='').returncode
 
@@ -156,7 +156,7 @@ E         backend/app/plan_enforcer.py:25: in <module>
 E             logger = logging.get(__name__)
 E                      ^^^^^^^^^^^
 E         E   AttributeError: module 'logging' has no attribute 'get'
-E         
+E
 E       assert 4 == 0
 E        +  where 4 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '--markers'], returncode=4, stdout='', stderr="ImportError ...gger = logging.get(__name__)\n             ^^^^^^^^^^^\nE   AttributeError: module 'logging' has no attribute 'get'\n").returncode
 
@@ -180,8 +180,8 @@ E           File "/home/harshit/Documents/Work/Money/scraper/backend/app/plan_en
 E             logger = logging.get(__name__)
 E                      ^^^^^^^^^^^
 E         AttributeError: module 'logging' has no attribute 'get'
-E         
-E         
+E
+E
 E       assert 2 == 0
 
 backend/tests/test_route_inventory_split.py:50: AssertionError
@@ -189,7 +189,7 @@ _________________ test_stable_is_strict_subset_of_experimental _________________
 
     def test_stable_is_strict_subset_of_experimental() -> None:
         """The experimental set is a strict superset of the stable set.
-    
+
         If this ever fails (stable has a route the experimental set does
         not, or both sets are equal), the route inventory gate is broken
         and the docs would mislead operators in production.
@@ -227,8 +227,8 @@ E           File "/home/harshit/Documents/Work/Money/scraper/backend/app/plan_en
 E             logger = logging.get(__name__)
 E                      ^^^^^^^^^^^
 E         AttributeError: module 'logging' has no attribute 'get'
-E         
-E         
+E
+E
 E       assert 2 == 0
 E        +  where 2 = CompletedProcess(args=['/usr/bin/python3', '/home/harshit/Documents/Work/Money/scraper/scripts/route_inventory_split.p...er = logging.get(__name__)\n             ^^^^^^^^^^^\nAttributeError: module \'logging\' has no attribute \'get\'\n\n').returncode
 
@@ -255,7 +255,7 @@ _____________________ test_split_runs_under_global_timeout _____________________
     @pytest.mark.timeout(60)
     def test_split_runs_under_global_timeout() -> None:
         """The split script must complete well under the global 30s pytest timeout.
-    
+
         If this test times out, the inventory import path picked up a
         network call (DNS, DB) and we need to fix the isolation before
         merging the Phase 0 work.
@@ -282,8 +282,8 @@ E           File "/home/harshit/Documents/Work/Money/scraper/backend/app/plan_en
 E             logger = logging.get(__name__)
 E                      ^^^^^^^^^^^
 E         AttributeError: module 'logging' has no attribute 'get'
-E         
-E         
+E
+E
 E       assert 2 == 0
 E        +  where 2 = CompletedProcess(args=['/usr/bin/python3', '/home/harshit/Documents/Work/Money/scraper/scripts/route_inventory_split.p...er = logging.get(__name__)\n             ^^^^^^^^^^^\nAttributeError: module \'logging\' has no attribute \'get\'\n\n').returncode
 
@@ -370,7 +370,7 @@ tmp_db = PosixPath('/tmp/pytest-of-harshit/pytest-467/test_v5_to_v6_migration_pr
     def test_v5_to_v6_migration_preserves_worker_heartbeats(monkeypatch, tmp_db) -> None:
         """Migration from v5 to v6 should rebuild worker_heartbeats with composite PK."""
         monkeypatch.setattr("app.job_store._get_db_path", lambda: tmp_db)
-    
+
         # Create stub tables that _run_migrations expects at hot-path index creation
         conn = sqlite3.connect(str(tmp_db))
         conn.execute(
@@ -401,14 +401,14 @@ tmp_db = PosixPath('/tmp/pytest-of-harshit/pytest-467/test_v5_to_v6_migration_pr
         conn.execute("INSERT INTO schema_version (version) VALUES (5)")
         conn.commit()
         conn.close()
-    
+
         # Now run the full migration (v5 -> v6)
         from app.job_store import _run_migrations
-    
+
         conn = sqlite3.connect(str(tmp_db))
         conn.row_factory = sqlite3.Row
         _run_migrations(conn)
-    
+
         # Verify schema_version is now 8 (v8 adds org_id/project_id columns)
         ver_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
 >       assert ver_row[0] == 8, f"Expected schema version 8, got {ver_row[0]}"

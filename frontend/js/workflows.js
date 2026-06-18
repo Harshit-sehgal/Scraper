@@ -3,7 +3,7 @@
    ═══════════════════════════════════ */
 
 import { apiFetch } from "./api.js";
-import { toast } from "./utils.js";
+import { showConfirm, toast } from "./utils.js";
 
 const RUN_STATUS_BADGE = {
   queued: { label: "Queued", cls: "badge-pending" },
@@ -291,22 +291,23 @@ export async function onWorkflowAction(action, id) {
       const resp = await apiFetch(`/api/workflows/${id}/run`, { method: "POST" });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      toast(`Workflow queued (job ${data.job_id || "—"})`, "ok");
+      toast(`Workflow queued (job ${data.job_id || "—"})`, "success");
       await loadWorkflowDetail(id);
     } catch (err) {
       toast(`Failed to queue workflow: ${err.message || err}`, "error");
     }
   }
   if (action === "delete-workflow" && id) {
-    if (!confirm("Delete this workflow? This cannot be undone.")) return;
-    try {
-      const resp = await apiFetch(`/api/workflows/${id}`, { method: "DELETE" });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      selectedWorkflowId = null;
-      runsCache.delete(id);
-      await refreshWorkflows();
-    } catch (err) {
-      toast(`Failed to delete workflow: ${err.message || err}`, "error");
-    }
+    showConfirm("Delete Workflow?", "Delete this workflow? This cannot be undone.", async () => {
+      try {
+        const resp = await apiFetch(`/api/workflows/${id}`, { method: "DELETE" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        selectedWorkflowId = null;
+        runsCache.delete(id);
+        await refreshWorkflows();
+      } catch (err) {
+        toast(`Failed to delete workflow: ${err.message || err}`, "error");
+      }
+    });
   }
 }

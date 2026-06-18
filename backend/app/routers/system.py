@@ -25,18 +25,13 @@ from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
 from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
+from app.storage_interface import get_job_repository
 from app.url_analyzer import analyze_url as _url_analyze
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["system"])
-
-
-def get_job_repository():
-    import app.main
-
-    return app.main.get_job_repository()
 
 
 class AcquisitionMode(StrEnum):
@@ -683,8 +678,8 @@ def _render_basic_metrics_text() -> str:
         repo = get_job_repository()
         worker_healths = repo.get_all_worker_healths(ttl_seconds=60)
         for wh in worker_healths:
-            wid = wh.get("worker_id", "unknown")
-            hostname = wh.get("hostname", "")
+            wid = str(wh.get("worker_id", "unknown"))
+            hostname = str(wh.get("hostname", ""))
             pid = str(wh.get("pid") or "unknown")
             alive = 1 if wh.get("alive") else 0
             lines.append(
@@ -699,7 +694,7 @@ def _render_basic_metrics_text() -> str:
                 try:
                     import datetime as _dt
 
-                    age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                    age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
                 except (ValueError, TypeError):
                     age = -1.0
             else:
@@ -957,8 +952,8 @@ async def metrics(request: Request):
                 registry=registry,
             )
             for wh in worker_healths:
-                wid = wh.get("worker_id", "unknown")
-                hostname = wh.get("hostname", "")
+                wid = str(wh.get("worker_id", "unknown"))
+                hostname = str(wh.get("hostname", ""))
                 pid = str(wh.get("pid") or "unknown")
                 hb_alive_gauge.labels(worker_id=wid, hostname=hostname, pid=pid).set(1 if wh.get("alive") else 0)
                 last_hb = wh.get("last_heartbeat")
@@ -966,7 +961,7 @@ async def metrics(request: Request):
                     try:
                         import datetime as _dt
 
-                        age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                        age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
                     except (ValueError, TypeError):
                         age = -1.0
                 else:

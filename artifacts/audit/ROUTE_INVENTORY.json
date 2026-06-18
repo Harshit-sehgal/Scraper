@@ -322,7 +322,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "backfill_job_metadata",
       "method": "POST",
@@ -338,7 +338,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "cancel_job",
       "method": "POST",
@@ -418,7 +418,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "reclean_job",
       "method": "POST",
