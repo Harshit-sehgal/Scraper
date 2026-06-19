@@ -1,0 +1,46 @@
+/* ─── Icon helpers ──────────────────────────────────────
+   Phosphor icons sit on a 256 viewBox; stroke-width 12 keeps
+   the effective stroke at ~1.5px on a 16px rendered size. */
+
+.icon {
+  display: inline-block;
+  vertical-align: -2px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.icon-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-md {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-lg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-xl {
+  width: 28px;
+  height: 28px;
+}
+
+/* Inline icon inside a button / nav row */
+.icon-leading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.icon-leading > .icon {
+  margin-right: -2px;
+}

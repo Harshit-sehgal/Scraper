@@ -379,7 +379,7 @@ function renderJobs(jobs) {
                 <div class="job-actions">
                     ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${attrStr(j.id)}">View</button>` : ""}
                     ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${attrStr(j.id)}">Cancel</button>` : ""}
-                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}">✕</button>
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}"><span data-icon="x" data-size="14"></span></button>
                 </div>
             </div>
         `;

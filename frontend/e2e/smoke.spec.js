@@ -19,7 +19,7 @@ test.describe("Dashboard UI smoke tests", () => {
   test("page loads and shows the DataForge brand", async ({ page }) => {
     await page.goto("/app/");
     await dismissApiKeyOverlay(page);
-    await expect(page.locator(".brand-name")).toHaveText("DataForge");
+    await expect(page.locator(".brand-name")).toHaveText("Dataforge");
   });
 
   test("sidebar nav items are visible", async ({ page }) => {

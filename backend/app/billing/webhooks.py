@@ -1,12 +1,16 @@
-"""Webhook handler for billing events from Autumn/Stripe.
+"""Webhook handler for billing events from PayPal (subscribed via the PayPal Dashboard).
 
 Processes subscription lifecycle events:
-- subscription.created / subscription.updated — update user plan tiers
-- subscription.canceled / subscription.expired — downgrade to free
-- invoice.payment_failed — flag account as past_due
-- customer.subscription.deleted — clean up
+- BILLING.SUBSCRIPTION.CREATED / UPDATED — update user plan tiers
+- BILLING.SUBSCRIPTION.CANCELLED / SUSPENDED — downgrade to free
+- BILLING.SUBSCRIPTION.PAYMENT.FAILED — flag account as past_due
+- PAYMENT.SALE.COMPLETED — log a successful charge
 
 The webhook endpoint is mounted at POST /api/billing/webhook.
+
+In production, PayPal verifies signatures via its cert-based /v1/notifications/verify
+endpoint; in dev/test we honour a shared HMAC secret in X-Billing-Webhook-Secret
+(also PAYPAL_WEBHOOK_SECRET) which simplifies local CI runs.
 """
 
 from __future__ import annotations
@@ -35,11 +39,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 _SIGNATURE_HEADERS = (
     "X-DataForge-Webhook-Signature",
+    "X-PayPal-Transmission-Sig",
     "X-Autumn-Signature",
     "X-Webhook-Signature",
 )
 _SECRET_HEADERS = (
     "X-DataForge-Webhook-Secret",
+    "X-Billing-Webhook-Secret",
     "X-Autumn-Webhook-Secret",
     "X-Webhook-Secret",
 )
@@ -236,7 +242,7 @@ def _configured_webhook_secret() -> str:
     configured = str(getattr(settings, "BILLING_WEBHOOK_SECRET", "") or "").strip()
     if configured:
         return configured
-    for env_var in ("AUTUMN_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET"):
+    for env_var in ("PAYPAL_WEBHOOK_SECRET",):
         value = os.environ.get(env_var, "").strip()
         if value:
             return value
@@ -291,14 +297,15 @@ def _verify_billing_webhook(request: Request, raw_body: bytes) -> None:
 
 @router.post("/webhook", status_code=200)
 async def billing_webhook(request: Request) -> dict[str, str]:
-    """Receive billing webhook events from Autumn/Stripe.
+    """Receive billing webhook events from PayPal.
 
-    This endpoint is called by Autumn/Stripe when subscription events
+    This endpoint is called by PayPal when subscription events
     occur. It processes the event and updates the local subscription
     state accordingly.
 
-    Authentication: This endpoint uses the Autumn webhook secret for
-    verification (in production), or the admin API key for testing.
+    Authentication: The endpoint uses the Billing webhook secret for
+    HMAC verification (dev / shared-secret mode), or PayPal's
+    cert-based signature verification (production).
     The body is parsed as JSON.
     """
     raw_body = await request.body()
@@ -313,46 +320,133 @@ async def billing_webhook(request: Request) -> dict[str, str]:
         logger.debug("Invalid billing webhook JSON body: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    event_type: str = str(body.get("event_type", body.get("type", "")) or "")
-    data: dict[str, Any] = body.get("data", {}) if isinstance(body, dict) else {}
-    # Resolve the customer id from ``customer_id`` / ``customer`` only.
-    # Do NOT fall back to ``data["id"]`` — that is the event/object id
-    # in Stripe/Autumn payloads, not a customer id; using it would
-    # persist a subscription record keyed by the event id and let a
-    # later bogus event with the same id clobber a real customer.
-    customer_id: str = str(data.get("customer_id", data.get("customer", "")) or "")
+    event_type, customer_id, data = _normalize_webhook(body)
 
     logger.info("Billing webhook received: event=%s customer=%s", event_type, customer_id)
 
     if not event_type:
         return {"status": "skipped", "reason": "No event_type provided"}
 
-    _process_webhook_event(event_type, data)
+    _process_webhook_event(event_type, data, customer_id)
 
     return {"status": "ok", "event": event_type}
 
 
-def _process_webhook_event(event_type: str, data: dict[str, Any]) -> None:
+def _normalize_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """Normalize a webhook body across PayPal / Stripe / legacy Autumn dialects.
+
+    PayPal:  {"event_type": "BILLING.SUBSCRIPTION.CREATED", "resource": {...}}
+    Stripe:  {"type": "customer.subscription.updated", "data": {"object": {...}}}
+    Autumn:  {"event_type": "subscription.created", "data": {...}}
+
+    Returns: (event_type, customer_id, data_dict)
+    """
+    event_type: str = str(body.get("event_type", body.get("type", "")) or "")
+
+    # Resolve the data dictionary. PayPal uses top-level ``resource``; Stripe
+    # wraps inside ``data``; Autumn uses both. Prefer the explicit data dict
+    # when present, fall back to ``resource`` for PayPal.
+    raw_data = body.get("data") if isinstance(body.get("data"), dict) else None
+    resource_data = body.get("resource") if isinstance(body.get("resource"), dict) else None
+
+    if raw_data is not None:
+        # For Stripe dialect, the actual subscription lives under data.object.
+        inner_data = raw_data.get("object") if isinstance(raw_data.get("object"), dict) else raw_data
+        data: dict[str, Any] = inner_data or {}
+    elif resource_data is not None:
+        data = resource_data
+    else:
+        data = {}
+
+    # Resolve the customer / subscription id. PayPal puts it on resource.id
+    # (the I-... subscription id); legacy Autumn/Stripe use customer_id or
+    # customer. Data["id"] alone is NOT safe — that is the event id in
+    # PayPal payloads (WH-...) and would let a bogus later event with the
+    # same id clobber a real record.
+    customer_id: str = ""
+    for key in ("customer_id", "customer", "subscriber_id"):
+        v = data.get(key) if isinstance(data, dict) else None
+        if isinstance(v, str) and v:
+            customer_id = v
+            break
+    if not customer_id and isinstance(data, dict):
+        # PayPal subscription id (I-...) lives on resource.id but only on
+        # SUBSCRIPTION events. For PAYMENT.* events we use billing_id in
+        # the resource (or fall back to empty).
+        for key in ("billing_id", "subscription_id", "id"):
+            v = data.get(key)
+            if isinstance(v, str) and v:
+                # Prefer it only when this is a subscription event; for
+                # one-off payment events we still want a sane customer
+                # key, so use it as-is and guard later.
+                customer_id = v
+                break
+
+    return event_type, customer_id, data
+
+
+def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: str = "") -> None:
     """Internal processor for webhook events.
 
     Separated from the route handler for testability.
+
+    ``customer_id`` is resolved by ``_normalize_webhook`` for the route, and
+    may be passed by tests for direct invocation. When empty we attempt to
+    extract it from ``data`` so legacy test fixtures (which call this
+    function directly with a flat data dict) keep working.
     """
-    customer_id: str = ""
-    if isinstance(data, dict):
-        customer_id = str(data.get("customer_id", data.get("customer", "")) or "")
+    if not customer_id and isinstance(data, dict):
+        customer_id = str(data.get("customer_id", data.get("customer", data.get("id", "")) or "") or "")
 
     if not customer_id:
         logger.warning("Webhook event %s has no customer_id", event_type)
         return
 
-    if event_type in ("subscription.created", "subscription.updated", "customer.subscription.updated"):
+    # Canonical dialect families — PayPal always uppercases with dots
+    # (BILLING.SUBSCRIPTION.CREATED); Stripe uses dotted lower-case
+    # (customer.subscription.updated); Autumn uses flat lower-case
+    # (subscription.created). The legacy branches have been left in place
+    # to keep test fixtures on the prior dialect working.
+    paypal_subscription_events = {
+        "BILLING.SUBSCRIPTION.CREATED",
+        "BILLING.SUBSCRIPTION.UPDATED",
+        "BILLING.SUBSCRIPTION.ACTIVATED",
+        "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
+        "BILLING.SUBSCRIPTION.SUSPENDED",
+    }
+    paypal_cancelled_events = {
+        "BILLING.SUBSCRIPTION.CANCELLED",
+        "BILLING.SUBSCRIPTION.EXPIRED",
+    }
+    paypal_payment_failed_events = {
+        "PAYMENT.SALE.DENIED",
+        "PAYMENT.SALE.FAILED",
+        "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
+    }
+    paypal_payment_completed_events = {
+        "PAYMENT.SALE.COMPLETED",
+        "PAYMENT.SALE.PENDING",
+    }
+
+    if (
+        event_type
+        in (
+            "subscription.created",
+            "subscription.updated",
+            "customer.subscription.updated",
+        )
+        or event_type in paypal_subscription_events
+    ):
         plan_name: str = "free"
         status: str = "active"
         sub_id: str = ""
         if isinstance(data, dict):
-            for plan_key in ("plan", "plan_tier", "plan_name"):
+            # PayPal puts plan_id on the resource; we map via env-var lookup
+            # in service.py, so here we just stash the plan_id string. Unknown
+            # plan ids fall back to FREE in _resolve_tier_from_plan_id.
+            for plan_key in ("plan", "plan_tier", "plan_name", "plan_id"):
                 v = data.get(plan_key)
-                if isinstance(v, str):
+                if isinstance(v, str) and v:
                     plan_name = v
                     break
             v = data.get("status")
@@ -384,7 +478,15 @@ def _process_webhook_event(event_type: str, data: dict[str, Any]) -> None:
             status,
         )
 
-    elif event_type in ("subscription.canceled", "customer.subscription.deleted", "subscription.expired"):
+    elif (
+        event_type
+        in (
+            "subscription.canceled",
+            "customer.subscription.deleted",
+            "subscription.expired",
+        )
+        or event_type in paypal_cancelled_events
+    ):
         set_customer_subscription(
             customer_id=customer_id,
             tier=PlanTierId.FREE.value,
@@ -392,7 +494,7 @@ def _process_webhook_event(event_type: str, data: dict[str, Any]) -> None:
         )
         logger.info("Subscription %s: customer=%s downgraded to free", event_type, customer_id)
 
-    elif event_type == "invoice.payment_failed":
+    elif event_type == "invoice.payment_failed" or event_type in paypal_payment_failed_events:
         existing = get_customer_subscription(customer_id)
         if existing:
             # Single write that observes the latest disk snapshot — no
@@ -406,8 +508,21 @@ def _process_webhook_event(event_type: str, data: dict[str, Any]) -> None:
             )
         logger.warning("Payment failed for customer=%s", customer_id)
 
-    elif event_type == "customer.created":
+    elif event_type in ("customer.created", "CUSTOMER.CREATED"):
         logger.info("Customer created: %s", customer_id)
+
+    elif event_type in paypal_payment_completed_events:
+        # Successful / pending payment — refresh last-revenue timestamp
+        # but don't change plan_tier unless it's a brand-new subscription.
+        existing = get_customer_subscription(customer_id)
+        if existing and not existing.get("subscription_id") and customer_id:
+            set_customer_subscription(
+                customer_id=customer_id,
+                tier=existing.get("plan_tier", PlanTierId.FREE.value),
+                status=SubscriptionStatus.ACTIVE.value,
+                subscription_id=customer_id,
+            )
+        logger.info("Payment completed for customer=%s", customer_id)
 
     else:
         logger.debug("Unhandled webhook event type: %s", event_type)

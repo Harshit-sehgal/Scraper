@@ -1,0 +1,788 @@
+/* ─── Components ──────────────────────────────────────── */
+
+/* ═══ Button ═══ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--ink-1);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.btn.small {
+  height: 26px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.btn.lg {
+  height: var(--control-height-lg);
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+}
+
+.btn.block {
+  width: 100%;
+}
+
+/* ─── Primary (black on white, white on black) ─── */
+.btn.primary {
+  background: var(--ink-1);
+  color: var(--ink-inverse);
+  border-color: var(--ink-1);
+}
+
+.btn.primary:hover {
+  opacity: 0.9;
+  border-color: var(--ink-1);
+  background: var(--ink-1);
+}
+
+:root[data-theme="dark"] .btn.primary {
+  background: var(--ink-1);
+  color: var(--ink-2);
+  border-color: var(--ink-1);
+}
+
+:root[data-theme="dark"] .btn.primary:hover {
+  opacity: 0.9;
+}
+
+/* ─── Secondary ─── */
+.btn.secondary {
+  background: var(--bg-muted);
+  border-color: var(--border);
+}
+
+.btn.secondary:hover {
+  background: var(--bg-active);
+}
+
+/* ─── Ghost / transparent ─── */
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+}
+
+.btn.ghost:hover {
+  background: var(--bg-hover);
+  color: var(--ink-1);
+}
+
+/* ─── Danger ─── */
+.btn.danger {
+  color: var(--status-red);
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.btn.danger:hover {
+  background: var(--status-red-soft);
+  border-color: var(--status-red);
+}
+
+.btn.danger.solid {
+  background: var(--status-red);
+  color: #fff;
+  border-color: var(--status-red);
+}
+
+/* ─── Pill ─── */
+.btn.pill {
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-4);
+}
+
+/* ─── Icon-only button (used in topbar) ─── */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: inherit;
+
+  /* Use explicit widths (svg width attrs / letter glyph size) so flex
+     children lay out without text-whitespace gaps. Don't set font-size: 0
+     — the theme toggle uses a single 🌙/☀️ text glyph and needs font-size
+     to render. utils.test.js only asserts on textContent, not display. */
+  font-size: var(--text-md);
+  line-height: 1;
+  gap: 0;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink-1);
+}
+
+.icon-btn.active,
+.icon-btn[aria-pressed="true"] {
+  background: var(--bg-muted);
+  color: var(--ink-1);
+}
+
+.icon-btn.lg {
+  width: 36px;
+  height: 36px;
+}
+
+.icon-btn.sm {
+  width: 26px;
+  height: 26px;
+}
+
+.icon-btn-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: currentcolor;
+  line-height: 1;
+}
+
+/* ═══ Input ═══ */
+
+.input,
+.text-input,
+.textarea-input,
+select.input {
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--ink-1);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+  appearance: none;
+  width: 100%;
+}
+
+.input:hover,
+.text-input:hover,
+select.input:hover {
+  border-color: var(--border-strong);
+}
+
+.input:focus,
+.text-input:focus,
+.textarea-input:focus,
+select.input:focus {
+  border-color: var(--border-focus);
+}
+
+.input::placeholder,
+.text-input::placeholder,
+.textarea-input::placeholder {
+  color: var(--ink-4);
+}
+
+.textarea-input,
+textarea.input {
+  height: auto;
+  min-height: 96px;
+  padding: var(--space-3);
+  line-height: var(--leading-snug);
+  resize: vertical;
+}
+
+.input.field-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+select.input {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='none' stroke='%23787774' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M128 184 56.36 112.36a8 8 0 0 1 11.32-11.32L128 161.34l60.32-60.32a8 8 0 0 1 11.32 11.32Z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 12px;
+  padding-right: var(--space-7);
+}
+
+:has([data-theme="dark"]) select.input,
+:root[data-theme="dark"] select.input {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='none' stroke='%238a8a8a' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M128 184 56.36 112.36a8 8 0 0 1 11.32-11.32L128 161.34l60.32-60.32a8 8 0 0 1 11.32 11.32Z'/%3e%3c/svg%3e");
+}
+
+.input-with-icon {
+  position: relative;
+  display: block;
+}
+
+.input-with-icon .input {
+  padding-left: 32px;
+}
+
+.input-with-icon > .icon,
+.input-with-icon > .icon-leading {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-4);
+  pointer-events: none;
+}
+
+/* ═══ Badge / Status Pill ═══ */
+
+.badge,
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--status-gray-soft);
+  color: var(--status-gray);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.005em;
+}
+
+.badge.solid {
+  border-radius: var(--radius-pill);
+}
+
+.badge.pending,
+.badge.discovering,
+.badge.running,
+.badge.info {
+  background: var(--status-blue-soft);
+  color: var(--status-blue);
+}
+
+.badge.completed,
+.badge.succeeded,
+.badge.ok,
+.badge.done {
+  background: var(--status-green-soft);
+  color: var(--status-green);
+}
+
+.badge.degraded,
+.badge.warning,
+.badge.partial {
+  background: var(--status-amber-soft);
+  color: var(--status-amber);
+}
+
+.badge.canceled,
+.badge.cancelled,
+.badge.failed,
+.badge.error,
+.badge.danger {
+  background: var(--status-red-soft);
+  color: var(--status-red);
+}
+
+.badge.empty_result,
+.badge.idle {
+  background: var(--bg-muted);
+  color: var(--ink-3);
+}
+
+.badge.experimental,
+.badge.beta {
+  background: var(--status-violet-soft);
+  color: var(--status-violet);
+}
+
+/* Inline solid dot inside a badge */
+.badge .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentcolor;
+}
+
+/* ═══ Card ═══ */
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+
+.card.padded-sm {
+  padding: var(--space-4);
+}
+
+.card.flush {
+  padding: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-4);
+  gap: var(--space-3);
+}
+
+.card-header h2,
+.card-header h3 {
+  margin: 0;
+}
+
+/* ═══ Table ═══ */
+
+.table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-1);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.table .col-actions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* ═══ Modal / Overlay ═══ */
+
+.shortcut-overlay,
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 1000;
+}
+
+.modal,
+.shortcut-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.05);
+  width: min(440px, 100%);
+  max-height: calc(100vh - var(--space-7));
+  overflow: auto;
+}
+
+.modal.large {
+  width: min(640px, 100%);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-6) 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-body {
+  padding: var(--space-4) var(--space-6) var(--space-5);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+/* ═══ kbd ═══ */
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ═══ Segmented Control / Toggle ═══ */
+
+.toggle-group {
+  display: inline-flex;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.toggle-group .toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-3);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.toggle-group .toggle:hover {
+  color: var(--ink-1);
+}
+
+.toggle-group .toggle.active {
+  background: var(--bg);
+  color: var(--ink-1);
+  box-shadow: 0 0 0 1px var(--border);
+  font-weight: 500;
+}
+
+/* ═══ Pagination ═══ */
+
+.pagination {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.pagination .btn {
+  min-width: 32px;
+  padding: 0 var(--space-2);
+}
+
+.pagination .btn.current,
+.pagination .btn[aria-current="page"] {
+  background: var(--ink-1);
+  color: var(--ink-inverse);
+  border-color: var(--ink-1);
+}
+
+/* ═══ Empty State ═══ */
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-9) var(--space-6);
+  text-align: center;
+  color: var(--ink-3);
+}
+
+.empty-state .empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+}
+
+.empty-state h3 {
+  color: var(--ink-1);
+  font-size: var(--text-md);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.empty-state p {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  max-width: 36ch;
+  margin: 0 auto var(--space-4);
+  line-height: var(--leading-normal);
+}
+
+.empty-state .empty-state-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* ═══ Toast ═══ */
+
+#toasts {
+  position: fixed;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--ink-1);
+  color: var(--ink-inverse);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.08);
+  min-width: 220px;
+  max-width: 360px;
+  pointer-events: auto;
+}
+
+.toast.success {
+  background: var(--status-green);
+}
+
+.toast.error {
+  background: var(--status-red);
+}
+
+.toast.warning {
+  background: var(--status-amber);
+}
+
+.toast.info {
+  background: var(--ink-1);
+}
+
+/* ═══ AUP Banner ═══ */
+
+.aup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.aup-banner a {
+  color: var(--ink-link);
+}
+
+.aup-banner-pending {
+  background: var(--status-amber-soft);
+  color: var(--status-amber);
+}
+
+.aup-banner-pending a,
+.aup-banner-pending button {
+  color: var(--status-amber);
+}
+
+.aup-banner-stale {
+  background: var(--status-blue-soft);
+  color: var(--status-blue);
+}
+
+/* ═══ Misc ═══ */
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+  margin: var(--space-5) 0;
+}
+
+.divider-v {
+  width: 1px;
+  height: 1.2em;
+  background: var(--border);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Health pill (live status indicator in topbar) */
+
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  height: 26px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.health-pill[data-state="healthy"] {
+  color: var(--status-green);
+  border-color: var(--status-green-soft);
+  background: var(--status-green-soft);
+}
+
+.health-pill[data-state="degraded"] {
+  color: var(--status-amber);
+  border-color: var(--status-amber-soft);
+  background: var(--status-amber-soft);
+}
+
+.health-pill[data-state="down"] {
+  color: var(--status-red);
+  border-color: var(--status-red-soft);
+  background: var(--status-red-soft);
+}
+
+.health-pill .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentcolor;
+}
+
+/* Inline status engine dot in sidebar bottom */
+
+.engine-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.engine-status .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-green);
+}
+
+.engine-status[data-state="offline"] .dot {
+  background: var(--status-red);
+}
+
+.engine-status[data-state="warn"] .dot {
+  background: var(--status-amber);
+}
+
+/* Notes / alert-like blocks */
+.note {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  line-height: var(--leading-normal);
+}
+
+.note.danger {
+  background: var(--status-red-soft);
+  border-color: var(--status-red-soft);
+  color: var(--status-red);
+}
+
+.note.warn {
+  background: var(--status-amber-soft);
+  border-color: var(--status-amber-soft);
+  color: var(--status-amber);
+}
+
+.note.info {
+  background: var(--status-blue-soft);
+  border-color: var(--status-blue-soft);
+  color: var(--status-blue);
+}

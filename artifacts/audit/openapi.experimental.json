@@ -256,6 +256,68 @@
         "title": "BatchExportRequest",
         "type": "object"
       },
+      "CheckoutRequest": {
+        "description": "Request body for POST /api/billing/checkout.",
+        "properties": {
+          "cancel_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Cancel Url",
+            "type": "string"
+          },
+          "plan_tier": {
+            "enum": [
+              "starter",
+              "pro",
+              "enterprise"
+            ],
+            "title": "Plan Tier",
+            "type": "string"
+          },
+          "return_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Return Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_tier",
+          "return_url",
+          "cancel_url"
+        ],
+        "title": "CheckoutRequest",
+        "type": "object"
+      },
+      "CheckoutResponse": {
+        "description": "Response from POST /api/billing/checkout.",
+        "properties": {
+          "approval_url": {
+            "title": "Approval Url",
+            "type": "string"
+          },
+          "plan_tier": {
+            "enum": [
+              "starter",
+              "pro",
+              "enterprise"
+            ],
+            "title": "Plan Tier",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_url",
+          "token",
+          "plan_tier"
+        ],
+        "title": "CheckoutResponse",
+        "type": "object"
+      },
       "DenylistAddRequest": {
         "description": "Request body for adding an entry to the admin domain denylist.",
         "properties": {
@@ -2165,6 +2227,48 @@
         ]
       }
     },
+    "/api/billing/checkout": {
+      "post": {
+        "description": "Create a PayPal Order for the requested plan tier and return its approval URL.\n\nWhen ``PAYPAL_CLIENT_ID`` (and / or ``PAYPAL_CLIENT_SECRET``) isn't configured,\na deterministic stub approval_url is returned. This keeps dev/test environments\nfree of live PayPal credentials while presenting the same response shape to\nclients.\n\nAuthentication: any authenticated session role (operator / admin) can create\na checkout; production routing is controlled by the optional ``return_url``\nprovided by the caller.",
+        "operationId": "create_checkout_api_billing_checkout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Checkout",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/billing/subscriptions": {
       "get": {
         "description": "List all tracked subscriptions (admin/operator only).",
@@ -2236,7 +2340,7 @@
     },
     "/api/billing/webhook": {
       "post": {
-        "description": "Receive billing webhook events from Autumn/Stripe.\n\nThis endpoint is called by Autumn/Stripe when subscription events\noccur. It processes the event and updates the local subscription\nstate accordingly.\n\nAuthentication: This endpoint uses the Autumn webhook secret for\nverification (in production), or the admin API key for testing.\nThe body is parsed as JSON.",
+        "description": "Receive billing webhook events from PayPal.\n\nThis endpoint is called by PayPal when subscription events\noccur. It processes the event and updates the local subscription\nstate accordingly.\n\nAuthentication: The endpoint uses the Billing webhook secret for\nHMAC verification (dev / shared-secret mode), or PayPal's\ncert-based signature verification (production).\nThe body is parsed as JSON.",
         "operationId": "billing_webhook_api_billing_webhook_post",
         "responses": {
           "200": {

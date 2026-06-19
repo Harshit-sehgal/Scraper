@@ -7,10 +7,9 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
-    <title>DataForge</title>
+    <title>Dataforge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
-    <!-- NOTE: Google Fonts removed to comply with strict CSP policy (font-src 'self' only).
-         If custom fonts are needed, vendor them locally in /frontend/fonts/ and reference via @font-face in styles.css -->
+    <!-- Inter Variable, SIL OFL — self-hosted for CSP font-src 'self'. -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -21,96 +20,44 @@
       <!-- ─── Top Bar ─── -->
       <header class="topbar">
         <div class="topbar-left">
-          <button type="button" class="sidebar-toggle" data-action="toggle-sidebar" aria-label="Toggle sidebar">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-            >
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="18" x2="20" y2="18" />
-            </svg>
+          <button
+            type="button"
+            class="sidebar-toggle icon-btn"
+            data-action="toggle-sidebar"
+            aria-label="Toggle sidebar"
+          >
+            <span data-icon="more" aria-hidden="true"></span>
           </button>
           <a href="#" class="topbar-brand">
-            <span class="brand-icon">D</span>
-            <span class="brand-name">DataForge</span>
+            <span class="brand-name">Dataforge</span>
           </a>
         </div>
         <div class="topbar-center">
           <div class="global-search">
-            <span class="global-search-icon" aria-hidden="true">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </span>
-            <input type="text" placeholder="Search jobs..." />
+            <span class="global-search-icon" data-icon="search" aria-hidden="true"></span>
+            <input type="text" placeholder="Search jobs..." aria-label="Search jobs" />
           </div>
         </div>
         <div class="topbar-right">
-          <button type="button" class="topbar-btn" data-action="show-api-key" title="API key" aria-label="API key">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 8.5m0 0 3 3L22 8l-3-3m-3.5 3.5L19 11"
-              />
-            </svg>
+          <button type="button" class="icon-btn" data-action="show-api-key" title="API key" aria-label="API key">
+            <span data-icon="key" aria-hidden="true"></span>
+          </button>
+          <button type="button" class="icon-btn" data-action="show-admin-key" title="Admin key" aria-label="Admin key">
+            <span data-icon="shield" aria-hidden="true"></span>
           </button>
           <button
             type="button"
-            class="topbar-btn"
-            data-action="show-admin-key"
-            title="Admin key"
-            aria-label="Admin key"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="topbar-btn"
+            class="icon-btn"
             id="btn-shortcuts"
             title="Keyboard shortcuts"
             data-action="show-shortcuts"
             aria-label="Keyboard shortcuts"
           >
-            ?
+            <span class="icon-btn-label" aria-hidden="true">?</span>
           </button>
           <button
             type="button"
-            class="topbar-btn"
+            class="icon-btn"
             id="btn-theme-toggle"
             title="Toggle dark mode"
             data-action="toggle-theme"
@@ -132,39 +79,13 @@
             <ul class="nav-list">
               <li>
                 <button type="button" class="nav-item active" data-action="switch-view" data-view="jobs" id="nav-jobs">
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <line x1="8" y1="6" x2="21" y2="6" />
-                      <line x1="8" y1="12" x2="21" y2="12" />
-                      <line x1="8" y1="18" x2="21" y2="18" />
-                      <line x1="3" y1="6" x2="3.01" y2="6" />
-                      <line x1="3" y1="12" x2="3.01" y2="12" />
-                      <line x1="3" y1="18" x2="3.01" y2="18" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="briefcase" aria-hidden="true"></span>
                   <span class="nav-text">Jobs</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="nav-item" data-action="switch-view" data-view="new" id="nav-new">
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="plus" aria-hidden="true"></span>
                   <span class="nav-text">New Job</span>
                 </button>
               </li>
@@ -176,20 +97,7 @@
                   data-view="dashboard"
                   id="nav-dashboard"
                 >
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <rect x="3" y="3" width="7" height="7" rx="1" />
-                      <rect x="14" y="3" width="7" height="7" rx="1" />
-                      <rect x="14" y="14" width="7" height="7" rx="1" />
-                      <rect x="3" y="14" width="7" height="7" rx="1" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="gauge" aria-hidden="true"></span>
                   <span class="nav-text">Dashboard</span>
                 </button>
               </li>
@@ -206,20 +114,7 @@
                   data-view="workflows"
                   id="nav-workflows"
                 >
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <line x1="6" y1="3" x2="6" y2="15" />
-                      <circle cx="18" cy="6" r="3" />
-                      <circle cx="6" cy="18" r="3" />
-                      <path d="M18 9a9 9 0 0 1-9 9" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="sliders" aria-hidden="true"></span>
                   <span class="nav-text">Workflows</span>
                 </button>
               </li>
@@ -231,38 +126,13 @@
                   data-view="auth-profiles"
                   id="nav-auth-profiles"
                 >
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="7.5" cy="15.5" r="4.5" />
-                      <path d="m21 2-9.6 9.6" />
-                      <path d="m15.5 7.5 3 3L22 7l-3-3" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
                   <span class="nav-text">Auth Profiles</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="nav-item" data-action="switch-view" data-view="recycle" id="nav-recycle">
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      <line x1="10" y1="11" x2="10" y2="17" />
-                      <line x1="14" y1="11" x2="14" y2="17" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="trash" aria-hidden="true"></span>
                   <span class="nav-text">Recycle Bin</span>
                 </button>
               </li>
@@ -273,37 +143,13 @@
             <ul class="nav-list">
               <li>
                 <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <rect x="2" y="5" width="20" height="14" rx="2" />
-                      <line x1="2" y1="10" x2="22" y2="10" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="creditCard" aria-hidden="true"></span>
                   <span class="nav-text">Billing</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="nav-item" data-action="switch-view" data-view="audit" id="nav-audit">
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="8" y1="13" x2="16" y2="13" />
-                      <line x1="8" y1="17" x2="13" y2="17" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="scroll" aria-hidden="true"></span>
                   <span class="nav-text">Audit</span>
                 </button>
               </li>
@@ -315,19 +161,7 @@
                   data-view="retention"
                   id="nav-retention"
                 >
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <rect x="2" y="3" width="20" height="5" rx="1" />
-                      <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
-                      <line x1="10" y1="12" x2="14" y2="12" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="archive" aria-hidden="true"></span>
                   <span class="nav-text">Retention</span>
                 </button>
               </li>
@@ -344,19 +178,7 @@
                   data-view="cognition"
                   id="nav-cognition"
                 >
-                  <span class="nav-icon"
-                    ><svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M9 3h6" />
-                      <path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3" />
-                      <line x1="8" y1="14" x2="16" y2="14" /></svg
-                  ></span>
+                  <span class="nav-icon" data-icon="flask" aria-hidden="true"></span>
                   <span class="nav-text">Cognition</span>
                 </button>
               </li>
@@ -433,83 +255,15 @@
 
             <!-- Jobs List -->
             <div class="list" id="jobs-list">
-              <div class="empty-state-illustration" id="empty-state">
-                <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect
-                    x="20"
-                    y="30"
-                    width="120"
-                    height="75"
-                    rx="8"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1.5"
-                    fill="none"
-                    class="empty-svg-line"
-                  />
-                  <rect
-                    x="35"
-                    y="42"
-                    width="36"
-                    height="36"
-                    rx="4"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    fill="none"
-                    class="anim-float"
-                  />
-                  <rect
-                    x="78"
-                    y="42"
-                    width="50"
-                    height="8"
-                    rx="2"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    fill="none"
-                    stroke-opacity="0.5"
-                  />
-                  <rect
-                    x="78"
-                    y="54"
-                    width="40"
-                    height="6"
-                    rx="2"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    fill="none"
-                    stroke-opacity="0.35"
-                  />
-                  <rect
-                    x="78"
-                    y="64"
-                    width="45"
-                    height="6"
-                    rx="2"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    fill="none"
-                    stroke-opacity="0.25"
-                  />
-                  <circle cx="53" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                  <circle cx="70" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                  <circle cx="87" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                  <circle cx="104" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                  <path
-                    d="M35 100 Q 50 90, 65 100 T 95 100 T 125 100"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    fill="none"
-                    stroke-opacity="0.2"
-                    class="anim-pulse-slow"
-                  />
-                </svg>
-                <div class="empty-state-title">No jobs yet</div>
-                <div class="empty-state-desc">
-                  Create your first scraping job to start extracting data from the web.
+              <div class="empty-state" id="empty-state">
+                <span class="empty-icon" data-icon="briefcase" data-size="28" aria-hidden="true"></span>
+                <h3>No jobs yet</h3>
+                <p>Create your first scraping job to start extracting data from the web.</p>
+                <div class="empty-state-actions">
+                  <button type="button" class="btn primary small" data-action="switch-view" data-view="new">
+                    Create your first job
+                  </button>
                 </div>
-                <button type="button" class="empty-state-btn" data-action="switch-view" data-view="new">
-                  Create your first job
-                </button>
               </div>
             </div>
           </div>
@@ -538,67 +292,10 @@
             </div>
 
             <div class="list" id="recycle-list">
-              <div class="empty-state-illustration" id="empty-recycle-state">
-                <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M42 28 L72 28 L82 18 L92 28 L122 28"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1.5"
-                    fill="none"
-                    class="empty-svg-line"
-                  />
-                  <rect
-                    x="52"
-                    y="40"
-                    width="60"
-                    height="55"
-                    rx="6"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    fill="none"
-                    class="anim-float-reverse"
-                  />
-                  <line
-                    x1="62"
-                    y1="52"
-                    x2="102"
-                    y2="52"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    stroke-opacity="0.4"
-                  />
-                  <line
-                    x1="62"
-                    y1="60"
-                    x2="95"
-                    y2="60"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    stroke-opacity="0.3"
-                  />
-                  <line
-                    x1="62"
-                    y1="68"
-                    x2="88"
-                    y2="68"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    stroke-opacity="0.2"
-                  />
-                  <circle cx="82" cy="82" r="4" fill="var(--accent)" class="anim-pulse-slow" />
-                  <path
-                    d="M60 96 L104 96"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1"
-                    stroke-opacity="0.25"
-                    stroke-dasharray="4 3"
-                    class="anim-pulse-slow"
-                  />
-                </svg>
-                <div class="empty-state-title">Recycle bin is empty</div>
-                <div class="empty-state-desc">
-                  Deleted jobs will appear here. You can restore them or permanently remove them.
-                </div>
+              <div class="empty-state" id="empty-recycle-state">
+                <span class="empty-icon" data-icon="trash" data-size="28" aria-hidden="true"></span>
+                <h3>Recycle bin is empty</h3>
+                <p>Deleted jobs will appear here. You can restore them or permanently remove them.</p>
               </div>
             </div>
           </div>
@@ -614,7 +311,7 @@
                 <h1>Operations Dashboard</h1>
                 <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
               </div>
-              <div class="flex-row" style="gap: 0.5rem">
+              <div class="flex-row gap-2">
                 <button type="button" class="btn primary small" data-action="refresh-dashboard">Refresh</button>
               </div>
             </div>
@@ -729,7 +426,7 @@
             </div>
 
             <!-- Two-column layout -->
-            <div class="row-2" style="margin-top: 1.5rem">
+            <div class="row-2 mt-4">
               <!-- Left: Governance Dashboard -->
               <div class="dash-card">
                 <div class="dash-card-header">
@@ -752,7 +449,7 @@
             </div>
 
             <!-- Degradation Predictions -->
-            <div class="dash-card" style="margin-top: 1.5rem">
+            <div class="dash-card mt-4">
               <div class="dash-card-header">
                 <span class="dash-card-title">Degradation Predictions</span>
                 <span class="dash-badge" id="dash-systemic-risk">—</span>
@@ -763,7 +460,7 @@
             </div>
 
             <!-- Telemetry Stats -->
-            <div class="dash-card" style="margin-top: 1.5rem">
+            <div class="dash-card mt-4">
               <div class="dash-card-header">
                 <span class="dash-card-title">Recent Telemetry</span>
               </div>
@@ -773,7 +470,7 @@
             </div>
 
             <!-- Rate Limit Stats -->
-            <div class="dash-card" style="margin-top: 1.5rem">
+            <div class="dash-card mt-4">
               <div class="dash-card-header">
                 <span class="dash-card-title">Rate Limits</span>
                 <span class="dash-badge" id="dash-rate-limit-tier">—</span>
@@ -784,11 +481,11 @@
             </div>
 
             <!-- Quick Links -->
-            <div class="dash-card" style="margin-top: 1.5rem" data-experimental="true">
+            <div class="dash-card mt-4" data-experimental="true">
               <div class="dash-card-header">
                 <span class="dash-card-title">Quick Reference</span>
               </div>
-              <div class="dash-card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; padding: 1rem">
+              <div class="dash-card-body flex-row gap-4 flex-wrap">
                 <a href="/api/system/status" target="_blank" rel="noopener noreferrer" class="btn ghost small"
                   >System Status API</a
                 >
@@ -976,23 +673,7 @@
 
               <!-- Error State -->
               <div id="analyze-error" class="analyze-error hidden">
-                <span class="analyze-error-icon" aria-hidden="true"
-                  ><svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path
-                      d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                    />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" /></svg
-                ></span>
+                <span data-icon="alertTriangle" aria-hidden="true"></span>
                 <span id="analyze-error-text"></span>
               </div>
             </div>
@@ -1081,7 +762,7 @@
                   aria-label="Search topic"
                 />
 
-                <div class="row-2 mt-0\.75">
+                <div class="row-2 mt-half">
                   <div>
                     <label class="section-label small" for="inp-location">Location focus</label>
                     <input
@@ -1101,7 +782,7 @@
                     />
                   </div>
                 </div>
-                <div class="row-2 mt-0\.75">
+                <div class="row-2 mt-half">
                   <div>
                     <label class="section-label small" for="inp-origin-location">Origin for radius optimization</label>
                     <input
@@ -1123,7 +804,7 @@
                     />
                   </div>
                 </div>
-                <div class="row-2 mt-0\.75">
+                <div class="row-2 mt-half">
                   <div>
                     <label class="section-label small" for="inp-discover-pages">Max Pages to Discover</label>
                     <input
@@ -1210,7 +891,7 @@
                       />
                     </div>
                   </div>
-                  <div class="row-2" style="margin-top: 0.5rem">
+                  <div class="row-2 mt-2">
                     <label class="check-label">
                       <input type="checkbox" id="chk-pagination" aria-label="Follow pagination" />
                       <span>Follow pagination</span>
@@ -1220,7 +901,7 @@
                       <input type="number" id="inp-max-pages" value="10" min="1" max="100" aria-label="Max pages" />
                     </div>
                   </div>
-                  <div style="margin-top: 0.75rem">
+                  <div class="mt-3">
                     <label class="section-label small" for="inp-min-score">Minimum record quality score (0 to 1)</label>
                     <input
                       type="number"
@@ -1245,7 +926,7 @@
                 <select id="inp-auth-profile" aria-label="Authentication profile">
                   <option value="">None (public access)</option>
                 </select>
-                <p class="hint-block" style="margin-top: 0.3rem">
+                <p class="hint-block mt-1">
                   <a href="#" data-action="switch-view" data-view="auth-profiles" class="hint">Manage auth profiles</a>
                 </p>
               </div>
@@ -1349,24 +1030,11 @@
               <div>
                 <h1>
                   Cognition State
-                  <span
-                    style="
-                      font-size: 0.6rem;
-                      background: var(--warning-soft);
-                      color: var(--warning);
-                      padding: 0.15rem 0.45rem;
-                      border-radius: 999px;
-                      vertical-align: middle;
-                      font-weight: 600;
-                      letter-spacing: 0.03em;
-                      text-transform: uppercase;
-                    "
-                    >EXPERIMENTAL</span
-                  >
+                  <span class="badge experimental">Experimental</span>
                 </h1>
                 <p class="subtle">Research-only semantic/topology views — not validated for production use</p>
               </div>
-              <div style="display: flex; gap: 0.5rem">
+              <div class="flex-row gap-2">
                 <button type="button" class="btn ghost small" data-action="refresh-cognition">Refresh</button>
                 <a href="/api/system/export/knowledge" download="knowledge-manifold.json" class="btn small"
                   >Download Knowledge</a
@@ -1394,55 +1062,47 @@
             </div>
 
             <!-- Cognition Grid -->
-            <div class="row-2" style="margin-top: 2rem">
+            <div class="row-2 mt-7">
               <!-- Left: Semantic Communities (Macro Scale) -->
-              <div class="ai-insight" style="display: block">
+              <div class="ai-insight cog-panel">
                 <h4 class="insight-title">Semantic Communities</h4>
-                <div class="list" id="community-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto">
+                <div class="list cog-scroll-list" id="community-list">
                   <div class="empty"><p>No stable communities identified</p></div>
                 </div>
               </div>
 
               <!-- Right: Stable Schema Patterns -->
-              <div class="ai-insight" style="display: block">
+              <div class="ai-insight cog-panel">
                 <h4 class="insight-title">Learned Schema Patterns</h4>
-                <div
-                  class="list"
-                  id="schema-pattern-list"
-                  style="margin-top: 1rem; max-height: 300px; overflow-y: auto"
-                >
+                <div class="list cog-scroll-list" id="schema-pattern-list">
                   <div class="empty"><p>No recurring schemas learned yet</p></div>
                 </div>
               </div>
             </div>
 
-            <div class="row-2" style="margin-top: 2rem">
+            <div class="row-2 mt-7">
               <!-- Left: Learned Exclusions -->
-              <div class="ai-insight" style="display: block">
+              <div class="ai-insight cog-panel">
                 <h4 class="insight-title">Learned Exclusions</h4>
-                <div class="list" id="exclusion-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto">
+                <div class="list cog-scroll-list-tall" id="exclusion-list">
                   <div class="empty"><p>No exclusions learned yet</p></div>
                 </div>
               </div>
 
               <!-- Right: Role Similarities -->
-              <div class="ai-insight" style="display: block">
+              <div class="ai-insight cog-panel">
                 <h4 class="insight-title">Manifold Alignment (Similarity)</h4>
-                <div
-                  class="list"
-                  id="role-similarity-list"
-                  style="margin-top: 1rem; max-height: 400px; overflow-y: auto"
-                >
+                <div class="list cog-scroll-list-tall" id="role-similarity-list">
                   <div class="empty"><p>Manifold is cold</p></div>
                 </div>
               </div>
             </div>
 
             <!-- Active Basins (Micro Scale) -->
-            <div style="margin-top: 2rem">
-              <div class="ai-insight" style="display: block">
+            <div class="mt-7">
+              <div class="ai-insight cog-panel">
                 <h4 class="insight-title">Active Field Basins (High Entropy Zones)</h4>
-                <div class="list" id="basin-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto">
+                <div class="list cog-scroll-list-tall" id="basin-list">
                   <div class="empty"><p>No active conflict basins</p></div>
                 </div>
               </div>
@@ -1518,40 +1178,10 @@
 
             <!-- Auth Profiles List -->
             <div class="list" id="auth-profiles-list">
-              <div class="empty-state-illustration" id="auth-profiles-empty-state">
-                <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect
-                    x="30"
-                    y="20"
-                    width="100"
-                    height="90"
-                    rx="8"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1.5"
-                    fill="none"
-                    class="empty-svg-line"
-                  />
-                  <circle
-                    cx="80"
-                    cy="55"
-                    r="18"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1.5"
-                    fill="none"
-                    class="empty-svg-line"
-                  />
-                  <path
-                    d="M60 85 Q70 75, 80 85 T100 85"
-                    stroke="var(--ink-faint)"
-                    stroke-width="1.5"
-                    fill="none"
-                    class="empty-svg-line"
-                  />
-                </svg>
-                <div class="empty-state-title">No auth profiles</div>
-                <div class="empty-state-desc">
-                  Create an auth profile to store a browser session for authenticated scraping.
-                </div>
+              <div class="empty-state" id="auth-profiles-empty-state">
+                <span class="empty-icon" data-icon="key" data-size="28" aria-hidden="true"></span>
+                <h3>No auth profiles</h3>
+                <p>Create an auth profile to store a browser session for authenticated scraping.</p>
               </div>
             </div>
           </div>
@@ -1603,17 +1233,18 @@
                   </div>
                 </div>
                 <div class="list" id="workflows-list">
-                  <div class="empty-state-illustration" id="workflows-empty-state">
-                    <p>No workflows yet.</p>
-                    <p class="subtle">
-                      Workflows are saved replay sequences you can re-run against the same target site.
-                    </p>
+                  <div class="empty-state" id="workflows-empty-state">
+                    <span class="empty-icon" data-icon="sliders" data-size="28" aria-hidden="true"></span>
+                    <h3>No workflows yet</h3>
+                    <p>Workflows are saved replay sequences you can re-run against the same target site.</p>
                   </div>
                 </div>
               </div>
 
               <div class="workflows-detail-pane" id="workflows-detail-pane">
-                <div class="empty-state-illustration" id="workflows-detail-empty">
+                <div class="empty-state" id="workflows-detail-empty">
+                  <span class="empty-icon" data-icon="sliders" data-size="28" aria-hidden="true"></span>
+                  <h3>Select a workflow</h3>
                   <p>Select a workflow to see its details and run history.</p>
                 </div>
               </div>
@@ -1713,7 +1344,7 @@
             <div class="audit-toolbar">
               <label class="audit-filter">
                 <span>Filter by category:</span>
-                <select id="audit-category-filter">
+                <select id="audit-category-filter" aria-label="Filter by category">
                   <option value="">All</option>
                   <option value="auth">Auth</option>
                   <option value="rbac">RBAC</option>
@@ -1725,7 +1356,7 @@
               </label>
               <label class="audit-filter">
                 <span>Limit:</span>
-                <select id="audit-limit-filter">
+                <select id="audit-limit-filter" aria-label="Audit event limit">
                   <option value="50">50</option>
                   <option value="100" selected>100</option>
                   <option value="200">200</option>
@@ -1802,7 +1433,7 @@
     >
       <div class="shortcut-modal">
         <h2 id="apikey-modal-title">API Key</h2>
-        <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
+        <p id="apikey-modal-desc" class="modal-desc">Enter your Dataforge API key for production access.</p>
         <form id="apikey-form" class="api-key-form">
           <input
             type="password"
@@ -1813,13 +1444,13 @@
             spellcheck="false"
             aria-label="API key"
           />
-          <label class="check-label" style="margin-top: 0.5rem">
+          <label class="check-label mt-2">
             <input type="checkbox" id="apikey-toggle-vis" />
             <span>Show key</span>
           </label>
         </form>
         <p id="apikey-error" class="api-key-error hidden"></p>
-        <div class="shortcut-close-row" style="margin-top: 1rem">
+        <div class="shortcut-close-row mt-4">
           <button type="button" class="btn ghost small" data-action="close-apikey" id="btn-apikey-cancel">
             Cancel
           </button>
@@ -1842,7 +1473,7 @@
       <div class="shortcut-modal confirm-modal">
         <h2 id="confirm-modal-title">Confirm</h2>
         <p id="confirm-modal-desc" class="modal-desc">Are you sure?</p>
-        <div class="shortcut-close-row" style="margin-top: 1rem; justify-content: flex-end; gap: 0.5rem">
+        <div class="shortcut-close-row mt-4" style="justify-content: flex-end; gap: 0.5rem">
           <button type="button" class="btn ghost small" data-action="close-confirm" id="btn-confirm-cancel">
             Cancel
           </button>

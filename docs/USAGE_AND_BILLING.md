@@ -91,7 +91,7 @@ Plan fields: `tier`, `max_jobs`, `max_scrapes`, `max_teammates`, `max_projects`,
 - Quota check function
 
 ### What Is Missing
-- Payment provider integration (Stripe / Paddle)
+- Payment provider integration (PayPal — Subscriptions API)
 - Subscription management
 - Invoice generation and history
 - Plan upgrade/downgrade flow

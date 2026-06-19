@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-18 16:00:51 UTC
+**Generated:** 2026-06-19 13:18:43 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -138,6 +138,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | POST | `/api/auth-profiles/{profile_id}/revoke` |
 | POST | `/api/auth-profiles/{profile_id}/start-login` |
 | POST | `/api/auth-profiles/{profile_id}/validate` |
+| POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
 | POST | `/api/saas/aup/accept` |
 | POST | `/api/saas/orgs` |
@@ -154,4 +155,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 98
+**Total routes:** 99

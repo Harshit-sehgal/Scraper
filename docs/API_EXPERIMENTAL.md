@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-18 16:00:51 UTC
+**Generated:** 2026-06-19 13:18:43 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -177,6 +177,7 @@ For the diff between stable and experimental, see
 | POST | `/api/auth-profiles/{profile_id}/revoke` |
 | POST | `/api/auth-profiles/{profile_id}/start-login` |
 | POST | `/api/auth-profiles/{profile_id}/validate` |
+| POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
 | POST | `/api/saas/aup/accept` |
 | POST | `/api/saas/orgs` |
@@ -193,4 +194,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 133
+**Total routes:** 134
