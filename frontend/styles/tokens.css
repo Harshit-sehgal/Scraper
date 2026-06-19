@@ -1,0 +1,138 @@
+/* ─── Design Tokens ─────────────────────────────────────
+   Dataforge — Notion-style monochrome palette.
+   Light is default; dark applies via [data-theme="dark"] on <html>. */
+
+:root,
+:root[data-theme="light"] {
+  /* Surfaces */
+  --bg: #fff;
+  --bg-subtle: #fafafa;
+  --bg-muted: #f5f5f5;
+  --bg-active: #ededed;
+  --bg-hover: rgb(0 0 0 / 0.04);
+  --bg-overlay: rgb(15 15 15 / 0.4);
+  --bg-code: #f7f7f7;
+  --bg-sidebar-item-active: rgb(0 0 0 / 0.05);
+  --bg-link-hover: rgb(37 99 235 / 0.06);
+
+  /* Ink — 4-tier (Notion-warm body) */
+  --ink-1: #1a1a1a; /* titles */
+  --ink-2: #37352f; /* body  — Notion warm gray */
+  --ink-3: #787774; /* subtle */
+  --ink-4: #a8a7a3; /* placeholder */
+  --ink-inverse: #fff;
+  --ink-link: #2563eb;
+
+  /* Borders */
+  --border: #eaeaea;
+  --border-strong: #d4d4d4;
+  --border-focus: #1a1a1a;
+
+  /* Spacing — 4px base */
+  --space-1: 0.25rem; /*  4 */
+  --space-2: 0.5rem; /*  8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.25rem; /* 20 */
+  --space-6: 1.5rem; /* 24 */
+  --space-7: 2rem; /* 32 */
+  --space-8: 2.5rem; /* 40 */
+  --space-9: 3rem; /* 48 */
+  --space-10: 4rem; /* 64 */
+  --space-11: 5rem; /* 80 */
+  --space-12: 6rem; /* 96 */
+
+  /* Radius */
+  --radius-xs: 3px;
+  --radius-sm: 4px; /* chips */
+  --radius: 6px; /* default — buttons, inputs */
+  --radius-lg: 8px; /* cards, modals */
+  --radius-pill: 9999px; /* reserved for status badges */
+
+  /* Typography */
+  --font-sans: "Inter", -apple-system, blinkmacsystemfont, "Segoe UI", roboto, sans-serif;
+  --font-mono: ui-monospace, sfmono-regular, "JetBrains Mono", menlo, consolas, monospace;
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-base: 0.875rem; /* 14 */
+  --text-md: 0.9375rem; /* 15 — body default */
+  --text-lg: 1.0625rem; /* 17 */
+  --text-xl: 1.25rem; /* 20 */
+  --text-2xl: 1.5625rem; /* 25 */
+  --text-3xl: 1.875rem; /* 30 */
+  --text-4xl: 2.25rem; /* 36 — landing hero */
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.65;
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+
+  /* Component dimensions */
+  --topbar-height: 48px;
+  --sidebar-width: 252px;
+  --sidebar-collapsed-width: 0px;
+  --control-height: 32px;
+  --control-height-lg: 38px;
+  --focus-ring-offset: 2px;
+
+  /* Status — muted, used only for badges (not buttons) */
+  --status-blue: #2563eb;
+  --status-blue-soft: rgb(37 99 235 / 0.08);
+  --status-green: #1f8f4e;
+  --status-green-soft: rgb(31 143 78 / 0.08);
+  --status-amber: #b45309;
+  --status-amber-soft: rgb(180 83 9 / 0.08);
+  --status-red: #c0392b;
+  --status-red-soft: rgb(192 57 43 / 0.08);
+  --status-gray: #6b6b6b;
+  --status-gray-soft: rgb(107 107 107 / 0.08);
+  --status-violet: #6d52b9;
+  --status-violet-soft: rgb(109 82 185 / 0.08);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+
+  /* Layout max widths */
+  --container-narrow: 720px;
+  --container-base: 1080px;
+  --container-wide: 1280px;
+}
+
+:root[data-theme="dark"] {
+  --bg: #191919;
+  --bg-subtle: #202020;
+  --bg-muted: #2a2a2a;
+  --bg-active: #303030;
+  --bg-hover: rgb(255 255 255 / 0.06);
+  --bg-overlay: rgb(0 0 0 / 0.55);
+  --bg-code: #1f1f1f;
+  --bg-sidebar-item-active: rgb(255 255 255 / 0.06);
+  --bg-link-hover: rgb(124 158 255 / 0.08);
+  --ink-1: #ebebeb;
+  --ink-2: #cfcfcf;
+  --ink-3: #8a8a8a;
+  --ink-4: #5f5f5f;
+  --ink-inverse: #191919;
+  --ink-link: #7c9eff;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+  --border-focus: #fff;
+  --status-blue: #7c9eff;
+  --status-blue-soft: rgb(124 158 255 / 0.12);
+  --status-green: #5acb82;
+  --status-green-soft: rgb(90 203 130 / 0.12);
+  --status-amber: #e0a961;
+  --status-amber-soft: rgb(224 169 97 / 0.12);
+  --status-red: #e07b6e;
+  --status-red-soft: rgb(224 123 110 / 0.12);
+  --status-gray: #9a9a9a;
+  --status-gray-soft: rgb(154 154 154 / 0.12);
+  --status-violet: #b39ddb;
+  --status-violet-soft: rgb(179 157 219 / 0.12);
+}

@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import runtime_deps
+from app.billing.checkout import router as billing_checkout_router
 from app.billing.webhooks import router as billing_webhook_router
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
@@ -162,6 +163,7 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(scheduled_monitoring_router)
     app.include_router(user_data_router)
     app.include_router(billing_webhook_router)
+    app.include_router(billing_checkout_router)
 
     # Experimental / research routes — gated on the same flag that gates
     # the import-time subsystem initialization. Including this router

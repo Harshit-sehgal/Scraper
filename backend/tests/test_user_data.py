@@ -2,7 +2,7 @@
 
 Tests:
 - DELETE /api/user/data endpoint
-- Billing service Autumn integration
+- Billing service PayPal integration
 - Webhook processing
 """
 
@@ -17,10 +17,10 @@ from pathlib import Path
 import pytest
 from app.billing.models import PlanTierId
 from app.billing.service import (
-    get_autumn_client,
+    get_paypal_client,
     get_plan_limit,
     get_user_tier_from_billing,
-    reset_autumn_client,
+    reset_paypal_client,
 )
 from app.billing.webhooks import (
     _process_webhook_event,
@@ -85,33 +85,35 @@ class TestDeleteMyDataEndpoint:
 # =========================================================================
 
 
-class TestAutumnClient:
-    """Tests for the Autumn billing client."""
+class TestPayPalClient:
+    """Tests for the PayPal billing client."""
 
     def test_not_configured_by_default(self) -> None:
-        """AutumnClient is not configured without API key."""
-        reset_autumn_client()
-        client = get_autumn_client()
-        # In test env without AUTUMN_API_KEY, should not be configured
+        """PayPalClient is not configured without API credentials."""
+        reset_paypal_client()
+        client = get_paypal_client()
+        # In test env without PAYPAL_CLIENT_ID/PAYPAL_CLIENT_SECRET, the
+        # client must report unconfigured so callers fall back to free-tier
+        # defaults and stub approval URLs.
         assert not client.is_configured
 
     def test_track_event_without_config(self) -> None:
         """track_event returns False when not configured."""
-        reset_autumn_client()
-        client = get_autumn_client()
+        reset_paypal_client()
+        client = get_paypal_client()
         result = client.track_event("customer_1", "api_request", value=1)
         assert result is False
 
     def test_get_customer_without_config(self) -> None:
         """get_customer returns None when not configured."""
-        reset_autumn_client()
-        client = get_autumn_client()
+        reset_paypal_client()
+        client = get_paypal_client()
         result = client.get_customer("customer_1")
         assert result is None
 
     def test_get_customer_plan_tier_without_config(self) -> None:
         """get_customer_plan_tier returns FREE when not configured."""
-        reset_autumn_client()
+        reset_paypal_client()
         tier = get_user_tier_from_billing("customer_1")
         assert tier == PlanTierId.FREE
 
@@ -144,7 +146,12 @@ class TestWebhookProcessing:
     """Tests for billing webhook event processing."""
 
     def test_subscription_created(self) -> None:
-        """subscription.created stores the customer's tier."""
+        """subscription.created stores the customer's tier.
+
+        Tests calling ``_process_webhook_event`` directly with the legacy
+        Stripe-style flat-dialect payload — must continue to work for
+        backwards-compatible fixtures.
+        """
         _process_webhook_event(
             "subscription.created",
             {
@@ -211,13 +218,44 @@ class TestWebhookProcessing:
         assert sub is not None
         assert sub["plan_tier"] == "enterprise"
 
+    def test_paypal_subscription_created_via_route(self) -> None:
+        """PayPal-dialect ``BILLING.SUBSCRIPTION.CREATED`` events are
+        normalized by the webhook route and stored with the expected tier.
+
+        Drives the route handler so we exercise the dialect normalization
+        that lets PayPal's ``event_type`` + ``resource`` payload shape
+        coexist with the legacy Stripe/Autumn dialects.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+
+        with TestClient(app) as tc:
+            payload = {
+                "event_type": "BILLING.SUBSCRIPTION.CREATED",
+                "resource": {
+                    "id": "I-PAYPAL-001",
+                    "plan_id": "starter",
+                    "status": "ACTIVE",
+                },
+            }
+            response = tc.post(
+                "/api/billing/webhook",
+                content=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["status"] == "ok"
+            sub = get_customer_subscription("I-PAYPAL-001")
+            assert sub is not None
+            assert sub["plan_tier"] == "starter"
+
 
 class TestBillingWebhookEndpoint:
     """Tests for the POST /api/billing/webhook endpoint."""
 
     @pytest.fixture(autouse=True)
     def _clear_webhook_secret(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("AUTUMN_WEBHOOK_SECRET", raising=False)
+        monkeypatch.delenv("PAYPAL_WEBHOOK_SECRET", raising=False)
         monkeypatch.delenv("DATAFORGE_BILLING_WEBHOOK_SECRET", raising=False)
 
     def test_webhook_missing_body(self, client: TestClient) -> None:
@@ -271,7 +309,7 @@ class TestBillingWebhookEndpoint:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Configured billing webhook secrets fail closed without a valid signature."""
-        monkeypatch.setenv("AUTUMN_WEBHOOK_SECRET", "test-webhook-secret")
+        monkeypatch.setenv("PAYPAL_WEBHOOK_SECRET", "test-webhook-secret")
         payload = {
             "event_type": "subscription.created",
             "data": {"customer_id": "cus_signed_test", "plan": "starter"},
@@ -293,7 +331,7 @@ class TestBillingWebhookEndpoint:
     ) -> None:
         """Configured billing webhooks accept a valid HMAC-SHA256 body signature."""
         secret = "test-webhook-secret"
-        monkeypatch.setenv("AUTUMN_WEBHOOK_SECRET", secret)
+        monkeypatch.setenv("PAYPAL_WEBHOOK_SECRET", secret)
         payload = {
             "event_type": "subscription.created",
             "data": {
@@ -315,3 +353,56 @@ class TestBillingWebhookEndpoint:
 
         assert response.status_code == 200
         assert get_customer_subscription("cus_signed_test") is not None
+
+
+# =========================================================================
+# Checkout endpoint tests
+# =========================================================================
+
+
+class TestCheckoutEndpoint:
+    """Tests for POST /api/billing/checkout (PayPal Order creation)."""
+
+    def test_checkout_stub_when_paypal_not_configured(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Without PAYPAL_CLIENT_ID the endpoint returns a deterministic
+        stub approval_url so dev environments don't need PayPal credentials.
+        """
+        monkeypatch.delenv("PAYPAL_CLIENT_ID", raising=False)
+        monkeypatch.delenv("PAYPAL_CLIENT_SECRET", raising=False)
+        # Force a fresh client (in case a prior test configured one).
+        reset_paypal_client()
+
+        response = client.post(
+            "/api/billing/checkout",
+            json={
+                "plan_tier": "pro",
+                "return_url": "https://example.com/return",
+                "cancel_url": "https://example.com/cancel",
+            },
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["plan_tier"] == "pro"
+        assert body["approval_url"].startswith("https://example.com/paypal-stub/pro/")
+        assert body["token"].startswith("stub-")
+
+    @pytest.mark.parametrize("bad_url", ["javascript:alert(1)", "data:text/html,hi", "file:///etc/passwd"])
+    def test_checkout_rejects_non_http_urls(
+        self,
+        client: TestClient,
+        bad_url: str,
+    ) -> None:
+        """return_url/cancel_url must be http(s) — no javascript:, data:, or file:."""
+        response = client.post(
+            "/api/billing/checkout",
+            json={
+                "plan_tier": "starter",
+                "return_url": bad_url,
+                "cancel_url": bad_url,
+            },
+        )
+        assert response.status_code == 422

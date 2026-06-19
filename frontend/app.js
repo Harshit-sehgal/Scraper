@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════
-   DataForge — Frontend App Entry Point (ES Module)
+   Dataforge — Frontend App Entry Point (ES Module)
    ═══════════════════════════════════════════
    ═══════════════════════════════════════════ */
 
 // ─── Init ───
+import { hydrateIcons, startIconObserver } from "./js/icons.js";
 import {
   readUIState,
   updateJobsLastUpdatedLabel,
@@ -287,6 +288,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // user clicks on visible controls are not dropped during startup.
   document.addEventListener("click", onDocumentClick);
   document.addEventListener("change", onDocumentChange);
+
+  // Hydrate [data-icon] placeholders with Phosphor SVG icons
+  hydrateIcons();
+  // Watch for future innerHTML rewrites so view-local mutations
+  // (renderJobs, addField, addFilter, etc.) keep their icons rendered
+  // without needing per-render explicit hydrateIcons() calls.
+  startIconObserver();
 
   // G2: Try session auth first — if the browser already has a valid
   // session cookie, no API key prompt is needed.

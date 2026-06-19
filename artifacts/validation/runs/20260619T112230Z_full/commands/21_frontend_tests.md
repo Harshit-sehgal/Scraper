@@ -1,0 +1,37 @@
+# frontend_tests
+
+- status: passed
+- command: `npm run test`
+- working_directory: `/home/harshit/Documents/Work/Money/scraper`
+- start_time: 2026-06-19T11:27:51.981149+00:00
+- end_time: 2026-06-19T11:27:54.219574+00:00
+- duration_seconds: 2.24
+- exit_code: 0
+- timeout_seconds: 300
+- required: true
+- redaction_applied: false
+
+## stdout
+
+```text
+
+> dataforge-frontend@0.1.0 test
+> vitest run --config frontend/vitest.config.js
+
+
+ RUN  v4.1.8 /home/harshit/Documents/Work/Money/scraper
+
+
+ Test Files  20 passed (20)
+      Tests  290 passed (290)
+   Start at  16:57:52
+   Duration  1.83s (transform 1.21s, setup 0ms, import 1.61s, tests 1.93s, environment 18.53s)
+
+
+```
+
+## stderr
+
+```text
+
+```

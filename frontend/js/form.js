@@ -133,7 +133,7 @@ export function addField(preset = null) {
             <label for="sf-desc-${fid}">Hint for AI</label>
             <input type="text" class="sf-desc" id="sf-desc-${fid}" placeholder="e.g. star rating out of 5" value="${desc}">
         </div>
-        <button type="button" class="btn-x" data-action="remove-field" aria-label="Remove field">✕</button>
+        <button type="button" class="btn-x" data-action="remove-field" aria-label="Remove field"><span data-icon="x" data-size="14"></span></button>
     `;
   c.appendChild(row);
 }
@@ -250,7 +250,7 @@ export function addFilter() {
             <label for="ff-value-${fid}">Value</label>
             <input type="text" class="ff-value" id="ff-value-${fid}" placeholder="e.g. 50">
         </div>
-        <button type="button" class="btn-x" data-action="remove-filter" aria-label="Remove field">✕</button>
+        <button type="button" class="btn-x" data-action="remove-filter" aria-label="Remove filter"><span data-icon="x" data-size="14"></span></button>
     `;
   c.appendChild(row);
 }

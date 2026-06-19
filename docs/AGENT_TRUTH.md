@@ -1281,14 +1281,15 @@ Three code-level gaps from Prompts 10–13 were completed in this session:
 All code-level gaps from Prompts 10–13 are now **COMPLETED**. The remaining items are infrastructure-dependent only.
 
 #### Payment/Billing Integration ✅ `backend/app/billing/`
-- **Autumn** (useautumn.com) usage-based billing built on Stripe
-- `billing/service.py` — `AutumnClient` wrapper: `track_event()`, `get_customer()`, `check_balance()`, `get_user_tier_from_billing()`
-- Free-tier fallback when `AUTUMN_API_KEY` not configured (development mode)
-- `billing/webhooks.py` — Webhook handler for subscription events (created/updated/canceled/past_due)
-- `POST /api/billing/webhook` — Exempt from DataForge API-key middleware for provider callbacks; verifies configured shared secret or HMAC-SHA256 body signature
-- `GET /api/billing/subscriptions` — Admin/operator management endpoints
-- `plan_enforcer.py` `_user_tier()` — Now calls `get_user_tier_from_billing()` for real tier lookups
-- Wire-up in `main.py` + middlewares.py exempt path
+- **PayPal Subscriptions API** — official `paypalhttp` Python SDK for Orders API v2 (checkout) and Subscriptions (lookups, webhooks).
+- `billing/service.py` — `PayPalClient` wrapper: `track_event()` (log-only no-op; PayPal Billing has no metered-events API), `get_customer()` (calls `subscriptions.SubscriptionsGet`), `check_balance()` (returns True; quota gating lives in `plan_enforcer`), `get_user_tier_from_billing()`, `plan_price()`. Tokens are refreshed via `paypalhttp.OAuthToken(client, client_id, client_secret)` and cached for ~50 minutes (PayPal tokens live 3600s).
+- Free-tier fallback when `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` not configured (development mode); checkout falls back to a deterministic stub approval_url.
+- `billing/checkout.py` — `POST /api/billing/checkout`: any authenticated session can create a PayPal Order and receive an `approval_url`; URLs strictly http(s), plan tier is `starter` / `pro` / `enterprise` literal.
+- `billing/webhooks.py` — Webhook handler for PayPal subscription lifecycle events (`BILLING.SUBSCRIPTION.CREATED` / `UPDATED` / `CANCELLED` / `SUSPENDED` / `PAYMENT.FAILED`, `PAYMENT.SALE.COMPLETED` / `FAILED`, `CUSTOMER.CREATED`) **and** legacy Stripe/Autumn dialects — normalized via `_normalize_webhook()`.
+- `POST /api/billing/webhook` — Exempt from DataForge API-key middleware for provider callbacks; verifies configured shared secret OR HMAC-SHA256 body signature against `PAYPAL_WEBHOOK_SECRET`.
+- `GET /api/billing/subscriptions` — Admin/operator management endpoints.
+- `plan_enforcer.py` `_user_tier()` — calls `get_user_tier_from_billing()` for real tier lookups.
+- Wire-up in `main.py` + middlewares.py exempt path.
 
 #### Infinite Scroll / Load-More Playwright Integration ✅ `backend/app/pagination_executor.py`
 - Async Playwright-based strategies: `_async_paginate_infinite_scroll()`, `_async_paginate_load_more()`, `_async_paginate_next_button()`, `_async_paginate_page_number()`, `_async_paginate_url_pattern()`
@@ -1325,7 +1326,7 @@ All code-level gaps from Prompts 10–13 are now **COMPLETED**. The remaining it
 
 | Item | Action Needed |
 | --- | --- |
-| **Autumn API key** | Sign up at useautumn.com, set `AUTUMN_API_KEY` env var |
+| **PayPal Subscriptions rollout** | Create three PayPal Plans (Starter / Pro / Enterprise) in the PayPal Dashboard; set `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PLAN_ID_STARTER` / `PAYPAL_PLAN_ID_PRO` / `PAYPAL_PLAN_ID_ENTERPRISE`, and `PAYPAL_WEBHOOK_SECRET`; flip `PAYPAL_ENVIRONMENT=live` |
 | **Container/SBOM audit** | Run dependency audit against the built production image |
 | **Postgres parity** | Run `python3 -m pytest --run-postgres` with Postgres server |
 | **Staging/TLS/backups** | Deploy with `docker-compose.prod.yml`, configure TLS, secrets, backups |

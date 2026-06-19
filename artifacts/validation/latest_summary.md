@@ -1,11 +1,11 @@
 # Latest Validation Summary
 
-- generated_at: 2026-06-18T16:02:25.103618+00:00
-- mode: full
-- run_id: 20260618T155729Z_full
-- archive_dir: `artifacts/validation/runs/20260618T155729Z_full`
+- generated_at: 2026-06-19T13:23:48.882552+00:00
+- mode: quick
+- run_id: 20260619T132330Z_quick
+- archive_dir: `artifacts/validation/runs/20260619T132330Z_quick`
 - overall_status: passed
-- passed: 24
+- passed: 13
 - failed: 0
 - skipped: 0
 - timed_out: 0
@@ -29,14 +29,3 @@
 | passed | true | url_and_research_smoke_tests | 0 | `artifacts/validation/commands/10_url_and_research_smoke_tests.md` |
 | passed | true | p0_regression_tests | 0 | `artifacts/validation/commands/11_p0_regression_tests.md` |
 | passed | true | openapi_spec | 0 | `artifacts/validation/commands/12_openapi_spec.md` |
-| passed | true | backend_full_tests | 0 | `artifacts/validation/commands/13_backend_full_tests.md` |
-| passed | true | ruff_check | 0 | `artifacts/validation/commands/14_ruff_check.md` |
-| passed | true | pyflakes | 0 | `artifacts/validation/commands/15_pyflakes.md` |
-| passed | true | mypy | 0 | `artifacts/validation/commands/16_mypy.md` |
-| passed | true | bandit_backend | 0 | `artifacts/validation/commands/17_bandit_backend.md` |
-| passed | true | pip_audit | 0 | `artifacts/validation/commands/18_pip_audit.md` |
-| passed | true | prod_env_example_placeholder_check | 1 | `artifacts/validation/commands/19_prod_env_example_placeholder_check.md` |
-| passed | true | npm_ci | 0 | `artifacts/validation/commands/20_npm_ci.md` |
-| passed | true | frontend_tests | 0 | `artifacts/validation/commands/21_frontend_tests.md` |
-| passed | true | frontend_lint_js | 0 | `artifacts/validation/commands/22_frontend_lint_js.md` |
-| passed | true | frontend_lint_css | 0 | `artifacts/validation/commands/23_frontend_lint_css.md` |

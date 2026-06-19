@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dataforge — Web Data Extraction on Autopilot</title>
+    <meta
+      name="description"
+      content="Turn any website into structured data. Manifest-driven scraping with streaming results, multi-tenant auth, and built-in audit trails."
+    />
+    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- ─── Open Graph ─── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Dataforge — Web Data Extraction on Autopilot" />
+    <meta
+      property="og:description"
+      content="Turn any website into structured data. Manifest-driven scraping with streaming results, multi-tenant auth, and built-in audit trails."
+    />
+    <meta property="og:url" content="/" />
+    <meta property="og:site_name" content="Dataforge" />
+
+    <!-- ─── Twitter Card ─── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dataforge — Web Data Extraction on Autopilot" />
+    <meta
+      name="twitter:description"
+      content="Turn any website into structured data. Manifest-driven scraping with streaming results, multi-tenant auth, and built-in audit trails."
+    />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ─── Skip link (a11y) ─── -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- ─── Top Nav ─── -->
+    <nav class="landing-nav" aria-label="Primary">
+      <a href="/" class="landing-brand">Dataforge</a>
+      <div class="landing-nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="landing-nav-actions">
+        <a href="/app/" class="btn ghost small">Sign in</a>
+        <a href="/app/" class="btn primary small">Get started</a>
+      </div>
+    </nav>
+
+    <main id="main-content">
+      <!-- ─── Hero ─── -->
+      <section class="hero">
+        <div class="hero-inner">
+          <div class="hero-text">
+            <h1>Web data extraction<br />on autopilot.</h1>
+            <p class="hero-sub">
+              Define what you need. Dataforge handles discovery, extraction, deduplication, and streaming — so you ship
+              data, not scrapers.
+            </p>
+            <div class="hero-cta">
+              <a href="/app/" class="btn primary lg">Open dashboard &rarr;</a>
+              <a href="/docs" class="btn secondary lg" target="_blank" rel="noopener noreferrer"
+                >Read the docs &nearr;</a
+              >
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="product-mockup" aria-hidden="true">
+              <div class="mockup-sidebar">
+                <div class="mockup-sidebar-item active"></div>
+                <div class="mockup-sidebar-item"></div>
+                <div class="mockup-sidebar-item"></div>
+                <div class="mockup-sidebar-item"></div>
+                <div class="mockup-sidebar-item"></div>
+              </div>
+              <div class="mockup-main">
+                <div class="mockup-topbar"></div>
+                <div class="mockup-row"></div>
+                <div class="mockup-row short"></div>
+                <div class="mockup-row"></div>
+                <div class="mockup-row short"></div>
+                <div class="mockup-row"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Features ─── -->
+      <section class="features" id="features">
+        <div class="features-inner">
+          <h2>Everything you need to extract data at scale</h2>
+          <div class="features-grid">
+            <div class="feature-card">
+              <span class="feature-icon" data-icon="bolt" data-size="28" aria-hidden="true"></span>
+              <h3>Predictable extraction</h3>
+              <p>Schema-first contracts define exactly what data you get — no surprises, no fragile selectors.</p>
+            </div>
+            <div class="feature-card">
+              <span class="feature-icon" data-icon="fileText" data-size="28" aria-hidden="true"></span>
+              <h3>Manifest-driven</h3>
+              <p>Declare your intent and schema upfront. The engine handles discovery, pagination, and retries.</p>
+            </div>
+            <div class="feature-card">
+              <span class="feature-icon" data-icon="refresh" data-size="28" aria-hidden="true"></span>
+              <h3>Streaming results</h3>
+              <p>Rows stream as they land — no waiting for full completion. Export CSV, JSON, or Excel on the fly.</p>
+            </div>
+            <div class="feature-card">
+              <span class="feature-icon" data-icon="shield" data-size="28" aria-hidden="true"></span>
+              <h3>Multi-tenant auth</h3>
+              <p>Store browser sessions per tenant. Auth profiles handle login walls, CAPTCHAs, and 2FA.</p>
+            </div>
+            <div class="feature-card">
+              <span class="feature-icon" data-icon="key" data-size="28" aria-hidden="true"></span>
+              <h3>First-class auth</h3>
+              <p>API keys, admin keys, and session cookies — all HMAC-verified, all audited, all revocable.</p>
+            </div>
+            <div class="feature-card">
+              <span class="feature-icon" data-icon="scroll" data-size="28" aria-hidden="true"></span>
+              <h3>Built-in audit</h3>
+              <p>Every action is logged. Auth, RBAC, admin, and data-access events — tamper-evident and immutable.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── How it works ─── -->
+      <section class="how" id="how">
+        <div class="how-inner">
+          <h2>How it works</h2>
+          <div class="how-steps">
+            <div class="how-step">
+              <span class="how-step-num">1</span>
+              <h3>Define the contract</h3>
+              <p>Describe the data you want in plain language. Set a schema with the columns you need.</p>
+            </div>
+            <div class="how-step">
+              <span class="how-step-num">2</span>
+              <h3>Run the scraper</h3>
+              <p>Dataforge discovers URLs, handles pagination, and streams extracted rows in real-time.</p>
+            </div>
+            <div class="how-step">
+              <span class="how-step-num">3</span>
+              <h3>Stream results</h3>
+              <p>Download as CSV, JSON, or Excel. Dedup, re-clean with AI, and iterate until the data is perfect.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Pricing ─── -->
+      <section class="pricing" id="pricing">
+        <div class="pricing-inner">
+          <h2>Pricing</h2>
+          <p class="pricing-sub">Start free. Scale when ready.</p>
+          <div class="pricing-grid">
+            <div class="pricing-card">
+              <h3>Free</h3>
+              <div class="pricing-price">$0<span>/mo</span></div>
+              <ul class="pricing-features">
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 3 concurrent jobs</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 100 records / job</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> CSV + JSON export</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Community support</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Basic audit log</li>
+              </ul>
+              <a href="/app/" class="btn secondary block">Get started</a>
+            </div>
+            <div class="pricing-card recommended">
+              <span class="pricing-recommended-badge">Recommended</span>
+              <h3>Team</h3>
+              <div class="pricing-price">$29<span>/mo</span></div>
+              <ul class="pricing-features">
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 20 concurrent jobs</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 10,000 records / job</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Excel + streaming</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Auth profiles</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Priority support</li>
+              </ul>
+              <a href="/app/" class="btn primary block">Get started</a>
+            </div>
+            <div class="pricing-card">
+              <h3>Enterprise</h3>
+              <div class="pricing-price">Custom</div>
+              <ul class="pricing-features">
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Unlimited jobs</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Unlimited records</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> SSO + RBAC</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> SLA guarantee</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Dedicated support</li>
+              </ul>
+              <a href="mailto:hello@dataforge.dev" class="btn secondary block">Contact us</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── FAQ ─── -->
+      <section class="faq" id="faq">
+        <div class="faq-inner">
+          <h2>Frequently asked questions</h2>
+          <details>
+            <summary>What websites can Dataforge scrape?</summary>
+            <p>
+              Dataforge works with any publicly accessible page. For sites behind login, use Auth Profiles to store and
+              replay browser sessions.
+            </p>
+          </details>
+          <details>
+            <summary>How is Dataforge different from BeautifulSoup or Scrapy?</summary>
+            <p>
+              Dataforge is schema-first and intent-driven — you describe what data you want, not how to extract it. The
+              engine handles discovery, pagination, deduplication, and retry automatically.
+            </p>
+          </details>
+          <details>
+            <summary>Is there rate limiting?</summary>
+            <p>
+              Yes. Dataforge has a built-in rate limiter with per-domain backoff and operators can choose production,
+              benchmark, forensic, resilient, or low-cost modes to tune behavior.
+            </p>
+          </details>
+          <details>
+            <summary>Can I export data to my pipeline?</summary>
+            <p>
+              Absolutely. Export as CSV, JSON, or Excel. The REST API also supports streaming results for real-time
+              pipelines.
+            </p>
+          </details>
+          <details>
+            <summary>Is my data secure?</summary>
+            <p>
+              All data is encrypted at rest and in transit. API keys are HMAC-verified. Every action is audited. Tenant
+              isolation is enforced at the API layer.
+            </p>
+          </details>
+          <details>
+            <summary>Do I need to write code?</summary>
+            <p>
+              No. The web UI lets you define schemas, run jobs, and export results — no code required. For advanced use,
+              the REST API offers full programmatic control.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <!-- ─── Footer ─── -->
+    <footer class="landing-footer">
+      <div class="footer-inner">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/docs" target="_blank" rel="noopener noreferrer">Documentation</a>
+            <a href="/api/docs" target="_blank" rel="noopener noreferrer">API Reference</a>
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <a href="/docs/guides/quickstart" target="_blank" rel="noopener noreferrer">Quickstart guide</a>
+            <a href="/docs/guides/auth-profiles" target="_blank" rel="noopener noreferrer">Auth profiles</a>
+            <a href="/docs/guides/workflows" target="_blank" rel="noopener noreferrer">Workflows</a>
+            <a href="/docs/SAAS_MODEL.md" target="_blank" rel="noopener noreferrer">SaaS model</a>
+          </div>
+          <div class="footer-col">
+            <h4>Company</h4>
+            <a href="mailto:hello@dataforge.dev">Contact</a>
+            <a href="/api/system/status" target="_blank" rel="noopener noreferrer">System status</a>
+            <a href="#faq">FAQ</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; 2026 Dataforge</span>
+          <span class="footer-version">v0.1</span>
+        </div>
+      </div>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

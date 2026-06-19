@@ -13,6 +13,7 @@ import {
 } from "./utils.js";
 import { refreshJobs, onJobsFilterChanged } from "./jobs.js";
 import { renderFilteredResults } from "./results.js";
+import { hydrateIcons } from "./icons.js";
 
 export let currentView = "jobs";
 export let currentMode = "manual";
@@ -140,6 +141,9 @@ export function switchView(name) {
   if (name === "retention") import("./retention.js").then((m) => m.refreshRetention()).catch(() => {});
 
   writeUIState({ view: name });
+
+  // Hydrate [data-icon] placeholders in the newly-activated view
+  requestAnimationFrame(() => hydrateIcons());
 }
 
 // ─── Popstate handler for back/forward buttons ───

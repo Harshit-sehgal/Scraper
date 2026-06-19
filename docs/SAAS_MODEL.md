@@ -123,7 +123,7 @@ Access checks use the centralized `can_access_scoped_resource()` helper in `app.
 
 ## 9. What Is Not Yet Implemented
 
-- Payment provider integration (Stripe/Paddle)
+- Payment provider integration (PayPal — Subscriptions API)
 - Plan enforcement in middleware/routes
 - Email verification on signup
 - Password reset flow

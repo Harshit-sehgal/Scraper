@@ -1,0 +1,13 @@
+/* ─── Fonts ─────────────────────────────────────────────
+   Inter Variable — single file covers 100-900 weight axis.
+   Self-hosted to satisfy CSP `font-src 'self'`. */
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src:
+    url("../fonts/Inter-Variable.woff2") format("woff2-variations"),
+    url("../fonts/Inter-Variable.woff2") format("woff2");
+}
