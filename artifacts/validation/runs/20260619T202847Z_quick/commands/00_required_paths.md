@@ -3,8 +3,8 @@
 - status: passed
 - command: `internal check`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-19T20:30:39.462766+00:00
-- end_time: 2026-06-19T20:30:39.462766+00:00
+- start_time: 2026-06-19T20:28:47.761365+00:00
+- end_time: 2026-06-19T20:28:47.761365+00:00
 - duration_seconds: 0.00
 - exit_code: 0
 - timeout_seconds: 0

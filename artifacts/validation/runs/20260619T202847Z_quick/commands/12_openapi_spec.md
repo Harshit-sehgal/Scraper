@@ -3,9 +3,9 @@
 - status: passed
 - command: `/usr/bin/python3 scripts/generate_openapi.py --no-docs-copy`
 - working_directory: `/home/harshit/Documents/Work/Money/scraper`
-- start_time: 2026-06-19T20:30:57.520401+00:00
-- end_time: 2026-06-19T20:30:58.659614+00:00
-- duration_seconds: 1.14
+- start_time: 2026-06-19T20:29:05.931820+00:00
+- end_time: 2026-06-19T20:29:07.056592+00:00
+- duration_seconds: 1.12
 - exit_code: 0
 - timeout_seconds: 120
 - required: true

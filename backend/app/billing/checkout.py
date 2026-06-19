@@ -67,6 +67,21 @@ def _stub_approval_url(plan_tier: str, request_id: str) -> str:
     return f"https://example.com/paypal-stub/{plan_tier}/{request_id}"
 
 
+# PayPal checkout web UI host — separate from the REST API base URL.
+# The REST API is api-m.sandbox.paypal.com (or api-m.paypal.com for live);
+# the checkout UI is www.sandbox.paypal.com (or www.paypal.com for live).
+_PAYPAL_CHECKOUT_WEB_HOSTS: dict[str, str] = {
+    "sandbox": "https://www.sandbox.paypal.com",
+    "live": "https://www.paypal.com",
+}
+
+
+def _checkout_web_host(_api_url: str) -> str:
+    """Derive the PayPal checkout web host from REST API URL or environment."""
+    is_live = os.environ.get("PAYPAL_ENVIRONMENT", "sandbox").lower() == "live"
+    return _PAYPAL_CHECKOUT_WEB_HOSTS["live" if is_live else "sandbox"]
+
+
 def _create_paypal_order(
     client: PayPalClient,
     plan_tier: str,
@@ -74,15 +89,15 @@ def _create_paypal_order(
     cancel_url: str,
     request_id: str,
 ) -> dict[str, Any] | None:
-    """Create a PayPal Order via the paypalhttp SDK. Returns None on failure."""
-    if client._paypalhttp is None:
+    """Create a PayPal Order via the paypal-checkout-sdk. Returns None on failure."""
+    if not client.is_configured:
         return None
     try:
-        from paypalhttp import orders  # type: ignore[import-untyped]
+        from paypalcheckoutsdk.orders import OrdersCreateRequest  # type: ignore[import-untyped]
 
-        price = client.plan_price(plan_tier)  # type: ignore[arg-type]
-        request = orders.OrdersCreateRequest()
-        request.request_body(
+        price = client.plan_price(plan_tier)
+        order_request = OrdersCreateRequest()
+        order_request.request_body(
             {
                 "intent": "CAPTURE",
                 "purchase_units": [
@@ -103,27 +118,31 @@ def _create_paypal_order(
                 },
             }
         )
-        result = client._client.execute(request)
-        order = getattr(result, "result", None) or getattr(result, "body", None)
+        http_client = client._ensure_client()  # type: ignore[attr-defined]
+        if http_client is None:
+            return None
+        result = http_client.execute(order_request)
+        # result is an HttpResponse with .result (parsed body dict)
+        order = getattr(result, "result", None)
         if order is None:
             return None
-        token = order.get("id") if isinstance(order, dict) else getattr(order, "id", "")
+
+        order_id = order.get("id") if isinstance(order, dict) else getattr(order, "id", "")
         links = order.get("links", []) if isinstance(order, dict) else getattr(order, "links", [])
         approval_url = ""
         for link in links or []:
-            if isinstance(link, dict):
-                if link.get("rel") == "approve":
-                    approval_url = link.get("href", "")
+            rel = link.get("rel") if isinstance(link, dict) else getattr(link, "rel", "")
+            if rel == "approve":
+                val = link.get("href") if isinstance(link, dict) else getattr(link, "href", "")
+                approval_url = str(val) if val else ""
+                if approval_url:
                     break
-            elif getattr(link, "rel", "") == "approve":
-                approval_url = getattr(link, "href", "")
-                break
-        if not approval_url and token:
-            # Fallback: the canonical PayPal approval URL pattern when
-            # ``links`` is omitted or oddly shaped.
-            base_url = os.environ.get("PAYPAL_API_URL", "https://www.sandbox.paypal.com")
-            approval_url = f"{base_url.rstrip('/')}/checkoutnow?token={token}"
-        return {"approval_url": approval_url, "token": token}
+        if not approval_url and order_id:
+            # Fallback: construct the canonical PayPal approval URL from the
+            # web checkout host (NOT the REST API host).
+            web_host = _checkout_web_host(client._api_url)  # type: ignore[attr-defined]
+            approval_url = f"{web_host}/checkoutnow?token={order_id}"
+        return {"approval_url": approval_url, "token": order_id}
     except (RuntimeError, ValueError, OSError, AttributeError) as exc:
         logger.warning("Failed to create PayPal order: %s", exc)
         return None
@@ -140,10 +159,6 @@ async def create_checkout(
     a deterministic stub approval_url is returned. This keeps dev/test environments
     free of live PayPal credentials while presenting the same response shape to
     clients.
-
-    Authentication: any authenticated session role (operator / admin) can create
-    a checkout; production routing is controlled by the optional ``return_url``
-    provided by the caller.
     """
     request_id = uuid.uuid4().hex
     client = get_paypal_client()
@@ -172,8 +187,6 @@ async def create_checkout(
             "PayPal order creation returned no approval URL — falling back to stub for tier=%s",
             payload.plan_tier,
         )
-        # Preserve API parity — never blow up the operator's upgrade CTA. Fall
-        # back to a stub and let the operator retry / open a support ticket.
         return CheckoutResponse(
             approval_url=_stub_approval_url(payload.plan_tier, request_id),
             token=f"stub-{request_id}",

@@ -2521,3 +2521,14 @@ placeholder /Filter rows/, `.ff-value-group label` "Max km/mi",
 | `npx vitest run --config frontend/vitest.config.js` | 0 | PASS; 20 files, 290 tests |
 | `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 checks |
 | `python3 scripts/validate_local.py --frontend` | 0 | PASS; 9/9 checks (frontend_tests, frontend_lint_js, frontend_lint_css) |
+
+## Pre-push confirmation validation — 2026-06-20
+
+- command: `python3 scripts/validate_local.py --quick`
+- working_directory: `/home/harshit/Documents/Work/Money/scraper`
+- exit_code: 0
+- overall_status: passed
+- per-command (12/12 passed): python_version, git_commit, git_status_short, node_version, npm_version, compileall, architecture_validator, research_boundary, dependency_bounds, url_and_research_smoke_tests, p0_regression_tests, openapi_spec
+- summary_md: `artifacts/validation/latest_summary.md`
+
+All quick-mode checks passed. The repository is green and ready for commit and push.
