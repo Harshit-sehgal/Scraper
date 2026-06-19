@@ -6,11 +6,6 @@
       "path": "backend/tests/fixtures/pages/38714795dea8.html"
     },
     {
-      "classification": "frontend_source",
-      "loc": 3382,
-      "path": "frontend/styles.css"
-    },
-    {
       "classification": "test",
       "loc": 2992,
       "path": "backend/tests/fixtures/pages/eb9b319cbca0.html"
@@ -77,7 +72,7 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 1627,
+      "loc": 1454,
       "path": "frontend/index.html"
     },
     {
@@ -159,6 +154,11 @@
       "classification": "frontend_source",
       "loc": 1052,
       "path": "frontend/dist/index.html"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 1029,
+      "path": "frontend/styles/views.css"
     },
     {
       "classification": "backend_router",
@@ -296,6 +296,11 @@
       "path": "backend/app/saas/identity_store.py"
     },
     {
+      "classification": "frontend_source",
+      "loc": 670,
+      "path": "frontend/styles/components.css"
+    },
+    {
       "classification": "backend_source",
       "loc": 652,
       "path": "backend/app/url_analyzer.py"
@@ -381,6 +386,11 @@
       "path": "backend/app/semantic_allocation_engine.py"
     },
     {
+      "classification": "frontend_source",
+      "loc": 577,
+      "path": "frontend/styles/layout.css"
+    },
+    {
       "classification": "test",
       "loc": 571,
       "path": "backend/tests/test_check_prod_env.py"
@@ -421,6 +431,11 @@
       "path": "backend/app/selector_discovery_analysis.py"
     },
     {
+      "classification": "backend_source",
+      "loc": 527,
+      "path": "backend/app/billing/webhooks.py"
+    },
+    {
       "classification": "script",
       "loc": 526,
       "path": "scripts/check_prod_env.py"
@@ -451,19 +466,24 @@
       "path": "backend/tests/test_p0_billing_usage.py"
     },
     {
+      "classification": "frontend_source",
+      "loc": 511,
+      "path": "frontend/landing/style.css"
+    },
+    {
       "classification": "backend_source",
       "loc": 502,
       "path": "backend/app/models.py"
     },
     {
+      "classification": "frontend_source",
+      "loc": 496,
+      "path": "frontend/app.js"
+    },
+    {
       "classification": "test",
       "loc": 490,
       "path": "backend/tests/test_session_bound_e2e.py"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 487,
-      "path": "frontend/app.js"
     },
     {
       "classification": "backend_source",
@@ -479,26 +499,6 @@
       "classification": "backend_router",
       "loc": 478,
       "path": "backend/app/routers/exports.py"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 478,
-      "path": "frontend/js/analyzer.js"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 471,
-      "path": "backend/app/semantic_mapper.py"
-    },
-    {
-      "classification": "test",
-      "loc": 470,
-      "path": "backend/tests/test_degradation_predictor.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 469,
-      "path": "backend/app/replay_buffer.py"
     }
   ],
   "largest_symbols": [
@@ -1103,6 +1103,14 @@
       "path": "backend/app/routers/jobs_write.py"
     },
     {
+      "end_lineno": 294,
+      "kind": "class",
+      "lineno": 100,
+      "loc": 195,
+      "name": "PayPalClient",
+      "path": "backend/app/billing/service.py"
+    },
+    {
       "end_lineno": 221,
       "kind": "function",
       "lineno": 29,
@@ -1293,16 +1301,8 @@
       "loc": 165,
       "name": "TestSnapshotDesyncDetector",
       "path": "backend/tests/test_snapshot_desync_detector.py"
-    },
-    {
-      "end_lineno": 185,
-      "kind": "class",
-      "lineno": 22,
-      "loc": 164,
-      "name": "ProxyManager",
-      "path": "backend/app/proxy_manager.py"
     }
   ],
-  "python_symbol_count": 8440,
-  "source_file_count": 666
+  "python_symbol_count": 8471,
+  "source_file_count": 679
 }
