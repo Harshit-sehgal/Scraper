@@ -385,6 +385,69 @@ def _normalize_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     return event_type, customer_id, data
 
 
+# ---------------------------------------------------------------------------
+# Plan-ID → tier resolution (mirrors PayPalClient._resolve_tier_from_plan_id
+# in service.py, kept here to avoid cross-module dependency on a private method)
+# ---------------------------------------------------------------------------
+
+_PLAN_ID_ENV_BY_TIER: dict[PlanTierId, str] = {
+    PlanTierId.STARTER: "PAYPAL_PLAN_ID_STARTER",
+    PlanTierId.PRO: "PAYPAL_PLAN_ID_PRO",
+    PlanTierId.ENTERPRISE: "PAYPAL_PLAN_ID_ENTERPRISE",
+}
+
+
+def _webhook_resolve_tier_from_plan_id(plan_id: str) -> str:
+    """Map a raw PayPal plan_id (e.g. P-5AB...) to a PlanTierId value string.
+
+    Compares against the env vars PAYPAL_PLAN_ID_STARTER / PRO / ENTERPRISE.
+    Returns "free" for unrecognised or empty plan IDs.
+    """
+    if not plan_id:
+        return PlanTierId.FREE.value
+    for tier, env_name in _PLAN_ID_ENV_BY_TIER.items():
+        expected = os.environ.get(env_name, "").strip()
+        if expected and expected == plan_id:
+            return tier.value
+    # Not a known plan ID — log and fall back to free.
+    logger.debug("Unrecognised PayPal plan_id %r — falling back to free", plan_id)
+    return PlanTierId.FREE.value
+
+
+# Module-level event-type dispatch sets (immutable, one allocation).
+_PAYPAL_SUBSCRIPTION_EVENTS: frozenset[str] = frozenset(
+    {
+        "BILLING.SUBSCRIPTION.CREATED",
+        "BILLING.SUBSCRIPTION.UPDATED",
+        "BILLING.SUBSCRIPTION.ACTIVATED",
+    }
+)
+_PAYPAL_SUSPENDED_EVENTS: frozenset[str] = frozenset(
+    {
+        "BILLING.SUBSCRIPTION.SUSPENDED",
+    }
+)
+_PAYPAL_CANCELLED_EVENTS: frozenset[str] = frozenset(
+    {
+        "BILLING.SUBSCRIPTION.CANCELLED",
+        "BILLING.SUBSCRIPTION.EXPIRED",
+    }
+)
+_PAYPAL_PAYMENT_FAILED_EVENTS: frozenset[str] = frozenset(
+    {
+        "PAYMENT.SALE.DENIED",
+        "PAYMENT.SALE.FAILED",
+        "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
+    }
+)
+_PAYPAL_PAYMENT_COMPLETED_EVENTS: frozenset[str] = frozenset(
+    {
+        "PAYMENT.SALE.COMPLETED",
+        "PAYMENT.SALE.PENDING",
+    }
+)
+
+
 def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: str = "") -> None:
     """Internal processor for webhook events.
 
@@ -402,32 +465,7 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
         logger.warning("Webhook event %s has no customer_id", event_type)
         return
 
-    # Canonical dialect families — PayPal always uppercases with dots
-    # (BILLING.SUBSCRIPTION.CREATED); Stripe uses dotted lower-case
-    # (customer.subscription.updated); Autumn uses flat lower-case
-    # (subscription.created). The legacy branches have been left in place
-    # to keep test fixtures on the prior dialect working.
-    paypal_subscription_events = {
-        "BILLING.SUBSCRIPTION.CREATED",
-        "BILLING.SUBSCRIPTION.UPDATED",
-        "BILLING.SUBSCRIPTION.ACTIVATED",
-        "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
-        "BILLING.SUBSCRIPTION.SUSPENDED",
-    }
-    paypal_cancelled_events = {
-        "BILLING.SUBSCRIPTION.CANCELLED",
-        "BILLING.SUBSCRIPTION.EXPIRED",
-    }
-    paypal_payment_failed_events = {
-        "PAYMENT.SALE.DENIED",
-        "PAYMENT.SALE.FAILED",
-        "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
-    }
-    paypal_payment_completed_events = {
-        "PAYMENT.SALE.COMPLETED",
-        "PAYMENT.SALE.PENDING",
-    }
-
+    # -- Subscription created / updated / activated --------------------------
     if (
         event_type
         in (
@@ -435,34 +473,39 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
             "subscription.updated",
             "customer.subscription.updated",
         )
-        or event_type in paypal_subscription_events
+        or event_type in _PAYPAL_SUBSCRIPTION_EVENTS
     ):
         plan_name: str = "free"
         status: str = "active"
         sub_id: str = ""
         if isinstance(data, dict):
-            # PayPal puts plan_id on the resource; we map via env-var lookup
-            # in service.py, so here we just stash the plan_id string. Unknown
-            # plan ids fall back to FREE in _resolve_tier_from_plan_id.
+            # Try human-readable plan keys (legacy Autumn/Stripe/PayPal test
+            # fixtures) first, then fall back to raw PayPal plan_id which we
+            # resolve via env-var mapping.
             for plan_key in ("plan", "plan_tier", "plan_name", "plan_id"):
                 v = data.get(plan_key)
                 if isinstance(v, str) and v:
                     plan_name = v
                     break
+            # If the plan_id looks like a PayPal UUID (P-...) rather than a
+            # human tier name, resolve it via env-var lookup.
+            valid_tiers = {t.value for t in PlanTierId}
+            if plan_name.lower() not in valid_tiers and plan_name.startswith("P-"):
+                plan_name = _webhook_resolve_tier_from_plan_id(plan_name)
             v = data.get("status")
-            if isinstance(v, str):
-                status = v
+            if isinstance(v, str) and v:
+                status = v.lower()
             for sub_key in ("subscription_id", "id"):
                 v = data.get(sub_key)
-                if isinstance(v, str):
+                if isinstance(v, str) and v:
                     sub_id = v
                     break
 
-        # Normalize plan name (compare against PlanTierId values, which are lowercase)
+        # Normalize: validate against known PlanTierId values.
         normalized_plan = plan_name.lower() if plan_name else "free"
         valid_tiers = {t.value for t in PlanTierId}
         if normalized_plan not in valid_tiers:
-            normalized_plan = "free"
+            normalized_plan = PlanTierId.FREE.value
 
         set_customer_subscription(
             customer_id=customer_id,
@@ -478,6 +521,26 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
             status,
         )
 
+    # -- Subscription suspended (preserve existing tier, mark past_due) ------
+    elif event_type in _PAYPAL_SUSPENDED_EVENTS:
+        existing = get_customer_subscription(customer_id)
+        if existing:
+            set_customer_subscription(
+                customer_id=customer_id,
+                tier=existing.get("plan_tier", PlanTierId.FREE.value),
+                status=SubscriptionStatus.PAST_DUE.value,
+                subscription_id=existing.get("subscription_id", ""),
+            )
+            logger.info(
+                "Subscription %s: customer=%s tier=%s (preserved) status=past_due",
+                event_type,
+                customer_id,
+                existing.get("plan_tier", PlanTierId.FREE.value),
+            )
+        else:
+            logger.warning("SUSPENDED event for unknown customer=%s — no existing record to preserve", customer_id)
+
+    # -- Subscription cancelled / expired ------------------------------------
     elif (
         event_type
         in (
@@ -485,7 +548,7 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
             "customer.subscription.deleted",
             "subscription.expired",
         )
-        or event_type in paypal_cancelled_events
+        or event_type in _PAYPAL_CANCELLED_EVENTS
     ):
         set_customer_subscription(
             customer_id=customer_id,
@@ -494,35 +557,38 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
         )
         logger.info("Subscription %s: customer=%s downgraded to free", event_type, customer_id)
 
-    elif event_type == "invoice.payment_failed" or event_type in paypal_payment_failed_events:
+    # -- Payment failed (subscription-level or sale-level) -------------------
+    elif event_type == "invoice.payment_failed" or event_type in _PAYPAL_PAYMENT_FAILED_EVENTS:
         existing = get_customer_subscription(customer_id)
         if existing:
-            # Single write that observes the latest disk snapshot — no
-            # in-place mutation that would diverge if another process
-            # changed the record between read and write.
             set_customer_subscription(
                 customer_id=customer_id,
                 tier=existing.get("plan_tier", PlanTierId.FREE.value),
                 status=SubscriptionStatus.PAST_DUE.value,
                 subscription_id=existing.get("subscription_id", ""),
             )
-        logger.warning("Payment failed for customer=%s", customer_id)
+            logger.warning("Payment failed for customer=%s — status set to past_due", customer_id)
+        else:
+            logger.warning("Payment failed for unknown customer=%s — no existing record", customer_id)
 
+    # -- Customer created ----------------------------------------------------
     elif event_type in ("customer.created", "CUSTOMER.CREATED"):
         logger.info("Customer created: %s", customer_id)
 
-    elif event_type in paypal_payment_completed_events:
-        # Successful / pending payment — refresh last-revenue timestamp
-        # but don't change plan_tier unless it's a brand-new subscription.
+    # -- Payment completed / pending -----------------------------------------
+    elif event_type in _PAYPAL_PAYMENT_COMPLETED_EVENTS:
         existing = get_customer_subscription(customer_id)
-        if existing and not existing.get("subscription_id") and customer_id:
+        if existing:
+            # Reactivate the subscription if it was past_due/cancelled.
             set_customer_subscription(
                 customer_id=customer_id,
                 tier=existing.get("plan_tier", PlanTierId.FREE.value),
                 status=SubscriptionStatus.ACTIVE.value,
-                subscription_id=customer_id,
+                subscription_id=existing.get("subscription_id", ""),
             )
-        logger.info("Payment completed for customer=%s", customer_id)
+            logger.info("Payment completed for customer=%s — subscription reactivated", customer_id)
+        else:
+            logger.info("Payment completed for unknown customer=%s — no existing record", customer_id)
 
     else:
         logger.debug("Unhandled webhook event type: %s", event_type)
