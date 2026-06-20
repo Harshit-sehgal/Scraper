@@ -1,0 +1,59 @@
+# =============================================================================
+# DataForge Scraper — Dependabot Auto-Merge
+# =============================================================================
+# Automatically approves and merges Dependabot pull requests for safe
+# dependency updates (patch and minor version bumps) when all required
+# CI checks pass.
+#
+# This keeps dependency updates flowing without manual triage while
+# ensuring every merged PR has passed the full CI pipeline.
+#
+# Security: Only auto-merges PRs opened by Dependabot. Major version
+# bumps require manual review.
+# =============================================================================
+
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-Merge Dependabot PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.actor == 'dependabot[bot]' || github.actor == 'dependabot-preview[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Approve PR
+        run: |
+          gh pr review "${{ github.event.pull_request.number }}" --approve \
+            --body "✅ Auto-approved by Dependabot Auto-Merge workflow."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge (squash)
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: |
+          gh pr merge "${{ github.event.pull_request.number }}" \
+            --squash --auto \
+            --body "🤖 Auto-merging ${{ steps.metadata.outputs.update-type }} dependency update."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip major version updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: |
+          echo "⚠️  Major version update — manual review required. Skipping auto-merge."

@@ -28,7 +28,7 @@ from app.saas.models import (
     Project,
 )
 from app.saas.service import SignupService
-from app.utils.rbac import UserRole, require_role_with_user
+from app.utils.rbac import UserRole, require_principal, require_role_with_user
 from app.utils.usage_ledger import UsageType
 
 logger = logging.getLogger(__name__)
@@ -553,18 +553,19 @@ async def list_org_members(
 async def remove_member(
     membership_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
 ) -> None:
     """Remove a member from an organization (admin/operator only).
 
-    The caller must be a member of the target membership's organization
-    (env-backed admins retain all-access). Without this check, a
-    persistent WRITE key from Org A could remove any member from Org B
-    by guessing/obtaining a ``membership_id``.
+    The caller must be a member of the target membership's organization.
+    Env-backed admins and env-backed operators (no org scope) retain
+    all-access, matching the ``can_access_scoped_resource`` bypass.
+    Without this check, a persistent WRITE key from Org A could remove
+    any member from Org B by guessing/obtaining a ``membership_id``.
     """
-    role, user_id = auth
+    role, user_id, org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
@@ -572,20 +573,26 @@ async def remove_member(
     if not membership:
         raise HTTPException(status_code=404, detail="membership not found")
 
-    # The caller must be a member of the target membership's organization
-    # (matching ``get_organization``'s convention). Without this check, a
-    # persistent WRITE key from Org A could remove any member from Org B
-    # by guessing/obtaining a ``membership_id``.
-    if not get_identity_store().is_org_member(user_id, membership.org_id):
+    # Env-backed admins and operators retain all-access (no org scope).
+    # For SaaS-scoped keys, the caller MUST be a member of the target
+    # membership's org.
+    if (
+        role != UserRole.ADMIN
+        and (role != UserRole.OPERATOR or org_id)
+        and not get_identity_store().is_org_member(user_id, membership.org_id)
+    ):
         log_job_event(
             actor=user_id,
             action="member_remove",
             job_id="saas",
             outcome="denied",
-            details={"membership_id": membership_id, "org_id": membership.org_id, "reason": "not_org_member"},
+            details={
+                "membership_id": membership_id,
+                "org_id": membership.org_id,
+                "reason": "not_org_member",
+            },
         )
         raise HTTPException(status_code=403, detail="not a member of this organization")
-    _ = role
 
     # Cannot remove self if the last owner
     if membership.role == MembershipRole.OWNER and membership.user_id == user_id:
@@ -777,7 +784,13 @@ async def create_api_key(
         "write": ApiKeyScope.WRITE,
         "admin": ApiKeyScope.ADMIN,
     }
-    scope = scope_map.get(body.scope.lower(), ApiKeyScope.READ)
+    raw_scope = body.scope.lower()
+    scope = scope_map.get(raw_scope)
+    if scope is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid scope: {body.scope}. Must be one of: read, write, admin.",
+        )
 
     # Privilege boundary: the granted key scope MUST NOT exceed the
     # caller's own membership role in the target org. Without this, a
@@ -790,9 +803,14 @@ async def create_api_key(
         (m.role for m in _caller_memberships if m.org_id == project.org_id and m.is_active()),
         None,
     )
+    if _caller_role_in_org is None and not _caller_memberships:
+        logger.warning(
+            "create_api_key: caller=%s has zero memberships — env-backed admin or identity-store issue",
+            user_id,
+        )
     _caller_role_value = _caller_role_in_org.value if _caller_role_in_org else "viewer"
     _caller_max_scope = _MAX_KEY_SCOPE_FOR_ROLE.get(_caller_role_value, "read")
-    if _SCOPE_RANK.get(body.scope.lower(), 0) > _SCOPE_RANK.get(_caller_max_scope, 0):
+    if _SCOPE_RANK.get(raw_scope, 0) > _SCOPE_RANK.get(_caller_max_scope, 0):
         log_job_event(
             actor=user_id,
             action="api_key_create",

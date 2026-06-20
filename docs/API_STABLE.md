@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-19 21:24:48 UTC
+**Generated:** 2026-06-20 15:43:21 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -113,6 +113,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | DELETE | `/api/workflows/{workflow_id}` |
 | GET | `/api/auth-profiles` |
 | GET | `/api/auth-profiles/{profile_id}` |
+| GET | `/api/billing/stub-return/{plan_tier}/{request_id}` |
 | GET | `/api/billing/subscriptions` |
 | GET | `/api/billing/subscriptions/{customer_id}` |
 | GET | `/api/intelligence/analyze-url` |
@@ -155,4 +156,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 99
+**Total routes:** 100

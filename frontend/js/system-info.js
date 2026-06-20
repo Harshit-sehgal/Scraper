@@ -61,7 +61,7 @@ function _renderWorkers(workers) {
     return;
   }
   const tbl = document.createElement("table");
-  tbl.className = "sysinfo-table";
+  tbl.className = "table sysinfo-table";
   tbl.innerHTML = `
     <thead>
       <tr>
@@ -78,12 +78,18 @@ function _renderWorkers(workers) {
   for (const w of workers) {
     const tr = document.createElement("tr");
     const lastHb = w.last_heartbeat ? new Date(w.last_heartbeat).toLocaleString() : "—";
-    const status = w.is_stale ? "Stale" : "Active";
     tr.appendChild(td(w.worker_id || "—"));
     tr.appendChild(td(w.hostname || "—"));
     tr.appendChild(td(w.pid || "—"));
     tr.appendChild(td(lastHb));
-    tr.appendChild(td(status));
+
+    const statusCell = document.createElement("td");
+    const statusBadge = document.createElement("span");
+    statusBadge.className = w.is_stale ? "badge canceled" : "badge completed";
+    statusBadge.textContent = w.is_stale ? "stale" : "active";
+    statusCell.appendChild(statusBadge);
+    tr.appendChild(statusCell);
+
     tbody.appendChild(tr);
   }
   container.appendChild(tbl);

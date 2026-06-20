@@ -120,6 +120,29 @@ test-notify: _need-container ## Run all tests with Telegram notifications enable
 	$(DC) exec -e TELEGRAM_ENABLED=true $(SERVICE) \
 		python -m pytest -q --tb=short -k "not test_scrape_url_end_to_end_multiple_records"
 
+# ─── CI Pipeline Helpers ───────────────────────────────────────────────────
+
+ci-check-python: ## Check Python version compatibility (CI gate)
+	@python3 --version | grep -q "3\.12" || { echo "❌ Python 3.12 required"; exit 1; }
+	@echo "✅ Python 3.12"
+
+ci-install-all: ## Install all CI dependencies (Python + Node + Playwright)
+	python3 -m pip install --upgrade pip
+	pip install -e ".[dev]"
+	pip install types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+	npm ci
+	python3 -m playwright install chromium --with-deps 2>/dev/null || true
+
+ci-validate-local: ## Run the full local validation matching CI gates
+	python3 scripts/validate_local.py --full
+
+ci-status: ## Print CI workflow status (requires GitHub CLI)
+	@gh run list --workflow=ci.yml --branch=main --limit=3 --json headBranch,status,conclusion,createdAt
+
+ci-open-latest: ## Open the latest CI run in browser
+	@gh run view --workflow=ci.yml --web 2>/dev/null || \
+		echo "Run: gh run list --workflow=ci.yml --limit=1"
+
 # ─── Linting ────────────────────────────────────────────────────────────────
 
 lint: _need-container ## Run all linters (ruff lint + format)

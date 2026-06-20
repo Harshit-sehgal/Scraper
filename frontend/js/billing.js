@@ -8,22 +8,22 @@ import { toast } from "./utils.js";
 const TIER_LABELS = {
   free: "Free",
   pro: "Pro",
-  team: "Team",
   starter: "Starter",
   enterprise: "Enterprise",
 };
 
 /** Map the operator's currently-rendered tier label to a checkout tier id.
  *
- * The PayPal dashboard recognises only ``starter`` / ``pro`` / ``enterprise``;
- * ``free`` and ``team`` are aliases we fold back to the next payable tier
- * or refuse to upgrade from.
+ * The PayPal dashboard recognises only ``starter`` / ``pro`` / ``enterprise``.
+ * Returning ``null`` for unknown / empty tiers lets the caller refuse
+ * with a clear toast instead of silently picking a wrong target.
  */
 function _checkoutTierFor(currentTier) {
   const normalized = String(currentTier || "")
     .trim()
     .toLowerCase();
-  if (normalized === "free" || normalized === "") return "starter";
+  // Empty or clearly non-payable — ask the caller to refresh instead.
+  if (normalized === "" || normalized === "—") return null;
   if (["starter", "pro", "enterprise"].includes(normalized)) return normalized;
   return null; // unknown tier — can't pick an upgrade target safely
 }

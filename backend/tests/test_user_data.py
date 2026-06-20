@@ -387,7 +387,10 @@ class TestCheckoutEndpoint:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["plan_tier"] == "pro"
-        assert body["approval_url"].startswith("https://example.com/paypal-stub/pro/")
+        # Stub URLs use the backend's own origin (operator-controlled,
+        # not example.com — example.com is not operator-controlled and
+        # can be re-registered, creating a phishing vector).
+        assert body["approval_url"].startswith("http://localhost:8000/api/billing/stub-return/pro/")
         assert body["token"].startswith("stub-")
 
     @pytest.mark.parametrize("bad_url", ["javascript:alert(1)", "data:text/html,hi", "file:///etc/passwd"])

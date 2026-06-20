@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _PAYPAL_CLIENT_ID_ENV = "PAYPAL_CLIENT_ID"
-_PAYPAL_CLIENT_SECRET_KEY_ENV = "PAYPAL_CLIENT_SECRET"  # noqa: S105  # nosec B105 — env-var NAME, not a credential
+_PAYPAL_CLIENT_SECRET_KEY_ENV = "PAYPAL_CLIENT_SECRET"  # nosec B105, noqa: S105 — env-var NAME, not a credential
 _PAYPAL_API_URL_ENV = "PAYPAL_API_URL"
 _PAYPAL_ENVIRONMENT_ENV = "PAYPAL_ENVIRONMENT"
 _DEFAULT_PAYPAL_API_URL = "https://api-m.sandbox.paypal.com"
@@ -97,6 +97,54 @@ _PAYPAL_STATUS_MAP: dict[str, SubscriptionStatus] = {
 # ---------------------------------------------------------------------------
 
 
+# Module-level plan-id → tier cache (immutable after startup).
+# Shared across the PayPalClient instance and the webhook normalizer so
+# both see the same mapping even after an env-driven config change.
+_PLAN_ID_CACHE: dict[str, PlanTierId] | None = None
+
+
+def resolve_tier_from_plan_id(plan_id: str) -> PlanTierId:
+    """Public plan-id → tier resolver.
+
+    Cached after first call so env vars and plan IDs are only read once
+    per process. Returns ``PlanTierId.FREE`` for unrecognised / empty
+    plan IDs. Safe to call from webhook handlers and from
+    :meth:`PayPalClient.get_customer`.
+    """
+    global _PLAN_ID_CACHE
+    if not plan_id:
+        return PlanTierId.FREE
+    if _PLAN_ID_CACHE is None:
+        # Build the cache once (module-level data, never changes).
+        # Detect collisions: if two env vars resolve to the same plan_id,
+        # the second wins silently (a copy-paste misconfiguration would
+        # otherwise bill STARTER customers at ENTERPRISE rates). Surface
+        # the contradiction so operators can fix it.
+        cache: dict[str, PlanTierId] = {}
+        collisions: list[tuple[str, PlanTierId, PlanTierId]] = []
+        for tier, env_name in _PLAN_ID_ENV_BY_TIER.items():
+            value = os.environ.get(env_name, "").strip()
+            if not value:
+                continue
+            existing = cache.get(value)
+            if existing is not None and existing != tier:
+                collisions.append((value, existing, tier))
+                logger.warning(
+                    "Billing plan-id collision: env var %s maps plan %r to %s, "
+                    "but %s already mapped it to %s. The later assignment wins — "
+                    "fix PAYPAL_PLAN_ID_* env vars to remove this ambiguity.",
+                    env_name,
+                    value,
+                    tier.value,
+                    "an earlier tier",
+                    existing.value,
+                )
+            else:
+                cache[value] = tier
+        _PLAN_ID_CACHE = cache
+    return _PLAN_ID_CACHE.get(plan_id, PlanTierId.FREE)
+
+
 class PayPalClient:
     """Wrapper around the PayPal REST API.
 
@@ -115,16 +163,14 @@ class PayPalClient:
         self._http_client: Any = None  # paypalcheckoutsdk.core.PayPalHttpClient
         self._access_token: str = ""
         self._access_token_expires_at: float = 0.0
-        # Module-level plan-id → tier cache (immutable after startup).
-        self._plan_id_cache: dict[str, PlanTierId] | None = None
 
     def _ensure_client(self) -> Any:
         """Lazy-initialize the PayPal HTTP client and OAuth token."""
         if self._initialized:
             return self._http_client
-        self._initialized = True
 
         if not self._client_id or not self._client_secret:
+            self._initialized = True
             logger.info("PAYPAL_CLIENT_ID/PAYPAL_CLIENT_SECRET not configured — billing disabled, using free-tier defaults")
             return None
 
@@ -138,9 +184,12 @@ class PayPalClient:
             env_cls = LiveEnvironment if self._environment == "live" else SandboxEnvironment
             self._http_client = PayPalHttpClient(env_cls(self._client_id, self._client_secret))
             self._refresh_access_token()
+            self._initialized = True
             logger.info("PayPal billing client initialized (env=%s)", self._environment)
         except ImportError:
             logger.warning("paypal-checkout-sdk not installed — billing disabled, using free-tier defaults")
+            # Do NOT set _initialized so a later attempt can succeed if
+            # the SDK becomes available (e.g. hot-reload, lazy dep install).
         except (RuntimeError, ValueError, OSError) as e:
             logger.warning("Failed to initialize PayPal client: %s", e)
 
@@ -178,6 +227,21 @@ class PayPalClient:
     def is_configured(self) -> bool:
         """Whether the PayPal client is properly configured."""
         return self._ensure_client() is not None
+
+    @property
+    def http_client(self) -> Any:
+        """Return the underlying paypal-checkoutsdk ``PayPalHttpClient``.
+
+        Lazily initializes the client (and OAuth token) on first access.
+        May return ``None`` when PayPal credentials are not configured or
+        the SDK is not installed — callers must check the return value.
+        """
+        return self._ensure_client()
+
+    @property
+    def api_url(self) -> str:
+        """Return the configured PayPal REST API base URL."""
+        return self._api_url
 
     def track_event(self, customer_id: str, event_name: str, value: int = 1, **kwargs: Any) -> bool:
         """Track a metered usage event.
@@ -246,24 +310,8 @@ class PayPalClient:
             return None
 
     def _resolve_tier_from_plan_id(self, plan_id: str) -> PlanTierId:
-        """Map a PayPal plan_id back to an internal PlanTierId via env vars.
-
-        The plan-id → tier mapping is cached after first resolution since
-        env vars and plan IDs are immutable for the process lifetime.
-        """
-        if not plan_id:
-            return PlanTierId.FREE
-
-        if self._plan_id_cache is not None:
-            return self._plan_id_cache.get(plan_id, PlanTierId.FREE)
-
-        # Build the cache once (module-level data, never changes).
-        self._plan_id_cache = {}
-        for tier, env_name in _PLAN_ID_ENV_BY_TIER.items():
-            expected = os.environ.get(env_name, "").strip()
-            if expected:
-                self._plan_id_cache[expected] = tier
-        return self._plan_id_cache.get(plan_id, PlanTierId.FREE)
+        """Backward-compatible instance wrapper. Prefer :func:`resolve_tier_from_plan_id`."""
+        return resolve_tier_from_plan_id(plan_id)
 
     def get_customer_plan_tier(self, customer_id: str) -> PlanTierId:
         """Get the plan tier for a customer. Falls back to FREE if not found."""
@@ -272,7 +320,7 @@ class PayPalClient:
             return PlanTierId.FREE
         return customer.plan_tier
 
-    def check_balance(self, customer_id: str, amount: int) -> bool:  # noqa: ARG002
+    def check_balance(self, _customer_id: str, _amount: int) -> bool:
         """Check whether a customer has remaining quota.
 
         PayPal Subscriptions don't expose a real-time balance counter via the REST API.
@@ -313,6 +361,15 @@ def reset_paypal_client(client: PayPalClient | None = None) -> None:
     """Reset the PayPal client singleton (for tests)."""
     global _paypal_client
     _paypal_client = client
+    # Also invalidate the plan-id cache so test env-var mutations are
+    # picked up. Without this, env changes between tests have no effect.
+    reset_plan_id_cache()
+
+
+def reset_plan_id_cache() -> None:
+    """Invalidate the module-level plan-id → tier cache (for tests)."""
+    global _PLAN_ID_CACHE
+    _PLAN_ID_CACHE = None
 
 
 # ---------------------------------------------------------------------------
@@ -350,4 +407,6 @@ __all__ = [
     "get_plan_limit",
     "get_user_tier_from_billing",
     "reset_paypal_client",
+    "reset_plan_id_cache",
+    "resolve_tier_from_plan_id",
 ]

@@ -157,6 +157,7 @@ def verify_env_vars() -> tuple[bool, list[str]]:
     ignored_env_vars = {
         "DATAFORGE_METRICS_TOKEN__",  # Prometheus template delimiter (real var is DATAFORGE_METRICS_TOKEN)
         "DATAFORGE_TELEGRAM_",  # Wildcard prefix in comments (real vars are DATAFORGE_TELEGRAM_BOT_TOKEN etc.)
+        "DATAFORGE_TELEGRAM_TOKEN",  # Comment mention only in telegram_notifier.py:65
     }
 
     issues = []

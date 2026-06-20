@@ -2532,3 +2532,39 @@ placeholder /Filter rows/, `.ff-value-group label` "Max km/mi",
 - summary_md: `artifacts/validation/latest_summary.md`
 
 All quick-mode checks passed. The repository is green and ready for commit and push.
+
+## UI Polish — Notion-style Monochrome and Muted Status Reskin — 2026-06-20
+
+Polished the user interface to remove unpolished "AI-generated" dashboard aesthetics, specifically replacing bright traffic-light colors and glowing dot indicators with a clean, human-designed Notion-like aesthetic.
+
+### Files modified
+
+- `frontend/styles/tokens.css` — Swapped the primary status tokens (`--status-*`) in both light and dark themes to match Notion's signature muted, warm, low-contrast database select tags.
+- `frontend/styles/components.css` —
+  - Styled `health-pill` to be a completely monochrome, clean gray status chip without green/amber/red indicators.
+  - Hidden the glowing `.dot` elements inside health pills and status badges, styling status badges purely as clean Notion tags.
+  - Hidden the `.dot` indicator in `engine-status` (sidebar bottom), transforming it into a clean, flat monochrome chip.
+  - Re-styled toast notifications from solid neon green/red boxes to modern card callouts with a subtle left color-border accent and dark text.
+  - Removed `text-transform: uppercase` from table headers (`.table th`) to follow Notion's lowercase/sentence-case aesthetic.
+- `frontend/styles/layout.css` — Removed the yellow/amber dot from experimental sidebar section titles, replacing it with a clean, lowercase, purple "beta" suffix pill.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --frontend` | 0 | PASS; 9/9 frontend gates (including vitest suite, eslint, and stylelint) passed successfully. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; all 12/12 quick verification tests passed. |
+| `PYTHONPATH=backend python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001` | 0 | PASS (running in background as task-225); successfully hosted backend + frontend at `http://127.0.0.1:8001/app/`. |
+
+### Dashboard Layout & Mismatch Rectifications (2026-06-20)
+
+- **Recent Activity Mismatch** — Fixed the styling mismatch where the Javascript generated `activity-list` / `activity-item` class names but the CSS only contained rules for `.recent-activity-row`. Styled the list as a clean, aligned 4-column timeline grid with color-coded Notion-style category pills.
+- **System Info Workers Table** — Wired the standard `.table` class into `system-info.js` (rendered as plain unstyled table previously) and wrapped raw worker status text in Notion badges (`completed`/`canceled`).
+- **Unstyled Custom Widgets** — Created layout classes and grid mappings for `.dash-metrics-grid`, `.dash-metric`, `.dash-prediction`, and `.dash-empty` cards inside Predictions, Governance, and Telemetry dashboard views.
+- **Broken Color Fallbacks** — Declared missing `--success`, `--danger`, and `--warning` variable aliases in [tokens.css](file:///home/harshit/Documents/Work/Money/scraper/frontend/styles/tokens.css) to fix unresolved variables inside JS logic.
+- **KPI Card Layout** — Replaced the monolithic grid layout of `.kpi-row` (which caused border clipping on smaller screens) with a clean, borderless card-deck alignment using `--bg-subtle` and sentence-case labels.
+
+### Workspace File Cleanup (2026-06-20)
+
+- **Removed AI Tool Config & Logs** — Deleted obsolete chat history, tag caches, and metadata folders left behind by other AI tools (`.aider.chat.history.md`, `.aider.input.history`, `.aider.tags.cache.v4`, `.claude`, `.codex`, `.kilo`, and `.commandcode`).
+- **Cleaned Validation Runs** — Purged 248 stale directories from `artifacts/validation/runs/` to free disk space and clean the workspace. All local tests run successfully after cleanup.

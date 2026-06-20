@@ -276,12 +276,11 @@ async def _paginate_and_extract(
     return result.records, result.stopped_reason
 
 
-async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[str, Any]:  # noqa: ARG001
+async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
     """Execute a workflow and return extraction results.
 
     Args:
         workflow: The workflow to execute.
-        headless: Whether to run the browser in headless mode.
 
     Returns:
         A dict containing the extracted records, success flag, and metadata.

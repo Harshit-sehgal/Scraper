@@ -78,18 +78,26 @@
   --focus-ring-offset: 2px;
 
   /* Status — muted, used only for badges (not buttons) */
-  --status-blue: #2563eb;
-  --status-blue-soft: rgb(37 99 235 / 0.08);
-  --status-green: #1f8f4e;
-  --status-green-soft: rgb(31 143 78 / 0.08);
-  --status-amber: #b45309;
-  --status-amber-soft: rgb(180 83 9 / 0.08);
-  --status-red: #c0392b;
-  --status-red-soft: rgb(192 57 43 / 0.08);
-  --status-gray: #6b6b6b;
-  --status-gray-soft: rgb(107 107 107 / 0.08);
-  --status-violet: #6d52b9;
-  --status-violet-soft: rgb(109 82 185 / 0.08);
+  --status-blue: #1b6189;
+  --status-blue-soft: #e1f2ff;
+  --status-green: #135c44;
+  --status-green-soft: #e2f5ee;
+  --status-amber: #ad8b00;
+  --status-amber-soft: #fbf3db;
+  --status-red: #9c2b23;
+  --status-red-soft: #ffe2dd;
+  --status-gray: #50504e;
+  --status-gray-soft: #f1f1f0;
+  --status-violet: #4f2396;
+  --status-violet-soft: #efe6fc;
+
+  /* Success, danger, warning variables for JS compatibility */
+  --success: var(--status-green);
+  --success-soft: var(--status-green-soft);
+  --danger: var(--status-red);
+  --danger-soft: var(--status-red-soft);
+  --warning: var(--status-amber);
+  --warning-soft: var(--status-amber-soft);
 
   /* Motion */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -102,6 +110,18 @@
   --container-narrow: 720px;
   --container-base: 1080px;
   --container-wide: 1280px;
+  --container-prose: 680px;
+
+  /* Surface elevation — used by popovers, palettes, menus */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.03);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.06), 0 2px 4px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.05);
+
+  /* Z-index scale */
+  --z-sticky: 50;
+  --z-overlay: 1000;
+  --z-toast: 2000;
+  --z-palette: 1100;
 }
 
 :root[data-theme="dark"] {
@@ -123,16 +143,19 @@
   --border: #2a2a2a;
   --border-strong: #3a3a3a;
   --border-focus: #fff;
-  --status-blue: #7c9eff;
-  --status-blue-soft: rgb(124 158 255 / 0.12);
-  --status-green: #5acb82;
-  --status-green-soft: rgb(90 203 130 / 0.12);
-  --status-amber: #e0a961;
-  --status-amber-soft: rgb(224 169 97 / 0.12);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2), 0 1px 1px rgb(0 0 0 / 0.15);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.25), 0 2px 4px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.2);
+  --status-blue: #5c92cc;
+  --status-blue-soft: #1d3b53;
+  --status-green: #82c3a5;
+  --status-green-soft: #243d30;
+  --status-amber: #e9c46a;
+  --status-amber-soft: #564526;
   --status-red: #e07b6e;
-  --status-red-soft: rgb(224 123 110 / 0.12);
-  --status-gray: #9a9a9a;
-  --status-gray-soft: rgb(154 154 154 / 0.12);
-  --status-violet: #b39ddb;
-  --status-violet-soft: rgb(179 157 219 / 0.12);
+  --status-red-soft: #522e2a;
+  --status-gray: #cfcfcf;
+  --status-gray-soft: #2f2f2f;
+  --status-violet: #a68ce6;
+  --status-violet-soft: #3c2d4f;
 }

@@ -10,8 +10,8 @@
     <title>Dataforge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
     <!-- Inter Variable, SIL OFL — self-hosted for CSP font-src 'self'. -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/svg+xml" href="/app/favicon.svg" />
+    <link rel="stylesheet" href="/app/styles.css?v=2" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -103,8 +103,8 @@
               </li>
             </ul>
           </div>
-          <div class="sidebar-section">
-            <span class="sidebar-section-title">Management</span>
+          <details class="sidebar-section advanced-nav">
+            <summary class="sidebar-section-title">Advanced</summary>
             <ul class="nav-list">
               <li>
                 <button
@@ -136,11 +136,6 @@
                   <span class="nav-text">Recycle Bin</span>
                 </button>
               </li>
-            </ul>
-          </div>
-          <div class="sidebar-section">
-            <span class="sidebar-section-title">Account</span>
-            <ul class="nav-list">
               <li>
                 <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
                   <span class="nav-icon" data-icon="creditCard" aria-hidden="true"></span>
@@ -166,7 +161,7 @@
                 </button>
               </li>
             </ul>
-          </div>
+          </details>
           <div class="sidebar-section" data-experimental="true">
             <span class="sidebar-section-title">Experimental</span>
             <ul class="nav-list">
@@ -213,13 +208,11 @@
               <div class="jobs-toolbar-left">
                 <input type="text" id="jobs-search" placeholder="Search jobs by name..." aria-label="Search jobs" />
                 <select id="jobs-status-filter" aria-label="Filter by status">
-                  <option value="all">All statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="discovering">Discovering</option>
+                  <option value="all">All</option>
                   <option value="running">Running</option>
                   <option value="completed">Completed</option>
-                  <option value="canceled">Canceled</option>
                   <option value="failed">Failed</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
               <div class="jobs-toolbar-right">
@@ -247,9 +240,11 @@
 
             <div class="list-head">
               <span>Job</span>
+              <span>Created</span>
               <span>URLs</span>
               <span>Status</span>
               <span>Records</span>
+              <span>Issues</span>
               <span>Actions</span>
             </div>
 
@@ -257,8 +252,8 @@
             <div class="list" id="jobs-list">
               <div class="empty-state" id="empty-state">
                 <span class="empty-icon" data-icon="briefcase" data-size="28" aria-hidden="true"></span>
-                <h3>No jobs yet</h3>
-                <p>Create your first scraping job to start extracting data from the web.</p>
+                <h3 class="empty-state-title">No jobs yet</h3>
+                <p class="empty-state-desc">Create your first scrape job.</p>
                 <div class="empty-state-actions">
                   <button type="button" class="btn primary small" data-action="switch-view" data-view="new">
                     Create your first job
@@ -678,9 +673,10 @@
               </div>
             </div>
 
-            <form id="job-form">
+            <form id="job-form" novalidate>
               <!-- Hidden submit button for WCAG compliance -->
               <button type="submit" hidden aria-hidden="true"></button>
+              <div id="form-errors" class="form-errors hidden" role="alert" aria-live="polite"></div>
 
               <!-- Mode Toggle -->
               <div class="section">
@@ -743,7 +739,9 @@
 
               <!-- Manual Mode: URLs -->
               <div class="section" id="section-manual">
-                <label class="section-label" for="inp-urls">Target URLs <span class="hint">one per line</span></label>
+                <label class="section-label" for="inp-urls"
+                  >Target URLs <span class="hint">one per line, up to 100</span></label
+                >
                 <textarea
                   id="inp-urls"
                   rows="4"
@@ -965,6 +963,9 @@
                 <button type="button" class="btn secondary small" data-action="export-json" id="btn-json">JSON</button>
                 <button type="button" class="btn secondary small" data-action="export-excel" id="btn-excel">
                   Excel
+                </button>
+                <button type="button" class="btn secondary small" data-action="copy-sample-row" id="btn-copy-sample">
+                  Copy sample
                 </button>
               </div>
             </div>
@@ -1530,6 +1531,6 @@
          FastAPI's StaticFiles mount at /app serves these files from the
          frontend/ directory. Production nginx deployments are unaffected
          (nginx has dedicated location blocks for both /app/ and root paths). -->
-    <script type="module" src="app.js"></script>
+    <script type="module" src="/app/app.js?v=2"></script>
   </body>
 </html>

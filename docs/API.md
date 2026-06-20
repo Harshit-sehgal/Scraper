@@ -163,7 +163,9 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
+| POST | `/api/billing/checkout` | Operator or admin |
 | POST | `/api/billing/webhook` | Billing webhook secret or HMAC signature |
+| GET | `/api/billing/stub-return/{plan_tier}/{request_id}` | Unauthenticated (dev-only stub) |
 | GET | `/api/billing/subscriptions` | Operator or admin |
 | GET | `/api/billing/subscriptions/{customer_id}` | Operator or admin |
 | DELETE | `/api/user/data` | Authenticated user (self-service deletion) |

@@ -84,12 +84,14 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GROQ_API_KEY` | - | Groq API key for LLM operations |
+| `DATAFORGE_GROQ_API_KEY` | - | Alternative prefix for Groq API key (takes precedence over `GROQ_API_KEY`) |
 
 ## Testing
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATAFORGE_TEST_DETERMINISTIC_ENV_VAR` | - | Test-only environment variable |
+| `DATAFORGE_TEST_SELECTOR_DECAY_PERSISTENCE` | `false` | Persist selector decay snapshots during tests |
 
 ## Direct Environment Reads
 
@@ -99,6 +101,7 @@ These are acceptable direct environment reads outside the config module:
 |------|----------|---------|
 | `backend/app/__init__.py` | `DATAFORGE_DOTENV_PATH` | Dotenv loading boundary |
 | `backend/app/utils/env.py` | Generic helper | Environment utility |
+| `backend/app/billing/checkout.py` | `DATAFORGE_PUBLIC_BASE_URL` | Public base URL for constructing checkout approval URLs |
 | `scripts/check_prod_env.py` | `DATAFORGE_SKIP_DB_CHECK` | Validation script |
 | `scripts/run_worker.py` | `DATAFORGE_JOB_ID` | Worker script |
 | `scripts/manual_test.py` | `DATAFORGE_API_BASE` | Manual testing |

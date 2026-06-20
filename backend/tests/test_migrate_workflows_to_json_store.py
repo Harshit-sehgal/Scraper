@@ -124,7 +124,7 @@ def _insert_workflow(db_path: Path, row: dict[str, object]) -> None:
         # migration script) and placeholders are static; only values are bound
         # via parameterized `?`. S608 false-positive.
         conn.execute(
-            f"INSERT INTO workflows ({', '.join(_WORKFLOW_COLUMNS)}) VALUES ({placeholders})",  # noqa: S608
+            f"INSERT INTO workflows ({', '.join(_WORKFLOW_COLUMNS)}) VALUES ({placeholders})",
             values,
         )
         conn.commit()

@@ -2188,7 +2188,7 @@
     },
     "/api/billing/checkout": {
       "post": {
-        "description": "Create a PayPal Order for the requested plan tier and return its approval URL.\n\nWhen ``PAYPAL_CLIENT_ID`` (and / or ``PAYPAL_CLIENT_SECRET``) isn't configured,\na deterministic stub approval_url is returned. This keeps dev/test environments\nfree of live PayPal credentials while presenting the same response shape to\nclients.\n\nAuthentication: any authenticated session role (operator / admin) can create\na checkout; production routing is controlled by the optional ``return_url``\nprovided by the caller.",
+        "description": "Create a PayPal Order for the requested plan tier and return its approval URL.\n\nWhen ``PAYPAL_CLIENT_ID`` (and / or ``PAYPAL_CLIENT_SECRET``) isn't configured,\na deterministic stub approval_url is returned. This keeps dev/test environments\nfree of live PayPal credentials while presenting the same response shape to\nclients.",
         "operationId": "create_checkout_api_billing_checkout_post",
         "requestBody": {
           "content": {

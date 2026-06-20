@@ -49,12 +49,14 @@ const VIEW_MAP = {
 };
 
 // Detect the SPA base path from the initial page load (e.g. /app/ or /)
+// Guarded with typeof window check so this module can be imported in
+// non-browser environments (Playwright, Node) without crashing.
 function getBasePath() {
+  if (typeof window === "undefined") return "";
   const path = window.location.pathname;
   // If we're under /app/... or /app, treat /app as the base
   const appIndex = path.indexOf("/app");
-  if (appIndex !== -1) return "/app";
-  return "";
+  return appIndex !== -1 ? "/app" : "";
 }
 
 const BASE_PATH = getBasePath();
@@ -123,6 +125,8 @@ export function switchView(name) {
   const navEl = document.getElementById(navMap[name]);
   if (navEl) {
     navEl.classList.add("active");
+    const parentDetails = navEl.closest("details");
+    if (parentDetails) parentDetails.open = true;
   }
 
   if (name === "jobs") refreshJobs().catch(() => {});

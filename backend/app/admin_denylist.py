@@ -134,7 +134,7 @@ class DomainDenylist:
 
     def _load_cache(self) -> None:
         with self._lock, self._connect() as conn:
-            query = f"SELECT domain, reason, added_by, added_at, path_prefix FROM {DENYLIST_TABLE}"  # nosec B608 # noqa: S608
+            query = f"SELECT domain, reason, added_by, added_at, path_prefix FROM {DENYLIST_TABLE}"  # nosec B608, noqa: S608
             rows = conn.execute(query).fetchall()
         self._cache = {}
         for row in rows:
@@ -180,7 +180,7 @@ class DomainDenylist:
                     added_by=excluded.added_by,
                     added_at=datetime('now'),
                     path_prefix=excluded.path_prefix
-                """  # nosec B608 # noqa: S608
+                """  # nosec B608, noqa: S608
             conn.execute(query, (domain, reason, added_by, path_prefix))
         self._invalidate_cache()
         return DenylistEntry(
@@ -196,10 +196,10 @@ class DomainDenylist:
         domain = (domain or "").strip().lower()
         with self._lock, self._connect() as conn:
             if path_prefix:
-                query = f"DELETE FROM {DENYLIST_TABLE} WHERE domain = ? AND path_prefix = ?"  # nosec B608 # noqa: S608
+                query = f"DELETE FROM {DENYLIST_TABLE} WHERE domain = ? AND path_prefix = ?"  # nosec B608, noqa: S608
                 cur = conn.execute(query, (domain, path_prefix))
             else:
-                query = f"DELETE FROM {DENYLIST_TABLE} WHERE domain = ?"  # nosec B608 # noqa: S608
+                query = f"DELETE FROM {DENYLIST_TABLE} WHERE domain = ?"  # nosec B608, noqa: S608
                 cur = conn.execute(query, (domain,))
         self._invalidate_cache()
         return cur.rowcount > 0
@@ -258,7 +258,7 @@ class DomainDenylist:
     def clear(self) -> None:
         """Remove every entry (test helper)."""
         with self._lock, self._connect() as conn:
-            query = f"DELETE FROM {DENYLIST_TABLE}"  # nosec B608 # noqa: S608
+            query = f"DELETE FROM {DENYLIST_TABLE}"  # nosec B608, noqa: S608
             conn.execute(query)
         self._invalidate_cache()
 
@@ -286,8 +286,11 @@ def get_denylist() -> DomainDenylist:
                 from app.config import settings
 
                 db_path = getattr(settings, "DENYLIST_DB_PATH", "") or DEFAULT_DB_PATH
-            except Exception:
+            except ImportError:
                 logger.debug("Failed to load DENYLIST_DB_PATH from settings", exc_info=True)
+                db_path = DEFAULT_DB_PATH
+            except AttributeError:
+                logger.debug("settings object has no DENYLIST_DB_PATH, using default", exc_info=True)
                 db_path = DEFAULT_DB_PATH
             _singleton = DomainDenylist(db_path=db_path)
     return _singleton

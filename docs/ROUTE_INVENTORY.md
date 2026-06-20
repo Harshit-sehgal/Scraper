@@ -2,13 +2,13 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-18 15:49:56 UTC
+**Generated:** 2026-06-19 21:42:08 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
 development docs/static routes, health/readiness routes, and session/auth routes.
 
-**Total route rows:** 143
+**Total route rows:** 144
 
 ## Stable Api Routes
 
@@ -22,6 +22,7 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `POST` | `/api/auth-profiles/{profile_id}/revoke` | `app.routers.auth_profiles` | `revoke_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/start-login` | `app.routers.auth_profiles` | `start_login` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/validate` | `app.routers.auth_profiles` | `validate_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/billing/checkout` | `app.billing.checkout` | `create_checkout` | stable | protected | operator-or-admin | require_role |  | CheckoutResponse | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions` | `app.billing.webhooks` | `list_subscriptions` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions/{customer_id}` | `app.billing.webhooks` | `get_subscription` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | `app.billing.webhooks` | `billing_webhook` | stable | protected | authenticated-user |  |  | dict | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |

@@ -39,7 +39,7 @@ def _audit_log_path() -> Path:
         from app.config import settings
 
         configured_log_dir = settings.AUDIT_LOG_DIR
-    except Exception:
+    except (ImportError, AttributeError):
         logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
         configured_log_dir = ""
     return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
@@ -395,7 +395,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
                     if parsed:
                         yield parsed
 
-        with open(log_path, encoding="utf-8") as f:
+        with log_path.open(encoding="utf-8") as f:
             recent = deque(_parse_lines(f), maxlen=count)
             events = list(recent)
     except OSError as e:

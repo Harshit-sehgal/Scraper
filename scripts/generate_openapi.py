@@ -64,7 +64,7 @@ def _run_subprocess(enable_experimental: bool) -> dict[str, Any]:
     env["DATAFORGE_OPERATOR_API_KEY"] = ""
     env["DATAFORGE_ADMIN_API_KEY"] = ""
     # Test-only session secret; not a real credential.
-    env["DATAFORGE_SESSION_SECRET"] = "openapi-gen-test-secret"  # noqa: S105
+    env["DATAFORGE_SESSION_SECRET"] = "openapi-gen-test-secret"
     env["DATAFORGE_ALLOW_INSECURE_DEV_AUTH"] = "true"
     env["DATAFORGE_SKIP_DB_CHECK"] = "true"
     result = subprocess.run(

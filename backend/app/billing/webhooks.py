@@ -31,6 +31,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.billing.models import PlanTierId, SubscriptionStatus
+from app.billing.service import resolve_tier_from_plan_id
 from app.config import settings
 from app.utils.rbac import UserRole, require_role
 
@@ -318,7 +319,7 @@ async def billing_webhook(request: Request) -> dict[str, str]:
         body: dict[str, Any] = loaded
     except Exception as exc:
         logger.debug("Invalid billing webhook JSON body: %s", exc)
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
 
     event_type, customer_id, data = _normalize_webhook(body)
 
@@ -360,9 +361,10 @@ def _normalize_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
 
     # Resolve the customer / subscription id. PayPal puts it on resource.id
     # (the I-... subscription id); legacy Autumn/Stripe use customer_id or
-    # customer. Data["id"] alone is NOT safe — that is the event id in
-    # PayPal payloads (WH-...) and would let a bogus later event with the
-    # same id clobber a real record.
+    # customer. We deliberately skip the bare "id" field because that is
+    # the PayPal event id (WH-...) — reusing it as a customer key would let
+    # a later event with a different subscription but the same event-id scope
+    # clobber a real record.
     customer_id: str = ""
     for key in ("customer_id", "customer", "subscriber_id"):
         v = data.get(key) if isinstance(data, dict) else None
@@ -370,48 +372,21 @@ def _normalize_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
             customer_id = v
             break
     if not customer_id and isinstance(data, dict):
-        # PayPal subscription id (I-...) lives on resource.id but only on
-        # SUBSCRIPTION events. For PAYMENT.* events we use billing_id in
-        # the resource (or fall back to empty).
-        for key in ("billing_id", "subscription_id", "id"):
+        # PayPal subscription id (I-...) lives on resource.{id,subscription_id}
+        # for SUBSCRIPTION events. For PAYMENT.* events we use billing_id.
+        for key in ("billing_id", "subscription_id"):
             v = data.get(key)
             if isinstance(v, str) and v:
-                # Prefer it only when this is a subscription event; for
-                # one-off payment events we still want a sane customer
-                # key, so use it as-is and guard later.
                 customer_id = v
                 break
 
     return event_type, customer_id, data
 
 
-# ---------------------------------------------------------------------------
-# Plan-ID → tier resolution (mirrors PayPalClient._resolve_tier_from_plan_id
-# in service.py, kept here to avoid cross-module dependency on a private method)
-# ---------------------------------------------------------------------------
-
-_PLAN_ID_ENV_BY_TIER: dict[PlanTierId, str] = {
-    PlanTierId.STARTER: "PAYPAL_PLAN_ID_STARTER",
-    PlanTierId.PRO: "PAYPAL_PLAN_ID_PRO",
-    PlanTierId.ENTERPRISE: "PAYPAL_PLAN_ID_ENTERPRISE",
-}
-
-
-def _webhook_resolve_tier_from_plan_id(plan_id: str) -> str:
-    """Map a raw PayPal plan_id (e.g. P-5AB...) to a PlanTierId value string.
-
-    Compares against the env vars PAYPAL_PLAN_ID_STARTER / PRO / ENTERPRISE.
-    Returns "free" for unrecognised or empty plan IDs.
-    """
-    if not plan_id:
-        return PlanTierId.FREE.value
-    for tier, env_name in _PLAN_ID_ENV_BY_TIER.items():
-        expected = os.environ.get(env_name, "").strip()
-        if expected and expected == plan_id:
-            return tier.value
-    # Not a known plan ID — log and fall back to free.
-    logger.debug("Unrecognised PayPal plan_id %r — falling back to free", plan_id)
-    return PlanTierId.FREE.value
+# Plan-ID → tier resolution delegates to the shared helper in
+# ``app.billing.service`` so the mapping lives in one place and is
+# properly cached after first read.
+resolve_plan_tier = resolve_tier_from_plan_id
 
 
 # Module-level event-type dispatch sets (immutable, one allocation).
@@ -488,14 +463,27 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
                     plan_name = v
                     break
             # If the plan_id looks like a PayPal UUID (P-...) rather than a
-            # human tier name, resolve it via env-var lookup.
+            # human tier name, resolve it via env-var lookup. Comparisons
+            # are case-insensitive because hypothetical proxy or
+            # PayPal-variant payloads might lowercase the prefix.
             valid_tiers = {t.value for t in PlanTierId}
-            if plan_name.lower() not in valid_tiers and plan_name.startswith("P-"):
-                plan_name = _webhook_resolve_tier_from_plan_id(plan_name)
+            if plan_name.lower() not in valid_tiers and plan_name.lower().startswith("p-"):
+                plan_name = resolve_plan_tier(plan_name).value
             v = data.get("status")
             if isinstance(v, str) and v:
                 status = v.lower()
-            for sub_key in ("subscription_id", "id"):
+            # Subscription id (sub_id) resolution. We deliberately do NOT
+            # fall back to bare ``data["id"]`` — that's the PayPal event
+            # id (WH-...) when ``data`` came from a top-level ``id`` field
+            # (see the customer_id resolution above). For PayPal payloads
+            # ``data`` is the ``resource`` dict where ``id`` IS the I-...
+            # subscription id, but for non-PayPal dialects or proxy-rewritten
+            # payloads the same field can hold the event id; we accept only
+            # ``subscription_id`` here so a stray event id never becomes a
+            # subscription record key. ``sub_id`` stays empty (stored as
+            # ``""``) when nothing matches — list/get endpoints tolerate
+            # this.
+            for sub_key in ("subscription_id", "billing_id"):
                 v = data.get(sub_key)
                 if isinstance(v, str) and v:
                     sub_id = v

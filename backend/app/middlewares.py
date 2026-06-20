@@ -147,6 +147,13 @@ async def api_key_middleware(request: Request, call_next):
         # capped by other middlewares.
         if request.url.path == "/api/billing/webhook":
             return await call_next(request)
+        # Stub-return page is rendered in a browser after the operator
+        # clicks the stub approval URL (PayPal credentials not configured).
+        # Browsers do not carry API keys to this redirect URL, but the page
+        # is dev-only — it shows a confirmation message and never commits
+        # state — so it is allowed through unauthenticated.
+        if request.url.path.startswith("/api/billing/stub-return/"):
+            return await call_next(request)
         bearer_token = None
         auth_header = request.headers.get("Authorization", "")
         auth_scheme, _, auth_token = auth_header.partition(" ")

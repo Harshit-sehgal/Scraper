@@ -260,19 +260,22 @@ select.input {
   pointer-events: none;
 }
 
-/* ═══ Badge / Status Pill ═══ */
+/* ═══ Badge / Status Pill ═══
+   Monochrome by design — status is conveyed by label text and a
+   subtle neutral pill, not by red/green indicator colors. The
+   "running" variant is filled so active work stands out. */
 
 .badge,
 .tag {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: 22px;
+  height: 20px;
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: var(--status-gray-soft);
-  color: var(--status-gray);
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  color: var(--ink-3);
   font-size: var(--text-xs);
   font-weight: 500;
   line-height: 1;
@@ -284,57 +287,47 @@ select.input {
   border-radius: var(--radius-pill);
 }
 
+/* Neutral status variants — all monochrome. */
 .badge.pending,
+.badge.queued,
 .badge.discovering,
-.badge.running,
-.badge.info {
-  background: var(--status-blue-soft);
-  color: var(--status-blue);
-}
-
 .badge.completed,
 .badge.succeeded,
 .badge.ok,
-.badge.done {
-  background: var(--status-green-soft);
-  color: var(--status-green);
-}
-
+.badge.done,
 .badge.degraded,
 .badge.warning,
-.badge.partial {
-  background: var(--status-amber-soft);
-  color: var(--status-amber);
-}
-
+.badge.partial,
 .badge.canceled,
 .badge.cancelled,
 .badge.failed,
 .badge.error,
-.badge.danger {
-  background: var(--status-red-soft);
-  color: var(--status-red);
-}
-
+.badge.danger,
 .badge.empty_result,
-.badge.idle {
+.badge.idle,
+.badge.info {
   background: var(--bg-muted);
   color: var(--ink-3);
+  border-color: var(--border);
+}
+
+/* Active work — filled ink pill, the one visual emphasis. */
+.badge.running {
+  background: var(--ink-1);
+  color: var(--ink-inverse);
+  border-color: var(--ink-1);
 }
 
 .badge.experimental,
 .badge.beta {
   background: var(--status-violet-soft);
   color: var(--status-violet);
+  border-color: transparent;
 }
 
-/* Inline solid dot inside a badge */
+/* Inline solid dot inside a badge — hidden for Notion theme */
 .badge .dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: currentcolor;
+  display: none;
 }
 
 /* ═══ Card ═══ */
@@ -392,8 +385,7 @@ select.input {
   border-bottom: 1px solid var(--border);
   background: var(--bg-subtle);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  letter-spacing: var(--tracking-normal);
 }
 
 .table td {
@@ -594,7 +586,9 @@ kbd {
   margin-top: var(--space-2);
 }
 
-/* ═══ Toast ═══ */
+/* ═══ Toast ═══
+   Monochrome — type is conveyed by a leading icon, not by a
+   colored border, so warnings/errors don't flash red/green. */
 
 #toasts {
   position: fixed;
@@ -603,7 +597,7 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  z-index: 2000;
+  z-index: var(--z-toast);
   pointer-events: none;
 }
 
@@ -612,31 +606,44 @@ kbd {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--ink-1);
-  color: var(--ink-inverse);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--ink-1);
   font-size: var(--text-sm);
   font-weight: 500;
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.08);
-  min-width: 220px;
-  max-width: 360px;
+  box-shadow: var(--shadow-md);
+  min-width: 240px;
+  max-width: 380px;
   pointer-events: auto;
 }
 
-.toast.success {
-  background: var(--status-green);
+.toast .toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--ink-3);
 }
 
-.toast.error {
-  background: var(--status-red);
+.toast.success .toast-icon {
+  color: var(--ink-1);
 }
 
-.toast.warning {
-  background: var(--status-amber);
+.toast .toast-timer {
+  display: none;
 }
 
+/* Legacy colored borders removed — kept class names for JS compat. */
+.toast.success,
+.toast.error,
+.toast.warning,
 .toast.info {
-  background: var(--ink-1);
+  border-left: 0;
+  background: var(--bg);
+  color: var(--ink-1);
 }
 
 /* ═══ AUP Banner ═══ */
@@ -696,40 +703,37 @@ kbd {
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-3);
-  height: 26px;
-  border-radius: var(--radius-pill);
+  height: 24px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-subtle);
   color: var(--ink-3);
   font-size: var(--text-xs);
   font-weight: 500;
   white-space: nowrap;
+  transition: all var(--duration-base) var(--ease-out);
 }
 
 .health-pill[data-state="healthy"] {
-  color: var(--status-green);
-  border-color: var(--status-green-soft);
-  background: var(--status-green-soft);
+  color: var(--ink-3);
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .health-pill[data-state="degraded"] {
-  color: var(--status-amber);
-  border-color: var(--status-amber-soft);
-  background: var(--status-amber-soft);
+  color: var(--ink-2);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
 }
 
 .health-pill[data-state="down"] {
-  color: var(--status-red);
-  border-color: var(--status-red-soft);
-  background: var(--status-red-soft);
+  color: var(--ink-1);
+  background: var(--bg-active);
+  border-color: var(--ink-4);
 }
 
 .health-pill .dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: currentcolor;
+  display: none;
 }
 
 /* Inline status engine dot in sidebar bottom */
@@ -741,21 +745,27 @@ kbd {
   font-size: var(--text-xs);
   color: var(--ink-3);
   font-weight: 500;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  transition: all var(--duration-base) var(--ease-out);
+}
+
+.engine-status[data-state="offline"] {
+  color: var(--ink-2);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+}
+
+.engine-status[data-state="warn"] {
+  color: var(--ink-2);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
 }
 
 .engine-status .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--status-green);
-}
-
-.engine-status[data-state="offline"] .dot {
-  background: var(--status-red);
-}
-
-.engine-status[data-state="warn"] .dot {
-  background: var(--status-amber);
+  display: none;
 }
 
 /* Notes / alert-like blocks */

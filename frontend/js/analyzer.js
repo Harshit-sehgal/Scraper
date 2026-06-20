@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 import { esc, toast } from "./utils.js";
-import { API, apiFetch } from "./api.js";
+import { apiFetch, endpoints } from "./api.js";
 import { currentMode, setMode } from "./views.js";
 import { addField } from "./form.js";
 
@@ -41,7 +41,7 @@ export async function analyzeURL() {
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
 
   try {
-    const res = await apiFetch(`${API}/api/url/analyze`, {
+    const res = await apiFetch(endpoints.urlAnalyze, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, fetch_preview: false }),
@@ -237,7 +237,7 @@ export async function createWorkflowDraftFromAnalysis() {
     : [];
   const selected = suggested[0]?.url || "";
   try {
-    const res = await apiFetch(`${API}/api/workflow-drafts/from-url-analysis`, {
+    const res = await apiFetch(endpoints.workflowDraftFromUrlAnalysis, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════ */
 
 // ─── Init ───
-import { hydrateIcons, startIconObserver } from "./js/icons.js";
+import { hydrateIcons, icon, startIconObserver } from "./js/icons.js";
 import {
   readUIState,
   updateJobsLastUpdatedLabel,
@@ -18,7 +18,7 @@ import {
   toast,
 } from "./js/utils.js";
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from "./js/jobs.js";
-import { onGlobalKeydown, switchView, getViewFromPath } from "./js/views.js";
+import { onGlobalKeydown, switchView, getViewFromPath, currentView } from "./js/views.js";
 import { refreshWorkflows, onWorkflowAction } from "./js/workflows.js";
 import { checkAndRenderAupBanner, acceptAup, dismissAupBanner } from "./js/aup.js";
 import { startHealthPill } from "./js/health-pill.js";
@@ -39,7 +39,6 @@ import {
   showAuthProfileEntryNotice,
 } from "./js/analyzer.js";
 import {
-  initForm,
   addField,
   addFilter,
   suggestSchemaFromIntent,
@@ -49,17 +48,10 @@ import {
 } from "./js/form.js";
 import { refreshCognition } from "./js/cognition.js";
 import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
-import { refreshRecycleBin, restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
+import { restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
 import { cancelJob, deleteJob, clearTerminalJobs } from "./js/jobs.js";
-import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel } from "./js/results.js";
-import {
-  showApiKeyPrompt,
-  showAdminKeyPrompt,
-  closeKeyModal,
-  saveKeyFromModal,
-  isKeyModalVisible,
-  checkSession,
-} from "./js/api.js";
+import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel, copySampleRow } from "./js/results.js";
+import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, checkSession } from "./js/api.js";
 import { setMode } from "./js/views.js";
 import { initAuthProfiles } from "./js/auth-profiles.js";
 import { refreshBilling, upgradePlan } from "./js/billing.js";
@@ -218,6 +210,9 @@ function onDocumentClick(e) {
     case "export-excel":
       exportExcel();
       break;
+    case "copy-sample-row":
+      copySampleRow();
+      break;
     case "toggle-theme":
       toggleTheme();
       break;
@@ -238,12 +233,10 @@ function onDocumentClick(e) {
         navigator.clipboard
           ?.writeText?.(id)
           ?.then?.(() => {
-            btn.innerHTML =
-              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+            btn.innerHTML = icon("check", 14);
             btn.classList.add("copied");
             setTimeout(() => {
-              btn.innerHTML =
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+              btn.innerHTML = icon("copy", 14);
               btn.classList.remove("copied");
             }, 2000);
           })

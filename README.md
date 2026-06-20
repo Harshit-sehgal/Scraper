@@ -1,5 +1,11 @@
 # DataForge Scraper
 
+[![CI](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml)
+[![Auto-Fix Formatting](https://github.com/Harshit-sehgal/Scraper/actions/workflows/auto-fix.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/auto-fix.yml)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-0366d6?logo=dependabot)](https://github.com/Harshit-sehgal/Scraper/network/dependencies)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue?logo=python)](https://www.python.org/downloads/release/python-3120/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > Current agent truth source: [`docs/AGENT_TRUTH.md`](docs/AGENT_TRUTH.md). Treat older status and roadmap claims as historical unless reproduced by fresh command output.
 
 DataForge Scraper is a pre-production FastAPI + Playwright web extraction platform for accessible websites. It provides configurable scraping jobs, browser-assisted loading, schema/selector-based extraction paths, result storage, exports, diagnostics, telemetry, API-key/RBAC utilities, SSRF-oriented URL checks, rate limiting, and an internal static dashboard.
@@ -31,16 +37,24 @@ Do not claim this project is a universal scraper, anti-bot proof, fully autonomo
 
 Status: pre-production candidate.
 
-| Gate | Status |
-|------|--------|
-| Quick validation | Passes with `python3 scripts/validate_local.py --quick` |
-| Full backend tests | Currently failing; see `docs/AGENT_TRUTH.md` |
-| Ruff / pyflakes / mypy | Currently failing; see `docs/AGENT_TRUTH.md` |
-| Frontend tests | Passing in the latest full validation run |
-| Frontend lint | Currently failing on `frontend/styles.css` formatting |
-| Security scan | Bandit passes; pip-audit currently reports vulnerable installed packages |
+| Gate | CI Status |
+|------|-----------|
+| **Fast Gates** (syntax, architecture, invariants, security audit) | [![Fast Gates](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=fast-gates)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **Static Analysis** (ruff, mypy, bandit, pyflakes) | [![Static Analysis](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=static-analysis)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **Backend Tests** (+ coverage) | [![Backend Tests](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=backend-tests)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **Frontend** (vitest, stylelint, Prettier) | [![Frontend](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=frontend)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **Chaos Engineering** | [![Chaos Engineering](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=chaos-engineering)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **Docker Image Build & Smoke** | [![Image Build](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=image-build)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **SBOM Generation** | [![SBOM](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=sbom)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
+| **Dependabot** (auto-merge safe updates) | [![Dependabot](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml) |
+| **Postgres Integration** | [![Postgres](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml) |
+| **Browser E2E** (Playwright) | [![Browser E2E](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml) |
+| **Local Validation** | Passes with `make validate` |
 
-For the latest verified status, use [`docs/AGENT_TRUTH.md`](docs/AGENT_TRUTH.md) and [`artifacts/validation/latest_summary.md`](artifacts/validation/latest_summary.md). Treat older status files as historical until their claims reproduce in the current checkout.
+> Note: Per-job status badges use GitHub's per-job query parameter (`?job=...`).
+> Replace `Harshit-sehgal/Scraper` in badge URLs with the actual repo owner/name if forked.
+
+For the latest detailed status, run `make validate` or check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml).
 
 ## API and Dashboard Notes
 

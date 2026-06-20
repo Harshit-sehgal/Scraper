@@ -186,7 +186,7 @@ async def _async_paginate_next_button(
     page: Any,
     config: PaginationConfig,
     extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
-    **kwargs: Any,  # noqa: ARG001
+    **_kwargs: Any,
 ) -> PaginationResult:
     """Click next button until gone, maxed, or no new records.
 
@@ -272,7 +272,7 @@ async def _async_paginate_infinite_scroll(
     page: Any,
     config: PaginationConfig,
     extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
-    **kwargs: Any,  # noqa: ARG001
+    **_kwargs: Any,
 ) -> PaginationResult:
     """Scroll down bounded by max pages (scroll actions), records, and time.
 
@@ -347,7 +347,7 @@ async def _async_paginate_load_more(
     page: Any,
     config: PaginationConfig,
     extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
-    **kwargs: Any,  # noqa: ARG001
+    **_kwargs: Any,
 ) -> PaginationResult:
     """Click 'Load more' button until gone, max clicks, or no new records.
 
@@ -441,7 +441,7 @@ async def _async_paginate_page_number(
     page: Any,
     config: PaginationConfig,
     extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
-    **kwargs: Any,  # noqa: ARG001
+    **_kwargs: Any,
 ) -> PaginationResult:
     """Click numbered page links to navigate through pages.
 
@@ -545,7 +545,7 @@ async def _async_paginate_url_pattern(
     page: Any,
     config: PaginationConfig,
     extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
-    **kwargs: Any,  # noqa: ARG001
+    **_kwargs: Any,
 ) -> PaginationResult:
     """Iterate through pages using URL parameter pattern.
 
@@ -753,12 +753,12 @@ def _paginate_page_number(config: PaginationConfig) -> PaginationResult:
     result = PaginationResult()
     start_time = time.monotonic()
 
-    for page_num in range(1, config.max_pages + 1):
+    for _page_num in range(1, config.max_pages + 1):
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
             break
 
-        # Placeholder: navigate to page_num and extract
+        # Placeholder: navigate to next page and extract
         page_records: list[dict] = []
         # ---- end placeholder ----
 
@@ -833,7 +833,7 @@ def _paginate_infinite_scroll(config: PaginationConfig) -> PaginationResult:
     result = PaginationResult()
     start_time = time.monotonic()
 
-    for scroll_num in range(config.max_pages):
+    for _scroll_num in range(config.max_pages):
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
             break
@@ -871,7 +871,7 @@ def _paginate_load_more(config: PaginationConfig) -> PaginationResult:
     result = PaginationResult()
     start_time = time.monotonic()
 
-    for click_num in range(config.max_pages):
+    for _click_num in range(config.max_pages):
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
             break

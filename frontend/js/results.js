@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 import { esc, attrStr, toast, showConfirm } from "./utils.js";
-import { API, apiFetch } from "./api.js";
+import { apiFetch, endpoints } from "./api.js";
 import { switchView } from "./views.js";
 import { refreshJobs } from "./jobs.js";
 
@@ -14,6 +14,13 @@ let currentResultsCache = [];
 
 export function setCurrentJobId(id) {
   currentJobId = id;
+}
+
+export function getExportUrl(format, id) {
+  if (format === "csv") return endpoints.exportCsv(id);
+  if (format === "json") return endpoints.exportJson(id);
+  if (format === "excel") return endpoints.exportExcel(id);
+  throw new Error(`Unsupported export format: ${format}`);
 }
 
 // ─── View Results ───
@@ -74,7 +81,7 @@ export async function viewResults(id) {
   switchView("results");
   renderResultsSkeleton();
   try {
-    const r = await apiFetch(`${API}/api/jobs/${id}`);
+    const r = await apiFetch(endpoints.job(id));
     if (!r.ok) throw new Error(`Failed to load results: ${r.status}`);
     const j = await r.json();
     // Guard against stale responses: if the user has since clicked
@@ -268,8 +275,7 @@ export function applyResultSearch(rows) {
 
 export function renderFilteredResults() {
   const filtered = applyResultSearch(currentResultsCache);
-  const emptyMessage =
-    currentResultsCache.length && !filtered.length ? "No matching rows for this filter" : "No results";
+  const emptyMessage = currentResultsCache.length && !filtered.length ? "No matching rows for this filter" : "";
 
   renderTable(filtered, emptyMessage);
 
@@ -287,7 +293,26 @@ export function renderTable(results, emptyMessage = "No results") {
   if (!thead || !tbody) return;
   if (!results.length) {
     thead.innerHTML = "";
-    tbody.innerHTML = `<tr><td class="empty-cell" colspan="100">${esc(emptyMessage)}</td></tr>`;
+    if (emptyMessage) {
+      tbody.innerHTML = `<tr><td class="empty-cell" colspan="100">${esc(emptyMessage)}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = `
+      <tr>
+        <td class="empty-cell" colspan="100">
+          <div class="empty-result">
+            <strong>No records were extracted.</strong>
+            <p>Possible reasons:</p>
+            <ul>
+              <li>the selectors did not match</li>
+              <li>the page loaded content dynamically</li>
+              <li>the website blocked automated access</li>
+              <li>the schema fields were too specific</li>
+            </ul>
+          </div>
+        </td>
+      </tr>
+    `;
     return;
   }
   const preferredOrder = [
@@ -403,6 +428,35 @@ export async function onResultsCellDoubleClick(e) {
   }
 }
 
+export async function copySampleRow() {
+  const sample = currentResultsCache[0];
+  if (!sample) {
+    toast("No sample row to copy", "warning");
+    return false;
+  }
+
+  const text = JSON.stringify(sample, null, 2);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const t = document.createElement("textarea");
+      t.value = text;
+      t.style.position = "fixed";
+      t.style.left = "-9999px";
+      document.body.appendChild(t);
+      t.select();
+      document.execCommand("copy");
+      t.remove();
+    }
+    toast("Copied sample row", "success");
+    return true;
+  } catch {
+    toast("Copy failed", "error");
+    return false;
+  }
+}
+
 // ─── Re-clean ───
 
 export async function recleanCurrentJob() {
@@ -418,7 +472,7 @@ export async function recleanCurrentJob() {
     }
 
     try {
-      const res = await apiFetch(`${API}/api/jobs/${id}/reclean`, { method: "POST" });
+      const res = await apiFetch(endpoints.recleanJob(id), { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "Re-clean failed");
 
@@ -459,15 +513,15 @@ async function downloadExport(url, filename) {
 
 export async function exportCSV() {
   if (!currentJobId) return;
-  await downloadExport(`${API}/api/jobs/${currentJobId}/export/csv`, `job-${currentJobId}.csv`);
+  await downloadExport(getExportUrl("csv", currentJobId), `job-${currentJobId}.csv`);
 }
 
 export async function exportJSON() {
   if (!currentJobId) return;
-  await downloadExport(`${API}/api/jobs/${currentJobId}/export/json`, `job-${currentJobId}.json`);
+  await downloadExport(getExportUrl("json", currentJobId), `job-${currentJobId}.json`);
 }
 
 export async function exportExcel() {
   if (!currentJobId) return;
-  await downloadExport(`${API}/api/jobs/${currentJobId}/export/excel`, `job-${currentJobId}.xlsx`);
+  await downloadExport(getExportUrl("excel", currentJobId), `job-${currentJobId}.xlsx`);
 }

@@ -132,7 +132,7 @@
     },
     {
       "classification": "backend_source",
-      "loc": 1156,
+      "loc": 1158,
       "path": "backend/app/postgres_repository_base.py"
     },
     {
@@ -182,12 +182,12 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 959,
+      "loc": 956,
       "path": "frontend/dashboard/dashboard.js"
     },
     {
       "classification": "backend_source",
-      "loc": 940,
+      "loc": 955,
       "path": "backend/app/worker_queue_postgres_base.py"
     },
     {
@@ -231,6 +231,11 @@
       "path": "backend/app/pagination_executor.py"
     },
     {
+      "classification": "backend_source",
+      "loc": 794,
+      "path": "backend/app/saas/router.py"
+    },
+    {
       "classification": "backend_router",
       "loc": 785,
       "path": "backend/app/routers/jobs_write.py"
@@ -239,11 +244,6 @@
       "classification": "backend_source",
       "loc": 785,
       "path": "backend/app/selector_engine.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 776,
-      "path": "backend/app/saas/router.py"
     },
     {
       "classification": "backend_source",
@@ -431,11 +431,6 @@
       "path": "backend/app/selector_discovery_analysis.py"
     },
     {
-      "classification": "backend_source",
-      "loc": 527,
-      "path": "backend/app/billing/webhooks.py"
-    },
-    {
       "classification": "script",
       "loc": 526,
       "path": "scripts/check_prod_env.py"
@@ -444,6 +439,11 @@
       "classification": "test",
       "loc": 525,
       "path": "backend/tests/test_migration_regression.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 519,
+      "path": "backend/app/billing/webhooks.py"
     },
     {
       "classification": "backend_source",
@@ -476,14 +476,14 @@
       "path": "backend/app/models.py"
     },
     {
-      "classification": "frontend_source",
-      "loc": 496,
-      "path": "frontend/app.js"
-    },
-    {
       "classification": "test",
       "loc": 490,
       "path": "backend/tests/test_session_bound_e2e.py"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 486,
+      "path": "frontend/app.js"
     },
     {
       "classification": "backend_source",
@@ -535,10 +535,10 @@
       "path": "backend/app/topology_state.py"
     },
     {
-      "end_lineno": 1012,
+      "end_lineno": 1030,
       "kind": "class",
       "lineno": 244,
-      "loc": 769,
+      "loc": 787,
       "name": "PostgresWorkerQueueBase",
       "path": "backend/app/worker_queue_postgres_base.py"
     },
@@ -551,10 +551,10 @@
       "path": "backend/app/routers/jobs_write.py"
     },
     {
-      "end_lineno": 1282,
+      "end_lineno": 1284,
       "kind": "class",
       "lineno": 560,
-      "loc": 723,
+      "loc": 725,
       "name": "PostgresRepositoryBase",
       "path": "backend/app/postgres_repository_base.py"
     },
@@ -1103,9 +1103,9 @@
       "path": "backend/app/routers/jobs_write.py"
     },
     {
-      "end_lineno": 294,
+      "end_lineno": 342,
       "kind": "class",
-      "lineno": 100,
+      "lineno": 148,
       "loc": 195,
       "name": "PayPalClient",
       "path": "backend/app/billing/service.py"
@@ -1303,6 +1303,6 @@
       "path": "backend/tests/test_snapshot_desync_detector.py"
     }
   ],
-  "python_symbol_count": 8471,
+  "python_symbol_count": 8479,
   "source_file_count": 679
 }

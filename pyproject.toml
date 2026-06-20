@@ -107,6 +107,16 @@ ignore = [
     "E203", "E501", "B904", "B905", "B007", "B027", "B008", "E402", "B023",
     "TRY300", "TRY301", "TRY003", "S311", "ASYNC109", "RUF006", "TC003", "TC001", "PLC0415", "UP047",
     "PYI036", "PYI046", "PLW2901", "S104",
+    # Security false positives: S608 flags f-string SQL with module constants;
+    # S105 flags env-var NAME strings as passwords; S106/S107/S113 etc. are
+    # covered by the existing bandit pipeline instead.
+    "S105", "S106", "S107", "S113", "S310", "S608",
+    # ASYNC240: Path methods in async functions — codebase has many sync-fast
+    # paths where wrapping in run_in_threadpool would add overhead for no gain.
+    "ASYNC240",
+    # ARG001/ARG002: unused function/method arguments — many are interface-compat
+    # params kept for API parity, callback signatures, or protocol requirements.
+    "ARG001", "ARG002", "ARG005",
 ]
 
 [tool.ruff.lint.per-file-ignores]

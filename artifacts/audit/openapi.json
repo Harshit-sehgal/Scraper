@@ -2228,6 +2228,56 @@
         ]
       }
     },
+    "/api/billing/stub-return/{plan_tier}/{request_id}": {
+      "get": {
+        "description": "Render a confirmation page for the dev/stub PayPal approval flow.\n\nReached when the operator follows the URL returned by\n:func:`_stub_approval_url` (i.e., when PayPal credentials are not\nconfigured and the checkout endpoint fell back to a local stub URL).\nWithout this handler the URL would 404 in dev, which is a regression\nfrom the prior behaviour where ``example.com/paypal-stub/...`` was\na real (if unsolicited) third-party URL.\n\nThe handler is intentionally unauthenticated \u2014 it is dev-only and the\nstub flow does not commit any state. Any caller with the ``request_id``\ncan render the page, which is acceptable given the page contains only\nthe request id (already public-unsafe if treated as a secret) and the\nplan tier label.",
+        "operationId": "stub_return_api_billing_stub_return__plan_tier___request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_tier",
+            "required": true,
+            "schema": {
+              "title": "Plan Tier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stub Return",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/billing/subscriptions": {
       "get": {
         "description": "List all tracked subscriptions (admin/operator only).",
@@ -3397,7 +3447,7 @@
     },
     "/api/saas/memberships/{membership_id}": {
       "delete": {
-        "description": "Remove a member from an organization (admin/operator only).\n\nThe caller must be a member of the target membership's organization\n(env-backed admins retain all-access). Without this check, a\npersistent WRITE key from Org A could remove any member from Org B\nby guessing/obtaining a ``membership_id``.",
+        "description": "Remove a member from an organization (admin/operator only).\n\nThe caller must be a member of the target membership's organization.\nEnv-backed admins and env-backed operators (no org scope) retain\nall-access, matching the ``can_access_scoped_resource`` bypass.\nWithout this check, a persistent WRITE key from Org A could remove\nany member from Org B by guessing/obtaining a ``membership_id``.",
         "operationId": "remove_member_api_saas_memberships__membership_id__delete",
         "parameters": [
           {

@@ -569,7 +569,7 @@ def _reset_identity_store_fixture():
             with store._connect() as conn:  # type: ignore[attr-defined]
                 for table in ("api_keys", "projects", "memberships", "organizations", "users"):
                     with contextlib.suppress(sqlite3.OperationalError):
-                        conn.execute(f"DELETE FROM {table}")  # noqa: S608 — table is from hardcoded tuple
+                        conn.execute(f"DELETE FROM {table}")
                 conn.commit()
         except Exception:
             logger.debug("Identity store cleanup failed (non-critical)", exc_info=True)

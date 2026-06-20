@@ -73,3 +73,6 @@ artifacts/validation/*.log
 artifacts/validation/coverage_*.json
 artifacts/validation/bandit_*.json
 .aider*
+
+# Shelved/unused architecture (replaced by validated backend/app)
+backend/forge_kernel/

@@ -2,7 +2,7 @@
    DataForge — Topbar health pill
    ═══════════════════════════════════ */
 
-import { API } from "./api.js";
+import { apiFetch, endpoints } from "./api.js";
 
 const REFRESH_MS = 30_000;
 const PROBE_TIMEOUT_MS = 5_000;
@@ -26,10 +26,10 @@ async function probe() {
   const timeout = setTimeout(() => ac.abort(), PROBE_TIMEOUT_MS);
   try {
     const [live, ready] = await Promise.all([
-      fetch(`${API}/api/health`, { signal: ac.signal, credentials: "include" })
+      apiFetch(endpoints.health, { signal: ac.signal })
         .then((r) => r.status)
         .catch(() => 0),
-      fetch(`${API}/api/ready`, { signal: ac.signal, credentials: "include" })
+      apiFetch(endpoints.ready, { signal: ac.signal })
         .then((r) => r.status)
         .catch(() => 0),
     ]);

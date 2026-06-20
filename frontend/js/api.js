@@ -4,6 +4,9 @@
 
 import { toast, attachFocusTrapTo, detachFocusTrapFrom } from "./utils.js";
 import { refreshSystemStatus, refreshJobs } from "./jobs.js";
+import { maybeHandleMockRequest, isMockMode } from "./mock-api.js";
+export { endpoints } from "./api-contract.js";
+export { isMockMode };
 
 // ─── API Base URL ───
 
@@ -242,6 +245,9 @@ export async function apiFetch(url, options = {}) {
   // recent-activity) pass relative URLs; in production (same-origin SPA)
   // the prefix is a no-op.
   const resolvedUrl = url.startsWith("/api/") ? `${API}${url}` : url;
+  const mockResponse = await maybeHandleMockRequest(resolvedUrl, rest);
+  if (mockResponse) return mockResponse;
+
   const headers = { ...(rest.headers || {}) };
   // For session-authenticated clients, the cookie is sent automatically.
   // Only attach X-API-Key for non-session (legacy) mode, or for admin ops
