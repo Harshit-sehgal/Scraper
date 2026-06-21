@@ -149,7 +149,7 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
             try:
                 yield conn
                 conn.commit()
-            except BaseException:
+            except Exception:
                 conn.rollback()
                 try:
                     from app.metrics_collector import record_error

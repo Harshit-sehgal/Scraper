@@ -118,7 +118,7 @@ def _db_conn():
     try:
         yield conn
         conn.commit()
-    except BaseException:
+    except Exception:
         conn.rollback()
         from contextlib import suppress
 

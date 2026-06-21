@@ -68,6 +68,28 @@ _repo_query_latencies_lock = threading.Lock()
 _csp_violations: dict[str, int] = {}
 _csp_violations_lock = threading.Lock()
 
+# Auth profile operation counters: action -> count
+# e.g. {"created": 5, "deleted": 2, "validated": 10, "revoked": 1}
+_auth_profile_ops: dict[str, int] = {}
+_auth_profile_ops_lock = threading.Lock()
+
+# Workflow operation counters: action -> count
+# e.g. {"created": 3, "updated": 7, "run": 15, "deleted": 1}
+_workflow_ops: dict[str, int] = {}
+_workflow_ops_lock = threading.Lock()
+
+# Signup counters: outcome -> count
+_signup_outcomes: dict[str, int] = {}
+_signup_outcomes_lock = threading.Lock()
+
+# Scheduled job operation counters: action -> count
+_scheduled_job_ops: dict[str, int] = {}
+_scheduled_job_ops_lock = threading.Lock()
+
+# Data retention operation counters: action -> count
+_retention_ops: dict[str, int] = {}
+_retention_ops_lock = threading.Lock()
+
 # Rate limit hit counters: incremented by the rate limiter middleware when
 # a request is blocked by the aggregate global tier or the per-IP tier.
 # Exposed as Prometheus gauges via /metrics.
@@ -312,6 +334,71 @@ def get_csp_violations() -> dict[str, int]:
         return dict(_csp_violations)
 
 
+def record_auth_profile_op(action: str) -> None:
+    """Record an auth profile operation (created, deleted, validated, revoked)."""
+    if not action:
+        return
+    with _auth_profile_ops_lock:
+        _auth_profile_ops[action] = _auth_profile_ops.get(action, 0) + 1
+
+
+def record_workflow_op(action: str) -> None:
+    """Record a workflow operation (created, updated, run, deleted)."""
+    if not action:
+        return
+    with _workflow_ops_lock:
+        _workflow_ops[action] = _workflow_ops.get(action, 0) + 1
+
+
+def record_signup_outcome(outcome: str) -> None:
+    """Record a signup outcome (success, failure_duplicate_email, failure_invalid)."""
+    if not outcome:
+        return
+    with _signup_outcomes_lock:
+        _signup_outcomes[outcome] = _signup_outcomes.get(outcome, 0) + 1
+
+
+def record_scheduled_job_op(action: str) -> None:
+    """Record a scheduled job operation (created, triggered, completed, failed)."""
+    if not action:
+        return
+    with _scheduled_job_ops_lock:
+        _scheduled_job_ops[action] = _scheduled_job_ops.get(action, 0) + 1
+
+
+def record_retention_op(action: str) -> None:
+    """Record a data retention operation (enforced, dry_run)."""
+    if not action:
+        return
+    with _retention_ops_lock:
+        _retention_ops[action] = _retention_ops.get(action, 0) + 1
+
+
+def get_auth_profile_ops() -> dict[str, int]:
+    with _auth_profile_ops_lock:
+        return dict(_auth_profile_ops)
+
+
+def get_workflow_ops() -> dict[str, int]:
+    with _workflow_ops_lock:
+        return dict(_workflow_ops)
+
+
+def get_signup_outcomes() -> dict[str, int]:
+    with _signup_outcomes_lock:
+        return dict(_signup_outcomes)
+
+
+def get_scheduled_job_ops() -> dict[str, int]:
+    with _scheduled_job_ops_lock:
+        return dict(_scheduled_job_ops)
+
+
+def get_retention_ops() -> dict[str, int]:
+    with _retention_ops_lock:
+        return dict(_retention_ops)
+
+
 def get_rate_limit_global_hits() -> int:
     with _rate_limit_global_hits_lock:
         return _rate_limit_global_hits
@@ -355,3 +442,13 @@ def reset_for_testing() -> None:
         _rate_limit_global_hits = 0
     with _rate_limit_per_ip_hits_lock:
         _rate_limit_per_ip_hits = 0
+    with _auth_profile_ops_lock:
+        _auth_profile_ops.clear()
+    with _workflow_ops_lock:
+        _workflow_ops.clear()
+    with _signup_outcomes_lock:
+        _signup_outcomes.clear()
+    with _scheduled_job_ops_lock:
+        _scheduled_job_ops.clear()
+    with _retention_ops_lock:
+        _retention_ops.clear()

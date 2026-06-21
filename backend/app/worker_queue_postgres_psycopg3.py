@@ -107,7 +107,7 @@ def _conn() -> Iterator:
         try:
             yield conn
             conn.commit()
-        except BaseException:
+        except Exception:
             conn.rollback()
             try:
                 from app.metrics_collector import record_error
@@ -165,7 +165,7 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
             try:
                 yield conn
                 conn.commit()
-            except BaseException:
+            except Exception:
                 conn.rollback()
                 try:
                     from app.metrics_collector import record_error

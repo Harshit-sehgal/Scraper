@@ -656,6 +656,16 @@ async def async_paginate(
         "load_more": _async_paginate_load_more,
     }
 
+    # Reject legacy aliases explicitly (rather than silently remapping them)
+    # so a typo such as ``url_parameter`` is reported back as an unknown
+    # strategy. The legacy-to-canonical mapping is retained only as the
+    # source of truth for the friendly error message suffix.
+    if config.strategy in LEGACY_TO_CANONICAL_REPLACEMENT:
+        return PaginationResult(
+            stopped_reason="error",
+            error=_format_unknown_strategy_error(config.strategy),
+        )
+
     strategy_fn = strategy_map.get(config.strategy)
     if strategy_fn is None:
         return PaginationResult(
@@ -938,6 +948,16 @@ def paginate(config: PaginationConfig | None = None) -> PaginationResult:
         "infinite_scroll": _paginate_infinite_scroll,
         "load_more": _paginate_load_more,
     }
+
+    # Reject legacy aliases explicitly (rather than silently remapping them)
+    # so a typo such as ``url_parameter`` is reported back as an unknown
+    # strategy. Mirrors the async dispatcher's CAND-P2-PAGINATION-ALIAS-001
+    # rejection contract.
+    if config.strategy in LEGACY_TO_CANONICAL_REPLACEMENT:
+        return PaginationResult(
+            stopped_reason="error",
+            error=_format_unknown_strategy_error(config.strategy),
+        )
 
     strategy_fn = strategy_map.get(config.strategy)
     if strategy_fn is None:

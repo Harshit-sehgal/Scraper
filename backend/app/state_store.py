@@ -18,7 +18,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from app.models import Job, JobStatus
+from app.models import Job
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +115,10 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
             logger.exception("Skipping invalid recycle-bin entry during state load")
 
     # Jobs that were in-progress during shutdown are marked failed on recovery.
+    from app.services.job_state_machine import mark_recovered_failed
+
     for job in jobs_store.values():
-        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-            job.status = JobStatus.FAILED
-            job.error = "Recovered after restart while still in progress."
-            job.completed_at = _now_iso()
-            job.cancel_requested = False
+        mark_recovered_failed(job)
 
     # Phase 68: Semantic field state — restore from persisted world_state if
     # present

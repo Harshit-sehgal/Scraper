@@ -1,4 +1,3 @@
-import datetime
 from typing import Any
 
 from app.utils.quality import normalized_dedup_text
@@ -41,9 +40,6 @@ def deduplicate_results(records: list[dict], schema_fields: list[Any], deduplica
 
 
 def mark_job_canceled(job, reason: str = "Canceled by user") -> None:
-    from app.models import JobStatus
+    from app.services.job_state_machine import mark_canceled
 
-    job.status = JobStatus.CANCELED
-    job.error = reason
-    job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
-    job.cancel_requested = False
+    mark_canceled(job, reason=reason)

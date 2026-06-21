@@ -18,7 +18,8 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from app.models import Job, JobStatus
+from app.models import Job
+from app.services.job_state_machine import mark_recovered_failed
 from app.storage_interface import JobRepository
 
 if TYPE_CHECKING:
@@ -802,12 +803,8 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     now_iso = datetime.datetime.now(datetime.UTC).isoformat()
                     dirty_ids = []
                     for job in list(jobs_store.values()):
-                        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-                            job.status = JobStatus.FAILED
-                            job.error = "Recovered after restart while still in progress."
-                            job.completed_at = now_iso
-                            job.cancel_requested = False
-                            dirty_ids.append(job.id)
+                        mark_recovered_failed(job)
+                        dirty_ids.append(job.id)
                     if dirty_ids:
                         self._execute(
                             conn,

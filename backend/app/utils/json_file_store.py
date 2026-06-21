@@ -131,7 +131,7 @@ class JSONFileStore:
                     )
                 else:
                     raise
-        except BaseException:
+        except Exception:
             os.close(lock_fd)
             raise
         return lock_fd
