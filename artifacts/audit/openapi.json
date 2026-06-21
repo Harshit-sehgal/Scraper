@@ -3073,7 +3073,7 @@
     },
     "/api/jobs/{job_id}/backfill-metadata": {
       "post": {
-        "description": "Explicitly backfill source metadata for manual-mode job results.",
+        "description": "Explicitly backfill source metadata for manual-mode job results.\n\nDelegates business logic to ``JobBackfillService``.",
         "operationId": "backfill_job_metadata_api_jobs__job_id__backfill_metadata_post",
         "parameters": [
           {
@@ -3114,6 +3114,7 @@
     },
     "/api/jobs/{job_id}/cancel": {
       "post": {
+        "description": "Cancel a running or pending job.\n\nDelegates business logic to ``JobCancellerService``.",
         "operationId": "cancel_job_api_jobs__job_id__cancel_post",
         "parameters": [
           {
@@ -3345,7 +3346,7 @@
     },
     "/api/jobs/{job_id}/reclean": {
       "post": {
-        "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.",
+        "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.\n\nDelegates business logic to ``JobReclenerService``.",
         "operationId": "reclean_job_api_jobs__job_id__reclean_post",
         "parameters": [
           {
