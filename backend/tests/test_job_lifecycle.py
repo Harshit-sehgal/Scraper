@@ -31,7 +31,7 @@ def _create_job_in_store(client, name: str = "lifecycle-test") -> str:
         "schema_fields": [{"name": "company_name", "field_type": "string"}],
     }
     resp = client.post("/api/jobs", json=payload)
-    assert resp.status_code == 200, f"Failed to create job: {resp.text}"
+    assert resp.status_code == 201, f"Failed to create job: {resp.text}"
     return resp.json()["job_id"]
 
 

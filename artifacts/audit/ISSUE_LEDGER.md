@@ -441,8 +441,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
   - ✅ Auth failure (middleware) — already covered by `test_audit_logger_integration.py`
   - ❌ Quota denial — still missing (needs route-level test)  - ✅ Auth profile denial (`log_rbac_event`) — added to `_get_visible_profile` in `auth_profiles.py` + test assertion
   - ✅ Scheduled job denial (`log_rbac_event`) — added to `_get_visible_scheduled_job` in `scheduled_monitoring.py` + test assertion
-  - ❌ URL safety block — still missing (no audit logging in URL safety path)
-  - ❌ Quota denial — still missing (no `log_rbac_event` in usage ledger's 429 path)
+  - ✅ URL safety block (`log_system_event`) — added `log_system_event` call to `_record_ssrf_reject` in `url_safety.py` + 7 tests covering all reject reasons: loopback, cloud metadata, bad scheme, internal TLD, disallowed port, restricted IP literal, empty URL
+  - ✅ Quota denial (`log_rbac_event`) — added to `require_plan_limit` in `plan_enforcer.py` + middleware 429 path in `middlewares.py` + test assertion in `test_api_request_quota_is_enforced_by_middleware`
 
 ### P2-OBSERVABILITY-METRICS-001
 

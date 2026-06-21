@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { renderLogs, applyResultSearch, renderTable } from "./results.js";
+import { renderLogs, applyResultSearch, renderTable, renderPaginationControls, paginateRows, formatPaginationLabel, getCurrentPage, getPageSize } from "./results.js";
 
 // ─── renderLogs ────────────────────────────────────────────────────────────
 
@@ -181,5 +181,136 @@ describe("renderTable()", () => {
     expect(thead.innerHTML).toContain("name");
     expect(thead.innerHTML).toContain("value");
     expect(thead.innerHTML).not.toContain("_hidden");
+  });
+});
+
+// ─── paginateRows ──────────────────────────────────────────────────────────
+
+describe("paginateRows()", () => {
+  const rows = Array.from({ length: 73 }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}` }));
+
+  it("returns first page of rows", () => {
+    const result = paginateRows(rows, 1, 25);
+    expect(result.rows).toHaveLength(25);
+    expect(result.rows[0].id).toBe(1);
+    expect(result.totalPages).toBe(3);
+    expect(result.totalRows).toBe(73);
+    expect(result.currentPage).toBe(1);
+  });
+
+  it("returns second page of rows", () => {
+    const result = paginateRows(rows, 2, 25);
+    expect(result.rows).toHaveLength(25);
+    expect(result.rows[0].id).toBe(26);
+    expect(result.currentPage).toBe(2);
+  });
+
+  it("returns third (last) page with remaining rows", () => {
+    const result = paginateRows(rows, 3, 25);
+    expect(result.rows).toHaveLength(23);
+    expect(result.rows[0].id).toBe(51);
+    expect(result.currentPage).toBe(3);
+  });
+
+  it("clamps page to 1 when page < 1", () => {
+    const result = paginateRows(rows, 0, 25);
+    expect(result.currentPage).toBe(1);
+    expect(result.rows[0].id).toBe(1);
+  });
+
+  it("clamps page to last page when page exceeds total", () => {
+    const result = paginateRows(rows, 99, 25);
+    expect(result.currentPage).toBe(3);
+    expect(result.rows).toHaveLength(23);
+  });
+
+  it("handles empty array", () => {
+    const result = paginateRows([], 1, 25);
+    expect(result.rows).toHaveLength(0);
+    expect(result.totalPages).toBe(1);
+    expect(result.currentPage).toBe(1);
+  });
+
+  it("handles custom page size", () => {
+    const result = paginateRows(rows, 1, 50);
+    expect(result.rows).toHaveLength(50);
+    expect(result.rows[0].id).toBe(1);
+    expect(result.rows[49].id).toBe(50);
+    expect(result.totalPages).toBe(2);
+  });
+
+  it("handles single record", () => {
+    const result = paginateRows([{ id: 1 }], 1, 25);
+    expect(result.rows).toHaveLength(1);
+    expect(result.totalPages).toBe(1);
+  });
+
+  it("handles exact multiple", () => {
+    const exactRows = Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }));
+    const result = paginateRows(exactRows, 2, 25);
+    expect(result.rows).toHaveLength(25);
+    expect(result.rows[0].id).toBe(26);
+    expect(result.totalPages).toBe(2);
+  });
+});
+
+// ─── formatPaginationLabel ───────────────────────────────────────────────────
+
+describe("formatPaginationLabel()", () => {
+  it("formats first page correctly", () => {
+    expect(formatPaginationLabel(1, 25, 73)).toBe("1–25 of 73");
+  });
+
+  it("formats second page correctly", () => {
+    expect(formatPaginationLabel(2, 25, 73)).toBe("26–50 of 73");
+  });
+
+  it("formats last page with fewer rows", () => {
+    expect(formatPaginationLabel(3, 25, 73)).toBe("51–73 of 73");
+  });
+
+  it("formats single row", () => {
+    expect(formatPaginationLabel(1, 25, 1)).toBe("1–1 of 1");
+  });
+
+  it("formats exact page boundary", () => {
+    expect(formatPaginationLabel(2, 25, 50)).toBe("26–50 of 50");
+  });
+
+  it("handles custom page size", () => {
+    expect(formatPaginationLabel(1, 100, 250)).toBe("1–100 of 250");
+  });
+});
+
+// ─── State Accessors ────────────────────────────────────────────────────────
+
+describe("pagination state accessors", () => {
+  it("getCurrentPage returns initial page (1)", () => {
+    expect(getCurrentPage()).toBe(1);
+  });
+
+  it("getPageSize returns default page size (25)", () => {
+    expect(getPageSize()).toBe(25);
+  });
+});
+
+// ─── renderPaginationControls (integration check) ───────────────────────────
+
+describe("renderPaginationControls()", () => {
+  beforeEach(() => {
+    const container = document.createElement("div");
+    container.id = "pagination-controls";
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("shows simple info when only one page", () => {
+    renderPaginationControls(1, 1, 10);
+    const container = document.getElementById("pagination-controls");
+    expect(container.textContent).toContain("10 rows");
+    expect(container.classList.contains("has-pages")).toBe(false);
   });
 });

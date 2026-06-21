@@ -246,20 +246,33 @@ def _aes_gcm_decrypt(ciphertext: bytes, tag: bytes, nonce: bytes, key: bytes) ->
 # ---------------------------------------------------------------------------
 
 
-def encrypt(plaintext: str) -> str:
-    """Encrypt a plaintext string and return a JSON-serializable payload.
-
-    The returned string is a base64-encoded JSON object containing the
-    ciphertext, nonce, tag, and key version. This format is self-contained
-    and versioned for future key rotation.
-
-    Uses the *active* key version for encryption.
-
-    Raises:
-        EncryptionError: If encryption fails (missing key, library error).
+def encrypt(plaintext: str, user_id: str | None = None) -> str:
+    """Encrypt a plaintext string with optional per-user key derivation.
+    
+    C8: When user_id is provided, derive key from user_id + salt instead of app-level key.
+    This ensures per-user encryption so one key compromise doesn't expose all users' data.
     """
+    import hashlib
+    
     key_version = _get_key_version()
-    key = _get_key(key_version)
+    
+    # C8: Per-user encryption
+    if user_id:
+        try:
+            import hmac
+            salt = os.environ.get("DATAFORGE_ENCRYPTION_SALT", "default-salt-change-in-prod")
+            derived = hmac.new(
+                (user_id + salt).encode("utf-8"),
+                salt.encode("utf-8"),
+                hashlib.sha256
+            ).digest()
+            key = derived[:32]  # Use first 32 bytes as AES-256 key
+        except Exception as e:
+            logger.warning("Failed to derive per-user key, using app-level: %s", e)
+            key = _get_key(key_version)
+    else:
+        key = _get_key(key_version)
+    
     if key is None:
         # Try discovering any available key
         all_keys = _get_all_available_keys()

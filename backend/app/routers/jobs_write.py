@@ -136,7 +136,7 @@ def register_jobs_write_routes(
 
         return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
-    @router.post("/api/jobs")
+    @router.post("/api/jobs", status_code=201)
     async def create_job(
         job_data: JobCreate,
         request: Request,
@@ -153,6 +153,7 @@ def register_jobs_write_routes(
         try:
             result = await service.create_job(job_data, request)
             return {
+                "id": result.job_id,
                 "job_id": result.job_id,
                 "status": result.status,
                 "idempotent_replay": result.idempotent_replay,

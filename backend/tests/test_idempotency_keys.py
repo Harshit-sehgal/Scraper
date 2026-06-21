@@ -23,12 +23,12 @@ class TestIdempotencyHappyPath:
     def test_repeated_key_returns_same_job_id(self, client) -> None:
         headers = {"Idempotency-Key": "client-retry-001"}
         first = client.post("/api/jobs", json=_create_payload("1"), headers=headers)
-        assert first.status_code == 200, first.text
+        assert first.status_code == 201, first.text
         first_body = first.json()
         assert first_body["idempotent_replay"] is False
 
         second = client.post("/api/jobs", json=_create_payload("1"), headers=headers)
-        assert second.status_code == 200, second.text
+        assert second.status_code == 201, second.text
         second_body = second.json()
         assert second_body["idempotent_replay"] is True
         assert second_body["job_id"] == first_body["job_id"]
@@ -36,7 +36,7 @@ class TestIdempotencyHappyPath:
     def test_repeated_key_with_different_payload_returns_409(self, client) -> None:
         headers = {"Idempotency-Key": "client-retry-conflict"}
         first = client.post("/api/jobs", json=_create_payload("A"), headers=headers)
-        assert first.status_code == 200, first.text
+        assert first.status_code == 201, first.text
 
         second = client.post("/api/jobs", json=_create_payload("B"), headers=headers)
         assert second.status_code == 409, second.text
@@ -47,8 +47,8 @@ class TestIdempotencyHappyPath:
         h2 = {"Idempotency-Key": "key-B"}
         a = client.post("/api/jobs", json=_create_payload("A"), headers=h1)
         b = client.post("/api/jobs", json=_create_payload("B"), headers=h2)
-        assert a.status_code == 200
-        assert b.status_code == 200
+        assert a.status_code == 201
+        assert b.status_code == 201
         assert a.json()["job_id"] != b.json()["job_id"]
         assert a.json()["idempotent_replay"] is False
         assert b.json()["idempotent_replay"] is False

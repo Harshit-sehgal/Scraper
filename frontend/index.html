@@ -225,17 +225,16 @@
                   <span class="nav-icon" data-icon="sliders" aria-hidden="true"></span>
                   <span class="nav-text">Workflows</span>
                 </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="auth-profiles"
-                  id="nav-auth-profiles"
-                >
+              </li>              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="auth-profiles" id="nav-auth-profiles">
                   <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
                   <span class="nav-text">Auth Profiles</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="scheduled-monitoring" id="nav-scheduled-monitoring">
+                  <span class="nav-icon" data-icon="clock" aria-hidden="true"></span>
+                  <span class="nav-text">Scheduled</span>
                 </button>
               </li>
               <li>
@@ -1062,8 +1061,9 @@
                 <button type="button" class="btn ghost small" data-action="switch-view" data-view="jobs">Back</button>
                 <h1 id="res-title">Results</h1>
                 <p class="subtle" id="res-meta"></p>
-                <div id="result-warning"></div>
-                <div id="lineage-summary"></div>
+          <div id="result-warning"></div>
+          <div id="failure-panel-container" style="display: none"></div>
+          <div id="lineage-summary"></div>
                 <div id="res-progress-wrap" class="job-progress-wrap hidden">
                   <div id="res-progress-bar" class="job-progress-bar" style="width: 0%"></div>
                   <span id="res-progress-text" class="job-progress-text">0%</span>
@@ -1132,6 +1132,7 @@
                   </tr>
                 </tbody>
               </table>
+              <div id="pagination-controls" class="pagination-controls"></div>
             </div>
           </div>
         </section>
@@ -1297,6 +1298,61 @@
                 <span class="empty-icon" data-icon="key" data-size="28" aria-hidden="true"></span>
                 <h3>No auth profiles</h3>
                 <p>Create an auth profile to store a browser session for authenticated scraping.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Scheduled Monitoring          -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-scheduled-monitoring">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Scheduled Monitoring</h1>
+                <p class="subtle">Recurring scraping jobs and change detection</p>
+              </div>
+              <div class="page-head-actions">
+                <button type="button" class="btn ghost small" data-action="refresh-scheduled" id="btn-refresh-scheduled">
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-row" id="scheduled-kpi-row">
+              <div class="kpi">
+                <span class="kpi-val" id="scheduled-kpi-total">0</span><span class="kpi-label">Total</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="scheduled-kpi-enabled">0</span><span class="kpi-label">Active</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="scheduled-kpi-failed">0</span><span class="kpi-label">Failed</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="scheduled-kpi-changes">0</span><span class="kpi-label">Changes</span>
+              </div>
+            </div>
+
+            <div class="jobs-toolbar">
+              <div class="jobs-toolbar-right">
+                <span class="jobs-last-updated" id="scheduled-last-updated">Never updated</span>
+              </div>
+            </div>
+
+            <!-- Scheduled Jobs List -->
+            <div class="list" id="scheduled-list">
+              <div class="empty-state" id="scheduled-empty-state">
+                <span class="empty-icon" data-icon="clock" data-size="28" aria-hidden="true"></span>
+                <h3>No scheduled jobs</h3>
+                <p>Create a recurring scrape job from the New Job page.</p>
+                <div class="empty-state-actions">
+                  <button type="button" class="btn primary small" data-action="switch-view" data-view="new">
+                    Create Job
+                  </button>
+                </div>
               </div>
             </div>
           </div>

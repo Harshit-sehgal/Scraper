@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from app.audit_logger import log_auth_event
+from app.audit_logger import log_auth_event, log_rbac_event
 from app.config import settings
 from app.rate_limiter import RateLimiterMiddleware
 
@@ -197,6 +197,14 @@ async def api_key_middleware(request: Request, call_next):
                 project_id=auth_context.project_id,
             )
         except ValueError as exc:
+            log_rbac_event(
+                actor=auth_context.user_id,
+                action="quota_exceeded:api_request",
+                resource="usage:api_request",
+                role=auth_context.role.value,
+                outcome="denied",
+                details={"path": request.url.path, "method": request.method, "error": str(exc)},
+            )
             return JSONResponse(
                 status_code=429,
                 content={"detail": str(exc)},

@@ -1,8 +1,53 @@
 """Browser extraction end-to-end test — full job lifecycle with Playwright."""
+import http.server
+import threading
+
 import pytest
 from app.models import JobStatus, ScrapeMode
 
+_HTML_TEST_PAGE = (
+    "<html><body><h1>Test Page</h1><div class='content'>Hello World</div></body></html>"
+)
+_HTML_JS_RENDERED_PAGE = (
+    "<html><body>"
+    "<div id='js-rendered'>Dynamic Content</div>"
+    "<script>document.getElementById('js-rendered').textContent = 'JS Rendered!';</script>"
+    "</body></html>"
+)
 
+
+class _TestPageHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802
+        if self.path == "/test-page":
+            body = _HTML_TEST_PAGE
+        elif self.path == "/js-rendered-page":
+            body = _HTML_JS_RENDERED_PAGE
+        else:
+            body = "<html><body>Not Found</body></html>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+    def log_message(self, format, *args):  # noqa: ARG002
+        pass
+
+
+@pytest.fixture(scope="module")
+def test_server_url():
+    """Start a local HTTP server for browser extraction tests."""
+    server = http.server.HTTPServer(("127.0.0.1", 0), _TestPageHandler)
+    port = server.server_address[1]
+    base_url = f"http://127.0.0.1:{port}"
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield base_url
+    finally:
+        server.shutdown()
+
+
+@pytest.mark.browser
 @pytest.mark.asyncio
 async def test_browser_extraction_e2e(clean_db, session_client, test_server_url):
     """Full E2E: Create → render → extract → export browser job."""
@@ -71,6 +116,7 @@ async def test_browser_extraction_e2e(clean_db, session_client, test_server_url)
     assert len(csv_content) > 0
 
 
+@pytest.mark.browser
 @pytest.mark.asyncio
 async def test_browser_handles_javascript_rendering(clean_db, session_client, test_server_url):
     """Verify browser mode actually renders JavaScript content."""
@@ -117,6 +163,7 @@ async def test_browser_handles_javascript_rendering(clean_db, session_client, te
         assert "dynamic_content" in first_record or len(records) > 0
 
 
+@pytest.mark.browser
 @pytest.mark.asyncio
 async def test_browser_pool_manages_resources(clean_db, session_client, test_server_url):
     """Verify browser pool doesn't exhaust resources on concurrent jobs."""

@@ -39,6 +39,7 @@ class ExtractionResult:
         method: str,
         selector_success: bool = False,
         selectors: dict | None = None,
+        page_closed: bool = False,
         network_diagnostics: list[str] | None = None,
     ) -> None:
         self.records = records
@@ -293,6 +294,12 @@ async def orchestrate_extraction(
     """
     memory = get_selector_memory()
     force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
+    
+    # C4: Track page invalidation
+    page_closed = False
+    def _on_page_close():
+        nonlocal page_closed
+        page_closed = True
 
     gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
 

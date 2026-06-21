@@ -66,26 +66,17 @@ test-results/
 .codex/
 .antigravitycli/
 .kilo/
+Instructions_for_ai/
 
 # Generated validation artifacts (large, reproducible)
 artifacts/audit/FILE_AUDIT_LEDGER.md
+artifacts/audit/openapi.experimental.json
 artifacts/validation/*.log
 artifacts/validation/coverage_*.json
 artifacts/validation/bandit_*.json
 artifacts/validation/runs/
-artifacts/validation/latest_summary.json
-artifacts/validation/latest_summary.md
-artifacts/validation/commands/13_backend_full_tests.md
-artifacts/validation/commands/14_ruff_check.md
-artifacts/validation/commands/15_pyflakes.md
-artifacts/validation/commands/16_mypy.md
-artifacts/validation/commands/17_bandit_backend.md
-artifacts/validation/commands/18_pip_audit.md
-artifacts/validation/commands/19_prod_env_example_placeholder_check.md
-artifacts/validation/commands/20_npm_ci.md
-artifacts/validation/commands/21_frontend_tests.md
-artifacts/validation/commands/22_frontend_lint_js.md
-artifacts/validation/commands/23_frontend_lint_css.md
+artifacts/validation/commands/
+artifacts/validation/latest_summary.*
 .aider*
 
 # Shelved/unused architectures (replaced by validated backend/app)

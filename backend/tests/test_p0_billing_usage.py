@@ -181,10 +181,27 @@ def test_api_request_middleware_records_protected_requests(client, monkeypatch) 
 
 
 def test_api_request_quota_is_enforced_by_middleware(client, monkeypatch) -> None:
+    import app.middlewares as middlewares_mod
+
     user_id = _configure_request_metering_keys(monkeypatch)
     ledger = UsageLedger()
     ledger.set_quota(user_id, UsageType.API_REQUEST, limit=1, period=QuotaPeriod.MONTHLY)
     monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    # Capture audit events before making requests
+    audit_events: list[dict] = []
+
+    def _capture_audit(actor, action, resource, role, outcome, details=None):
+        audit_events.append({
+            "actor": actor,
+            "action": action,
+            "resource": resource,
+            "role": role,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(middlewares_mod, "log_rbac_event", _capture_audit, raising=False)
 
     first = client.get("/api/jobs", headers={"X-API-Key": "user-key"})
     second = client.get("/api/jobs", headers={"X-API-Key": "user-key"})
@@ -195,6 +212,14 @@ def test_api_request_quota_is_enforced_by_middleware(client, monkeypatch) -> Non
     assert quota is not None
     assert quota.current_usage == 1
     assert len(ledger.get_usage(user_id, UsageType.API_REQUEST)) == 1
+
+    # Verify audit event was emitted for the quota denial
+    assert any(
+        e.get("action") == "quota_exceeded:api_request"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("error", "").startswith("quota exceeded")
+        for e in audit_events
+    ), f"Expected quota_exceeded audit event not found in {audit_events}"
 
 
 def test_public_session_me_is_not_metered(client, monkeypatch) -> None:

@@ -43,10 +43,10 @@ class TestCreateJobCharacterization:
         "urls": ["https://example.com/data"],
     }
 
-    def test_create_returns_200_with_job_id_and_status(self, client) -> None:
+    def test_create_returns_201_with_job_id_and_status(self, client) -> None:
         """The happy path returns ``job_id``, ``status``, and ``idempotent_replay``."""
         resp = client.post("/api/jobs", json=self.MINIMAL_MANUAL_JOB)
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         body = resp.json()
         assert isinstance(body["job_id"], str) and len(body["job_id"]) > 0
         assert body["status"] == "pending"
@@ -150,7 +150,7 @@ class TestCreateJobCharacterization:
                 "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         job_id = resp.json()["job_id"]
 
         import app.main as main_mod
@@ -169,7 +169,7 @@ class TestCreateJobCharacterization:
             "/api/jobs",
             json={**self.MINIMAL_MANUAL_JOB, "schema_fields": fields},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         import app.main as main_mod
 
         job = main_mod.jobs_store[resp.json()["job_id"]]
@@ -189,7 +189,7 @@ class TestCreateJobCharacterization:
             json=self.MINIMAL_MANUAL_JOB,
             headers={"Idempotency-Key": "replay-test-key"},
         )
-        assert first.status_code == 200
+        assert first.status_code == 201
         first_body = first.json()
         assert first_body["idempotent_replay"] is False
 
@@ -198,7 +198,7 @@ class TestCreateJobCharacterization:
             json=self.MINIMAL_MANUAL_JOB,
             headers={"Idempotency-Key": "replay-test-key"},
         )
-        assert second.status_code == 200
+        assert second.status_code == 201
         second_body = second.json()
         assert second_body["job_id"] == first_body["job_id"]
         assert second_body["idempotent_replay"] is True
@@ -210,7 +210,7 @@ class TestCreateJobCharacterization:
             json=self.MINIMAL_MANUAL_JOB,
             headers={"Idempotency-Key": "conflict-test-key"},
         )
-        assert first.status_code == 200
+        assert first.status_code == 201
 
         second = client.post(
             "/api/jobs",

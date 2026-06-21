@@ -73,21 +73,26 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
         import json as _json
 
         data = _json.loads(json_path.read_text())
-        for raw in data.get("jobs", []):
-            job = _row_to_job(_job_from_raw(raw))
-            if job:
-                row_data = _job_to_row(job)
-                cols = ", ".join(row_data.keys())
-                ph = ", ".join("?" for _ in row_data)
-                conn.execute(f"INSERT OR IGNORE INTO jobs ({cols}) VALUES ({ph})", list(row_data.values()))  # noqa: RUF100, S608
-        for raw in data.get("recycle_bin", []):
-            job = _row_to_job(_job_from_raw(raw))
-            if job:
-                row_data = _job_to_row(job)
-                cols = ", ".join(row_data.keys())
-                ph = ", ".join("?" for _ in row_data)
-                conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_data.values()))  # noqa: RUF100, S608
-        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            for raw in data.get("jobs", []):
+                job = _row_to_job(_job_from_raw(raw))
+                if job:
+                    row_data = _job_to_row(job)
+                    cols = ", ".join(row_data.keys())
+                    ph = ", ".join("?" for _ in row_data)
+                    conn.execute(f"INSERT OR IGNORE INTO jobs ({cols}) VALUES ({ph})", list(row_data.values()))  # noqa: RUF100, S608
+            for raw in data.get("recycle_bin", []):
+                job = _row_to_job(_job_from_raw(raw))
+                if job:
+                    row_data = _job_to_row(job)
+                    cols = ", ".join(row_data.keys())
+                    ph = ", ".join("?" for _ in row_data)
+                    conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_data.values()))  # noqa: RUF100, S608
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         logger.info(
             "Migrated %d jobs + %d recycle-bin entries from JSON to SQLite",
             len(data.get("jobs", [])),

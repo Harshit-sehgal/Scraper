@@ -253,8 +253,8 @@ async def create_checkout(
     created = await _create_paypal_order(
         client,
         payload.plan_tier,
-        payload.return_url,
-        payload.cancel_url,
+        payload.return_url or "",
+        payload.cancel_url or "",
         request_id,
     )
     if not created or not created.get("approval_url") or not created.get("token"):

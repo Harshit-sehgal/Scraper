@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import httpcore
 import httpx
 
+from app.audit_logger import log_system_event
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -267,8 +268,6 @@ def _record_ssrf_reject(reason: str) -> None:
         logger.debug("Failed to record SSRF reject reason: %s", reason)
 
     try:
-        from app.audit_logger import log_system_event
-
         log_system_event(
             action="ssrf_reject",
             resource=f"url_safety:{reason}",

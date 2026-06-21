@@ -50,10 +50,11 @@ import { refreshCognition } from "./js/cognition.js";
 import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
 import { restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
 import { cancelJob, deleteJob, clearTerminalJobs } from "./js/jobs.js";
-import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel, copySampleRow } from "./js/results.js";
+import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel, copySampleRow, goToFirstPage, goToPrevPage, goToNextPage, goToLastPage, goToPage } from "./js/results.js";
 import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, checkSession } from "./js/api.js";
 import { setMode } from "./js/views.js";
 import { initAuthProfiles } from "./js/auth-profiles.js";
+import { initScheduledMonitoring, refreshScheduledJobs, deleteScheduledJob } from "./js/scheduled-monitoring.js";
 import { refreshBilling, upgradePlan } from "./js/billing.js";
 import { refreshAudit } from "./js/audit.js";
 import { refreshRetention, deleteMyData } from "./js/retention.js";
@@ -135,6 +136,12 @@ function onDocumentClick(e) {
       break;
     case "open-command-palette":
       import("./js/command-palette.js").then((m) => m.openCommandPalette()).catch(() => {});
+      break;
+    case "refresh-scheduled":
+      refreshScheduledJobs();
+      break;
+    case "delete-scheduled-job":
+      if (id) deleteScheduledJob(id);
       break;
     case "switch-view":
       if (view) switchView(view);
@@ -274,6 +281,23 @@ function onDocumentClick(e) {
     case "copy-sample-row":
       copySampleRow();
       break;
+    case "go-to-first-page":
+      goToFirstPage();
+      break;
+    case "go-to-prev-page":
+      goToPrevPage();
+      break;
+    case "go-to-next-page":
+      goToNextPage();
+      break;
+    case "go-to-last-page":
+      goToLastPage();
+      break;
+    case "go-to-page": {
+      const page = btn.getAttribute("data-page");
+      if (page) goToPage(page);
+      break;
+    }
     case "toggle-theme":
       toggleTheme();
       break;
@@ -510,6 +534,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ── Init auth profiles module ──
   initAuthProfiles();
+
+  // ── Init scheduled monitoring module ──
+  initScheduledMonitoring();
 
   // ── Initial view ──
   // URL path takes precedence over localStorage state

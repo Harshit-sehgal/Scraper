@@ -107,7 +107,7 @@ class TestApiEnqueuesJob:
                 "urls": ["https://example.com"],
             },
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         job_id = data["job_id"]
         assert job_id is not None
@@ -138,7 +138,7 @@ class TestApiEnqueuesJob:
                 "urls": ["https://example.com"],
             },
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
 
         status = queue.get_status()
         assert status["pending"] == 0, f"Expected 0 pending tasks with worker queue disabled, got {status['pending']}"
@@ -208,7 +208,7 @@ class TestWorkerPicksQueuedJob:
                 "urls": ["https://example.com"],
             },
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
         job_id = response.json()["job_id"]
 
         # Dequeue and execute the task
@@ -345,7 +345,7 @@ class TestRealWorkerHandler:
                 "urls": ["https://example.com/products"],
             },
         )
-        assert response.status_code == 200, f"API returned {response.status_code}: {response.text}"
+        assert response.status_code == 201, f"API returned {response.status_code}: {response.text}"
         job_id = response.json()["job_id"]
         assert job_id is not None
 

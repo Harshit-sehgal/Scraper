@@ -416,25 +416,6 @@ async def test_get_safe_async_client_blocks_unix_socket() -> None:
 # ── Audit event coverage ────────────────────────────────────────────────
 
 
-@pytest.fixture
-def _capture_audit_events(monkeypatch):
-    """Monkeypatch ``app.url_safety.log_system_event`` to capture audit events."""
-    import app.url_safety as url_safety_mod
-
-    captured: list[dict] = []
-
-    def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
-
-    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
-    return captured
-
-
 def test_ssrf_reject_loopback_audit_logged(monkeypatch) -> None:
     """SSRF rejection for loopback addresses emits an audit event."""
     import app.url_safety as url_safety_mod

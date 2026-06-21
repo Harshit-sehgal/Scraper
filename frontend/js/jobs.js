@@ -13,6 +13,7 @@
 import { apiFetch, endpoints } from "./api.js";
 import { currentView } from "./views.js";
 import { currentJobId, renderLogs, viewResults } from "./results.js";
+import { renderFailureBadge, initFailureBadges, attachFailureExplanationToJobRow } from "./failure-explanation.js";
 
 // ─── State ───
 
@@ -440,12 +441,22 @@ export function renderJobs(jobs) {
                 <div class="job-actions">
                     ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${attrStr(j.id)}">View</button>` : ""}
                     ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${attrStr(j.id)}">Cancel</button>` : ""}
+                    ${("failed" === j.status || "error" === j.status) ? renderFailureBadge(j) : ""}
                     <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}"><span data-icon="x" data-size="14"></span></button>
                 </div>
             </div>
         `;
     })
     .join("");
+
+  // Attach failure explanation tooltips to failed job rows
+  jobs.forEach((j) => {
+    const row = list.querySelector(`[data-id="${CSS.escape(j.id)}"]`);
+    if (row) attachFailureExplanationToJobRow(row, j);
+  });
+
+  // Init interactive failure badges (click-to-toast)
+  initFailureBadges();
 
   // Apply status-change flash animation if a job just transitioned
   if (_flashJobId) {

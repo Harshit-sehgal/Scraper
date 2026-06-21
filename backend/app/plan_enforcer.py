@@ -19,6 +19,7 @@ from typing import Any
 
 from fastapi import HTTPException, Request
 
+from app.audit_logger import log_rbac_event
 from app.utils.rbac import resolve_auth_context
 from app.utils.usage_ledger import QuotaPeriod, UsageType, get_usage_ledger
 
@@ -198,6 +199,19 @@ def require_plan_limit(usage_type: UsageType, *, quantity: int = 1):
                 usage_type.value,
                 details["current_usage"],
                 details["limit"],
+            )
+            log_rbac_event(
+                actor=user_id,
+                action=f"quota_exceeded:{usage_type.value}",
+                resource=f"plan:{usage_type.value}",
+                role=details["tier"],
+                outcome="denied",
+                details={
+                    "current_usage": details["current_usage"],
+                    "limit": details["limit"],
+                    "period": details["period"],
+                    "usage_type": usage_type.value,
+                },
             )
             raise HTTPException(
                 status_code=429,

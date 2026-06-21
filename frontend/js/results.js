@@ -6,14 +6,49 @@ import { esc, attrStr, toast, showConfirm } from "./utils.js";
 import { apiFetch, endpoints } from "./api.js";
 import { switchView } from "./views.js";
 import { refreshJobs } from "./jobs.js";
+import { renderFailurePanel } from "./failure-explanation.js";
 
 // ─── State ───
 
 export let currentJobId = null;
 let currentResultsCache = [];
 
+// Pagination state
+let _currentPage = 1;
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [25, 50, 100];
+let _pageSize = DEFAULT_PAGE_SIZE;
+
 export function setCurrentJobId(id) {
   currentJobId = id;
+}
+
+export function getCurrentPage() {
+  return _currentPage;
+}
+
+export function getPageSize() {
+  return _pageSize;
+}
+
+/**
+ * Paginate an array of rows.
+ * Returns { rows, totalPages, totalRows, currentPage }
+ */
+export function paginateRows(rows, page, pageSize) {
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const safePage = Math.max(1, Math.min(page, totalPages));
+  const start = (safePage - 1) * pageSize;
+  const paged = rows.slice(start, start + pageSize);
+  return { rows: paged, totalPages, totalRows, currentPage: safePage };
+}
+
+/** Build pagination metadata string */
+export function formatPaginationLabel(page, pageSize, totalRows) {
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalRows);
+  return `${start}–${end} of ${totalRows}`;
 }
 
 export function getExportUrl(format, id) {
@@ -93,7 +128,19 @@ export async function viewResults(id) {
     const resMeta = document.getElementById("res-meta");
     if (resMeta) resMeta.textContent = `${j.filtered_records} records extracted (${j.total_records} total)`;
 
-    // Warning banner
+    // Failure explanation panel (for failed / empty / degraded jobs)
+    const failurePanelEl = document.getElementById("failure-panel-container");
+    if (failurePanelEl) {
+      if (["failed", "error", "empty_result", "degraded"].includes(j.status)) {
+        const html = renderFailurePanel(j);
+        failurePanelEl.innerHTML = html;
+        failurePanelEl.style.display = "block";
+      } else {
+        failurePanelEl.style.display = "none";
+      }
+    }
+
+    // Warning banner (legacy)
     const warnBanner = document.getElementById("result-warning");
     if (warnBanner) {
       if (j.status === "empty_result") {
@@ -160,6 +207,8 @@ export async function viewResults(id) {
     currentResultsCache = Array.isArray(j.results) ? j.results : [];
     const resultSearch = document.getElementById("inp-result-search");
     if (resultSearch) resultSearch.value = "";
+    // Reset pagination when viewing a new job's results
+    _currentPage = 1;
     renderFilteredResults();
     syncResultsScrollSlider();
   } catch (_e) {
@@ -277,14 +326,116 @@ export function renderFilteredResults() {
   const filtered = applyResultSearch(currentResultsCache);
   const emptyMessage = currentResultsCache.length && !filtered.length ? "No matching rows for this filter" : "";
 
-  renderTable(filtered, emptyMessage);
+  // Paginate
+  const { rows: pagedRows, totalPages, totalRows, currentPage } = paginateRows(filtered, _currentPage, _pageSize);
+  _currentPage = currentPage;
+
+  renderTable(pagedRows, emptyMessage);
 
   const label = document.getElementById("result-count-label");
   if (label) {
-    label.textContent = `${filtered.length} of ${currentResultsCache.length} rows`;
+    label.textContent = `${totalRows} row${totalRows !== 1 ? "s" : ""}`;
   }
 
+  // Render pagination controls
+  renderPaginationControls(currentPage, totalPages, totalRows);
+
   syncResultsScrollSlider();
+}
+
+// ─── Pagination Controls ───
+
+export function renderPaginationControls(currentPage, totalPages, totalRows) {
+  const container = document.getElementById("pagination-controls");
+  if (!container) return;
+
+  if (totalPages <= 1) {
+    container.innerHTML = `
+      <span class="pagination-info">
+        ${totalRows} row${totalRows !== 1 ? "s" : ""}
+      </span>
+    `;
+    container.classList.remove("has-pages");
+    return;
+  }
+
+  container.classList.add("has-pages");
+
+  const pageSize = _pageSize;
+  const rangeLabel = formatPaginationLabel(currentPage, pageSize, totalRows);
+
+  // Build page number list (show at most 7 pages with ellipsis)
+  let pageButtons = "";
+  const maxVisible = 7;
+  if (totalPages <= maxVisible) {
+    for (let i = 1; i <= totalPages; i++) {
+      pageButtons += buildPageBtn(i, currentPage);
+    }
+  } else {
+    // First page
+    pageButtons += buildPageBtn(1, currentPage);
+    if (currentPage > 3) pageButtons += '<span class="pagination-ellipsis">…</span>';
+
+    const startEllipsis = Math.max(2, currentPage - 1);
+    const endEllipsis = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = startEllipsis; i <= endEllipsis; i++) {
+      pageButtons += buildPageBtn(i, currentPage);
+    }
+
+    if (currentPage < totalPages - 2) pageButtons += '<span class="pagination-ellipsis">…</span>';
+    pageButtons += buildPageBtn(totalPages, currentPage);
+  }
+
+  container.innerHTML = `
+    <div class="pagination-left">
+      <span class="pagination-range">${rangeLabel}</span>
+      <select class="pagination-size-select" id="pagination-size-select" aria-label="Rows per page">
+        ${PAGE_SIZE_OPTIONS.map(
+          (s) => `<option value="${s}"${s === pageSize ? " selected" : ""}>${s} / page</option>`
+        ).join("")}
+      </select>
+    </div>
+    <div class="pagination-right">
+      <button type="button" class="btn ghost small" data-action="go-to-first-page"
+        ${currentPage <= 1 ? "disabled" : ""}
+        aria-label="First page" title="First page">
+        <span data-icon="chevronLeftDouble" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="btn ghost small" data-action="go-to-prev-page"
+        ${currentPage <= 1 ? "disabled" : ""}
+        aria-label="Previous page" title="Previous page">
+        <span data-icon="chevronLeft" aria-hidden="true"></span>
+      </button>
+      <div class="pagination-pages">
+        ${pageButtons}
+      </div>
+      <button type="button" class="btn ghost small" data-action="go-to-next-page"
+        ${currentPage >= totalPages ? "disabled" : ""}
+        aria-label="Next page" title="Next page">
+        <span data-icon="chevronRight" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="btn ghost small" data-action="go-to-last-page"
+        ${currentPage >= totalPages ? "disabled" : ""}
+        aria-label="Last page" title="Last page">
+        <span data-icon="chevronRightDouble" aria-hidden="true"></span>
+      </button>
+    </div>
+  `;
+
+  // Attach page size change handler
+  const sizeSelect = document.getElementById("pagination-size-select");
+  if (sizeSelect) {
+    sizeSelect.addEventListener("change", () => {
+      _pageSize = parseInt(sizeSelect.value, 10) || DEFAULT_PAGE_SIZE;
+      _currentPage = 1;
+      renderFilteredResults();
+    });
+  }
+}
+
+function buildPageBtn(page, currentPage) {
+  const active = page === currentPage ? "current" : "";
+  return `<button type="button" class="btn ghost small pagination-page ${active}" data-action="go-to-page" data-page="${page}" aria-label="Page ${page}" aria-current="${page === currentPage ? "page" : "false"}">${page}</button>`;
 }
 
 export function renderTable(results, emptyMessage = "No results") {
@@ -398,6 +549,45 @@ export function onResultsSliderInput() {
 
 export function onResultsTableScroll() {
   syncResultsScrollSlider();
+}
+
+// ─── Pagination Navigation ───
+
+export function goToFirstPage() {
+  if (_currentPage <= 1) return;
+  _currentPage = 1;
+  renderFilteredResults();
+}
+
+export function goToPrevPage() {
+  if (_currentPage <= 1) return;
+  _currentPage--;
+  renderFilteredResults();
+}
+
+export function goToNextPage() {
+  const totalRows = applyResultSearch(currentResultsCache).length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / _pageSize));
+  if (_currentPage >= totalPages) return;
+  _currentPage++;
+  renderFilteredResults();
+}
+
+export function goToLastPage() {
+  const totalRows = applyResultSearch(currentResultsCache).length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / _pageSize));
+  if (_currentPage >= totalPages) return;
+  _currentPage = totalPages;
+  renderFilteredResults();
+}
+
+export function goToPage(page) {
+  const p = parseInt(page, 10);
+  if (isNaN(p) || p < 1) return;
+  const totalRows = applyResultSearch(currentResultsCache).length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / _pageSize));
+  _currentPage = Math.min(p, totalPages);
+  renderFilteredResults();
 }
 
 // ─── Cell Copy ───

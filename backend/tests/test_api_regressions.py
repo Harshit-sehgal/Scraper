@@ -103,7 +103,7 @@ def test_auto_mode_clears_provided_urls(client) -> None:
         "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
     }
     created = client.post("/api/jobs", json=payload)
-    assert created.status_code == 200
+    assert created.status_code == 201
     job_id = created.json()["job_id"]
 
     fetched = client.get(f"/api/jobs/{job_id}")
@@ -120,7 +120,7 @@ def test_cancel_pending_job_sets_canceled_status(client) -> None:
         "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
     }
     created = client.post("/api/jobs", json=payload)
-    assert created.status_code == 200
+    assert created.status_code == 201
     job_id = created.json()["job_id"]
 
     canceled = client.post(f"/api/jobs/{job_id}/cancel")
@@ -141,7 +141,7 @@ def test_reclean_running_returns_409_before_no_results(client) -> None:
         "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
     }
     created = client.post("/api/jobs", json=payload)
-    assert created.status_code == 200
+    assert created.status_code == 201
     job_id = created.json()["job_id"]
 
     # Explicitly force running without results to verify check order.
@@ -728,7 +728,7 @@ def test_delete_active_job_returns_409(client) -> None:
         "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
     }
     r = client.post("/api/jobs", json=payload)
-    assert r.status_code == 200
+    assert r.status_code == 201
     job_id = r.json()["job_id"]
 
     # Manually force job to RUNNING state
