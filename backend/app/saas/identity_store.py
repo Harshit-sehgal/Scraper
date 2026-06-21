@@ -168,6 +168,9 @@ class IdentityStore(ABC):
     def get_organization(self, org_id: str) -> Organization | None: ...
 
     @abstractmethod
+    def delete_organization(self, org_id: str) -> bool: ...
+
+    @abstractmethod
     def list_user_organizations(self, user_id: str, include_removed: bool = False) -> list[Organization]: ...
 
     @abstractmethod
@@ -193,6 +196,9 @@ class IdentityStore(ABC):
 
     @abstractmethod
     def get_project(self, project_id: str) -> Project | None: ...
+
+    @abstractmethod
+    def delete_project(self, project_id: str) -> bool: ...
 
     @abstractmethod
     def list_org_projects(self, org_id: str) -> list[Project]: ...
@@ -474,6 +480,24 @@ class SQLiteIdentityStore(IdentityStore):
             ).fetchone()
         return _row_to_organization(row) if row else None
 
+    def delete_organization(self, org_id: str) -> bool:
+        if not org_id:
+            return False
+        with self._lock, self._connect() as conn:
+            # Cascade: drop api keys for any projects of this org, then
+            # the projects, memberships, user_selections pointing at the
+            # org, and finally the org row.
+            conn.execute(
+                "DELETE FROM api_keys WHERE project_id IN (SELECT id FROM projects WHERE org_id = ?)",
+                (org_id,),
+            )
+            conn.execute("DELETE FROM projects WHERE org_id = ?", (org_id,))
+            conn.execute("DELETE FROM memberships WHERE org_id = ?", (org_id,))
+            conn.execute("DELETE FROM user_selections WHERE org_id = ?", (org_id,))
+            cursor = conn.execute("DELETE FROM organizations WHERE id = ?", (org_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
     def list_user_organizations(self, user_id: str, include_removed: bool = False) -> list[Organization]:
         if not user_id:
             return []
@@ -595,6 +619,16 @@ class SQLiteIdentityStore(IdentityStore):
                 (project_id,),
             ).fetchone()
         return _row_to_project(row) if row else None
+
+    def delete_project(self, project_id: str) -> bool:
+        if not project_id:
+            return False
+        with self._lock, self._connect() as conn:
+            # Cascade: drop api keys for this project, then the project row.
+            conn.execute("DELETE FROM api_keys WHERE project_id = ?", (project_id,))
+            cursor = conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+            conn.commit()
+            return cursor.rowcount > 0
 
     def list_org_projects(self, org_id: str) -> list[Project]:
         if not org_id:

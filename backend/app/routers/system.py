@@ -93,7 +93,7 @@ async def system_manifest(
     version-aware information without hardcoding values in JS.
     """
     from app.config import settings
-    from app.saas.router import CURRENT_AUP_VERSION
+    from app.saas import CURRENT_AUP_VERSION
     from app.utils.encryption import _get_key_version
 
     pyproject_path = Path(__file__).resolve().parents[3] / "pyproject.toml"

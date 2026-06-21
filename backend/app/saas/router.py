@@ -11,13 +11,14 @@ Hosts endpoints for:
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.audit_logger import log_job_event
 from app.plan_enforcer import get_plan_limits, get_user_tier
+from app.saas import CURRENT_AUP_VERSION  # re-exported from app.saas.__init__
 from app.saas.identity_store import IdentityStoreError, get_identity_store
 
 # Models & services
@@ -28,6 +29,7 @@ from app.saas.models import (
     Project,
 )
 from app.saas.service import SignupService
+from app.utils.aup import require_aup_accepted
 from app.utils.rbac import UserRole, require_principal, require_role_with_user
 from app.utils.usage_ledger import UsageType
 
@@ -38,8 +40,6 @@ router = APIRouter(prefix="/api/saas", tags=["saas"])
 # ═══════════════════════════════════════════════════════════════════════
 # AUP (Acceptable Use Policy)
 # ═══════════════════════════════════════════════════════════════════════
-
-CURRENT_AUP_VERSION = "2026-06-11-v1"
 
 
 class AupAcceptRequest(BaseModel):
@@ -346,19 +346,65 @@ async def get_organization(
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
-    # Verify membership
-    if not get_identity_store().is_org_member(user_id, org_id):
-        raise HTTPException(status_code=403, detail="not a member of this organization")
-
+    # Existence before permission so a request for a missing org returns
+    # 404 consistently, even when the caller is not a member.
     org = get_identity_store().get_organization(org_id)
     if not org:
         raise HTTPException(status_code=404, detail="organization not found")
+
+    # Verify membership
+    if not get_identity_store().is_org_member(user_id, org_id):
+        raise HTTPException(status_code=403, detail="not a member of this organization")
 
     return OrgResponse(
         id=org.id,
         name=org.name,
         created_by_user_id=org.created_by_user_id,
         created_at=org.created_at,
+    )
+
+
+@router.delete("/orgs/{org_id}", status_code=204)
+async def delete_organization(
+    org_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> None:
+    """Permanently delete an organization and all its resources.
+
+    Cascading deletion removes all memberships, projects, API keys,
+    and user_selections associated with the org. Only the org owner
+    or an env-backed admin/operator may delete an org.
+
+    This is a destructive operation and cannot be undone.
+    """
+    role, user_id, _org_id, _project_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    org = store.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="organization not found")
+
+    # Enforce ownership: env-backed admins/operators retain all-access;
+    # SaaS-scoped keys must be the org creator.
+    if (role not in (UserRole.ADMIN, UserRole.OPERATOR) or _org_id) and org.created_by_user_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the organization owner can delete it",
+        )
+
+    store.delete_organization(org_id)
+
+    log_job_event(
+        actor=user_id,
+        action="org_delete",
+        job_id="saas",
+        outcome="success",
+        details={"org_id": org_id, "org_name": org.name},
     )
 
 
@@ -398,8 +444,12 @@ async def create_project(
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
+    _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
 ) -> ProjectResponse:
-    """Create a new project within an organization."""
+    """Create a new project within an organization.
+
+    Requires AUP acceptance.
+    """
     _role, user_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
@@ -492,6 +542,44 @@ async def get_project(
         name=project.name,
         created_by_user_id=project.created_by_user_id,
         created_at=project.created_at,
+    )
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+async def delete_project(
+    project_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> None:
+    """Permanently delete a project and all its API keys.
+
+    Cascading deletion removes all API keys associated with the project.
+    Only project members with operator-level access or env-backed
+    admins/operators may delete a project.
+    """
+    role, user_id, _org_id, _project_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    project = store.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="project not found")
+
+    # Verify caller is a member of the org
+    if not store.is_org_member(user_id, project.org_id) and role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    store.delete_project(project_id)
+
+    log_job_event(
+        actor=user_id,
+        action="project_delete",
+        job_id="saas",
+        outcome="success",
+        details={"project_id": project_id, "org_id": project.org_id, "project_name": project.name},
     )
 
 
@@ -717,7 +805,8 @@ class ApiKeyCreateRequest(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=120, description="Key name")
     scope: Literal["read", "write", "admin"] = Field(
-        "read", description="Key scope: read, write, or admin",
+        "read",
+        description="Key scope: read, write, or admin",
     )
 
 
@@ -761,11 +850,14 @@ async def create_api_key(
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
+    _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
 ) -> ApiKeyCreateResponse:
     """Create a new API key for a project.
 
     The raw key is returned **only once** in this response. It is hashed
     before storage and cannot be retrieved later.
+
+    Requires AUP acceptance.
     """
     _role, user_id = auth
     if not user_id:
@@ -965,3 +1057,51 @@ async def get_plan_info(
         max_projects=_TIER_PROJECTS.get(tier, 2),
         features=_TIER_FEATURES.get(tier, _TIER_FEATURES["free"]),
     )
+
+
+class UsageSummaryResponse(BaseModel):
+    """Current usage summary for the authenticated user."""
+
+    jobs_created: int = 0
+    pages_fetched: int = 0
+    scheduled_jobs: int = 0
+    ai_structuring: int = 0
+    api_requests: int = 0
+
+
+@router.get("/usage", response_model=UsageSummaryResponse)
+async def get_usage_summary(
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> UsageSummaryResponse:
+    """Return current usage counters for the authenticated user.
+
+    Used by the frontend billing page to show how much of the plan
+    quota has been consumed (e.g. "3 of 10 jobs used this month").
+    """
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        ledger = get_usage_ledger()
+        jobs_usage = ledger.get_usage(user_id, UsageType.JOB_CREATED)
+        pages_usage = ledger.get_usage(user_id, UsageType.PAGE_FETCHED)
+        scheduled_usage = ledger.get_usage(user_id, UsageType.SCHEDULED_JOB)
+        ai_usage = ledger.get_usage(user_id, UsageType.AI_STRUCTURING)
+        api_usage = ledger.get_usage(user_id, UsageType.API_REQUEST)
+
+        return UsageSummaryResponse(
+            jobs_created=sum(r.quantity for r in jobs_usage),
+            pages_fetched=sum(r.quantity for r in pages_usage),
+            scheduled_jobs=sum(r.quantity for r in scheduled_usage),
+            ai_structuring=sum(r.quantity for r in ai_usage),
+            api_requests=sum(r.quantity for r in api_usage),
+        )
+    except (ImportError, RuntimeError, ValueError) as exc:
+        logger.warning("Failed to read usage summary: %s", exc)
+        return UsageSummaryResponse()

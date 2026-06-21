@@ -23,6 +23,14 @@ def reset_identity_store_fixture():
             pass
 
 
+def _accept_aup_for(user_id: str) -> None:
+    """Mark the user as accepted-the-current-AUP so mutate routes pass AUP gating."""
+    from app.saas import CURRENT_AUP_VERSION
+    from app.saas.identity_store import get_identity_store
+
+    get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
+
+
 class TestApiKeyManagement:
     """Tests for project-scoped API key CRUD."""
 
@@ -40,6 +48,8 @@ class TestApiKeyManagement:
         data_signup = signup.json()
         project_id = data_signup["project_id"]
         user_id = data_signup["user_id"]
+        # Accept the AUP so cookie-authenticated admin users can mutate routes
+        _accept_aup_for(user_id)
         # Authenticate as the newly signed-up user
         from app.auth.session import SESSION_COOKIE, create_session_cookie
 
@@ -66,9 +76,12 @@ class TestApiKeyManagement:
                 "password": "password123",
             },
         )
+        assert signup.status_code == 201
         data_signup = signup.json()
         project_id = data_signup["project_id"]
         user_id = data_signup["user_id"]
+        # Accept the AUP so cookie-authenticated admin users can mutate routes
+        _accept_aup_for(user_id)
 
         from app.auth.session import SESSION_COOKIE, create_session_cookie
 
@@ -95,9 +108,12 @@ class TestApiKeyManagement:
                 "password": "password123",
             },
         )
+        assert signup.status_code == 201
         data_signup = signup.json()
         project_id = data_signup["project_id"]
         user_id = data_signup["user_id"]
+        # Accept the AUP so cookie-authenticated admin users can mutate routes
+        _accept_aup_for(user_id)
 
         from app.auth.session import SESSION_COOKIE, create_session_cookie
 

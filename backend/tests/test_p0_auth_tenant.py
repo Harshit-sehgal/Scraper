@@ -63,6 +63,13 @@ def _setup_saas_accounts(tmp_path):
     keys = ApiKeyService()
     org_a = signup.signup("alice@example.com", "hunter2", org_name="OrgA", project_name="ProjA")
     org_b = signup.signup("bob@example.com", "hunter2", org_name="OrgB", project_name="ProjB")
+    # Accept AUP for both test users so routes that require AUP acceptance
+    # (e.g. create_scheduled_job, create_project, create_api_key) don't 403.
+    from app.saas import CURRENT_AUP_VERSION as _AUP_VER
+    from app.saas.identity_store import get_identity_store
+    _store = get_identity_store()
+    _store.mark_aup_accepted(org_a.user.id, aup_version=_AUP_VER)
+    _store.mark_aup_accepted(org_b.user.id, aup_version=_AUP_VER)
     return reset_identity_store, org_a, org_b, keys
 
 

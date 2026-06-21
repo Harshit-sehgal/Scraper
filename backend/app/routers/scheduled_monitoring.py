@@ -15,6 +15,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.models import ScheduledJob, ScheduledJobFrequency
+from app.utils.aup import require_aup_accepted
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 
@@ -84,10 +85,14 @@ async def create_scheduled_job(
         tuple[UserRole, str, str, str],
         Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
+    _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
     frequency: ScheduledJobFrequency = ScheduledJobFrequency.DAILY,
     job_name: str = "",
 ):
-    """Create a new scheduled (recurring) scraping job."""
+    """Create a new scheduled (recurring) scraping job.
+
+    Requires AUP acceptance.
+    """
     _role, user_id, org_id, project_id = auth
     job = ScheduledJob(
         name=name.strip(),

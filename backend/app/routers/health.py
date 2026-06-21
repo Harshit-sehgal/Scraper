@@ -41,7 +41,7 @@ async def root():
     can surface an acceptance banner before the user makes any calls.
     """
     from app.config import settings
-    from app.saas.router import CURRENT_AUP_VERSION
+    from app.saas import CURRENT_AUP_VERSION
 
     base = {
         "message": "DataForge API v2",
