@@ -288,3 +288,123 @@ def test_restart_recovery_survives_second_load(isolated_db) -> None:
 
     assert jobs2[job.id].status == JobStatus.FAILED
     assert "Recovered" in (jobs2[job.id].error or "")
+
+
+# ---------------------------------------------------------------------------
+# test_sqlite_ownership_field_parity  (TODO-SAFE-006)
+# ---------------------------------------------------------------------------
+
+
+def test_sqlite_ownership_fields_row_round_trip() -> None:
+    """created_by, org_id, and project_id survive _job_to_row → _row_to_job."""
+    job = _make_job(
+        created_by="user-fingerprint-abc",
+        org_id="org-uuid-789",
+        project_id="project-uuid-012",
+    )
+    restored = _roundtrip(job)
+    assert restored.created_by == "user-fingerprint-abc"
+    assert restored.org_id == "org-uuid-789"
+    assert restored.project_id == "project-uuid-012"
+
+
+def test_sqlite_ownership_fields_via_db(isolated_db) -> None:
+    """created_by, org_id, and project_id survive save_state → load_state."""
+    job = _make_job(
+        status=JobStatus.COMPLETED,
+        created_by="user-fingerprint-xyz",
+        org_id="org-uuid-456",
+        project_id="project-uuid-123",
+    )
+    save_state({job.id: job}, {})
+    jobs, _, _ = load_state()
+    loaded = jobs.get(job.id)
+    assert loaded is not None
+    assert loaded.created_by == "user-fingerprint-xyz"
+    assert loaded.org_id == "org-uuid-456"
+    assert loaded.project_id == "project-uuid-123"
+
+
+def test_sqlite_ownership_fields_empty_defaults(isolated_db) -> None:
+    """A job without explicit ownership gets empty strings by default."""
+    job = _make_job(status=JobStatus.COMPLETED)
+    save_state({job.id: job}, {})
+    jobs, _, _ = load_state()
+    loaded = jobs.get(job.id)
+    assert loaded is not None
+    assert loaded.created_by == ""
+    assert loaded.org_id == ""
+    assert loaded.project_id == ""
+
+
+def test_sqlite_ownership_fields_recycle_bin(isolated_db) -> None:
+    """Ownership fields survive move to and load from recycle bin."""
+    job = _make_job(
+        status=JobStatus.COMPLETED,
+        created_by="user-recycle-fp",
+        org_id="org-recycle-uuid",
+        project_id="project-recycle-uuid",
+    )
+    save_state({}, {job.id: job})
+    _, recycle, _ = load_state()
+    loaded = recycle.get(job.id)
+    assert loaded is not None
+    assert loaded.created_by == "user-recycle-fp"
+    assert loaded.org_id == "org-recycle-uuid"
+    assert loaded.project_id == "project-recycle-uuid"
+
+
+def test_sqlite_ownership_fields_direct_row_access(isolated_db) -> None:
+    """Read ownership columns directly from SQLite to confirm storage."""
+    import sqlite3 as _sqlite3
+
+    from app.job_store import _get_db_path
+
+    job = _make_job(
+        status=JobStatus.COMPLETED,
+        created_by="direct-db-user",
+        org_id="direct-db-org",
+        project_id="direct-db-project",
+    )
+    save_state({job.id: job}, {})
+
+    conn = _sqlite3.connect(str(_get_db_path()))
+    try:
+        row = conn.execute(
+            "SELECT created_by, org_id, project_id FROM jobs WHERE id = ?",
+            (job.id,),
+        ).fetchone()
+        assert row is not None
+        assert row[0] == "direct-db-user"
+        assert row[1] == "direct-db-org"
+        assert row[2] == "direct-db-project"
+    finally:
+        conn.close()
+
+
+def test_sqlite_ownership_fields_recycle_bin_direct_row_access(isolated_db) -> None:
+    """Ownership columns in recycle_bin are stored and readable directly from SQLite."""
+    import sqlite3 as _sqlite3
+
+    from app.job_store import _get_db_path
+
+    job = _make_job(
+        status=JobStatus.COMPLETED,
+        created_by="recycle-db-user",
+        org_id="recycle-db-org",
+        project_id="recycle-db-project",
+    )
+    save_state({}, {job.id: job})
+
+    conn = _sqlite3.connect(str(_get_db_path()))
+    try:
+        row = conn.execute(
+            "SELECT created_by, org_id, project_id FROM recycle_bin WHERE id = ?",
+            (job.id,),
+        ).fetchone()
+        assert row is not None
+        assert row[0] == "recycle-db-user"
+        assert row[1] == "recycle-db-org"
+        assert row[2] == "recycle-db-project"
+    finally:
+        conn.close()

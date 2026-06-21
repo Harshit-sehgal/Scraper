@@ -568,7 +568,7 @@ def test_saas_signup_is_explicit_public_when_keys_are_not_configured(client, mon
     try:
         response = client.post(
             "/api/saas/signup",
-            json={"email": "public-signup@example.com", "password": "securepassword123"},
+            json={"email": "public-signup@example.com", "password": "SecurePass123!"},
         )
         assert response.status_code == 201
     finally:

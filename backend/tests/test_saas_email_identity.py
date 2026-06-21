@@ -150,6 +150,7 @@ class TestTeamInvitationStore:
 
     def _make_org(self, identity_store, sample_user, name: str, org_id: str):
         from app.saas.models import Organization
+
         org = Organization(
             id=org_id,
             name=name,
@@ -183,7 +184,10 @@ class TestTeamInvitationStore:
     def test_respond_to_invitation_accept(self, identity_store, sample_user):
         org = self._make_org(identity_store, sample_user, "Accept Org", "org-3")
         invitation = identity_store.create_team_invitation(
-            org.id, sample_user.email, sample_user.id, "member",
+            org.id,
+            sample_user.email,
+            sample_user.id,
+            "member",
         )
 
         result = identity_store.respond_to_invitation(invitation["id"], accept=True)
@@ -196,7 +200,10 @@ class TestTeamInvitationStore:
     def test_respond_to_invitation_decline(self, identity_store, sample_user):
         org = self._make_org(identity_store, sample_user, "Decline Org", "org-4")
         invitation = identity_store.create_team_invitation(
-            org.id, sample_user.email, sample_user.id, "member",
+            org.id,
+            sample_user.email,
+            sample_user.id,
+            "member",
         )
 
         result = identity_store.respond_to_invitation(invitation["id"], accept=False)
@@ -209,7 +216,10 @@ class TestTeamInvitationStore:
     def test_respond_to_invitation_twice_fails(self, identity_store, sample_user):
         org = self._make_org(identity_store, sample_user, "Double Org", "org-5")
         invitation = identity_store.create_team_invitation(
-            org.id, sample_user.email, sample_user.id, "member",
+            org.id,
+            sample_user.email,
+            sample_user.id,
+            "member",
         )
 
         # First accept
@@ -510,10 +520,12 @@ class TestInvitationAPI:
         from app.saas.models import User
         from app.saas.service import hash_password
 
-        store.create_user(User(
-            email="invited-user@example.com",
-            password_hash=hash_password("hunter2"),
-        ))
+        store.create_user(
+            User(
+                email="invited-user@example.com",
+                password_hash=hash_password("hunter2"),
+            )
+        )
         invited_user = store.get_user_by_email("invited-user@example.com")
         assert invited_user is not None
         invited_cookies = self._cookies_for(invited_user.id)
@@ -553,10 +565,12 @@ class TestInvitationAPI:
         from app.saas.models import User
         from app.saas.service import hash_password
 
-        store.create_user(User(
-            email="decliner-user@example.com",
-            password_hash=hash_password("hunter2"),
-        ))
+        store.create_user(
+            User(
+                email="decliner-user@example.com",
+                password_hash=hash_password("hunter2"),
+            )
+        )
         declined_user = store.get_user_by_email("decliner-user@example.com")
         assert declined_user is not None
         declined_cookies = self._cookies_for(declined_user.id)
@@ -612,10 +626,12 @@ class TestInvitationAPI:
         from app.saas.models import User
         from app.saas.service import hash_password
 
-        store.create_user(User(
-            email="pending-user@example.com",
-            password_hash=hash_password("hunter2"),
-        ))
+        store.create_user(
+            User(
+                email="pending-user@example.com",
+                password_hash=hash_password("hunter2"),
+            )
+        )
         invited_user = store.get_user_by_email("pending-user@example.com")
         assert invited_user is not None
         invited_cookies = self._cookies_for(invited_user.id)

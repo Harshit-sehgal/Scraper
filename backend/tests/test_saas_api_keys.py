@@ -40,7 +40,7 @@ class TestApiKeyManagement:
             "/api/saas/signup",
             json={
                 "email": "test-apikeys@example.com",
-                "password": "password123",
+                "password": "Hunter2!@#",
                 "display_name": "API Key Test",
             },
         )
@@ -73,7 +73,7 @@ class TestApiKeyManagement:
             "/api/saas/signup",
             json={
                 "email": "test-list@example.com",
-                "password": "password123",
+                "password": "Hunter2!@#",
             },
         )
         assert signup.status_code == 201
@@ -105,7 +105,7 @@ class TestApiKeyManagement:
             "/api/saas/signup",
             json={
                 "email": "test-revoke@example.com",
-                "password": "password123",
+                "password": "Hunter2!@#",
             },
         )
         assert signup.status_code == 201
@@ -141,7 +141,7 @@ class TestApiKeyManagement:
             "/api/saas/signup",
             json={
                 "email": "user1@example.com",
-                "password": "password123",
+                "password": "Hunter2!@#",
             },
         )
         user1_id = signup1.json()["user_id"]
@@ -150,7 +150,7 @@ class TestApiKeyManagement:
             "/api/saas/signup",
             json={
                 "email": "user2@example.com",
-                "password": "password123",
+                "password": "Hunter2!@#",
             },
         )
         project2 = signup2.json()["project_id"]

@@ -20,6 +20,7 @@ def _make_job(
     urls: list[str] | None = None,
     topic: str = "test",
     cancel_requested: bool = False,
+    status: JobStatus = JobStatus.PENDING,
 ):
     job = MagicMock()
     job.id = "test-job-1"
@@ -33,7 +34,10 @@ def _make_job(
     job.results = []
     job.discovered_urls = []
     job.cancel_requested = cancel_requested
-    job.status = JobStatus.RUNNING
+    # Status starts as PENDING by default because real jobs enter ``run_job``
+    # having only been persisted. ``transition_to`` is strict and rejects
+    # same-state transitions, so tests must model that initial state.
+    job.status = status
     job.error = ""
     job.started_at = None
     job.completed_at = None
@@ -47,6 +51,9 @@ def _make_job(
     job.selectors_map = None
     job.search_params = None
     job.origin_location = None
+    # Status starts as PENDING because real jobs enter ``run_job`` having
+    # only been persisted. ``transition_to`` is strict and rejects same-state
+    # transitions, so tests must model that initial state.
     job.max_distance_km = None
     job.deduplicate = False
     job.deduplicate_field = None

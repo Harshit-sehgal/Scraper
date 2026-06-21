@@ -116,6 +116,11 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
         ("POST", "/api/saas/aup/accept"),  # P1-COMPLIANCE-001: AUP acceptance (idempotent, any authenticated user)
         ("DELETE", "/api/user/data"),  # self-service data deletion — any authenticated user can delete their own data
         ("POST", "/api/billing/webhook"),  # billing webhook called by PayPal (no API key)
+        ("POST", "/api/saas/email-verification/send"),  # any authenticated user can request verification
+        ("POST", "/api/saas/email-verification/verify"),  # any authenticated user can verify their email
+        ("POST", "/api/saas/invitations/{invitation_id}/respond"),  # any authenticated user can respond to invitations
+        ("POST", "/api/saas/password-reset/request"),  # unauthenticated — prevents email enumeration
+        ("POST", "/api/saas/password-reset/reset"),  # unauthenticated — uses token, not session
     }
 
     unsafe = [

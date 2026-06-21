@@ -41,9 +41,7 @@ def _mock_base_mocks(monkeypatch=None):
     from app.page_profiler import StructureProfile, ValuePatterns
 
     mocks = {}
-    mocks["fetch_page_content"] = MagicMock(
-        return_value=(_results_page_html(), 200, "playwright_full", 0)
-    )
+    mocks["fetch_page_content"] = MagicMock(return_value=(_results_page_html(), 200, "playwright_full", 0))
     mocks["detect_anti_bot"] = MagicMock(return_value=0.1)
     mocks["detect_page_structure"] = MagicMock(
         return_value=StructureProfile(
@@ -53,9 +51,7 @@ def _mock_base_mocks(monkeypatch=None):
             container_selector="div.item",
         )
     )
-    mocks["detect_value_patterns"] = MagicMock(
-        return_value=ValuePatterns(currencies=["$29.99"], dates=[])
-    )
+    mocks["detect_value_patterns"] = MagicMock(return_value=ValuePatterns(currencies=["$29.99"], dates=[]))
     mocks["llm_json"] = AsyncMock(
         return_value=[
             {"name": "title", "type": "string", "confidence": 0.9},
@@ -105,9 +101,7 @@ class TestAnalyzeUrlForFieldsDirect:
                 headers=[],
                 container_selector="div.item",
             )
-            mock_patterns.return_value = ValuePatterns(
-                currencies=["$29.99", "$39.99"], dates=[]
-            )
+            mock_patterns.return_value = ValuePatterns(currencies=["$29.99", "$39.99"], dates=[])
             mock_llm.return_value = [
                 {"name": "title", "type": "string", "confidence": 0.9},
                 {"name": "price", "type": "currency", "confidence": 0.8},
@@ -117,13 +111,27 @@ class TestAnalyzeUrlForFieldsDirect:
 
             # Top-level keys
             expected_keys = {
-                "url", "redirect_info", "acquisition_lineage", "user_message",
-                "session_detection", "canonical_url", "acquisition_mode",
-                "acquisition_config", "content_quality", "empty_check",
-                "search_form", "search_recovery", "page_structure",
-                "structure_confidence", "estimated_record_count", "item_container",
-                "fetch_method", "fetch_time_ms", "anti_bot_score",
-                "browser_state_evidence", "suggested_fields",
+                "url",
+                "redirect_info",
+                "acquisition_lineage",
+                "user_message",
+                "session_detection",
+                "canonical_url",
+                "acquisition_mode",
+                "acquisition_config",
+                "content_quality",
+                "empty_check",
+                "search_form",
+                "search_recovery",
+                "page_structure",
+                "structure_confidence",
+                "estimated_record_count",
+                "item_container",
+                "fetch_method",
+                "fetch_time_ms",
+                "anti_bot_score",
+                "browser_state_evidence",
+                "suggested_fields",
             }
             assert expected_keys.issubset(result.keys()), f"Missing keys: {expected_keys - result.keys()}"
 
@@ -158,8 +166,10 @@ class TestAnalyzeUrlForFieldsDirect:
             mock_fetch.return_value = (_results_page_html(), 200, "playwright_full", 0)
             mock_anti_bot.return_value = 0.1
             mock_structure.return_value = StructureProfile(
-                structure_type="table", structure_confidence=0.9,
-                headers=[], container_selector="div.item",
+                structure_type="table",
+                structure_confidence=0.9,
+                headers=[],
+                container_selector="div.item",
             )
             mock_patterns.return_value = ValuePatterns()
             mock_llm.return_value = [
@@ -170,9 +180,7 @@ class TestAnalyzeUrlForFieldsDirect:
 
             result = await analyze_url_for_fields(url)
             confidences = [f["confidence"] for f in result["suggested_fields"]]
-            assert confidences == sorted(confidences, reverse=True), (
-                f"Fields not sorted by confidence: {confidences}"
-            )
+            assert confidences == sorted(confidences, reverse=True), f"Fields not sorted by confidence: {confidences}"
 
     @pytest.mark.asyncio
     async def test_suggested_fields_truncated_to_max_fields(self) -> None:
@@ -206,20 +214,17 @@ class TestAnalyzeUrlForFieldsDirect:
             mock_fetch.return_value = (_results_page_html(), 200, "playwright_full", 0)
             mock_anti_bot.return_value = 0.1
             mock_structure.return_value = StructureProfile(
-                structure_type="cards", structure_confidence=0.8,
-                headers=[], container_selector="div.item",
+                structure_type="cards",
+                structure_confidence=0.8,
+                headers=[],
+                container_selector="div.item",
             )
             mock_patterns.return_value = ValuePatterns()
-            many_fields = [
-                {"name": f"field_{i}", "type": "string", "confidence": 0.9}
-                for i in range(50)
-            ]
+            many_fields = [{"name": f"field_{i}", "type": "string", "confidence": 0.9} for i in range(50)]
             mock_llm.return_value = many_fields
 
             result = await analyze_url_for_fields(url)
-            assert len(result["suggested_fields"]) <= 20, (
-                f"Got {len(result['suggested_fields'])} fields, expected ≤20"
-            )
+            assert len(result["suggested_fields"]) <= 20, f"Got {len(result['suggested_fields'])} fields, expected ≤20"
 
 
 class TestAnalyzeUrlForFieldsFetchFailure:
@@ -367,11 +372,7 @@ class TestAnalyzeUrlForFieldsWithMissingContainerValues:
 
         # HTML designed so the visible-text fallback generates ~20 tokens
         sparse_html = (
-            "<html><body>"
-            '<div class="sparse">A</div>'
-            '<div class="sparse">B</div>'
-            "Just a few visible words on the page"
-            "</body></html>"
+            '<html><body><div class="sparse">A</div><div class="sparse">B</div>Just a few visible words on the page</body></html>'
         )
 
         with (
@@ -467,9 +468,7 @@ class TestAnalyzeUrlForFieldsLLMFallback:
             result = await analyze_url_for_fields(url)
 
             # Should get pattern-based fields instead
-            assert len(result["suggested_fields"]) > 0, (
-                "Should have pattern-based fields when LLM returns nothing"
-            )
+            assert len(result["suggested_fields"]) > 0, "Should have pattern-based fields when LLM returns nothing"
             types = {f["type"] for f in result["suggested_fields"]}
             assert "currency" in types
 
@@ -514,17 +513,13 @@ class TestAnalyzeUrlForFieldsAcquisitionLineage:
                 headers=[],
                 container_selector="div.item",
             )
-            mock_patterns.return_value = ValuePatterns(
-                currencies=["$29.99"], dates=[]
-            )
+            mock_patterns.return_value = ValuePatterns(currencies=["$29.99"], dates=[])
             mock_llm.return_value = [
                 {"name": "title", "type": "string", "confidence": 0.9},
             ]
 
             result = await analyze_url_for_fields(url)
             lineage = result["acquisition_lineage"]
-            assert "data_evidence_score" in lineage, (
-                "Lineage must have data_evidence_score"
-            )
+            assert "data_evidence_score" in lineage, "Lineage must have data_evidence_score"
             assert isinstance(lineage["data_evidence_score"], (int, float))
             assert lineage["data_evidence_score"] >= 0

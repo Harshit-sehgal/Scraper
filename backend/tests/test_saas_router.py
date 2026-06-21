@@ -11,6 +11,10 @@ def reset_identity_store_fixture():
     import tempfile
 
     from app.saas.identity_store import SQLiteIdentityStore, reset_identity_store
+    from app.saas.router import reset_rate_limiters
+
+    # Reset rate limiters so tests don't hit 429s from sharing 127.0.0.1
+    reset_rate_limiters()
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         store = SQLiteIdentityStore(storage_path=f.name)
@@ -29,7 +33,7 @@ class TestSignup:
     def test_signup_creates_user_org_and_project(self, client: TestClient):
         resp = client.post(
             "/api/saas/signup",
-            json={"email": "newuser@example.com", "password": "securepassword123"},
+            json={"email": "newuser@example.com", "password": "SecurePass123!"},
         )
         assert resp.status_code == 201, resp.text
         data = resp.json()
@@ -43,14 +47,14 @@ class TestSignup:
         # First signup
         resp = client.post(
             "/api/saas/signup",
-            json={"email": "dup@example.com", "password": "securepassword123"},
+            json={"email": "dup@example.com", "password": "SecurePass123!"},
         )
         assert resp.status_code == 201
 
         # Duplicate
         resp2 = client.post(
             "/api/saas/signup",
-            json={"email": "dup@example.com", "password": "securepassword123"},
+            json={"email": "dup@example.com", "password": "SecurePass123!"},
         )
         assert resp2.status_code == 409
 
@@ -59,7 +63,7 @@ class TestSignup:
             "/api/saas/signup",
             json={
                 "email": "named@example.com",
-                "password": "securepassword123",
+                "password": "SecurePass123!",
                 "display_name": "Test User",
                 "org_name": "My Org",
                 "project_name": "My Project",
@@ -105,7 +109,7 @@ class TestProfileEndpoint:
             "/api/saas/signup",
             json={
                 "email": "profile-test@example.com",
-                "password": "securepassword123",
+                "password": "SecurePass123!",
                 "display_name": "Profile Tester",
             },
         )
@@ -134,7 +138,7 @@ class TestProfileEndpoint:
         """Accepting the AUP must be reflected in the next /me response."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "aup-test@example.com", "password": "securepassword123"},
+            json={"email": "aup-test@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -303,7 +307,7 @@ class TestAupEnforcementOnMutationRoutes:
         """Creating an API key must 403 if the user has not accepted the AUP."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "noaup-api@example.com", "password": "securepassword123"},
+            json={"email": "noaup-api@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -322,7 +326,7 @@ class TestAupEnforcementOnMutationRoutes:
         """Creating a project must 403 if the user has not accepted the AUP."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "noaup-proj@example.com", "password": "securepassword123"},
+            json={"email": "noaup-proj@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -341,7 +345,7 @@ class TestAupEnforcementOnMutationRoutes:
         """Creating a scheduled job must 403 if the user has not accepted the AUP."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "noaup-sched@example.com", "password": "securepassword123"},
+            json={"email": "noaup-sched@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -358,7 +362,7 @@ class TestAupEnforcementOnMutationRoutes:
         """Creating an API key must succeed after AUP acceptance."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "withaup-api@example.com", "password": "securepassword123"},
+            json={"email": "withaup-api@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -389,7 +393,7 @@ class TestOrganizationDeleteEndpoint:
         """Deleting an org must cascade to memberships, projects, and API keys."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "orgdelete@example.com", "password": "securepassword123"},
+            json={"email": "orgdelete@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -418,7 +422,7 @@ class TestOrganizationDeleteEndpoint:
         """Deleting a non-existent org must 404."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "ghost-delete@example.com", "password": "securepassword123"},
+            json={"email": "ghost-delete@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -441,7 +445,7 @@ class TestProjectDeleteEndpoint:
         """Deleting a project must cascade to API keys."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "projdelete@example.com", "password": "securepassword123"},
+            json={"email": "projdelete@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]
@@ -477,7 +481,7 @@ class TestProjectDeleteEndpoint:
         """Deleting a non-existent project must 404."""
         signup = client.post(
             "/api/saas/signup",
-            json={"email": "ghost-proj-delete@example.com", "password": "securepassword123"},
+            json={"email": "ghost-proj-delete@example.com", "password": "SecurePass123!"},
         )
         assert signup.status_code == 201
         user_id = signup.json()["user_id"]

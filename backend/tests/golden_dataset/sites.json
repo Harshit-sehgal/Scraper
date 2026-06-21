@@ -50,6 +50,24 @@
       "notes": "Stable educational scraping site."
     },
     {
+      "id": "scrapethissite_hockey",
+      "url": "https://www.scrapethissite.com/pages/forms/",
+      "description": "ScrapeThisSite — hockey team data in table structure with pagination",
+      "schema": {
+        "fields": {
+          "team_name": { "type": "string", "required": true },
+          "year": { "type": "number", "required": false },
+          "wins": { "type": "number", "required": false },
+          "losses": { "type": "number", "required": false }
+        }
+      },
+      "category": "table",
+      "min_expected_records": 50,
+      "min_f1": 0.9,
+      "timeout_seconds": 90,
+      "notes": "Paginated table with form elements. Tests table extraction + pagination."
+    },
+    {
       "id": "example_com",
       "url": "https://example.com/",
       "description": "Example domain — minimal page for connectivity validation",
@@ -80,6 +98,71 @@
       "min_f1": 1.0,
       "timeout_seconds": 45,
       "notes": "Always available HTTP test service."
+    },
+    {
+      "id": "scrapethissite_faq",
+      "url": "https://www.scrapethissite.com/faq/",
+      "description": "ScrapeThisSite FAQ — tests extraction from definition list / key-value structure",
+      "schema": {
+        "fields": {
+          "question": { "type": "string", "required": true },
+          "answer": { "type": "string", "required": false }
+        }
+      },
+      "category": "key_value",
+      "min_expected_records": 10,
+      "min_f1": 0.85,
+      "timeout_seconds": 60,
+      "notes": "Definition list structure — tests key-value detection."
+    },
+    {
+      "id": "scrapethissite_ajax",
+      "url": "https://www.scrapethissite.com/pages/ajax-javascript/",
+      "description": "ScrapeThisSite AJAX — tests JS-rendered content extraction",
+      "schema": {
+        "fields": {
+          "movie_title": { "type": "string", "required": true },
+          "year": { "type": "number", "required": false }
+        }
+      },
+      "category": "dynamic",
+      "min_expected_records": 20,
+      "min_f1": 0.8,
+      "timeout_seconds": 90,
+      "notes": "JavaScript-rendered content. Tests Playwright/Render engine fallback."
+    },
+    {
+      "id": "scrapethissite_home",
+      "url": "https://www.scrapethissite.com/",
+      "description": "ScrapeThisSite homepage — broad structure test with mixed content",
+      "schema": {
+        "fields": {
+          "heading": { "type": "string", "required": false },
+          "description": { "type": "string", "required": false }
+        }
+      },
+      "category": "mixed",
+      "min_expected_records": 5,
+      "min_f1": 0.8,
+      "timeout_seconds": 45,
+      "notes": "Mixed content page — tests structure detection flexibility."
+    },
+    {
+      "id": "webscraper_products",
+      "url": "https://webscraper.io/test-sites/e-commerce/allinone",
+      "description": "WebScraper.io — comprehensive e-commerce test site with cards structure",
+      "schema": {
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "price": { "type": "currency", "required": false },
+          "description": { "type": "string", "required": false }
+        }
+      },
+      "category": "ecommerce",
+      "min_expected_records": 20,
+      "min_f1": 0.85,
+      "timeout_seconds": 90,
+      "notes": "E-commerce test site with multiple product cards and category structure."
     }
   ]
 }

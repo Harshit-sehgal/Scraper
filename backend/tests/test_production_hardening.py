@@ -455,7 +455,7 @@ def _make_queue_that_raises(exc: BaseException):
 
 
 # Tests in this file rely on per-function ``monkeypatch`` teardown so cross-test
-# state (e.g. ``jobs_write.get_usage_ledger``, ``app.worker_queue.get_worker_queue``)
+# state (e.g. ``job_creation_service.get_usage_ledger``, ``app.worker_queue.get_worker_queue``)
 # is reverted automatically. If any of these tests ever flips to a session- or
 # module-scoped monkeypatch fixture, both B025 tests would need to be revisited.
 
@@ -489,12 +489,12 @@ def test_create_job_enqueue_quota_bypass(client, monkeypatch) -> None:
             msg = "Scheduled-job quota exceeded"
             raise ValueError(msg)
 
-    # ``jobs_write`` imports ``get_usage_ledger`` at module load time, so
-    # the cached reference inside ``jobs_write`` is what we must patch
-    # (not the source module attribute).
+    # ``get_usage_ledger`` now lives in ``app.services.job_creation_service``
+    # (extracted during the JobCreationService split). Patch the cached
+    # reference inside that module rather than the now-stale ``jobs_write``
+    # attribute.
     monkeypatch.setattr(
-        jobs_write,
-        "get_usage_ledger",
+        "app.services.job_creation_service.get_usage_ledger",
         _QuotaFullLedger,
     )
 

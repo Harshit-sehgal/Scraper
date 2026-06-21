@@ -558,6 +558,9 @@ def _reset_identity_store_fixture():
     The identity store's SQLite DB persists across test boundaries because
     it is file-backed. Without clearing, earlier tests can create users or
     orgs that cause unique-constraint or state conflicts in later tests.
+
+    Also resets the SaaS router's in-memory rate limiter counters so
+    rapid test requests from the same loopback IP don't trigger 429s.
     """
     try:
         import sqlite3
@@ -575,6 +578,14 @@ def _reset_identity_store_fixture():
             logger.debug("Identity store cleanup failed (non-critical)", exc_info=True)
 
         reset_identity_store()
+    except ImportError:
+        pass
+
+    # Reset SaaS rate limiters so tests running from the same IP don't 429
+    try:
+        from app.saas.router import reset_rate_limiters
+
+        reset_rate_limiters()
     except ImportError:
         pass
 
