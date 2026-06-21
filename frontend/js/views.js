@@ -48,6 +48,9 @@ const VIEW_MAP = {
   "/billing": "billing",
   "/audit": "audit",
   "/retention": "retention",
+  "/email-verification": "email-verification",
+  "/password-reset": "password-reset",
+  "/invitations": "invitations",
 };
 
 // Detect the SPA base path from the initial page load (e.g. /app/ or /)
@@ -125,6 +128,9 @@ export function switchView(name) {
     billing: "nav-billing",
     audit: "nav-audit",
     retention: "nav-retention",
+    "email-verification": "nav-email-verification",
+    "password-reset": "nav-password-reset",
+    invitations: "nav-invitations",
   };
   const navEl = document.getElementById(navMap[name]);
   if (navEl) {
@@ -149,6 +155,12 @@ export function switchView(name) {
   if (name === "retention") import("./retention.js").then((m) => m.refreshRetention()).catch(() => {});
   if (name === "api-keys") import("./api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch(() => {});
   if (name === "settings") import("./settings-page.js").then((m) => m.refreshSettingsPage()).catch(() => {});
+  if (name === "email-verification")
+    import("./email-verification.js").then((m) => m.refreshEmailVerification()).catch(() => {});
+  if (name === "password-reset") {
+    // No auto-refresh needed; form-based view
+  }
+  if (name === "invitations") import("./invitations.js").then((m) => m.refreshInvitations()).catch(() => {});
 
   writeUIState({ view: name });
 
@@ -191,6 +203,8 @@ const TAB_KEYS = {
   8: "billing",
   9: "audit",
   0: "retention",
+  // Note: email-verification, password-reset, and invitations are
+  // in the Account subnav and do not have dedicated number keys.
 };
 
 export function onGlobalKeydown(e) {

@@ -11,7 +11,7 @@
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
     <!-- Inter Variable, SIL OFL — self-hosted for CSP font-src 'self'. -->
     <link rel="icon" type="image/svg+xml" href="/app/favicon.svg" />
-    <link rel="stylesheet" href="/app/styles.css?v=2" />
+    <link rel="stylesheet" href="/app/styles.css?v=4" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -113,12 +113,104 @@
               </li>
               <li>
                 <button type="button" class="nav-item" data-action="switch-view" data-view="settings" id="nav-settings">
-                  <span class="nav-icon" data-icon="gear" aria-hidden="true"></span>
+                  <span class="nav-icon" aria-hidden="true"
+                    ><svg
+                      class="icon"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 256 256"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="12"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"
+                      /></svg
+                  ></span>
                   <span class="nav-text">Settings</span>
                 </button>
               </li>
             </ul>
           </div>
+          <details class="sidebar-section advanced-nav">
+            <summary class="sidebar-section-title">Account</summary>
+            <ul class="nav-list">
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="email-verification"
+                  id="nav-email-verification"
+                >
+                  <span class="nav-icon" aria-hidden="true"
+                    ><svg
+                      class="icon"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 256 256"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="12"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48Zm-96,85.15L52.57,64H203.43ZM98.71,128,40,181.81V74.19Zm11.84,10.85,12,11.05a8,8,0,0,0,10.82,0l12-11.05,58,53.15H52.57ZM157.29,128,216,74.18V181.82Z"
+                      /></svg
+                  ></span>
+                  <span class="nav-text">Email Verification</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="password-reset"
+                  id="nav-password-reset"
+                >
+                  <span class="nav-icon" data-icon="refresh" aria-hidden="true"></span>
+                  <span class="nav-text">Password Reset</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="invitations"
+                  id="nav-invitations"
+                >
+                  <span class="nav-icon" aria-hidden="true"
+                    ><svg
+                      class="icon"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 256 256"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="12"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"
+                      /></svg
+                  ></span>
+                  <span class="nav-text">Invitations</span>
+                </button>
+              </li>
+            </ul>
+          </details>
           <details class="sidebar-section advanced-nav">
             <summary class="sidebar-section-title">Advanced</summary>
             <ul class="nav-list">
@@ -1440,6 +1532,204 @@
           </div>
         </section>
 
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Email Verification             -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-email-verification">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>Email Verification</h1>
+                <p class="subtle">Manage your email verification status</p>
+              </div>
+            </div>
+
+            <div class="email-verify-card">
+              <h2>Verification Status</h2>
+              <div id="email-verify-status" class="email-verify-status">
+                <p class="subtle">Loading…</p>
+              </div>
+              <div id="email-verify-actions" class="email-verify-actions">
+                <button
+                  type="button"
+                  class="btn primary"
+                  data-action="send-email-verification"
+                  id="btn-send-verification"
+                >
+                  Send Verification Email
+                </button>
+              </div>
+            </div>
+
+            <div class="email-verify-card">
+              <h2>Verify with Token</h2>
+              <p class="subtle">Enter the verification token from the email</p>
+              <div class="email-verify-input-row">
+                <input
+                  type="text"
+                  id="email-verify-token-input"
+                  class="input mono-input"
+                  placeholder="Paste verification token..."
+                  spellcheck="false"
+                  aria-label="Verification token"
+                />
+                <button type="button" class="btn primary" data-action="verify-email-token" id="btn-verify-token">
+                  Verify
+                </button>
+              </div>
+              <p id="email-verify-result" class="email-verify-result hidden"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Password Reset                -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-password-reset">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>Password Reset</h1>
+                <p class="subtle">Request a password reset or confirm a token</p>
+              </div>
+            </div>
+
+            <div class="pwd-reset-card">
+              <h2>Request Reset</h2>
+              <p class="subtle">Enter your email to receive a reset token</p>
+              <div class="pwd-reset-input-row">
+                <input
+                  type="email"
+                  id="pwd-reset-email-input"
+                  class="input"
+                  placeholder="your@email.com"
+                  aria-label="Email address"
+                />
+                <button type="button" class="btn primary" data-action="request-password-reset" id="btn-request-reset">
+                  Send Reset Token
+                </button>
+              </div>
+              <p id="pwd-reset-request-result" class="pwd-reset-result hidden"></p>
+            </div>
+
+            <div class="pwd-reset-card">
+              <h2>Confirm Reset</h2>
+              <p class="subtle">Enter the reset token and your new password</p>
+              <div class="pwd-reset-form">
+                <label for="pwd-reset-token-input">Reset Token</label>
+                <input
+                  type="text"
+                  id="pwd-reset-token-input"
+                  class="input mono-input"
+                  placeholder="Paste reset token..."
+                  spellcheck="false"
+                  aria-label="Reset token"
+                />
+                <label for="pwd-reset-new-password">New Password</label>
+                <input
+                  type="password"
+                  id="pwd-reset-new-password"
+                  class="input"
+                  placeholder="New password (min 8 characters)"
+                  autocomplete="new-password"
+                  aria-label="New password"
+                />
+                <button type="button" class="btn primary" data-action="confirm-password-reset" id="btn-confirm-reset">
+                  Reset Password
+                </button>
+              </div>
+              <p id="pwd-reset-confirm-result" class="pwd-reset-result hidden"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Invitations                    -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-invitations">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Team Invitations</h1>
+                <p class="subtle">Manage organization invitations</p>
+              </div>
+              <div class="page-head-actions">
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="refresh-invitations"
+                  id="btn-refresh-invitations"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div class="invitations-grid">
+              <div class="invitations-card">
+                <h2>Pending Invitations</h2>
+                <div id="invitations-pending-list" class="invitations-list">
+                  <p class="subtle">Loading…</p>
+                </div>
+              </div>
+
+              <div class="invitations-card">
+                <h2>Create Invitation</h2>
+                <p class="subtle">Invite a user to your organization</p>
+                <div class="invitations-form">
+                  <label for="invite-org-select">Organization</label>
+                  <select id="invite-org-select" aria-label="Select organization">
+                    <option value="">Select an org…</option>
+                  </select>
+                  <label for="invite-email-input">Email</label>
+                  <input
+                    type="email"
+                    id="invite-email-input"
+                    class="input"
+                    placeholder="colleague@example.com"
+                    aria-label="Email to invite"
+                  />
+                  <label for="invite-role-select">Role</label>
+                  <select id="invite-role-select" aria-label="Role">
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                  <button type="button" class="btn primary" data-action="create-invitation" id="btn-create-invitation">
+                    Send Invitation
+                  </button>
+                </div>
+                <p id="invite-create-result" class="invite-result hidden"></p>
+              </div>
+            </div>
+
+            <div class="invitations-card">
+              <h2>Org Invitations</h2>
+              <p class="subtle">Invitations sent from your organizations</p>
+              <div class="invitations-toolbar">
+                <label>
+                  <span>Filter by status:</span>
+                  <select id="invitations-status-filter" aria-label="Filter by status">
+                    <option value="">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="declined">Declined</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Organization:</span>
+                  <select id="invitations-org-filter" aria-label="Filter by organization">
+                    <option value="">All</option>
+                  </select>
+                </label>
+              </div>
+              <div id="invitations-org-list" class="invitations-list">
+                <p class="subtle">Loading…</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- ─── API Keys ─── -->
         <section class="view" id="view-api-keys">
           <div class="container narrow">
@@ -1783,6 +2073,6 @@
          FastAPI's StaticFiles mount at /app serves these files from the
          frontend/ directory. Production nginx deployments are unaffected
          (nginx has dedicated location blocks for both /app/ and root paths). -->
-    <script type="module" src="/app/app.js?v=2"></script>
+    <script type="module" src="/app/app.js?v=4"></script>
   </body>
 </html>

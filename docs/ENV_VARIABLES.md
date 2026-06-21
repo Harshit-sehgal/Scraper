@@ -79,6 +79,15 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES` | `false` | Enable experimental API routes |
 | `DATAFORGE_SMOKE_TEST_MODE` | `false` | Enable smoke test mode |
 
+## Data Retention
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_RETENTION_DAYS_COMPLETED` | `30` | Days to retain completed jobs before automatic cleanup |
+| `DATAFORGE_RETENTION_DAYS_IDEMPOTENCY` | `7` | Days to retain idempotency keys for deduplication |
+| `DATAFORGE_RETENTION_DAYS_RECYCLE` | `30` | Days to retain soft-deleted jobs in recycle bin before permanent purge |
+| `DATAFORGE_RETENTION_INTERVAL` | `43200` | Background retention sweep interval in seconds (default 12h) |
+
 ## LLM Integration
 
 | Variable | Default | Description |

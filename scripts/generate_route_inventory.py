@@ -43,6 +43,8 @@ TENANT_SCOPED_PREFIXES = (
     "/api/saas/orgs",
     "/api/saas/projects",
     "/api/saas/memberships",
+    "/api/saas/email-verification",
+    "/api/saas/invitations",
 )
 GLOBAL_OR_NOT_TENANT_PREFIXES = (
     "/api/session",
@@ -54,8 +56,12 @@ GLOBAL_OR_NOT_TENANT_PREFIXES = (
     "/api/url",
     "/api/intelligence",
     "/api/saas/plan",
+    "/api/saas/usage",
+    "/api/saas/password-reset",
     "/api/billing/subscriptions",
     "/api/billing/webhook",
+    "/api/billing/checkout",
+    "/api/billing/stub-return",
 )
 
 

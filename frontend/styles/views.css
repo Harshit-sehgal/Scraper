@@ -1277,6 +1277,326 @@
   border-top: 1px solid var(--border);
 }
 
+/* ═══ Email Verification ═══ */
+
+#view-email-verification .email-verify-card {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  margin-bottom: var(--space-5);
+}
+
+#view-email-verification .email-verify-card h2,
+#view-email-verification .email-verify-card h3 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink-1);
+  margin-bottom: var(--space-4);
+  letter-spacing: var(--tracking-tight);
+}
+
+#view-email-verification .email-verify-status-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+#view-email-verification .email-verify-status-row:last-child {
+  border-bottom: 0;
+}
+
+#view-email-verification .email-verify-label {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+#view-email-verification .email-verify-value {
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+#view-email-verification .email-verify-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+#view-email-verification .email-verify-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+
+#view-email-verification .email-verify-input-row .input {
+  flex: 1 1 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+#view-email-verification .email-verify-result {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+#view-email-verification .email-verify-result.success {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-1);
+}
+
+#view-email-verification .email-verify-result.error {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+#view-email-verification .email-verify-desc {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  margin-bottom: var(--space-4);
+  max-width: 60ch;
+  line-height: var(--leading-normal);
+}
+
+/* ═══ Password Reset ═══ */
+
+#view-password-reset .pwd-reset-card {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  margin-bottom: var(--space-5);
+}
+
+#view-password-reset .pwd-reset-card h2,
+#view-password-reset .pwd-reset-card h3 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink-1);
+  margin-bottom: var(--space-4);
+  letter-spacing: var(--tracking-tight);
+}
+
+#view-password-reset .pwd-reset-section {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+#view-password-reset .pwd-reset-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+#view-password-reset .pwd-reset-desc {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  margin-bottom: var(--space-4);
+  max-width: 60ch;
+  line-height: var(--leading-normal);
+}
+
+#view-password-reset .pwd-reset-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 400px;
+}
+
+#view-password-reset .pwd-reset-input-row .input {
+  flex: 1 1 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+#view-password-reset .pwd-reset-result {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+#view-password-reset .pwd-reset-result.success {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-1);
+}
+
+#view-password-reset .pwd-reset-result.error {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+/* ═══ Invitations ═══ */
+
+#view-invitations .invitations-card {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  margin-bottom: var(--space-5);
+}
+
+#view-invitations .invitations-card h2,
+#view-invitations .invitations-card h3 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink-1);
+  margin-bottom: var(--space-4);
+  letter-spacing: var(--tracking-tight);
+}
+
+#view-invitations .invitations-panel {
+  margin-bottom: var(--space-5);
+}
+
+#view-invitations .invitations-panel:last-child {
+  margin-bottom: 0;
+}
+
+#view-invitations .invitations-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+#view-invitations .invitations-toolbar select {
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink-1);
+  font-size: var(--text-sm);
+}
+
+#view-invitations .invitation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-2);
+  background: var(--bg-subtle);
+  transition: border-color var(--duration-base) var(--ease-out);
+}
+
+#view-invitations .invitation-item:hover {
+  border-color: var(--border-strong);
+}
+
+#view-invitations .invitation-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+#view-invitations .invitation-info strong {
+  color: var(--ink-1);
+  font-weight: 600;
+}
+
+#view-invitations .invitation-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+#view-invitations .invitation-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+#view-invitations .invite-create-card {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-subtle);
+  margin-bottom: var(--space-4);
+}
+
+#view-invitations .invite-create-row {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+#view-invitations .invite-create-row .form-group {
+  min-width: 160px;
+  flex: 0 1 auto;
+}
+
+#view-invitations .invite-create-row .form-group label {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+  margin-bottom: var(--space-1);
+}
+
+#view-invitations .invite-create-row .form-group select,
+#view-invitations .invite-create-row .form-group input {
+  width: 100%;
+  min-width: 160px;
+}
+
+#view-invitations .invite-result {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+#view-invitations .invite-result.success {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-1);
+}
+
+#view-invitations .invite-result.error {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+#view-invitations .hint {
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
 /* ═══ Generic utility (used inline in views) ═══ */
 
 .flex-row {

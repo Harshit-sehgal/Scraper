@@ -1,19 +1,5 @@
 import { test, expect } from "@playwright/test";
-
-// Helper: dismiss the apikey overlay if it auto-opens on 403.
-// Wait a moment for the app to finish its initial API calls (which may
-// trigger the overlay via 403), then close it if visible.
-async function dismissApiKeyOverlay(page) {
-  // Give the app time to make initial API calls and potentially show the overlay
-  await page.waitForTimeout(1000);
-  const overlay = page.locator("#apikey-overlay");
-  if (await overlay.isVisible()) {
-    // Use JavaScript to close it — force-adding hidden class avoids the
-    // intercept issue where the overlay's aria-modal blocks clicks on the close button.
-    await overlay.evaluate((el) => el.classList.add("hidden"));
-    await expect(overlay).toBeHidden();
-  }
-}
+import { dismissApiKeyOverlay } from "./helpers.js";
 
 test.describe("Dashboard UI smoke tests", () => {
   test("page loads and shows the DataForge brand", async ({ page }) => {

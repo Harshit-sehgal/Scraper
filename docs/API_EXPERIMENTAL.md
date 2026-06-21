@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-21 12:30:36 UTC
+**Generated:** 2026-06-21 19:03:25 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -115,6 +115,7 @@ For the diff between stable and experimental, see
 | GET | `/api/system/replay/chain` |
 | GET | `/api/system/replay/events` |
 | GET | `/api/system/replay/status` |
+| GET | `/api/system/retention/config` |
 | GET | `/api/system/search` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
@@ -124,6 +125,7 @@ For the diff between stable and experimental, see
 | POST | `/api/system/csp-violations` |
 | POST | `/api/system/merge/knowledge` |
 | POST | `/api/system/refactor/compress` |
+| POST | `/api/system/retention/enforce` |
 | POST | `/api/system/scheduler/step` |
 
 ## Session/Auth Routes
@@ -159,9 +161,12 @@ For the diff between stable and experimental, see
 | GET | `/api/billing/subscriptions/{customer_id}` |
 | GET | `/api/intelligence/analyze-url` |
 | GET | `/api/saas/aup/status` |
+| GET | `/api/saas/email-verification/status` |
+| GET | `/api/saas/invitations/pending` |
 | GET | `/api/saas/me` |
 | GET | `/api/saas/orgs` |
 | GET | `/api/saas/orgs/{org_id}` |
+| GET | `/api/saas/orgs/{org_id}/invitations` |
 | GET | `/api/saas/orgs/{org_id}/members` |
 | GET | `/api/saas/orgs/{org_id}/projects` |
 | GET | `/api/saas/plan` |
@@ -184,7 +189,13 @@ For the diff between stable and experimental, see
 | POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
 | POST | `/api/saas/aup/accept` |
+| POST | `/api/saas/email-verification/send` |
+| POST | `/api/saas/email-verification/verify` |
+| POST | `/api/saas/invitations/{invitation_id}/respond` |
 | POST | `/api/saas/orgs` |
+| POST | `/api/saas/orgs/{org_id}/invitations` |
+| POST | `/api/saas/password-reset/request` |
+| POST | `/api/saas/password-reset/reset` |
 | POST | `/api/saas/projects` |
 | POST | `/api/saas/projects/{project_id}/keys` |
 | POST | `/api/saas/signup` |
@@ -198,4 +209,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 138
+**Total routes:** 149

@@ -54,6 +54,19 @@ export const endpoints = {
   operatorPredictions: "/api/operator/predictions",
   rateLimitStats: "/api/system/rate-limit-stats",
   topology: "/api/system/topology",
+
+  /* SaaS identity features */
+  emailVerificationStatus: "/api/saas/email-verification/status",
+  emailVerificationSend: "/api/saas/email-verification/send",
+  emailVerificationVerify: "/api/saas/email-verification/verify",
+  passwordResetRequest: "/api/saas/password-reset/request",
+  passwordResetConfirm: "/api/saas/password-reset/reset",
+  invitationsPending: "/api/saas/invitations/pending",
+  invitationRespond: (id) => `/api/saas/invitations/${encodeURIComponent(id)}/respond`,
+  organizations: "/api/saas/orgs",
+  organizationInvitations: (orgId, query) =>
+    `/api/saas/orgs/${encodeURIComponent(orgId)}/invitations${query ? `?${query}` : ""}`,
+  createOrganizationInvitation: (orgId) => `/api/saas/orgs/${encodeURIComponent(orgId)}/invitations`,
 };
 
 export const endpointGroups = {

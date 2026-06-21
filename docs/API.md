@@ -86,6 +86,8 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/system/audit-log` | Admin |
 | GET | `/api/system/diagnostics/export` | Admin |
 | GET | `/api/system/rate-limit-stats` | Operator or admin |
+| GET | `/api/system/retention/config` | Operator or admin |
+| POST | `/api/system/retention/enforce` | Admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
 
 ## Session/Auth Routes
@@ -116,15 +118,27 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | POST | `/api/saas/signup` | Public signup |
 | GET | `/api/saas/me` | Authenticated user |
 | GET | `/api/saas/plan` | Authenticated user |
+| GET | `/api/saas/usage` | Authenticated user |
 | GET | `/api/saas/aup/status` | Authenticated user |
 | POST | `/api/saas/aup/accept` | Authenticated user |
+| GET | `/api/saas/email-verification/status` | Authenticated user |
+| POST | `/api/saas/email-verification/send` | Authenticated user |
+| POST | `/api/saas/email-verification/verify` | Authenticated user |
+| POST | `/api/saas/password-reset/request` | Public (email-based, no auth required) |
+| POST | `/api/saas/password-reset/reset` | Public (token-based, no auth required) |
+| GET | `/api/saas/invitations/pending` | Authenticated user |
+| POST | `/api/saas/invitations/{invitation_id}/respond` | Authenticated user |
 | GET | `/api/saas/orgs` | Authenticated user |
 | POST | `/api/saas/orgs` | Operator or admin |
+| DELETE | `/api/saas/orgs/{org_id}` | Operator or admin |
 | GET | `/api/saas/orgs/{org_id}` | Authenticated user |
 | GET | `/api/saas/orgs/{org_id}/members` | Authenticated user |
 | GET | `/api/saas/orgs/{org_id}/projects` | Authenticated user |
+| GET | `/api/saas/orgs/{org_id}/invitations` | Authenticated user |
+| POST | `/api/saas/orgs/{org_id}/invitations` | Operator or admin |
 | DELETE | `/api/saas/memberships/{membership_id}` | Operator or admin |
 | POST | `/api/saas/projects` | Operator or admin |
+| DELETE | `/api/saas/projects/{project_id}` | Operator or admin |
 | GET | `/api/saas/projects/{project_id}` | Authenticated user |
 | GET | `/api/saas/projects/{project_id}/keys` | Authenticated user |
 | POST | `/api/saas/projects/{project_id}/keys` | Operator or admin |

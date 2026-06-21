@@ -4,7 +4,7 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 133
+**API route rows:** 149
 **Unknown auth rows:** 0
 **Unknown tenant-scope rows:** 0
 
@@ -20,6 +20,8 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/auth-profiles/{profile_id}/revoke` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/start-login` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/validate` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/billing/checkout` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/billing/stub-return/{plan_tier}/{request_id}` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency |
 | `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
@@ -54,22 +56,34 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/recycle_bin/{job_id}/restore` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `POST` | `/api/saas/aup/accept` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/aup/status` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/email-verification/send` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/email-verification/status` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/email-verification/verify` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/invitations/pending` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/invitations/{invitation_id}/respond` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/me` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `DELETE` | `/api/saas/memberships/{membership_id}` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/saas/memberships/{membership_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/orgs` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/orgs` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/saas/orgs/{org_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/orgs/{org_id}` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/orgs/{org_id}/members` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/orgs/{org_id}/projects` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/password-reset/request` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
+| `POST` | `/api/saas/password-reset/reset` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `GET` | `/api/saas/plan` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/saas/projects` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/saas/projects` | protected | operator-or-admin | require_aup_accepted, require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/saas/projects/{project_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/projects/{project_id}` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/projects/{project_id}/keys` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/saas/projects/{project_id}/keys` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/saas/projects/{project_id}/keys` | protected | operator-or-admin | require_aup_accepted, require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/saas/signup` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
+| `GET` | `/api/saas/usage` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/scheduled` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/scheduled` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/scheduled` | protected | operator-or-admin | require_aup_accepted, require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/scheduled/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/scheduled/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PUT` | `/api/scheduled/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
@@ -125,6 +139,8 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/system/replay/chain` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/replay/events` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/replay/status` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
+| `GET` | `/api/system/retention/config` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
+| `POST` | `/api/system/retention/enforce` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `POST` | `/api/system/scheduler/step` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/search` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/status` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |

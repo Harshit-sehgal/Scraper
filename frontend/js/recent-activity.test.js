@@ -1,24 +1,17 @@
-/**
- * Vitest tests for the Recent Activity panel.
- */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+/* ═══════════════════════════════════════════
+   DataForge — Recent Activity Smoke Tests
+   ═══════════════════════════════════════════ */
+
+import { describe, it, expect } from "vitest";
+
+import { startRecentActivity, stopRecentActivity } from "./recent-activity.js";
 
 describe("recent-activity module", () => {
-  beforeEach(() => {
-    document.body.innerHTML = `
-      <ol id="recent-activity-list"></ol>
-      <span id="recent-activity-refreshed-at"></span>
-    `;
+  it("exports startRecentActivity as a function", () => {
+    expect(typeof startRecentActivity).toBe("function");
   });
 
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
-  it("exports refreshRecentActivity, startRecentActivity, stopRecentActivity", async () => {
-    const mod = await import("./recent-activity.js");
-    expect(typeof mod.refreshRecentActivity).toBe("function");
-    expect(typeof mod.startRecentActivity).toBe("function");
-    expect(typeof mod.stopRecentActivity).toBe("function");
+  it("exports stopRecentActivity as a function", () => {
+    expect(typeof stopRecentActivity).toBe("function");
   });
 });

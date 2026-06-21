@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-21 12:30:36 UTC
+**Generated:** 2026-06-21 19:03:25 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -82,10 +82,12 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/system/diagnostics/export` |
 | GET | `/api/system/manifest` |
 | GET | `/api/system/rate-limit-stats` |
+| GET | `/api/system/retention/config` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
 | POST | `/api/operator/denylist` |
 | POST | `/api/system/csp-violations` |
+| POST | `/api/system/retention/enforce` |
 
 ## Session/Auth Routes
 
@@ -120,9 +122,12 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/billing/subscriptions/{customer_id}` |
 | GET | `/api/intelligence/analyze-url` |
 | GET | `/api/saas/aup/status` |
+| GET | `/api/saas/email-verification/status` |
+| GET | `/api/saas/invitations/pending` |
 | GET | `/api/saas/me` |
 | GET | `/api/saas/orgs` |
 | GET | `/api/saas/orgs/{org_id}` |
+| GET | `/api/saas/orgs/{org_id}/invitations` |
 | GET | `/api/saas/orgs/{org_id}/members` |
 | GET | `/api/saas/orgs/{org_id}/projects` |
 | GET | `/api/saas/plan` |
@@ -145,7 +150,13 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
 | POST | `/api/saas/aup/accept` |
+| POST | `/api/saas/email-verification/send` |
+| POST | `/api/saas/email-verification/verify` |
+| POST | `/api/saas/invitations/{invitation_id}/respond` |
 | POST | `/api/saas/orgs` |
+| POST | `/api/saas/orgs/{org_id}/invitations` |
+| POST | `/api/saas/password-reset/request` |
+| POST | `/api/saas/password-reset/reset` |
 | POST | `/api/saas/projects` |
 | POST | `/api/saas/projects/{project_id}/keys` |
 | POST | `/api/saas/signup` |
@@ -159,4 +170,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 103
+**Total routes:** 114

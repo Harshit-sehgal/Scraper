@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════ */
 
 // ─── Init ───
-import { hydrateIcons, icon, startIconObserver } from "./js/icons.js";
+import { hydrateIcons, icon, startIconObserver } from "./js/icons.js?v=4";
 import {
   readUIState,
   updateJobsLastUpdatedLabel,
@@ -197,6 +197,34 @@ function onDocumentClick(e) {
       break;
     case "delete-my-data":
       deleteMyData();
+      break;
+    case "send-email-verification":
+      import("./js/email-verification.js").then((m) => m.sendEmailVerification()).catch(() => {});
+      break;
+    case "verify-email-token":
+      import("./js/email-verification.js").then((m) => m.verifyEmailToken()).catch(() => {});
+      break;
+    case "request-password-reset":
+      import("./js/password-reset.js").then((m) => m.requestPasswordReset()).catch(() => {});
+      break;
+    case "confirm-password-reset":
+      import("./js/password-reset.js").then((m) => m.confirmPasswordReset()).catch(() => {});
+      break;
+    case "create-invitation":
+      import("./js/invitations.js").then((m) => m.createInvitation()).catch(() => {});
+      break;
+    case "accept-invitation": {
+      const invId = id || btn.getAttribute("data-id") || "";
+      if (invId) import("./js/invitations.js").then((m) => m.respondToInvitation(invId, true)).catch(() => {});
+      break;
+    }
+    case "decline-invitation": {
+      const invId = id || btn.getAttribute("data-id") || "";
+      if (invId) import("./js/invitations.js").then((m) => m.respondToInvitation(invId, false)).catch(() => {});
+      break;
+    }
+    case "refresh-invitations":
+      import("./js/invitations.js").then((m) => m.refreshInvitations()).catch(() => {});
       break;
     case "toggle-all-fields":
       toggleAllFields(btn.getAttribute("data-select") === "true");
