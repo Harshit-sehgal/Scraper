@@ -101,17 +101,50 @@ function onDocumentClick(e) {
       closeKeyModal();
       break;
     case "show-api-key":
-      showApiKeyPrompt();
+      switchView("api-keys");
       break;
     case "show-admin-key":
-      showAdminKeyPrompt();
+      switchView("api-keys");
+      break;
+    case "save-api-key":
+      import("./js/api-keys-page.js").then((m) => m.saveApiKeyFromPage()).catch(() => {});
+      break;
+    case "clear-api-key":
+      import("./js/api-keys-page.js").then((m) => m.clearApiKeyFromPage()).catch(() => {});
+      break;
+    case "toggle-api-key-vis":
+      import("./js/api-keys-page.js").then((m) => m.toggleApiKeyVisibility()).catch(() => {});
+      break;
+    case "save-admin-key":
+      import("./js/api-keys-page.js").then((m) => m.saveAdminKeyFromPage()).catch(() => {});
+      break;
+    case "clear-admin-key":
+      import("./js/api-keys-page.js").then((m) => m.clearAdminKeyFromPage()).catch(() => {});
+      break;
+    case "toggle-admin-key-vis":
+      import("./js/api-keys-page.js").then((m) => m.toggleAdminKeyVisibility()).catch(() => {});
+      break;
+    case "refresh-api-keys":
+      import("./js/api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch(() => {});
+      break;
+    case "logout-session":
+      import("./js/api-keys-page.js").then((m) => m.logoutFromPage()).catch(() => {});
+      break;
+    case "set-theme-mode":
+      import("./js/settings-page.js").then((m) => m.setThemeMode(mode)).catch(() => {});
+      break;
+    case "open-command-palette":
+      import("./js/command-palette.js").then((m) => m.openCommandPalette()).catch(() => {});
       break;
     case "switch-view":
       if (view) switchView(view);
       break;
     case "toggle-sidebar": {
-      const sidebar = document.getElementById("sidebar");
-      if (sidebar) sidebar.classList.toggle("open");
+      const layout = document.getElementById("app-layout");
+      if (layout) {
+        const isClosed = layout.dataset.sidebar === "closed";
+        layout.dataset.sidebar = isClosed ? "open" : "closed";
+      }
       break;
     }
     case "clear-terminal-jobs":
@@ -436,6 +469,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ── Init theme ──
   initTheme();
+
+  // ── Topbar scroll shadow ──
+  const topbar = document.querySelector(".topbar");
+  if (topbar) {
+    const onTopbarScroll = () => {
+      topbar.classList.toggle("scrolled", window.scrollY > 4);
+    };
+    window.addEventListener("scroll", onTopbarScroll, { passive: true });
+    onTopbarScroll();
+  }
 
   // ── Init auth profiles module ──
   initAuthProfiles();

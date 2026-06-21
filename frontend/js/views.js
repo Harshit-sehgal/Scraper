@@ -38,9 +38,11 @@ const VIEW_MAP = {
   "/": "jobs",
   "/jobs": "jobs",
   "/new": "new",
+  "/dashboard": "dashboard",
+  "/api-keys": "api-keys",
+  "/settings": "settings",
   "/recycle": "recycle",
   "/cognition": "cognition",
-  "/dashboard": "dashboard",
   "/auth-profiles": "auth-profiles",
   "/workflows": "workflows",
   "/billing": "billing",
@@ -113,9 +115,11 @@ export function switchView(name) {
   const navMap = {
     jobs: "nav-jobs",
     new: "nav-new",
+    dashboard: "nav-dashboard",
+    "api-keys": "nav-api-keys",
+    settings: "nav-settings",
     recycle: "nav-recycle",
     cognition: "nav-cognition",
-    dashboard: "nav-dashboard",
     "auth-profiles": "nav-auth-profiles",
     workflows: "nav-workflows",
     billing: "nav-billing",
@@ -143,6 +147,8 @@ export function switchView(name) {
   if (name === "billing") import("./billing.js").then((m) => m.refreshBilling()).catch(() => {});
   if (name === "audit") import("./audit.js").then((m) => m.refreshAudit()).catch(() => {});
   if (name === "retention") import("./retention.js").then((m) => m.refreshRetention()).catch(() => {});
+  if (name === "api-keys") import("./api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch(() => {});
+  if (name === "settings") import("./settings-page.js").then((m) => m.refreshSettingsPage()).catch(() => {});
 
   writeUIState({ view: name });
 
@@ -177,11 +183,11 @@ export function setMode(mode) {
 const TAB_KEYS = {
   1: "jobs",
   2: "new",
-  3: "recycle",
-  4: "cognition",
-  5: "dashboard",
-  6: "auth-profiles",
-  7: "workflows",
+  3: "dashboard",
+  4: "api-keys",
+  5: "settings",
+  6: "workflows",
+  7: "auth-profiles",
   8: "billing",
   9: "audit",
   0: "retention",
@@ -192,12 +198,15 @@ export function onGlobalKeydown(e) {
   const jobsSearch = document.getElementById("jobs-search");
   const resultSearch = document.getElementById("inp-result-search");
 
+  // Cmd+K / Ctrl+K: open command palette
+  if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    e.preventDefault();
+    import("./command-palette.js").then((m) => m.openCommandPalette()).catch(() => {});
+    return;
+  }
+
   // Number keys 1-9, 0: switch between tabs (only when not typing)
   if (!typing && ((e.key >= "1" && e.key <= "9") || e.key === "0")) {
-    // H2: Guard keyboard shortcut for cognition tab
-    if (e.key === "4" && window.DATAFORGE_EXPERIMENTAL !== true) {
-      return;
-    }
     e.preventDefault();
     const viewName = TAB_KEYS[e.key];
     if (viewName) {
@@ -227,6 +236,14 @@ export function onGlobalKeydown(e) {
   }
 
   if (e.key === "Escape") {
+    // Close command palette if open
+    const cp = document.getElementById("command-palette-overlay");
+    if (cp && !cp.classList.contains("hidden")) {
+      import("./command-palette.js").then((m) => m.closeCommandPalette()).catch(() => {});
+      e.preventDefault();
+      return;
+    }
+
     // Close confirmation modal if open
     if (isConfirmVisible()) {
       closeConfirm();

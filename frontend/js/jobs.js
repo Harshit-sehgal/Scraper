@@ -124,6 +124,8 @@ export async function refreshJobs() {
     syncPollers(jobsCache);
     setJobsUpdatedAt(Date.now());
     updateJobsLastUpdatedLabel();
+    // Update sidebar activity feed with the latest jobs
+    import("./sidebar-activity.js").then((m) => m.updateSidebarActivity(jobsCache)).catch(() => {});
   } catch (_e) {
     setEngineStatus("Offline", true);
     updateJobsLastUpdatedLabel("Unable to refresh");

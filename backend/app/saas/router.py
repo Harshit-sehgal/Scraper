@@ -11,7 +11,7 @@ Hosts endpoints for:
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -716,7 +716,9 @@ class ApiKeyCreateRequest(BaseModel):
     """Request to create a new API key for a project."""
 
     name: str = Field(..., min_length=1, max_length=120, description="Key name")
-    scope: str = Field("read", description="Key scope: read, write, or admin")
+    scope: Literal["read", "write", "admin"] = Field(
+        "read", description="Key scope: read, write, or admin",
+    )
 
 
 class ApiKeyResponse(BaseModel):
@@ -784,13 +786,11 @@ async def create_api_key(
         "write": ApiKeyScope.WRITE,
         "admin": ApiKeyScope.ADMIN,
     }
+    # ``body.scope`` is constrained to Literal["read","write","admin"] so
+    # the lookup is always success; the surrounding code is kept defensive
+    # in case the validator is ever loosened.
     raw_scope = body.scope.lower()
-    scope = scope_map.get(raw_scope)
-    if scope is None:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid scope: {body.scope}. Must be one of: read, write, admin.",
-        )
+    scope = scope_map[raw_scope]
 
     # Privilege boundary: the granted key scope MUST NOT exceed the
     # caller's own membership role in the target org. Without this, a

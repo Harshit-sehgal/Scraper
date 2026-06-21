@@ -39,11 +39,15 @@
           </div>
         </div>
         <div class="topbar-right">
-          <button type="button" class="icon-btn" data-action="show-api-key" title="API key" aria-label="API key">
-            <span data-icon="key" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="icon-btn" data-action="show-admin-key" title="Admin key" aria-label="Admin key">
-            <span data-icon="shield" aria-hidden="true"></span>
+          <button
+            type="button"
+            class="icon-btn"
+            id="btn-command-palette"
+            title="Command palette (Ctrl+K)"
+            data-action="open-command-palette"
+            aria-label="Command palette"
+          >
+            <span data-icon="search" aria-hidden="true"></span>
           </button>
           <button
             type="button"
@@ -63,7 +67,7 @@
             data-action="toggle-theme"
             aria-label="Toggle dark mode"
           >
-            🌙
+            <span data-icon="moon" aria-hidden="true"></span>
           </button>
           <span class="health-pill" id="health-pill" data-state="unknown" aria-live="polite" title="API health status"
             >checking…</span
@@ -99,6 +103,30 @@
                 >
                   <span class="nav-icon" data-icon="gauge" aria-hidden="true"></span>
                   <span class="nav-text">Dashboard</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="api-keys"
+                  id="nav-api-keys"
+                >
+                  <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
+                  <span class="nav-text">API Keys</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="settings"
+                  id="nav-settings"
+                >
+                  <span class="nav-icon" data-icon="gear" aria-hidden="true"></span>
+                  <span class="nav-text">Settings</span>
                 </button>
               </li>
             </ul>
@@ -180,6 +208,12 @@
             </ul>
           </div>
         </nav>
+        <div class="sidebar-activity" id="sidebar-activity">
+          <div class="sidebar-activity-title">Recent</div>
+          <div class="sidebar-activity-list" id="sidebar-activity-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
         <div class="sidebar-bottom">
           <span class="engine-status" id="engine-status"
             ><span class="dot"></span><span id="engine-status-text">Ready</span></span
@@ -1417,6 +1451,187 @@
             </div>
           </div>
         </section>
+
+        <!-- ─── API Keys ─── -->
+        <section class="view" id="view-api-keys">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>API Keys</h1>
+                <p class="subtle">Manage your API and admin keys for this session</p>
+              </div>
+            </div>
+
+            <div class="api-keys-card">
+              <div class="api-keys-card-header">
+                <span class="api-keys-card-title">API Key</span>
+                <span class="badge" id="api-key-status">Not set</span>
+              </div>
+              <p class="subtle api-keys-desc">
+                Your API key authenticates requests to the Dataforge backend. It is held in memory only and cleared on page reload.
+              </p>
+              <div class="api-keys-input-row">
+                <input
+                  type="password"
+                  id="api-key-input"
+                  class="input"
+                  placeholder="Paste your API key here..."
+                  autocomplete="new-password"
+                  spellcheck="false"
+                  aria-label="API key input"
+                />
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  id="btn-api-key-toggle-vis"
+                  data-action="toggle-api-key-vis"
+                  aria-label="Toggle API key visibility"
+                >
+                  <span data-icon="eye" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="api-keys-actions">
+                <button type="button" class="btn primary small" data-action="save-api-key" id="btn-save-api-key">
+                  Save Key
+                </button>
+                <button type="button" class="btn ghost small" data-action="clear-api-key" id="btn-clear-api-key">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div class="api-keys-card">
+              <div class="api-keys-card-header">
+                <span class="api-keys-card-title">Admin Key</span>
+                <span class="badge" id="admin-key-status">Not set</span>
+              </div>
+              <p class="subtle api-keys-desc">
+                Admin keys enable protected operator actions. Held in memory for this session only.
+              </p>
+              <div class="api-keys-input-row">
+                <input
+                  type="password"
+                  id="admin-key-input"
+                  class="input"
+                  placeholder="Paste your admin key here..."
+                  autocomplete="new-password"
+                  spellcheck="false"
+                  aria-label="Admin key input"
+                />
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  id="btn-admin-key-toggle-vis"
+                  data-action="toggle-admin-key-vis"
+                  aria-label="Toggle admin key visibility"
+                >
+                  <span data-icon="eye" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="api-keys-actions">
+                <button type="button" class="btn primary small" data-action="save-admin-key" id="btn-save-admin-key">
+                  Save Key
+                </button>
+                <button type="button" class="btn ghost small" data-action="clear-admin-key" id="btn-clear-admin-key">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div class="api-keys-card">
+              <div class="api-keys-card-header">
+                <span class="api-keys-card-title">Session</span>
+                <span class="badge" id="session-status">Checking...</span>
+              </div>
+              <div id="session-info" class="api-keys-session-info">
+                <p class="subtle">Loading session info...</p>
+              </div>
+              <div class="api-keys-actions">
+                <button type="button" class="btn ghost small" data-action="refresh-api-keys" id="btn-refresh-api-keys">
+                  Refresh
+                </button>
+                <button type="button" class="btn ghost small" data-action="logout-session" id="btn-logout-session">
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Settings ─── -->
+        <section class="view" id="view-settings">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>Settings</h1>
+                <p class="subtle">Preferences and configuration</p>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h2>Appearance</h2>
+              <div class="settings-option">
+                <div class="settings-option-info">
+                  <span class="settings-option-label">Theme</span>
+                  <span class="settings-option-desc">Choose your preferred color scheme</span>
+                </div>
+                <div class="toggle-group" id="settings-theme-toggle">
+                  <button type="button" class="toggle active" data-mode="system" data-action="set-theme-mode" aria-label="System theme">
+                    System
+                  </button>
+                  <button type="button" class="toggle" data-mode="light" data-action="set-theme-mode" aria-label="Light theme">
+                    Light
+                  </button>
+                  <button type="button" class="toggle" data-mode="dark" data-action="set-theme-mode" aria-label="Dark theme">
+                    Dark
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h2>Keyboard Shortcuts</h2>
+              <div class="settings-shortcuts-grid">
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span>
+                  <span class="settings-shortcut-desc">Command palette</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>N</kbd></span>
+                  <span class="settings-shortcut-desc">New job</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>/</kbd></span>
+                  <span class="settings-shortcut-desc">Focus search</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>Esc</kbd></span>
+                  <span class="settings-shortcut-desc">Close / clear</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>1</kbd>-<kbd>0</kbd></span>
+                  <span class="settings-shortcut-desc">Switch views</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>?</kbd></span>
+                  <span class="settings-shortcut-desc">Shortcut help</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h2>About</h2>
+              <div class="settings-about-grid">
+                <span class="settings-about-label">Application</span>
+                <span class="settings-about-value">Dataforge</span>
+                <span class="settings-about-label">Version</span>
+                <span class="settings-about-value">0.1.0</span>
+                <span class="settings-about-label">API</span>
+                <span class="settings-about-value" id="settings-api-url">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -1509,9 +1724,9 @@
             <span class="shortcut-desc">Clear search / Close modals</span>
           </div>
           <div class="shortcut-item">
-            <span class="shortcut-key"><kbd>1</kbd>–<kbd>0</kbd></span>
+            <span class="shortcut-key"><kbd>1</kbd>-<kbd>0</kbd></span>
             <span class="shortcut-desc"
-              >Switch views (Jobs, New, Recycle, Cognition, Dashboard, Auth Profiles, Workflows, Billing, Audit,
+              >Switch views (Jobs, New, Dashboard, API Keys, Settings, Workflows, Auth Profiles, Billing, Audit,
               Retention)</span
             >
           </div>
@@ -1522,6 +1737,36 @@
         </div>
         <div class="shortcut-close-row">
           <button type="button" class="btn secondary small" data-action="close-shortcuts">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Command Palette -->
+    <div
+      id="command-palette-overlay"
+      class="command-palette-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
+    >
+      <div class="command-palette">
+        <div class="command-palette-input-wrap">
+          <span data-icon="search" class="command-palette-search-icon" aria-hidden="true"></span>
+          <input
+            type="text"
+            id="command-palette-input"
+            class="command-palette-input"
+            placeholder="Search views, actions..."
+            aria-label="Search commands"
+          />
+        </div>
+        <div id="command-palette-results" class="command-palette-results">
+          <div class="command-palette-hint">Type to search...</div>
+        </div>
+        <div class="command-palette-footer">
+          <span class="command-palette-footer-hint"><kbd>Up</kbd><kbd>Down</kbd> navigate</span>
+          <span class="command-palette-footer-hint"><kbd>Enter</kbd> select</span>
+          <span class="command-palette-footer-hint"><kbd>Esc</kbd> close</span>
         </div>
       </div>
     </div>

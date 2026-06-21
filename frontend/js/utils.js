@@ -169,7 +169,16 @@ export function toggleTheme() {
 function updateThemeToggleIcon(theme) {
   const btn = document.getElementById("btn-theme-toggle");
   if (!btn) return;
-  btn.textContent = theme === "dark" ? "☀️" : "🌙";
+  const iconName = theme === "dark" ? "sun" : "moon";
+  const existingSpan = btn.querySelector("[data-icon]");
+  if (existingSpan) {
+    existingSpan.setAttribute("data-icon", iconName);
+    // Trigger icon hydration
+    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch(() => {});
+  } else {
+    btn.innerHTML = `<span data-icon="${iconName}" aria-hidden="true"></span>`;
+    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch(() => {});
+  }
 }
 
 // ─── Shortcut Help Modal ───

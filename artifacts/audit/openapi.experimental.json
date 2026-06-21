@@ -23,6 +23,11 @@
           "scope": {
             "default": "read",
             "description": "Key scope: read, write, or admin",
+            "enum": [
+              "read",
+              "write",
+              "admin"
+            ],
             "title": "Scope",
             "type": "string"
           }
