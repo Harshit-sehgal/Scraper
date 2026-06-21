@@ -254,7 +254,7 @@ def validate_public_domain(domain: str) -> None:
 
 
 def _record_ssrf_reject(reason: str) -> None:
-    """Record an SSRF reject with a structured reason for Prometheus export.
+    """Record an SSRF reject with a structured reason for audit and metrics.
 
     Lazy-imported so this module's import surface stays small for
     tests that do not need the metrics collector.
@@ -265,6 +265,18 @@ def _record_ssrf_reject(reason: str) -> None:
         record_ssrf_reject(reason)
     except Exception:
         logger.debug("Failed to record SSRF reject reason: %s", reason)
+
+    try:
+        from app.audit_logger import log_system_event
+
+        log_system_event(
+            action="ssrf_reject",
+            resource=f"url_safety:{reason}",
+            outcome="denied",
+            details={"reason": reason},
+        )
+    except Exception:
+        logger.debug("Failed to log SSRF reject audit event for reason: %s", reason)
 
 
 # ───────────────────────────────────────────────────────────────────────

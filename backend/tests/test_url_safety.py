@@ -411,3 +411,220 @@ async def test_get_safe_async_client_blocks_unix_socket() -> None:
     backend = SafeAsyncNetworkBackend(AutoBackend())
     with pytest.raises(ValueError, match="UNIX socket connections are disabled"):
         await backend.connect_unix_socket("/tmp/some.sock")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+
+
+# ── Audit event coverage ────────────────────────────────────────────────
+
+
+@pytest.fixture
+def _capture_audit_events(monkeypatch):
+    """Monkeypatch ``app.url_safety.log_system_event`` to capture audit events."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+    return captured
+
+
+def test_ssrf_reject_loopback_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for loopback addresses emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    with pytest.raises(ValueError, match="restricted local loopback target"):
+        validate_public_http_url("http://localhost/")
+
+    # Verify an audit event was emitted with the SSRF reject reason
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and "loopback" in e.get("resource", "")
+        and e.get("details", {}).get("reason") == "loopback_name"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
+
+
+def test_ssrf_reject_cloud_metadata_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for cloud metadata emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    with pytest.raises(ValueError, match="restricted cloud metadata endpoint"):
+        validate_public_http_url("http://169.254.169.254/latest/meta-data/")
+
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("reason") == "cloud_metadata"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
+
+
+def test_ssrf_reject_bad_scheme_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for bad URL schemes emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    with pytest.raises(ValueError, match="scheme"):
+        validate_public_http_url("ftp://example.com")
+
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("reason") == "bad_scheme"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
+
+
+def test_ssrf_reject_internal_tld_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for internal TLDs emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    with pytest.raises(ValueError, match="internal TLD"):
+        validate_public_http_url("http://somehost.local/path")
+
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("reason") == "internal_tld"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
+
+
+def test_ssrf_reject_disallowed_port_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for disallowed ports emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    # Ensure smoke-test mode is off so the port allowlist is enforced
+    monkeypatch.delenv("DATAFORGE_SMOKE_TEST_MODE", raising=False)
+    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
+
+    with pytest.raises(ValueError, match="not in the allowed list"):
+        validate_public_http_url("http://example.com:22/")
+
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("reason") == "disallowed_port"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
+
+
+def test_ssrf_reject_restricted_ip_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for private IPs used as explicit hosts emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    with pytest.raises(ValueError, match="restricted IP"):
+        validate_public_http_url("http://192.168.1.1/path")
+
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("reason") == "restricted_ip_literal"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
+
+
+def test_ssrf_reject_empty_url_audit_logged(monkeypatch) -> None:
+    """SSRF rejection for empty URLs emits an audit event."""
+    import app.url_safety as url_safety_mod
+
+    captured: list[dict] = []
+
+    def _capture(action, resource="", outcome="success", details=None):
+        captured.append({
+            "action": action,
+            "resource": resource,
+            "outcome": outcome,
+            "details": details or {},
+        })
+
+    monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
+
+    with pytest.raises(ValueError, match="empty"):
+        validate_public_http_url("")
+
+    assert any(
+        e.get("action") == "ssrf_reject"
+        and e.get("outcome") == "denied"
+        and e.get("details", {}).get("reason") == "empty_url"
+        for e in captured
+    ), f"Expected ssrf_reject audit event not found in {captured}"
