@@ -87,6 +87,7 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/system/diagnostics/export` | Admin |
 | GET | `/api/system/rate-limit-stats` | Operator or admin |
 | GET | `/api/system/retention/config` | Operator or admin |
+| GET | `/api/system/retention/health` | Operator or admin |
 | POST | `/api/system/retention/enforce` | Admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
 

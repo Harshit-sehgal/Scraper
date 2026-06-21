@@ -806,7 +806,7 @@ async def send_email_verification(
         )
 
     token = store.create_email_verification_token(user_id)
-    logger.info("Email verification token for %s: %s", user.email, token)
+    logger.debug("Email verification token created for %s", user.email)
 
     log_job_event(
         actor=user_id,
@@ -1064,7 +1064,7 @@ async def request_password_reset(
     user = store.get_user_by_email(validated_email)
     if user is not None:
         token = store.create_password_reset_token(user.id)
-        logger.info("Password reset token for %s: %s", body.email, token)
+        logger.debug("Password reset token created for %s", body.email)
         log_job_event(
             actor=user.id,
             action="password_reset_requested",

@@ -57,10 +57,12 @@ def test_job_results_disk_offload_and_retrieval(client, monkeypatch) -> None:
     async def fake_ai_clean_and_align(rows, *args, **kwargs):
         return rows[:1002], {}
 
-    # Monkeypatch at the import site: jobs_write.py imports ai_clean_and_align_records
-    # at module level from app.scraper, so patching the source module doesn't
-    # affect the already-imported reference. Patch at the import site instead.
-    monkeypatch.setattr("app.routers.jobs_write.ai_clean_and_align_records", fake_ai_clean_and_align)
+    # ARCH-001 refactoring moved reclean logic from jobs_write.py into
+    # JobReclenerService (app.services.job_mutation_service.py), which
+    # imports ai_clean_and_align_records lazily from app.scraper inside
+    # the method body.  Patching the source module (app.scraper) ensures
+    # the lazy import resolves to the mock regardless of the caller.
+    monkeypatch.setattr("app.scraper.ai_clean_and_align_records", fake_ai_clean_and_align)
 
     reclean_r = client.post(f"/api/jobs/{job_id}/reclean")
     assert reclean_r.status_code == 200

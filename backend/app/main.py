@@ -106,8 +106,8 @@ def configure_middleware(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["authorization", "content-type", "x-api-key"],
     )
     app.middleware("http")(security_headers_middleware)
     app.middleware("http")(csp_report_only_middleware)

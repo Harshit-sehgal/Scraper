@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-21 19:03:25 UTC
+**Generated:** 2026-06-21 21:14:29 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -116,6 +116,7 @@ For the diff between stable and experimental, see
 | GET | `/api/system/replay/events` |
 | GET | `/api/system/replay/status` |
 | GET | `/api/system/retention/config` |
+| GET | `/api/system/retention/health` |
 | GET | `/api/system/search` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
@@ -209,4 +210,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 149
+**Total routes:** 150

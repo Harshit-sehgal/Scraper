@@ -53,10 +53,20 @@ logger = logging.getLogger(__name__)
 
 
 def _get_feedback_engine():
-    """Lazy import to respect test mocking at app.selector_discovery.MotifFeedbackEngine."""
-    from app.selector_discovery import MotifFeedbackEngine as _MotifFeedbackEngine
+    """Return a no-op feedback engine stub.
 
-    return _MotifFeedbackEngine()
+    ``MotifFeedbackEngine`` was removed during a previous refactoring.
+    This stub preserves the call site so ``solidified_motifs`` support
+    can be re-added without changing the public API.
+    """
+    class _NoopFeedbackEngine:
+        """No-op stub that returns empty motif context."""
+
+        @staticmethod
+        def build_motif_context(*args, **kwargs) -> str:
+            return ""
+
+    return _NoopFeedbackEngine()
 
 
 def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict[str, Any]:  # noqa: ARG001, RUF100

@@ -18,7 +18,20 @@ import logging
 from typing import Any
 
 from app.config import settings
+from app.content_quality import (
+    _assess_content_quality,
+    _extract_container_text_values,
+)
+from app.empty_response_detector import EmptyResponseCheck, detect_empty_response
 from app.html_utils import clean_html_for_selectors
+from app.llm_bridge import llm_json, reset_llm_call_count
+from app.page_profiler import ValuePatterns, detect_page_structure, detect_value_patterns
+from app.search_form_recovery import (
+    _build_absolute_url,
+    _detect_search_form,
+    _map_search_params_to_fields,
+    _try_form_search_recovery,
+)
 
 # ── Re-exports from sub-modules for backward compatibility ──────────────
 from app.selector_discovery_analysis import (
@@ -33,12 +46,6 @@ from app.selector_discovery_analysis import (
     discover_selectors,
 )
 from app.session_url_detector import detect_session_params
-from app.search_form_recovery import (
-    _build_absolute_url,
-    _detect_search_form,
-    _map_search_params_to_fields,
-    _try_form_search_recovery,
-)
 from app.url_redirects import (
     _detect_redirect,
     build_redirect_info,
@@ -50,13 +57,42 @@ from app.url_value_classification import (
     _value_patterns_to_field_types,
     build_url_analysis_prompt,
 )
-from app.content_quality import (
-    _assess_content_quality,
-    _extract_container_text_values,
-)
-from app.empty_response_detector import EmptyResponseCheck, detect_empty_response
-from app.page_profiler import ValuePatterns, detect_page_structure, detect_value_patterns
-from app.llm_bridge import llm_json, reset_llm_call_count
+
+# ── Satisfy pyflakes ────────────────────────────────────────────────────
+# Some imports are referenced at runtime by url_analysis_pipeline._import_sd()
+# via importlib.import_module("app.selector_discovery").  These assert expressions
+# keep the names in the module namespace and suppress F401 warnings.
+#
+# ``app.acquisition_telemetry`` symbols are NOT imported at module level
+# because the research boundary checker requires kernel files to import
+# research modules lazily.  They are imported on demand by the pipeline
+# stages that need them.
+assert detect_session_params  # used by pipeline._stage_detect_session
+assert EmptyResponseCheck  # used by pipeline._stage_quality_check
+assert detect_empty_response  # used by pipeline._stage_quality_check
+assert detect_page_structure  # used by pipeline._stage_analyze_page
+assert detect_value_patterns  # used by pipeline._stage_analyze_page
+assert llm_json  # used by pipeline._stage_extract_fields
+assert reset_llm_call_count  # used by pipeline.run()
+assert settings  # test mock compatibility path
+
+
+# ── Lazy re-exports for backward compatibility ────────────────────────────
+# ``acquisition_telemetry`` is a research module; kernel files must import it
+# lazily (inside function bodies).  PEP 562 module __getattr__ allows us to
+# keep the re-exports available for monkeypatch targets and runtime lookups
+# (``url_analysis_pipeline._import_sd("get_acquisition_telemetry")``) without
+# importing at module load time, which would violate the research boundary.
+
+
+def __getattr__(name: str):
+    if name in {"AcquisitionTelemetryCollector", "get_acquisition_telemetry", "reset_acquisition_telemetry_collector"}:
+        import importlib
+
+        telemetry = importlib.import_module("app.acquisition_telemetry")
+        return getattr(telemetry, name)
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
 
 __all__ = [
     "_analyze_page_data_type",

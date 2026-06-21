@@ -67,6 +67,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION` | `v1` | Active version used for new encrypted payloads |
 | `DATAFORGE_AUTH_PROFILES_FILE` | `data/auth_profiles.json` | Path to the file-backed auth-profile store (used by `AuthProfileStore` in `app/utils/auth_profile_store.py`) |
 | `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE` | `data/billing_subscriptions.json` | Path to the file-backed billing-subscription store |
+| `DATAFORGE_WORKFLOW_RUNS_FILE` | `data/workflow_runs.json` | Path to the file-backed workflow-run history store |
 | `DATAFORGE_DISCOVERY_DIRECTORY_DOMAINS` | - | Comma-separated allowlist of domains for auto-discovery directory mode |
 | `DATAFORGE_LOCATION_WORDS` | - | Comma-separated extra location words to recognise when extracting location fields |
 | `DATAFORGE_LOCATION_WORDS_FILE` | - | Path to a file containing extra location words (one per line) |

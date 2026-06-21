@@ -448,20 +448,10 @@ class TestPostgresSerialization:
         result = _row_to_job({})
         assert result is None
 
-    def test_job_to_row_includes_deleted_at_none(self) -> None:
-        """Active jobs should have deleted_at=None for soft-delete restoration."""
-        _job_to_row, _ = self._import_postgres_module()
-        if _job_to_row is None:
-            return
-
-        job = Job(
-            id="test-deleted-at",
-            name="Deleted At Test",
-            urls=["https://example.com"],
-        )
-        row = _job_to_row(job)
-        assert "deleted_at" in row
-        assert row["deleted_at"] is None
+    # Note: ``deleted_at`` is NOT in the shared mapper output (ARCH-004).
+    # It is stamped by the Postgres save methods (save_all,
+    # move_to_recycle_bin, clear_terminal_jobs) after calling job_to_row.
+    # See postgres_repository_base for the inline stamping.
 
 
 class TestPostgresSchemaRepair:

@@ -116,7 +116,7 @@ class TestThreeWayAcquisition:
             patch("app.page_profiler.detect_value_patterns") as mock_patterns,
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm,
             patch("httpx.AsyncClient") as mock_httpx_client,
-            patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry),
+            patch("app.acquisition_telemetry.get_acquisition_telemetry", return_value=telemetry),
         ):
             mock_resp = MagicMock()
             mock_resp.url = url
@@ -201,7 +201,7 @@ class TestThreeWayAcquisition:
                 },
             ),
             patch("app.url_safety.validate_public_http_url", return_value=None),
-            patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry),
+            patch("app.acquisition_telemetry.get_acquisition_telemetry", return_value=telemetry),
             patch("app.selector_discovery.detect_session_params") as mock_session,
         ):
             mock_resp = MagicMock()
@@ -291,7 +291,7 @@ class TestThreeWayAcquisition:
                 },
             ),
             patch("app.url_safety.validate_public_http_url", return_value=None),
-            patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry),
+            patch("app.acquisition_telemetry.get_acquisition_telemetry", return_value=telemetry),
             patch("app.selector_discovery.detect_session_params") as mock_session,
         ):
             mock_resp = MagicMock()

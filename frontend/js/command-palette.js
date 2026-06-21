@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════ */
 
 import { switchView } from "./views.js";
+import { esc } from "./utils.js";
 import { hydrateIcons } from "./icons.js";
 
 const COMMANDS = [
@@ -68,7 +69,7 @@ function renderResults(commands) {
       data-view="${cmd.view || ""}"
     >
       <span data-icon="arrowRight" aria-hidden="true" class="command-palette-item-icon"></span>
-      <span class="command-palette-item-label">${cmd.label}</span>
+      <span class="command-palette-item-label">${esc(cmd.label)}</span>
     </button>`;
   });
 

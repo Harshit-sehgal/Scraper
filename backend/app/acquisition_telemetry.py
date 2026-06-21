@@ -134,3 +134,9 @@ def get_acquisition_telemetry() -> AcquisitionTelemetryCollector:
     if _collector is None:
         _collector = AcquisitionTelemetryCollector()
     return _collector
+
+
+def reset_acquisition_telemetry_collector() -> None:
+    """Reset the module-level singleton (for testing)."""
+    global _collector
+    _collector = None

@@ -24,7 +24,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from app.models import Job, JobStatus, SourcePolicy
+from app.models import Job, JobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -117,125 +117,12 @@ def _job_from_raw(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _job_to_row(job: Job) -> dict[str, Any]:
-    """Convert a Job model to a flat row dict for SQLite storage."""
-    return {
-        "id": job.id,
-        "name": job.name,
-        "status": job.status.value if hasattr(job.status, "value") else str(job.status),
-        "mode": job.mode.value if hasattr(job.mode, "value") else str(job.mode),
-        "topic": job.topic or "",
-        "intent": job.intent or "",
-        "urls": json.dumps(job.urls or []),
-        "schema_fields": json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]),
-        "filters": (
-            json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.filters or [])])
-            if hasattr(job, "filters")
-            else "[]"
-        ),
-        "results": json.dumps(job.results or []),
-        "logs": json.dumps([log.model_dump() if hasattr(log, "model_dump") else log for log in (job.logs or [])]),
-        "total_records": job.total_records or 0,
-        "filtered_records": job.filtered_records or 0,
-        "total_llm_calls": job.total_llm_calls or 0,
-        "error": job.error if job.error is not None else "",
-        "warnings": json.dumps(job.warnings or []),
-        "quality_report": json.dumps(job.quality_report if hasattr(job, "quality_report") else {}),
-        "analysis": job.analysis if job.analysis is not None else "",
-        "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, "discovered_urls") else []),
-        "selectors_map": json.dumps(job.selectors_map if hasattr(job, "selectors_map") else {}),
-        "search_params": json.dumps(job.search_params if job.search_params is not None else {}),
-        "max_pages": job.max_pages if hasattr(job, "max_pages") else 0,
-        "progress_current": job.progress_current or 0,
-        "progress_total": job.progress_total or 0,
-        "estimated_cost_usd": job.estimated_cost_usd or 0,
-        "cancel_requested": 1 if job.cancel_requested else 0,
-        "created_at": job.created_at or "",
-        "completed_at": job.completed_at if job.completed_at is not None else "",
-        "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
-        "acquisition_mode": (
-            job.acquisition_mode.value if hasattr(job.acquisition_mode, "value") else str(job.acquisition_mode or "standard")
-        ),
-        "search_params_json": json.dumps(job.search_params if job.search_params is not None else {}),
-        "location": job.location or "",
-        "preferred_domain": job.preferred_domain or "",
-        "source_policy": job.source_policy.value if hasattr(job.source_policy, "value") else str(job.source_policy),
-        "max_per_domain": job.max_per_domain or 4,
-        "origin_location": job.origin_location or "",
-        "max_distance_km": job.max_distance_km,
-        "pagination": 1 if job.pagination else 0,
-        "deduplicate": 1 if job.deduplicate else 0,
-        "deduplicate_field": job.deduplicate_field or "",
-        "started_at": job.started_at if job.started_at is not None else "",
-        "results_on_disk": 1 if job.results_on_disk else 0,
-        "results_file_path": job.results_file_path if job.results_file_path is not None else "",
-        "created_by": job.created_by or "",
-        "org_id": job.org_id or "",
-        "project_id": job.project_id or "",
-    }
-
-
-def _row_to_job(row: dict[str, Any]) -> Job | None:
-    """Convert a SQLite row dict back to a Job model."""
-    try:
-        source_policy_str = row.get("source_policy", "all_sources")
-        try:
-            sp = SourcePolicy(source_policy_str)
-        except (ValueError, KeyError):
-            sp = SourcePolicy.ALL_SOURCES
-
-        return Job.model_validate(
-            {
-                "id": row["id"],
-                "name": row["name"],
-                "status": row["status"],
-                "mode": row.get("mode", "manual"),
-                "topic": row.get("topic", ""),
-                "intent": row.get("intent", ""),
-                "urls": json.loads(row.get("urls") or "[]"),
-                "schema_fields": json.loads(row.get("schema_fields") or "[]"),
-                "filters": json.loads(row.get("filters") or "[]"),
-                "results": json.loads(row.get("results") or "[]"),
-                "logs": json.loads(row.get("logs") or "[]"),
-                "total_records": row.get("total_records", 0),
-                "filtered_records": row.get("filtered_records", 0),
-                "total_llm_calls": row.get("total_llm_calls", 0),
-                "error": row.get("error") or None,
-                "quality_report": json.loads(row.get("quality_report", "{}")),
-                "analysis": row.get("analysis") or None,
-                "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
-                "selectors_map": json.loads(row.get("selectors_map", "{}")),
-                "search_params": json.loads(row.get("search_params", "{}")) or None,
-                "max_pages": row.get("max_pages", 0),
-                "progress_current": row.get("progress_current", 0),
-                "progress_total": row.get("progress_total", 0),
-                "estimated_cost_usd": row.get("estimated_cost_usd", 0),
-                "cancel_requested": bool(row.get("cancel_requested", 0)),
-                "created_at": row.get("created_at", ""),
-                "completed_at": row.get("completed_at") or None,
-                "min_record_score": row.get("min_record_score", 0.35),
-                "location": row.get("location", ""),
-                "preferred_domain": row.get("preferred_domain", ""),
-                "source_policy": sp,
-                "max_per_domain": row.get("max_per_domain", 4),
-                "origin_location": row.get("origin_location", ""),
-                "max_distance_km": row.get("max_distance_km"),
-                "pagination": bool(row.get("pagination", 0)),
-                "deduplicate": bool(row.get("deduplicate", 1)),
-                "deduplicate_field": row.get("deduplicate_field", ""),
-                "started_at": row.get("started_at") or None,
-                "results_on_disk": bool(row.get("results_on_disk", 0)),
-                "results_file_path": row.get("results_file_path") or None,
-                "warnings": json.loads(row.get("warnings", "[]")),
-                "acquisition_mode": row.get("acquisition_mode", "standard"),
-                "created_by": row.get("created_by", ""),
-                "org_id": row.get("org_id", "") or "",
-                "project_id": row.get("project_id", "") or "",
-            },
-        )
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.warning("Failed to deserialize job row: %s", e)
-        return None
+# ── Serialization — delegated to the shared mapper module ──────────────
+# ARCH-004: Both SQLite and Postgres backends use the same canonical
+# job_to_row / row_to_job from app.storage_mapper.  We re-export under
+# the private names that callers within this file expect.
+from app.storage_mapper import job_to_row as _job_to_row
+from app.storage_mapper import row_to_job as _row_to_job
 
 
 def _run_migrations(conn: sqlite3.Connection) -> None:
@@ -1348,6 +1235,12 @@ def get_all_worker_healths(ttl_seconds: int = 60) -> list[dict]:
             rows = conn.execute(
                 "SELECT worker_id, last_heartbeat, hostname, pid FROM worker_heartbeats",
             ).fetchall()
+        except sqlite3.OperationalError:
+            # The ``worker_heartbeats`` table may not exist if the
+            # database was created without going through the full
+            # migration path (e.g. ephemeral test databases). Return
+            # an empty list instead of crashing the caller.
+            return []
         finally:
             conn.close()
     results: list[dict] = []

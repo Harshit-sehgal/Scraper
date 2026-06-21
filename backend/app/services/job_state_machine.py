@@ -97,6 +97,10 @@ def transition_to(
     Raises:
         ValueError: If the transition is invalid.
     """
+    # Allow idempotent transitions (same status → same status)
+    if job.status == new_status:
+        return
+
     if not can_transition(job, new_status):
         valid = _VALID_TRANSITIONS.get(job.status, set())
         msg = (

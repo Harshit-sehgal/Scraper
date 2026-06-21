@@ -9,6 +9,7 @@
  */
 
 import { apiFetch, getSessionRole } from "./api.js";
+import { esc } from "./utils.js";
 
 const REFRESH_MS = 60_000;
 const MAX_EVENTS = 12;
@@ -80,7 +81,7 @@ function _renderPermissionDenied() {
 function _renderError(message) {
   const container = document.getElementById("recent-activity-list");
   if (!container) return;
-  container.innerHTML = `<p class="subtle">${message}</p>`;
+  container.innerHTML = `<p class="subtle">${esc(message)}</p>`;
 }
 
 function _renderLastRefreshed() {

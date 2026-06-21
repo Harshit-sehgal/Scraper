@@ -554,6 +554,19 @@ async def get_retention_config_endpoint(
     return {"config": get_retention_config()}
 
 
+@router.get("/api/system/retention/health", status_code=200)
+async def get_retention_health_endpoint(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+) -> dict[str, Any]:
+    """Return health status of data retention enforcement."""
+    from app.utils.retention_monitoring import get_retention_monitor
+
+    monitor = get_retention_monitor()
+    health = monitor.get_health_check()
+
+    return {"health": health}
+
+
 # ─── Rate Limiter Stats ─────────────────────────────────────────────────
 
 
@@ -1066,7 +1079,6 @@ async def metrics(request: Request):
                 if last_hb:
                     try:
                         import datetime as _dt
-
                         age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
                     except (ValueError, TypeError):
                         age = -1.0

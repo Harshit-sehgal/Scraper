@@ -16,8 +16,6 @@ import datetime
 import logging
 from typing import Any
 
-from starlette.concurrency import run_in_threadpool
-
 from app.config import settings
 from app.models import JobStatus
 from app.routers.jobs_state import JobStoreManager, save_job
@@ -159,10 +157,10 @@ class JobBackfillService:
         ``source_trust_score`` for rows where ``source_type`` is
         ``"unknown"``.
         """
+        from fastapi.concurrency import run_in_threadpool as _run_sync
+
         from app.discovery import infer_source_metadata
         from app.utils.job_results_store import load_job_results_from_disk, save_job_results_to_disk
-        from fastapi import HTTPException
-        from fastapi.concurrency import run_in_threadpool as _run_sync
 
         job = await _run_sync(self._manager.get_job, job_id)
         _ensure_job_write_access(job, role, user_id, org_id, project_id, "backfill_metadata")
@@ -221,6 +219,9 @@ class JobReclenerService:
         """
         import asyncio
 
+        from fastapi import HTTPException
+        from fastapi.concurrency import run_in_threadpool as _run_sync
+
         from app.discovery import infer_source_metadata
         from app.filters import process_results
         from app.scraper import ai_clean_and_align_records
@@ -229,8 +230,6 @@ class JobReclenerService:
             load_job_results_from_disk,
             save_job_results_to_disk,
         )
-        from fastapi import HTTPException
-        from fastapi.concurrency import run_in_threadpool as _run_sync
 
         with self._manager.lock:
             if job_id not in self._manager.jobs_store:

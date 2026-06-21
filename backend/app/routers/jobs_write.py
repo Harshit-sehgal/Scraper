@@ -20,6 +20,11 @@ from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_admin_action, log_job_event
 from app.config import settings
+
+# Satisfy pyflakes — `settings` is patched in tests via ``jobs_write.settings``
+# and is also used by service modules that import it through this namespace.
+assert settings
+
 from app.discovery import (
     DiscoveryDependencyError,
     discover_urls,

@@ -183,8 +183,8 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     async def mock_save_job(job) -> None:
         saved_jobs.append(job)
 
-    # monkeypatch at the import site (jobs_write has already imported save_job at module level)
-    monkeypatch.setattr("app.routers.jobs_write.save_job", mock_save_job)
+    # monkeypatch at the service import site where save_job is used
+    monkeypatch.setattr("app.services.job_mutation_service.save_job", mock_save_job)
 
     # Track if persist_state gets called
     persist_called = False
@@ -197,7 +197,7 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
 
     # Mock infer_source_metadata to return a mock inferred dict
     monkeypatch.setattr(
-        "app.routers.jobs_write.infer_source_metadata",
+        "app.discovery.infer_source_metadata",
         lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85},
     )
 

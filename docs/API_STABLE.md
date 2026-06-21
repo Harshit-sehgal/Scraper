@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-21 19:03:25 UTC
+**Generated:** 2026-06-21 21:14:29 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -83,6 +83,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/system/manifest` |
 | GET | `/api/system/rate-limit-stats` |
 | GET | `/api/system/retention/config` |
+| GET | `/api/system/retention/health` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
 | POST | `/api/operator/denylist` |
@@ -170,4 +171,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 114
+**Total routes:** 115

@@ -457,6 +457,7 @@ async def _data_retention_loop() -> None:
                 enforce_idempotency_retention,
                 enforce_retention,
             )
+            from app.utils.retention_monitoring import record_retention_run
 
             with _jobs_store_lock:
                 result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
@@ -472,6 +473,9 @@ async def _data_retention_loop() -> None:
                 except (ImportError, RuntimeError) as e:
                     logger.warning("Retention background task failed to persist: %s", e)
 
+            # Record success for monitoring
+            record_retention_run(result)
+
             total_purged = result["jobs_purged"] + result["recycle_purged"] + idem_deleted
             if total_purged > 0:
                 logger.info(
@@ -483,7 +487,9 @@ async def _data_retention_loop() -> None:
 
         except asyncio.CancelledError:
             break
-        except Exception:
+        except Exception as e:
+            from app.utils.retention_monitoring import record_retention_run
+            record_retention_run(result=None, error=e)
             logger.exception("Data retention background task failed (non-blocking)")
 
 

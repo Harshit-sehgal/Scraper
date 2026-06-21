@@ -447,6 +447,65 @@ class TestPasswordResetAPI:
         )
         assert resp.status_code == 422
 
+    def test_email_verification_rate_limit_blocks_after_max(self, client):
+        from app.saas.router import reset_rate_limiters
+
+        reset_rate_limiters()
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "verify-rate@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+
+        # 3 requests are allowed by the default limit (3 per 5 minutes)
+        for _ in range(3):
+            resp = client.post("/api/saas/email-verification/send", cookies=cookies)
+            assert resp.status_code == 200
+
+        # 4th request should be rate-limited
+        resp = client.post("/api/saas/email-verification/send", cookies=cookies)
+        assert resp.status_code == 429
+
+    def test_password_reset_rate_limit_blocks_after_max(self, client):
+        from app.saas.router import reset_rate_limiters
+
+        reset_rate_limiters()
+        body = {"email": "reset-rate@example.com"}
+
+        # 5 requests are allowed by the default limit (5 per 5 minutes)
+        for _ in range(5):
+            resp = client.post("/api/saas/password-reset/request", json=body)
+            assert resp.status_code == 200
+
+        # 6th request should be rate-limited
+        resp = client.post("/api/saas/password-reset/request", json=body)
+        assert resp.status_code == 429
+
+
+class TestBruteForcePrevention:
+    def test_signup_rate_limit_blocks_after_max(self, client):
+        from app.saas.router import reset_rate_limiters
+
+        reset_rate_limiters()
+        email = "signup-rate@example.com"
+
+        # 3 requests are allowed by the default signup limit
+        for _ in range(3):
+            resp = client.post(
+                "/api/saas/signup",
+                json={"email": email, "password": "SecurePass123!"},
+            )
+            assert resp.status_code in (200, 201, 400, 422)
+
+        # 4th request should be rate-limited
+        resp = client.post(
+            "/api/saas/signup",
+            json={"email": email, "password": "SecurePass123!"},
+        )
+        assert resp.status_code == 429
+
 
 class TestInvitationAPI:
     """Tests for invitation endpoints."""

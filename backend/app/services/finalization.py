@@ -6,13 +6,13 @@ and terminal persistence.
 
 from __future__ import annotations
 
-import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.models import JobStatus
 from app.services._job_log import log_job_message as _log
+from app.services.job_state_machine import transition_to
 from app.services.status_classifier import classify_job_status, job_completion_message
 
 if TYPE_CHECKING:
@@ -87,14 +87,17 @@ async def run_finalization(
             _log(job, f"Failed to offload results to disk: {e}", level="warning", persist_fn=persist_job_state_fn)
 
     total_urls = len(job.urls)
-    job.status, job.error = classify_job_status(
+    terminal_status, error_message = classify_job_status(
         total_urls=total_urls,
         urls_with_records=urls_with_records,
         all_raw_results_count=len(all_raw_results),
     )
-
-    job.cancel_requested = False
-    job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
+    transition_to(
+        job,
+        terminal_status,
+        error=error_message,
+        cancel_requested=False,
+    )
     job.progress_current = job.progress_total
     _record_job_completed_usage(job)
 

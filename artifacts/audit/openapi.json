@@ -5908,6 +5908,30 @@
         ]
       }
     },
+    "/api/system/retention/health": {
+      "get": {
+        "description": "Return health status of data retention enforcement.",
+        "operationId": "get_retention_health_endpoint_api_system_retention_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Retention Health Endpoint Api System Retention Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Retention Health Endpoint",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/system/status": {
       "get": {
         "description": "Detailed system and active jobs overview. Requires operator or admin.\n\nIn worker mode (multi-process deployment), queries the persistent\nrepository for job counts rather than relying on the API process's\nin-memory store, which may be stale or empty.",

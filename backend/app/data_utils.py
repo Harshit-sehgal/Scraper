@@ -309,6 +309,18 @@ def process_raw_records(
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
     avg_score = sum(r.get("record_score", 0) for r in results) / max(len(results), 1)
+
+    # Run semantic pipeline if quality is low
     if avg_score < 0.5 and results:
-        results = run_pipeline(results, [f.name for f in schema_fields])
+        try:
+            semantic_results = run_pipeline(results, [f.name for f in schema_fields])
+            if semantic_results:
+                results = semantic_results
+        except Exception as e:
+            # Log but don't fail extraction if semantic pipeline is unavailable
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("Semantic pipeline unavailable (falling back to raw records): %s", e)
+            # Continue with unprocessed results
+
     return results

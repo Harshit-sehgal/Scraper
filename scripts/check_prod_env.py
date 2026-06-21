@@ -275,6 +275,27 @@ def check_grafana_password(value: str) -> bool:
     return True
 
 
+def check_paypal_client_id(value: str) -> bool:
+    if not value or _is_placeholder_secret(value):
+        print("  [FAIL]  PAYPAL_CLIENT_ID is not set or is a placeholder. Production requires a real PayPal client ID.")
+        return False
+    return True
+
+
+def check_paypal_plan_id(value: str, name: str) -> bool:
+    if not value or _is_placeholder_secret(value):
+        print(f"  [FAIL]  {name} is not set or is a placeholder. Production requires a real PayPal plan ID.")
+        return False
+    return True
+
+
+def check_paypal_webhook_secret(value: str) -> bool:
+    if not value or _is_placeholder_secret(value):
+        print("  [FAIL]  PAYPAL_WEBHOOK_SECRET is not set or is a placeholder. Production requires a real webhook secret.")
+        return False
+    return True
+
+
 def check_database_url(value: str) -> bool:
     """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
     if not value.startswith(("postgresql://", "postgres://")):
@@ -563,6 +584,42 @@ def main() -> int:
             True,
             check_grafana_password,
             "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)",
+        ),
+        (
+            "PAYPAL_CLIENT_ID",
+            True,
+            check_paypal_client_id,
+            "Live PayPal REST client ID for checkout and webhook verification",
+        ),
+        (
+            "PAYPAL_CLIENT_SECRET",
+            True,
+            check_paypal_client_id,
+            "Live PayPal REST client secret",
+        ),
+        (
+            "PAYPAL_PLAN_ID_STARTER",
+            True,
+            lambda v: check_paypal_plan_id(v, "PAYPAL_PLAN_ID_STARTER"),
+            "PayPal subscription plan ID for the Starter tier",
+        ),
+        (
+            "PAYPAL_PLAN_ID_PRO",
+            True,
+            lambda v: check_paypal_plan_id(v, "PAYPAL_PLAN_ID_PRO"),
+            "PayPal subscription plan ID for the Pro tier",
+        ),
+        (
+            "PAYPAL_PLAN_ID_ENTERPRISE",
+            True,
+            lambda v: check_paypal_plan_id(v, "PAYPAL_PLAN_ID_ENTERPRISE"),
+            "PayPal subscription plan ID for the Enterprise tier",
+        ),
+        (
+            "PAYPAL_WEBHOOK_SECRET",
+            True,
+            check_paypal_webhook_secret,
+            "PayPal webhook signing secret for event verification",
         ),
     ]
 
