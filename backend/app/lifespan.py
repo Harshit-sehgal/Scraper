@@ -403,12 +403,14 @@ async def _process_due_scheduled_jobs() -> None:
 
             # Add to recent_run_summaries (capped at 10)
             summaries = list(scheduled.get("recent_run_summaries") or [])
-            summaries.append({
-                "ran_at": now_iso,
-                "status": "completed",
-                "records_count": len(job.results) if hasattr(job, "results") else 0,
-                "job_id": job.id,
-            })
+            summaries.append(
+                {
+                    "ran_at": now_iso,
+                    "status": "completed",
+                    "records_count": len(job.results) if hasattr(job, "results") else 0,
+                    "job_id": job.id,
+                }
+            )
             scheduled["recent_run_summaries"] = summaries[-10:]
 
             # Persist the updated schedule

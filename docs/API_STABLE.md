@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-20 16:24:16 UTC
+**Generated:** 2026-06-21 11:36:10 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -107,6 +107,8 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | --- | --- |
 | DELETE | `/api/auth-profiles/{profile_id}` |
 | DELETE | `/api/saas/memberships/{membership_id}` |
+| DELETE | `/api/saas/orgs/{org_id}` |
+| DELETE | `/api/saas/projects/{project_id}` |
 | DELETE | `/api/saas/projects/{project_id}/keys/{key_id}` |
 | DELETE | `/api/scheduled/{job_id}` |
 | DELETE | `/api/user/data` |
@@ -126,6 +128,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/saas/plan` |
 | GET | `/api/saas/projects/{project_id}` |
 | GET | `/api/saas/projects/{project_id}/keys` |
+| GET | `/api/saas/usage` |
 | GET | `/api/scheduled` |
 | GET | `/api/scheduled/{job_id}` |
 | GET | `/api/scheduled/{job_id}/changes` |
@@ -156,4 +159,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 100
+**Total routes:** 103

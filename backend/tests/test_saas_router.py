@@ -289,12 +289,14 @@ class TestAupEnforcementOnMutationRoutes:
     @staticmethod
     def _cookies_for(user_id: str, role: str = "admin") -> dict:
         from app.auth.session import SESSION_COOKIE, create_session_cookie
+
         return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
 
     @staticmethod
     def _accept_aup_via_store(user_id: str) -> None:
         from app.saas import CURRENT_AUP_VERSION
         from app.saas.identity_store import get_identity_store
+
         get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
 
     def test_create_api_key_fails_without_aup(self, client: TestClient):
@@ -380,6 +382,7 @@ class TestOrganizationDeleteEndpoint:
     @staticmethod
     def _cookies_for(user_id: str, role: str = "admin") -> dict:
         from app.auth.session import SESSION_COOKIE, create_session_cookie
+
         return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
 
     def test_delete_org_removes_org_and_cascades(self, client: TestClient):
@@ -408,6 +411,7 @@ class TestOrganizationDeleteEndpoint:
 
         # Verify project is gone
         from app.saas.identity_store import get_identity_store
+
         assert get_identity_store().get_project(project_id) is None
 
     def test_delete_nonexistent_org_returns_404(self, client: TestClient):
@@ -430,6 +434,7 @@ class TestProjectDeleteEndpoint:
     @staticmethod
     def _cookies_for(user_id: str, role: str = "admin") -> dict:
         from app.auth.session import SESSION_COOKIE, create_session_cookie
+
         return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
 
     def test_delete_project_removes_project_and_api_keys(self, client: TestClient):
@@ -446,6 +451,7 @@ class TestProjectDeleteEndpoint:
         # Accept AUP so we can create an API key
         from app.saas import CURRENT_AUP_VERSION
         from app.saas.identity_store import get_identity_store
+
         get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
 
         # Create an API key in the project

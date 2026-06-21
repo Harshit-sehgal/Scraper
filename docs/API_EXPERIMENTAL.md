@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-20 16:24:16 UTC
+**Generated:** 2026-06-21 11:36:10 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -146,6 +146,8 @@ For the diff between stable and experimental, see
 | --- | --- |
 | DELETE | `/api/auth-profiles/{profile_id}` |
 | DELETE | `/api/saas/memberships/{membership_id}` |
+| DELETE | `/api/saas/orgs/{org_id}` |
+| DELETE | `/api/saas/projects/{project_id}` |
 | DELETE | `/api/saas/projects/{project_id}/keys/{key_id}` |
 | DELETE | `/api/scheduled/{job_id}` |
 | DELETE | `/api/user/data` |
@@ -165,6 +167,7 @@ For the diff between stable and experimental, see
 | GET | `/api/saas/plan` |
 | GET | `/api/saas/projects/{project_id}` |
 | GET | `/api/saas/projects/{project_id}/keys` |
+| GET | `/api/saas/usage` |
 | GET | `/api/scheduled` |
 | GET | `/api/scheduled/{job_id}` |
 | GET | `/api/scheduled/{job_id}/changes` |
@@ -195,4 +198,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 135
+**Total routes:** 138
