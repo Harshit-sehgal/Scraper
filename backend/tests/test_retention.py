@@ -6,11 +6,9 @@ import datetime
 from typing import Any
 
 import pytest
-
 from app.models import Job, JobStatus
 from app.utils.data_retention import _age_in_days, enforce_retention, get_retention_config
 from app.utils.retention_monitoring import RetentionMonitor, get_retention_monitor, record_retention_run
-
 
 # ─── Fixtures ──────────────────────────────────────────────────────────
 

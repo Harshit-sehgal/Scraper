@@ -46,9 +46,26 @@ control.
 
 ## Remaining Work
 
-- Map each required metric to existing code or implement it.
-- Add alert thresholds for auth failures, tenant denials, quota
-  denials, failed jobs, browser failures, and domain failure rate.
-- Prove metrics ingestion in staging.
+- Prove metrics ingestion in staging (Prometheus scrape + alert thresholds).
 - Add dashboard screenshots or exported JSON to release evidence.
-- Define log retention and redaction guarantees.
+- Define log retention and redaction guarantees in deployment runbooks.
+
+## Metric Mapping (2026-06-22)
+
+| Required metric | Implementation | Exposed as |
+| --- | --- | --- |
+| `job_created_total` | `record_job_created()` in job creation | `dataforge_job_created_total` |
+| `job_succeeded_total` | `record_job_succeeded()` in finalization | `dataforge_job_succeeded_total` |
+| `job_failed_total` | `record_job_failed()` in finalization | `dataforge_job_failed_total` |
+| `quota_rejected_total` | audit RBAC quota denials + plan enforcer | `dataforge_quota_rejected_total` |
+| `auth_failed_total` | audit auth failures | `dataforge_auth_failed_total` |
+| `tenant_access_denied_total` | audit RBAC denials (non-quota) | `dataforge_tenant_access_denied_total` |
+| `exports_created_total` | successful export routes | `dataforge_exports_created_total` |
+| `workflow_preview_total` | workflow preview route | `dataforge_workflow_preview_total` |
+| `workflow_run_total` | workflow run route | `dataforge_workflow_run_total` |
+| `browser_context_failed_total` | `record_browser_launch(success=False)` | `dataforge_browser_launch_outcomes{outcome=failure}` |
+| SSRF / URL safety blocks | `record_ssrf_reject()` | `dataforge_ssrf_rejects_total` |
+| Job counts by status | in-memory jobs store snapshot | `dataforge_jobs_total{status=...}` |
+| Request latency | middleware | `dataforge_request_duration_seconds_*` |
+
+Deferred (needs staging histograms): `page_fetch_duration_seconds`, `domain_failure_rate` aggregate series.

@@ -490,6 +490,69 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
         workflow_router._workflows.clear_all()
 
 
+def test_project_scoped_key_cannot_access_another_orgs_workflow_draft(client, monkeypatch, tmp_path) -> None:
+    from app.routers import workflow as workflow_router
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    workflow_router._workflow_drafts.clear_all()
+
+    try:
+        created = client.post(
+            "/api/workflow-drafts/from-url-analysis",
+            headers={"X-API-Key": write_key_b.raw_key},
+            json={
+                "original_url": "https://example.com/search?q=laptops",
+                "selected_start_url": "https://example.com/",
+                "classification": "session_url",
+            },
+        )
+        assert created.status_code == 201
+        draft_id = created.json()["id"]
+
+        denied_calls = [
+            client.post(
+                f"/api/workflow-drafts/{draft_id}/detect-fields",
+                headers={"X-API-Key": write_key_a.raw_key},
+                json={"html_snapshot": "<html><body><input name='q'></body></html>"},
+            ),
+            client.post(
+                f"/api/workflow-drafts/{draft_id}/manual-mapping",
+                headers={"X-API-Key": write_key_a.raw_key},
+                json={
+                    "start_url": "https://example.com/",
+                    "fields": [{"name": "q", "selector": "input[name=q]", "value": "laptops"}],
+                    "extraction_schema": [{"name": "title", "field_type": "string"}],
+                },
+            ),
+        ]
+        for response in denied_calls:
+            assert response.status_code == 404, response.text
+
+        owner_detect = client.post(
+            f"/api/workflow-drafts/{draft_id}/detect-fields",
+            headers={"X-API-Key": write_key_b.raw_key},
+            json={"html_snapshot": "<html><body><input name='q'></body></html>"},
+        )
+        assert owner_detect.status_code == 200
+    finally:
+        reset_identity_store(None)
+        workflow_router._workflow_drafts.clear_all()
+
+
 def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monkeypatch, tmp_path) -> None:
     from app.routers import auth_profiles as auth_profiles_router
     from app.saas import ApiKeyScope

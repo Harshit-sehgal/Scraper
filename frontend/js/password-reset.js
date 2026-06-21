@@ -2,7 +2,7 @@
    DataForge — Password Reset View
    ═══════════════════════════════════════════ */
 
-import { esc, toast } from "./utils.js";
+import { toast } from "./utils.js";
 import { apiFetch } from "./api.js";
 
 export async function requestPasswordReset() {

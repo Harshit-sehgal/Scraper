@@ -98,6 +98,15 @@ async def run_finalization(
         error=error_message,
         cancel_requested=False,
     )
+    try:
+        from app.metrics_collector import record_job_failed, record_job_succeeded
+
+        if terminal_status == JobStatus.FAILED:
+            record_job_failed()
+        elif terminal_status in (JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT):
+            record_job_succeeded()
+    except ImportError:
+        pass
     job.progress_current = job.progress_total
     _record_job_completed_usage(job)
 

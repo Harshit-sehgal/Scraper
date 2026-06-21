@@ -504,6 +504,13 @@ async def run_workflow(
     )
     logger.info("Workflow queued: %s -> job %s (run %s)", workflow_id, job_id, run_id)
 
+    try:
+        from app.metrics_collector import record_workflow_run
+
+        record_workflow_run()
+    except ImportError:
+        pass
+
     return {
         "workflow_id": workflow_id,
         "job_id": job_id,
@@ -623,4 +630,10 @@ async def preview_workflow(
         wf["last_failure_reason"] = result.get("failure_type") or result.get("user_message")
     wf["last_run_at"] = _now_iso()
     _write_back(wf)
+    try:
+        from app.metrics_collector import record_workflow_preview
+
+        record_workflow_preview()
+    except ImportError:
+        pass
     return result

@@ -171,7 +171,7 @@ class JobCreationService:
         mode = str(job_data.mode or "fast").lower()
         if mode == "semantic":
             try:
-                from app.semantic_pipeline import get_pipeline_status
+                from app.semantic_pipeline import get_pipeline_status  # type: ignore[attr-defined]
                 status = await get_pipeline_status()
                 if not status.get("available", False):
                     from app.exceptions import JobCreationError
@@ -203,6 +203,13 @@ class JobCreationService:
         with self._manager.lock:
             self._manager.jobs_store[job.id] = job
         await save_job(job)
+
+        try:
+            from app.metrics_collector import record_job_created
+
+            record_job_created()
+        except ImportError:
+            pass
 
         # Step 7: Record idempotency key
         if idem_key:

@@ -248,14 +248,15 @@ def _aes_gcm_decrypt(ciphertext: bytes, tag: bytes, nonce: bytes, key: bytes) ->
 
 def encrypt(plaintext: str, user_id: str | None = None) -> str:
     """Encrypt a plaintext string with optional per-user key derivation.
-    
+
     C8: When user_id is provided, derive key from user_id + salt instead of app-level key.
     This ensures per-user encryption so one key compromise doesn't expose all users' data.
     """
     import hashlib
-    
+
     key_version = _get_key_version()
-    
+    key: bytes | None = None
+
     # C8: Per-user encryption
     if user_id:
         try:
@@ -272,7 +273,7 @@ def encrypt(plaintext: str, user_id: str | None = None) -> str:
             key = _get_key(key_version)
     else:
         key = _get_key(key_version)
-    
+
     if key is None:
         # Try discovering any available key
         all_keys = _get_all_available_keys()

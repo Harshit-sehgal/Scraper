@@ -93,6 +93,27 @@ class TestBrowserLaunchOutcomes:
         assert outcomes == {"success": 1, "failure": 2}
 
 
+class TestProductCounters:
+    def test_record_and_get(self, reset_metrics) -> None:
+        from app.metrics_collector import (
+            get_product_totals,
+            record_auth_failed,
+            record_job_created,
+            record_quota_rejected,
+            record_tenant_access_denied,
+        )
+
+        record_job_created()
+        record_auth_failed()
+        record_quota_rejected()
+        record_tenant_access_denied()
+        totals = get_product_totals()
+        assert totals["job_created_total"] == 1
+        assert totals["auth_failed_total"] == 1
+        assert totals["quota_rejected_total"] == 1
+        assert totals["tenant_access_denied_total"] == 1
+
+
 class TestSsrfRejects:
     def test_record_and_get(self, reset_metrics) -> None:
         from app.metrics_collector import get_ssrf_rejects, record_ssrf_reject

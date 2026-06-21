@@ -94,4 +94,4 @@ async def test_workflow_update_and_delete(clean_db, session_client):
     assert delete_resp.status_code in (200, 204)
 
     get_resp = session_client.get(f"/api/workflows/{workflow_id}")
-    assert get_resp.status_code == 404 or get_resp.status_code == 200
+    assert get_resp.status_code in (404, 200)

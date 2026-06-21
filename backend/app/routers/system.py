@@ -709,6 +709,7 @@ def _render_basic_metrics_text() -> str:
         get_request_latencies,
         get_requests_total,
         get_retention_ops,
+        get_product_totals,
         get_scheduled_job_ops,
         get_signup_outcomes,
         get_ssrf_rejects,
@@ -765,6 +766,9 @@ def _render_basic_metrics_text() -> str:
                 {"action": ret_action},
             ),
         )
+
+    for counter_name, counter_value in get_product_totals().items():
+        lines.append(_basic_metric_line(f"dataforge_{counter_name}", counter_value))
 
     backend_ok = 1
     try:

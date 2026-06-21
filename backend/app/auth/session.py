@@ -163,19 +163,19 @@ def _sign(payload: str) -> str:
 
 def _unsign(signed: str) -> str | None:
     """Verify and return the payload from a signed cookie value, or None on failure.
-    
+
     H11: Try primary key, then rotated keys for secret rotation support.
     """
     try:
         payload, sig = signed.rsplit(".", 1)
     except (ValueError, AttributeError):
         return None
-    
+
     # Try primary key
     expected = _sign(payload)
     if hmac.compare_digest(sig, expected):
         return payload
-    
+
     # H11: Try rotated keys
     try:
         import os

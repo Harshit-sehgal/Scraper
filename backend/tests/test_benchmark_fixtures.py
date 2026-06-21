@@ -163,6 +163,20 @@ async def test_blocked_fixture_does_not_produce_false_records(
         )
 
 
+def test_login_wall_fixture_signals_login_required() -> None:
+    """Benchmark corpus: login-wall mock page should not look like a successful listing."""
+    html = _load_fixture("login_wall_mock")
+    assert "password" in html.lower()
+    assert "sign in" in html.lower() or "log in" in html.lower()
+
+
+def test_load_more_fixture_contains_pagination_control() -> None:
+    """Benchmark corpus: load-more mock page exposes a load-more control."""
+    html = _load_fixture("load_more_mock")
+    assert "load-more" in html.lower() or "load more" in html.lower()
+    assert "Item 1" in html
+
+
 # ── Acquisition lineage tests ───────────────────────────────────────────
 
 

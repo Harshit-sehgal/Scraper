@@ -187,6 +187,13 @@ def log_auth_event(
         details=merged_details,
     )
     _get_audit_logger().info(event.to_log_line())
+    try:
+        from app.metrics_collector import record_auth_failed
+
+        if outcome == "failure":
+            record_auth_failed()
+    except ImportError:
+        logger.debug("Metrics collector unavailable for auth event", exc_info=True)
 
 
 def log_rbac_event(
@@ -217,6 +224,16 @@ def log_rbac_event(
         details={**(details or {}), "role": role},
     )
     _get_audit_logger().info(event.to_log_line())
+    if outcome == "denied":
+        try:
+            from app.metrics_collector import record_quota_rejected, record_tenant_access_denied
+
+            if "quota" in action.lower():
+                record_quota_rejected()
+            else:
+                record_tenant_access_denied()
+        except ImportError:
+            logger.debug("Metrics collector unavailable for rbac event", exc_info=True)
 
 
 def log_admin_action(

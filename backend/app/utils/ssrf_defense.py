@@ -39,17 +39,15 @@ class SSRFDefense:
     def resolve_and_check(cls, hostname: str) -> str | None:
         """Resolve hostname and verify it's not in blocked range (DNS-rebinding mitigation)."""
         try:
-            # Resolve hostname
             result = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
 
             if not result:
                 logger.warning("DNS resolution failed for %s", hostname)
                 return None
 
-            # Check each resolved IP
-            resolved_ips = []
+            resolved_ips: list[str] = []
             for family, socktype, proto, canonname, sockaddr in result:
-                ip = sockaddr[0]
+                ip = str(sockaddr[0])
 
                 if cls.is_blocked_ip(ip):
                     logger.warning(
@@ -61,7 +59,6 @@ class SSRFDefense:
 
                 resolved_ips.append(ip)
 
-            # Return first non-blocked IP
             return resolved_ips[0] if resolved_ips else None
 
         except socket.gaierror as e:
@@ -88,9 +85,9 @@ class SSRFDefense:
 
             return True, ip
 
-        except Exception as e:
-            logger.exception("URL validation error: %s", e)
-            return False, str(e)
+        except Exception:
+            logger.exception("URL validation error")
+            return False, "URL validation failed"
 
 
 class DNSRebindingDefense:
@@ -130,11 +127,11 @@ class DNSRebindingDefense:
 
             # Cache current resolution
             result = socket.getaddrinfo(hostname, None)
-            ips = [addr[4][0] for addr in result]
+            ips = [str(addr[4][0]) for addr in result]
             self._dns_cache[hostname] = (current_time, ips)
 
             return False
 
-        except Exception as e:
-            logger.exception("DNS rebinding check error: %s", e)
+        except Exception:
+            logger.exception("DNS rebinding check error")
             return False

@@ -85,9 +85,11 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
     into a 5xx.
     """
     try:
-        from app.metrics_collector import record_export_outcome
+        from app.metrics_collector import record_export_created, record_export_outcome
 
         record_export_outcome(fmt, success)
+        if success:
+            record_export_created()
     except Exception:
         logger.exception("Failed to record export outcome metric for %s", fmt)
 

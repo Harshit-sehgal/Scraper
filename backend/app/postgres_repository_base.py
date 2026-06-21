@@ -29,6 +29,30 @@ logger = logging.getLogger(__name__)
 
 _CURRENT_SCHEMA_VERSION = 8
 
+_JOB_COLUMNS: frozenset[str] = frozenset({
+    "id", "name", "mode", "intent", "urls", "topic", "location",
+    "preferred_domain", "source_policy", "max_per_domain",
+    "origin_location", "max_distance_km", "schema_fields", "filters",
+    "pagination", "max_pages", "deduplicate", "deduplicate_field",
+    "min_record_score", "selectors_map", "search_params",
+    "cancel_requested", "status", "created_by", "org_id", "project_id",
+    "created_at", "started_at", "completed_at", "total_records",
+    "filtered_records", "error", "results", "analysis",
+    "discovered_urls", "quality_report", "estimated_cost_usd",
+    "total_llm_calls", "logs", "progress_current", "progress_total",
+    "results_on_disk", "results_file_path", "warnings",
+    "acquisition_mode", "deleted_at",
+})
+
+
+def _validate_cols(cols: list[str]) -> str:
+    """Validate column names against known schema and return comma-joined string."""
+    for c in cols:
+        if c not in _JOB_COLUMNS:
+            msg = f"Unknown column: {c!r}"
+            raise ValueError(msg)
+    return ", ".join(cols)
+
 # Module-level exception tuple for DB operations so we don't swallow
 # programming errors with bare ``except Exception``.
 _DB_OPS_ERRORS: tuple[type[BaseException], ...] = (
@@ -770,22 +794,15 @@ class PostgresRepositoryBase(JobRepository, ABC):
         self._ensure()
         with self._conn() as conn:
 
-            def _safe_cols(row):
-                for k in row:
-                    if not k.isidentifier():
-                        msg = f"Unsafe column name in job_to_row: {k!r}"
-                        raise ValueError(msg)
-                return list(row.keys())
-
             for job in jobs.values():
                 row = job_to_row(job)
-                safe_keys = _safe_cols(row)
-                cols = ", ".join(safe_keys)
+                safe_keys = [k for k in row if k in _JOB_COLUMNS]
+                cols = _validate_cols(safe_keys)
                 ph = ", ".join("%s" for _ in safe_keys)
                 update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id")
                 self._execute(
                     conn,
-                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608  # noqa: RUF100, S608
+                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
                     [row[k] for k in safe_keys],
                 )
                 sync_job_results(conn, job.id, job.results)

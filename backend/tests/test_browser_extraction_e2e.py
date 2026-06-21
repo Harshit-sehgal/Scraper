@@ -17,7 +17,7 @@ _HTML_JS_RENDERED_PAGE = (
 
 
 class _TestPageHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         if self.path == "/test-page":
             body = _HTML_TEST_PAGE
         elif self.path == "/js-rendered-page":
@@ -29,7 +29,7 @@ class _TestPageHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body.encode())
 
-    def log_message(self, format, *args):  # noqa: ARG002
+    def log_message(self, format, *args):
         pass
 
 
@@ -88,8 +88,8 @@ async def test_browser_extraction_e2e(clean_db, session_client, test_server_url)
 
         if job["status"] in [JobStatus.COMPLETED.value, JobStatus.DEGRADED.value, JobStatus.FAILED.value]:
             break
+        time.sleep(1)  # noqa: ASYNC251
 
-        time.sleep(1)
 
     # Verify job completed
     assert job["status"] in [JobStatus.COMPLETED.value, JobStatus.DEGRADED.value], \
@@ -149,7 +149,7 @@ async def test_browser_handles_javascript_rendering(clean_db, session_client, te
         if job["status"] != JobStatus.PENDING.value:
             break
 
-        time.sleep(1)
+        time.sleep(1)  # noqa: ASYNC251
 
     # Get results
     results_resp = session_client.get(f"/api/jobs/{job_id}/results")
@@ -198,7 +198,7 @@ async def test_browser_pool_manages_resources(clean_db, session_client, test_ser
                 still_pending.append(job_id)
 
         job_ids = still_pending
-        time.sleep(2)
+        time.sleep(2)  # noqa: ASYNC251
 
     # All should complete without resource exhaustion
     # (Resource exhaustion would show as jobs stuck in PENDING)

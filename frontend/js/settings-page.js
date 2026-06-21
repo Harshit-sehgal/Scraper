@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 import { API } from "./api.js";
-import { initTheme, toast, toggleTheme } from "./utils.js";
+import { toast } from "./utils.js";
 
 const THEME_KEY = "dataforge_theme_v1";
 
@@ -37,13 +37,17 @@ export function setThemeMode(mode) {
     document.documentElement.setAttribute("data-theme", "dark");
     try {
       localStorage.setItem(THEME_KEY, "dark");
-    } catch {}
+    } catch {
+      // localStorage not available
+    }
     toast("Theme: Dark", "info");
   } else {
     document.documentElement.removeAttribute("data-theme");
     try {
       localStorage.setItem(THEME_KEY, "light");
-    } catch {}
+    } catch {
+      // localStorage not available
+    }
     toast("Theme: Light", "info");
   }
 

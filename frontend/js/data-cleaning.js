@@ -21,7 +21,7 @@ const TYPE_PATTERNS = [
   { type: "email", pattern: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, priority: 1 },
   { type: "url", pattern: /^https?:\/\/\S+$/i, priority: 2 },
   { type: "phone", pattern: /^[\d\s\-+()]{7,}$/, priority: 3 },
-  { type: "date", pattern: /^\d{1,4}[\/\-.]\d{1,2}[\/\-.]\d{1,4}$/, priority: 4 },
+  { type: "date", pattern: /^\d{1,4}[/\-.]\d{1,2}[/\-.]\d{1,4}$/, priority: 4 },
   { type: "number", pattern: /^-?\d+(\.\d+)?$/, priority: 5 },
   { type: "price", pattern: /^[$€£¥]/, priority: 6 },
 ];
@@ -79,7 +79,7 @@ function _cleanNumber(v) {
 
 function _cleanDate(v) {
   const s = String(v).trim();
-  const m = s.match(/^(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})$/);
+  const m = s.match(/^(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})$/);
   if (m) {
     let a = m[1],
       b = m[2],

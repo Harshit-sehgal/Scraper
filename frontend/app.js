@@ -48,7 +48,15 @@ import {
 } from "./js/form.js";
 import { refreshCognition } from "./js/cognition.js";
 import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
-import { restoreJob, hardDeleteJob, clearRecycleBin, handleRecycleSelectAll, handleRecycleSelectItem, batchRestore, batchHardDelete } from "./js/recycle.js";
+import {
+  restoreJob,
+  hardDeleteJob,
+  clearRecycleBin,
+  handleRecycleSelectAll,
+  handleRecycleSelectItem,
+  batchRestore,
+  batchHardDelete,
+} from "./js/recycle.js";
 import { cancelJob, deleteJob, clearTerminalJobs } from "./js/jobs.js";
 import {
   viewResults,

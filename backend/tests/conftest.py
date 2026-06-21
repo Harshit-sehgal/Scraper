@@ -782,7 +782,7 @@ def clean_db():
             conn.commit()
             conn.close()
     except Exception:
-        pass
+        logger.warning("Failed to clean idempotency keys", exc_info=True)
     from app.utils.usage_ledger import reset_usage_ledger
 
     reset_usage_ledger()

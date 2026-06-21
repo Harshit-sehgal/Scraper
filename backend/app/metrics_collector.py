@@ -88,6 +88,22 @@ _scheduled_job_ops_lock = threading.Lock()
 
 # Data retention operation counters: action -> count
 _retention_ops: dict[str, int] = {}
+
+# Product-level counters aligned with docs/OBSERVABILITY.md required metrics.
+_product_totals: dict[str, int] = {}
+_product_totals_lock = threading.Lock()
+
+_PRODUCT_COUNTER_NAMES = (
+    "job_created_total",
+    "job_succeeded_total",
+    "job_failed_total",
+    "quota_rejected_total",
+    "auth_failed_total",
+    "tenant_access_denied_total",
+    "exports_created_total",
+    "workflow_preview_total",
+    "workflow_run_total",
+)
 _retention_ops_lock = threading.Lock()
 
 # Rate limit hit counters: incremented by the rate limiter middleware when
@@ -379,6 +395,52 @@ def record_retention_op(action: str) -> None:
         _retention_ops[action] = _retention_ops.get(action, 0) + 1
 
 
+def increment_product_counter(name: str, amount: int = 1) -> None:
+    """Increment a named product counter exposed on ``/metrics``."""
+    if name not in _PRODUCT_COUNTER_NAMES or amount <= 0:
+        return
+    with _product_totals_lock:
+        _product_totals[name] = _product_totals.get(name, 0) + amount
+
+
+def record_job_created() -> None:
+    increment_product_counter("job_created_total")
+
+
+def record_job_succeeded() -> None:
+    increment_product_counter("job_succeeded_total")
+
+
+def record_job_failed() -> None:
+    increment_product_counter("job_failed_total")
+
+
+def record_quota_rejected() -> None:
+    increment_product_counter("quota_rejected_total")
+
+
+def record_auth_failed() -> None:
+    increment_product_counter("auth_failed_total")
+
+
+def record_tenant_access_denied() -> None:
+    increment_product_counter("tenant_access_denied_total")
+
+
+def record_export_created() -> None:
+    increment_product_counter("exports_created_total")
+
+
+def record_workflow_preview() -> None:
+    increment_product_counter("workflow_preview_total")
+    record_workflow_op("preview")
+
+
+def record_workflow_run() -> None:
+    increment_product_counter("workflow_run_total")
+    record_workflow_op("run")
+
+
 def get_auth_profile_ops() -> dict[str, int]:
     with _auth_profile_ops_lock:
         return dict(_auth_profile_ops)
@@ -402,6 +464,11 @@ def get_scheduled_job_ops() -> dict[str, int]:
 def get_retention_ops() -> dict[str, int]:
     with _retention_ops_lock:
         return dict(_retention_ops)
+
+
+def get_product_totals() -> dict[str, int]:
+    with _product_totals_lock:
+        return dict(_product_totals)
 
 
 def get_rate_limit_global_hits() -> int:
@@ -457,3 +524,5 @@ def reset_for_testing() -> None:
         _scheduled_job_ops.clear()
     with _retention_ops_lock:
         _retention_ops.clear()
+    with _product_totals_lock:
+        _product_totals.clear()

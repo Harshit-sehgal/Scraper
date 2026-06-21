@@ -61,7 +61,7 @@ except ImportError:
 # ─── H5: Redis-backed rate limiting for distributed deployments ────────
 class RedisRateLimiter:
     """H5: Distributed rate limiting using Redis for multi-worker deployments."""
-    
+
     def __init__(self, redis_url: str = ""):
         self.redis_url = redis_url or os.environ.get("DATAFORGE_REDIS_URL", "")
         self.redis = None

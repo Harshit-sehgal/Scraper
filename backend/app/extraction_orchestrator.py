@@ -294,7 +294,7 @@ async def orchestrate_extraction(
     """
     memory = get_selector_memory()
     force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
-    
+
     # C4: Track page invalidation
     page_closed = False
     def _on_page_close():

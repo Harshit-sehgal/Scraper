@@ -119,7 +119,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-CI-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** validation / test_reproducibility
 - **file_path:** `backend/tests`
 - **line/function:** full suite

@@ -67,9 +67,10 @@ function _render() {
         </button>
       </div>
     </div>
-    ${_cachedJobs.map((j) => {
-      const checked = _selected.has(j.id) ? "checked" : "";
-      return `
+    ${_cachedJobs
+      .map((j) => {
+        const checked = _selected.has(j.id) ? "checked" : "";
+        return `
         <div class="job-row recycle-row ${checked ? "selected" : ""}" data-job-id="${attrStr(j.id)}">
           <div class="recycle-check-col">
             <input type="checkbox" class="recycle-check-item" data-id="${attrStr(j.id)}"
@@ -83,7 +84,8 @@ function _render() {
             <button class="btn danger-ghost small" data-action="hard-delete-job" data-id="${attrStr(j.id)}">Delete Forever</button>
           </div>
         </div>`;
-    }).join("")}`;
+      })
+      .join("")}`;
 
   _updateBatchBar();
 }
@@ -181,7 +183,10 @@ export async function batchRestore() {
           // Continue with remaining
         }
       }
-      toast(`Restored ${success} of ${ids.length} job${ids.length !== 1 ? "s" : ""}`, success > 0 ? "success" : "error");
+      toast(
+        `Restored ${success} of ${ids.length} job${ids.length !== 1 ? "s" : ""}`,
+        success > 0 ? "success" : "error",
+      );
       _selected = new Set();
       refreshRecycleBin();
     },
@@ -207,7 +212,10 @@ export async function batchHardDelete() {
           // Continue with remaining
         }
       }
-      toast(`Deleted ${success} of ${ids.length} job${ids.length !== 1 ? "s" : ""} permanently`, success > 0 ? "success" : "error");
+      toast(
+        `Deleted ${success} of ${ids.length} job${ids.length !== 1 ? "s" : ""} permanently`,
+        success > 0 ? "success" : "error",
+      );
       _selected = new Set();
       refreshRecycleBin();
     },
