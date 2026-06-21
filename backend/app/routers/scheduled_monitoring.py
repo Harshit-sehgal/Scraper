@@ -204,7 +204,7 @@ async def detect_changes(
 
     This is intentionally a thin, deterministic diff over what the
     scheduler already records. A full record-level diff engine is a
-    separate milestone (see ``docs/ROADMAP.md``).
+    separate milestone tracked in `AGENTS.md` / `artifacts/audit/ISSUE_LEDGER.md`.
     """
     job = _get_visible_scheduled_job(job_id, auth)
 

@@ -58,4 +58,4 @@ The Dockerfile installs Python packages from `pyproject.toml` (the single source
 - Verify Prometheus scrape path, alert rules, alert delivery, and Grafana provisioning/login.
 - Run load tests and failure drills.
 
-See `docs/PRODUCTION_READINESS.md` for the gate checklist.
+See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for the gate list.

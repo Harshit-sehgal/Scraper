@@ -125,7 +125,6 @@ regenerated from code by `scripts/generate_route_inventory.py` and
 | File | What it covers |
 | --- | --- |
 | [`PRODUCTION.md`](PRODUCTION.md) | Production overview |
-| [`PRODUCTION_READINESS.md`](PRODUCTION_READINESS.md) | **Stale.** Treat as historical — see `AGENT_TRUTH.md`. |
 | [`PRODUCTION_STARTUP.md`](PRODUCTION_STARTUP.md) | Container startup sequence |
 | [`DEPLOYMENT_CHECKLIST.md`](DEPLOYMENT_CHECKLIST.md) | Pre-deploy checklist |
 | [`OPS_READINESS_CHECKLIST.md`](OPS_READINESS_CHECKLIST.md) | SRE readiness checks |
@@ -143,9 +142,6 @@ regenerated from code by `scripts/generate_route_inventory.py` and
 | --- | --- |
 | [`BENCHMARKS.md`](BENCHMARKS.md) | Benchmark results |
 | [`BENCHMARK_PLAN.md`](BENCHMARK_PLAN.md) | Benchmark methodology |
-| [`REFACTOR_PLAN.md`](REFACTOR_PLAN.md) | Outstanding work items |
-| [`ROADMAP.md`](ROADMAP.md) | **Stale.** Historical/forward-looking only. |
-| [`CURRENT_STATUS.md`](CURRENT_STATUS.md) | **Stale.** Auto-generated summary superseded by `AGENT_TRUTH.md`. |
 | [`HANDOFF.md`](HANDOFF.md) | Handoff notes |
 | [`LIMITATIONS.md`](LIMITATIONS.md) | Known limitations |
 

@@ -23,8 +23,10 @@ job_events      (one row per lifecycle event, JSONB in Postgres)
 job_artifacts   (one row per file artifact — optional, future)
 ```
 
-The report's blueprint recommends exactly this split (see
-`docs/ROADMAP.md` for the larger context).
+The report's blueprint recommends exactly this split. See
+[ARCHITECTURE.md](ARCHITECTURE.md) and
+[MODULE_CLASSIFICATION.md](MODULE_CLASSIFICATION.md) for the current
+storage layout.
 
 ## Schema version: v6
 

@@ -1,9 +1,8 @@
 # Storage And Deployment Notes
 
-**Last refreshed:** 2026-06-08
-**Current truth source:** `../PROJECT_STATUS.md`
+**Current truth source:** `../docs/AGENT_TRUTH.md`
 
-DataForge supports local SQLite storage and Postgres repository/queue code. Local SQLite tests pass in the safe backend suite (3025 passed, 78 skipped). Postgres repository and queue tests passed locally with Docker/testcontainers in prior sessions.
+DataForge supports local SQLite storage and Postgres repository/queue code. The full backend test suite passes locally on SQLite (`python3 scripts/validate_local.py --quick` is 12/12 green); see `AGENT_TRUTH.md` for the most recent evidence.
 
 This does not prove production readiness. A local Compose smoke verified Docker build, startup, worker processing, Nginx route blocking, internal metrics scraping, and container Chromium launch, but target deployment, backups, restore, load, and failure testing remain unvalidated.
 
@@ -36,8 +35,7 @@ Use Postgres queue only after validating the deployed worker and database behavi
 ## Production References
 
 - `../docs/PRODUCTION.md`
-- `../docs/PRODUCTION_READINESS.md`
 - `../docs/SECURITY.md`
 - `../docs/TESTING.md`
 
-Do not use this file for stale production claims; update `PROJECT_STATUS.md` first after fresh command output.
+For current production-readiness evidence, see `../docs/AGENT_TRUTH.md`.

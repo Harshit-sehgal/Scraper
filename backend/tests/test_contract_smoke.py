@@ -4,8 +4,8 @@ These tests verify the repository's externally-visible contract BEFORE any
 code fixes. They should initially FAIL for the right reasons, providing a
 stable target for the remediation sequence.
 
-See docs/PRODUCTION_READINESS.md and the deep-research audit report for
-the rationale behind each test.
+See `docs/AGENT_TRUTH.md` and `docs/DEPLOYMENT_CHECKLIST.md` for the
+rationale behind each test.
 
 Key tests:
 1. /openapi.json returns 200 in development mode

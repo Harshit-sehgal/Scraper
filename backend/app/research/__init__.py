@@ -7,7 +7,7 @@ kernel or part of the research shell?".
 
 Why this matters
 ----------------
-The repo's deep-research-report and PROJECT_STATUS.md both call out a
+The repo's deep-research-report and AGENTS.md both call out a
 central architectural problem: the product kernel and a large research
 shell (semantic world state, topology, federation, gossip, motif, energy,
 instability, strategy evolution, chaos, replay, etc.) share the same

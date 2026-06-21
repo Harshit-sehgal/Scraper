@@ -10,7 +10,7 @@
 
 DataForge Scraper is a pre-production FastAPI + Playwright web extraction platform for accessible websites. It provides configurable scraping jobs, browser-assisted loading, schema/selector-based extraction paths, result storage, exports, diagnostics, telemetry, API-key/RBAC utilities, SSRF-oriented URL checks, rate limiting, and an internal static dashboard.
 
-Do not claim this project is a universal scraper, anti-bot proof, fully autonomous, or production-ready without the deployment gates in `docs/PRODUCTION_READINESS.md`.
+Do not claim this project is a universal scraper, anti-bot proof, fully autonomous, or production-ready — confirm against `python3 scripts/validate_local.py --quick` (the existing deployment gate).
 
 ## What It Does
 
@@ -155,7 +155,6 @@ Do not deploy publicly until the production checklist is validated in the target
 
 - `docs/AGENT_TRUTH.md` - current command-evidence truth source
 - `docs/VALIDATION.md` - reproducible validation commands and log locations
-- `PROJECT_STATUS.md` - historical status unless refreshed by current command output
 - `docs/ARCHITECTURE.md` - actual architecture map
 - `docs/API.md` - manually verified route summary
 - `docs/SECURITY.md` - security posture and remaining risks
@@ -163,7 +162,6 @@ Do not deploy publicly until the production checklist is validated in the target
 - `docs/TESTING.md` - test commands and what they prove
 - `docs/BENCHMARKS.md` - benchmark truth and gaps
 - `docs/PRODUCTION.md` - production deployment notes
-- `docs/PRODUCTION_READINESS.md` - gate checklist
 - `docs/MODULE_CLASSIFICATION.md` - core/stable/experimental classification
 
 Archived docs under `docs/archive/` are historical unless explicitly refreshed.
