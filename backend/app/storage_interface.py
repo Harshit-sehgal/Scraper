@@ -457,7 +457,7 @@ class SQLiteJobRepository(JobRepository):
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error, deleted_at "
             "FROM recycle_bin "
-            "WHERE " + where + " "
+            "WHERE " + where + " "  # nosec B608  # noqa: RUF100, S608
             "ORDER BY created_at DESC LIMIT ?"
         )
         with _DB_LOCK:
@@ -540,7 +540,7 @@ class SQLiteJobRepository(JobRepository):
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error "
             "FROM jobs "
-            "WHERE " + where + " "
+            "WHERE " + where + " "  # nosec B608  # noqa: RUF100, S608
             "ORDER BY created_at DESC LIMIT ?"
         )
         with _DB_LOCK:

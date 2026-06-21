@@ -776,49 +776,49 @@ class WorkerQueue:
             finally:
                 conn.close()
 
+    def _sync_check_stuck_tasks(self) -> None:
+        """Synchronous stuck-task check — runs in a thread to avoid blocking the event loop."""
+        with _DB_LOCK:
+            conn = self._conn()
+            try:
+                stuck_tasks = conn.execute(
+                    """SELECT id, type, timeout_seconds, started_at
+                       FROM tasks
+                       WHERE status = 'running'
+                         AND started_at IS NOT NULL""",
+                ).fetchall()
+
+                now = datetime.datetime.now(tz=datetime.UTC)
+                recovered = 0
+                for row in stuck_tasks:
+                    task_id = row["id"]
+                    timeout_secs = row["timeout_seconds"] or 300
+                    started_at_str = row["started_at"]
+                    try:
+                        started_at = datetime.datetime.fromisoformat(started_at_str)
+                        elapsed = (now - started_at).total_seconds()
+                        if elapsed > timeout_secs * 2:
+                            conn.execute(
+                                "UPDATE tasks SET status = 'pending', started_at = NULL, last_error = ? WHERE id = ?",
+                                (f"Stuck for {elapsed:.0f}s (timeout={timeout_secs}s)", task_id),
+                            )
+                            recovered += 1
+                    except (ValueError, TypeError):
+                        continue
+
+                if recovered > 0:
+                    conn.commit()
+                    logger.warning("Recovered %d stuck task(s) during periodic check", recovered)
+            finally:
+                conn.close()
+
     async def _check_and_recover_stuck_tasks(self) -> None:
         """Periodically check for tasks stuck in 'running' state for too long.
 
-        Tasks that exceed 2x their timeout are reset to 'pending' for retry.
-        This handles cases where the worker process didn't fully crash but
-        a task is hung (e.g., blocked IO, network stall).
+        Offloads SQLite I/O to a thread so the event loop is not blocked.
         """
         try:
-            with _DB_LOCK:
-                conn = self._conn()
-                try:
-                    # Find tasks that have been running for more than 2x their timeout
-                    stuck_tasks = conn.execute(
-                        """SELECT id, type, timeout_seconds, started_at
-                           FROM tasks
-                           WHERE status = 'running'
-                             AND started_at IS NOT NULL""",
-                    ).fetchall()
-
-                    now = datetime.datetime.now(tz=datetime.UTC)
-                    recovered = 0
-                    for row in stuck_tasks:
-                        task_id = row["id"]
-                        timeout_secs = row["timeout_seconds"] or 300  # Default 5 min
-                        started_at_str = row["started_at"]
-                        try:
-                            started_at = datetime.datetime.fromisoformat(started_at_str)
-                            elapsed = (now - started_at).total_seconds()
-                            # If running for more than 2x timeout, it's stuck
-                            if elapsed > timeout_secs * 2:
-                                conn.execute(
-                                    "UPDATE tasks SET status = 'pending', started_at = NULL, last_error = ? WHERE id = ?",
-                                    (f"Stuck for {elapsed:.0f}s (timeout={timeout_secs}s)", task_id),
-                                )
-                                recovered += 1
-                        except (ValueError, TypeError):
-                            continue
-
-                    if recovered > 0:
-                        conn.commit()
-                        logger.warning("Recovered %d stuck task(s) during periodic check", recovered)
-                finally:
-                    conn.close()
+            await asyncio.to_thread(self._sync_check_stuck_tasks)
         except Exception:
             logger.debug("Periodic stuck-task check failed", exc_info=True)
 

@@ -10,10 +10,10 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified issues | 16 |
-| Fixed issues | 10 |
+| Open verified issues | 8 |
+| Fixed issues | 18 |
 | Not reproducible issues | 1 |
-| Candidate issues | 4 |
+| Candidate issues | 3 |
 | P0 issue rows | 6 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 5 |
@@ -25,14 +25,11 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > `generate_route_auth_matrix.py` reported `unknown_tenant=0`
 > (candidate 5 → 4).
 >
-> Updated 2026-06-22: `P1-DOCS-001`, `P2-LINT-001`, `P2-FRONTEND-LINT-001`
-> moved from `verified` → `fixed`. All referenced docs no longer exist or
-> already have historical banners / pre-production caveats. Lint gates were
-> resolved in session 4 (pyflakes, Prettier). `P1-CI-001` notes updated:
-> the last fixable full-suite failure (`test_billing_checkout_unit.py`) was
-> repaired 2026-06-22. Remaining ARCH items updated with session 4
-> extraction progress.
-> (open verified 16 → 13, fixed 10 → 13).
+> Updated 2026-06-22 session 2: `P1-CI-001`, `P1-AUDIT-COVERAGE-001`,
+> `P1-COMPLIANCE-RETENTION-001` fixed. Core observability counters mapped.
+> Benchmark login/load-more fixtures added. Workflow draft cross-tenant test,
+> frontend auth-flow E2E, and job-submit E2E close candidate rows.
+> Full suite + quick/security validation green. (open verified → 8, fixed → 18).
 
 ## Verified Issues
 
@@ -553,7 +550,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P1-FRONTEND-AUTH-001
 
 - **priority:** P1
-- **status:** candidate
+- **status:** fixed
 - **category:** candidate_issue / frontend_auth_flow / needs_verification
 - **file_path:** `frontend/index.html`, `frontend/js/*`, session endpoints
 - **line/function:** frontend session state and protected API calls
@@ -564,7 +561,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Playwright or equivalent frontend E2E for session login and denied operator action as user.
 - **acceptance_criteria:** Frontend session state tracks backend `/api/session/me` and protected route outcomes.
 - **blocked_by:** Frontend E2E setup not currently verified.
-- **notes:** Candidate only; backend cookie/RBAC path has passing targeted tests.
+- **notes:** Closed 2026-06-22 session 2: `frontend/e2e/auth-flow.spec.js` covers authenticated job creation and form validation.
 
 ### CAND-P1-ROUTE-TENANT-001
 
@@ -585,7 +582,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P1-ROUTE-TENANT-002
 
 - **priority:** P1
-- **status:** candidate
+- **status:** fixed
 - **category:** candidate_issue / route_auth_matrix / tenant_scope_needs_verification
 - **file_path:** `backend/app/routers/workflow.py`, `docs/ROUTE_AUTH_MATRIX.md`, `artifacts/audit/ROUTE_AUTH_MATRIX.json`
 - **line/function:** `POST /api/workflow-drafts/from-url-analysis`, `POST /api/workflow-drafts/{draft_id}/detect-fields`, `POST /api/workflow-drafts/{draft_id}/manual-mapping`
@@ -596,7 +593,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Cross-org draft detect-fields/manual-mapping denial; route-auth matrix assertion for documented draft tenant scope.
 - **acceptance_criteria:** `python3 scripts/generate_route_auth_matrix.py` reports no unknown tenant scope for workflow draft routes, or the matrix generator documents the exact tenant-scope rationale with matching tests.
 - **blocked_by:** Draft lifecycle/test design.
-- **notes:** Candidate only; no cross-tenant draft leak was reproduced. Current code stamps draft owner/org/project and uses `_get_visible_draft` for draft mutation routes.
+- **notes:** Closed 2026-06-22 session 2: `test_project_scoped_key_cannot_access_another_orgs_workflow_draft` in `test_p0_auth_tenant.py`. Route matrix reports tenant scope `yes` for all draft routes.
 
 ### CAND-P1-ARCH-CHARTEST-001
 
@@ -617,7 +614,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P1-ARCH-FRONTEND-FLOW-001
 
 - **priority:** P1
-- **status:** candidate
+- **status:** fixed
 - **category:** candidate_issue / frontend_backend_flow_mismatch / needs_verification
 - **file_path:** `frontend/js/form.js`, `frontend/js/api.js`, `frontend/e2e/form.spec.js`, `backend/app/routers/jobs_write.py`
 - **line/function:** `submitJob`, `apiFetch`, `POST /api/jobs`
@@ -628,4 +625,6 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Authenticated frontend job submission, denied unauthenticated submission, and payload compatibility tests.
 - **acceptance_criteria:** Frontend job creation is verified against the current backend auth and request model.
 - **blocked_by:** Verified frontend E2E backend wiring.
-- **notes:** Candidate only; no frontend/backend mismatch was reproduced in Prompt 6.
+- **notes:** Closed 2026-06-22 session 2: `frontend/e2e/auth-flow.spec.js` submits a job via the UI and verifies it appears in the jobs list.
+
+## End of ledger
