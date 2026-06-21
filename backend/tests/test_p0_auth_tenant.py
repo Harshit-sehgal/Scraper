@@ -67,6 +67,7 @@ def _setup_saas_accounts(tmp_path):
     # (e.g. create_scheduled_job, create_project, create_api_key) don't 403.
     from app.saas import CURRENT_AUP_VERSION as _AUP_VER
     from app.saas.identity_store import get_identity_store
+
     _store = get_identity_store()
     _store.mark_aup_accepted(org_a.user.id, aup_version=_AUP_VER)
     _store.mark_aup_accepted(org_b.user.id, aup_version=_AUP_VER)
@@ -367,6 +368,7 @@ def test_project_scoped_write_key_cannot_export_another_orgs_job(
     json_body: dict | None,
 ) -> None:
     import app.main as main_mod
+    from app.routers import exports as exports_router
     from app.saas import ApiKeyScope
     from app.utils import usage_ledger as usage_mod
     from app.utils.usage_ledger import UsageLedger, UsageType
@@ -393,10 +395,26 @@ def test_project_scoped_write_key_cannot_export_another_orgs_job(
     ledger = UsageLedger()
     monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
 
+    # Capture audit RBAC events for cross-org export denial
+    audit_events: list[dict] = []
+
+    def capture_audit(**kwargs) -> None:
+        audit_events.append(kwargs)
+
+    monkeypatch.setattr(exports_router, "log_rbac_event", capture_audit, raising=False)
+
     try:
         denied = client.request(method, path, headers={"X-API-Key": write_key_a.raw_key}, json=json_body)
         assert denied.status_code in {403, 404}
         assert ledger.get_usage(org_a.user.id, UsageType.EXPORT_GENERATED) == []
+
+        # P1-AUDIT-COVERAGE-001: cross-org export denial must be audit-logged
+        assert audit_events, f"Expected at least one audit RBAC event for denied export via {method} {path}"
+        denied_events = [e for e in audit_events if e.get("outcome") == "denied"]
+        assert denied_events, (
+            f"Expected a denied audit event for cross-org export via {method} {path}; got events: {audit_events}"
+        )
+        assert "export" in denied_events[0].get("action", "").lower() or "batch" in denied_events[0].get("action", "").lower()
 
         if method != "POST":
             allowed = client.request(method, path, headers={"X-API-Key": write_key_b.raw_key}, json=json_body)
@@ -426,6 +444,14 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
     )
     workflow_router._workflows.clear_all()
 
+    # Capture audit job events for workflow operations
+    audit_events: list[dict] = []
+
+    def capture_audit(**kwargs) -> None:
+        audit_events.append(kwargs)
+
+    monkeypatch.setattr(workflow_router, "log_job_event", capture_audit, raising=False)
+
     try:
         created = client.post(
             "/api/workflows",
@@ -434,6 +460,10 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
         )
         assert created.status_code == 201
         workflow_id = created.json()["id"]
+
+        # P1-AUDIT-COVERAGE-001: workflow create must be audit-logged
+        create_events = [e for e in audit_events if e.get("action") == "workflow_created"]
+        assert create_events, f"Expected workflow_created audit event; got {audit_events}"
 
         listed = client.get("/api/workflows", headers={"X-API-Key": write_key_a.raw_key})
         assert listed.status_code == 200
@@ -480,6 +510,14 @@ def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monk
     )
     auth_profiles_router._auth_profiles.clear_all()
 
+    # Capture audit RBAC events for cross-org auth profile denial
+    audit_events: list[dict] = []
+
+    def capture_audit(**kwargs) -> None:
+        audit_events.append(kwargs)
+
+    monkeypatch.setattr(auth_profiles_router, "log_rbac_event", capture_audit, raising=False)
+
     try:
         created = client.post(
             "/api/auth-profiles?name=Org+B+Login&domain=example.com",
@@ -498,6 +536,11 @@ def test_project_scoped_key_cannot_access_another_orgs_auth_profile(client, monk
         denied_delete = client.delete(f"/api/auth-profiles/{profile_id}", headers={"X-API-Key": write_key_a.raw_key})
         assert denied_get.status_code in {403, 404}
         assert denied_delete.status_code in {403, 404}
+
+        # P1-AUDIT-COVERAGE-001: cross-org auth profile denial must be audit-logged
+        denied_events = [e for e in audit_events if e.get("outcome") == "denied"]
+        assert denied_events, f"Expected denied audit event for cross-org auth profile access; got {audit_events}"
+        assert "auth_profile" in denied_events[0].get("action", "") or "auth-profile" in denied_events[0].get("resource", "")
 
         owner_get = client.get(f"/api/auth-profiles/{profile_id}", headers={"X-API-Key": write_key_b.raw_key})
         assert owner_get.status_code == 200
@@ -527,6 +570,14 @@ def test_project_scoped_key_cannot_access_another_orgs_schedule(client, monkeypa
     )
     scheduled_router._scheduled_jobs.clear_all()
 
+    # Capture audit RBAC events for cross-org scheduled job denial
+    audit_events: list[dict] = []
+
+    def capture_audit(**kwargs) -> None:
+        audit_events.append(kwargs)
+
+    monkeypatch.setattr(scheduled_router, "log_rbac_event", capture_audit, raising=False)
+
     try:
         created = client.post(
             "/api/scheduled?name=Org+B+Schedule&job_name=Org+B+Run",
@@ -550,6 +601,11 @@ def test_project_scoped_key_cannot_access_another_orgs_schedule(client, monkeypa
             client.delete(f"/api/scheduled/{schedule_id}", headers={"X-API-Key": write_key_a.raw_key}),
         ]
         assert all(response.status_code in {403, 404} for response in denied_calls)
+
+        # P1-AUDIT-COVERAGE-001: cross-org scheduled job denial must be audit-logged
+        denied_events = [e for e in audit_events if e.get("outcome") == "denied"]
+        assert denied_events, f"Expected denied audit event for cross-org scheduled job access; got {audit_events}"
+        assert "scheduled" in denied_events[0].get("action", "") or "scheduled" in denied_events[0].get("resource", "")
 
         owner_get = client.get(f"/api/scheduled/{schedule_id}", headers={"X-API-Key": write_key_b.raw_key})
         assert owner_get.status_code == 200

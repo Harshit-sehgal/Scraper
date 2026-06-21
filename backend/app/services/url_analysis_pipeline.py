@@ -58,9 +58,7 @@ class _UrlAnalysisContext:
     session_detection: dict = field(default_factory=dict)
     html: str = ""
     fetch_method: str = "unknown"
-    search_form: dict = field(
-        default_factory=lambda: {"detected": False, "form_fields": [], "search_fields": [], "action": ""}
-    )
+    search_form: dict = field(default_factory=lambda: {"detected": False, "form_fields": [], "search_fields": [], "action": ""})
     search_recovery: dict | None = None
     anti_bot_score: float = 0.0
     profile: Any = None
@@ -84,7 +82,7 @@ class _UrlAnalysisContext:
     # Error state
     error_response: dict | None = None
 
-    # Config (set in run())
+    # Set in run().
     config: Any = None
     mode_enum: Any = None
 
@@ -174,9 +172,8 @@ class URLAnalysisPipeline:
 
         # ── Escalation Check ─────────────────────────────────────────
         max_depth = ctx.config.max_retries
-        if (
-            _escalation_depth < max_depth
-            and should_escalate(ctx.mode_enum, ctx._acquisition_state_value, ctx.empty_check.is_empty)
+        if _escalation_depth < max_depth and should_escalate(
+            ctx.mode_enum, ctx._acquisition_state_value, ctx.empty_check.is_empty
         ):
             escalated_mode = escalate_mode(ctx.mode_enum)
             if escalated_mode != ctx.mode_enum:
@@ -199,9 +196,11 @@ class URLAnalysisPipeline:
 
     async def _stage_resolve_url(self, ctx: _UrlAnalysisContext) -> None:
         """Resolve the final URL via httpx redirect-following with SSRF checks."""
-        import httpx
-        from app.url_safety import get_safe_async_client, validate_public_http_url
         from urllib.parse import urljoin
+
+        import httpx
+
+        from app.url_safety import get_safe_async_client, validate_public_http_url
 
         ctx.final_url = ctx.url
         try:

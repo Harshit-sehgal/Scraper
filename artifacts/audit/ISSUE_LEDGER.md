@@ -24,6 +24,15 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > `/api/saas/plan` was wired to per-user tier lookup and
 > `generate_route_auth_matrix.py` reported `unknown_tenant=0`
 > (candidate 5 → 4).
+>
+> Updated 2026-06-22: `P1-DOCS-001`, `P2-LINT-001`, `P2-FRONTEND-LINT-001`
+> moved from `verified` → `fixed`. All referenced docs no longer exist or
+> already have historical banners / pre-production caveats. Lint gates were
+> resolved in session 4 (pyflakes, Prettier). `P1-CI-001` notes updated:
+> the last fixable full-suite failure (`test_billing_checkout_unit.py`) was
+> repaired 2026-06-22. Remaining ARCH items updated with session 4
+> extraction progress.
+> (open verified 16 → 13, fixed 10 → 13).
 
 ## Verified Issues
 
@@ -121,7 +130,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Full backend pytest should pass in a clean test environment.
 - **acceptance_criteria:** `python3 -m pytest backend/tests -q` exits 0 and the output is recorded.
 - **blocked_by:** None.
-- **notes:** Targeted P0 auth/tenant, billing/quota, route matrix, workflow, scheduled, SaaS router, and export tests pass. The full suite failure did not time out.
+- **notes:** Original three failures (auth profiles, pyflakes) were fixed in Prompt 3 and session 4. A new `test_billing_checkout_unit.py` failure (stale `user_id` kwarg, missing `@pytest.mark.asyncio`) was fixed 2026-06-22 — all 4 billing checkout tests now pass. Quick validation (12/12 gates) passes. Full suite still times out at >120s cumulative across 215+ test files — each batch passes individually within its timeout.
 
 ### P1-AUTHPROFILE-002
 
@@ -174,7 +183,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P2-LINT-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** code_quality
 - **file_path:** `backend`, `scripts`
 - **line/function:** ruff/pyflakes gates
@@ -185,7 +194,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Ruff and pyflakes commands pass.
 - **acceptance_criteria:** Both gates exit 0 and outputs are recorded.
 - **blocked_by:** `P1-AUTHPROFILE-002` for duplicate model cleanup.
-- **notes:** Keep cleanup focused.
+- **notes:** Resolved (2026-06-22): pyflakes warnings fixed by removing dead re-exports from `jobs_write.py` and switching `selector_discovery.py` to PEP 562 `__getattr__` lazy imports. Ruff was already clean. Both gates exit 0.
 
 ### P1-SECURITY-AUDIT-001
 
@@ -206,7 +215,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P2-FRONTEND-LINT-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** frontend_quality
 - **file_path:** `frontend/styles.css`
 - **line/function:** Prettier formatting
@@ -217,12 +226,12 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** `npm run lint:js`.
 - **acceptance_criteria:** Frontend lint exits 0.
 - **blocked_by:** None.
-- **notes:** Do not redesign UI in this cleanup.
+- **notes:** Resolved (2026-06-22): Prettier formatting applied to `frontend/styles.css` via existing formatter. `npm run lint:js` exits 0.
 
 ### P1-DOCS-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** documentation_truth
 - **file_path:** `PROJECT_STATUS.md`, `docs/CURRENT_STATUS.md`, `docs/PRODUCTION_READINESS.md`, `docs/ROADMAP.md`, `docs/LIMITATIONS.md`, `README.md`, `docs/TESTING.md`
 - **line/function:** document claims audited in `artifacts/audit/DOCS_TRUTH_CHECK.md`
@@ -233,7 +242,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Documentation review plus current validation logs.
 - **acceptance_criteria:** No doc calls the project production-ready or 100/100 SaaS-ready without current evidence.
 - **blocked_by:** None.
-- **notes:** `docs/AGENT_TRUTH.md` is the current truth source.
+- **notes:** Resolved (2026-06-22): `PROJECT_STATUS.md`, `docs/CURRENT_STATUS.md`, `docs/PRODUCTION_READINESS.md`, `docs/ROADMAP.md` no longer exist. `docs/LIMITATIONS.md` and `docs/TESTING.md` already have historical banners pointing to `docs/AGENT_TRUTH.md`. `README.md` already says "pre-production candidate" with a "Banned Overclaims" section. No doc calls the project production-ready or 100/100 SaaS-ready without current evidence.
 
 ### P2-ENV-001
 
@@ -281,7 +290,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Job creation response, unsafe URL rejection, owner/org/project stamping, idempotency replay, quota denial, scheduled-job creation, and audit/metering behavior.
 - **acceptance_criteria:** Job creation behavior is covered by focused tests and write routes delegate business decisions to tested service/domain code.
 - **blocked_by:** Full backend suite is still red under `P1-CI-001`.
-- **notes:** No refactor was made in Prompt 6.
+- **notes:** Session 4 (2026-06-22) extracted `job_mutation_service.py` from `jobs_write.py` — job creation, update, deletion, and scheduling logic now delegate to the mutation service. The router remains responsible for HTTP/dependency wiring. Stale re-exports were also removed. Full characterization tests still pending.
 
 ### P1-ARCH-SELECTOR-001
 
@@ -297,7 +306,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Static page field discovery, session-bound URL handling, redirect/session-expired classification, form recovery, low-content warning, and network/browser-disabled fallbacks.
 - **acceptance_criteria:** Existing behavior is covered by fixtures and each pipeline stage can be tested without live sites.
 - **blocked_by:** Benchmark corpus and broader characterization tests.
-- **notes:** No extraction refactor was made in Prompt 6.
+- **notes:** Session 4 (2026-06-22) created `url_analysis_pipeline.py` to stage the pipeline into separate concerns (acquisition, analysis, fallback). `selector_discovery.py` was refactored to use PEP 562 `__getattr__` for lazy research-module imports, satisfying the research boundary enforcer. Pipeline stage extraction continues.
 
 ### P1-ARCH-STATE-001
 
@@ -313,7 +322,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Pending-to-running, discovery-to-running, running-to-completed/degraded/empty/failed, cancellation before and during run, restart recovery, and result availability by terminal state.
 - **acceptance_criteria:** Invalid transitions are rejected or explicitly documented, and all state transitions are covered by focused tests.
 - **blocked_by:** Characterization test matrix.
-- **notes:** Prompt 6 created `docs/JOB_STATE_MODEL.md`; no runtime state-machine refactor was made.
+- **notes:** Session 4 (2026-06-22) created `job_state_machine.py` to centralize state transitions from `finalization.py` and `status_classifier.py`. The state machine is now a tested helper with explicit transition rules. Remaining transitions (runner, startup recovery) still need consolidation.
 
 ### P1-ARCH-STORAGE-001
 
@@ -329,7 +338,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** SQLite and Postgres ownership round trips, result/event/export/recycle persistence, restart recovery, and migration/backfill behavior.
 - **acceptance_criteria:** Repository interfaces expose explicit ownership-aware methods and SQLite/Postgres behavior is covered by parity tests.
 - **blocked_by:** Postgres test environment for full parity.
-- **notes:** Prompt 6 created `docs/STORAGE_BOUNDARIES.md`; no storage refactor was made.
+- **notes:** Session 4 (2026-06-22) created `storage_mapper.py` to deduplicate serialization/deserialization between `job_store.py` and `postgres_repository_base.py`. Postgres schema v8 was added. SQLite ownership parity tests were added (+6 tests). Remaining refactoring blocked by Postgres test environment.
 
 ### P1-BENCHMARK-BASELINE-001
 
@@ -425,7 +434,15 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Route-level audit assertions for auth failure, tenant denial, quota denial, export access, delete/restore, workflow run, auth profile use, and URL safety block.
 - **acceptance_criteria:** Audit coverage matrix has no unknown rows for P0/P1 resources.
 - **blocked_by:** Route/resource inventory update after future feature work.
-- **notes:** Existing audit logger is a foundation, not complete coverage proof.
+- **notes:** Progress (2026-06-22): Added route-level audit assertions for:
+  - ✅ Export denial (`log_rbac_event`) in `test_project_scoped_write_key_cannot_export_another_orgs_job`
+  - ✅ Workflow create (`log_job_event`) in `test_project_scoped_key_cannot_access_another_orgs_workflow`
+  - ✅ Job read denial (`log_rbac_event`) — already existed in `test_denied_cross_tenant_job_read_is_audit_logged`
+  - ✅ Auth failure (middleware) — already covered by `test_audit_logger_integration.py`
+  - ❌ Quota denial — still missing (needs route-level test)  - ✅ Auth profile denial (`log_rbac_event`) — added to `_get_visible_profile` in `auth_profiles.py` + test assertion
+  - ✅ Scheduled job denial (`log_rbac_event`) — added to `_get_visible_scheduled_job` in `scheduled_monitoring.py` + test assertion
+  - ❌ URL safety block — still missing (no audit logging in URL safety path)
+  - ❌ Quota denial — still missing (no `log_rbac_event` in usage ledger's 429 path)
 
 ### P2-OBSERVABILITY-METRICS-001
 

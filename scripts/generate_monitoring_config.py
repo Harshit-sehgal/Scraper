@@ -14,7 +14,7 @@ groups:
         annotations:
           summary: "DataForge error rate is high"
           description: "Error rate: {{ $value | humanizePercentage }}"
-      
+
       # Browser pool exhaustion
       - alert: DataForgeBrowserPoolExhausted
         expr: dataforge_browser_pool_available < 1
@@ -24,7 +24,7 @@ groups:
         annotations:
           summary: "Browser pool is exhausted"
           description: "No available browser instances"
-      
+
       # Job queue depth
       - alert: DataForgeJobQueueDeep
         expr: dataforge_job_queue_depth > 100
@@ -34,7 +34,7 @@ groups:
         annotations:
           summary: "Job queue is backing up"
           description: "Queue depth: {{ $value }}"
-      
+
       # Storage quota warning
       - alert: DataForgeStorageQuotaWarning
         expr: dataforge_storage_used_bytes / dataforge_storage_quota_bytes > 0.8
@@ -44,7 +44,7 @@ groups:
         annotations:
           summary: "Storage usage above 80%"
           description: "Usage: {{ $value | humanizePercentage }}"
-      
+
       # Retention enforcement not running
       - alert: DataForgeRetentionNotRunning
         expr: time() - dataforge_retention_last_run_timestamp > 86400
@@ -54,7 +54,7 @@ groups:
         annotations:
           summary: "Data retention not enforced in 24h"
           description: "Retention enforcement may be broken"
-      
+
       # API latency
       - alert: DataForgeHighLatency
         expr: histogram_quantile(0.95, rate(dataforge_request_duration_seconds_bucket[5m])) > 2
@@ -86,7 +86,7 @@ receivers:
   - name: default
     webhook_configs:
       - url: 'http://localhost:5001/alerts'
-  
+
   - name: critical
     email_configs:
       - to: 'ops@example.com'
@@ -94,7 +94,7 @@ receivers:
         smarthost: 'smtp.example.com:587'
     webhook_configs:
       - url: 'http://localhost:5001/critical'
-  
+
   - name: warnings
     webhook_configs:
       - url: 'http://localhost:5001/warnings'

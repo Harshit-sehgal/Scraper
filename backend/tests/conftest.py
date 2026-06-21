@@ -765,3 +765,47 @@ def auth_headers() -> dict:
 def operator_headers() -> dict:
     """Empty operator headers — operator auth is disabled in tests via conftest."""
     return {}
+
+
+@pytest.fixture
+def clean_db():
+    """Clear job/recycle stores and identity DB for a clean test state."""
+    import app.main as main_mod
+    from app.job_store import _DB_LOCK, _get_connection
+
+    main_mod.jobs_store.clear()
+    main_mod.recycle_bin_store.clear()
+    try:
+        with _DB_LOCK:
+            conn = _get_connection()
+            conn.execute("DELETE FROM idempotency_keys")
+            conn.commit()
+            conn.close()
+    except Exception:
+        pass
+    from app.utils.usage_ledger import reset_usage_ledger
+
+    reset_usage_ledger()
+    from app.saas.router import reset_rate_limiters
+
+    reset_rate_limiters()
+    yield
+
+
+@pytest.fixture
+def session_client(monkeypatch):
+    """TestClient pre-authenticated with an admin session cookie."""
+    from app import main as main_mod
+    from app.auth.session import SESSION_COOKIE, create_session_cookie
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(main_mod.settings, "API_KEY", "")
+    monkeypatch.setattr(main_mod.settings, "ADMIN_API_KEY", "")
+    monkeypatch.setattr(main_mod.settings, "OPERATOR_API_KEY", "")
+    monkeypatch.setattr(main_mod.settings, "METRICS_TOKEN", "")
+    monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", True)
+
+    cookies = {SESSION_COOKIE: create_session_cookie(role="admin", user_id="test-admin-id")}
+    client = TestClient(main_mod.app, cookies=cookies)
+    client.session = {"user_id": "test-admin-id", "role": "admin"}
+    return client

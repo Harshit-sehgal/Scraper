@@ -67,14 +67,14 @@ from app.url_value_classification import (
 # because the research boundary checker requires kernel files to import
 # research modules lazily.  They are imported on demand by the pipeline
 # stages that need them.
-assert detect_session_params  # used by pipeline._stage_detect_session
-assert EmptyResponseCheck  # used by pipeline._stage_quality_check
-assert detect_empty_response  # used by pipeline._stage_quality_check
-assert detect_page_structure  # used by pipeline._stage_analyze_page
-assert detect_value_patterns  # used by pipeline._stage_analyze_page
-assert llm_json  # used by pipeline._stage_extract_fields
-assert reset_llm_call_count  # used by pipeline.run()
-assert settings  # test mock compatibility path
+assert detect_session_params  # noqa: S101  # used by pipeline._stage_detect_session
+assert EmptyResponseCheck  # noqa: S101  # used by pipeline._stage_quality_check
+assert detect_empty_response  # noqa: S101  # used by pipeline._stage_quality_check
+assert detect_page_structure  # noqa: S101  # used by pipeline._stage_analyze_page
+assert detect_value_patterns  # noqa: S101  # used by pipeline._stage_analyze_page
+assert llm_json  # noqa: S101  # used by pipeline._stage_extract_fields
+assert reset_llm_call_count  # noqa: S101  # used by pipeline.run()
+assert settings  # noqa: S101  # test mock compatibility path
 
 
 # ── Lazy re-exports for backward compatibility ────────────────────────────
@@ -93,6 +93,7 @@ def __getattr__(name: str):
         return getattr(telemetry, name)
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
+
 
 __all__ = [
     "_analyze_page_data_type",
@@ -149,7 +150,9 @@ def _build_error_response(
     """
     from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
-    state = AcquisitionState(acquisition_state) if hasattr(AcquisitionState, acquisition_state.upper()) else AcquisitionState.DIRECT
+    state = (
+        AcquisitionState(acquisition_state) if hasattr(AcquisitionState, acquisition_state.upper()) else AcquisitionState.DIRECT
+    )
 
     lineage = AcquisitionLineage(
         original_url=url,

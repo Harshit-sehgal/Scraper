@@ -793,7 +793,9 @@ async def send_email_verification(
         raise HTTPException(status_code=401, detail="authenticated user required")
 
     # Rate limit: 3 email verification sends per 5 minutes
-    _check_rate_limit(_EMAIL_VERIFICATION_LIMITERS, user_id, max_requests=3, window_seconds=300.0, action="email verification send")
+    _check_rate_limit(
+        _EMAIL_VERIFICATION_LIMITERS, user_id, max_requests=3, window_seconds=300.0, action="email verification send"
+    )
 
     store = get_identity_store()
     user = store.get_user(user_id)
@@ -805,7 +807,7 @@ async def send_email_verification(
             user_id=user_id,
         )
 
-    token = store.create_email_verification_token(user_id)
+    store.create_email_verification_token(user_id)
     logger.debug("Email verification token created for %s", user.email)
 
     log_job_event(
@@ -839,7 +841,9 @@ async def verify_email(
 
     # Rate limit: 5 email verification attempts per 5 minutes per IP
     client_ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(_EMAIL_VERIFICATION_CONFIRM_LIMITERS, client_ip, max_requests=5, window_seconds=300.0, action="email verification")
+    _check_rate_limit(
+        _EMAIL_VERIFICATION_CONFIRM_LIMITERS, client_ip, max_requests=5, window_seconds=300.0, action="email verification"
+    )
 
     store = get_identity_store()
     user = store.verify_email_token(body.token)
@@ -920,7 +924,9 @@ class PasswordResetConfirmResponse(BaseModel):
 # Rate-limit state for password reset endpoints (in-memory, per-IP).
 # Uses a dict of per-IP counters so one user's burst cannot block others.
 # ─── Email validation (lightweight, no external dependency) ────────────
-_EMAIL_RE = re.compile(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+_EMAIL_RE = re.compile(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+)
 
 
 def _validate_email(email: str) -> str:
@@ -969,10 +975,9 @@ def reset_rate_limiters() -> None:
     _EMAIL_VERIFICATION_CONFIRM_LIMITERS.clear()
     _SIGNUP_LIMITERS.clear()
 
+
 # Password strength validation
-_PASSWORD_RE = re.compile(
-    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{8,128}$"
-)
+_PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{8,128}$")
 
 
 def _validate_password(password: str) -> str:
@@ -1056,14 +1061,16 @@ async def request_password_reset(
     Rate-limited to 5 requests per 5 minutes per IP address.
     """
     client_ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(_PASSWORD_RESET_REQUEST_LIMITERS, client_ip, max_requests=5, window_seconds=300.0, action="password reset request")
+    _check_rate_limit(
+        _PASSWORD_RESET_REQUEST_LIMITERS, client_ip, max_requests=5, window_seconds=300.0, action="password reset request"
+    )
 
     validated_email = _validate_email(body.email)
 
     store = get_identity_store()
     user = store.get_user_by_email(validated_email)
     if user is not None:
-        token = store.create_password_reset_token(user.id)
+        store.create_password_reset_token(user.id)
         logger.debug("Password reset token created for %s", body.email)
         log_job_event(
             actor=user.id,
@@ -1089,7 +1096,9 @@ async def confirm_password_reset(
     brute-force guessing of reset tokens.
     """
     client_ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(_PASSWORD_RESET_CONFIRM_LIMITERS, client_ip, max_requests=10, window_seconds=300.0, action="password reset confirmation")
+    _check_rate_limit(
+        _PASSWORD_RESET_CONFIRM_LIMITERS, client_ip, max_requests=10, window_seconds=300.0, action="password reset confirmation"
+    )
 
     # Validate new password strength
     _validate_password(body.new_password)

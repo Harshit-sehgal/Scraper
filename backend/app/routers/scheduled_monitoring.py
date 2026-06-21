@@ -14,6 +14,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.audit_logger import log_rbac_event
 from app.models import ScheduledJob, ScheduledJobFrequency
 from app.utils.aup import require_aup_accepted
 from app.utils.json_file_store import JSONFileStore
@@ -73,7 +74,23 @@ def _can_access_scheduled_job(item: dict[str, Any], auth: tuple[UserRole, str, s
 
 def _get_visible_scheduled_job(job_id: str, auth: tuple[UserRole, str, str, str]) -> dict[str, Any]:
     item = _scheduled_jobs.get(job_id)
-    if item is None or not _can_access_scheduled_job(item, auth):
+    if item is None:
+        raise HTTPException(status_code=404, detail="Scheduled job not found")
+    if not _can_access_scheduled_job(item, auth):
+        _role, user_id, _org_id, _project_id = auth
+        log_rbac_event(
+            actor=user_id,
+            action="get_scheduled_job",
+            resource=f"scheduled:{job_id}",
+            role=_role.value,
+            outcome="denied",
+            details={
+                "owner_id": item.get("user_id", ""),
+                "org_id": item.get("org_id", ""),
+                "project_id": item.get("project_id", ""),
+                "policy": "scoped_resource_or_saas_org_project",
+            },
+        )
         raise HTTPException(status_code=404, detail="Scheduled job not found")
     return item
 

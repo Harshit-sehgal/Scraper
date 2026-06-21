@@ -1,4 +1,5 @@
 """Unit tests for billing checkout module."""
+
 from unittest.mock import patch
 
 import pytest
@@ -17,10 +18,11 @@ def test_checkout_request_validation():
         CheckoutRequest(plan_tier="invalid")
 
 
-def test_create_checkout_returns_approval_url():
+@pytest.mark.asyncio
+async def test_create_checkout_returns_approval_url():
     """Verify checkout creates an approval URL."""
     req = CheckoutRequest(plan_tier="starter")
-    resp = create_checkout(req, user_id="user_123")
+    resp = await create_checkout(req, _role="admin")
 
     assert isinstance(resp, CheckoutResponse)
     assert resp.approval_url is not None
@@ -29,16 +31,21 @@ def test_create_checkout_returns_approval_url():
     assert resp.approval_url.startswith("http://") or resp.approval_url.startswith("https://")
 
 
-def test_checkout_with_unconfigured_paypal():
+@pytest.mark.asyncio
+async def test_checkout_with_unconfigured_paypal():
     """Verify checkout returns stub URL when PayPal not configured."""
     import os
+
     # Clear PayPal env vars
-    with patch.dict(os.environ, {
-        "PAYPAL_CLIENT_ID": "",
-        "PAYPAL_CLIENT_SECRET": "",
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "PAYPAL_CLIENT_ID": "",
+            "PAYPAL_CLIENT_SECRET": "",
+        },
+    ):
         req = CheckoutRequest(plan_tier="pro")
-        resp = create_checkout(req, user_id="user_123")
+        resp = await create_checkout(req, _role="admin")
 
         # Should return a deterministic stub URL
         assert resp.approval_url is not None
@@ -49,13 +56,17 @@ def test_checkout_response_serialization():
     """Verify checkout response can be serialized."""
     resp = CheckoutResponse(
         approval_url="https://example.com/approve",
-        order_id="order_123",
+        token="order_123",
+        plan_tier="starter",
     )
 
     # Should be JSON-serializable
     import json
-    json_str = json.dumps({
-        "approval_url": resp.approval_url,
-        "order_id": resp.order_id,
-    })
+
+    json_str = json.dumps(
+        {
+            "approval_url": resp.approval_url,
+            "token": resp.token,
+        }
+    )
     assert "https://example.com/approve" in json_str

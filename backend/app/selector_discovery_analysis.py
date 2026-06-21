@@ -59,11 +59,12 @@ def _get_feedback_engine():
     This stub preserves the call site so ``solidified_motifs`` support
     can be re-added without changing the public API.
     """
+
     class _NoopFeedbackEngine:
         """No-op stub that returns empty motif context."""
 
         @staticmethod
-        def build_motif_context(*args, **kwargs) -> str:
+        def build_motif_context(*args, **kwargs) -> str:  # noqa: ARG004
             return ""
 
     return _NoopFeedbackEngine()

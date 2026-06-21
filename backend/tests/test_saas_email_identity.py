@@ -387,6 +387,12 @@ class TestEmailVerificationAPI:
 
 
 class TestPasswordResetAPI:
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
     """Tests for ``/api/saas/password-reset/*`` endpoints."""
 
     def test_request_password_reset(self, client):
@@ -485,26 +491,31 @@ class TestPasswordResetAPI:
 
 
 class TestBruteForcePrevention:
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
     def test_signup_rate_limit_blocks_after_max(self, client):
         from app.saas.router import reset_rate_limiters
 
         reset_rate_limiters()
-        email = "signup-rate@example.com"
 
-        # 3 requests are allowed by the default signup limit
         for _ in range(3):
             resp = client.post(
                 "/api/saas/signup",
-                json={"email": email, "password": "SecurePass123!"},
+                json={"email": "signup-rate-bf@example.com", "password": "SecurePass123!"},
             )
-            assert resp.status_code in (200, 201, 400, 422)
+            # First call creates the user (201), subsequent calls may 409
+            assert resp.status_code in (200, 201, 400, 409, 422), f"Unexpected {resp.status_code}: {resp.text}"
 
-        # 4th request should be rate-limited
+        # 4th request should be rate-limited by IP
         resp = client.post(
             "/api/saas/signup",
-            json={"email": email, "password": "SecurePass123!"},
+            json={"email": "signup-rate-bf@example.com", "password": "SecurePass123!"},
         )
-        assert resp.status_code == 429
+        assert resp.status_code == 429, f"Expected 429 got {resp.status_code}: {resp.text}"
 
 
 class TestInvitationAPI:

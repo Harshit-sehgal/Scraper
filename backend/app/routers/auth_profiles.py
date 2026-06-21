@@ -17,7 +17,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.audit_logger import log_admin_action
+from app.audit_logger import log_admin_action, log_rbac_event
 from app.config import settings
 from app.models import AuthProfile, AuthProfileStatus
 from app.url_safety import validate_public_domain
@@ -57,7 +57,23 @@ def _safe_profile(item: dict[str, Any]) -> dict[str, Any]:
 
 def _get_visible_profile(profile_id: str, auth: tuple[UserRole, str, str, str]) -> dict[str, Any]:
     item = _auth_profiles.get(profile_id)
-    if item is None or not _can_access_profile(item, auth):
+    if item is None:
+        raise HTTPException(status_code=404, detail="Auth profile not found")
+    if not _can_access_profile(item, auth):
+        _role, user_id, _org_id, _project_id = auth
+        log_rbac_event(
+            actor=user_id,
+            action="get_auth_profile",
+            resource=f"auth-profile:{profile_id}",
+            role=_role.value,
+            outcome="denied",
+            details={
+                "owner_id": item.get("user_id", ""),
+                "org_id": item.get("org_id", ""),
+                "project_id": item.get("project_id", ""),
+                "policy": "scoped_resource_or_saas_org_project",
+            },
+        )
         raise HTTPException(status_code=404, detail="Auth profile not found")
     return item
 
