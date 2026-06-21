@@ -10,10 +10,10 @@ from app.services.ai_structuring import apply_global_ai_structuring
 from app.services.discovery import run_discovery_phase
 from app.services.finalization import run_finalization
 from app.services.insight import run_insight_phase
+from app.services.job_state_machine import mark_canceled, transition_to
 from app.services.post_processing import run_post_processing
 from app.services.scraping import run_scraping_phase
 from app.storage_interface import get_job_repository
-from app.utils.job import mark_job_canceled
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ async def run_job(
 
     if job.cancel_requested or await _cancel_requested_from_db():
         job.cancel_requested = True
-        mark_job_canceled(job, "Canceled before execution.")
+        mark_canceled(job, "Canceled before execution.")
         await _persist_job_state(critical=True)
         return
 
@@ -147,7 +147,7 @@ async def run_job(
                 await _persist_job_state(critical=True)
                 return
 
-        job.status = JobStatus.RUNNING
+        transition_to(job, JobStatus.RUNNING)
         if job.mode == ScrapeMode.MANUAL:
             job.progress_total = len(job.urls) + 1
             job.progress_current = 0
@@ -198,7 +198,7 @@ async def run_job(
 
         if job.cancel_requested or await _cancel_requested_from_db():
             job.cancel_requested = True
-            mark_job_canceled(job)
+            mark_canceled(job)
             await _persist_job_state(critical=True)
             return
 
@@ -238,13 +238,11 @@ async def run_job(
     except Exception as e:
         logger.exception("Job %s failed", job_id)
         if job.cancel_requested:
-            mark_job_canceled(job)
+            mark_canceled(job)
             _add_job_log(job, "Job canceled", level="warning")
             logger.warning("Job %s: Canceled", job_id)
         else:
-            job.status = JobStatus.FAILED
-            job.error = str(e)
-            job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
+            transition_to(job, JobStatus.FAILED, error=str(e))
             _add_job_log(job, f"Job failed: {e!s}", level="error")
             logger.exception("Job %s: Failed (%s)", job_id, type(e).__name__)
         await _persist_job_state(critical=True)

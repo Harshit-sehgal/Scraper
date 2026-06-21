@@ -17,6 +17,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.audit_logger import log_admin_action
 from app.config import settings
 from app.models import AuthProfile, AuthProfileStatus
 from app.url_safety import validate_public_domain
@@ -117,6 +118,12 @@ async def create_auth_profile(
     )
     _auth_profiles.upsert(profile.id, profile.model_dump())
     logger.info("Auth profile created: %s for domain %s", profile.name, profile.domain)
+    log_admin_action(
+        actor=user_id,
+        action="auth_profile_created",
+        resource=f"auth-profile:{profile.id}",
+        details={"name": profile.name, "domain": profile.domain},
+    )
     return _safe_profile(profile.model_dump())
 
 
@@ -153,9 +160,16 @@ async def delete_auth_profile(
     ],
 ) -> None:
     """Delete an auth profile permanently."""
-    _get_visible_profile(profile_id, auth)
-    if _auth_profiles.delete(profile_id):
+    profile = _get_visible_profile(profile_id, auth)
+    deleted = _auth_profiles.delete(profile_id)
+    if deleted:
         logger.info("Auth profile deleted: %s", profile_id)
+        log_admin_action(
+            actor=auth[1],
+            action="auth_profile_deleted",
+            resource=f"auth-profile:{profile_id}",
+            details={"domain": profile.get("domain"), "name": profile.get("name")},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +340,7 @@ async def validate_profile(
         tuple[UserRole, str, str, str],
         Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
-    live: bool = False,
+    live: bool = True,
 ) -> dict[str, Any]:
     """Validate that the stored session is still active.
 
@@ -399,6 +413,12 @@ async def revoke_profile(
     profile["updated_at"] = _now_iso()
     _write_back(profile)
     logger.info("Auth profile revoked: %s", profile_id)
+    log_admin_action(
+        actor=auth[1],
+        action="auth_profile_revoked",
+        resource=f"auth-profile:{profile_id}",
+        details={"domain": profile.get("domain")},
+    )
     return _safe_profile(profile)
 
 

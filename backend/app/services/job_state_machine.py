@@ -52,11 +52,11 @@ _VALID_TRANSITIONS: dict[JobStatus, set[JobStatus]] = {
         JobStatus.CANCELED,
         JobStatus.FAILED,  # exception or recovery
     },
-    JobStatus.COMPLETED: set(),       # terminal
-    JobStatus.DEGRADED: set(),        # terminal
-    JobStatus.EMPTY_RESULT: set(),    # terminal
-    JobStatus.CANCELED: set(),        # terminal
-    JobStatus.FAILED: set(),          # terminal
+    JobStatus.COMPLETED: set(),  # terminal
+    JobStatus.DEGRADED: set(),  # terminal
+    JobStatus.EMPTY_RESULT: set(),  # terminal
+    JobStatus.CANCELED: set(),  # terminal
+    JobStatus.FAILED: set(),  # terminal
 }
 
 

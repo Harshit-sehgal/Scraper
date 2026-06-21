@@ -15,6 +15,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.audit_logger import log_job_event
 from app.models import (
     SchemaField,
     Workflow,
@@ -323,6 +324,12 @@ async def create_workflow(
     )
     _workflows.upsert(wf.id, _workflow_to_dict(wf))
     logger.info("Workflow created: %s (%s)", wf.name, wf.id)
+    log_job_event(
+        actor=user_id,
+        action="workflow_created",
+        job_id=wf.id,
+        details={"name": wf.name, "mode": wf.mode},
+    )
     return _workflow_to_dict(wf)
 
 
@@ -403,6 +410,12 @@ async def update_workflow(
 
     _write_back(existing)
     logger.info("Workflow updated: %s", workflow_id)
+    log_job_event(
+        actor=auth[1],
+        action="workflow_updated",
+        job_id=workflow_id,
+        details={"name": existing.get("name")},
+    )
     return existing
 
 
@@ -431,6 +444,11 @@ async def delete_workflow(
     _get_visible_workflow(workflow_id, auth)
     if _workflows.delete(workflow_id):
         logger.info("Workflow deleted: %s", workflow_id)
+        log_job_event(
+            actor=auth[1],
+            action="workflow_deleted",
+            job_id=workflow_id,
+        )
 
 
 @router.post("/{workflow_id}/run", status_code=202)
@@ -478,6 +496,12 @@ async def run_workflow(
     }
     _workflow_runs.upsert(run_id, run_record)
 
+    log_job_event(
+        actor=user_id,
+        action="workflow_queued",
+        job_id=workflow_id,
+        details={"run_id": run_id, "workflow_name": wf.get("name")},
+    )
     logger.info("Workflow queued: %s -> job %s (run %s)", workflow_id, job_id, run_id)
 
     return {

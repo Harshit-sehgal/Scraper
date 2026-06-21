@@ -11,13 +11,15 @@ Hosts endpoints for:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field, field_validator
 
 from app.audit_logger import log_job_event
 from app.plan_enforcer import get_plan_limits, get_user_tier
+from app.rate_limiter import SlidingWindowCounter
 from app.saas import CURRENT_AUP_VERSION  # re-exported from app.saas.__init__
 from app.saas.identity_store import IdentityStoreError, get_identity_store
 
@@ -168,12 +170,26 @@ class SignupResponse(BaseModel):
 
 
 @router.post("/signup", status_code=201)
-async def signup(body: SignupRequest) -> SignupResponse:
-    """Create a new user with a default organization and project."""
+async def signup(body: SignupRequest, request: Request) -> SignupResponse:
+    """Create a new user with a default organization and project.
+
+    Rate-limited to 3 signups per 5 minutes per IP address to prevent
+    account creation spam.
+    """
+    # Rate limit: 3 signups per 5 minutes per IP
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_SIGNUP_LIMITERS, client_ip, max_requests=3, window_seconds=300.0, action="signup")
+
+    # Validate password strength
+    _validate_password(body.password)
+
     svc = SignupService()
+    # Validate email format
+    validated_email = _validate_email(body.email)
+
     try:
         result = svc.signup(
-            email=body.email,
+            email=validated_email,
             password=body.password,
             display_name=body.display_name or "",
             org_name=body.org_name,
@@ -249,6 +265,18 @@ class OrgCreateRequest(BaseModel):
     """Request to create a new organization."""
 
     name: str = Field(..., min_length=1, max_length=120, description="Organization name")
+
+    @field_validator("name")
+    @classmethod
+    def _validate_org_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            msg = "Organization name must not be blank"
+            raise ValueError(msg)
+        if len(stripped) < 1 or len(stripped) > 120:
+            msg = "Organization name must be between 1 and 120 characters"
+            raise ValueError(msg)
+        return stripped
 
 
 class OrgResponse(BaseModel):
@@ -418,6 +446,18 @@ class ProjectCreateRequest(BaseModel):
 
     org_id: str = Field(..., description="Parent organization ID")
     name: str = Field(..., min_length=1, max_length=120, description="Project name")
+
+    @field_validator("name")
+    @classmethod
+    def _validate_project_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            msg = "Project name must not be blank"
+            raise ValueError(msg)
+        if len(stripped) < 1 or len(stripped) > 120:
+            msg = "Project name must be between 1 and 120 characters"
+            raise ValueError(msg)
+        return stripped
 
 
 class ProjectResponse(BaseModel):
@@ -698,6 +738,589 @@ async def remove_member(
         outcome="success",
         details={"membership_id": membership_id, "org_id": membership.org_id},
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Email Verification
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class EmailVerificationSendResponse(BaseModel):
+    """Response for requesting email verification."""
+
+    message: str = "Verification email sent. Check your inbox."
+    user_id: str
+
+
+class EmailVerifyRequest(BaseModel):
+    """Request body for verifying an email address."""
+
+    token: str = Field(..., description="Verification token (from email link)")
+
+
+class EmailVerifyResponse(BaseModel):
+    """Response after successful email verification."""
+
+    verified: bool
+    message: str
+
+
+class EmailVerificationStatusResponse(BaseModel):
+    """Email verification status for the authenticated user."""
+
+    email: str
+    email_verified: bool
+    email_verified_at: str | None
+
+
+@router.post("/email-verification/send", status_code=200)
+async def send_email_verification(
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> EmailVerificationSendResponse:
+    """Create an email verification token for the authenticated user.
+
+    In the current MVP the token is logged rather than sent via SMTP.
+    A real email-sending integration (SendGrid, SES, etc.) will replace
+    this when the project's email transport is wired in.
+
+    Rate-limited to 3 requests per 5 minutes per user to prevent abuse.
+    """
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    # Rate limit: 3 email verification sends per 5 minutes
+    _check_rate_limit(_EMAIL_VERIFICATION_LIMITERS, user_id, max_requests=3, window_seconds=300.0, action="email verification send")
+
+    store = get_identity_store()
+    user = store.get_user(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    if user.email_verified_at is not None:
+        return EmailVerificationSendResponse(
+            message="Email is already verified.",
+            user_id=user_id,
+        )
+
+    token = store.create_email_verification_token(user_id)
+    logger.info("Email verification token for %s: %s", user.email, token)
+
+    log_job_event(
+        actor=user_id,
+        action="email_verification_sent",
+        job_id="saas",
+        outcome="success",
+        details={"email": user.email},
+    )
+
+    return EmailVerificationSendResponse(user_id=user_id)
+
+
+@router.post("/email-verification/verify", status_code=200)
+async def verify_email(
+    body: EmailVerifyRequest,
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+    request: Request,
+) -> EmailVerifyResponse:
+    """Verify an email address using a verification token.
+
+    Rate-limited to 5 attempts per 5 minutes per IP address to prevent
+    brute-force guessing of verification tokens.
+    """
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    # Rate limit: 5 email verification attempts per 5 minutes per IP
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_EMAIL_VERIFICATION_CONFIRM_LIMITERS, client_ip, max_requests=5, window_seconds=300.0, action="email verification")
+
+    store = get_identity_store()
+    user = store.verify_email_token(body.token)
+    if user is None:
+        log_job_event(
+            actor=user_id,
+            action="email_verification_failed",
+            job_id="saas",
+            outcome="failure",
+            details={"reason": "invalid_or_expired_token"},
+        )
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+    log_job_event(
+        actor=user_id,
+        action="email_verified",
+        job_id="saas",
+        outcome="success",
+    )
+
+    return EmailVerifyResponse(verified=True, message="Email verified successfully")
+
+
+@router.get("/email-verification/status", response_model=EmailVerificationStatusResponse)
+async def email_verification_status(
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> EmailVerificationStatusResponse:
+    """Return the email verification status for the authenticated user."""
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    user = store.get_user(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    return EmailVerificationStatusResponse(
+        email=user.email,
+        email_verified=user.email_verified_at is not None,
+        email_verified_at=user.email_verified_at,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Password Reset
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class PasswordResetRequest(BaseModel):
+    """Request body to initiate a password reset."""
+
+    email: str = Field(..., description="Email address for the account to reset")
+
+
+class PasswordResetResponse(BaseModel):
+    """Response after a password reset request."""
+
+    message: str = "If that email exists, a reset link has been sent."
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Request body to confirm a password reset with a new password."""
+
+    token: str = Field(..., description="Reset token (from email link)")
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    """Response after a successful password reset."""
+
+    message: str = "Password has been reset successfully."
+
+
+# Rate-limit state for password reset endpoints (in-memory, per-IP).
+# Uses a dict of per-IP counters so one user's burst cannot block others.
+# ─── Email validation (lightweight, no external dependency) ────────────
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+
+def _validate_email(email: str) -> str:
+    """Validate and normalize an email address.
+
+    Returns the stripped, lowercased email if valid.
+    Raises HTTPException 422 if invalid.
+    """
+    stripped = email.strip().lower()
+    if not stripped or len(stripped) > 254:
+        raise HTTPException(status_code=422, detail="Invalid email address")
+    if not _EMAIL_RE.match(stripped):
+        raise HTTPException(status_code=422, detail="Invalid email address format")
+    return stripped
+
+
+# Rate-limit state for password reset endpoints (in-memory, per-IP).
+# Uses a dict of per-IP counters so one user's burst cannot block others.
+_PASSWORD_RESET_REQUEST_LIMITERS: dict[str, SlidingWindowCounter] = {}
+_PASSWORD_RESET_CONFIRM_LIMITERS: dict[str, SlidingWindowCounter] = {}
+
+# Rate-limit state for email verification (per-user, because the caller
+# is authenticated). Prevents a user from spamming the send endpoint.
+_EMAIL_VERIFICATION_LIMITERS: dict[str, SlidingWindowCounter] = {}
+
+# Rate-limit state for invitation creation (per-user).
+_INVITATION_CREATE_LIMITERS: dict[str, SlidingWindowCounter] = {}
+
+# Rate-limit state for email verification confirm (per-IP, to prevent token brute-forcing).
+_EMAIL_VERIFICATION_CONFIRM_LIMITERS: dict[str, SlidingWindowCounter] = {}
+
+# Rate-limit state for signup (per-IP, to prevent account creation spam).
+_SIGNUP_LIMITERS: dict[str, SlidingWindowCounter] = {}
+
+
+def reset_rate_limiters() -> None:
+    """Clear all in-memory rate limiter state.
+
+    Called by test fixtures between test runs to prevent rate-limit
+    carryover from one test to the next. Not intended for production use.
+    """
+    _PASSWORD_RESET_REQUEST_LIMITERS.clear()
+    _PASSWORD_RESET_CONFIRM_LIMITERS.clear()
+    _EMAIL_VERIFICATION_LIMITERS.clear()
+    _INVITATION_CREATE_LIMITERS.clear()
+    _EMAIL_VERIFICATION_CONFIRM_LIMITERS.clear()
+    _SIGNUP_LIMITERS.clear()
+
+# Password strength validation
+_PASSWORD_RE = re.compile(
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{8,128}$"
+)
+
+
+def _validate_password(password: str) -> str:
+    """Validate password strength.
+
+    Requirements:
+    - 8-128 characters
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+    - At least one special character
+
+    Returns the password if valid.
+    Raises HTTPException 422 if invalid.
+    """
+    if not password or len(password) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="Password must be at least 8 characters",
+        )
+    if len(password) > 128:
+        raise HTTPException(
+            status_code=422,
+            detail="Password must be 128 characters or fewer",
+        )
+    if not _PASSWORD_RE.match(password):
+        raise HTTPException(
+            status_code=422,
+            detail="Password must include uppercase, lowercase, digit, and special character",
+        )
+    return password
+
+
+def _check_rate_limit(
+    limiters: dict[str, SlidingWindowCounter],
+    key: str,
+    max_requests: int = 5,
+    window_seconds: float = 300.0,
+    action: str = "request",
+) -> None:
+    """Check rate limit for an action by key (IP address or user ID).
+
+    Args:
+        limiters: Dict mapping keys to sliding-window counters.
+        key: Identifier to rate-limit by (IP address or user ID).
+        max_requests: Maximum allowed requests in the window.
+        window_seconds: Duration of the sliding window in seconds.
+        action: Human-readable action name for log/error messages.
+
+    Raises HTTPException 429 if the limit is exceeded.
+    Returns None on success.
+    """
+    counter = limiters.get(key)
+    if counter is None:
+        counter = SlidingWindowCounter(max_requests=max_requests, window_seconds=window_seconds)
+        limiters[key] = counter
+    elif counter.is_expired():
+        # Prune expired counters to prevent unbounded memory growth
+        del limiters[key]
+        counter = SlidingWindowCounter(max_requests=max_requests, window_seconds=window_seconds)
+        limiters[key] = counter
+
+    if not counter.allow():
+        logger.warning("Rate limit exceeded for %s: key=%s", action, key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many {action}s. Please try again later.",
+        )
+
+
+@router.post("/password-reset/request", status_code=200)
+async def request_password_reset(
+    body: PasswordResetRequest,
+    request: Request,
+) -> PasswordResetResponse:
+    """Request a password reset token for the given email.
+
+    Always returns 200 to prevent email enumeration. If the email exists,
+    a reset token is created and logged.
+
+    Rate-limited to 5 requests per 5 minutes per IP address.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_PASSWORD_RESET_REQUEST_LIMITERS, client_ip, max_requests=5, window_seconds=300.0, action="password reset request")
+
+    validated_email = _validate_email(body.email)
+
+    store = get_identity_store()
+    user = store.get_user_by_email(validated_email)
+    if user is not None:
+        token = store.create_password_reset_token(user.id)
+        logger.info("Password reset token for %s: %s", body.email, token)
+        log_job_event(
+            actor=user.id,
+            action="password_reset_requested",
+            job_id="saas",
+            outcome="success",
+            details={"email": body.email},
+        )
+    else:
+        logger.info("Password reset requested for unknown email: %s", body.email)
+
+    return PasswordResetResponse()
+
+
+@router.post("/password-reset/reset", status_code=200)
+async def confirm_password_reset(
+    body: PasswordResetConfirmRequest,
+    request: Request,
+) -> PasswordResetConfirmResponse:
+    """Confirm a password reset using the token and set a new password.
+
+    Rate-limited to 10 attempts per 5 minutes per IP address to prevent
+    brute-force guessing of reset tokens.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_PASSWORD_RESET_CONFIRM_LIMITERS, client_ip, max_requests=10, window_seconds=300.0, action="password reset confirmation")
+
+    # Validate new password strength
+    _validate_password(body.new_password)
+
+    from app.saas.service import hash_password
+
+    store = get_identity_store()
+    new_hash = hash_password(body.new_password)
+    success = store.consume_password_reset_token(body.token, new_hash)
+    if not success:
+        log_job_event(
+            actor="unknown",
+            action="password_reset_failed",
+            job_id="saas",
+            outcome="failure",
+            details={"reason": "invalid_or_expired_token"},
+        )
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    log_job_event(
+        actor="resolved-from-token",
+        action="password_reset_completed",
+        job_id="saas",
+        outcome="success",
+    )
+
+    return PasswordResetConfirmResponse()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Team Invitations
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class InvitationCreateRequest(BaseModel):
+    """Request to invite a user to an organization."""
+
+    email: str = Field(..., description="Email address to invite")
+    role: str = Field("member", description="Role to assign (member/admin/viewer)")
+
+
+class InvitationResponse(BaseModel):
+    """Invitation details."""
+
+    id: str
+    org_id: str
+    invited_email: str
+    invited_by_user_id: str
+    role: str
+    status: str
+    created_at: str
+    expires_at: str
+
+
+class InvitationListResponse(BaseModel):
+    """List of invitations."""
+
+    items: list[InvitationResponse]
+    total: int
+
+
+class InvitationRespondRequest(BaseModel):
+    """Request to accept or decline an invitation."""
+
+    accept: bool = Field(..., description="True to accept, False to decline")
+
+
+class InvitationRespondResponse(BaseModel):
+    """Response after responding to an invitation."""
+
+    id: str
+    status: str
+    message: str
+
+
+class PendingInvitationResponse(BaseModel):
+    """Pending invitation details (returned to the invited user)."""
+
+    id: str
+    org_id: str
+    invited_email: str
+    role: str
+    created_at: str
+    expires_at: str
+
+
+@router.post("/orgs/{org_id}/invitations", status_code=201, response_model=InvitationResponse)
+async def create_invitation(
+    org_id: str,
+    body: InvitationCreateRequest,
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> InvitationResponse:
+    """Create a team invitation for an organization.
+
+    Requires admin/operator role in the org.
+    Rate-limited to 10 invitations per 5 minutes per user to prevent spam.
+    """
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    # Rate limit: 10 invitation creates per 5 minutes per user
+    _check_rate_limit(_INVITATION_CREATE_LIMITERS, user_id, max_requests=10, window_seconds=300.0, action="invitation creation")
+
+    # Validate email format
+    validated_email = _validate_email(body.email)
+
+    store = get_identity_store()
+
+    # Verify the caller is a member of the org
+    if not store.is_org_member(user_id, org_id):
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    # Verify the org exists
+    org = store.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="organization not found")
+
+    invitation = store.create_team_invitation(
+        org_id=org_id,
+        invited_email=validated_email,
+        invited_by_user_id=user_id,
+        role=body.role,
+    )
+
+    log_job_event(
+        actor=user_id,
+        action="invitation_created",
+        job_id="saas",
+        outcome="success",
+        details={"org_id": org_id, "invited_email": validated_email, "role": body.role},
+    )
+
+    return InvitationResponse(**invitation)
+
+
+@router.get("/orgs/{org_id}/invitations", response_model=InvitationListResponse)
+async def list_org_invitations(
+    org_id: str,
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+    status: str | None = None,
+) -> InvitationListResponse:
+    """List invitations for an organization."""
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+
+    if not store.is_org_member(user_id, org_id):
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    invitations = store.list_org_invitations(org_id, status=status)
+    return InvitationListResponse(
+        items=[InvitationResponse(**inv) for inv in invitations],
+        total=len(invitations),
+    )
+
+
+@router.post("/invitations/{invitation_id}/respond", response_model=InvitationRespondResponse)
+async def respond_to_invitation(
+    invitation_id: str,
+    body: InvitationRespondRequest,
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> InvitationRespondResponse:
+    """Accept or decline a team invitation."""
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    result = store.respond_to_invitation(invitation_id, accept=body.accept)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Invitation not found or already responded to")
+
+    status = "accepted" if body.accept else "declined"
+    log_job_event(
+        actor=user_id,
+        action=f"invitation_{status}",
+        job_id="saas",
+        outcome="success",
+        details={"invitation_id": invitation_id, "org_id": result["org_id"]},
+    )
+
+    return InvitationRespondResponse(
+        id=invitation_id,
+        status=result["status"],
+        message=f"Invitation {result['status']}.",
+    )
+
+
+@router.get("/invitations/pending", response_model=list[PendingInvitationResponse])
+async def get_pending_invitations(
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> list[PendingInvitationResponse]:
+    """Return pending invitations for the authenticated user's email."""
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    user = store.get_user(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    invitation = store.get_pending_invitation_by_email(user.email)
+    if invitation is None:
+        return []
+
+    return [
+        PendingInvitationResponse(
+            id=invitation["id"],
+            org_id=invitation["org_id"],
+            invited_email=invitation["invited_email"],
+            role=invitation["role"],
+            created_at=invitation["created_at"],
+            expires_at=invitation["expires_at"],
+        ),
+    ]
 
 
 # ═══════════════════════════════════════════════════════════════════════

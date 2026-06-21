@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import re
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -28,52 +27,35 @@ from app.discovery import (
 from app.filters import process_results
 from app.models import (
     DiscoveryRequest,
-    Job,
     JobCreate,
     JobStatus,
     SchemaSuggestionRequest,
-    ScrapeMode,
 )
 from app.plan_enforcer import require_plan_limit
 from app.routers.jobs_state import (
     JobStoreManager,
-    canonical_request_fingerprint,
-    lookup_idempotency_fingerprint,
-    lookup_idempotency_key,
-    record_idempotency_key,
     save_job,
 )
 from app.scraper import ai_clean_and_align_records
+from app.services.job_creation_service import (
+    JobCreationError,
+    JobCreationService,
+)
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.utils.rbac import (
     UserRole,
     can_access_scoped_resource,
-    get_current_user,
     require_principal,
     require_role,
 )
-from app.utils.usage_ledger import UsageType, get_usage_ledger
+from app.utils.usage_ledger import UsageType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
-
-
-def _schedule_job(job_id: str) -> None:
-    """Schedule a job for execution via the active runtime dependency container.
-
-    Route handlers call this instead of directly referencing closure-captured
-    functions. The actual ``schedule_task_fn`` and ``run_job_coro_fn`` are
-    resolved from ``app.runtime_deps`` at call time, which lets tests swap
-    them via :func:`app.runtime_deps.set_deps`.
-    """
-    from app.runtime_deps import run_job_coro_fn as _rjf
-    from app.runtime_deps import schedule_task_fn as _stf
-
-    _stf(_rjf(job_id))
 
 
 def _ensure_job_write_access(job, auth_tuple, action: str) -> None:
@@ -184,197 +166,22 @@ def register_jobs_write_routes(
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
         _plan_check: Annotated[dict[str, Any], Depends(require_plan_limit(UsageType.JOB_CREATED, quantity=1))],
     ):
-        # Extract user identity for data isolation
-        _role, user_id = get_current_user(request)
-        # P0-SAAS-001: also pull org/project from the resolved AuthContext
-        # so jobs created with persistent API keys carry tenant ownership.
+        """Create a new scraping job.
+
+        Delegates business logic to ``JobCreationService``. This route
+        handler is a thin HTTP adapter that converts domain results
+        and exceptions to FastAPI responses.
+        """
+        service = JobCreationService(manager)
         try:
-            from app.utils.rbac import resolve_auth_context
-
-            _ctx = resolve_auth_context(request, allow_cookie=True)
-            _owner_org_id = _ctx.org_id
-            _owner_project_id = _ctx.project_id
-        except (RuntimeError, ValueError, TypeError):
-            _owner_org_id = ""
-            _owner_project_id = ""
-        manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
-        urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
-
-        # Defence-in-depth: reject SSRF targets in manual URLs (loopback,
-        # private RFC1918, link-local, cloud-metadata, internal TLDs)
-        # BEFORE persisting the job. Mirrors the same guard on
-        # /api/scraper/diagnostics so a manual-mode operator cannot pivot
-        # to internal services via the job queue.
-        from app.url_safety import validate_public_http_url
-
-        safe_urls: list[str] = []
-        for u in manual_urls:
-            try:
-                validate_public_http_url(u)
-                safe_urls.append(u)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"URL failed security validation: {u}",
-                ) from None
-        urls = safe_urls if job_data.mode == ScrapeMode.MANUAL else []
-
-        idem_key = (request.headers.get("Idempotency-Key") or "").strip()
-        if idem_key and not re.fullmatch(r"[A-Za-z0-9_\-]{1,128}", idem_key):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Idempotency-Key header is invalid. Allowed characters: letters, digits, underscore, hyphen. Max length: 128."
-                ),
-            )
-        if idem_key:
-            existing_job_id = await run_in_threadpool(
-                lookup_idempotency_key,
-                idem_key,
-            )
-            if existing_job_id is not None:
-                existing_fingerprint = await run_in_threadpool(
-                    lookup_idempotency_fingerprint,
-                    idem_key,
-                )
-                if existing_fingerprint is not None and existing_fingerprint != canonical_request_fingerprint(job_data):
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Conflict: Another request with a different payload was already sent for this Idempotency-Key.",
-                    )
-
-                with manager.lock:
-                    cached = manager.jobs_store.get(existing_job_id)
-                if cached is not None:
-                    return {
-                        "job_id": cached.id,
-                        "status": cached.status.value,
-                        "idempotent_replay": True,
-                    }
-                return {
-                    "job_id": existing_job_id,
-                    "status": "unknown",
-                    "idempotent_replay": True,
-                }
-
-        job = Job(
-            name=job_data.name,
-            mode=job_data.mode,
-            intent=job_data.intent,
-            urls=urls,
-            topic=job_data.topic,
-            location=job_data.location,
-            preferred_domain=job_data.preferred_domain,
-            source_policy=job_data.source_policy,
-            max_per_domain=job_data.max_per_domain,
-            origin_location=job_data.origin_location,
-            max_distance_km=job_data.max_distance_km,
-            schema_fields=job_data.schema_fields,
-            filters=job_data.filters,
-            selectors_map=job_data.selectors_map,
-            search_params=job_data.search_params,
-            pagination=job_data.pagination,
-            max_pages=job_data.max_pages,
-            deduplicate=job_data.deduplicate,
-            deduplicate_field=job_data.deduplicate_field,
-            min_record_score=job_data.min_record_score,
-            created_by=user_id,
-            org_id=_owner_org_id,
-            project_id=_owner_project_id,
-        )
-        try:
-            get_usage_ledger().record_usage(
-                user_id,
-                UsageType.JOB_CREATED,
-                quantity=1,
-                metadata={"job_id": job.id},
-                idempotency_key=idem_key or f"job-created:{job.id}",
-                org_id=_owner_org_id,
-                project_id=_owner_project_id,
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=429, detail=str(exc)) from exc
-        with manager.lock:
-            manager.jobs_store[job.id] = job
-        await save_job(job)
-
-        if idem_key:
-            fingerprint = canonical_request_fingerprint(job_data)
-            await run_in_threadpool(
-                record_idempotency_key,
-                idem_key,
-                job.id,
-                fingerprint,
-            )
-
-        if settings.WORKER_QUEUE:
-            try:
-                from app.worker_queue import Priority, get_worker_queue
-
-                queue = get_worker_queue()
-                task_id = await queue.enqueue(
-                    task_type="scrape_job",
-                    payload={
-                        "job_id": job.id,
-                        "user_id": user_id,
-                        "org_id": _owner_org_id,
-                        "project_id": _owner_project_id,
-                    },
-                    priority=Priority.NORMAL,
-                    task_id=job.id,
-                    usage_context={
-                        "user_id": user_id,
-                        "org_id": _owner_org_id,
-                        "project_id": _owner_project_id,
-                        "job_id": job.id,
-                    },
-                )
-                logger.info("Job %s enqueued to worker queue (task=%s)", job.id, task_id)
-            except ValueError as e:
-                with manager.lock:
-                    manager.jobs_store.pop(job.id, None)
-                try:
-                    repo = get_job_repository()
-                    repo.hard_delete(job.id)
-                except (AttributeError, ImportError, RuntimeError):
-                    logger.warning("Failed to hard-delete job %s after scheduled-job quota rejection", job.id)
-                raise HTTPException(status_code=429, detail=str(e)) from e
-            except (RuntimeError, OSError) as e:
-                if settings.ENV.lower() == "production":
-                    logger.exception(
-                        "Failed to enqueue job %s to worker queue in production",
-                        job.id,
-                    )
-                    with manager.lock:
-                        if job.id in manager.jobs_store:
-                            del manager.jobs_store[job.id]
-                    try:
-                        repo = get_job_repository()
-                        repo.hard_delete(job.id)
-                    except (AttributeError, ImportError, RuntimeError):
-                        logger.warning("Failed to hard-delete job %s after enqueue failure", job.id)
-                    raise HTTPException(
-                        status_code=503,
-                        detail=(
-                            f"Failed to enqueue job {job.id} to worker queue. "
-                            "Inline fallback is disabled in production. "
-                            "Check that the worker queue is running and healthy."
-                        ),
-                    ) from e
-                logger.warning(
-                    "Failed to enqueue job %s to worker queue, falling back to inline: %s",
-                    job.id,
-                    e,
-                )
-                _schedule_job(job.id)
-        else:
-            _schedule_job(job.id)
-
-        return {
-            "job_id": job.id,
-            "status": job.status.value,
-            "idempotent_replay": False,
-        }
+            result = await service.create_job(job_data, request)
+            return {
+                "job_id": result.job_id,
+                "status": result.status,
+                "idempotent_replay": result.idempotent_replay,
+            }
+        except JobCreationError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.detail) from e
 
     @router.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(

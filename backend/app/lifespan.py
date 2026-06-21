@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -185,6 +186,10 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
     # Schedule background processing of due scheduled jobs.
     scheduled_task = schedule_background_task(_scheduled_job_processor_loop())
     _background_tasks.append(scheduled_task)
+
+    # Schedule periodic data retention enforcement.
+    retention_task = schedule_background_task(_data_retention_loop())
+    _background_tasks.append(retention_task)
 
     yield
     # ─── SHUTDOWN ─────────────────────────────────────────────────────
@@ -424,6 +429,62 @@ async def _process_due_scheduled_jobs() -> None:
             )
         except Exception:
             logger.exception("Failed to process scheduled job %s", sched_id)
+
+
+async def _data_retention_loop() -> None:
+    """Periodically enforce data retention policy.
+
+    Runs every 12 hours (configurable via ``DATAFORGE_RETENTION_INTERVAL``
+    or ``retention_run_interval_seconds`` in settings). Removes completed
+    jobs and recycle-bin items older than the configured TTL by calling
+    ``enforce_retention`` with ``dry_run=False``.
+
+    The loop is cancelled by the lifespan shutdown handler which cancels
+    all ``_background_tasks``.
+    """
+    retention_interval = getattr(settings, "retention_run_interval_seconds", None) or (
+        int(os.environ.get("DATAFORGE_RETENTION_INTERVAL", "43200"))
+    )
+    while True:
+        try:
+            await asyncio.sleep(retention_interval)
+        except asyncio.CancelledError:
+            break
+
+        try:
+            from app.globals import _jobs_store_lock, jobs_store, recycle_bin_store
+            from app.utils.data_retention import (
+                enforce_idempotency_retention,
+                enforce_retention,
+            )
+
+            with _jobs_store_lock:
+                result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
+            idem_deleted = enforce_idempotency_retention(dry_run=False)
+
+            # Persist the deletions to the database
+            if result["jobs_purged"] > 0 or result["recycle_purged"] > 0:
+                try:
+                    from app.job_store import save_state
+
+                    with _jobs_store_lock:
+                        save_state(jobs_store, recycle_bin_store, prune_missing=True)
+                except (ImportError, RuntimeError) as e:
+                    logger.warning("Retention background task failed to persist: %s", e)
+
+            total_purged = result["jobs_purged"] + result["recycle_purged"] + idem_deleted
+            if total_purged > 0:
+                logger.info(
+                    "Data retention: purged %d jobs, %d recycle items, %d idempotency keys",
+                    result["jobs_purged"],
+                    result["recycle_purged"],
+                    idem_deleted,
+                )
+
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Data retention background task failed (non-blocking)")
 
 
 async def _rate_limit_prune_loop() -> None:

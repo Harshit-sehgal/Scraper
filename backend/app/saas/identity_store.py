@@ -21,11 +21,13 @@ tests via ``reset_identity_store``.
 from __future__ import annotations
 
 import logging
+import secrets
 import sqlite3
 import threading
+import uuid
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +63,7 @@ _DB_ERRORS: tuple[type[BaseException], ...] = (
 
 
 def _now_iso() -> str:
+    """Return current UTC time as ISO-8601 string."""
     return datetime.now(UTC).isoformat()
 
 
@@ -233,6 +236,42 @@ class IdentityStore(ABC):
     @abstractmethod
     def health_check(self) -> dict[str, Any]: ...
 
+    # ── Email Verification ────────────────────────────────────────────────
+
+    @abstractmethod
+    def create_email_verification_token(self, user_id: str) -> str: ...
+
+    @abstractmethod
+    def verify_email_token(self, token: str) -> User | None: ...
+
+    @abstractmethod
+    def get_email_verification_by_token(self, token: str) -> dict | None: ...
+
+    # ── Password Reset ────────────────────────────────────────────────
+
+    @abstractmethod
+    def create_password_reset_token(self, user_id: str) -> str: ...
+
+    @abstractmethod
+    def consume_password_reset_token(self, token: str, new_password_hash: str) -> bool: ...
+
+    @abstractmethod
+    def get_password_reset_by_token(self, token: str) -> dict | None: ...
+
+    # ── Team Invitations ──────────────────────────────────────────────
+
+    @abstractmethod
+    def create_team_invitation(self, org_id: str, invited_email: str, invited_by_user_id: str, role: str) -> dict: ...
+
+    @abstractmethod
+    def list_org_invitations(self, org_id: str, status: str | None = None) -> list[dict]: ...
+
+    @abstractmethod
+    def respond_to_invitation(self, invitation_id: str, accept: bool) -> dict | None: ...
+
+    @abstractmethod
+    def get_pending_invitation_by_email(self, email: str) -> dict | None: ...
+
 
 # ───────────────────────────────────────────────────────────────────────
 # SQLite implementation
@@ -347,6 +386,42 @@ class SQLiteIdentityStore(IdentityStore):
                     project_id TEXT NOT NULL,
                     updated_at TEXT NOT NULL DEFAULT ''
                 );
+
+                CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                    token TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT '',
+                    expires_at TEXT NOT NULL DEFAULT '',
+                    consumed_at TEXT DEFAULT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_email_verification_user
+                    ON email_verification_tokens(user_id);
+
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT '',
+                    expires_at TEXT NOT NULL DEFAULT '',
+                    consumed_at TEXT DEFAULT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_password_reset_user
+                    ON password_reset_tokens(user_id);
+
+                CREATE TABLE IF NOT EXISTS team_invitations (
+                    id TEXT PRIMARY KEY,
+                    org_id TEXT NOT NULL,
+                    invited_email TEXT NOT NULL,
+                    invited_by_user_id TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'member',
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL DEFAULT '',
+                    expires_at TEXT NOT NULL DEFAULT '',
+                    responded_at TEXT DEFAULT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_team_invitations_org
+                    ON team_invitations(org_id);
+                CREATE INDEX IF NOT EXISTS idx_team_invitations_email
+                    ON team_invitations(invited_email);
                 """,
             )
             with suppress(sqlite3.OperationalError):
@@ -772,11 +847,203 @@ class SQLiteIdentityStore(IdentityStore):
             updated_at=row["updated_at"] or _now_iso(),
         )
 
+    # ── Email Verification ──────────────────────────────────────────
+
+    def create_email_verification_token(self, user_id: str) -> str:
+        token = secrets.token_urlsafe(32)
+        now = _now_iso()
+        expires = (datetime.now(UTC) + timedelta(hours=24)).isoformat()
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO email_verification_tokens (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                (token, user_id, now, expires),
+            )
+            conn.commit()
+        return token
+
+    def verify_email_token(self, token: str) -> User | None:
+        if not token:
+            return None
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM email_verification_tokens WHERE token = ? AND consumed_at IS NULL AND expires_at > ?",
+                (token, _now_iso()),
+            ).fetchone()
+            if not row:
+                return None
+            user_id = row["user_id"]
+            conn.execute(
+                "UPDATE email_verification_tokens SET consumed_at = ? WHERE token = ?",
+                (_now_iso(), token),
+            )
+            conn.execute(
+                "UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL",
+                (_now_iso(), user_id),
+            )
+            conn.commit()
+        return self.get_user(user_id)
+
+    def get_email_verification_by_token(self, token: str) -> dict | None:
+        if not token:
+            return None
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM email_verification_tokens WHERE token = ?",
+                (token,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    # ── Password Reset ──────────────────────────────────────────────
+
+    def create_password_reset_token(self, user_id: str) -> str:
+        token = secrets.token_urlsafe(32)
+        now = _now_iso()
+        expires = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO password_reset_tokens (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                (token, user_id, now, expires),
+            )
+            conn.commit()
+        return token
+
+    def consume_password_reset_token(self, token: str, new_password_hash: str) -> bool:
+        if not token:
+            return False
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM password_reset_tokens WHERE token = ? AND consumed_at IS NULL AND expires_at > ?",
+                (token, _now_iso()),
+            ).fetchone()
+            if not row:
+                return False
+            user_id = row["user_id"]
+            conn.execute(
+                "UPDATE password_reset_tokens SET consumed_at = ? WHERE token = ?",
+                (_now_iso(), token),
+            )
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (new_password_hash, user_id),
+            )
+            conn.commit()
+        return True
+
+    def get_password_reset_by_token(self, token: str) -> dict | None:
+        if not token:
+            return None
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM password_reset_tokens WHERE token = ?",
+                (token,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    # ── Team Invitations ────────────────────────────────────────────
+
+    def create_team_invitation(self, org_id: str, invited_email: str, invited_by_user_id: str, role: str) -> dict:
+        invite_id = str(uuid.uuid4())
+        now = _now_iso()
+        expires = (datetime.now(UTC) + timedelta(days=7)).isoformat()
+        clean_email = invited_email.strip().lower()
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO team_invitations
+                    (id, org_id, invited_email, invited_by_user_id, role, status, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+                """,
+                (invite_id, org_id, clean_email, invited_by_user_id, role, now, expires),
+            )
+            conn.commit()
+        return {
+            "id": invite_id,
+            "org_id": org_id,
+            "invited_email": clean_email,
+            "invited_by_user_id": invited_by_user_id,
+            "role": role,
+            "status": "pending",
+            "created_at": now,
+            "expires_at": expires,
+        }
+
+    def list_org_invitations(self, org_id: str, status: str | None = None) -> list[dict]:
+        if not org_id:
+            return []
+        sql = "SELECT * FROM team_invitations WHERE org_id = ?"
+        params: list[object] = [org_id]
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
+        sql += " ORDER BY created_at DESC"
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        return [dict(r) for r in rows]
+
+    def respond_to_invitation(self, invitation_id: str, accept: bool) -> dict | None:
+        if not invitation_id:
+            return None
+        now = _now_iso()
+        new_status = "accepted" if accept else "declined"
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM team_invitations WHERE id = ? AND status = 'pending' AND expires_at > ?",
+                (invitation_id, now),
+            ).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                "UPDATE team_invitations SET status = ?, responded_at = ? WHERE id = ?",
+                (new_status, now, invitation_id),
+            )
+
+            # If accepted and user exists, auto-create membership
+            if accept:
+                invited_email = row["invited_email"]
+                role = row["role"]
+                user_row = conn.execute(
+                    "SELECT id FROM users WHERE LOWER(email) = LOWER(?)",
+                    (invited_email,),
+                ).fetchone()
+                if user_row:
+                    # Check if already a member
+                    existing = conn.execute(
+                        "SELECT 1 FROM memberships WHERE user_id = ? AND org_id = ? AND removed_at IS NULL",
+                        (user_row["id"], row["org_id"]),
+                    ).fetchone()
+                    if not existing:
+                        membership_id = str(uuid.uuid4())
+                        conn.execute(
+                            "INSERT INTO memberships (id, user_id, org_id, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                            (membership_id, user_row["id"], row["org_id"], role, now),
+                        )
+            conn.commit()
+        return {
+            "id": invitation_id,
+            "org_id": row["org_id"],
+            "invited_email": row["invited_email"],
+            "status": new_status,
+            "responded_at": now,
+        }
+
+    def get_pending_invitation_by_email(self, email: str) -> dict | None:
+        if not email:
+            return None
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM team_invitations WHERE LOWER(invited_email) = LOWER(?) AND status = 'pending' AND expires_at > ?",
+                (email.strip(), _now_iso()),
+            ).fetchone()
+        return dict(row) if row else None
+
     def clear(self) -> None:
         with self._lock, self._connect() as conn:
             conn.execute("DELETE FROM user_selections")
             conn.execute("DELETE FROM api_keys")
             conn.execute("DELETE FROM memberships")
+            conn.execute("DELETE FROM team_invitations")
+            conn.execute("DELETE FROM password_reset_tokens")
+            conn.execute("DELETE FROM email_verification_tokens")
             conn.execute("DELETE FROM projects")
             conn.execute("DELETE FROM organizations")
             conn.execute("DELETE FROM users")

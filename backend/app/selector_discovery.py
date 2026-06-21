@@ -6,12 +6,10 @@ This module has been refactored into focused sub-modules:
 
 All public symbols are re-exported for backward compatibility.
 
-Characterization (I3): ``analyze_url_for_fields`` is ~564 lines with 8 numbered
-steps. Each step is an extraction candidate (redirect detection, page fetch,
-search-form recovery, anti-bot/page analysis, LLM prompt building, LLM field
-suggestion, post-processing, acquisition-lineage construction). Early-return
-error paths (lines ~254-286 and ~288-321) duplicate dict-building logic that
-could be shared. Extract when test coverage for each step is in place.
+The core orchestrator ``analyze_url_for_fields`` (~500 lines with 8 numbered
+steps) has been cleaned up: early-return error paths now share a common
+``_build_error_response`` helper, and field processing is extracted into
+``_build_llm_fields`` with a module-level ``FIELD_TYPE_MAP`` constant.
 """
 
 from __future__ import annotations
@@ -30,7 +28,7 @@ from app.content_quality import (
 from app.empty_response_detector import EmptyResponseCheck, detect_empty_response
 from app.html_utils import clean_html_for_selectors
 from app.llm_bridge import llm_json, reset_llm_call_count
-from app.page_profiler import detect_page_structure, detect_value_patterns
+from app.page_profiler import ValuePatterns, detect_page_structure, detect_value_patterns
 from app.search_form_recovery import (
     _build_absolute_url,
     _detect_search_form,
@@ -112,6 +110,144 @@ else:
 
 
 logger = logging.getLogger(__name__)
+
+
+# ── Response-building helpers ─────────────────────────────────────
+
+
+def _build_error_response(
+    url: str,
+    redirect_info: dict,
+    session_detection: dict,
+    final_url: str,
+    error_message: str,
+    user_message: str,
+    acquisition_state: str = "direct",
+    acquisition_message: str | None = None,
+    empty_type: str = "blank",
+    suggestions: list[str] | None = None,
+    *,
+    acquisition_mode: str = "standard",
+) -> dict:
+    """Build a consistent error response for early-return paths.
+
+    Shared by the fetch-failure and empty-page early returns to avoid
+    duplicating the dict-building logic.
+    """
+    from app.acquisition_state import AcquisitionLineage, AcquisitionState
+
+    state = AcquisitionState(acquisition_state) if hasattr(AcquisitionState, acquisition_state.upper()) else AcquisitionState.DIRECT
+
+    lineage = AcquisitionLineage(
+        original_url=url,
+        final_url=final_url,
+        state=state,
+        message=acquisition_message or error_message,
+    )
+
+    return {
+        "url": url,
+        "redirect_info": redirect_info,
+        "acquisition_lineage": lineage.model_dump(mode="json"),
+        "user_message": user_message,
+        "session_detection": session_detection,
+        "canonical_url": session_detection.get("canonical_url", url),
+        "content_quality": None,
+        "empty_check": {
+            "is_empty": True,
+            "empty_type": empty_type,
+            "confidence": 1.0,
+            "message": error_message,
+            "suggestions": suggestions or [],
+        },
+        "search_form": None,
+        "search_recovery": None,
+        "error": error_message,
+        "page_structure": "unknown",
+        "structure_confidence": 0.0,
+        "estimated_record_count": 0,
+        "item_container": None,
+        "suggested_fields": [],
+        "anti_bot_score": 0.0,
+        "acquisition_mode": acquisition_mode,
+    }
+
+
+FIELD_TYPE_MAP: dict[str, str] = {
+    "string": "string",
+    "text": "string",
+    "number": "number",
+    "float": "float",
+    "integer": "integer",
+    "int": "integer",
+    "boolean": "boolean",
+    "bool": "boolean",
+    "email": "email",
+    "phone": "phone",
+    "url": "url",
+    "website": "url",
+    "date": "date",
+    "currency": "currency",
+    "price": "currency",
+    "rating": "rating",
+    "location": "location",
+    "address": "location",
+    "percentage": "percentage",
+    "list": "list_string",
+    "code": "code",
+    "time": "time",
+}
+
+
+def _build_llm_fields(result: dict | None, patterns: ValuePatterns) -> list[dict]:
+    """Build suggested_fields list from LLM result or pattern fallback."""
+    suggested_fields: list[dict] = []
+    if result and isinstance(result, dict):
+        raw_fields = result.get("fields", [])
+        if isinstance(raw_fields, dict):
+            raw_fields = [
+                {"name": k, "example_value": v, "type": "string", "confidence": 0.5}
+                for k, v in raw_fields.items()
+                if isinstance(v, str)
+            ]
+
+        if isinstance(raw_fields, list):
+            for f in raw_fields:
+                if not isinstance(f, dict):
+                    continue
+                name = str(f.get("name", "")).strip()
+                if not name:
+                    continue
+
+                raw_type = str(f.get("type", "string")).lower().strip()
+                mapped_type = FIELD_TYPE_MAP.get(raw_type, "string")
+
+                suggested_fields.append(
+                    {
+                        "name": name,
+                        "type": mapped_type,
+                        "selector": "",
+                        "example_value": f.get("example_value", ""),
+                        "confidence": min(float(f.get("confidence", 0.5)), 1.0),
+                        "description": str(f.get("description", "")),
+                    },
+                )
+
+    # If LLM returned no fields, use pattern analysis as fallback
+    if not suggested_fields:
+        for hint in _value_patterns_to_field_types(patterns):
+            suggested_fields.append(
+                {
+                    "name": hint["type"],
+                    "type": hint["type"],
+                    "selector": "",
+                    "example_value": hint.get("example", ""),
+                    "confidence": hint["confidence"],
+                    "description": hint.get("description", "") if hint.get("description") else "",
+                },
+            )
+
+    return suggested_fields
 
 
 async def analyze_url_for_fields(
@@ -258,74 +394,27 @@ async def analyze_url_for_fields(
         )
     except Exception as e:
         logger.exception("[URLAnalyzer] Failed to fetch %s", url)
-        from app.acquisition_state import AcquisitionLineage, AcquisitionState
-
-        return {
-            "url": url,
-            "redirect_info": redirect_info,
-            "acquisition_lineage": AcquisitionLineage(
-                original_url=url,
-                final_url=final_url,
-                state=AcquisitionState.DIRECT,
-                message=f"Failed to fetch URL: {e!s}",
-            ).model_dump(mode="json"),
-            "user_message": f"Failed to fetch the URL: {e!s}",
-            "session_detection": session_detection,
-            "canonical_url": session_detection.get("canonical_url", url),
-            "content_quality": None,
-            "empty_check": {
-                "is_empty": True,
-                "empty_type": "blank",
-                "confidence": 1.0,
-                "message": "Failed to fetch",
-                "suggestions": [],
-            },
-            "search_form": None,
-            "search_recovery": None,
-            "error": f"Failed to fetch URL: {e!s}",
-            "page_structure": "unknown",
-            "structure_confidence": 0.0,
-            "estimated_record_count": 0,
-            "item_container": None,
-            "suggested_fields": [],
-            "anti_bot_score": 0.0,
-            "acquisition_mode": acquisition_mode,
-        }
+        return _build_error_response(
+            url=url,
+            redirect_info=redirect_info,
+            session_detection=session_detection,
+            final_url=final_url,
+            error_message=f"Failed to fetch URL: {e!s}",
+            user_message=f"Failed to fetch the URL: {e!s}",
+            acquisition_mode=acquisition_mode,
+        )
 
     if not html or len(html.strip()) < 100:
-        from app.acquisition_state import AcquisitionLineage, AcquisitionState
-
-        return {
-            "url": url,
-            "redirect_info": redirect_info,
-            "acquisition_lineage": AcquisitionLineage(
-                original_url=url,
-                final_url=final_url,
-                state=AcquisitionState.DIRECT,
-                message="Fetched page appears empty",
-            ).model_dump(mode="json"),
-            "user_message": "The fetched page appears to be empty.",
-            "session_detection": session_detection,
-            "canonical_url": session_detection.get("canonical_url", url),
-            "content_quality": None,
-            "empty_check": {
-                "is_empty": True,
-                "empty_type": "blank",
-                "confidence": 1.0,
-                "message": "Fetched page appears empty",
-                "suggestions": ["The URL may be incorrect or the server returned an empty page"],
-            },
-            "search_form": None,
-            "search_recovery": None,
-            "error": "Fetched page appears empty",
-            "page_structure": "unknown",
-            "structure_confidence": 0.0,
-            "estimated_record_count": 0,
-            "item_container": None,
-            "suggested_fields": [],
-            "anti_bot_score": 0.0,
-            "acquisition_mode": acquisition_mode,
-        }
+        return _build_error_response(
+            url=url,
+            redirect_info=redirect_info,
+            session_detection=session_detection,
+            final_url=final_url,
+            error_message="Fetched page appears empty",
+            user_message="The fetched page appears to be empty.",
+            suggestions=["The URL may be incorrect or the server returned an empty page"],
+            acquisition_mode=acquisition_mode,
+        )
 
     # ── Step 3: Search Form Recovery (for expired session URLs) ──────
     # If the URL redirected (e.g. session token expired) and the user
@@ -441,80 +530,7 @@ async def analyze_url_for_fields(
         result = None
 
     # ── Step 8: Build structured response ────────────────────────────
-    field_type_map = {
-        "string": "string",
-        "text": "string",
-        "number": "number",
-        "float": "float",
-        "integer": "integer",
-        "int": "integer",
-        "boolean": "boolean",
-        "bool": "boolean",
-        "email": "email",
-        "phone": "phone",
-        "url": "url",
-        "website": "url",
-        "date": "date",
-        "currency": "currency",
-        "price": "currency",
-        "rating": "rating",
-        "location": "location",
-        "address": "location",
-        "percentage": "percentage",
-        "list": "list_string",
-        "code": "code",
-        "time": "time",
-    }
-
-    suggested_fields = []
-    if result and isinstance(result, dict):
-        raw_fields = result.get("fields", [])
-        if isinstance(raw_fields, dict):
-            raw_fields = [
-                {"name": k, "example_value": v, "type": "string", "confidence": 0.5}
-                for k, v in raw_fields.items()
-                if isinstance(v, str)
-            ]
-
-        if isinstance(raw_fields, list):
-            for f in raw_fields:
-                if not isinstance(f, dict):
-                    continue
-                name = str(f.get("name", "")).strip()
-                if not name:
-                    continue
-
-                raw_type = str(f.get("type", "string")).lower().strip()
-                mapped_type = field_type_map.get(raw_type, "string")
-
-                suggested_fields.append(
-                    {
-                        "name": name,
-                        "type": mapped_type,
-                        "selector": "",
-                        "example_value": f.get("example_value", ""),
-                        "confidence": min(float(f.get("confidence", 0.5)), 1.0),
-                        "description": str(f.get("description", "")),
-                    },
-                )
-
-    # If LLM returned no fields, use pattern analysis as fallback
-    if not suggested_fields:
-        for hint in _value_patterns_to_field_types(patterns):
-            suggested_fields.append(
-                {
-                    "name": hint["type"],
-                    "type": hint["type"],
-                    "selector": "",
-                    "example_value": hint.get("example", ""),
-                    "confidence": hint["confidence"],
-                    "description": hint.get("description", ""),
-                },
-            )
-
-    # Post-processing: rename generic type-name fields to more descriptive
-    # names
-    suggested_fields = _rename_generic_fields(suggested_fields)
+    suggested_fields = _rename_generic_fields(_build_llm_fields(result, patterns))
 
     # Sort by confidence descending
     suggested_fields.sort(key=lambda f: f["confidence"], reverse=True)

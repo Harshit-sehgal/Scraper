@@ -492,6 +492,68 @@ async def csp_violations(request: Request):
     return JSONResponse(status_code=204, content=None)
 
 
+# ─── Data Retention ──────────────────────────────────────────────────────
+
+
+@router.post("/api/system/retention/enforce", status_code=200)
+async def enforce_data_retention(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    dry_run: Annotated[bool, Query(
+        description="When true, report what would be deleted without deleting.",
+    )] = True,
+) -> dict[str, Any]:
+    """Enforce the data retention policy, purging data older than the configured TTL.
+
+    By default this runs as a dry-run (reports only). Pass ``?dry_run=false``
+    to actually delete expired data.
+
+    Returns:
+        - ``jobs_purged``: completed/terminal jobs deleted
+        - ``recycle_purged``: recycle-bin items deleted
+        - ``jobs_skipped``: completed jobs within retention window
+        - ``recycle_skipped``: recycle items within retention window
+        - ``idempotency_keys_purged``: stale idempotency keys deleted
+        - ``config``: current retention policy in days
+    """
+    from app.globals import _jobs_store_lock, jobs_store, recycle_bin_store
+    from app.utils.data_retention import enforce_idempotency_retention, enforce_retention, get_retention_config
+
+    with _jobs_store_lock:
+        result: dict[str, Any] = dict(
+            enforce_retention(
+                jobs_store,
+                recycle_bin_store,
+                dry_run=dry_run,
+            )
+        )
+    result["idempotency_keys_purged"] = enforce_idempotency_retention(dry_run=dry_run)
+    result["config"] = get_retention_config()
+    result["dry_run"] = dry_run
+
+    # Persist the in-memory deletions to the database
+    if not dry_run and (result["jobs_purged"] > 0 or result["recycle_purged"] > 0):
+        try:
+            from app.job_store import save_state
+
+            with _jobs_store_lock:
+                save_state(jobs_store, recycle_bin_store, prune_missing=True)
+        except (ImportError, RuntimeError) as e:
+            logger.warning("Failed to persist retention deletions: %s", e)
+            result["persist_error"] = str(e)
+
+    return result
+
+
+@router.get("/api/system/retention/config", status_code=200)
+async def get_retention_config_endpoint(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+) -> dict[str, Any]:
+    """Return the current data retention policy configuration."""
+    from app.utils.data_retention import get_retention_config
+
+    return {"config": get_retention_config()}
+
+
 # ─── Rate Limiter Stats ─────────────────────────────────────────────────
 
 
@@ -620,6 +682,7 @@ def _render_basic_metrics_text() -> str:
     """Render a minimal Prometheus exposition if prometheus_client is unavailable."""
     from app.metrics_collector import (
         get_anti_bot_classifications,
+        get_auth_profile_ops,
         get_browser_launch_outcomes,
         get_csp_violations,
         get_errors,
@@ -632,8 +695,12 @@ def _render_basic_metrics_text() -> str:
         get_repo_query_latencies,
         get_request_latencies,
         get_requests_total,
+        get_retention_ops,
+        get_scheduled_job_ops,
+        get_signup_outcomes,
         get_ssrf_rejects,
         get_worker_failures,
+        get_workflow_ops,
     )
     from app.models import JobStatus
 
@@ -647,6 +714,44 @@ def _render_basic_metrics_text() -> str:
         lines.append(_basic_metric_line("dataforge_recycle_bin_total", len(recycle_bin_store)))
     for status, count in counts.items():
         lines.append(_basic_metric_line("dataforge_jobs_total", count, {"status": status}))
+
+    # Auth profile operations
+    for op_action, op_count in get_auth_profile_ops().items():
+        lines.append(_basic_metric_line("dataforge_auth_profile_ops_total", op_count, {"action": op_action}))
+
+    # Workflow operations
+    for wf_action, wf_count in get_workflow_ops().items():
+        lines.append(_basic_metric_line("dataforge_workflow_ops_total", wf_count, {"action": wf_action}))
+
+    # Signup outcomes
+    for signup_outcome, signup_count in get_signup_outcomes().items():
+        lines.append(
+            _basic_metric_line(
+                "dataforge_signup_outcomes_total",
+                signup_count,
+                {"outcome": signup_outcome},
+            ),
+        )
+
+    # Scheduled job operations
+    for sched_action, sched_count in get_scheduled_job_ops().items():
+        lines.append(
+            _basic_metric_line(
+                "dataforge_scheduled_job_ops_total",
+                sched_count,
+                {"action": sched_action},
+            ),
+        )
+
+    # Retention operations
+    for ret_action, ret_count in get_retention_ops().items():
+        lines.append(
+            _basic_metric_line(
+                "dataforge_retention_ops_total",
+                ret_count,
+                {"action": ret_action},
+            ),
+        )
 
     backend_ok = 1
     try:
@@ -1034,6 +1139,7 @@ async def metrics(request: Request):
     # methods.
     from app.metrics_collector import (
         get_anti_bot_classifications,
+        get_auth_profile_ops,
         get_browser_launch_outcomes,
         get_csp_violations,
         get_export_outcomes,
@@ -1041,7 +1147,11 @@ async def metrics(request: Request):
         get_rate_limit_global_hits,
         get_rate_limit_per_ip_hits,
         get_repo_query_latencies,
+        get_retention_ops,
+        get_scheduled_job_ops,
+        get_signup_outcomes,
         get_ssrf_rejects,
+        get_workflow_ops,
     )
 
     method_counts = get_extraction_method_counts()
@@ -1145,5 +1255,65 @@ async def metrics(request: Request):
         registry=registry,
     )
     rl_per_ip.set(get_rate_limit_per_ip_hits())
+
+    # Auth profile operations
+    auth_profile_ops = get_auth_profile_ops()
+    if auth_profile_ops:
+        apo_gauge = Gauge(
+            "dataforge_auth_profile_ops_total",
+            "Auth profile operation counts by action",
+            ["action"],
+            registry=registry,
+        )
+        for action, count in auth_profile_ops.items():
+            apo_gauge.labels(action=action).set(count)
+
+    # Workflow operations
+    workflow_ops = get_workflow_ops()
+    if workflow_ops:
+        wo_gauge = Gauge(
+            "dataforge_workflow_ops_total",
+            "Workflow operation counts by action",
+            ["action"],
+            registry=registry,
+        )
+        for action, count in workflow_ops.items():
+            wo_gauge.labels(action=action).set(count)
+
+    # Signup outcomes
+    signup_outcomes = get_signup_outcomes()
+    if signup_outcomes:
+        so_gauge = Gauge(
+            "dataforge_signup_outcomes_total",
+            "Signup outcome counts",
+            ["outcome"],
+            registry=registry,
+        )
+        for outcome, count in signup_outcomes.items():
+            so_gauge.labels(outcome=outcome).set(count)
+
+    # Scheduled job operations
+    scheduled_job_ops = get_scheduled_job_ops()
+    if scheduled_job_ops:
+        sjo_gauge = Gauge(
+            "dataforge_scheduled_job_ops_total",
+            "Scheduled job operation counts by action",
+            ["action"],
+            registry=registry,
+        )
+        for action, count in scheduled_job_ops.items():
+            sjo_gauge.labels(action=action).set(count)
+
+    # Retention operations
+    retention_ops = get_retention_ops()
+    if retention_ops:
+        ro_gauge = Gauge(
+            "dataforge_retention_ops_total",
+            "Data retention operation counts by action",
+            ["action"],
+            registry=registry,
+        )
+        for action, count in retention_ops.items():
+            ro_gauge.labels(action=action).set(count)
 
     return Response(content=generate_latest(registry), media_type="text/plain")
