@@ -134,7 +134,7 @@ class DomainDenylist:
 
     def _load_cache(self) -> None:
         with self._lock, self._connect() as conn:
-            query = f"SELECT domain, reason, added_by, added_at, path_prefix FROM {DENYLIST_TABLE}"  # nosec B608, noqa: S608
+            query = "SELECT domain, reason, added_by, added_at, path_prefix FROM domain_denylist"
             rows = conn.execute(query).fetchall()
         self._cache = {}
         for row in rows:
@@ -172,15 +172,15 @@ class DomainDenylist:
             msg = f"invalid domain: {domain!r}"
             raise ValueError(msg)
         with self._lock, self._connect() as conn:
-            query = f"""
-                INSERT INTO {DENYLIST_TABLE} (domain, reason, added_by, path_prefix)
+            query = """
+                INSERT INTO domain_denylist (domain, reason, added_by, path_prefix)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(domain) DO UPDATE SET
                     reason=excluded.reason,
                     added_by=excluded.added_by,
                     added_at=datetime('now'),
                     path_prefix=excluded.path_prefix
-                """  # nosec B608, noqa: S608
+                """
             conn.execute(query, (domain, reason, added_by, path_prefix))
         self._invalidate_cache()
         return DenylistEntry(
@@ -196,10 +196,10 @@ class DomainDenylist:
         domain = (domain or "").strip().lower()
         with self._lock, self._connect() as conn:
             if path_prefix:
-                query = f"DELETE FROM {DENYLIST_TABLE} WHERE domain = ? AND path_prefix = ?"  # nosec B608, noqa: S608
+                query = "DELETE FROM domain_denylist WHERE domain = ? AND path_prefix = ?"
                 cur = conn.execute(query, (domain, path_prefix))
             else:
-                query = f"DELETE FROM {DENYLIST_TABLE} WHERE domain = ?"  # nosec B608, noqa: S608
+                query = "DELETE FROM domain_denylist WHERE domain = ?"
                 cur = conn.execute(query, (domain,))
         self._invalidate_cache()
         return cur.rowcount > 0
@@ -258,7 +258,7 @@ class DomainDenylist:
     def clear(self) -> None:
         """Remove every entry (test helper)."""
         with self._lock, self._connect() as conn:
-            query = f"DELETE FROM {DENYLIST_TABLE}"  # nosec B608, noqa: S608
+            query = "DELETE FROM domain_denylist"
             conn.execute(query)
         self._invalidate_cache()
 

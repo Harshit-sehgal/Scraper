@@ -130,7 +130,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Full backend pytest should pass in a clean test environment.
 - **acceptance_criteria:** `python3 -m pytest backend/tests -q` exits 0 and the output is recorded.
 - **blocked_by:** None.
-- **notes:** Original three failures (auth profiles, pyflakes) were fixed in Prompt 3 and session 4. A new `test_billing_checkout_unit.py` failure (stale `user_id` kwarg, missing `@pytest.mark.asyncio`) was fixed 2026-06-22 — all 4 billing checkout tests now pass. Quick validation (12/12 gates) passes. Full suite still times out at >120s cumulative across 215+ test files — each batch passes individually within its timeout.
+- **notes:** Fixed 2026-06-22 session 2: `python3 -m pytest backend/tests/ -q` exits 0 (~5 min). Quick validation 12/12 and security validation 8/8 also pass. Prior failures (workflow schema drift, metrics_collector NameError, pyflakes drift) repaired.
 
 ### P1-AUTHPROFILE-002
 
@@ -407,7 +407,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-COMPLIANCE-RETENTION-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** compliance / acceptable_use / retention
 - **file_path:** `docs/SAFETY_AND_ACCEPTABLE_USE.md`, `artifacts/audit/COMPLIANCE_BASELINE.md`
 - **line/function:** data retention and acceptable-use controls
@@ -418,12 +418,12 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Retention expiration, hard delete, restore window, export logging, audit event, and tenant isolation tests.
 - **acceptance_criteria:** Retention/delete behavior is documented, tested, and visible to operators.
 - **blocked_by:** Product/legal retention decisions.
-- **notes:** Safety policy now exists; enforcement depth remains follow-up work.
+- **notes:** Closed 2026-06-22 session 2: defaults enforced in code (`data_retention.py`), tests in `test_retention.py`, operator policy documented in `docs/COMPLIANCE_RETENTION.md`. Legal/customer-facing terms still require product review.
 
 ### P1-AUDIT-COVERAGE-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** audit_logging / coverage_baseline
 - **file_path:** `backend/app/audit_logger.py`, `backend/tests/test_audit_logger.py`, `artifacts/audit/COMPLIANCE_BASELINE.md`
 - **line/function:** audit event coverage map
@@ -434,15 +434,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Route-level audit assertions for auth failure, tenant denial, quota denial, export access, delete/restore, workflow run, auth profile use, and URL safety block.
 - **acceptance_criteria:** Audit coverage matrix has no unknown rows for P0/P1 resources.
 - **blocked_by:** Route/resource inventory update after future feature work.
-- **notes:** Progress (2026-06-22): Added route-level audit assertions for:
-  - ✅ Export denial (`log_rbac_event`) in `test_project_scoped_write_key_cannot_export_another_orgs_job`
-  - ✅ Workflow create (`log_job_event`) in `test_project_scoped_key_cannot_access_another_orgs_workflow`
-  - ✅ Job read denial (`log_rbac_event`) — already existed in `test_denied_cross_tenant_job_read_is_audit_logged`
-  - ✅ Auth failure (middleware) — already covered by `test_audit_logger_integration.py`
-  - ❌ Quota denial — still missing (needs route-level test)  - ✅ Auth profile denial (`log_rbac_event`) — added to `_get_visible_profile` in `auth_profiles.py` + test assertion
-  - ✅ Scheduled job denial (`log_rbac_event`) — added to `_get_visible_scheduled_job` in `scheduled_monitoring.py` + test assertion
-  - ✅ URL safety block (`log_system_event`) — added `log_system_event` call to `_record_ssrf_reject` in `url_safety.py` + 7 tests covering all reject reasons: loopback, cloud metadata, bad scheme, internal TLD, disallowed port, restricted IP literal, empty URL
-  - ✅ Quota denial (`log_rbac_event`) — added to `require_plan_limit` in `plan_enforcer.py` + middleware 429 path in `middlewares.py` + test assertion in `test_api_request_quota_is_enforced_by_middleware`
+- **notes:** Closed 2026-06-22 session 2. All P0/P1 security-sensitive routes in the audit matrix now have code + tests, including workflow draft cross-tenant denial (`test_project_scoped_key_cannot_access_another_orgs_workflow_draft`).
 
 ### P2-OBSERVABILITY-METRICS-001
 
@@ -458,7 +450,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Metrics endpoint tests for required series; staging scrape proof; alert threshold tests.
 - **acceptance_criteria:** Required metrics/events are implemented or explicitly deferred with rationale and tests.
 - **blocked_by:** Observability implementation pass.
-- **notes:** This is a baseline gap, not a Prompt 7 code fix.
+- **notes:** Session 2 (2026-06-22): Core product counters implemented in `metrics_collector.py`, wired via audit logger / job creation / finalization / exports / workflow routes, exposed on `/metrics`. Staging scrape proof and alert thresholds remain ops follow-up. See `docs/OBSERVABILITY.md` mapping table.
 
 ### P1-MIGRATION-ROLLBACK-001
 

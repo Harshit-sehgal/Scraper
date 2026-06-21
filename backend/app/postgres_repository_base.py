@@ -820,12 +820,13 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 row = job_to_row(job)
                 now_iso = datetime.datetime.now(datetime.UTC).isoformat()
                 row["deleted_at"] = now_iso
-                cols = ", ".join(row.keys())
-                ph = ", ".join("%s" for _ in row)
+                safe_keys = [k for k in row if k in _JOB_COLUMNS]
+                cols = _validate_cols(safe_keys)
+                ph = ", ".join("%s" for _ in safe_keys)
                 self._execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",  # nosec B608  # noqa: RUF100, S608
-                    list(row.values()),
+                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",
+                    [row[k] for k in safe_keys],
                 )
                 self._execute(
                     conn,
@@ -845,13 +846,14 @@ class PostgresRepositoryBase(JobRepository, ABC):
         self._ensure()
         with self._conn() as conn:
             row = job_to_row(job)
-            cols = ", ".join(row.keys())
-            ph = ", ".join("%s" for _ in row)
-            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row if k != "id")
+            safe_keys = [k for k in row if k in _JOB_COLUMNS]
+            cols = _validate_cols(safe_keys)
+            ph = ", ".join("%s" for _ in safe_keys)
+            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id")
             self._execute(
                 conn,
-                f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608  # noqa: RUF100, S608
-                list(row.values()),
+                f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
+                [row[k] for k in safe_keys],
             )
             sync_job_results(conn, job.id, job.results)
             sync_job_events(conn, job.id, job.logs)
@@ -1016,12 +1018,13 @@ class PostgresRepositoryBase(JobRepository, ABC):
             now = datetime.datetime.now(datetime.UTC).isoformat()
             self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, job_id))
             cols_to_copy = [k for k in row if k != "deleted_at"]
-            insert_cols = ", ".join(cols_to_copy)
-            insert_vals = ", ".join("%s" for _ in cols_to_copy)
-            params = [row[k] for k in cols_to_copy] + [now]
+            safe_cols = [k for k in cols_to_copy if k in _JOB_COLUMNS]
+            insert_cols = _validate_cols(safe_cols)
+            insert_vals = ", ".join("%s" for _ in safe_cols)
+            params = [row[k] for k in safe_cols] + [now]
             self._execute(
                 conn,
-                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608  # noqa: RUF100, S608
+                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",
                 params,
             )
             return True
@@ -1034,13 +1037,14 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 return False
             self._execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
             cols = [k for k in row if k != "deleted_at"]
-            col_list = ", ".join(cols)
-            ph = ", ".join("%s" for _ in cols)
-            update_parts = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
+            safe_cols = [k for k in cols if k in _JOB_COLUMNS]
+            col_list = _validate_cols(safe_cols)
+            ph = ", ".join("%s" for _ in safe_cols)
+            update_parts = ", ".join(f"{c} = EXCLUDED.{c}" for c in safe_cols if c != "id")
             self._execute(
                 conn,
-                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",  # nosec B608  # noqa: RUF100, S608
-                [row[k] for k in cols],
+                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",
+                [row[k] for k in safe_cols],
             )
             return True
 
@@ -1070,12 +1074,13 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 now = datetime.datetime.now(datetime.UTC).isoformat()
                 self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, row["id"]))
                 cols = [k for k in row if k != "deleted_at"]
-                col_list = ", ".join(cols)
-                ph = ", ".join("%s" for _ in cols)
+                safe_cols = [k for k in cols if k in _JOB_COLUMNS]
+                col_list = _validate_cols(safe_cols)
+                ph = ", ".join("%s" for _ in safe_cols)
                 self._execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608  # noqa: RUF100, S608
-                    [row[k] for k in cols] + [now],
+                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",
+                    [row[k] for k in safe_cols] + [now],
                 )
                 self._execute(conn, "DELETE FROM job_results WHERE job_id = %s", (row["id"],))
                 self._execute(conn, "DELETE FROM job_events WHERE job_id = %s", (row["id"],))

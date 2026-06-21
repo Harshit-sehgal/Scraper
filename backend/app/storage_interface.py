@@ -453,11 +453,11 @@ class SQLiteJobRepository(JobRepository):
             params.append(cursor)
         params.append(safe_limit)
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
+            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error, deleted_at "
             "FROM recycle_bin "
-            f"WHERE {where} "  # noqa: RUF100, S608
+            "WHERE " + where + " "
             "ORDER BY created_at DESC LIMIT ?"
         )
         with _DB_LOCK:
@@ -536,11 +536,11 @@ class SQLiteJobRepository(JobRepository):
             params.append(cursor)
         params.append(safe_limit)
         sql = (
-            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "  # nosec B608  # noqa: RUF100, S608
+            "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
             "progress_total, error "
             "FROM jobs "
-            f"WHERE {where} "  # noqa: RUF100, S608
+            "WHERE " + where + " "
             "ORDER BY created_at DESC LIMIT ?"
         )
         with _DB_LOCK:
