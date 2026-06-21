@@ -4,6 +4,9 @@ Extracts the numbered stages from ``selector_discovery.analyze_url_for_fields``
 into focused stage methods on a ``URLAnalysisPipeline`` class. The pipeline
 is stateful: a ``_UrlAnalysisContext`` dataclass flows through the stages.
 
+All stage methods use lazy imports through ``app.selector_discovery`` so that
+existing test mocks on ``app.selector_discovery.*`` continue to work.
+
 Usage::
 
     pipeline = URLAnalysisPipeline()
@@ -12,19 +15,32 @@ Usage::
 
 from __future__ import annotations
 
-import datetime
 import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.config import settings
-from app.empty_response_detector import EmptyResponseCheck, detect_empty_response
-from app.llm_bridge import llm_json, reset_llm_call_count
-from app.page_profiler import ValuePatterns, detect_page_structure, detect_value_patterns
-from app.search_form_recovery import _detect_search_form, _try_form_search_recovery
 
 logger = logging.getLogger(__name__)
+
+
+# ── Lazy import helpers ──────────────────────────────────────────────────
+
+
+def _import_sd(name: str):
+    """Lazy-import a name from app.selector_discovery.
+
+    This indirection ensures that test mocks patching
+    ``app.selector_discovery.<name>`` are picked up at call time.
+    """
+    import importlib
+
+    mod = importlib.import_module("app.selector_discovery")
+    return getattr(mod, name)
+
+
+# ── Pipeline context ─────────────────────────────────────────────────────
 
 
 @dataclass
@@ -42,32 +58,40 @@ class _UrlAnalysisContext:
     session_detection: dict = field(default_factory=dict)
     html: str = ""
     fetch_method: str = "unknown"
-    search_form: dict = field(default_factory=lambda: {"detected": False, "form_fields": [], "search_fields": [], "action": ""})
+    search_form: dict = field(
+        default_factory=lambda: {"detected": False, "form_fields": [], "search_fields": [], "action": ""}
+    )
     search_recovery: dict | None = None
     anti_bot_score: float = 0.0
     profile: Any = None
-    patterns: ValuePatterns = field(default_factory=ValuePatterns)
+    patterns: Any = None
     content_quality: dict = field(default_factory=dict)
-    empty_check: EmptyResponseCheck = field(
-        default_factory=lambda: EmptyResponseCheck(is_empty=False, empty_type="", confidence=0.0, message="")
-    )
+    empty_check: Any = None
     suggested_fields: list = field(default_factory=list)
     estimated_records: int = 0
     item_container: str = ""
     browser_state_evidence: Any = None
     escalated_mode: str | None = None
 
+    # The acquisition state value (StrEnum value) from the built lineage.
+    # Used by the escalation check after _stage_build_response completes.
+    _acquisition_state_value: str = "direct"
+
     # Timing
     start_time: float = field(default_factory=time.time)
     elapsed: float = 0.0
 
     # Error state
-    error: str = ""
     error_response: dict | None = None
 
-    # Config
+    # Config (set in run())
     config: Any = None
     mode_enum: Any = None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Pipeline
+# ═══════════════════════════════════════════════════════════════════════════
 
 
 class URLAnalysisPipeline:
@@ -77,8 +101,6 @@ class URLAnalysisPipeline:
     ``_UrlAnalysisContext``. The ``run`` method orchestrates the stages
     in order, handling early returns and recursive escalation.
     """
-
-    # ── Public API ───────────────────────────────────────────────────────
 
     async def run(
         self,
@@ -105,7 +127,7 @@ class URLAnalysisPipeline:
             start_time=time.time(),
         )
 
-        reset_llm_call_count()
+        _import_sd("reset_llm_call_count")()
 
         # Resolve acquisition config
         from app.acquisition_mode import (  # research-shell, lazy
@@ -125,10 +147,7 @@ class URLAnalysisPipeline:
 
         # ── Stage 1: URL Resolution ──────────────────────────────────
         await self._stage_resolve_url(ctx)
-        # Redirect detection runs immediately after URL resolution
-        from app.url_redirects import _detect_redirect
-
-        ctx.redirect_info = _detect_redirect(url, ctx.final_url)
+        ctx.redirect_info = _import_sd("_detect_redirect")(url, ctx.final_url)
 
         # ── Stage 2: Session Detection ───────────────────────────────
         await self._stage_detect_session(ctx)
@@ -157,7 +176,7 @@ class URLAnalysisPipeline:
         max_depth = ctx.config.max_retries
         if (
             _escalation_depth < max_depth
-            and should_escalate(ctx.mode_enum, self._get_last_state(ctx), ctx.empty_check.is_empty)
+            and should_escalate(ctx.mode_enum, ctx._acquisition_state_value, ctx.empty_check.is_empty)
         ):
             escalated_mode = escalate_mode(ctx.mode_enum)
             if escalated_mode != ctx.mode_enum:
@@ -176,13 +195,13 @@ class URLAnalysisPipeline:
 
         return response
 
-    # ── Stage Implementations ────────────────────────────────────────────
+    # ── Stage 1: URL Resolution ──────────────────────────────────────────
 
     async def _stage_resolve_url(self, ctx: _UrlAnalysisContext) -> None:
-        """Stage 1: Resolve the final URL via httpx redirect-following."""
+        """Resolve the final URL via httpx redirect-following with SSRF checks."""
         import httpx
         from app.url_safety import get_safe_async_client, validate_public_http_url
-        from urllib.parse import urljoin as _urljoin
+        from urllib.parse import urljoin
 
         ctx.final_url = ctx.url
         try:
@@ -199,12 +218,12 @@ class URLAnalysisPipeline:
                     location = resp.headers.get("location", "")
                     if not location:
                         break
-                    redirect_target = _urljoin(str(resp.url), location)
+                    redirect_target = urljoin(str(resp.url), location)
                     try:
                         validate_public_http_url(redirect_target)
                     except ValueError as e:
                         logger.warning(
-                            "[URLAnalyzer] Redirect target blocked by SSRF validation: %s → %s: %s",
+                            "[URLAnalyzer] Redirect target blocked by SSRF validation: %s -> %s: %s",
                             ctx.url,
                             redirect_target,
                             e,
@@ -215,25 +234,21 @@ class URLAnalysisPipeline:
                 if str(resp.url) != ctx.url:
                     ctx.final_url = str(resp.url)
                     logger.info(
-                        "[URLAnalyzer] URL resolved: %s → %s (after %d redirect hops)",
+                        "[URLAnalyzer] URL resolved: %s -> %s (after %d redirect hops)",
                         ctx.url,
                         ctx.final_url,
                         hops,
                     )
         except Exception as exc:
-            logger.debug(
-                "[URLAnalyzer] Could not determine final URL via httpx for %s: %s",
-                ctx.url,
-                exc,
-                exc_info=True,
-            )
+            logger.debug("[URLAnalyzer] Could not determine final URL via httpx for %s: %s", ctx.url, exc, exc_info=True)
+
+    # ── Stage 2: Session Detection ───────────────────────────────────────
 
     async def _stage_detect_session(self, ctx: _UrlAnalysisContext) -> None:
-        """Stage 2: Detect session-bound URL parameters."""
-        from app.session_url_detector import detect_session_params
-
+        """Detect session-bound URL parameters."""
+        detect = _import_sd("detect_session_params")
         if ctx.config.detect_session_params:
-            ctx.session_detection = detect_session_params(ctx.url)
+            ctx.session_detection = detect(ctx.url)
         else:
             ctx.session_detection = {
                 "is_session_bound": False,
@@ -243,16 +258,18 @@ class URLAnalysisPipeline:
                 "details": [],
             }
 
+    # ── Stage 3: Page Fetching ───────────────────────────────────────────
+
     async def _stage_fetch_page(self, ctx: _UrlAnalysisContext) -> bool:
-        """Stage 3: Fetch the page HTML via Playwright.
+        """Fetch the page HTML via Playwright.
 
         Returns False if fetch failed or page is empty (error response set).
         """
-        from app.html_utils import fetch_page_content as _fetch_page_content
+        from app.html_utils import fetch_page_content
         from app.strategy_evolution import FetchStrategy  # research-shell, lazy
 
         try:
-            html, _js_render_delay, fetch_method, _retry_count = await _fetch_page_content(
+            html, _js_render_delay, fetch_method, _retry_count = await fetch_page_content(
                 ctx.url,
                 preferred_method=FetchStrategy.PLAYWRIGHT_FULL,
             )
@@ -279,15 +296,19 @@ class URLAnalysisPipeline:
 
         return True
 
+    # ── Stage 4: Search Form Recovery ────────────────────────────────────
+
     async def _stage_search_recovery(self, ctx: _UrlAnalysisContext) -> None:
-        """Stage 4: Attempt search form recovery for expired session URLs."""
+        """Attempt search form recovery for expired session URLs."""
+        detect_form = _import_sd("_detect_search_form")
+        try_recovery = _import_sd("_try_form_search_recovery")
+        build_redirect = _import_sd("build_redirect_info")
+
         if ctx.config.attempt_search_form:
-            ctx.search_form = _detect_search_form(ctx.html)
+            ctx.search_form = detect_form(ctx.html)
         else:
             ctx.search_form = {"detected": False, "form_fields": [], "search_fields": [], "action": ""}
         ctx.search_recovery = None
-
-        from app.url_redirects import build_redirect_info
 
         if (
             ctx.config.attempt_recovery
@@ -296,10 +317,10 @@ class URLAnalysisPipeline:
             and ctx.search_form.get("detected")
         ):
             logger.info(
-                "[URLAnalyzer] Redirected URL with search params — attempting recovery via %s",
+                "[URLAnalyzer] Redirected URL with search params attempting recovery via %s",
                 ctx.search_form.get("action", "/search"),
             )
-            ctx.search_recovery = await _try_form_search_recovery(
+            ctx.search_recovery = await try_recovery(
                 landing_page_html=ctx.html,
                 landing_page_url=ctx.final_url,
                 search_params=ctx.search_params,
@@ -307,14 +328,14 @@ class URLAnalysisPipeline:
 
             if ctx.search_recovery.get("success") and ctx.search_recovery.get("fresh_html"):
                 logger.info(
-                    "[URLAnalyzer] Recovery succeeded → %s, re-analyzing fresh page",
+                    "[URLAnalyzer] Recovery succeeded -> %s, re-analyzing fresh page",
                     ctx.search_recovery.get("fresh_url", ""),
                 )
                 ctx.html = ctx.search_recovery["fresh_html"]
                 ctx.fetch_method = "search_form_post"
                 if ctx.search_recovery.get("fresh_url"):
                     ctx.final_url = ctx.search_recovery["fresh_url"]
-                ctx.redirect_info = build_redirect_info(
+                ctx.redirect_info = build_redirect(
                     original_url=ctx.url,
                     final_url=ctx.final_url,
                     search_recovery=ctx.search_recovery,
@@ -325,38 +346,46 @@ class URLAnalysisPipeline:
                 )
         elif ctx.redirect_info.get("redirected") and ctx.search_form.get("detected"):
             logger.info(
-                "[URLAnalyzer] Redirected URL with search form detected — provide search_params to attempt recovery. Fields: %s",
-                [f["name"] or f["id"] for f in (ctx.search_form.get("search_fields") or []) if isinstance(f, dict)],
+                "[URLAnalyzer] Redirected URL with search form detected provide search_params to attempt recovery",
             )
 
+    # ── Stage 5: Page Analysis ───────────────────────────────────────────
+
     def _stage_analyze_page(self, ctx: _UrlAnalysisContext) -> None:
-        """Stage 5: Analyze page structure, value patterns, and anti-bot."""
+        """Analyze page structure, value patterns, and anti-bot score."""
         from app.scrape_telemetry import detect_anti_bot
 
         ctx.anti_bot_score = detect_anti_bot(ctx.html)
-        ctx.profile = detect_page_structure(ctx.html)
-        ctx.patterns = detect_value_patterns(ctx.html)
+        ctx.profile = _import_sd("detect_page_structure")(ctx.html)
+        ctx.patterns = _import_sd("detect_value_patterns")(ctx.html)
+
+    # ── Stage 6: Content Quality + Empty Check ───────────────────────────
 
     def _stage_quality_check(self, ctx: _UrlAnalysisContext) -> None:
-        """Stage 6: Content quality assessment and empty response detection."""
-        from app.content_quality import _assess_content_quality
+        """Content quality assessment and empty response detection."""
+        assess = _import_sd("_assess_content_quality")
+        detect_empty = _import_sd("detect_empty_response")
+        echeck_cls = _import_sd("EmptyResponseCheck")
 
-        ctx.content_quality = _assess_content_quality(ctx.html, ctx.profile)
+        ctx.content_quality = assess(ctx.html, ctx.profile)
         ctx.empty_check = (
-            detect_empty_response(ctx.html)
+            detect_empty(ctx.html)
             if ctx.config.detect_empty_responses
-            else EmptyResponseCheck(is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled")
+            else echeck_cls(is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled")
         )
 
+    # ── Stage 7: Field Extraction (LLM) ──────────────────────────────────
+
     async def _stage_extract_fields(self, ctx: _UrlAnalysisContext) -> None:
-        """Stage 7: Extract container values, run LLM analysis, build field suggestions."""
-        from app.content_quality import _extract_container_text_values
-        from app.url_value_classification import _rename_generic_fields, build_url_analysis_prompt
+        """Extract container values, run LLM analysis, build field suggestions."""
+        extract_values = _import_sd("_extract_container_text_values")
+        rename_fields = _import_sd("_rename_generic_fields")
+        build_prompt = _import_sd("build_url_analysis_prompt")
+        build_llm = _import_sd("_build_llm_fields")
+        llm_json = _import_sd("llm_json")
         from bs4 import BeautifulSoup
 
-        from app.selector_discovery import _build_llm_fields
-
-        container_values = _extract_container_text_values(ctx.html, ctx.profile.container_selector)
+        container_values = extract_values(ctx.html, ctx.profile.container_selector)
 
         if len(container_values) < 3:
             soup = BeautifulSoup(ctx.html, "html.parser")
@@ -376,7 +405,7 @@ class URLAnalysisPipeline:
             "headers": ctx.profile.headers,
         }
 
-        prompt = build_url_analysis_prompt(container_values, page_analysis)
+        prompt = build_prompt(container_values, page_analysis)
 
         try:
             result = await llm_json(
@@ -396,7 +425,7 @@ class URLAnalysisPipeline:
             logger.exception("[URLAnalyzer] LLM analysis failed for %s", ctx.url)
             result = None
 
-        ctx.suggested_fields = _rename_generic_fields(_build_llm_fields(result, ctx.patterns))
+        ctx.suggested_fields = rename_fields(build_llm(result, ctx.patterns))
         ctx.suggested_fields.sort(key=lambda f: f["confidence"], reverse=True)
         ctx.suggested_fields = ctx.suggested_fields[: settings.URL_ANALYZER_MAX_FIELDS]
 
@@ -405,8 +434,10 @@ class URLAnalysisPipeline:
         if result and isinstance(result, dict):
             ctx.estimated_records = int(result.get("estimated_record_count", 0))
 
+    # ── Stage 8: Response Building ───────────────────────────────────────
+
     async def _stage_build_response(self, ctx: _UrlAnalysisContext) -> dict[str, Any]:
-        """Stage 8: Build the final response with acquisition lineage."""
+        """Build the final response with acquisition lineage and telemetry."""
         from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
         ctx.elapsed = time.time() - ctx.start_time
@@ -441,7 +472,6 @@ class URLAnalysisPipeline:
         acquisition_lineage.session_bound = bool(ctx.session_detection.get("is_session_bound", False))
         acquisition_lineage.ephemeral_params = list(ctx.session_detection.get("ephemeral_params") or [])
 
-        # Data evidence score
         has_containers = bool(ctx.content_quality.get("has_data_containers"))
         not_empty_score = 0.5 if not ctx.empty_check.is_empty else 0.0
         data_score = (1.0 if has_containers else 0.0) + not_empty_score - ctx.anti_bot_score * 0.3
@@ -470,6 +500,9 @@ class URLAnalysisPipeline:
         canonical_url = ctx.session_detection["canonical_url"]
         if acquisition_lineage.state == AcquisitionState.RECOVERED and acquisition_lineage.recovered_url:
             canonical_url = acquisition_lineage.recovered_url
+
+        # Store the acquisition state value for the escalation check
+        ctx._acquisition_state_value = acquisition_lineage.state.value
 
         # Record telemetry
         try:
@@ -530,7 +563,7 @@ class URLAnalysisPipeline:
             "suggested_fields": ctx.suggested_fields,
         }
 
-    # ── Helpers ─────────────────────────────────────────────────────────
+    # ── Error Response Builder ───────────────────────────────────────────
 
     def _build_error_response(
         self,
@@ -544,11 +577,10 @@ class URLAnalysisPipeline:
         """Build a consistent error response for early-return paths."""
         from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
-        state = AcquisitionState.DIRECT
         lineage = AcquisitionLineage(
             original_url=ctx.url,
             final_url=ctx.final_url,
-            state=state,
+            state=AcquisitionState.DIRECT,
             message=error_message,
         )
 
@@ -578,14 +610,3 @@ class URLAnalysisPipeline:
             "anti_bot_score": 0.0,
             "acquisition_mode": ctx.acquisition_mode,
         }
-
-    def _get_last_state(self, ctx: _UrlAnalysisContext) -> str:
-        """Get the last acquisition state for escalation checking."""
-        try:
-            if ctx.search_recovery:
-                return ctx.search_recovery.get("status", "direct")
-            if ctx.empty_check.is_empty:
-                return "empty"
-            return "direct"
-        except Exception:
-            return "direct"
