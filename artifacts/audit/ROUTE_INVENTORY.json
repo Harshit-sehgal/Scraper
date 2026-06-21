@@ -1,5 +1,5 @@
 {
-  "route_count": 144,
+  "route_count": 159,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -159,7 +159,23 @@
       "response_model_if_known": "CheckoutResponse",
       "router_module": "app.billing.checkout",
       "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown"
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "",
+      "category": "stable API routes",
+      "handler_function": "stub_return",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency",
+      "path": "/api/billing/stub-return/{plan_tier}/{request_id}",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "",
+      "router_module": "app.billing.checkout",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
     },
     {
       "auth_dependency_if_known": "require_role",
@@ -708,6 +724,86 @@
     {
       "auth_dependency_if_known": "require_role_with_user",
       "category": "stable API routes",
+      "handler_function": "send_email_verification",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/email-verification/send",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "EmailVerificationSendResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "email_verification_status",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/email-verification/status",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "EmailVerificationStatusResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "verify_email",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/email-verification/verify",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "EmailVerifyResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "get_pending_invitations",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/invitations/pending",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "list",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "respond_to_invitation",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/invitations/{invitation_id}/respond",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "InvitationRespondResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
       "handler_function": "get_my_profile",
       "method": "GET",
       "middleware_protected": "yes",
@@ -722,7 +818,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "remove_member",
       "method": "DELETE",
@@ -770,6 +866,22 @@
       "tenant_scoped": "yes"
     },
     {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "delete_organization",
+      "method": "DELETE",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/orgs/{org_id}",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
       "auth_dependency_if_known": "require_role_with_user",
       "category": "stable API routes",
       "handler_function": "get_organization",
@@ -781,6 +893,38 @@
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
       "response_model_if_known": "OrgResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "list_org_invitations",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/orgs/{org_id}/invitations",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "InvitationListResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "create_invitation",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/orgs/{org_id}/invitations",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "InvitationResponse",
       "router_module": "app.saas.router",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -818,6 +962,38 @@
       "tenant_scoped": "yes"
     },
     {
+      "auth_dependency_if_known": "",
+      "category": "stable API routes",
+      "handler_function": "request_password_reset",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed",
+      "path": "/api/saas/password-reset/request",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "PasswordResetResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "",
+      "category": "stable API routes",
+      "handler_function": "confirm_password_reset",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed",
+      "path": "/api/saas/password-reset/reset",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "PasswordResetConfirmResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
       "auth_dependency_if_known": "require_role_with_user",
       "category": "stable API routes",
       "handler_function": "get_plan_info",
@@ -834,7 +1010,7 @@
       "tenant_scoped": "no"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_aup_accepted, require_role_with_user",
       "category": "stable API routes",
       "handler_function": "create_project",
       "method": "POST",
@@ -845,6 +1021,22 @@
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
       "response_model_if_known": "ProjectResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "delete_project",
+      "method": "DELETE",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/projects/{project_id}",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
       "router_module": "app.saas.router",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -882,7 +1074,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_aup_accepted, require_role_with_user",
       "category": "stable API routes",
       "handler_function": "create_api_key",
       "method": "POST",
@@ -930,6 +1122,22 @@
       "tenant_scoped": "no"
     },
     {
+      "auth_dependency_if_known": "require_role_with_user",
+      "category": "stable API routes",
+      "handler_function": "get_usage_summary",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/usage",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "UsageSummaryResponse",
+      "router_module": "app.saas.router",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
       "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "list_scheduled_jobs",
@@ -946,7 +1154,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_principal",
+      "auth_dependency_if_known": "require_aup_accepted, require_principal",
       "category": "stable API routes",
       "handler_function": "create_scheduled_job",
       "method": "POST",
@@ -1839,6 +2047,38 @@
       "response_model_if_known": "",
       "router_module": "app.routers.experimental",
       "stable_or_experimental": "experimental",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "get_retention_config_endpoint",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/retention/config",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.system",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "enforce_data_retention",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/retention/enforce",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.system",
+      "stable_or_experimental": "stable",
       "tenant_scoped": "no"
     },
     {

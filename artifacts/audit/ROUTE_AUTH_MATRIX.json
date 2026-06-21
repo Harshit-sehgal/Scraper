@@ -1,5 +1,5 @@
 {
-  "route_count": 133,
+  "route_count": 149,
   "routes": [
     {
       "method": "GET",
@@ -95,6 +95,30 @@
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/billing/checkout",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency",
+      "path": "/api/billing/stub-return/{plan_tier}/{request_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "none",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
       "test_coverage": "yes"
     },
     {
@@ -506,6 +530,66 @@
       "test_coverage": "yes"
     },
     {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/email-verification/send",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/email-verification/status",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/email-verification/verify",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/invitations/pending",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/invitations/{invitation_id}/respond",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator/user",
@@ -524,7 +608,7 @@
       "path": "/api/saas/memberships/{membership_id}",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role_with_user",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -554,12 +638,48 @@
       "test_coverage": "yes"
     },
     {
+      "method": "DELETE",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/orgs/{org_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator/user",
       "path": "/api/saas/orgs/{org_id}",
       "public_protected_unknown": "protected",
       "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/orgs/{org_id}/invitations",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/orgs/{org_id}/invitations",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
       "route_dependency": "require_role_with_user",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
@@ -590,6 +710,30 @@
       "test_coverage": "yes"
     },
     {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed",
+      "path": "/api/saas/password-reset/request",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "none",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed",
+      "path": "/api/saas/password-reset/reset",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "none",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator/user",
@@ -608,7 +752,19 @@
       "path": "/api/saas/projects",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role_with_user",
+      "route_dependency": "require_aup_accepted, require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "DELETE",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/saas/projects/{project_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -644,7 +800,7 @@
       "path": "/api/saas/projects/{project_id}/keys",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role_with_user",
+      "route_dependency": "require_aup_accepted, require_role_with_user",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -676,6 +832,18 @@
     {
       "method": "GET",
       "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/saas/usage",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role_with_user",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
       "path": "/api/scheduled",
       "public_protected_unknown": "protected",
@@ -692,7 +860,7 @@
       "path": "/api/scheduled",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_principal",
+      "route_dependency": "require_aup_accepted, require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -1354,6 +1522,30 @@
       "required_role": "admin",
       "route_dependency": "require_role, verify_experimental_enabled",
       "stable_or_experimental": "experimental",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/retention/config",
+      "public_protected_unknown": "protected",
+      "required_role": "admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/retention/enforce",
+      "public_protected_unknown": "protected",
+      "required_role": "admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
       "tenant_scoped": "no",
       "test_coverage": "yes"
     },
