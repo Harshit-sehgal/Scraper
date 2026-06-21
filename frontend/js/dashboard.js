@@ -9,6 +9,7 @@ import { renderTelemetry } from "./telemetry.js";
 import { renderGovernance } from "./governance.js";
 import { renderDomainHealth } from "./domain-health.js";
 import { renderPredictions } from "./predictions.js";
+import { refreshDashboardBilling } from "./dashboard-billing.js";
 
 // ─── Refresh Dashboard ───
 
@@ -84,6 +85,9 @@ export async function refreshDashboard() {
 
     // Telemetry
     if (dashData?.telemetry) renderTelemetry(dashData.telemetry);
+
+    // Billing widget
+    refreshDashboardBilling();
   } catch (e) {
     console.error("Dashboard refresh failed:", e);
   } finally {

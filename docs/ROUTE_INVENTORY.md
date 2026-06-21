@@ -2,13 +2,13 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-21 18:44:53 UTC
+**Generated:** 2026-06-21 22:33:11 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
 development docs/static routes, health/readiness routes, and session/auth routes.
 
-**Total route rows:** 159
+**Total route rows:** 160
 
 ## Stable Api Routes
 
@@ -107,6 +107,7 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/system/rate-limit-stats` | `app.routers.system` | `rate_limit_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/system/retention/config` | `app.routers.system` | `get_retention_config_endpoint` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
 | `POST` | `/api/system/retention/enforce` | `app.routers.system` | `enforce_data_retention` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
+| `GET` | `/api/system/retention/health` | `app.routers.system` | `get_retention_health_endpoint` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
 | `GET` | `/api/system/status` | `app.routers.system` | `system_status` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/system/storage/status` | `app.routers.system` | `storage_status` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/url/analyze` | `app.routers.system` | `analyze_url` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |

@@ -87,7 +87,25 @@ def enforce_retention(
     recycle_bin_store: dict[str, Any],
     *,
     dry_run: bool = False,
+    background: bool = False,  # H6: Non-blocking flag
 ) -> dict[str, int]:
+    """Enforce the current retention policy against the in-memory stores.
+
+    When background=True (H6), schedule cleanup without blocking writes.
+    Returns immediately; actual cleanup happens async.
+    """
+    if background:
+        # H6: Schedule cleanup async to avoid blocking writers
+        try:
+            from app.runtime_deps import schedule_task_fn
+            schedule_task_fn(
+                lambda: enforce_retention(jobs_store, recycle_bin_store, dry_run=dry_run, background=False)
+            )
+            logger.info("H6: Scheduled retention cleanup in background")
+            return {"jobs_purged": 0, "recycle_purged": 0, "jobs_skipped": 0, "recycle_skipped": 0}
+        except (ImportError, RuntimeError) as e:
+            logger.debug("H6: Async scheduling failed, running inline: %s", e)
+    
     """Enforce the current retention policy against the in-memory stores.
 
     Returns a dict with keys:

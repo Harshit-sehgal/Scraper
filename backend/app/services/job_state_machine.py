@@ -101,10 +101,11 @@ def transition_to(
     if job.status == new_status:
         return
 
+    # H7: Guard invalid transitions with explicit assertion
     if not can_transition(job, new_status):
         valid = _VALID_TRANSITIONS.get(job.status, set())
         msg = (
-            f"Invalid state transition: {job.status.value!r} → "
+            f"H7: Invalid state transition: {job.status.value!r} → "
             f"{new_status.value!r}. "
             f"Allowed from {job.status.value!r}: "
             f"{[s.value for s in valid] or ['(none — terminal)']}"

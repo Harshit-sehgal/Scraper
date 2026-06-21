@@ -1,5 +1,5 @@
 {
-  "route_count": 159,
+  "route_count": 160,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -2073,6 +2073,22 @@
       "middleware_protected": "yes",
       "notes": "require_role/admin-only dependency",
       "path": "/api/system/retention/enforce",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.system",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "get_retention_health_endpoint",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/retention/health",
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",

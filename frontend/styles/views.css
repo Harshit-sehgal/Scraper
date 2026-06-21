@@ -528,6 +528,98 @@
   }
 }
 
+/* ═══ Dashboard Billing Widget ═══ */
+
+#view-dashboard .billing-widget-tier {
+  margin-bottom: var(--space-4);
+}
+
+#view-dashboard .billing-widget-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-muted);
+  color: var(--ink-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+#view-dashboard .billing-widget-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+#view-dashboard .billing-widget-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+#view-dashboard .billing-widget-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+}
+
+#view-dashboard .billing-widget-bar-label {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+#view-dashboard .billing-widget-bar-val {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}
+
+#view-dashboard .billing-widget-bar-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+#view-dashboard .billing-widget-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--ink-1);
+  transition: width var(--duration-base) var(--ease-out);
+  min-width: 0;
+}
+
+#view-dashboard .billing-widget-bar-fill.fill-warning {
+  background: var(--ink-2);
+}
+
+#view-dashboard .billing-widget-bar-fill.fill-critical {
+  background: var(--ink-2);
+}
+
+#view-dashboard .billing-widget-note {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  margin-bottom: var(--space-3);
+}
+
+#view-dashboard .billing-widget-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* ═══ Jobs view ═══ */
 
 #view-jobs .jobs-toolbar {

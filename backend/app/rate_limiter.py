@@ -58,6 +58,37 @@ try:
 except ImportError:
     pass
 
+# ─── H5: Redis-backed rate limiting for distributed deployments ────────
+class RedisRateLimiter:
+    """H5: Distributed rate limiting using Redis for multi-worker deployments."""
+    
+    def __init__(self, redis_url: str = ""):
+        self.redis_url = redis_url or os.environ.get("DATAFORGE_REDIS_URL", "")
+        self.redis = None
+        if self.redis_url:
+            try:
+                import redis
+                self.redis = redis.from_url(self.redis_url, decode_responses=True)
+                self.redis.ping()
+                logger.info("H5: Redis rate limiter initialized: %s", self.redis_url[:20])
+            except Exception as e:
+                logger.warning("H5: Redis connection failed, falling back to in-memory: %s", e)
+                self.redis = None
+
+    def allow(self, key: str, limit: int, window: int) -> bool:
+        """H5: Check if request within limit; uses Redis INCR with TTL."""
+        if not self.redis:
+            return True
+        try:
+            rate_key = f"rate:{key}"
+            count = self.redis.incr(rate_key)
+            if count == 1:
+                self.redis.expire(rate_key, window)
+            return count <= limit
+        except Exception as e:
+            logger.warning("H5: Redis check failed, allowing: %s", e)
+            return True  # Fail open on Redis errors
+
 # ─── Trusted-proxy allowlist ──────────────────────────────────────────
 # Only TCP peers whose address is in this list may inject X-Forwarded-For
 # headers. The previous implementation trusted ANY RFC1918 / loopback
