@@ -18,7 +18,7 @@ from app.semantic_persistence import (
 def test_persistence_round_trip() -> None:
     # 1. Setup local path
     test_path = str(Path(__file__).parent / "test_semantic_state.json")
-    os.environ["SEMANTIC_STATE_PATH"] = test_path
+    os.environ["DATAFORGE_SEMANTIC_STATE_PATH"] = test_path
 
     # 2. Clear initial state
     clear_semantic_state()
@@ -84,7 +84,7 @@ def test_persistence_round_trip() -> None:
 def test_persistence_affects_pipeline() -> None:
     # Ensures that saved state actually changes run_pipeline behavior
     test_path = str(Path(__file__).parent / "test_pipeline_persistence.json")
-    os.environ["SEMANTIC_STATE_PATH"] = test_path
+    os.environ["DATAFORGE_SEMANTIC_STATE_PATH"] = test_path
     clear_semantic_state()
     if os.path.exists(test_path):
         os.remove(test_path)

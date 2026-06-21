@@ -6,7 +6,7 @@ This document defines expected quality checks. It is not proof that every lint/t
 
 ## Current Verified Snapshot
 
-For the latest verified syntax, lint, type checking (mypy), and pytest collection/passing results across all test groups and environments, see [PROJECT_STATUS.md](../PROJECT_STATUS.md).
+For the latest verified syntax, lint, type checking (mypy), and pytest collection/passing results across all test groups and environments, see [AGENT_TRUTH.md](AGENT_TRUTH.md) and run `python3 scripts/validate_local.py --quick` (current exit status reported in `artifacts/validation/latest_summary.md`).
 
 ## Not Verified In This Snapshot
 

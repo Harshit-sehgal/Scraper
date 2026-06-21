@@ -6,6 +6,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from fastapi import FastAPI
+
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "route_auth_matrix.py"
 
 
@@ -77,6 +79,23 @@ def test_route_auth_matrix_markdown_contains_all_rows(monkeypatch, tmp_path) -> 
     assert "| `DELETE` | `/api/jobs/{job_id}` | admin |" in markdown
 
 
+def test_route_auth_matrix_uses_fresh_app_factory(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
+    monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
+    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))
+    monkeypatch.setenv("DATAFORGE_SEMANTIC_STATE_PATH", str(tmp_path / "semantic_state.json"))
+
+    module = _load_module()
+
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod, "app", FastAPI())
+
+    matrix = module.build_matrix()
+
+    assert _row_by_method_path(matrix, "GET", "/api/jobs").access == "authenticated-user"
+
+
 def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
@@ -96,7 +115,7 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
         ("POST", "/api/saas/signup"),  # self-service account creation
         ("POST", "/api/saas/aup/accept"),  # P1-COMPLIANCE-001: AUP acceptance (idempotent, any authenticated user)
         ("DELETE", "/api/user/data"),  # self-service data deletion — any authenticated user can delete their own data
-        ("POST", "/api/billing/webhook"),  # billing webhook called by Autumn/Stripe (no API key)
+        ("POST", "/api/billing/webhook"),  # billing webhook called by PayPal (no API key)
     }
 
     unsafe = [

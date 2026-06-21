@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-15 23:39:19 UTC
+**Generated:** 2026-06-21 12:30:36 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -103,11 +103,13 @@ For the diff between stable and experimental, see
 | GET | `/api/operator/predictions/{domain}` |
 | GET | `/api/system/acquisition/telemetry` |
 | GET | `/api/system/agency` |
+| GET | `/api/system/audit-log` |
 | GET | `/api/system/crystalline` |
 | GET | `/api/system/diagnostics/export` |
 | GET | `/api/system/domain-policy` |
 | GET | `/api/system/export/knowledge` |
 | GET | `/api/system/history/topology` |
+| GET | `/api/system/manifest` |
 | GET | `/api/system/observability` |
 | GET | `/api/system/rate-limit-stats` |
 | GET | `/api/system/replay/chain` |
@@ -144,12 +146,15 @@ For the diff between stable and experimental, see
 | --- | --- |
 | DELETE | `/api/auth-profiles/{profile_id}` |
 | DELETE | `/api/saas/memberships/{membership_id}` |
+| DELETE | `/api/saas/orgs/{org_id}` |
+| DELETE | `/api/saas/projects/{project_id}` |
 | DELETE | `/api/saas/projects/{project_id}/keys/{key_id}` |
 | DELETE | `/api/scheduled/{job_id}` |
 | DELETE | `/api/user/data` |
 | DELETE | `/api/workflows/{workflow_id}` |
 | GET | `/api/auth-profiles` |
 | GET | `/api/auth-profiles/{profile_id}` |
+| GET | `/api/billing/stub-return/{plan_tier}/{request_id}` |
 | GET | `/api/billing/subscriptions` |
 | GET | `/api/billing/subscriptions/{customer_id}` |
 | GET | `/api/intelligence/analyze-url` |
@@ -162,17 +167,21 @@ For the diff between stable and experimental, see
 | GET | `/api/saas/plan` |
 | GET | `/api/saas/projects/{project_id}` |
 | GET | `/api/saas/projects/{project_id}/keys` |
+| GET | `/api/saas/usage` |
 | GET | `/api/scheduled` |
 | GET | `/api/scheduled/{job_id}` |
 | GET | `/api/scheduled/{job_id}/changes` |
 | GET | `/api/workflows` |
 | GET | `/api/workflows/{workflow_id}` |
+| GET | `/api/workflows/{workflow_id}/runs` |
+| GET | `/api/workflows/{workflow_id}/runs/{run_id}` |
 | PATCH | `/api/workflows/{workflow_id}` |
 | POST | `/api/auth-profiles` |
 | POST | `/api/auth-profiles/{profile_id}/complete-login` |
 | POST | `/api/auth-profiles/{profile_id}/revoke` |
 | POST | `/api/auth-profiles/{profile_id}/start-login` |
 | POST | `/api/auth-profiles/{profile_id}/validate` |
+| POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
 | POST | `/api/saas/aup/accept` |
 | POST | `/api/saas/orgs` |
@@ -189,4 +198,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 129
+**Total routes:** 138

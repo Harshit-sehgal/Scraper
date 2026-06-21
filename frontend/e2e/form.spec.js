@@ -1,9 +1,22 @@
 import { test, expect } from "@playwright/test";
 
+async function dismissApiKeyOverlay(page) {
+  await page.waitForTimeout(1000);
+  const overlay = page.locator("#apikey-overlay");
+  if (await overlay.isVisible().catch(() => false)) {
+    await overlay.evaluate((el) => el.classList.add("hidden"));
+    await expect(overlay).toBeHidden();
+  }
+}
+
 test.describe("New job form interaction", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/app/");
-    // Navigate to the new job view
+    // Dismiss any API key overlay that may block clicks
+    await dismissApiKeyOverlay(page);
+    // Navigate to the new job view — initForm() runs and dispatches
+    // ``dataforge:form-ready`` once it has finished resetting the form
+    // (including the awaited auth-profile dropdown refresh).
     await page.locator("#btn-create-new").click();
     await expect(page.locator("#view-new")).toBeVisible();
   });
@@ -51,12 +64,13 @@ test.describe("New job form interaction", () => {
   });
 
   test("adds multiple schema fields", async ({ page }) => {
-    // initForm() starts with 1 field. Add 2 more for 3 total.
+    // Count fields present after initForm, then add 2 more.
+    const initialCount = await page.locator(".field-row").count();
     await page.locator("#btn-add-field").click();
     await page.locator("#btn-add-field").click();
 
-    // All 3 should be present (1 initial + 2 added)
-    await expect(page.locator(".field-row")).toHaveCount(3);
+    // Total should be initial + 2 added
+    await expect(page.locator(".field-row")).toHaveCount(initialCount + 2);
 
     // Fill them with different names
     const names = ["company_name", "email", "phone"];
@@ -68,17 +82,17 @@ test.describe("New job form interaction", () => {
   });
 
   test("removes a schema field via the X button", async ({ page }) => {
-    // initForm() starts with 1 field. Add 1 more for 2 total.
+    const initialCount = await page.locator(".field-row").count();
     await page.locator("#btn-add-field").click();
-    await expect(page.locator(".field-row")).toHaveCount(2);
+    await expect(page.locator(".field-row")).toHaveCount(initialCount + 1);
 
     // Remove the first field
     await page.locator(".field-row").first().locator(".btn-x").click();
-    await expect(page.locator(".field-row")).toHaveCount(1);
+    await expect(page.locator(".field-row")).toHaveCount(initialCount);
   });
 
   test("adds a filter and shows operator options", async ({ page }) => {
-    // initForm() starts with 1 field. Fill its name for filter reference.
+    // Fill first field name for filter reference.
     await page.locator(".sf-name").first().fill("rating");
 
     // Add a filter
@@ -94,7 +108,7 @@ test.describe("New job form interaction", () => {
   });
 
   test("filter distance_within shows extra fields", async ({ page }) => {
-    // initForm() starts with 1 field. Fill its name for filter reference.
+    // Fill first field name for filter reference.
     await page.locator(".sf-name").first().fill("distance");
 
     // Add a filter
@@ -181,11 +195,11 @@ test.describe("New job form interaction", () => {
     await page.locator("#inp-name").fill("Persistent Test");
 
     // Switch to jobs tab
-    await page.locator("#tab-jobs").click();
+    await page.locator("#nav-jobs").click();
     await expect(page.locator("#view-jobs")).toBeVisible();
 
     // Switch back to new job
-    await page.locator("#tab-new").click();
+    await page.locator("#nav-new").click();
     await expect(page.locator("#view-new")).toBeVisible();
   });
 });

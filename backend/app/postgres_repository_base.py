@@ -505,9 +505,9 @@ def ensure_schema(conn) -> None:
 # dispatch. Instead they use the module-level variants below which raise
 # a clear error if called before __init__ has set the driver callbacks.
 
-_driver_fetch_all = None
-_driver_fetch_one = None
-_driver_execute = None
+_driver_fetch_all: Any = None
+_driver_fetch_one: Any = None
+_driver_execute: Any = None
 
 
 def _set_driver_functions(
@@ -1117,12 +1117,14 @@ class PostgresRepositoryBase(JobRepository, ABC):
         self._ensure()
         terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
         with self._conn() as conn:
-            rows = self._fetch_all(
-                conn,
-                "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"  # nosec B608  # noqa: RUF100, S608
-                + (" AND completed_at < %s" if older_than else ""),  # nosec B608  # noqa: RUF100, S608
-                (list(terminal_statuses), older_than) if older_than else (list(terminal_statuses),),
-            )
+            # Build the query and params separately to avoid B608 false positives
+            # from string concatenation. All values are parameterised.
+            base_sql = "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"
+            params: list[object] = [list(terminal_statuses)]
+            if older_than:
+                base_sql += " AND completed_at < %s"
+                params.append(older_than)
+            rows = self._fetch_all(conn, base_sql, tuple(params))
             for row in rows:
                 now = datetime.datetime.now(datetime.UTC).isoformat()
                 self._execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, row["id"]))

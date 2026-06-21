@@ -11,12 +11,14 @@ Hosts endpoints for:
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.audit_logger import log_job_event
+from app.plan_enforcer import get_plan_limits, get_user_tier
+from app.saas import CURRENT_AUP_VERSION  # re-exported from app.saas.__init__
 from app.saas.identity_store import IdentityStoreError, get_identity_store
 
 # Models & services
@@ -27,7 +29,9 @@ from app.saas.models import (
     Project,
 )
 from app.saas.service import SignupService
-from app.utils.rbac import UserRole, require_role_with_user
+from app.utils.aup import require_aup_accepted
+from app.utils.rbac import UserRole, require_principal, require_role_with_user
+from app.utils.usage_ledger import UsageType
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +40,6 @@ router = APIRouter(prefix="/api/saas", tags=["saas"])
 # ═══════════════════════════════════════════════════════════════════════
 # AUP (Acceptable Use Policy)
 # ═══════════════════════════════════════════════════════════════════════
-
-CURRENT_AUP_VERSION = "2026-06-11-v1"
 
 
 class AupAcceptRequest(BaseModel):
@@ -344,19 +346,65 @@ async def get_organization(
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
-    # Verify membership
-    if not get_identity_store().is_org_member(user_id, org_id):
-        raise HTTPException(status_code=403, detail="not a member of this organization")
-
+    # Existence before permission so a request for a missing org returns
+    # 404 consistently, even when the caller is not a member.
     org = get_identity_store().get_organization(org_id)
     if not org:
         raise HTTPException(status_code=404, detail="organization not found")
+
+    # Verify membership
+    if not get_identity_store().is_org_member(user_id, org_id):
+        raise HTTPException(status_code=403, detail="not a member of this organization")
 
     return OrgResponse(
         id=org.id,
         name=org.name,
         created_by_user_id=org.created_by_user_id,
         created_at=org.created_at,
+    )
+
+
+@router.delete("/orgs/{org_id}", status_code=204)
+async def delete_organization(
+    org_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> None:
+    """Permanently delete an organization and all its resources.
+
+    Cascading deletion removes all memberships, projects, API keys,
+    and user_selections associated with the org. Only the org owner
+    or an env-backed admin/operator may delete an org.
+
+    This is a destructive operation and cannot be undone.
+    """
+    role, user_id, _org_id, _project_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    org = store.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="organization not found")
+
+    # Enforce ownership: env-backed admins/operators retain all-access;
+    # SaaS-scoped keys must be the org creator.
+    if (role not in (UserRole.ADMIN, UserRole.OPERATOR) or _org_id) and org.created_by_user_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the organization owner can delete it",
+        )
+
+    store.delete_organization(org_id)
+
+    log_job_event(
+        actor=user_id,
+        action="org_delete",
+        job_id="saas",
+        outcome="success",
+        details={"org_id": org_id, "org_name": org.name},
     )
 
 
@@ -396,8 +444,12 @@ async def create_project(
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
+    _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
 ) -> ProjectResponse:
-    """Create a new project within an organization."""
+    """Create a new project within an organization.
+
+    Requires AUP acceptance.
+    """
     _role, user_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
@@ -493,6 +545,44 @@ async def get_project(
     )
 
 
+@router.delete("/projects/{project_id}", status_code=204)
+async def delete_project(
+    project_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> None:
+    """Permanently delete a project and all its API keys.
+
+    Cascading deletion removes all API keys associated with the project.
+    Only project members with operator-level access or env-backed
+    admins/operators may delete a project.
+    """
+    role, user_id, _org_id, _project_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    store = get_identity_store()
+    project = store.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="project not found")
+
+    # Verify caller is a member of the org
+    if not store.is_org_member(user_id, project.org_id) and role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    store.delete_project(project_id)
+
+    log_job_event(
+        actor=user_id,
+        action="project_delete",
+        job_id="saas",
+        outcome="success",
+        details={"project_id": project_id, "org_id": project.org_id, "project_name": project.name},
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Membership / Team Management
 # ═══════════════════════════════════════════════════════════════════════
@@ -551,18 +641,46 @@ async def list_org_members(
 async def remove_member(
     membership_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
 ) -> None:
-    """Remove a member from an organization (admin/operator only)."""
-    _role, user_id = auth
+    """Remove a member from an organization (admin/operator only).
+
+    The caller must be a member of the target membership's organization.
+    Env-backed admins and env-backed operators (no org scope) retain
+    all-access, matching the ``can_access_scoped_resource`` bypass.
+    Without this check, a persistent WRITE key from Org A could remove
+    any member from Org B by guessing/obtaining a ``membership_id``.
+    """
+    role, user_id, org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
     membership = get_identity_store().get_membership(membership_id)
     if not membership:
         raise HTTPException(status_code=404, detail="membership not found")
+
+    # Env-backed admins and operators retain all-access (no org scope).
+    # For SaaS-scoped keys, the caller MUST be a member of the target
+    # membership's org.
+    if (
+        role != UserRole.ADMIN
+        and (role != UserRole.OPERATOR or org_id)
+        and not get_identity_store().is_org_member(user_id, membership.org_id)
+    ):
+        log_job_event(
+            actor=user_id,
+            action="member_remove",
+            job_id="saas",
+            outcome="denied",
+            details={
+                "membership_id": membership_id,
+                "org_id": membership.org_id,
+                "reason": "not_org_member",
+            },
+        )
+        raise HTTPException(status_code=403, detail="not a member of this organization")
 
     # Cannot remove self if the last owner
     if membership.role == MembershipRole.OWNER and membership.user_id == user_id:
@@ -583,7 +701,10 @@ async def remove_member(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Plan & Limits (stub — records tier, does not enforce)
+# Plan & Limits — informational view of the caller's tier. Enforcement
+# of tier limits lives in ``app.plan_enforcer`` (wired into job creation
+# and other metered routes via ``require_plan_limit``); this endpoint
+# only reports the current tier and its derived limits to the UI.
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -596,6 +717,71 @@ class PlanTier(str):
     STARTER = "starter"
     PRO = "pro"
     ENTERPRISE = "enterprise"
+
+
+# Per-tier feature flags and teammate/project caps. Usage limits
+# (jobs/pages/scheduled/api) are sourced from ``app.plan_enforcer`` so
+# there is a single source of truth for the numeric limits.
+_TIER_FEATURES: dict[str, list[str]] = {
+    "free": ["basic_scraping", "scheduled_jobs", "aup_compliance"],
+    "starter": ["basic_scraping", "scheduled_jobs", "aup_compliance", "csv_export", "json_export"],
+    "pro": [
+        "basic_scraping",
+        "scheduled_jobs",
+        "aup_compliance",
+        "csv_export",
+        "json_export",
+        "excel_export",
+        "workflow_replay",
+        "auth_profiles",
+    ],
+    "enterprise": [
+        "basic_scraping",
+        "scheduled_jobs",
+        "aup_compliance",
+        "csv_export",
+        "json_export",
+        "excel_export",
+        "workflow_replay",
+        "auth_profiles",
+        "priority_support",
+        "custom_retention",
+    ],
+}
+
+_TIER_TEAMMATES: dict[str, int] = {
+    "free": 2,
+    "starter": 5,
+    "pro": 25,
+    "enterprise": -1,
+}
+
+_TIER_PROJECTS: dict[str, int] = {
+    "free": 2,
+    "starter": 10,
+    "pro": 100,
+    "enterprise": -1,
+}
+
+
+# Maximum API-key scope grantable per org membership role. Used by
+# ``create_api_key`` to enforce the privilege boundary: a viewer-level
+# member must not be able to mint an admin-scope key (which maps to
+# ``UserRole.ADMIN`` → global all-access). Kept at module level so the
+# policy is testable in isolation.
+_MAX_KEY_SCOPE_FOR_ROLE: dict[str, str] = {
+    "owner": "admin",
+    "admin": "admin",
+    "member": "write",
+    "viewer": "read",
+}
+
+# Rank order for scope comparison (higher = more privileged).
+_SCOPE_RANK: dict[str, int] = {
+    "read": 0,
+    "write": 1,
+    "admin": 2,
+}
 
 
 class PlanInfoResponse(BaseModel):
@@ -618,7 +804,10 @@ class ApiKeyCreateRequest(BaseModel):
     """Request to create a new API key for a project."""
 
     name: str = Field(..., min_length=1, max_length=120, description="Key name")
-    scope: str = Field("read", description="Key scope: read, write, or admin")
+    scope: Literal["read", "write", "admin"] = Field(
+        "read",
+        description="Key scope: read, write, or admin",
+    )
 
 
 class ApiKeyResponse(BaseModel):
@@ -661,11 +850,14 @@ async def create_api_key(
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
+    _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
 ) -> ApiKeyCreateResponse:
     """Create a new API key for a project.
 
     The raw key is returned **only once** in this response. It is hashed
     before storage and cannot be retrieved later.
+
+    Requires AUP acceptance.
     """
     _role, user_id = auth
     if not user_id:
@@ -686,7 +878,47 @@ async def create_api_key(
         "write": ApiKeyScope.WRITE,
         "admin": ApiKeyScope.ADMIN,
     }
-    scope = scope_map.get(body.scope.lower(), ApiKeyScope.READ)
+    # ``body.scope`` is constrained to Literal["read","write","admin"] so
+    # the lookup is always success; the surrounding code is kept defensive
+    # in case the validator is ever loosened.
+    raw_scope = body.scope.lower()
+    scope = scope_map[raw_scope]
+
+    # Privilege boundary: the granted key scope MUST NOT exceed the
+    # caller's own membership role in the target org. Without this, a
+    # viewer-level member who holds a WRITE key (→ OPERATOR) could
+    # issue an admin-scope key for any project in the org, and because
+    # UserRole.ADMIN maps to global all-access, that key would grant
+    # access to every tenant's data.
+    _caller_memberships = get_identity_store().list_user_memberships(user_id)
+    _caller_role_in_org = next(
+        (m.role for m in _caller_memberships if m.org_id == project.org_id and m.is_active()),
+        None,
+    )
+    if _caller_role_in_org is None and not _caller_memberships:
+        logger.warning(
+            "create_api_key: caller=%s has zero memberships — env-backed admin or identity-store issue",
+            user_id,
+        )
+    _caller_role_value = _caller_role_in_org.value if _caller_role_in_org else "viewer"
+    _caller_max_scope = _MAX_KEY_SCOPE_FOR_ROLE.get(_caller_role_value, "read")
+    if _SCOPE_RANK.get(raw_scope, 0) > _SCOPE_RANK.get(_caller_max_scope, 0):
+        log_job_event(
+            actor=user_id,
+            action="api_key_create",
+            job_id="saas",
+            outcome="denied",
+            details={
+                "project_id": project_id,
+                "requested_scope": body.scope,
+                "caller_membership_role": _caller_role_value,
+                "reason": "scope_exceeds_membership_role",
+            },
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot issue a {body.scope}-scope key: your membership role in this org does not permit it.",
+        )
 
     svc = ApiKeyService(store=get_identity_store())
     issued = svc.issue(
@@ -801,20 +1033,75 @@ async def revoke_api_key(
 
 @router.get("/plan", response_model=PlanInfoResponse)
 async def get_plan_info(
-    _auth: Annotated[
+    auth: Annotated[
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ) -> PlanInfoResponse:
     """Return the current user's plan and limits.
 
-    Stub — returns free tier defaults. Future: lookup from a billing table.
+    Looks up the caller's tier via the billing service (falling back to
+    ``free`` when billing is unconfigured) and derives the usage limits
+    from the same ``app.plan_enforcer`` source of truth that enforces
+    them at job-creation time, so the informational view and the
+    enforcement gate can never drift.
     """
+    _role, user_id = auth
+    tier = get_user_tier(user_id) if user_id else "free"
+    limits = get_plan_limits(tier)
     return PlanInfoResponse(
-        tier="free",
-        max_jobs=10,
-        max_scrapes=1000,
-        max_teammates=2,
-        max_projects=2,
-        features=["basic_scraping", "scheduled_jobs", "aup_compliance"],
+        tier=tier,
+        max_jobs=limits.get(UsageType.JOB_CREATED.value, 10),
+        max_scrapes=limits.get(UsageType.PAGE_FETCHED.value, 1000),
+        max_teammates=_TIER_TEAMMATES.get(tier, 2),
+        max_projects=_TIER_PROJECTS.get(tier, 2),
+        features=_TIER_FEATURES.get(tier, _TIER_FEATURES["free"]),
     )
+
+
+class UsageSummaryResponse(BaseModel):
+    """Current usage summary for the authenticated user."""
+
+    jobs_created: int = 0
+    pages_fetched: int = 0
+    scheduled_jobs: int = 0
+    ai_structuring: int = 0
+    api_requests: int = 0
+
+
+@router.get("/usage", response_model=UsageSummaryResponse)
+async def get_usage_summary(
+    auth: Annotated[
+        tuple[UserRole, str],
+        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> UsageSummaryResponse:
+    """Return current usage counters for the authenticated user.
+
+    Used by the frontend billing page to show how much of the plan
+    quota has been consumed (e.g. "3 of 10 jobs used this month").
+    """
+    _role, user_id = auth
+    if not user_id:
+        raise HTTPException(status_code=401, detail="authenticated user required")
+
+    try:
+        from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+        ledger = get_usage_ledger()
+        jobs_usage = ledger.get_usage(user_id, UsageType.JOB_CREATED)
+        pages_usage = ledger.get_usage(user_id, UsageType.PAGE_FETCHED)
+        scheduled_usage = ledger.get_usage(user_id, UsageType.SCHEDULED_JOB)
+        ai_usage = ledger.get_usage(user_id, UsageType.AI_STRUCTURING)
+        api_usage = ledger.get_usage(user_id, UsageType.API_REQUEST)
+
+        return UsageSummaryResponse(
+            jobs_created=sum(r.quantity for r in jobs_usage),
+            pages_fetched=sum(r.quantity for r in pages_usage),
+            scheduled_jobs=sum(r.quantity for r in scheduled_usage),
+            ai_structuring=sum(r.quantity for r in ai_usage),
+            api_requests=sum(r.quantity for r in api_usage),
+        )
+    except (ImportError, RuntimeError, ValueError) as exc:
+        logger.warning("Failed to read usage summary: %s", exc)
+        return UsageSummaryResponse()

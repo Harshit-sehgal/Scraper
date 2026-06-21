@@ -1,5 +1,3 @@
-from typing import Any
-
 """Layer 3: Semantic Mapper.
 =========================
 
@@ -13,6 +11,7 @@ regardless of whether it was found on a flight site or a product page.
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Any
 
 from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns

@@ -89,6 +89,72 @@ class TestAupEndpoints:
         assert resp.status_code in (200, 401)
 
 
+class TestProfileEndpoint:
+    """Tests for the self-service ``GET /api/saas/me`` endpoint."""
+
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        """Build the cookies dict carrying a session cookie for user_id."""
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
+    def test_me_returns_profile_for_authenticated_user(self, client: TestClient) -> None:
+        """A signed-up user with a valid session cookie can fetch their own profile."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={
+                "email": "profile-test@example.com",
+                "password": "securepassword123",
+                "display_name": "Profile Tester",
+            },
+        )
+        assert signup.status_code == 201, signup.text
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+
+        me = client.get("/api/saas/me", cookies=cookies)
+        assert me.status_code == 200, me.text
+        body = me.json()
+        assert body["user_id"] == user_id
+        assert body["email"] == "profile-test@example.com"
+        assert body["display_name"] == "Profile Tester"
+        # AUP not yet accepted.
+        assert body["aup_accepted_at"] is None
+        assert body["aup_version_accepted"] is None
+
+    def test_me_returns_404_for_session_with_unknown_user_id(self, client: TestClient) -> None:
+        """A session cookie whose user_id does not match a real user must 404, not 500."""
+        cookies = self._cookies_for("ghost-user-id")
+        resp = client.get("/api/saas/me", cookies=cookies)
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    def test_me_after_aup_accept_reflects_status(self, client: TestClient) -> None:
+        """Accepting the AUP must be reflected in the next /me response."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "aup-test@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+        from app.saas import CURRENT_AUP_VERSION
+
+        accept = client.post(
+            "/api/saas/aup/accept",
+            json={"aup_version": CURRENT_AUP_VERSION},
+            cookies=cookies,
+        )
+        assert accept.status_code == 200, accept.text
+
+        me = client.get("/api/saas/me", cookies=cookies)
+        assert me.status_code == 200
+        body = me.json()
+        assert body["aup_version_accepted"] == CURRENT_AUP_VERSION
+        assert body["aup_accepted_at"] is not None
+
+
 class TestPlanEndpoint:
     """Tests for the plan/limits endpoint."""
 
@@ -103,6 +169,28 @@ class TestPlanEndpoint:
             assert data["max_teammates"] == 2
             assert data["max_projects"] == 2
             assert isinstance(data["features"], list)
+
+    def test_plan_limits_match_enforcement_source_of_truth(self, client: TestClient):
+        """The /plan endpoint MUST derive usage limits from the same
+        ``app.plan_enforcer`` source of truth that enforces them at
+        job-creation time, so the informational view and the
+        enforcement gate can never drift.
+        """
+        from app.plan_enforcer import get_plan_limits
+        from app.utils.usage_ledger import UsageType
+
+        resp = client.get("/api/saas/plan")
+        assert resp.status_code in (200, 401)
+        if resp.status_code != 200:
+            return
+        data = resp.json()
+        # Billing is unconfigured in tests, so the tier resolves to free.
+        free_limits = get_plan_limits("free")
+        assert data["max_jobs"] == free_limits[UsageType.JOB_CREATED.value]
+        assert data["max_scrapes"] == free_limits[UsageType.PAGE_FETCHED.value]
+        # features must be a non-empty list and contain the free-tier baseline.
+        assert isinstance(data["features"], list)
+        assert data["features"], "free tier should expose at least one feature"
 
 
 class TestOrganizationEndpoints:
@@ -162,3 +250,238 @@ class TestProjectEndpoints:
         assert list_resp.status_code == 200
         items = list_resp.json()["items"]
         assert any(p["name"] == "P1" for p in items)
+
+
+class TestUsageEndpoint:
+    """Tests for the usage summary endpoint."""
+
+    def test_get_usage_returns_defaults_with_no_activity(self, client: TestClient):
+        # The /api/saas/usage endpoint returns the authenticated user's
+        # accumulated activity. The default user_id under dev-fallback
+        # auth is shared across the entire test process, so we cannot
+        # assert absolute zeros. Instead verify that the response shape
+        # is sane and all known counters are present and non-negative.
+        resp = client.get("/api/saas/usage")
+        # Dev auth fallback allows access
+        assert resp.status_code in (200, 401)
+        if resp.status_code == 200:
+            data = resp.json()
+            assert set(data.keys()) >= {
+                "jobs_created",
+                "pages_fetched",
+                "scheduled_jobs",
+                "ai_structuring",
+                "api_requests",
+            }
+            assert data["jobs_created"] >= 0
+            assert data["pages_fetched"] >= 0
+            assert data["scheduled_jobs"] >= 0
+            assert data["ai_structuring"] >= 0
+            # The API-request counter always increments at least once per
+            # request via the request counter middleware, so it must be
+            # at least 1 (and certainly non-negative).
+            assert data["api_requests"] >= 1
+
+
+class TestAupEnforcementOnMutationRoutes:
+    """Tests that AUP acceptance is required for protected mutation routes."""
+
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
+    @staticmethod
+    def _accept_aup_via_store(user_id: str) -> None:
+        from app.saas import CURRENT_AUP_VERSION
+        from app.saas.identity_store import get_identity_store
+
+        get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
+
+    def test_create_api_key_fails_without_aup(self, client: TestClient):
+        """Creating an API key must 403 if the user has not accepted the AUP."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "noaup-api@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        project_id = signup.json()["project_id"]
+        cookies = self._cookies_for(user_id)
+
+        resp = client.post(
+            f"/api/saas/projects/{project_id}/keys",
+            json={"name": "test-key", "scope": "read"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 403
+        assert "Acceptable Use Policy" in resp.json()["detail"]
+
+    def test_create_project_fails_without_aup(self, client: TestClient):
+        """Creating a project must 403 if the user has not accepted the AUP."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "noaup-proj@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        org_id = signup.json()["organization_id"]
+        cookies = self._cookies_for(user_id)
+
+        resp = client.post(
+            "/api/saas/projects",
+            json={"org_id": org_id, "name": "No-AUP Project"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 403
+        assert "Acceptable Use Policy" in resp.json()["detail"]
+
+    def test_create_scheduled_job_fails_without_aup(self, client: TestClient):
+        """Creating a scheduled job must 403 if the user has not accepted the AUP."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "noaup-sched@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+
+        resp = client.post(
+            "/api/scheduled?name=No+AUP+Schedule&job_name=No+AUP+Run",
+            cookies=cookies,
+        )
+        assert resp.status_code == 403
+        assert "Acceptable Use Policy" in resp.json()["detail"]
+
+    def test_create_api_key_succeeds_with_aup(self, client: TestClient):
+        """Creating an API key must succeed after AUP acceptance."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "withaup-api@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        project_id = signup.json()["project_id"]
+        cookies = self._cookies_for(user_id)
+
+        self._accept_aup_via_store(user_id)
+
+        resp = client.post(
+            f"/api/saas/projects/{project_id}/keys",
+            json={"name": "test-key-aup", "scope": "read"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["name"] == "test-key-aup"
+
+
+class TestOrganizationDeleteEndpoint:
+    """Tests for the organization deletion endpoint."""
+
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
+    def test_delete_org_removes_org_and_cascades(self, client: TestClient):
+        """Deleting an org must cascade to memberships, projects, and API keys."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "orgdelete@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        org_id = signup.json()["organization_id"]
+        project_id = signup.json()["project_id"]
+        cookies = self._cookies_for(user_id)
+
+        # Verify org exists
+        get_resp = client.get(f"/api/saas/orgs/{org_id}", cookies=cookies)
+        assert get_resp.status_code == 200
+
+        # Delete the org
+        del_resp = client.delete(f"/api/saas/orgs/{org_id}", cookies=cookies)
+        assert del_resp.status_code == 204, del_resp.text
+
+        # Verify org is gone (owner's cookie should get 404)
+        get_resp2 = client.get(f"/api/saas/orgs/{org_id}", cookies=cookies)
+        assert get_resp2.status_code == 404
+
+        # Verify project is gone
+        from app.saas.identity_store import get_identity_store
+
+        assert get_identity_store().get_project(project_id) is None
+
+    def test_delete_nonexistent_org_returns_404(self, client: TestClient):
+        """Deleting a non-existent org must 404."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "ghost-delete@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+
+        resp = client.delete("/api/saas/orgs/nonexistent-org-id", cookies=cookies)
+        assert resp.status_code == 404
+
+
+class TestProjectDeleteEndpoint:
+    """Tests for the project deletion endpoint."""
+
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
+    def test_delete_project_removes_project_and_api_keys(self, client: TestClient):
+        """Deleting a project must cascade to API keys."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "projdelete@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        project_id = signup.json()["project_id"]
+        cookies = self._cookies_for(user_id)
+
+        # Accept AUP so we can create an API key
+        from app.saas import CURRENT_AUP_VERSION
+        from app.saas.identity_store import get_identity_store
+
+        get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
+
+        # Create an API key in the project
+        key_resp = client.post(
+            f"/api/saas/projects/{project_id}/keys",
+            json={"name": "delete-me-key", "scope": "read"},
+            cookies=cookies,
+        )
+        assert key_resp.status_code == 201
+        key_id = key_resp.json()["id"]
+
+        # Delete the project
+        del_resp = client.delete(f"/api/saas/projects/{project_id}", cookies=cookies)
+        assert del_resp.status_code == 204, del_resp.text
+
+        # Verify project is gone
+        assert get_identity_store().get_project(project_id) is None
+
+        # Verify API key is gone
+        assert get_identity_store().get_api_key(key_id) is None
+
+    def test_delete_nonexistent_project_returns_404(self, client: TestClient):
+        """Deleting a non-existent project must 404."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "ghost-proj-delete@example.com", "password": "securepassword123"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        cookies = self._cookies_for(user_id)
+
+        resp = client.delete("/api/saas/projects/nonexistent-project-id", cookies=cookies)
+        assert resp.status_code == 404

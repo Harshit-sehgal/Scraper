@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.globals import jobs_store, recycle_bin_store
@@ -182,6 +182,10 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
         prune_task = schedule_background_task(_rate_limit_prune_loop())
         _background_tasks.append(prune_task)
 
+    # Schedule background processing of due scheduled jobs.
+    scheduled_task = schedule_background_task(_scheduled_job_processor_loop())
+    _background_tasks.append(scheduled_task)
+
     yield
     # ─── SHUTDOWN ─────────────────────────────────────────────────────
 
@@ -267,7 +271,7 @@ def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     if job:
         try:
             get_job_repository().save_single(job)
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             logger.exception("Failed to persist single job %s", job_id)
             if critical:
                 raise
@@ -292,6 +296,134 @@ async def run_job_wrapper(job_id: str) -> None:
         persist_state_single_fn=lambda: persist_single_fn(job_id, critical=False),
         persist_state_single_critical_fn=lambda: persist_single_fn(job_id, critical=True),
     )
+
+
+async def _scheduled_job_processor_loop() -> None:
+    """Periodically check for due scheduled jobs and enqueue them.
+
+    Reads the file-backed scheduled job store every 60 seconds, finds
+    enabled jobs whose ``next_run_at`` has passed, creates a new scrape
+    job from the template, and updates the schedule's next run time.
+
+    This loop is cancelled by the lifespan shutdown handler which
+    cancels all ``_background_tasks``.
+    """
+    _SCHEDULED_POLL_INTERVAL = 60  # seconds
+    while True:
+        try:
+            await asyncio.sleep(_SCHEDULED_POLL_INTERVAL)
+        except asyncio.CancelledError:
+            break
+
+        try:
+            await _process_due_scheduled_jobs()
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Scheduled job processor loop failed (non-blocking)")
+
+
+async def _process_due_scheduled_jobs() -> None:
+    """Find and execute all due scheduled jobs."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.routers.scheduled_monitoring import _scheduled_jobs, _write_back
+
+    now_iso = datetime.now(UTC).isoformat()
+    now_dt = datetime.now(UTC)
+
+    # Frequency to timedelta mapping for computing next_run_at
+    _FREQUENCY_DELTAS: dict[str, timedelta] = {
+        "hourly": timedelta(hours=1),
+        "daily": timedelta(days=1),
+        "weekly": timedelta(weeks=1),
+        "monthly": timedelta(days=30),
+    }
+
+    due_jobs: list[dict[str, Any]] = []
+    for item in _scheduled_jobs.values():
+        if not item.get("enabled", True):
+            continue
+        next_run = str(item.get("next_run_at") or "")
+        if next_run and next_run <= now_iso:
+            due_jobs.append(item)
+
+    if not due_jobs:
+        return
+
+    logger.info("Found %d due scheduled job(s) to process", len(due_jobs))
+
+    for scheduled in due_jobs:
+        sched_id = str(scheduled.get("id") or "")
+        try:
+            # Build a job from the scheduled template
+            from app.models import Job, ScrapeMode
+
+            urls = list(scheduled.get("urls") or [])
+            mode_str = str(scheduled.get("mode") or "manual")
+            mode = ScrapeMode.MANUAL if mode_str == "manual" else ScrapeMode.AUTO
+
+            # Create a new job record (not via the API, directly)
+            from app.globals import jobs_store
+            from app.routers.jobs_state import save_job
+
+            job_name = str(scheduled.get("job_name") or scheduled.get("name") or "Scheduled Job")
+            job = Job(
+                name=f"{job_name} (scheduled {now_dt.strftime('%Y-%m-%d %H:%M')})",
+                mode=mode,
+                urls=urls,
+                topic=str(scheduled.get("topic") or ""),
+                location=str(scheduled.get("location") or ""),
+                schema_fields=list(scheduled.get("schema_fields") or []),
+                filters=list(scheduled.get("filters") or []),
+                pagination=bool(scheduled.get("pagination", False)),
+                max_pages=int(scheduled.get("max_pages", 10)),
+                deduplicate=bool(scheduled.get("deduplicate", True)),
+                min_record_score=float(scheduled.get("min_record_score", 0.35)),
+                created_by=str(scheduled.get("user_id") or ""),
+                org_id=str(scheduled.get("org_id") or ""),
+                project_id=str(scheduled.get("project_id") or ""),
+            )
+            jobs_store[job.id] = job
+            await save_job(job)
+
+            # Execute the job
+            await run_job_wrapper(job.id)
+
+            # Update next_run_at based on frequency
+            frequency = str(scheduled.get("frequency") or "daily").lower()
+            delta = _FREQUENCY_DELTAS.get(frequency, timedelta(days=1))
+            next_run_dt = now_dt + delta
+            scheduled["next_run_at"] = next_run_dt.isoformat()
+            scheduled["last_run_at"] = now_iso
+            scheduled["last_run_status"] = "completed"
+            scheduled["last_run_records_count"] = len(job.results) if hasattr(job, "results") else 0
+            scheduled["total_executions"] = int(scheduled.get("total_executions", 0)) + 1
+            scheduled["successful_executions"] = int(scheduled.get("successful_executions", 0)) + 1
+
+            # Add to recent_run_summaries (capped at 10)
+            summaries = list(scheduled.get("recent_run_summaries") or [])
+            summaries.append(
+                {
+                    "ran_at": now_iso,
+                    "status": "completed",
+                    "records_count": len(job.results) if hasattr(job, "results") else 0,
+                    "job_id": job.id,
+                }
+            )
+            scheduled["recent_run_summaries"] = summaries[-10:]
+
+            # Persist the updated schedule
+            _write_back(scheduled)
+
+            logger.info(
+                "Scheduled job %s (%s) executed, next run at %s",
+                scheduled.get("name", ""),
+                sched_id,
+                scheduled["next_run_at"],
+            )
+        except Exception:
+            logger.exception("Failed to process scheduled job %s", sched_id)
 
 
 async def _rate_limit_prune_loop() -> None:

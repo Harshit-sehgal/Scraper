@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════
-   DataForge — Frontend App Entry Point (ES Module)
+   Dataforge — Frontend App Entry Point (ES Module)
    ═══════════════════════════════════════════
    ═══════════════════════════════════════════ */
 
 // ─── Init ───
+import { hydrateIcons, icon, startIconObserver } from "./js/icons.js";
 import {
   readUIState,
   updateJobsLastUpdatedLabel,
@@ -17,7 +18,10 @@ import {
   toast,
 } from "./js/utils.js";
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from "./js/jobs.js";
-import { onGlobalKeydown, switchView, currentView } from "./js/views.js";
+import { onGlobalKeydown, switchView, getViewFromPath, currentView } from "./js/views.js";
+import { refreshWorkflows, onWorkflowAction } from "./js/workflows.js";
+import { checkAndRenderAupBanner, acceptAup, dismissAupBanner } from "./js/aup.js";
+import { startHealthPill } from "./js/health-pill.js";
 import {
   onResultsSliderInput,
   onResultsTableScroll,
@@ -35,7 +39,6 @@ import {
   showAuthProfileEntryNotice,
 } from "./js/analyzer.js";
 import {
-  initForm,
   addField,
   addFilter,
   suggestSchemaFromIntent,
@@ -45,19 +48,15 @@ import {
 } from "./js/form.js";
 import { refreshCognition } from "./js/cognition.js";
 import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
-import { refreshRecycleBin, restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
+import { restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
 import { cancelJob, deleteJob, clearTerminalJobs } from "./js/jobs.js";
-import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel } from "./js/results.js";
-import {
-  showApiKeyPrompt,
-  showAdminKeyPrompt,
-  closeKeyModal,
-  saveKeyFromModal,
-  isKeyModalVisible,
-  checkSession,
-} from "./js/api.js";
+import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel, copySampleRow } from "./js/results.js";
+import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, checkSession } from "./js/api.js";
 import { setMode } from "./js/views.js";
 import { initAuthProfiles } from "./js/auth-profiles.js";
+import { refreshBilling, upgradePlan } from "./js/billing.js";
+import { refreshAudit } from "./js/audit.js";
+import { refreshRetention, deleteMyData } from "./js/retention.js";
 
 function onDocumentClick(e) {
   const btn = e.target.closest("[data-action]");
@@ -102,14 +101,52 @@ function onDocumentClick(e) {
       closeKeyModal();
       break;
     case "show-api-key":
-      showApiKeyPrompt();
+      switchView("api-keys");
       break;
     case "show-admin-key":
-      showAdminKeyPrompt();
+      switchView("api-keys");
+      break;
+    case "save-api-key":
+      import("./js/api-keys-page.js").then((m) => m.saveApiKeyFromPage()).catch(() => {});
+      break;
+    case "clear-api-key":
+      import("./js/api-keys-page.js").then((m) => m.clearApiKeyFromPage()).catch(() => {});
+      break;
+    case "toggle-api-key-vis":
+      import("./js/api-keys-page.js").then((m) => m.toggleApiKeyVisibility()).catch(() => {});
+      break;
+    case "save-admin-key":
+      import("./js/api-keys-page.js").then((m) => m.saveAdminKeyFromPage()).catch(() => {});
+      break;
+    case "clear-admin-key":
+      import("./js/api-keys-page.js").then((m) => m.clearAdminKeyFromPage()).catch(() => {});
+      break;
+    case "toggle-admin-key-vis":
+      import("./js/api-keys-page.js").then((m) => m.toggleAdminKeyVisibility()).catch(() => {});
+      break;
+    case "refresh-api-keys":
+      import("./js/api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch(() => {});
+      break;
+    case "logout-session":
+      import("./js/api-keys-page.js").then((m) => m.logoutFromPage()).catch(() => {});
+      break;
+    case "set-theme-mode":
+      import("./js/settings-page.js").then((m) => m.setThemeMode(mode)).catch(() => {});
+      break;
+    case "open-command-palette":
+      import("./js/command-palette.js").then((m) => m.openCommandPalette()).catch(() => {});
       break;
     case "switch-view":
       if (view) switchView(view);
       break;
+    case "toggle-sidebar": {
+      const layout = document.getElementById("app-layout");
+      if (layout) {
+        const isClosed = layout.dataset.sidebar === "closed";
+        layout.dataset.sidebar = isClosed ? "open" : "closed";
+      }
+      break;
+    }
     case "clear-terminal-jobs":
       clearTerminalJobs();
       break;
@@ -122,11 +159,44 @@ function onDocumentClick(e) {
     case "refresh-dashboard":
       refreshDashboard();
       break;
+    case "refresh-auth-profiles":
+      import("./js/auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
+      break;
     case "switch-operator-mode":
       if (mode) switchOperatorMode(mode);
       break;
     case "analyze-url":
       analyzeURL();
+      break;
+    case "refresh-workflows":
+      refreshWorkflows();
+      break;
+    case "run-workflow":
+    case "delete-workflow":
+      onWorkflowAction(action, id);
+      break;
+    case "aup-accept": {
+      const v = btn.getAttribute("data-version") || "";
+      acceptAup(v);
+      break;
+    }
+    case "aup-dismiss":
+      dismissAupBanner();
+      break;
+    case "refresh-billing":
+      refreshBilling();
+      break;
+    case "refresh-audit":
+      refreshAudit();
+      break;
+    case "refresh-retention":
+      refreshRetention();
+      break;
+    case "upgrade-plan":
+      upgradePlan();
+      break;
+    case "delete-my-data":
+      deleteMyData();
       break;
     case "toggle-all-fields":
       toggleAllFields(btn.getAttribute("data-select") === "true");
@@ -173,6 +243,9 @@ function onDocumentClick(e) {
     case "export-excel":
       exportExcel();
       break;
+    case "copy-sample-row":
+      copySampleRow();
+      break;
     case "toggle-theme":
       toggleTheme();
       break;
@@ -193,10 +266,10 @@ function onDocumentClick(e) {
         navigator.clipboard
           ?.writeText?.(id)
           ?.then?.(() => {
-            btn.textContent = "✓";
+            btn.innerHTML = icon("check", 14);
             btn.classList.add("copied");
             setTimeout(() => {
-              btn.textContent = "📋";
+              btn.innerHTML = icon("copy", 14);
               btn.classList.remove("copied");
             }, 2000);
           })
@@ -242,9 +315,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("click", onDocumentClick);
   document.addEventListener("change", onDocumentChange);
 
+  // Hydrate [data-icon] placeholders with Phosphor SVG icons
+  hydrateIcons();
+  // Watch for future innerHTML rewrites so view-local mutations
+  // (renderJobs, addField, addFilter, etc.) keep their icons rendered
+  // without needing per-render explicit hydrateIcons() calls.
+  startIconObserver();
+
   // G2: Try session auth first — if the browser already has a valid
   // session cookie, no API key prompt is needed.
   await checkSession();
+
+  // Start the topbar health pill — periodic probe of /api/health + /api/ready.
+  startHealthPill();
 
   // Fetch experimental feature flag from the public root endpoint
   // and reveal experimental UI elements when enabled.
@@ -253,9 +336,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     .then((data) => {
       if (data.experimental_enabled) {
         document.body.dataset.experimental = "true";
+        // F-003: the cognition-view guards in views.js compare
+        // ``window.DATAFORGE_EXPERIMENTAL !== true``; without setting it
+        // here, the Cognition tab visibly appears (via the dataset class)
+        // but is functionally unreachable — clicking it redirects to Jobs.
+        window.DATAFORGE_EXPERIMENTAL = true;
         document.querySelectorAll('[data-experimental="true"]').forEach((el) => {
           el.classList.add("visible");
         });
+      }
+      // Once we know the active AUP version, surface the
+      // acceptance banner if needed. The check is silent on
+      // 404/401 (no auth, no banner) so it never nags anonymous
+      // visitors.
+      if (data.aup_version) {
+        checkAndRenderAupBanner(data.aup_version);
       }
     })
     .catch(() => {});
@@ -375,15 +470,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Init theme ──
   initTheme();
 
+  // ── Topbar scroll shadow ──
+  const topbar = document.querySelector(".topbar");
+  if (topbar) {
+    const onTopbarScroll = () => {
+      topbar.classList.toggle("scrolled", window.scrollY > 4);
+    };
+    window.addEventListener("scroll", onTopbarScroll, { passive: true });
+    onTopbarScroll();
+  }
+
   // ── Init auth profiles module ──
   initAuthProfiles();
 
   // ── Initial view ──
-  let initialView = ["jobs", "new", "recycle", "cognition", "dashboard", "auth-profiles"].includes(
-    String(uiState.view || ""),
-  )
-    ? String(uiState.view)
-    : "jobs";
+  // URL path takes precedence over localStorage state
+  let initialView = getViewFromPath(window.location.pathname);
+  // Fall back to saved state if URL is at root and we have a saved view
+  if (initialView === "jobs" && window.location.pathname === "/" && uiState.view) {
+    initialView = uiState.view;
+  }
   // H2: Guard initial view restoration for cognition
   if (initialView === "cognition" && window.DATAFORGE_EXPERIMENTAL !== true) {
     initialView = "jobs";

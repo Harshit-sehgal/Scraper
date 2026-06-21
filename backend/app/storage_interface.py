@@ -689,7 +689,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM job_results WHERE job_id = ?", (job_id,))
                 conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
                 conn.commit()
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 conn.rollback()
                 raise
             finally:
@@ -733,7 +733,7 @@ class SQLiteJobRepository(JobRepository):
         if ws_path.exists():
             try:
                 return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 logger.debug("Failed to parse world_state.json", exc_info=True)
                 return None
         return None
@@ -768,7 +768,7 @@ class SQLiteJobRepository(JobRepository):
                 )
                 conn.commit()
                 return True
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 conn.rollback()
                 raise
             finally:
@@ -803,7 +803,7 @@ class SQLiteJobRepository(JobRepository):
                 )
                 conn.commit()
                 return True
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 conn.rollback()
                 raise
             finally:
@@ -835,7 +835,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
                 conn.commit()
                 return deleted > 0
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 conn.rollback()
                 raise
             finally:
@@ -889,7 +889,7 @@ class SQLiteJobRepository(JobRepository):
                     conn.execute("DELETE FROM job_events WHERE job_id = ?", (jid,))
                 conn.commit()
                 return len(rows)
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 conn.rollback()
                 raise
             finally:
@@ -978,7 +978,7 @@ def get_job_repository() -> JobRepository:
                     return repo
                 except RuntimeError:
                     raise
-                except Exception as e:
+                except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, ImportError) as e:
                     msg = (
                         f"Failed to create Psycopg3JobRepository: {e}. "
                         "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
@@ -1007,7 +1007,7 @@ def get_job_repository() -> JobRepository:
                 return repo
             except RuntimeError:
                 raise
-            except Exception as e:
+            except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, ImportError) as e:
                 msg = f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
                 raise RuntimeError(
                     msg,
@@ -1037,13 +1037,13 @@ def reset_repository() -> None:
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 logger.warning("Failed to shut down Postgres repository", exc_info=True)
         elif "Psycopg3JobRepository" in cls_name:
             try:
                 from app.psycopg3_repository import shutdown_psycopg3
 
                 shutdown_psycopg3()
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 logger.warning("Failed to shut down Psycopg3 repository", exc_info=True)
     _repository_instance = None

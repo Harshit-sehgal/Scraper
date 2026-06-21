@@ -47,7 +47,13 @@ from app.scraper import ai_clean_and_align_records
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from app.utils.rbac import UserRole, get_current_user, require_role
+from app.utils.rbac import (
+    UserRole,
+    can_access_scoped_resource,
+    get_current_user,
+    require_principal,
+    require_role,
+)
 from app.utils.usage_ledger import UsageType, get_usage_ledger
 
 if TYPE_CHECKING:
@@ -68,6 +74,44 @@ def _schedule_job(job_id: str) -> None:
     from app.runtime_deps import schedule_task_fn as _stf
 
     _stf(_rjf(job_id))
+
+
+def _ensure_job_write_access(job, auth_tuple, action: str) -> None:
+    """Enforce tenant isolation on job-mutation routes.
+
+    Mirrors ``jobs_read._ensure_job_access`` but lives in the write
+    router so mutation routes (cancel / backfill / reclean) cannot
+    mutate a job from another org/project. Env-backed admin/operator
+    keys retain all-access; persistent SaaS WRITE keys are scoped to
+    their own org/project (via ``can_access_scoped_resource``).
+    """
+    role, user_id, org_id, project_id = auth_tuple
+    if can_access_scoped_resource(
+        role,
+        user_id,
+        org_id,
+        project_id,
+        resource_owner_id=getattr(job, "created_by", ""),
+        resource_org_id=getattr(job, "org_id", ""),
+        resource_project_id=getattr(job, "project_id", ""),
+    ):
+        return
+    from app.audit_logger import log_rbac_event
+
+    log_rbac_event(
+        actor=user_id,
+        action=action,
+        resource=f"job:{job.id}",
+        role=role.value,
+        outcome="denied",
+        details={
+            "owner_id": getattr(job, "created_by", ""),
+            "org_id": getattr(job, "org_id", ""),
+            "project_id": getattr(job, "project_id", ""),
+            "policy": "scoped_resource_or_saas_org_project",
+        },
+    )
+    raise HTTPException(status_code=404, detail="Job not found")
 
 
 def register_jobs_write_routes(
@@ -150,7 +194,7 @@ def register_jobs_write_routes(
             _ctx = resolve_auth_context(request, allow_cookie=True)
             _owner_org_id = _ctx.org_id
             _owner_project_id = _ctx.project_id
-        except Exception:
+        except (RuntimeError, ValueError, TypeError):
             _owner_org_id = ""
             _owner_project_id = ""
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
@@ -199,7 +243,8 @@ def register_jobs_write_routes(
                         detail="Conflict: Another request with a different payload was already sent for this Idempotency-Key.",
                     )
 
-                cached = manager.jobs_store.get(existing_job_id)
+                with manager.lock:
+                    cached = manager.jobs_store.get(existing_job_id)
                 if cached is not None:
                     return {
                         "job_id": cached.id,
@@ -294,7 +339,7 @@ def register_jobs_write_routes(
                 except (AttributeError, ImportError, RuntimeError):
                     logger.warning("Failed to hard-delete job %s after scheduled-job quota rejection", job.id)
                 raise HTTPException(status_code=429, detail=str(e)) from e
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 if settings.ENV.lower() == "production":
                     logger.exception(
                         "Failed to enqueue job %s to worker queue in production",
@@ -334,12 +379,16 @@ def register_jobs_write_routes(
     @router.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         with manager.lock:
             if job_id not in manager.jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
             job = manager.jobs_store[job_id]
+            _ensure_job_write_access(job, auth, "cancel_job")
             if job.status in {
                 JobStatus.COMPLETED,
                 JobStatus.DEGRADED,
@@ -365,7 +414,7 @@ def register_jobs_write_routes(
 
                 queue = get_worker_queue()
                 await queue.cancel(job_id)
-            except Exception as e:
+            except (RuntimeError, ValueError, OSError) as e:
                 cancel_task_success = False
                 logger.warning(
                     "Failed to cancel queued task for job %s: %s",
@@ -385,10 +434,14 @@ def register_jobs_write_routes(
     @router.post("/api/jobs/{job_id}/backfill-metadata")
     async def backfill_job_metadata(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         """Explicitly backfill source metadata for manual-mode job results."""
         job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_write_access(job, auth, "backfill_metadata")
 
         results_list = list(job.results)
         if job.results_on_disk:
@@ -419,13 +472,17 @@ def register_jobs_write_routes(
     @router.post("/api/jobs/{job_id}/reclean")
     async def reclean_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         with manager.lock:
             if job_id not in manager.jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
             job = manager.jobs_store[job_id]
+            _ensure_job_write_access(job, auth, "reclean_job")
             if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                 raise HTTPException(
                     status_code=409,
@@ -579,7 +636,7 @@ def register_jobs_write_routes(
             }
             job.quality_report = quality
             await save_job(job)
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception(
                 "Job %s: Reclean failed irrecoverably, restoring previous status %s",
                 job_id,
@@ -589,7 +646,7 @@ def register_jobs_write_routes(
             reclean_warnings.append(f"Reclean failed: {e}")
             try:
                 await save_job(job)
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.exception(
                     "Job %s: Failed to persist job state after reclean rollback",
                     job_id,
@@ -632,7 +689,7 @@ def register_jobs_write_routes(
         repo = get_job_repository()
         try:
             await run_in_threadpool(repo.move_to_recycle_bin, job_id)
-        except Exception:
+        except (RuntimeError, OSError, ValueError):
             logger.exception("Failed to move job %s to recycle bin in repository", job_id)
             raise HTTPException(
                 status_code=500,
@@ -680,7 +737,7 @@ def register_jobs_write_routes(
             try:
                 await run_in_threadpool(repo.move_to_recycle_bin, jid)
                 cleared_ids.append(jid)
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.exception("Failed to move terminal job %s to recycle bin during cleanup", jid)
                 failed_ids.append(jid)
 
@@ -725,7 +782,7 @@ def register_jobs_write_routes(
         repo = get_job_repository()
         try:
             await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
             raise HTTPException(
                 status_code=500,
@@ -751,7 +808,7 @@ def register_jobs_write_routes(
         repo = get_job_repository()
         try:
             await run_in_threadpool(repo.hard_delete, job_id)
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception("Failed to hard-delete job %s from repository", job_id)
             raise HTTPException(
                 status_code=500,
@@ -784,7 +841,7 @@ def register_jobs_write_routes(
             try:
                 await run_in_threadpool(repo.hard_delete, jid)
                 deleted_ids.append(jid)
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.exception("Failed to hard-delete job %s during recycle bin clear", jid)
                 failed_ids.append(jid)
         for jid, job in snapshot:

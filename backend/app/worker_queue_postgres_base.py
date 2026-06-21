@@ -299,6 +299,24 @@ class PostgresWorkerQueueBase(ABC):
         """
         self._handlers[task_type] = handler
 
+    def set_max_concurrency(self, value: int) -> None:
+        """Resize the concurrency budget at runtime.
+
+        Public API that replaces the previous reliance on the private
+        ``_max_concurrency`` attribute. The semaphore is swapped atomically;
+        the in-flight dict is left as-is so tasks already running keep
+        their slot until they complete.
+        """
+        if value < 1:
+            msg = f"max_concurrency must be >= 1, got {value}"
+            raise ValueError(msg)
+        self._max_concurrency = value
+        self._concurrency_sem = asyncio.Semaphore(value)
+
+    def get_poll_interval(self) -> float:
+        """Return the worker poll interval in seconds (public accessor)."""
+        return self._poll_interval
+
     # ─── Task lifecycle ────────────────────────────────────────────────
 
     async def enqueue(

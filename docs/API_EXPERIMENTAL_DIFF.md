@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-15 23:39:19 UTC
+**Generated:** 2026-06-21 12:30:36 UTC
 **Mode:** `experimental_routes - stable_routes`
 
 This is the set of routes that are exposed **only** when

@@ -1,5 +1,3 @@
-from typing import Any
-
 """Semantic OS — Official Engine Interface.
 ======================================
 
@@ -9,6 +7,7 @@ Provides high-level orchestration, state governance, and topological search.
 
 import logging
 from collections.abc import Callable
+from typing import Any
 
 from app.checkpoint_manager import get_checkpoint_manager
 from app.semantic_world_state import get_world_state

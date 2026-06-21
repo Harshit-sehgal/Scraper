@@ -106,7 +106,7 @@ class GlobalCognitiveScheduler:
                 task.handler(*task.args, **task.kwargs)
                 self._execution_stats["tasks_completed"] += 1
                 self._execution_stats["priority_counts"][task.priority.name] += 1
-            except Exception as e:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
                 logger.exception("TASK FAILED: [%s]", task.task_id)
                 # Record degradation telemetry (best-effort)
                 try:
@@ -116,7 +116,7 @@ class GlobalCognitiveScheduler:
                             severity="warning",
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
-                except Exception:
+                except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                     logger.debug("Failed to record degradation for task failure", exc_info=True)
 
             duration = time.time() - t0

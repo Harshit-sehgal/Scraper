@@ -152,26 +152,79 @@ def process_request(user_id: str, pages: int):
 
 ## Billing Integration
 
-### Stripe Integration (Planned)
+### PayPal Integration (Live)
+
+The billing service (`backend/app/billing/service.py`) wraps the official
+`paypalhttp` Python SDK for the PayPal REST API — Orders API v2 for one-time
+checkout and Subscriptions for recurring tiers.
+
+**Mode-switching.** When `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` are not
+configured, `PayPalClient.is_configured` is `False` and the code path falls
+through to a deterministic stub (`/api/billing/checkout` returns
+`https://example.com/paypal-stub/<tier>/<uuid>`). This keeps dev / CI runs
+free of live credentials while preserving the same response shape.
+
+**Checkout.** `POST /api/billing/checkout` creates a PayPal Order via
+`paypalhttp.orders.OrdersCreateRequest` and returns an `approval_url` the
+operator is redirected to. The frontend (`frontend/js/billing.js::upgradePlan`)
+reads the rendered tier, calls the endpoint with `return_url` / `cancel_url`,
+and `window.location.href = approval_url`.
+
+**Plan mapping.** A PayPal `plan_id` (UUID created in the PayPal Dashboard) is
+mapped back to a `PlanTierId` via the env vars `PAYPAL_PLAN_ID_STARTER`,
+`PAYPAL_PLAN_ID_PRO`, and `PAYPAL_PLAN_ID_ENTERPRISE`. Unknown / unconfigured
+plan IDs fall back to FREE so a stale plan never silently grants paid access.
+
+**Webhook verification.** `POST /api/billing/webhook` checks
+`X-PayPal-Transmission-Sig` (and the dev / shared-secret path
+`X-Billing-Webhook-Secret`) using HMAC-SHA256 of the raw body against
+`PAYPAL_WEBHOOK_SECRET`. In production, PayPal's cert-based `/v1/notifications/verify`
+endpoint is the canonical path; the HMAC mode lets local CI runs simulate
+the same shape end-to-end. The handler normalizes three dialects — PayPal
+(`event_type` + `resource`), Stripe (`type` + `data.object`), and the legacy
+Autumn (`event_type` + `data`) — into a common `(event_type, customer_id,
+data)` tuple before mutating the file-backed subscription store.
+
+**Production rollout checklist** (see `docs/SAAS_MODEL.md`):
 
 ```python
-# Future integration
-from stripe import Customer
+# env vars
+PAYPAL_CLIENT_ID=...            # from PayPal Dashboard (live)
+PAYPAL_CLIENT_SECRET=...        # from PayPal Dashboard (live)
+PAYPAL_ENVIRONMENT=live
+PAYPAL_API_URL=https://api-m.paypal.com    # default for live
+PAYPAL_PLAN_ID_STARTER=P-START...
+PAYPAL_PLAN_ID_PRO=P-PRO...
+PAYPAL_PLAN_ID_ENTERPRISE=P-ENT...
+PAYPAL_WEBHOOK_SECRET=...       # dev / shared-secret webhook ID
+```
 
-def create_customer(user_id: str, email: str):
-    customer = Customer.create(
-        email=email,
-        metadata={"user_id": user_id}
-    )
-    return customer
+```python
+# paypalhttp client wiring (already done in service.py)
+import paypalhttp
+environment = paypalhttp.LiveEnvironment("CID", "SECRET")
+client = paypalhttp.HttpClient(environment)
+token = paypalhttp.OAuthToken(client, "CID", "SECRET")
 
-def create_subscription(customer_id: str, price_id: str):
-    subscription = Subscription.create(
-        customer=customer_id,
-        items=[{"price": price_id}],
-        metadata={"user_id": customer_id}
-    )
-    return subscription
+# create-checkout
+from paypalhttp.orders import OrdersCreateRequest
+request = OrdersCreateRequest()
+request.request_body({
+    "intent": "CAPTURE",
+    "purchase_units": [{
+        "reference_id": request_id,
+        "amount": {"currency_code": "USD", "value": "29.00"},
+        "description": "Dataforge Starter plan subscription",
+    }],
+    "application_context": {
+        "return_url": return_url,
+        "cancel_url": cancel_url,
+        "shipping_preference": "NO_SHIPPING",
+        "user_action": "PAY_NOW",
+    },
+})
+result = client.execute(request)
+# result.result.links -> [{rel: "approve", href: "..."}, ...]
 ```
 
 ### Usage-Based Billing

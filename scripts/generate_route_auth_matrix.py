@@ -28,7 +28,7 @@ def _coverage_for(path: str, corpus: str) -> str:
         return "unknown"
     if path in corpus:
         return "yes"
-    literal_prefix = re.sub(r"/\\{[^}]+\\}.*", "", path)
+    literal_prefix = re.sub(r"/\{[^}]+\}.*", "", path)
     if literal_prefix and literal_prefix != path and literal_prefix in corpus:
         return "yes"
     family = "/" + "/".join(path.strip("/").split("/")[:2])

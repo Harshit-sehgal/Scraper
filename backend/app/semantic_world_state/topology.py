@@ -70,7 +70,7 @@ class TopologyMixin:
         self,
         tokens: list[Any],
         schema_fields: list[Any],
-        is_noise: bool = False,  # noqa: ARG002
+        is_noise: bool = False,  # reserved for downstream schema expansion; unused today
         domain: str = "",
     ) -> int:  # noqa: C901, FBT001, FBT002, PLR0912, PLR0915, RUF100
         """Capture pre-allocation conflict topology from tokens with Relational Recall (Phase 31)."""

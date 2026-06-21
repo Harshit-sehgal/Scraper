@@ -4,6 +4,9 @@
 
 import { toast, attachFocusTrapTo, detachFocusTrapFrom } from "./utils.js";
 import { refreshSystemStatus, refreshJobs } from "./jobs.js";
+import { maybeHandleMockRequest, isMockMode } from "./mock-api.js";
+export { endpoints } from "./api-contract.js";
+export { isMockMode };
 
 // ─── API Base URL ───
 
@@ -38,6 +41,49 @@ export const API = (() => {
 let _sessionChecked = false;
 let _isSessionAuthenticated = false;
 let _sessionRole = "";
+let _sessionUser = null; // { user_id, role, ... } from /api/session/me
+
+// ─── Auth-state subscribers ──────────────────────────────────────────────
+// The app shell subscribes to know when to reveal the signed-in UI, route
+// to the sign-in page on session loss, and start/stop the pollers. We never
+// pop a modal automatically — sign-in is always user-initiated from the
+// dedicated sign-in page (or the topbar "Sign in" button).
+const _authListeners = new Set();
+
+export function onAuthChange(fn) {
+  if (typeof fn === "function") _authListeners.add(fn);
+  return () => _authListeners.delete(fn);
+}
+
+function _notifyAuthChange(reason) {
+  _authListeners.forEach((fn) => {
+    try {
+      fn({
+        authenticated: _isSessionAuthenticated,
+        role: _sessionRole,
+        user: _sessionUser,
+        reason,
+      });
+    } catch (e) {
+      console.warn("auth listener error:", e);
+    }
+  });
+}
+
+export function markSignedOut(reason = "signed-out") {
+  _isSessionAuthenticated = false;
+  _sessionRole = "";
+  _sessionUser = null;
+  _notifyAuthChange(reason);
+}
+
+export function isAdminOrOperator() {
+  return _sessionRole === "admin" || _sessionRole === "operator";
+}
+
+export function getSessionUser() {
+  return _sessionUser;
+}
 
 // ─── Legacy API Key Management (kept for backward compat and
 //      non-browser / programmatic usage) ───────────────────────────────
@@ -84,11 +130,14 @@ export async function checkSession() {
       if (data.authenticated) {
         _isSessionAuthenticated = true;
         _sessionRole = data.role || "";
+        _sessionUser = data;
+        _notifyAuthChange("session-restored");
         return true;
       }
     }
   } catch {
-    // Network error — ignore, will fall through to key prompt
+    // Network error — treat as unauthenticated; the app will show the
+    // sign-in page and the user can retry.
   }
   return false;
 }
@@ -114,8 +163,10 @@ export async function loginWithApiKey(apiKey) {
       const data = await res.json();
       _isSessionAuthenticated = true;
       _sessionRole = data.role || "";
+      _sessionUser = data;
       // The cookie is now set — clear the JS-memory key
       _apiKey = "";
+      _notifyAuthChange("signed-in");
       return true;
     }
   } catch {
@@ -135,8 +186,9 @@ export async function logoutSession() {
   } catch {
     // Ignore network errors during logout
   }
-  _isSessionAuthenticated = false;
-  _sessionRole = "";
+  _apiKey = "";
+  _adminKey = "";
+  markSignedOut("signed-out");
 }
 
 // ─── Modal Key Management ───
@@ -156,11 +208,11 @@ function setupKeyModal(type) {
   input.value = "";
 
   if (type === "admin") {
-    title.textContent = "\u{1F6E1}\uFE0F Admin Key";
+    title.textContent = "Admin Key";
     desc.textContent =
       "Enter your DataForge Admin key for protected actions (session only — held in memory, not stored).";
   } else {
-    title.textContent = "\u{1F511} API Key";
+    title.textContent = "API Key";
     desc.textContent = "Enter your DataForge API key. The key is held in memory only and is cleared on page reload.";
     // Pre-fill only with the in-memory copy; never read from storage.
     input.value = getApiKey() || "";
@@ -235,6 +287,16 @@ let lastApi403 = 0;
 
 export async function apiFetch(url, options = {}) {
   const { admin, ...rest } = options;
+  // F-010: prefix relative ``/api/...`` URLs with ``API`` so requests
+  // resolve to the backend (not the dev-server origin) when the frontend
+  // is served from a different port (localhost:3000/5173). Several
+  // modules (billing, audit, retention, workflows, aup, system-info,
+  // recent-activity) pass relative URLs; in production (same-origin SPA)
+  // the prefix is a no-op.
+  const resolvedUrl = url.startsWith("/api/") ? `${API}${url}` : url;
+  const mockResponse = await maybeHandleMockRequest(resolvedUrl, rest);
+  if (mockResponse) return mockResponse;
+
   const headers = { ...(rest.headers || {}) };
   // For session-authenticated clients, the cookie is sent automatically.
   // Only attach X-API-Key for non-session (legacy) mode, or for admin ops
@@ -251,12 +313,12 @@ export async function apiFetch(url, options = {}) {
       headers["X-API-Key"] = key;
     }
   }
-  const res = await fetch(url, { ...rest, headers, credentials: "include" });
+  const res = await fetch(resolvedUrl, { ...rest, headers, credentials: "include" });
   if (res.status === 403 && !admin) {
     const now = Date.now();
-    if (now - lastApi403 > 15000 && !isKeyModalVisible()) {
+    if (now - lastApi403 > 15000) {
       lastApi403 = now;
-      showApiKeyPrompt();
+      toast("Session expired \u2014 go to API Keys to reconnect", "warning");
     }
   }
   return res;

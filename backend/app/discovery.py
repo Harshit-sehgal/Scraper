@@ -1,5 +1,3 @@
-from typing import Any
-
 """Auto-Discovery Engine: Given a topic / query, automatically finds the best
 web pages to scrape by searching the web and ranking results.
 
@@ -8,6 +6,7 @@ Uses free search via DuckDuckGo.
 
 import logging
 from collections import defaultdict
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 from app.async_utils import run_sync_in_thread

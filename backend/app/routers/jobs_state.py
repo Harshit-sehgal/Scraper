@@ -118,7 +118,7 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
     try:
         repo = get_job_repository()
         return repo.lookup_idempotency_key(idem_key)
-    except Exception:
+    except (RuntimeError, OSError, ValueError):
         logger.warning(
             "idempotency-key lookup failed; treating as a cache miss (fail-open). "
             "Duplicate retries with idem_key=%r may create duplicate jobs until the "
@@ -138,7 +138,7 @@ def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
     try:
         repo = get_job_repository()
         return repo.lookup_idempotency_fingerprint(idem_key)
-    except Exception:
+    except (RuntimeError, OSError, ValueError):
         logger.warning(
             "idempotency-fingerprint lookup failed; treating as a cache miss. "
             "A retry with idem_key=%r will not be recognized as a duplicate "
@@ -159,7 +159,7 @@ def record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None
     try:
         repo = get_job_repository()
         repo.record_idempotency_key(idem_key, job_id, fingerprint)
-    except Exception:
+    except (RuntimeError, OSError, ValueError):
         logger.warning(
             "Failed to record idempotency key %s; subsequent retries will not be deduplicated.",
             idem_key,

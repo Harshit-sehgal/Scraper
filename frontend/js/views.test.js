@@ -34,11 +34,11 @@ function setupDOM() {
     <div id="view-recycle" class="view">Recycle Bin</div>
     <div id="view-cognition" class="view">Cognition</div>
     <div id="view-dashboard" class="view">Dashboard</div>
-    <div id="tab-jobs" class="tab">Jobs</div>
-    <div id="tab-new" class="tab">New</div>
-    <div id="tab-recycle" class="tab">Recycle</div>
-    <div id="tab-cognition" class="tab">Cognition</div>
-    <div id="tab-dashboard" class="tab">Dashboard</div>
+    <div id="nav-jobs" class="nav-item">Jobs</div>
+    <div id="nav-new" class="nav-item">New</div>
+    <div id="nav-recycle" class="nav-item">Recycle</div>
+    <div id="nav-cognition" class="nav-item">Cognition</div>
+    <div id="nav-dashboard" class="nav-item">Dashboard</div>
     <div id="mode-toggle">
       <span class="toggle" data-mode="manual">Manual</span>
       <span class="toggle" data-mode="auto">Auto</span>
@@ -85,8 +85,8 @@ describe("switchView()", () => {
     switchView("new");
     expect(document.getElementById("view-new").classList.contains("active")).toBe(true);
     expect(document.getElementById("view-jobs").classList.contains("active")).toBe(false);
-    expect(document.getElementById("tab-new").classList.contains("active")).toBe(true);
-    expect(document.getElementById("tab-jobs").classList.contains("active")).toBe(false);
+    expect(document.getElementById("nav-new").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-jobs").classList.contains("active")).toBe(false);
   });
 
   it("deactivates all views and tabs before activating the target", () => {
@@ -94,13 +94,49 @@ describe("switchView()", () => {
     switchView("dashboard");
     expect(document.getElementById("view-dashboard").classList.contains("active")).toBe(true);
     expect(document.getElementById("view-jobs").classList.contains("active")).toBe(false);
-    expect(document.getElementById("tab-dashboard").classList.contains("active")).toBe(true);
-    expect(document.getElementById("tab-jobs").classList.contains("active")).toBe(false);
+    expect(document.getElementById("nav-dashboard").classList.contains("active")).toBe(true);
+    expect(document.getElementById("nav-jobs").classList.contains("active")).toBe(false);
   });
 
   it("updates currentView state", () => {
     switchView("recycle");
     expect(currentView).toBe("recycle");
+  });
+
+  it("highlights the workflows tab when switching to workflows", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-workflows"></section>
+      <div id="nav-workflows" class="nav-item">Workflows</div>
+    `;
+    switchView("workflows");
+    expect(document.getElementById("nav-workflows").classList.contains("active")).toBe(true);
+  });
+
+  it("highlights the billing tab when switching to billing", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-billing"></section>
+      <div id="nav-billing" class="nav-item">Billing</div>
+    `;
+    switchView("billing");
+    expect(document.getElementById("nav-billing").classList.contains("active")).toBe(true);
+  });
+
+  it("highlights the audit tab when switching to audit", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-audit"></section>
+      <div id="nav-audit" class="nav-item">Audit</div>
+    `;
+    switchView("audit");
+    expect(document.getElementById("nav-audit").classList.contains("active")).toBe(true);
+  });
+
+  it("highlights the retention tab when switching to retention", () => {
+    document.body.innerHTML += `
+      <section class="view" id="view-retention"></section>
+      <div id="nav-retention" class="nav-item">Retention</div>
+    `;
+    switchView("retention");
+    expect(document.getElementById("nav-retention").classList.contains("active")).toBe(true);
   });
 });
 
@@ -161,12 +197,39 @@ describe("onGlobalKeydown()", () => {
     expect(document.getElementById("view-jobs").classList.contains("active")).toBe(true);
   });
 
-  it('key "5" switches to dashboard view', () => {
-    const e = new KeyboardEvent("keydown", { key: "5" });
+  it('key "3" switches to dashboard view', () => {
+    const e = new KeyboardEvent("keydown", { key: "3" });
     e.preventDefault = vi.fn();
     onGlobalKeydown(e);
     expect(e.preventDefault).toHaveBeenCalled();
     expect(document.getElementById("view-dashboard").classList.contains("active")).toBe(true);
+  });
+
+  it('key "8" switches to billing view', () => {
+    document.body.innerHTML += '<section class="view" id="view-billing"></section>';
+    const e = new KeyboardEvent("keydown", { key: "8" });
+    e.preventDefault = vi.fn();
+    onGlobalKeydown(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+    expect(document.getElementById("view-billing").classList.contains("active")).toBe(true);
+  });
+
+  it('key "9" switches to audit view', () => {
+    document.body.innerHTML += '<section class="view" id="view-audit"></section>';
+    const e = new KeyboardEvent("keydown", { key: "9" });
+    e.preventDefault = vi.fn();
+    onGlobalKeydown(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+    expect(document.getElementById("view-audit").classList.contains("active")).toBe(true);
+  });
+
+  it('key "0" switches to retention view', () => {
+    document.body.innerHTML += '<section class="view" id="view-retention"></section>';
+    const e = new KeyboardEvent("keydown", { key: "0" });
+    e.preventDefault = vi.fn();
+    onGlobalKeydown(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+    expect(document.getElementById("view-retention").classList.contains("active")).toBe(true);
   });
 
   it('key "n" switches to new view', () => {

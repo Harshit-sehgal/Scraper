@@ -201,8 +201,10 @@ describe("apiFetch", () => {
 
     await apiFetch("/api/jobs");
 
+    // F-010: relative /api/... URLs are now resolved to ${API}/api/...
+    // before fetch so they reach the backend in dev mode.
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/jobs",
+      `${API}/api/jobs`,
       expect.objectContaining({
         headers: expect.objectContaining({ "X-API-Key": "test-key" }),
       }),
@@ -216,7 +218,7 @@ describe("apiFetch", () => {
     await apiFetch("/api/jobs", { admin: true });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/jobs",
+      `${API}/api/jobs`,
       expect.objectContaining({
         headers: expect.objectContaining({ "X-Admin-Key": "admin-key" }),
       }),
@@ -227,11 +229,17 @@ describe("apiFetch", () => {
     setApiKey("test-key");
     global.fetch.mockResolvedValue(new Response("{}", { status: 403 }));
     createModalOverlay();
+    createToastsContainer();
 
     await apiFetch("/api/jobs");
 
+    // 403 now surfaces a warning toast (the legacy modal-prompt was
+    // retired; see F-010 session-expired handling). The modal overlay
+    // must therefore *remain* hidden — the user is directed to the
+    // API Keys screen via the toast, not via a blocking modal.
     const overlay = document.getElementById("apikey-overlay");
-    expect(overlay.classList.contains("hidden")).toBe(false);
+    expect(overlay.classList.contains("hidden")).toBe(true);
+    expect(document.getElementById("toasts").children.length).toBeGreaterThanOrEqual(1);
   });
 
   it("does not show 403 prompt for admin requests", async () => {
@@ -257,7 +265,7 @@ describe("apiFetch", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/jobs",
+      `${API}/api/jobs`,
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ "Content-Type": "application/json" }),

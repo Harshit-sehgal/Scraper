@@ -33,13 +33,62 @@ _logger: logging.Logger | None = None
 _audit_lock = threading.Lock()
 
 
+def _audit_log_path() -> Path:
+    """Resolve the current audit log path from settings or module defaults."""
+    try:
+        from app.config import settings
+
+        configured_log_dir = settings.AUDIT_LOG_DIR
+    except (ImportError, AttributeError):
+        logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
+        configured_log_dir = ""
+    return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
+
+
+def _normalise_path(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def _has_file_handler(audit_logger: logging.Logger, log_path: Path) -> bool:
+    target = _normalise_path(log_path)
+    for handler in audit_logger.handlers:
+        base_filename = getattr(handler, "baseFilename", "")
+        if base_filename and _normalise_path(base_filename) == target:
+            return True
+    return False
+
+
+def _add_file_handler(audit_logger: logging.Logger, log_path: Path) -> None:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    handler = RotatingFileHandler(
+        filename=str(log_path),
+        maxBytes=AUDIT_LOG_MAX_BYTES,
+        backupCount=AUDIT_LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
+    handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(
+        "%(asctime)s [AUDIT] %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    audit_logger.addHandler(handler)
+
+
 def _get_audit_logger() -> logging.Logger:
     """Get or create the audit logger singleton."""
     global _logger
     if _logger is not None:
+        log_path = _audit_log_path()
+        if not _has_file_handler(_logger, log_path):
+            _add_file_handler(_logger, log_path)
         return _logger
     with _audit_lock:
         if _logger is not None:
+            log_path = _audit_log_path()
+            if not _has_file_handler(_logger, log_path):
+                _add_file_handler(_logger, log_path)
             return _logger
 
         _logger = logging.getLogger("audit")
@@ -48,34 +97,13 @@ def _get_audit_logger() -> logging.Logger:
         # Prevent the audit logger from propagating to the root logger
         _logger.propagate = False
 
-        # Only add handler if not already configured
-        if not _logger.handlers:
-            try:
-                from app.config import settings
-
-                configured_log_dir = settings.AUDIT_LOG_DIR
-            except Exception:
-                logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
-                configured_log_dir = ""
-
-            log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
-            log_dir.mkdir(parents=True, exist_ok=True)
-            log_path = log_dir / AUDIT_LOG_FILE
-
-            handler = RotatingFileHandler(
-                filename=str(log_path),
-                maxBytes=AUDIT_LOG_MAX_BYTES,
-                backupCount=AUDIT_LOG_BACKUP_COUNT,
-                encoding="utf-8",
-            )
-            handler.setLevel(logging.INFO)
-
-            formatter = logging.Formatter(
-                "%(asctime)s [AUDIT] %(message)s",
-                datefmt="%Y-%m-%dT%H:%M:%S",
-            )
-            handler.setFormatter(formatter)
-            _logger.addHandler(handler)
+        # Pytest/logging integrations can attach non-file handlers to the
+        # named ``audit`` logger before this singleton is initialized. Do not
+        # treat those as audit persistence. Ensure the active log path has a
+        # real file handler.
+        log_path = _audit_log_path()
+        if not _has_file_handler(_logger, log_path):
+            _add_file_handler(_logger, log_path)
 
     return _logger
 
@@ -338,14 +366,7 @@ def _parse_audit_log_line(line: str) -> dict[str, Any] | None:
 
 def get_audit_log_path() -> Path:
     """Get the current audit log file path."""
-    try:
-        from app.config import settings
-
-        configured_log_dir = settings.AUDIT_LOG_DIR
-    except Exception:
-        logger.debug("Failed to load AUDIT_LOG_DIR from settings, using default", exc_info=True)
-        configured_log_dir = ""
-    return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
+    return _audit_log_path()
 
 
 def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
@@ -374,7 +395,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
                     if parsed:
                         yield parsed
 
-        with open(log_path, encoding="utf-8") as f:
+        with log_path.open(encoding="utf-8") as f:
             recent = deque(_parse_lines(f), maxlen=count)
             events = list(recent)
     except OSError as e:

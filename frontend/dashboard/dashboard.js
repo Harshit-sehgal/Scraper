@@ -2,6 +2,7 @@
  * Semantic Reliability Dashboard JS
  * Polling topology visualization and drift monitoring.
  */
+/* global Chart */
 
 // Wrap the entire dashboard in an IIFE so the module-level state
 // (``_dashboardApiKey``, ``dashboardApiLast403``, ``currentInterval``,
@@ -90,32 +91,28 @@
       const key = getDashboardApiKey();
       if (key && url.includes("/api/")) headers["X-API-Key"] = key;
     }
-    try {
-      let res = await fetch(url, { ...options, headers, credentials: "include" });
-      // Auto-prompt on 403: API key may be missing or invalid
-      if (res.status === 403) {
-        const now = Date.now();
-        if (now - dashboardApiLast403 > 15000) {
-          dashboardApiLast403 = now;
-          const newKey = await promptForApiKey();
-          if (newKey !== null) {
-            // Try session login first (G2), fall back to legacy key
-            const sessionOk = await dashboardLoginSession(newKey);
-            if (sessionOk) {
-              // Retry with cookie (no extra headers needed)
-              res = await fetch(url, { ...options, credentials: "include" });
-            } else {
-              setDashboardApiKey(newKey);
-              const retryHeaders = { ...(options.headers || {}), "X-API-Key": newKey };
-              res = await fetch(url, { ...options, headers: retryHeaders });
-            }
+    let res = await fetch(url, { ...options, headers, credentials: "include" });
+    // Auto-prompt on 403: API key may be missing or invalid
+    if (res.status === 403) {
+      const now = Date.now();
+      if (now - dashboardApiLast403 > 15000) {
+        dashboardApiLast403 = now;
+        const newKey = await promptForApiKey();
+        if (newKey !== null) {
+          // Try session login first (G2), fall back to legacy key
+          const sessionOk = await dashboardLoginSession(newKey);
+          if (sessionOk) {
+            // Retry with cookie (no extra headers needed)
+            res = await fetch(url, { ...options, credentials: "include" });
+          } else {
+            setDashboardApiKey(newKey);
+            const retryHeaders = { ...(options.headers || {}), "X-API-Key": newKey };
+            res = await fetch(url, { ...options, headers: retryHeaders });
           }
         }
       }
-      return res;
-    } catch (err) {
-      throw err;
     }
+    return res;
   }
 
   // Replace native window.prompt() with a non-blocking modal so the dashboard
@@ -825,7 +822,7 @@
     });
 
     // 3. Draw Regions (Attractor Nodes)
-    regions.forEach((r, i) => {
+    regions.forEach((r) => {
       const radius = 5 + Number(r.local_energy || 0) * 20;
       const opacity = 0.2 + Number(r.integrity || 0) * 0.8;
       const { x: cx, y: cy } = regionPositions[r.region_id];
@@ -1039,7 +1036,7 @@
     driftChart.update("none");
 
     // Community Chart
-    communityChart.data.labels = communities.map((c, i) => `C-${i}`);
+    communityChart.data.labels = communities.map((_c, i) => `C-${i}`);
     communityChart.data.datasets[0].data = communities.map((c) => c.length);
     communityChart.update("none");
   }

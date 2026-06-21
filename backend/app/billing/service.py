@@ -1,21 +1,33 @@
-"""Autumn billing service — usage-based metering and subscription management.
+"""PayPal billing service — usage-based metering and subscription management.
 
-Provides the BillingService class that wraps the Autumn Python SDK for:
-- Tracking metered usage events (API calls, page fetches, jobs, etc.)
-- Looking up customer subscription tiers and limits
-- Checking if a customer has sufficient balance/credit
-- Processing subscription webhooks
+Provides the BillingService class that wraps the public PayPal REST API for:
+- Looking up customer subscription tiers and limits (GET /v1/billing/subscriptions/{id})
+- Tracking metered usage events (logged only — PayPal Billing has no metered events API;
+  the quota counts are read from the local subscription store instead)
+- Subscription webhook processing (in `webhooks.py`)
 
-Fallback behavior: When Autumn is not configured (no API key in dev/test),
-the service returns free-tier defaults so the application works without
-a billing provider during development.
+Fallback behavior: When PayPal is not configured (no client credentials in dev/test),
+the service returns free-tier defaults so the application works without a gateway
+during development.
+
+Environment variables:
+    PAYPAL_CLIENT_ID       — PayPal REST API client ID (OAuth)
+    PAYPAL_CLIENT_SECRET   — PayPal REST API client secret (OAuth)
+    PAYPAL_API_URL         — Override the REST API base URL (default: https://api-m.sandbox.paypal.com)
+    PAYPAL_ENVIRONMENT     — "live" | "sandbox" (default: "sandbox")
+    PAYPAL_WEBHOOK_SECRET  — Optional shared-secret webhook secret (alternative to PayPal cert verify)
+    PAYPAL_PLAN_ID_STARTER / PAYPAL_PLAN_ID_PRO / PAYPAL_PLAN_ID_ENTERPRISE
+                            — Plan IDs created in the PayPal Dashboard
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any
+
+import requests  # type: ignore[import-untyped]
 
 from app.billing.models import CustomerInfo, PlanTierId, SubscriptionStatus
 
@@ -25,9 +37,23 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-_AUTUMN_API_KEY_ENV = "AUTUMN_API_KEY"
-_AUTUMN_API_URL_ENV = "AUTUMN_API_URL"
-_DEFAULT_AUTUMN_API_URL = "https://api.useautumn.com"
+_PAYPAL_CLIENT_ID_ENV = "PAYPAL_CLIENT_ID"
+_PAYPAL_CLIENT_SECRET_KEY_ENV = "PAYPAL_CLIENT_SECRET"  # nosec B105, noqa: S105 — env-var NAME, not a credential
+_PAYPAL_API_URL_ENV = "PAYPAL_API_URL"
+_PAYPAL_ENVIRONMENT_ENV = "PAYPAL_ENVIRONMENT"
+_DEFAULT_PAYPAL_API_URL = "https://api-m.sandbox.paypal.com"
+
+# Map our internal plan tier names → PayPal Plan IDs (set in the PayPal Dashboard).
+_PLAN_ID_ENV_BY_TIER: dict[PlanTierId, str] = {
+    PlanTierId.STARTER: "PAYPAL_PLAN_ID_STARTER",
+    PlanTierId.PRO: "PAYPAL_PLAN_ID_PRO",
+    PlanTierId.ENTERPRISE: "PAYPAL_PLAN_ID_ENTERPRISE",
+}
+_DEFAULT_PLAN_PRICES_USD: dict[PlanTierId, str] = {
+    PlanTierId.STARTER: "29.00",
+    PlanTierId.PRO: "99.00",
+    PlanTierId.ENTERPRISE: "299.00",
+}
 
 # ---------------------------------------------------------------------------
 # Plan limit definitions (same as plan_enforcer.py, kept in sync)
@@ -52,159 +78,298 @@ PLAN_LIMITS: dict[tuple[PlanTierId, str], int] = {
     (PlanTierId.ENTERPRISE, "api_requests_per_month"): -1,
 }
 
+# Map PayPal's subscription status strings to our internal SubscriptionStatus values.
+_PAYPAL_STATUS_MAP: dict[str, SubscriptionStatus] = {
+    "active": SubscriptionStatus.ACTIVE,
+    "approval_pending": SubscriptionStatus.ACTIVE,
+    "suspended": SubscriptionStatus.PAST_DUE,
+    "past_due": SubscriptionStatus.PAST_DUE,
+    "cancelled": SubscriptionStatus.CANCELED,
+    "canceled": SubscriptionStatus.CANCELED,
+    "expired": SubscriptionStatus.EXPIRED,
+    "unpaid": SubscriptionStatus.UNPAID,
+    "trialing": SubscriptionStatus.TRIALING,
+    "incomplete": SubscriptionStatus.INCOMPLETE,
+}
+
 # ---------------------------------------------------------------------------
-# Autumn client wrapper
+# PayPal REST API client
 # ---------------------------------------------------------------------------
 
 
-class AutumnClient:
-    """Thin wrapper around the Autumn Python SDK.
+# Module-level plan-id → tier cache (immutable after startup).
+# Shared across the PayPalClient instance and the webhook normalizer so
+# both see the same mapping even after an env-driven config change.
+_PLAN_ID_CACHE: dict[str, PlanTierId] | None = None
 
-    Falls back to free-tier defaults when the SDK is not installed
-    or the API key is not configured (development mode).
+
+def resolve_tier_from_plan_id(plan_id: str) -> PlanTierId:
+    """Public plan-id → tier resolver.
+
+    Cached after first call so env vars and plan IDs are only read once
+    per process. Returns ``PlanTierId.FREE`` for unrecognised / empty
+    plan IDs. Safe to call from webhook handlers and from
+    :meth:`PayPalClient.get_customer`.
+    """
+    global _PLAN_ID_CACHE
+    if not plan_id:
+        return PlanTierId.FREE
+    if _PLAN_ID_CACHE is None:
+        # Build the cache once (module-level data, never changes).
+        # Detect collisions: if two env vars resolve to the same plan_id,
+        # the second wins silently (a copy-paste misconfiguration would
+        # otherwise bill STARTER customers at ENTERPRISE rates). Surface
+        # the contradiction so operators can fix it.
+        cache: dict[str, PlanTierId] = {}
+        collisions: list[tuple[str, PlanTierId, PlanTierId]] = []
+        for tier, env_name in _PLAN_ID_ENV_BY_TIER.items():
+            value = os.environ.get(env_name, "").strip()
+            if not value:
+                continue
+            existing = cache.get(value)
+            if existing is not None and existing != tier:
+                collisions.append((value, existing, tier))
+                logger.warning(
+                    "Billing plan-id collision: env var %s maps plan %r to %s, "
+                    "but %s already mapped it to %s. The later assignment wins — "
+                    "fix PAYPAL_PLAN_ID_* env vars to remove this ambiguity.",
+                    env_name,
+                    value,
+                    tier.value,
+                    "an earlier tier",
+                    existing.value,
+                )
+            else:
+                cache[value] = tier
+        _PLAN_ID_CACHE = cache
+    return _PLAN_ID_CACHE.get(plan_id, PlanTierId.FREE)
+
+
+class PayPalClient:
+    """Wrapper around the PayPal REST API.
+
+    Uses the paypal-checkout-sdk for Orders API v2 (checkout) and
+    direct requests for OAuth + Subscriptions API v1.
+
+    Falls back to free-tier defaults when credentials are not configured.
     """
 
     def __init__(self) -> None:
-        self._api_key = os.environ.get(_AUTUMN_API_KEY_ENV, "")
-        self._api_url = os.environ.get(_AUTUMN_API_URL_ENV, _DEFAULT_AUTUMN_API_URL)
-        self._client: Any = None
+        self._client_id = os.environ.get(_PAYPAL_CLIENT_ID_ENV, "")
+        self._client_secret = os.environ.get(_PAYPAL_CLIENT_SECRET_KEY_ENV, "")
+        self._api_url = os.environ.get(_PAYPAL_API_URL_ENV, _DEFAULT_PAYPAL_API_URL)
+        self._environment = os.environ.get(_PAYPAL_ENVIRONMENT_ENV, "sandbox").lower()
         self._initialized = False
+        self._http_client: Any = None  # paypalcheckoutsdk.core.PayPalHttpClient
+        self._access_token: str = ""
+        self._access_token_expires_at: float = 0.0
 
     def _ensure_client(self) -> Any:
-        """Lazy-initialize the Autumn SDK client."""
+        """Lazy-initialize the PayPal HTTP client and OAuth token."""
         if self._initialized:
-            return self._client
-        self._initialized = True
+            return self._http_client
 
-        if not self._api_key:
-            logger.info("AUTUMN_API_KEY not configured — billing disabled, using free-tier defaults")
+        if not self._client_id or not self._client_secret:
+            self._initialized = True
+            logger.info("PAYPAL_CLIENT_ID/PAYPAL_CLIENT_SECRET not configured — billing disabled, using free-tier defaults")
             return None
 
         try:
-            # Autumn Python SDK (pip install autumn-sdk)
-            import autumn  # type: ignore[import-untyped]
+            from paypalcheckoutsdk.core import (  # type: ignore[import-untyped]
+                LiveEnvironment,
+                PayPalHttpClient,
+                SandboxEnvironment,
+            )
 
-            self._client = autumn.Client(api_key=self._api_key, base_url=self._api_url)
-            logger.info("Autumn billing client initialized")
+            env_cls = LiveEnvironment if self._environment == "live" else SandboxEnvironment
+            self._http_client = PayPalHttpClient(env_cls(self._client_id, self._client_secret))
+            self._refresh_access_token()
+            self._initialized = True
+            logger.info("PayPal billing client initialized (env=%s)", self._environment)
         except ImportError:
-            logger.warning("autumn-sdk not installed — billing disabled, using free-tier defaults")
-        except Exception as e:
-            logger.warning("Failed to initialize Autumn client: %s", e)
+            logger.warning("paypal-checkout-sdk not installed — billing disabled, using free-tier defaults")
+            # Do NOT set _initialized so a later attempt can succeed if
+            # the SDK becomes available (e.g. hot-reload, lazy dep install).
+        except (RuntimeError, ValueError, OSError) as e:
+            logger.warning("Failed to initialize PayPal client: %s", e)
 
-        return self._client
+        return self._http_client
+
+    def _refresh_access_token(self) -> None:
+        """Fetch a fresh bearer token via PayPal's OAuth2 token endpoint."""
+        if not self._client_id or not self._client_secret:
+            return
+        try:
+            resp = requests.post(
+                f"{self._api_url}/v1/oauth2/token",
+                data={"grant_type": "client_credentials"},
+                auth=(self._client_id, self._client_secret),
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            self._access_token = body.get("access_token", "")
+            expires_in = int(body.get("expires_in", 3600))
+            # Refresh 60s early to avoid edge-of-expiry 401s.
+            self._access_token_expires_at = time.time() + max(expires_in - 60, 60)
+            logger.debug("PayPal access token refreshed (expires_in=%ds)", expires_in)
+        except (requests.RequestException, ValueError, KeyError, OSError) as e:
+            logger.warning("Failed to refresh PayPal access token: %s", e)
+
+    def _ensure_token(self) -> str:
+        """Return a valid access token, refreshing if expired."""
+        if not self._access_token or time.time() > self._access_token_expires_at:
+            self._refresh_access_token()
+        return self._access_token
 
     @property
     def is_configured(self) -> bool:
-        """Whether the Autumn client is properly configured."""
+        """Whether the PayPal client is properly configured."""
         return self._ensure_client() is not None
+
+    @property
+    def http_client(self) -> Any:
+        """Return the underlying paypal-checkoutsdk ``PayPalHttpClient``.
+
+        Lazily initializes the client (and OAuth token) on first access.
+        May return ``None`` when PayPal credentials are not configured or
+        the SDK is not installed — callers must check the return value.
+        """
+        return self._ensure_client()
+
+    @property
+    def api_url(self) -> str:
+        """Return the configured PayPal REST API base URL."""
+        return self._api_url
 
     def track_event(self, customer_id: str, event_name: str, value: int = 1, **kwargs: Any) -> bool:
         """Track a metered usage event.
 
-        Args:
-            customer_id: The Autumn/Stripe customer ID.
-            event_name: The event name defined in your Autumn pricing plan.
-            value: The quantity (default 1).
-            **kwargs: Additional properties to attach to the event.
-
-        Returns:
-            True if the event was tracked successfully, False otherwise.
+        PayPal's Billing Subscriptions API does not expose a metered-events endpoint.
+        Quotas are enforced via the local subscription store; this method exists for
+        API parity with the previous Autumn-based interface and only logs the event.
         """
-        client = self._ensure_client()
-        if client is None:
+        if not self.is_configured:
             logger.debug("Billing disabled — skipping event tracking for %s", event_name)
             return False
-        try:
-            client.track(customer_id=customer_id, event_name=event_name, value=value, properties=kwargs)
-            logger.debug("Tracked billing event: customer=%s event=%s value=%d", customer_id, event_name, value)
-            return True
-        except Exception as e:
-            logger.warning("Failed to track billing event %s for %s: %s", event_name, customer_id, e)
-            return False
+        logger.debug(
+            "PayPal billing event (no-op): customer=%s event=%s value=%d extra=%s",
+            customer_id,
+            event_name,
+            value,
+            kwargs,
+        )
+        return True
 
     def get_customer(self, customer_id: str) -> CustomerInfo | None:
-        """Look up a customer's subscription and plan tier.
+        """Look up a customer's subscription and plan tier via PayPal Subscriptions API v1.
 
-        Returns CustomerInfo with the current plan tier, or None if
-        the customer is not found.
+        Calls GET /v1/billing/subscriptions/{id} with a fresh OAuth bearer token.
+        Returns CustomerInfo with the current plan tier, or None if not found.
         """
-        client = self._ensure_client()
-        if client is None:
+        if not self.is_configured:
             return None
+
+        token = self._ensure_token()
+        if not token:
+            return None
+
         try:
-            customer = client.customers.get(customer_id=customer_id)
-            if customer is None:
-                return None
-            plan_name = (
-                getattr(customer.subscription, "plan", {}).get("name", "free") if hasattr(customer, "subscription") else "free"
+            resp = requests.get(
+                f"{self._api_url}/v1/billing/subscriptions/{customer_id}",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                timeout=30,
             )
-            sub_status = getattr(customer.subscription, "status", "active") if hasattr(customer, "subscription") else "active"
+            if resp.status_code == 404:
+                logger.debug("Subscription %s not found in PayPal", customer_id)
+                return None
+            resp.raise_for_status()
+            body: dict[str, Any] = resp.json()
+
+            plan_id = str(body.get("plan_id", "") or "")
+            status_str = str(body.get("status", "ACTIVE")).lower()
+            tier = self._resolve_tier_from_plan_id(plan_id)
+
+            subscriber: dict[str, Any] = body.get("subscriber", {}) or {}
+            email = str(subscriber.get("email_address", "") or "")
+
             return CustomerInfo(
                 customer_id=customer_id,
-                email=getattr(customer, "email", ""),
-                name=getattr(customer, "name", ""),
-                plan_tier=PlanTierId(plan_name.lower()) if plan_name.lower() in PlanTierId.__members__ else PlanTierId.FREE,
-                subscription_status=SubscriptionStatus(sub_status)
-                if sub_status in SubscriptionStatus.__members__
-                else SubscriptionStatus.ACTIVE,
+                email=email,
+                name="",
+                plan_tier=tier,
+                subscription_status=_PAYPAL_STATUS_MAP.get(status_str, SubscriptionStatus.ACTIVE),
+                subscription_id=customer_id,
             )
-        except Exception as e:
-            logger.warning("Failed to lookup customer %s: %s", customer_id, e)
+        except (requests.RequestException, ValueError, KeyError, OSError) as e:
+            logger.warning("Failed to lookup subscription %s: %s", customer_id, e)
             return None
 
-    def get_customer_plan_tier(self, customer_id: str) -> PlanTierId:
-        """Get the plan tier for a customer.
+    def _resolve_tier_from_plan_id(self, plan_id: str) -> PlanTierId:
+        """Backward-compatible instance wrapper. Prefer :func:`resolve_tier_from_plan_id`."""
+        return resolve_tier_from_plan_id(plan_id)
 
-        Falls back to FREE if the customer is not found or billing
-        is not configured.
-        """
+    def get_customer_plan_tier(self, customer_id: str) -> PlanTierId:
+        """Get the plan tier for a customer. Falls back to FREE if not found."""
         customer = self.get_customer(customer_id)
         if customer is None:
             return PlanTierId.FREE
         return customer.plan_tier
 
-    def check_balance(self, customer_id: str, amount: int) -> bool:
-        """Check if a customer has sufficient credit balance.
+    def check_balance(self, _customer_id: str, _amount: int) -> bool:
+        """Check whether a customer has remaining quota.
 
-        Args:
-            customer_id: The Autumn/Stripe customer ID.
-            amount: The amount to check (in the billing currency unit).
-
-        Returns:
-            True if the customer has sufficient balance, False if
-            not or if billing is not configured.
+        PayPal Subscriptions don't expose a real-time balance counter via the REST API.
+        We rely on the local subscription store + plan_enforcer for actual quota gating.
+        This implementation returns True in all cases (fail-open) to preserve
+        the prior API shape.
         """
-        client = self._ensure_client()
-        if client is None:
+        if not self.is_configured:
             logger.debug("Billing disabled — skipping balance check")
-            return True
-        try:
-            result = client.check_balance(customer_id=customer_id, amount=amount)
-            return bool(getattr(result, "sufficient", False))
-        except Exception as e:
-            logger.warning("Failed to check balance for %s: %s", customer_id, e)
-            return True  # Fail open in dev
+        return True
+
+    def plan_price(self, tier: PlanTierId | str) -> str:
+        """Return the dollar price string used in checkout for a tier."""
+        if isinstance(tier, str):
+            try:
+                tier = PlanTierId(tier)
+            except ValueError:
+                return "0.00"
+        return _DEFAULT_PLAN_PRICES_USD.get(tier, "0.00")
 
 
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
 
-_autumn_client: AutumnClient | None = None
+_paypal_client: PayPalClient | None = None
 
 
-def get_autumn_client() -> AutumnClient:
-    """Return the module-level Autumn client singleton."""
-    global _autumn_client
-    if _autumn_client is None:
-        _autumn_client = AutumnClient()
-    return _autumn_client
+def get_paypal_client() -> PayPalClient:
+    """Return the module-level PayPal client singleton."""
+    global _paypal_client
+    if _paypal_client is None:
+        _paypal_client = PayPalClient()
+    return _paypal_client
 
 
-def reset_autumn_client(client: AutumnClient | None = None) -> None:
-    """Reset the Autumn client singleton (for tests)."""
-    global _autumn_client
-    _autumn_client = client
+def reset_paypal_client(client: PayPalClient | None = None) -> None:
+    """Reset the PayPal client singleton (for tests)."""
+    global _paypal_client
+    _paypal_client = client
+    # Also invalidate the plan-id cache so test env-var mutations are
+    # picked up. Without this, env changes between tests have no effect.
+    reset_plan_id_cache()
+
+
+def reset_plan_id_cache() -> None:
+    """Invalidate the module-level plan-id → tier cache (for tests)."""
+    global _PLAN_ID_CACHE
+    _PLAN_ID_CACHE = None
 
 
 # ---------------------------------------------------------------------------
@@ -221,13 +386,11 @@ def get_plan_limit(tier: PlanTierId, metric: str) -> int:
 
 
 def get_user_tier_from_billing(user_id: str) -> PlanTierId:
-    """Look up a user's plan tier via the billing provider.
+    """Look up a user's plan tier via the PayPal subscription id.
 
-    Uses the Autumn customer ID (which may be the same as the user_id
-    or mapped via the identity store). Falls back to FREE when billing
-    is not configured.
+    Falls back to FREE when billing is not configured.
     """
-    client = get_autumn_client()
+    client = get_paypal_client()
     if not client.is_configured:
         return PlanTierId.FREE
     return client.get_customer_plan_tier(user_id)
@@ -239,9 +402,11 @@ def get_user_tier_from_billing(user_id: str) -> PlanTierId:
 
 __all__ = [
     "PLAN_LIMITS",
-    "AutumnClient",
-    "get_autumn_client",
+    "PayPalClient",
+    "get_paypal_client",
     "get_plan_limit",
     "get_user_tier_from_billing",
-    "reset_autumn_client",
+    "reset_paypal_client",
+    "reset_plan_id_cache",
+    "resolve_tier_from_plan_id",
 ]

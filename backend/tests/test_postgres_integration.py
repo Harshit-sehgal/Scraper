@@ -10,6 +10,7 @@ Or to run all postgres-marked tests:
     python3 -m pytest -m postgres -v
 """
 
+import logging
 import os
 
 import pytest
@@ -17,6 +18,8 @@ from app.models import Job, JobStatus, ScrapeMode, SourcePolicy
 from app.storage_interface import get_job_repository, reset_repository
 
 pytestmark = pytest.mark.postgres
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
@@ -69,10 +72,32 @@ def clean_db(postgres_container):
     # ``app.postgres_repository_base`` and renamed (no leading underscore).
     # The connection-management helpers remained in ``app.postgres_repository``
     # with backward-compat aliases (``_conn``, ``_execute``).
-    from app.postgres_repository import _conn, _execute
+    from app.postgres_repository import PostgresJobRepository, _conn, _execute
     from app.postgres_repository_base import ensure_schema
 
     reset_repository()
+    # Build a fresh ``PostgresJobRepository`` and invoke ``health_check()``
+    # so the abstract base's ``_ensure()`` runs on the FIRST repository
+    # method call. ``_ensure()`` calls ``_set_driver_functions(...)`` and
+    # patches the module-level ``_driver_*`` vars that ``ensure_schema(conn)``
+    # requires. Without this, ``ensure_schema`` raises "Postgres driver
+    # not initialised" in tests where no prior test has instantiated a
+    # repository yet (e.g. ``test_health_check_success``).
+    #
+    # Note: ``_ensure()`` runs on the first method call regardless of
+    # whether the method itself succeeds — so the exception (if any) from
+    # ``health_check()`` is irrelevant and we swallow it.
+    try:
+        PostgresJobRepository().health_check()
+    except Exception:
+        # `_ensure()` already installed module-level driver functions; any
+        # exception from `health_check()` is irrelevant. Log at WARNING with
+        # `exc_info=True` so a regression surfaces (traceback captured) but
+        # doesn't read as an error alarm.
+        logger.warning(
+            "health_check() failed during PostgresJobRepository construction; treating as benign",
+            exc_info=True,
+        )
     with _conn() as conn:
         ensure_schema(conn)
         _execute(conn, "DELETE FROM jobs")

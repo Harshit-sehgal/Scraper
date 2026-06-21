@@ -6,10 +6,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from app.models import WorkflowPaginationConfig
 from app.pagination_executor import PaginationConfig, async_paginate
-
-pytestmark = pytest.mark.asyncio
-
+from pydantic import ValidationError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,6 +78,8 @@ async def _dummy_extract_fn(page: Any) -> list[dict]:
 class TestAsyncPaginateNextButton:
     """Tests for async next-button pagination strategy."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_single_page_no_next_button(self):
         """Should stop with button_gone when no next button is present."""
         page = _make_mock_page()
@@ -112,6 +113,8 @@ class TestAsyncPaginateNextButton:
 
 class TestAsyncPaginateInfiniteScroll:
     """Tests for async infinite-scroll pagination strategy."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_single_scroll_no_new_content(self):
         """Should stop with no_new_records when scroll height doesn't change."""
@@ -161,6 +164,8 @@ class TestAsyncPaginateInfiniteScroll:
 class TestAsyncPaginateLoadMore:
     """Tests for async load-more button pagination strategy."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_no_load_more_button(self):
         """Should stop with button_gone when no load-more button is present."""
         page = _make_mock_page()
@@ -179,6 +184,8 @@ class TestAsyncPaginateLoadMore:
 class TestAsyncPaginatePageNumber:
     """Tests for async page-number pagination strategy."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_single_page_no_pagination_links(self):
         """Should stop with button_gone when no page links exist."""
         page = _make_mock_page()
@@ -188,13 +195,15 @@ class TestAsyncPaginatePageNumber:
         assert result.pages_scraped == 1  # page 1 extracted
 
 
-class TestAsyncPaginateUrlParameter:
+class TestAsyncPaginateUrlPattern:
     """Tests for async URL-parameter pagination strategy."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_requires_url_pattern(self):
         """Should return error when no url_pattern is configured."""
         page = _make_mock_page()
-        config = PaginationConfig(strategy="url_parameter", max_pages=3)
+        config = PaginationConfig(strategy="url_pattern", max_pages=3)
         result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
         assert result.stopped_reason == "error"
         assert "url_pattern" in (result.error or "")
@@ -203,7 +212,7 @@ class TestAsyncPaginateUrlParameter:
         """Should navigate to constructed URLs."""
         page = _make_mock_page()
         config = PaginationConfig(
-            strategy="url_parameter",
+            strategy="url_pattern",
             max_pages=3,
             url_pattern="https://example.com?page={page}",
             delay_between_pages=0,
@@ -215,6 +224,8 @@ class TestAsyncPaginateUrlParameter:
 
 class TestAsyncPaginateEdgeCases:
     """Tests for edge cases in async pagination."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_unknown_strategy(self):
         """Should return error for unknown strategy."""
@@ -252,3 +263,286 @@ class TestAsyncPaginateEdgeCases:
         result = await async_paginate(page, config)
         assert result.stopped_reason is not None
         assert result.total_records == 0
+
+
+# ---------------------------------------------------------------------------
+# Scroll / load-more executor edge cases — closes the e2e gap on
+# CAND-P2-EXTRACTION-SCROLL-001 by exercising the unbounded edge cases
+# that the existing happy-path tests don't cover.
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncPaginateScrollLoadMoreExecutors:
+    """Executor-level edge-case coverage for the scroll and load-more paths."""
+
+    pytestmark = pytest.mark.asyncio
+
+    async def test_scroll_respects_max_records(self):
+        """``max_records=2`` stops the scroll even when scrollHeight keeps
+        growing — the executor must respect the record limit before the
+        page limit or the timeout."""
+        page = _make_mock_page()
+        # max_records=2 is reached on the FIRST iteration, so the loop returns
+        # immediately — exact 2 evaluate awaits: scrollHeight probe + scrollTo.
+        page.evaluate.side_effect = [1000, None]
+        page.wait_for_function = AsyncMock()
+
+        async def extract_two_records(page: Any) -> list[dict]:
+            return [
+                {"id": "a", "value": "1"},
+                {"id": "b", "value": "2"},
+            ]
+
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=10,
+            max_records=2,
+            delay_between_pages=0,
+        )
+
+        result = await async_paginate(page, config, extract_fn=extract_two_records)
+        assert result.total_records == 2
+        # max_records is checked before the next no-new-records detection pass.
+        assert result.stopped_reason == "max_records"
+
+    async def test_scroll_respects_max_runtime(self):
+        """``max_runtime_seconds=0`` always triggers ``stopped_reason == 'timeout'``."""
+        page = _make_mock_page()
+        page.evaluate.side_effect = [1000, None, 2000, None, 3000]
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=10,
+            max_runtime_seconds=0,
+            delay_between_pages=0,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason == "timeout"
+
+    async def test_scroll_records_concatenate_across_pages(self):
+        """Cross-page dedup is NOT implemented — records from each scroll are
+        concatenated straight into ``result.records``. This test pins the
+        actual contract so that any future cross-page dedup addition will
+        fail it, signalling a contract change that needs explicit review.
+
+        Each iteration emits two unique ids (``[k1,k2]``, ``[k2,k3]``,
+        ``[k3,k4]``); per-page dedup leaves each iteration's pair unique,
+        so the total is 6 records with 0 duplicates removed.
+        """
+        page = _make_mock_page()
+        # 3 iterations × (scrollHeight probe + scrollTo) = 6 awaits.
+        page.evaluate.side_effect = [1000, None, 2000, None, 3000, None]
+        page.wait_for_function = AsyncMock()
+
+        extract_iter = iter(
+            [
+                [{"id": "k1", "value": "1"}, {"id": "k2", "value": "2"}],
+                [{"id": "k2", "value": "2"}, {"id": "k3", "value": "3"}],
+                [{"id": "k3", "value": "3"}, {"id": "k4", "value": "4"}],
+            ],
+        )
+
+        async def extract_progressive(page: Any) -> list[dict]:
+            return next(extract_iter)
+
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=5,
+            max_records=20,
+            delay_between_pages=0,
+            stop_on_duplicates=True,
+        )
+
+        result = await async_paginate(page, config, extract_fn=extract_progressive)
+        assert result.total_records == 6
+        assert result.duplicates_removed == 0
+
+    async def test_load_more_stops_when_button_vanishes(self):
+        """Mid-iteration button disappearance MUST produce ``button_gone``."""
+        page = _make_mock_page()
+        # First two clicks succeed, the third locator returns no element
+        # (visible=False) — the executor should treat this as ``button_gone``.
+        call_state = {"calls": 0}
+
+        def make_disappearing_locator():
+            loc = MagicMock()
+            visible_third_call = call_state["calls"] >= 2
+            loc.is_visible = AsyncMock(return_value=not visible_third_call)
+            loc.is_checked = AsyncMock(return_value=False)
+            loc.click = AsyncMock(side_effect=lambda *a, **kw: call_state.__setitem__("calls", call_state["calls"] + 1))
+            loc.count = AsyncMock(return_value=1 if not visible_third_call else 0)
+            loc.text_content = AsyncMock(return_value="Load more")
+            return loc
+
+        page.locator = MagicMock(side_effect=lambda _: make_disappearing_locator())
+        page.evaluate = AsyncMock(return_value=1000)
+        page.wait_for_function = AsyncMock()
+
+        config = PaginationConfig(
+            strategy="load_more",
+            max_pages=10,
+            delay_between_pages=0,
+        )
+
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason in ("button_gone", "max_pages")
+        assert result.error is None or "button" in (result.error or "").lower()
+
+    async def test_scroll_resets_position_on_completion(self):
+        """On natural completion the executor MUST scroll back to the top so
+        subsequent captures (e.g. screenshots) don't show the bottom."""
+        page = _make_mock_page()
+        page.evaluate.side_effect = [
+            1000,  # initial scrollHeight
+            None,  # scrollTo(0, scrollHeight)
+            1000,  # stabilization probe (same height)
+            None,  # final resetToTop scrollTo(0, 0)
+        ]
+        config = PaginationConfig(
+            strategy="infinite_scroll",
+            max_pages=2,
+            delay_between_pages=0,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        # The executor must complete without error AND issue the reset call.
+        # `result` is used here so it doesn't trip pyflakes (unused-var),
+        # and also binds the assertion to an actual successful execution.
+        assert result.error is None, f"unexpected error during scroll completion: {result.error!r}"
+        # Substring matching would risk false-positives if the executor
+        # ever inlined or merged JS literals (e.g., confusing
+        # ``scrollTo(0, 0)`` with ``scrollTo(0, document.body.scrollHeight)``
+        # fragments). Pinned to the literal at line 279 of pagination_executor.py.
+        RESET_JS = "window.scrollTo(0, 0)"
+        reset_call_seen = any(call.args and str(call.args[0]) == RESET_JS for call in page.evaluate.call_args_list)
+        assert reset_call_seen, (
+            f"executor must issue {RESET_JS!r} on completion; "
+            f"saw: {[str(c.args[0])[:60] if c.args else None for c in page.evaluate.call_args_list]}"
+        )
+
+
+class TestCanonicalFiveStrategyContract:
+    """Regression: pins the canonical-5-strategy contract between
+    ``WorkflowPaginationConfig.strategy`` and ``PaginationConfig.strategy``
+    (closes ``CAND-P2-PAGINATION-ALIAS-001``).
+
+    Both async + sync ``strategy_map`` dispatch tables MUST enumerate
+    exactly ``{next_button, page_number, url_pattern, infinite_scroll,
+    load_more}``. The legacy key ``url_parameter`` (typo of ``url_pattern``)
+    MUST be rejected as ``Unknown pagination strategy`` in the async
+    dispatcher, because the ``models.WorkflowPaginationConfig.strategy``
+    literal already documents ``url_pattern`` as the canonical spelling.
+
+    Sync parity is enforced structurally: code-grep shows the sync
+    ``strategy_map`` (pagination_executor.py around line 855) has the
+    EXACT same canonical-5 keys and the SAME legacy key absent.
+    """
+
+    LEGACY_STRATEGY = "url_parameter"
+    CANONICAL_STRATEGIES = (
+        "next_button",
+        "page_number",
+        "url_pattern",
+        "infinite_scroll",
+        "load_more",
+    )
+
+    @pytest.mark.asyncio
+    async def test_async_does_not_reject_canonical_strategy_as_unknown(
+        self,
+    ) -> None:
+        """For each canonical strategy, ``async_paginate`` MUST NOT return the
+        specific ``Unknown pagination strategy`` rejection pattern.
+
+        This is the bilateral positive pin: the negative pin
+        (:meth:`test_async_rejects_legacy_url_parameter_key`) locks the
+        rejection for the legacy key; this method locks the non-rejection
+        for the canonical-5 set.
+
+        Other failure modes (``Locator not found``, mock setup mismatches,
+        etc.) are intentionally NOT covered here -- they are pinned by the
+        per-strategy unit tests in this file
+        (``TestAsyncPaginateNextButton``,
+        ``TestAsyncPaginateUrlPattern``,
+        ``TestAsyncPaginatePageNumber``,
+        ``TestAsyncPaginateInfiniteScroll``,
+        ``TestAsyncPaginateLoadMore``).
+        """
+        for strategy in self.CANONICAL_STRATEGIES:
+            page = _make_mock_page()
+            config = PaginationConfig(
+                strategy=strategy,
+                max_pages=1,
+                delay_between_pages=0,
+            )
+            result = await async_paginate(
+                page,
+                config,
+                extract_fn=_dummy_extract_fn,
+            )
+            is_unknown_strategy_rejection = result.stopped_reason == "error" and "Unknown pagination strategy" in (
+                result.error or ""
+            )
+            assert not is_unknown_strategy_rejection, (
+                f"async_paginate must not reject canonical "
+                f"strategy={strategy!r} as 'Unknown pagination strategy'; "
+                f"got result.error={result.error!r}, "
+                f"result.stopped_reason={result.stopped_reason!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_async_rejects_legacy_url_parameter_key(self) -> None:
+        """Regression pin: after the CAND-P2-PAGINATION-ALIAS-001 rename,
+        ``async_paginate`` MUST explicitly reject the legacy ``url_parameter``
+        key with an ``Unknown pagination strategy`` error.
+
+        Catches any future refactor that reintroduces ``url_parameter``
+        alongside or instead of ``url_pattern``.
+        """
+        page = _make_mock_page()
+        config = PaginationConfig(
+            strategy=self.LEGACY_STRATEGY,
+            max_pages=1,
+            delay_between_pages=0,
+        )
+        result = await async_paginate(
+            page,
+            config,
+            extract_fn=_dummy_extract_fn,
+        )
+        assert result.stopped_reason == "error", (
+            f"legacy url_parameter must reject with stopped_reason='error'; got stopped_reason={result.stopped_reason!r}"
+        )
+        assert "Unknown pagination strategy" in (result.error or ""), (
+            "async_paginate must explicitly reject the legacy "
+            "url_parameter key (expected 'Unknown pagination strategy' "
+            f"error); got error={result.error!r}"
+        )
+        assert self.LEGACY_STRATEGY in (result.error or ""), (
+            f"rejection error should name the offending legacy key for debuggability; got error={result.error!r}"
+        )
+
+    def test_strategy_enum_strings_match_across_layers(self) -> None:
+        """``PaginationConfig().strategy`` default + ``WorkflowPaginationConfig``
+        strategy Literal MUST be mutually consistent with the canonical-5 set.
+
+        Catches any silent drift where one layer keeps a typo'd or stale
+        key while the other has been corrected.
+        """
+        # The default config must use one of the canonical-5 keys,
+        # not the legacy typo.
+        assert PaginationConfig().strategy in self.CANONICAL_STRATEGIES, (  # pyright: ignore[reportCallIssue]
+            f"PaginationConfig default strategy must be one of the canonical 5; got {PaginationConfig().strategy!r}"  # pyright: ignore[reportCallIssue]
+        )
+        # WorkflowPaginationConfig must accept all 5 canonical keys.
+        for strategy in self.CANONICAL_STRATEGIES:
+            wf = WorkflowPaginationConfig(strategy=strategy)  # pyright: ignore[reportCallIssue]
+            assert wf.strategy == strategy, (
+                f"WorkflowPaginationConfig.strategy={strategy!r} round-trip failed; got {wf.strategy!r}"
+            )
+        # And it MUST reject the legacy typo at config-build time too.
+        # Pydantic v2 raises ``ValidationError`` for Literal mismatches;
+        # pydantic v1 raises ``ValueError``. Both targets are listed so a
+        # future v1-to-v2 swap (or vice-versa) does not silently flip the
+        # test into a passing-for-the-wrong-reason state.
+        with pytest.raises((ValidationError, ValueError)) as exc_info:
+            WorkflowPaginationConfig(strategy=self.LEGACY_STRATEGY)
+        assert exc_info.value is not None

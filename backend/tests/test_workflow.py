@@ -1,5 +1,7 @@
 """Tests for the Workflow router and models."""
 
+from typing import get_args
+
 import pytest
 from app.models import (
     Workflow,
@@ -11,6 +13,14 @@ from app.models import (
     WorkflowUpdate,
 )
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+# Single source of truth for the WorkflowPaginationConfig.strategy enum.
+# Derived from the model at import time so the test automatically tracks any
+# future addition to the Literal type in backend/app/models.py.
+_DOCUMENTED_STRATEGIES: tuple[str, ...] = get_args(
+    WorkflowPaginationConfig.model_fields["strategy"].annotation,
+)
 
 
 class TestWorkflowModel:
@@ -65,6 +75,24 @@ class TestWorkflowModel:
         assert config.enabled is True
         assert config.max_pages == 5
 
+    def test_pagination_config_accepts_all_documented_strategies(self):
+        """All strategies advertised in the Literal field must round-trip."""
+        for strategy in _DOCUMENTED_STRATEGIES:
+            config = WorkflowPaginationConfig(strategy=strategy)
+            assert config.strategy == strategy
+
+    def test_pagination_config_rejects_unknown_strategy(self):
+        """Unknown strategies must fail at Pydantic validation time (not at pagination_executor runtime)."""
+        with pytest.raises(ValidationError) as exc_info:
+            WorkflowPaginationConfig(strategy="not_a_real_strategy")
+        # The error must mention the field so the next agent can debug without runtime poking.
+        assert "strategy" in str(exc_info.value)
+
+    def test_pagination_config_default_strategy_still_works(self):
+        """The default `next_button` option must keep working post-change."""
+        config = WorkflowPaginationConfig()
+        assert config.strategy == "next_button"
+
 
 class TestWorkflowCreateRequest:
     """Tests for WorkflowCreate validation."""
@@ -115,6 +143,25 @@ class TestWorkflowEndpoints:
         resp = client.get(f"/api/workflows/{wf_id}")
         assert resp.status_code == 200
         assert resp.json()["name"] == "Integration Test"
+
+    @pytest.mark.parametrize(
+        "unsafe_url",
+        [
+            "http://localhost:9000",
+            "http://127.0.0.1/admin",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://0.0.0.0/",
+        ],
+    )
+    def test_create_rejects_unsafe_start_url(self, client: TestClient, unsafe_url: str):
+        """R-012: ``create_workflow`` MUST reject unsafe/private start URLs,
+        matching the draft routes. Without this, an operator could persist a
+        workflow whose start_url points at an internal host."""
+        resp = client.post(
+            "/api/workflows",
+            json={"name": "Unsafe", "start_url": unsafe_url},
+        )
+        assert resp.status_code == 400, f"unsafe start_url {unsafe_url!r} must be rejected; got {resp.status_code}"
 
     def test_list_workflows(self, client: TestClient):
         """List should return workflows."""
@@ -187,6 +234,112 @@ class TestWorkflowEndpoints:
         """Accessing a non-existent workflow returns 404."""
         resp = client.get("/api/workflows/nonexistent-id")
         assert resp.status_code == 404
+
+    def test_run_workflow_records_run_history(self, client: TestClient, tmp_path, monkeypatch):
+        """POST /api/workflows/{id}/run must append a run-history record."""
+        from app.utils.workflow_run_store import WORKFLOW_RUNS_ENV
+
+        runs_file = tmp_path / "workflow_runs.json"
+        monkeypatch.setenv(WORKFLOW_RUNS_ENV, str(runs_file))
+
+        # Re-import the router-bound store to pick up the env override.
+        from app.utils.workflow_run_store import WorkflowRunStore
+
+        # Swap the module-level instance with one pointed at tmp.
+        # (The store reads the env on every call so this is safe
+        # even if some other test has already imported the module.)
+        fresh = WorkflowRunStore(path=runs_file)
+        monkeypatch.setattr("app.routers.workflow._workflow_runs", fresh)
+
+        create_resp = client.post(
+            "/api/workflows",
+            json={"name": "Run History Test", "start_url": "https://example.com"},
+        )
+        assert create_resp.status_code == 201
+        wf_id = create_resp.json()["id"]
+
+        run_resp = client.post(f"/api/workflows/{wf_id}/run")
+        assert run_resp.status_code == 202
+        run_id = run_resp.json()["run_id"]
+
+        # The history endpoint must surface the new run, newest first.
+        list_resp = client.get(f"/api/workflows/{wf_id}/runs")
+        assert list_resp.status_code == 200
+        body = list_resp.json()
+        assert body["workflow_id"] == wf_id
+        assert body["total"] == 1
+        assert body["returned"] == 1
+        first = body["items"][0]
+        assert first["run_id"] == run_id
+        assert first["workflow_name"] == "Run History Test"
+        assert first["status"] == "queued"
+        assert "queued_at" in first
+
+        # The single-run fetch must succeed and the run must be
+        # tied back to the workflow.
+        one = client.get(f"/api/workflows/{wf_id}/runs/{run_id}")
+        assert one.status_code == 200
+        assert one.json()["run_id"] == run_id
+
+    def test_run_history_isolated_per_workflow(self, client: TestClient, tmp_path, monkeypatch):
+        """Runs from workflow A must not appear in workflow B's history."""
+        from app.utils.workflow_run_store import WorkflowRunStore
+
+        runs_file = tmp_path / "workflow_runs.json"
+        monkeypatch.setattr("app.routers.workflow._workflow_runs", WorkflowRunStore(path=runs_file))
+
+        a = client.post("/api/workflows", json={"name": "A", "start_url": "https://example.com/a"}).json()
+        b = client.post("/api/workflows", json={"name": "B", "start_url": "https://example.com/b"}).json()
+
+        client.post(f"/api/workflows/{a['id']}/run")
+        client.post(f"/api/workflows/{b['id']}/run")
+        client.post(f"/api/workflows/{a['id']}/run")
+
+        a_runs = client.get(f"/api/workflows/{a['id']}/runs").json()["total"]
+        b_runs = client.get(f"/api/workflows/{b['id']}/runs").json()["total"]
+        assert a_runs == 2
+        assert b_runs == 1
+
+    def test_run_history_supports_status_filter(self, client: TestClient, tmp_path, monkeypatch):
+        """The `status` query parameter must filter the run list."""
+        from app.utils.workflow_run_store import WorkflowRunStore
+
+        runs_file = tmp_path / "workflow_runs.json"
+        monkeypatch.setattr("app.routers.workflow._workflow_runs", WorkflowRunStore(path=runs_file))
+
+        create = client.post("/api/workflows", json={"name": "Filter", "start_url": "https://example.com"}).json()
+        first = client.post(f"/api/workflows/{create['id']}/run").json()
+        # Manually mark the first run as succeeded.
+        from app.routers import workflow as wf_router
+
+        wf_router._workflow_runs.merge(first["run_id"], {"status": "succeeded"})
+        client.post(f"/api/workflows/{create['id']}/run")  # second run, still queued
+
+        ok = client.get(f"/api/workflows/{create['id']}/runs?status=succeeded").json()
+        queued = client.get(f"/api/workflows/{create['id']}/runs?status=queued").json()
+        assert ok["total"] == 1
+        assert ok["items"][0]["status"] == "succeeded"
+        assert queued["total"] == 1
+        assert queued["items"][0]["status"] == "queued"
+
+    def test_get_run_404_when_run_belongs_to_other_workflow(
+        self,
+        client: TestClient,
+        tmp_path,
+        monkeypatch,
+    ):
+        """A run id from workflow A must not be reachable via workflow B."""
+        from app.utils.workflow_run_store import WorkflowRunStore
+
+        runs_file = tmp_path / "workflow_runs.json"
+        monkeypatch.setattr("app.routers.workflow._workflow_runs", WorkflowRunStore(path=runs_file))
+
+        a = client.post("/api/workflows", json={"name": "Owner A", "start_url": "https://example.com/a"}).json()
+        b = client.post("/api/workflows", json={"name": "Owner B", "start_url": "https://example.com/b"}).json()
+        run_a = client.post(f"/api/workflows/{a['id']}/run").json()
+
+        cross = client.get(f"/api/workflows/{b['id']}/runs/{run_a['run_id']}")
+        assert cross.status_code == 404
 
 
 class TestWorkflowReplayPrompt9:

@@ -66,3 +66,13 @@ test-results/
 .codex/
 .antigravitycli/
 .kilo/
+
+# Generated validation artifacts (large, reproducible)
+artifacts/audit/FILE_AUDIT_LEDGER.md
+artifacts/validation/*.log
+artifacts/validation/coverage_*.json
+artifacts/validation/bandit_*.json
+.aider*
+
+# Shelved/unused architectures (replaced by validated backend/app)
+shelved/

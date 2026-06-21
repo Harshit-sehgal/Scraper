@@ -1,5 +1,3 @@
-from typing import Any
-
 """Architecture Patch Notes — documents all tracked-file changes needed.
 
 These changes need to be applied to the 4 tracked files that keep reverting.
@@ -13,6 +11,7 @@ Fixes needed:
 """
 
 import logging
+from typing import Any
 
 
 def check_all_fixes() -> dict[str, Any]:

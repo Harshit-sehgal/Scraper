@@ -5,8 +5,14 @@ worker flow, and verifies the final results utilize the network_payload source
 with safe, token-free provenance.
 """
 
+import http.server
+import json
 import sys
+import threading
+import urllib.parse
 from pathlib import Path
+
+import pytest
 
 # Ensure backend and scripts are in sys.path BEFORE any project imports
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -16,12 +22,6 @@ if str(_BACKEND_DIR) not in sys.path:
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-import http.server
-import json
-import threading
-import urllib.parse
-
-import pytest
 from app.main import app as main_app
 from app.models import JobStatus
 from app.storage_interface import get_job_repository, reset_repository

@@ -1,8 +1,20 @@
 """
 Architecture Invariant Validator
-================================
-Enforces the Semantic Field Constitutional Laws.
-Detects architectural drift, symbolic regressions, and ontological inconsistencies.
+ ================================
+ Detects architectural drift: duplicate metric definitions, dangling
+ references to removed modules, and illegal direct storage of derived
+ metrics. Runs as part of the local validation quick gate and CI.
+
+ Note: an earlier version of this file declared a ``FORBIDDEN_PATTERNS``
+ table purporting to enforce "Semantic Field Constitutional Laws" (no
+ ``output[...] =`` assignment, no ``redistribute_instability(`` call, no
+ ``counter % 3``). That table was never invoked by ``main()`` and the
+ patterns match legitimate code in the semantic engine
+ (``semantic_pipeline.py``, ``topology_state.py``), so enforcing them
+ as-is would false-positive. The dead constant has been removed rather
+ than wired in to avoid breaking the gate; if those laws are real
+ product invariants, they need scoped pattern definitions (e.g.
+ restricted to specific modules/classes), not repo-wide regex bans.
 """
 
 import ast
@@ -10,16 +22,6 @@ import collections
 import os
 import re
 import sys
-
-# Laws and forbidden patterns
-FORBIDDEN_PATTERNS = [
-    # LAW 2 — No Semantic Overrides
-    (r"output\[.*\] =", "Direct semantic override of output field detected. Law 2 violation."),
-    # LAW 4 — Enforce Locality
-    (r"redistribute_instability\(", "Global redistribution loop detected. Law 4 violation."),
-    # LAW 5 — No Fixed Evolution Cadence
-    (r"counter % 3", "Fixed procedural evolution cadence detected. Law 5 violation."),
-]
 
 
 def check_duplicate_definitions(filepath):
@@ -145,18 +147,35 @@ def check_metric_ownership(filepath):
     return errors
 
 
+def check_forbidden_patterns(_filepath: str) -> list[str]:
+    """No-op placeholder retained for backward compat.
+
+    The ``FORBIDDEN_PATTERNS`` table has been removed (see module
+    docstring). Returns an empty list so ``main()``'s call site stays
+    stable if a future, properly-scoped law check is added here.
+    """
+    return []
+
+
 def main():
-    backend_dir = "backend/app"
+    # Resolve against this script's location so the gate does not
+    # silently pass with zero files scanned when invoked from a
+    # different working directory (D-007).
+    backend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend", "app")
     all_errors = []
 
     print("--- ARCHITECTURE VALIDATION START ---")  # noqa: T201
 
     files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]
+    if not files:
+        print(f"ERROR: no .py files found under {backend_dir}", file=sys.stderr)  # noqa: T201
+        sys.exit(2)
 
     for f in files:
         all_errors.extend(check_duplicate_definitions(f))
         all_errors.extend(check_dangling_references(f))
         all_errors.extend(check_metric_ownership(f))
+        all_errors.extend(check_forbidden_patterns(f))
 
     if all_errors:
         print(f"\nVALIDATION FAILED: {len(all_errors)} violations found.")  # noqa: T201
@@ -164,7 +183,7 @@ def main():
             print(f"  [VIOLATION] {err}")  # noqa: T201
         sys.exit(1)
     else:
-        print("\nVALIDATION PASSED: Architecture is lawful.")  # noqa: T201
+        print(f"\nVALIDATION PASSED: Architecture is lawful ({len(files)} files scanned).")  # noqa: T201
         sys.exit(0)
 
 

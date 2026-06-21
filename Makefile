@@ -27,7 +27,13 @@ DC := docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 
-.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate validate-full validate-backend validate-frontend validate-security doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability
+# Guard: check that the Docker container is running before exec-ing into it.
+# Targets that use docker compose exec should depend on _need-container.
+_need-container:
+	@$(DC) ps -q $(SERVICE) 2>/dev/null | grep -q . || \
+		{ echo "Error: $(SERVICE) container is not running. Run 'make up' first, or use 'make validate' for local checks." >&2; exit 1; }
+
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate validate-full validate-backend validate-frontend validate-security doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability _need-container
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -62,37 +68,37 @@ ps: ## List containers
 
 # ─── Container Interaction ──────────────────────────────────────────────────
 
-shell: ## Open bash in the app container
+shell: _need-container ## Open bash in the app container
 	$(DC) exec $(SERVICE) bash
 
-exec: ## Run a command in the app container (usage: make exec CMD="python -c ...")
+exec: _need-container ## Run a command in the app container (usage: make exec CMD="python -c ...")
 	$(DC) exec $(SERVICE) $(CMD)
 
 # ─── Testing ────────────────────────────────────────────────────────────────
 
-test: ## Run all tests (excluding flaky live-network end-to-end)
+test: _need-container ## Run all tests (excluding flaky live-network end-to-end)
 	# Excludes test_scrape_url_end_to_end_multiple_records: that test
 	# hits a live target and is environment-flaky in CI. Use
 	# `make test-all` to include it (requires a reachable network).
 	$(DC) exec $(SERVICE) python -m pytest -q --tb=short -k "not test_scrape_url_end_to_end_multiple_records"
 
-test-all: ## Run all tests (including API-dependent, requires GROQ_API_KEY)
+test-all: _need-container ## Run all tests (including API-dependent, requires GROQ_API_KEY)
 	$(DC) exec $(SERVICE) python -m pytest -q --tb=short
 
-test-file: ## Run tests in a specific file (usage: make test-file FILE=test_foo.py)
+test-file: _need-container ## Run tests in a specific file (usage: make test-file FILE=test_foo.py)
 	$(DC) exec $(SERVICE) python -m pytest -q --tb=short backend/tests/$(FILE)
 
-test-coverage: ## Run tests with coverage report
+test-coverage: _need-container ## Run tests with coverage report
 	$(DC) exec $(SERVICE) python -m pytest --cov=backend/app --cov-report=term-missing --cov-report=html:coverage_html --cov-fail-under=60 -q --tb=short
 
-test-coverage-report: ## Generate and open coverage HTML report
+test-coverage-report: _need-container ## Generate and open coverage HTML report
 	$(DC) exec $(SERVICE) python -m pytest --cov=backend/app --cov-report=html:coverage_html --cov-fail-under=60 -q --tb=short
 	@echo "Coverage report generated at coverage_html/index.html"
 
-test-flaky: ## Run tests 3 times to detect flaky tests
+test-flaky: _need-container ## Run tests 3 times to detect flaky tests
 	$(DC) exec $(SERVICE) python -m pytest --count=3 --timeout=30 -q --tb=short -x
 
-test-reliability: ## Run full test suite with reliability checks
+test-reliability: _need-container ## Run full test suite with reliability checks
 	$(DC) exec $(SERVICE) python -m pytest --timeout=30 -q --tb=short --reruns=2 --reruns-delay=1
 
 test-telegram: ## Print the current Telegram notifier status
@@ -108,19 +114,42 @@ test-telegram-summary: ## Send a fake pass/fail summary via the bot (override RE
 		--suite "manual-summary" --result "$${RESULT:-PASSED}" \
 		--passed "$${PASSED:-120}" --failed "$${FAILED:-0}" --skipped "$${SKIPPED:-3}"
 
-test-notify: ## Run all tests with Telegram notifications enabled
+test-notify: _need-container ## Run all tests with Telegram notifications enabled
 	# Convenience wrapper: forces TELEGRAM_ENABLED=true for this run so the
 	# pytest conftest hooks send start/end/failure notifications.
 	$(DC) exec -e TELEGRAM_ENABLED=true $(SERVICE) \
 		python -m pytest -q --tb=short -k "not test_scrape_url_end_to_end_multiple_records"
 
+# ─── CI Pipeline Helpers ───────────────────────────────────────────────────
+
+ci-check-python: ## Check Python version compatibility (CI gate)
+	@python3 --version | grep -q "3\.12" || { echo "❌ Python 3.12 required"; exit 1; }
+	@echo "✅ Python 3.12"
+
+ci-install-all: ## Install all CI dependencies (Python + Node + Playwright)
+	python3 -m pip install --upgrade pip
+	pip install -e ".[dev]"
+	pip install types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+	npm ci
+	python3 -m playwright install chromium --with-deps 2>/dev/null || true
+
+ci-validate-local: ## Run the full local validation matching CI gates
+	python3 scripts/validate_local.py --full
+
+ci-status: ## Print CI workflow status (requires GitHub CLI)
+	@gh run list --workflow=ci.yml --branch=main --limit=3 --json headBranch,status,conclusion,createdAt
+
+ci-open-latest: ## Open the latest CI run in browser
+	@gh run view --workflow=ci.yml --web 2>/dev/null || \
+		echo "Run: gh run list --workflow=ci.yml --limit=1"
+
 # ─── Linting ────────────────────────────────────────────────────────────────
 
-lint: ## Run all linters (ruff lint + format)
+lint: _need-container ## Run all linters (ruff lint + format)
 	$(DC) exec $(SERVICE) python -m ruff check backend/app backend/tests
 	$(DC) exec $(SERVICE) python -m ruff format --check backend/app backend/tests
 
-mypy: ## Run mypy type checker
+mypy: _need-container ## Run mypy type checker
 	$(DC) exec $(SERVICE) python -m mypy backend/app backend/tests --check-untyped-defs
 
 boundary: ## Run the research-shell boundary check (CI invariant)

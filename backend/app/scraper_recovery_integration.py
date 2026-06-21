@@ -280,7 +280,7 @@ async def scrape_url_with_recovery(
 
             # Use scrape result HTML for evidence-based classification if
             # available
-            result_html = None
+            result_html: str | None = None
             if "result" in locals():
                 result_html = getattr(result, "html", None)
 

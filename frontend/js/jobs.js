@@ -10,7 +10,7 @@
   writeUIState,
   showConfirm,
 } from "./utils.js";
-import { API, apiFetch } from "./api.js";
+import { apiFetch, endpoints } from "./api.js";
 import { currentView } from "./views.js";
 import { currentJobId, renderLogs, viewResults } from "./results.js";
 
@@ -28,6 +28,28 @@ let _flashJobId = null;
 // "Job canceled" a few seconds later).
 const _recentUserActions = new Map(); // jobId -> expiresAt (ms)
 const _USER_ACTION_TTL_MS = 8000;
+
+const STATUS_GROUPS = {
+  pending: "queued",
+  queued: "queued",
+  discovering: "running",
+  running: "running",
+  completed: "completed",
+  degraded: "completed",
+  empty_result: "completed",
+  failed: "failed",
+  error: "failed",
+  canceled: "cancelled",
+  cancelled: "cancelled",
+};
+
+const STATUS_LABELS = {
+  queued: "Queued",
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
 
 function _markUserAction(id) {
   _recentUserActions.set(id, Date.now() + _USER_ACTION_TTL_MS);
@@ -47,16 +69,41 @@ export function getPollers() {
   return pollers;
 }
 
+export function getJobStatusGroup(status) {
+  return STATUS_GROUPS[String(status || "").toLowerCase()] || "queued";
+}
+
+export function formatJobStatus(status) {
+  return STATUS_LABELS[getJobStatusGroup(status)] || "Queued";
+}
+
+function formatCreatedAt(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getIssueCount(job) {
+  const warnings = Array.isArray(job.warnings) ? job.warnings.length : 0;
+  return warnings + (job.error ? 1 : 0);
+}
+
 // ─── Refresh System Status ───
 
 export async function refreshSystemStatus() {
   try {
-    const r = await apiFetch(`${API}/api/system/status`);
+    const r = await apiFetch(endpoints.systemStatus);
     if (!r.ok) throw new Error("status unavailable");
     const data = await r.json();
     const active = Number((data.jobs || {}).active || 0);
     setEngineStatus(active > 0 ? `Online • ${active} active` : "Online • Idle");
-  } catch (e) {
+  } catch (_e) {
     setEngineStatus("Offline", true);
   }
 }
@@ -68,7 +115,8 @@ export async function refreshJobs() {
   renderSkeleton();
 
   try {
-    const res = await apiFetch(`${API}/api/jobs`);
+    const res = await apiFetch(endpoints.jobs);
+    if (!res.ok) throw new Error("jobs unavailable");
     const data = await res.json();
     jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
     renderJobs(applyJobFilters(jobsCache));
@@ -76,7 +124,9 @@ export async function refreshJobs() {
     syncPollers(jobsCache);
     setJobsUpdatedAt(Date.now());
     updateJobsLastUpdatedLabel();
-  } catch (e) {
+    // Update sidebar activity feed with the latest jobs
+    import("./sidebar-activity.js").then((m) => m.updateSidebarActivity(jobsCache)).catch(() => {});
+  } catch (_e) {
     setEngineStatus("Offline", true);
     updateJobsLastUpdatedLabel("Unable to refresh");
     // If cache is empty, show empty state on error
@@ -87,10 +137,10 @@ export async function refreshJobs() {
         list.innerHTML = "";
         list.appendChild(empty);
         empty.classList.remove("hidden");
-        const titleEl = empty.querySelector(".empty-state-title");
-        const descEl = empty.querySelector(".empty-state-desc");
-        if (titleEl) titleEl.textContent = "Unable to connect to server";
-        if (descEl) descEl.textContent = "Check that the backend is running on " + API;
+        const titleEl = empty.querySelector(".empty-state-title") || empty.querySelector("h3");
+        const descEl = empty.querySelector(".empty-state-desc") || empty.querySelector("p");
+        if (titleEl) titleEl.textContent = "Could not load jobs";
+        if (descEl) descEl.textContent = "Could not load jobs. Check whether the backend is running.";
       }
     }
   }
@@ -166,7 +216,7 @@ function syncPollers(jobs) {
 
 async function pollJob(id) {
   try {
-    const r = await apiFetch(`${API}/api/jobs/${id}`);
+    const r = await apiFetch(endpoints.job(id));
     if (!r.ok) return;
     const j = await r.json();
 
@@ -236,7 +286,7 @@ export async function cancelJob(id) {
   showConfirm("Cancel Job?", "Cancel this running job?", async () => {
     try {
       _markUserAction(id);
-      const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: "POST" });
+      const r = await apiFetch(endpoints.cancelJob(id), { method: "POST" });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || "Cancel failed");
       toast(data.message || "Cancellation requested", "info");
@@ -251,7 +301,7 @@ export async function deleteJob(id) {
   showConfirm("Delete Job?", "Move this job to the recycle bin?", async () => {
     try {
       _markUserAction(id);
-      const r = await apiFetch(`${API}/api/jobs/${id}`, { method: "DELETE" });
+      const r = await apiFetch(endpoints.deleteJob(id), { method: "DELETE" });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || "Delete failed");
       toast("Job deleted");
@@ -269,7 +319,7 @@ export async function clearTerminalJobs() {
     `Remove completed/failed/canceled jobs, keeping the latest ${keepRecent}?`,
     async () => {
       try {
-        const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: "DELETE" });
+        const r = await apiFetch(endpoints.cleanupTerminalJobs(keepRecent), { method: "DELETE" });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || "Terminal cleanup failed");
         toast(data.message || "Terminal jobs cleared", "info");
@@ -290,7 +340,7 @@ export function applyJobFilters(jobs) {
   return jobs.filter((j) => {
     const name = String(j.name || "").toLowerCase();
     const topic = String(j.topic || "").toLowerCase();
-    const statusMatch = status === "all" || String(j.status || "").toLowerCase() === status;
+    const statusMatch = status === "all" || getJobStatusGroup(j.status) === status;
     const queryMatch = !q || name.includes(q) || topic.includes(q);
     return statusMatch && queryMatch;
   });
@@ -325,7 +375,7 @@ export function updateKPIs(jobs) {
   if (records) records.textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
 }
 
-function renderJobs(jobs) {
+export function renderJobs(jobs) {
   const list = document.getElementById("jobs-list");
   const empty = document.getElementById("empty-state");
   if (!list) return;
@@ -333,6 +383,13 @@ function renderJobs(jobs) {
   if (!jobs.length) {
     list.innerHTML = "";
     if (empty) {
+      const titleEl = empty.querySelector(".empty-state-title") || empty.querySelector("h3");
+      const descEl = empty.querySelector(".empty-state-desc") || empty.querySelector("p");
+      const hasJobs = jobsCache.length > 0;
+      if (titleEl) titleEl.textContent = hasJobs ? "No jobs match these filters" : "No jobs yet";
+      if (descEl) {
+        descEl.textContent = hasJobs ? "Adjust the status filter or search query." : "Create your first scrape job.";
+      }
       list.appendChild(empty);
       empty.classList.remove("hidden");
     }
@@ -344,13 +401,15 @@ function renderJobs(jobs) {
       const isActive = ["pending", "discovering", "running"].includes(j.status);
       const hasProgress = j.progress_total > 0;
       const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
+      const statusGroup = getJobStatusGroup(j.status);
+      const issueCount = getIssueCount(j);
 
       const highlightClass =
-        j.status === "completed" || j.status === "degraded"
+        statusGroup === "completed"
           ? "completed-highlight"
-          : j.status === "failed"
+          : statusGroup === "failed"
             ? "failed-highlight"
-            : j.status === "running" || j.status === "discovering" || j.status === "pending"
+            : statusGroup === "running" || statusGroup === "queued"
               ? "running-highlight"
               : "";
 
@@ -359,7 +418,7 @@ function renderJobs(jobs) {
                 <div class="job-name-col">
                     <div class="job-name">
                         ${esc(j.name)}
-                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${attrStr(j.id)}" title="Copy job ID">📋</button>
+                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${attrStr(j.id)}" title="Copy job ID" aria-label="Copy job ID"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
                         <span class="mode-tag">${j.mode === "auto" ? "auto" : "manual"}</span>
                     </div>
                     ${
@@ -373,13 +432,15 @@ function renderJobs(jobs) {
                         : ""
                     }
                 </div>
+                <div class="job-created">${esc(formatCreatedAt(j.created_at || j.created))}</div>
                 <div class="job-urls">${Array.isArray(j.urls) ? j.urls.length : 0} URL${(Array.isArray(j.urls) ? j.urls.length : 0) !== 1 ? "s" : ""}</div>
-                <div><span class="badge ${attrStr(j.status)}">${esc(j.status)}</span></div>
-                <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "—"}</div>
+                <div><span class="badge ${attrStr(statusGroup)}">${esc(formatJobStatus(j.status))}</span></div>
+                <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "0"}</div>
+                <div class="job-issues">${issueCount ? `${issueCount}` : "0"}</div>
                 <div class="job-actions">
                     ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${attrStr(j.id)}">View</button>` : ""}
                     ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${attrStr(j.id)}">Cancel</button>` : ""}
-                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}">✕</button>
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}"><span data-icon="x" data-size="14"></span></button>
                 </div>
             </div>
         `;

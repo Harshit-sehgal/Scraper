@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import logging
 import re
-
-logger = logging.getLogger(__name__)
 import sys
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "backend"
+SCRIPTS = REPO / "scripts"
 DOCS = REPO / "docs"
 
 
@@ -30,9 +31,13 @@ def get_routes_from_code() -> set[str]:
     try:
         # Import the app and get routes
         sys.path.insert(0, str(BACKEND))
-        from app.main import app
+        sys.path.insert(0, str(SCRIPTS))
+        from app.main import create_app
+        from fastapi_route_iter import iter_app_routes
 
-        for route in app.routes:
+        app = create_app()
+
+        for route in iter_app_routes(app):
             if hasattr(route, "path"):
                 methods = getattr(route, "methods", {"GET"})
                 for method in methods:
@@ -152,6 +157,7 @@ def verify_env_vars() -> tuple[bool, list[str]]:
     ignored_env_vars = {
         "DATAFORGE_METRICS_TOKEN__",  # Prometheus template delimiter (real var is DATAFORGE_METRICS_TOKEN)
         "DATAFORGE_TELEGRAM_",  # Wildcard prefix in comments (real vars are DATAFORGE_TELEGRAM_BOT_TOKEN etc.)
+        "DATAFORGE_TELEGRAM_TOKEN",  # Comment mention only in telegram_notifier.py:65
     }
 
     issues = []

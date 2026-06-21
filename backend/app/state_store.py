@@ -1,5 +1,3 @@
-from typing import Any
-
 """Simple JSON persistence for job and recycle-bin state with safety guarantees.
 
 Storage safety features:
@@ -18,6 +16,7 @@ import logging
 import shutil
 from pathlib import Path
 from threading import Lock
+from typing import Any
 
 from app.models import Job, JobStatus
 
@@ -155,7 +154,7 @@ def _write_state_to_disk(path: Path, payload: dict[str, Any]) -> None:
                 if old_backup.exists():
                     old_backup.unlink(missing_ok=True)
                 return
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
             if attempt < _SAVE_RETRIES:
                 logger.warning(
                     "State save attempt %d/%d failed for %s: %s",
@@ -183,7 +182,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
 
         ws = get_world_state()
         world_state_data = ws.to_dict()
-    except Exception:
+    except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
         logger.exception("Failed to serialize semantic world state")
 
     payload = {

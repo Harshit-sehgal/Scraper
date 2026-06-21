@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.globals import jobs_store, recycle_bin_store
+from app.storage_interface import get_job_repository
 
 logger = logging.getLogger(__name__)
 
@@ -30,28 +31,29 @@ def _sanitise_error(msg: str) -> str:
     return _PATH_PATTERN.sub("<path>", msg)
 
 
-def get_job_repository():
-    import app.main
-
-    return app.main.get_job_repository()
-
-
 @router.get("/")
 async def root():
     """Root path — API identification.
 
     In production mode, /docs, /redoc, /openapi.json, and /app are disabled,
     so we omit them from the response to avoid confusing operators and clients.
+    The currently-active AUP version is also returned so the dashboard
+    can surface an acceptance banner before the user makes any calls.
     """
     from app.config import settings
+    from app.saas import CURRENT_AUP_VERSION
 
-    if settings.ENV.lower() == "production":
-        return {"message": "DataForge API v2", "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES}
-    return {
+    base = {
         "message": "DataForge API v2",
+        "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES,
+        "aup_version": CURRENT_AUP_VERSION,
+    }
+    if settings.ENV.lower() == "production":
+        return base
+    return {
+        **base,
         "docs": "/docs",
         "dashboard": "/app",
-        "experimental_enabled": settings.ENABLE_EXPERIMENTAL_ROUTES,
     }
 
 

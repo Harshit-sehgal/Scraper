@@ -1,0 +1,61 @@
+# =============================================================================
+# DataForge Scraper — Stale Branch Cleanup
+# =============================================================================
+# Automatically marks stale branches and pull requests that have been
+# inactive for 30 days, then closes them after 7 more days of inactivity.
+#
+# This keeps the repository's open PR list manageable and prevents
+# abandoned feature branches from accumulating.
+# =============================================================================
+
+name: Stale Branch Cleanup
+
+on:
+  schedule:
+    # Daily at 4 AM UTC
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  stale:
+    name: Close Stale Branches & PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Stale PR settings
+          stale-pr-message: >-
+            👋 This pull request has been inactive for **30 days**. If there
+            are no further updates within **7 days**, it will be automatically
+            closed. Please push new commits or leave a comment to keep it open.
+          close-pr-message: >-
+            ⏰ This pull request has been closed due to 37 days of inactivity.
+            Feel free to reopen it when you're ready to continue working on it.
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          stale-pr-label: stale
+          exempt-pr-labels: keep-open,dependencies,security
+
+          # Stale issue settings
+          stale-issue-message: >-
+            👋 This issue has been inactive for **60 days**. If there are no
+            further updates within **14 days**, it will be automatically closed.
+          close-issue-message: >-
+            ⏰ This issue has been closed due to 74 days of inactivity. Feel
+            free to reopen it if the problem persists.
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+          stale-issue-label: stale
+          exempt-issue-labels: keep-open,security,bug,enhancement
+
+          # Only target issues/PRs without these labels
+          exempt-all-milestones: true
+          operations-per-run: 100

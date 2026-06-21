@@ -3,7 +3,7 @@
 **Last refreshed:** 2026-06-08
 **Status:** Local production-like startup smoke passed on 2026-06-01; target production remains unvalidated
 
-Use `docs/PRODUCTION.md` and `docs/PRODUCTION_READINESS.md` as the current production references. This file remains as a short startup sequence to avoid duplicating stale operational claims.
+Use [PRODUCTION.md](PRODUCTION.md) and [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) as the current production references. This file remains as a short startup sequence to avoid duplicating stale operational claims.
 
 ## Required Sequence
 

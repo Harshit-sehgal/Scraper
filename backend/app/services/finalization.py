@@ -76,10 +76,13 @@ async def run_finalization(
             job.results = []
             _log(
                 job,
-                f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).",
+                (
+                    f"Job results bounded and offloaded to disk "
+                    f"due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records)."
+                ),
                 persist_fn=persist_job_state_fn,
             )
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             logger.exception("Failed to offload results to disk")
             _log(job, f"Failed to offload results to disk: {e}", level="warning", persist_fn=persist_job_state_fn)
 

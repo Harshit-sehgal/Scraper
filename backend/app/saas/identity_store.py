@@ -36,6 +36,7 @@ from app.saas.models import (
     MembershipRole,
     Organization,
     Project,
+    SelectedContext,
     User,
     UserStatus,
 )
@@ -167,6 +168,9 @@ class IdentityStore(ABC):
     def get_organization(self, org_id: str) -> Organization | None: ...
 
     @abstractmethod
+    def delete_organization(self, org_id: str) -> bool: ...
+
+    @abstractmethod
     def list_user_organizations(self, user_id: str, include_removed: bool = False) -> list[Organization]: ...
 
     @abstractmethod
@@ -194,7 +198,19 @@ class IdentityStore(ABC):
     def get_project(self, project_id: str) -> Project | None: ...
 
     @abstractmethod
+    def delete_project(self, project_id: str) -> bool: ...
+
+    @abstractmethod
     def list_org_projects(self, org_id: str) -> list[Project]: ...
+
+    @abstractmethod
+    def set_selected(self, user_id: str, org_id: str, project_id: str) -> SelectedContext: ...
+
+    @abstractmethod
+    def get_selected(self, user_id: str) -> SelectedContext | None: ...
+
+    @abstractmethod
+    def clear(self) -> None: ...
 
     @abstractmethod
     def create_api_key(self, api_key: ApiKey) -> ApiKey: ...
@@ -324,6 +340,13 @@ class SQLiteIdentityStore(IdentityStore):
                 );
                 CREATE INDEX IF NOT EXISTS idx_api_keys_project
                     ON api_keys(project_id, revoked_at);
+
+                CREATE TABLE IF NOT EXISTS user_selections (
+                    user_id TEXT PRIMARY KEY,
+                    org_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT ''
+                );
                 """,
             )
             with suppress(sqlite3.OperationalError):
@@ -457,6 +480,24 @@ class SQLiteIdentityStore(IdentityStore):
             ).fetchone()
         return _row_to_organization(row) if row else None
 
+    def delete_organization(self, org_id: str) -> bool:
+        if not org_id:
+            return False
+        with self._lock, self._connect() as conn:
+            # Cascade: drop api keys for any projects of this org, then
+            # the projects, memberships, user_selections pointing at the
+            # org, and finally the org row.
+            conn.execute(
+                "DELETE FROM api_keys WHERE project_id IN (SELECT id FROM projects WHERE org_id = ?)",
+                (org_id,),
+            )
+            conn.execute("DELETE FROM projects WHERE org_id = ?", (org_id,))
+            conn.execute("DELETE FROM memberships WHERE org_id = ?", (org_id,))
+            conn.execute("DELETE FROM user_selections WHERE org_id = ?", (org_id,))
+            cursor = conn.execute("DELETE FROM organizations WHERE id = ?", (org_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
     def list_user_organizations(self, user_id: str, include_removed: bool = False) -> list[Organization]:
         if not user_id:
             return []
@@ -579,6 +620,16 @@ class SQLiteIdentityStore(IdentityStore):
             ).fetchone()
         return _row_to_project(row) if row else None
 
+    def delete_project(self, project_id: str) -> bool:
+        if not project_id:
+            return False
+        with self._lock, self._connect() as conn:
+            # Cascade: drop api keys for this project, then the project row.
+            conn.execute("DELETE FROM api_keys WHERE project_id = ?", (project_id,))
+            cursor = conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
     def list_org_projects(self, org_id: str) -> list[Project]:
         if not org_id:
             return []
@@ -688,6 +739,48 @@ class SQLiteIdentityStore(IdentityStore):
             }
         except _DB_ERRORS as e:
             return {"ok": False, "backend": "sqlite", "error": str(e)}
+
+    def set_selected(self, user_id: str, org_id: str, project_id: str) -> SelectedContext:
+        now = _now_iso()
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_selections (user_id, org_id, project_id, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    org_id = excluded.org_id,
+                    project_id = excluded.project_id,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, org_id, project_id, now),
+            )
+            conn.commit()
+        return SelectedContext(user_id=user_id, org_id=org_id, project_id=project_id, updated_at=now)
+
+    def get_selected(self, user_id: str) -> SelectedContext | None:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM user_selections WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return SelectedContext(
+            user_id=row["user_id"],
+            org_id=row["org_id"],
+            project_id=row["project_id"],
+            updated_at=row["updated_at"] or _now_iso(),
+        )
+
+    def clear(self) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute("DELETE FROM user_selections")
+            conn.execute("DELETE FROM api_keys")
+            conn.execute("DELETE FROM memberships")
+            conn.execute("DELETE FROM projects")
+            conn.execute("DELETE FROM organizations")
+            conn.execute("DELETE FROM users")
+            conn.commit()
 
 
 # ───────────────────────────────────────────────────────────────────────

@@ -1,0 +1,17 @@
+{
+  "jobs": {
+    "total": 3,
+    "active": 1,
+    "running": 1,
+    "completed": 1,
+    "failed": 1
+  },
+  "queue": {
+    "pending": 0,
+    "running": 1
+  },
+  "workers": {
+    "active": 1,
+    "total": 1
+  }
+}

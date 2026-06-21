@@ -3,13 +3,93 @@
    ═══════════════════════════════════════════ */
 
 import { esc, attrStr, toast } from "./utils.js";
-import { API, apiFetch } from "./api.js";
+import { apiFetch, endpoints } from "./api.js";
 import { currentMode, setMode, switchView } from "./views.js";
 
 // ─── Field Counter ───
 
 let _fieldCounter = 0;
 let _filterCounter = 0;
+export const MAX_MANUAL_URLS = 100;
+
+function setFormErrors(errors) {
+  const el = document.getElementById("form-errors");
+  if (!el) return;
+  if (!errors.length) {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.innerHTML = `
+    <strong>The job could not start.</strong>
+    <ul>${errors.map((error) => `<li>${esc(error)}</li>`).join("")}</ul>
+  `;
+  el.classList.remove("hidden");
+}
+
+function getManualUrls() {
+  const urlsEl = document.getElementById("inp-urls");
+  return urlsEl
+    ? urlsEl.value
+        .split("\n")
+        .map((u) => u.trim())
+        .filter((u) => u)
+    : [];
+}
+
+export function validateJobForm() {
+  const errors = [];
+  const name = document.getElementById("inp-name")?.value?.trim() || "";
+  if (!name) {
+    errors.push("Job name is required.");
+  }
+
+  const fieldRows = Array.from(document.querySelectorAll(".field-row"));
+  if (!fieldRows.length) {
+    errors.push("The job could not start because no extraction fields were added.");
+  }
+
+  const fieldNames = [];
+  fieldRows.forEach((row, idx) => {
+    const fieldName = row.querySelector(".sf-name")?.value?.trim() || "";
+    if (!fieldName) {
+      errors.push(`Field ${idx + 1} needs a name.`);
+      return;
+    }
+    fieldNames.push(fieldName);
+  });
+
+  const seen = new Set();
+  fieldNames.forEach((fieldName) => {
+    const key = fieldName.toLowerCase();
+    if (seen.has(key)) {
+      errors.push(`Duplicate field name blocked: ${fieldName}.`);
+    }
+    seen.add(key);
+  });
+
+  if (currentMode === "manual") {
+    const urls = getManualUrls();
+    if (!urls.length) {
+      errors.push("URL is required.");
+    }
+    const invalid = urls.find((url) => !/^https?:\/\//i.test(url));
+    if (invalid) {
+      errors.push(`URLs must start with http:// or https://. Check: ${invalid}`);
+    }
+    if (urls.length > MAX_MANUAL_URLS) {
+      errors.push(`Too many URLs. Add at most ${MAX_MANUAL_URLS} URLs for one job.`);
+    }
+  } else {
+    const topic = document.getElementById("inp-topic")?.value?.trim() ?? "";
+    if (!topic) {
+      errors.push("Topic is required for Auto Discover jobs.");
+    }
+  }
+
+  setFormErrors(errors);
+  return { ok: errors.length === 0, errors };
+}
 
 // ─── Init Form ───
 
@@ -39,6 +119,7 @@ export async function initForm() {
   setVal("inp-source-policy", "official_plus_directory");
   setHtml("schema-container", "");
   setHtml("filters-container", "");
+  setFormErrors([]);
   const preview = document.getElementById("discovery-preview");
   if (preview) {
     preview.innerHTML = "";
@@ -54,17 +135,31 @@ export async function initForm() {
   clearAnalysis();
   addField();
 
-  // Refresh auth profile dropdown
-  _refreshAuthProfileDropdown();
+  // Bug-fix: previously non-awaited, so ``dataforge:form-ready`` could fire
+  // before the dropdown refresh was scheduled. Now ``await``ed so the event
+  // fires only AFTER the dropdown is fully resolved.
+  await _refreshAuthProfileDropdown();
+  // Dispatch a deterministic signal so E2E tests can await completion
+  // without relying on racy timeout(300).
+  document.dispatchEvent(new CustomEvent("dataforge:form-ready"));
 }
 
 async function _refreshAuthProfileDropdown() {
   const select = document.getElementById("inp-auth-profile");
   if (!select) return;
   try {
-    const res = await apiFetch(`${API}/api/auth-profiles`, { method: "GET" });
+    const res = await apiFetch(endpoints.authProfiles, { method: "GET" });
+    // Auth-profiles endpoint requires ADMIN/OPERATOR, so user-level keys
+    // (USER role) receive 403. We deliberately tolerate 401/403 here so
+    // the form remains usable for ROLE-restricted users — they keep the
+    // "None (public access)" option and never block on the dropdown.
+    // For 5xx / network failures we log a warning so production outages
+    // are not silently hidden behind the same UI as an intentional 403.
     if (!res.ok) {
-      select.innerHTML = '<option value="">Unable to load profiles</option>';
+      if (res.status >= 500) {
+        console.warn("[form] auth-profiles unavailable:", res.status);
+      }
+      select.innerHTML = '<option value="">None (public access)</option>';
       return;
     }
     const data = await res.json();
@@ -91,6 +186,7 @@ export function addField(preset = null) {
   const p = preset || {};
   const name = attrStr(p.name || "");
   const desc = attrStr(p.description || "");
+  const selector = attrStr(p.selector || p.css_selector || "");
   const selectedType = p.field_type || "string";
   const fid = _fieldCounter++;
   row.innerHTML = `
@@ -119,7 +215,11 @@ export function addField(preset = null) {
             <label for="sf-desc-${fid}">Hint for AI</label>
             <input type="text" class="sf-desc" id="sf-desc-${fid}" placeholder="e.g. star rating out of 5" value="${desc}">
         </div>
-        <button type="button" class="btn-x" data-action="remove-field" aria-label="Remove field">✕</button>
+        <div class="form-group">
+            <label for="sf-selector-${fid}">CSS selector <span class="hint">optional</span></label>
+            <input type="text" class="sf-selector" id="sf-selector-${fid}" placeholder=".listing-title" value="${selector}">
+        </div>
+        <button type="button" class="btn-x" data-action="remove-field" aria-label="Remove field"><span data-icon="x" data-size="14"></span></button>
     `;
   c.appendChild(row);
 }
@@ -141,7 +241,7 @@ export async function suggestSchemaFromIntent() {
   }
 
   try {
-    const res = await apiFetch(`${API}/api/schema/suggest`, {
+    const res = await apiFetch(endpoints.schemaSuggest, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ intent, max_fields: 8 }),
@@ -236,7 +336,7 @@ export function addFilter() {
             <label for="ff-value-${fid}">Value</label>
             <input type="text" class="ff-value" id="ff-value-${fid}" placeholder="e.g. 50">
         </div>
-        <button type="button" class="btn-x" data-action="remove-filter" aria-label="Remove field">✕</button>
+        <button type="button" class="btn-x" data-action="remove-filter" aria-label="Remove filter"><span data-icon="x" data-size="14"></span></button>
     `;
   c.appendChild(row);
 }
@@ -296,7 +396,7 @@ export async function previewDiscovery() {
   preview.innerHTML = '<div class="disc-loading"><span class="spinner"></span> Discovering URLs...</div>';
 
   try {
-    const res = await apiFetch(`${API}/api/discover`, {
+    const res = await apiFetch(endpoints.discover, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -343,6 +443,12 @@ export async function previewDiscovery() {
 
 export async function submitJob(e) {
   e.preventDefault();
+
+  const validation = validateJobForm();
+  if (!validation.ok) {
+    toast(validation.errors[0] || "Check the form before starting the job.", "error");
+    return;
+  }
 
   const nameEl = document.getElementById("inp-name");
   const name = nameEl ? nameEl.value.trim() : "";
@@ -404,13 +510,7 @@ export async function submitJob(e) {
   let maxPages = Number.isFinite(rawMax) ? rawMax : 10;
 
   if (currentMode === "manual") {
-    const urlsEl = document.getElementById("inp-urls");
-    urls = urlsEl
-      ? urlsEl.value
-          .split("\n")
-          .map((u) => u.trim())
-          .filter((u) => u)
-      : [];
+    urls = getManualUrls();
     if (!urls.length) {
       toast("Enter at least one URL", "error");
       return;
@@ -432,6 +532,17 @@ export async function submitJob(e) {
   // Build selectors_map
   const { getSelectorsMap } = await import("./analyzer.js");
   const sm = getSelectorsMap();
+  const manualSelectorFields = {};
+  document.querySelectorAll(".field-row").forEach((row) => {
+    const fieldName = row.querySelector(".sf-name")?.value?.trim() || "";
+    const selector = row.querySelector(".sf-selector")?.value?.trim() || "";
+    if (fieldName && selector) {
+      manualSelectorFields[fieldName] = {
+        selector,
+        type: row.querySelector(".sf-type")?.value || "string",
+      };
+    }
+  });
   let selectorsMap = {};
   if (sm && sm.fields && Object.keys(sm.fields).length > 0) {
     const schemaNames = new Set(schema.map((f) => f.name));
@@ -441,9 +552,12 @@ export async function submitJob(e) {
         filteredFields[name] = sel;
       }
     });
-    if (Object.keys(filteredFields).length > 0) {
-      selectorsMap = { item_container: sm.item_container || "", fields: filteredFields };
+    const fields = { ...filteredFields, ...manualSelectorFields };
+    if (Object.keys(fields).length > 0) {
+      selectorsMap = { item_container: sm.item_container || "", fields };
     }
+  } else if (Object.keys(manualSelectorFields).length > 0) {
+    selectorsMap = { item_container: "", fields: manualSelectorFields };
   }
 
   const authProfileId = document.getElementById("inp-auth-profile")?.value?.trim() || "";
@@ -478,12 +592,13 @@ export async function submitJob(e) {
   }
 
   try {
-    const res = await apiFetch(`${API}/api/jobs`, {
+    const res = await apiFetch(endpoints.jobs, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Failed");
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "The job could not start.");
+    setFormErrors([]);
     toast("Job started", "success");
     switchView("jobs");
   } catch (err) {
@@ -491,7 +606,7 @@ export async function submitJob(e) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = "Start Scraping →";
+      btn.innerHTML = "Start scraping";
     }
   }
 }

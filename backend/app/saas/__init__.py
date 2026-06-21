@@ -14,6 +14,9 @@ Public surface:
 - ``identity_store``: abstract ``IdentityStore`` + SQLite implementation.
 - ``service``: ``SignupService``, ``ApiKeyService``, ``MembershipService``,
   password-hash helpers, and raw-key generation.
+- ``CURRENT_AUP_VERSION``: the active Acceptable Use Policy version
+  enforced by ``app.utils.aup.require_aup_accepted``. Lives here so
+  routers and the enforcement dependency can share it without a cycle.
 
 Tests live in ``backend/tests/test_saas_identity.py``.
 """
@@ -45,7 +48,16 @@ from app.saas.service import (
     verify_password,
 )
 
+# Active Acceptable Use Policy version. Callers that gate behaviour on
+# which AUP revision a user has accepted compare against this constant.
+# Defined here (instead of in ``saas.router``) so ``app.utils.aup`` can
+# import it at module load time without creating an import cycle
+# through the router module that already depends on
+# ``require_aup_accepted``.
+CURRENT_AUP_VERSION = "2026-06-11-v1"
+
 __all__ = [
+    "CURRENT_AUP_VERSION",
     "ApiKey",
     "ApiKeyScope",
     "ApiKeyService",

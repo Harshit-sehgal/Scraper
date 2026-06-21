@@ -79,6 +79,51 @@ Current behavior:
 - The panel recommends `blocked_or_unsafe`.
 - The continue action is disabled.
 
+## Pagination Workflow
+
+User-configurable pagination settings live on
+`backend.app.models.WorkflowPaginationConfig`. The `strategy` field
+accepts exactly the canonical 5 values pinned by the bilateral
+`TestCanonicalFiveStrategyContract` (`backend/tests/test_pagination_async.py`
++ `backend/tests/test_pagination_sync.py`):
+
+- `next_button` — default; click-based "Next" pagination
+- `page_number` — numeric page-number CSS selector
+- `url_pattern` — URL template with required `{page}` placeholder
+  (canonical spelling; legacy `url_parameter` is rejected at
+  config-build time by `WorkflowPaginationConfig`)
+- `infinite_scroll` — scroll-driven record streaming
+- `load_more` — explicit "Load More" button click
+
+### Backend dispatch
+
+1. The job create / workflow create routes accept
+   `pagination_config.strategy` from the canonical 5 enum only.
+2. The scraper dispatches via `async_paginate(page, config, extract_fn)`
+   for live browser-backed jobs, or `paginate(config)` for sync /
+   config-only paths (e.g., billing-tier validation, dry-run preview).
+3. Both dispatchers use the SAME canonical 5-strategy `strategy_map`
+   (keys: `next_button`, `page_number`, `url_pattern`, `infinite_scroll`,
+   `load_more`).
+4. Unknown strategy keys (typos, stale `url_parameter`) return
+   `PaginationResult(stopped_reason="error", ...)` fail-closed — they
+   do NOT silently fall back to `next_button`.
+
+### Frontend surface
+
+The workflow draft UI populates `strategy` from the canonical 5 enum.
+`url_pattern` is rendered as the URL-template option; there is no
+`url_parameter` entry in the UI. `infinite_scroll` and `load_more`
+surface a configurable `max_pages` and `delay_between_pages`.
+
+### Safety boundary
+
+Pagination helpers do not bypass CAPTCHAs, anti-bot defenses, paywalls,
+or session/SSO challenges. They assume a public, accessible page;
+`AuthProfile` is the documented path for login-required workflows.
+
+---
+
 ## Safety Boundary
 
 These flows do not implement CAPTCHA bypass, anti-bot bypass, paywall

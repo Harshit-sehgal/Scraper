@@ -11,12 +11,16 @@ live in the workflow/job runner.
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.config import settings
 from app.models import AuthProfile, AuthProfileStatus
+from app.url_safety import validate_public_domain
+from app.utils.auth_profile_store import AuthProfileStore
 from app.utils.encryption import decrypt as encryption_decrypt
 from app.utils.encryption import encrypt as encryption_encrypt
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
@@ -24,8 +28,8 @@ from app.utils.rbac import UserRole, can_access_scoped_resource, require_princip
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth-profiles", tags=["auth-profiles"])
 
-# In-memory auth profile store (replace with DB in production)
-_auth_profiles: dict[str, dict[str, Any]] = {}
+# File-backed auth profile store shared across uvicorn/gunicorn workers.
+_auth_profiles = AuthProfileStore()
 
 
 def _now_iso() -> str:
@@ -57,6 +61,21 @@ def _get_visible_profile(profile_id: str, auth: tuple[UserRole, str, str, str]) 
     return item
 
 
+def _write_back(profile: dict[str, Any]) -> None:
+    """Persist a (possibly-mutated) local copy of a profile record.
+
+    The store returns deep copies on every read so direct mutation
+    of the dict the caller holds does NOT persist; this helper is
+    what makes mutations on those copies visible to subsequent
+    reads and to sibling workers.
+    """
+    profile_id = str(profile.get("id") or "")
+    if not profile_id:
+        msg = "auth profile dict missing 'id' before write-back"
+        raise RuntimeError(msg)
+    _auth_profiles.upsert(profile_id, profile)
+
+
 # ---------------------------------------------------------------------------
 # CRUD endpoints
 # ---------------------------------------------------------------------------
@@ -78,6 +97,15 @@ async def create_auth_profile(
     ``POST /auth-profiles/{id}/start-login``.
     """
     _role, user_id, org_id, project_id = auth
+    # SSRF guard: validate the target domain is a public host before
+    # storing it. Without this, an operator could store
+    # ``domain="localhost"`` and later trigger a server-side fetch
+    # (``_try_live_session_check``) against an internal service with
+    # the profile's attached cookies.
+    try:
+        validate_public_domain(domain)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     profile = AuthProfile(
         name=name.strip(),
         description=description.strip() if description else "",
@@ -87,7 +115,7 @@ async def create_auth_profile(
         project_id=project_id,
         status=AuthProfileStatus.PENDING_LOGIN,
     )
-    _auth_profiles[profile.id] = profile.model_dump()
+    _auth_profiles.upsert(profile.id, profile.model_dump())
     logger.info("Auth profile created: %s for domain %s", profile.name, profile.domain)
     return _safe_profile(profile.model_dump())
 
@@ -126,8 +154,8 @@ async def delete_auth_profile(
 ) -> None:
     """Delete an auth profile permanently."""
     _get_visible_profile(profile_id, auth)
-    del _auth_profiles[profile_id]
-    logger.info("Auth profile deleted: %s", profile_id)
+    if _auth_profiles.delete(profile_id):
+        logger.info("Auth profile deleted: %s", profile_id)
 
 
 # ---------------------------------------------------------------------------
@@ -175,8 +203,6 @@ async def complete_login(
     captured after the user has logged in. It is encrypted before storage.
     """
     profile = _get_visible_profile(profile_id, auth)
-    import json
-
     plaintext = json.dumps(storage_state)
     encrypted = encryption_encrypt(plaintext)
 
@@ -185,6 +211,7 @@ async def complete_login(
     profile["status"] = AuthProfileStatus.ACTIVE.value
     profile["updated_at"] = now
     profile["last_validated_at"] = now
+    _write_back(profile)
 
     logger.info("Auth profile login completed: %s for domain %s", profile_id, profile.get("domain"))
     return _safe_profile(profile)
@@ -195,7 +222,7 @@ async def complete_login(
 # ---------------------------------------------------------------------------
 
 
-def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
+async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
     """Attempt a live HTTP check against the profile's target domain.
 
     Uses the stored cookies (from Playwright storage_state) to make
@@ -216,11 +243,9 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     try:
-        import json
-
         plaintext = encryption_decrypt(encrypted)
         storage_state = json.loads(plaintext)
-    except Exception:
+    except (ValueError, TypeError):
         logger.debug("Could not decrypt storage state for live check", exc_info=True)
         return None
 
@@ -244,13 +269,13 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
             if name and value:
                 cookie_dict[name] = value
 
-        with httpx.Client(
+        async with httpx.AsyncClient(
             cookies=cookie_dict,
             follow_redirects=True,
             timeout=15.0,
-            verify=False,  # noqa: S501  # nosec: target domains may use self-signed certs
+            verify=settings.VERIFY_SSL if hasattr(settings, "VERIFY_SSL") else True,
         ) as client:
-            response = client.get(
+            response = await client.get(
                 target_url,
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -289,7 +314,7 @@ def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | None:
     except httpx.TimeoutException:
         logger.debug("Timeout connecting to %s for live session check", target_url)
         return None
-    except Exception:
+    except (RuntimeError, ValueError, TypeError):
         logger.debug("Live session check failed for %s", target_url, exc_info=True)
         return None
 
@@ -320,20 +345,23 @@ async def validate_profile(
     if expires_at and _now_iso() > expires_at:
         profile["status"] = AuthProfileStatus.EXPIRED.value
         profile["updated_at"] = _now_iso()
+        _write_back(profile)
         return {"valid": False, "status": "expired", "reason": "Session has expired.", "profile": _safe_profile(profile)}
 
     if not has_state:
         profile["status"] = AuthProfileStatus.FAILED.value
         profile["updated_at"] = _now_iso()
+        _write_back(profile)
         return {"valid": False, "status": "failed", "reason": "No stored session state.", "profile": _safe_profile(profile)}
 
     # Optional live HTTP check
     if live and profile.get("status") == AuthProfileStatus.ACTIVE.value:
-        live_result = _try_live_session_check(profile)
+        live_result = await _try_live_session_check(profile)
         if live_result is not None:
             if not live_result["valid"]:
                 profile["status"] = AuthProfileStatus.EXPIRED.value
                 profile["updated_at"] = _now_iso()
+                _write_back(profile)
                 return {
                     "valid": False,
                     "status": "expired",
@@ -342,10 +370,12 @@ async def validate_profile(
                 }
             # Live check confirmed valid
             profile["last_validated_at"] = _now_iso()
+            _write_back(profile)
             return {"valid": True, "status": "active", "reason": "Live HTTP check passed.", "profile": _safe_profile(profile)}
 
     # Local-only check passed
     profile["last_validated_at"] = _now_iso()
+    _write_back(profile)
     return {"valid": True, "status": "active", "profile": _safe_profile(profile)}
 
 
@@ -367,6 +397,7 @@ async def revoke_profile(
     profile["status"] = AuthProfileStatus.REVOKED.value
     profile["encrypted_storage_state"] = ""
     profile["updated_at"] = _now_iso()
+    _write_back(profile)
     logger.info("Auth profile revoked: %s", profile_id)
     return _safe_profile(profile)
 
@@ -406,10 +437,9 @@ def get_decrypted_storage_state(profile_id: str, expected_domain: str) -> dict[s
     if not encrypted:
         raise HTTPException(status_code=403, detail="No stored session state")
 
-    import json
-
     plaintext = encryption_decrypt(encrypted)
     # Update usage stats
     profile["last_used_at"] = _now_iso()
-    profile["usage_count"] = profile.get("usage_count", 0) + 1
+    profile["usage_count"] = int(profile.get("usage_count", 0) or 0) + 1
+    _write_back(profile)
     return json.loads(plaintext)

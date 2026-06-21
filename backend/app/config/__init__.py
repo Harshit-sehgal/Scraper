@@ -72,8 +72,8 @@ class Settings(
 
     @property
     def GROQ_API_KEY(self) -> str:
-        """Groq API key for LLM calls. Read from GROQ_API_KEY env var dynamically."""
-        return (os.environ.get("GROQ_API_KEY") or "").strip()
+        """Groq API key for LLM calls. Read from DATAFORGE_GROQ_API_KEY env var dynamically."""
+        return (os.environ.get("DATAFORGE_GROQ_API_KEY") or os.environ.get("GROQ_API_KEY") or "").strip()
 
     @property
     def WORKER_QUEUE(self) -> bool:
@@ -127,8 +127,8 @@ class Settings(
 
     @property
     def SEMANTIC_STATE_PATH_DYNAMIC(self) -> str:
-        """Semantic state path (dynamic). Reads from SEMANTIC_STATE_PATH env var dynamically."""
-        return os.environ.get("SEMANTIC_STATE_PATH") or self.SEMANTIC_STATE_PATH
+        """Semantic state path (dynamic). Reads from DATAFORGE_SEMANTIC_STATE_PATH env var dynamically."""
+        return os.environ.get("DATAFORGE_SEMANTIC_STATE_PATH") or self.SEMANTIC_STATE_PATH
 
     @property
     def STATE_FILE_PATH_DYNAMIC(self) -> str:
@@ -138,7 +138,7 @@ class Settings(
     @property
     def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
         """Whether to persist selector decay snapshots during tests."""
-        return (os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
+        return (os.environ.get("DATAFORGE_TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
 
     # ─── Backward-compatible aliases ────────────────────────────────────
 

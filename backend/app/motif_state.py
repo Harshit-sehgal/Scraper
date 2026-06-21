@@ -1,5 +1,3 @@
-from typing import Any
-
 """MotifState — owns all motif memory and stability tracking.
 
 True ownership boundary: NO external code should mutate motif_counts,
@@ -16,6 +14,7 @@ import logging
 import math
 from collections import Counter
 from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 

@@ -1,7 +1,7 @@
 """Pydantic models for the billing system.
 
 Defines plan tiers, subscription statuses, and billing event payloads
-used by the Autumn integration and plan enforcement layer.
+used by the PayPal Subscriptions API integration and plan enforcement layer.
 """
 
 from __future__ import annotations
@@ -33,6 +33,20 @@ class SubscriptionStatus(StrEnum):
     EXPIRED = "expired"
 
 
+class PayPalEventType(StrEnum):
+    """Canonical PayPal Billing Subscriptions webhook event types mapped onto
+    our SubscriptionStatus / PlanTierId state machine."""
+
+    SUBSCRIPTION_CREATED = "BILLING.SUBSCRIPTION.CREATED"
+    SUBSCRIPTION_UPDATED = "BILLING.SUBSCRIPTION.UPDATED"
+    SUBSCRIPTION_CANCELLED = "BILLING.SUBSCRIPTION.CANCELLED"
+    SUBSCRIPTION_SUSPENDED = "BILLING.SUBSCRIPTION.SUSPENDED"
+    SUBSCRIPTION_PAYMENT_FAILED = "BILLING.SUBSCRIPTION.PAYMENT.FAILED"
+    PAYMENT_SALE_COMPLETED = "PAYMENT.SALE.COMPLETED"
+    PAYMENT_SALE_FAILED = "PAYMENT.SALE.FAILED"
+    CUSTOMER_CREATED = "CUSTOMER.CREATED"
+
+
 class CustomerInfo(BaseModel):
     """Customer information returned by the billing provider."""
 
@@ -56,7 +70,12 @@ class MeteredEvent(BaseModel):
 
 
 class BillingWebhookPayload(BaseModel):
-    """Generic webhook payload from Autumn/Stripe."""
+    """Generic billing webhook payload.
+
+    Supports PayPal's nested format (``event_type`` + ``resource``),
+    Stripe-style top-level ``type`` events, and the legacy ``Autumn`` flat
+    ``event_type`` form. The webhook handler normalizes across all three.
+    """
 
     event_type: str
     data: dict = Field(default_factory=dict)

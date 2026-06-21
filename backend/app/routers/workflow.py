@@ -7,9 +7,7 @@ saved workflows that replay a sequence of browser steps.
 from __future__ import annotations
 
 import datetime
-import json
 import logging
-import os
 import uuid
 from pathlib import Path
 from typing import Annotated, Any
@@ -31,15 +29,23 @@ from app.services.workflow_runner import (
 )
 from app.url_analyzer import analyze_url as analyze_guided_url
 from app.url_safety import validate_public_http_url
+from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
+from app.utils.workflow_run_store import WorkflowRunStore
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 draft_router = APIRouter(prefix="/api/workflow-drafts", tags=["workflow-drafts"])
 
-# In-memory workflow store (mirrors jobs_store pattern)
-_workflows: dict[str, dict[str, Any]] = {}
-_workflow_drafts: dict[str, dict[str, Any]] = {}
+# File-backed workflow store shared across uvicorn/gunicorn workers.
+# Reads always re-read disk; writes use flock-serialised atomic rename.
+_workflows = JSONFileStore(Path(__file__).resolve().parents[2] / "data" / "workflows.json")
+_workflow_drafts = JSONFileStore(
+    Path(__file__).resolve().parents[2] / "data" / "workflow_drafts.json",
+)
+# Run history is its own keyed store so we can paginate and filter
+# independent of the workflow definitions.
+_workflow_runs = WorkflowRunStore()
 
 
 class WorkflowDraftFromUrlAnalysisRequest(BaseModel):
@@ -95,130 +101,19 @@ def _serialize_pagination_config(pc: Any) -> dict[str, Any]:
     return {}
 
 
-def _workflow_store_path() -> Path:
-    configured = os.environ.get("DATAFORGE_WORKFLOW_STORE_FILE", "")
-    if configured:
-        return Path(configured)
-    return Path("backend/data/workflows.json")
+def _write_back(record: dict[str, Any]) -> None:
+    """Persist a (possibly-mutated) local copy of a workflow record.
 
-
-def _load_workflows_from_db() -> None:
-    """Seed the in-memory ``_workflows`` dict from the SQLite workflows table.
-
-    Called once at module import time. If the DB is unavailable (e.g. during
-    test collection before the app is fully initialized), the dict stays empty
-    and is populated by route handlers at runtime.
+    The store returns deep copies on every read so direct mutation of the
+    dict the caller holds does NOT persist; this helper is what makes
+    mutations on those copies visible to subsequent reads and to sibling
+    workers.
     """
-    try:
-        from app.job_store import _DB_LOCK, _get_connection
-
-        with _DB_LOCK:
-            conn = _get_connection()
-            try:
-                rows = conn.execute("SELECT * FROM workflows").fetchall()
-                for row in rows:
-                    wf = dict(row)
-                    # Deserialise JSON columns back to Python objects.
-                    _list_cols = {"steps", "extraction_schema"}
-                    for col in ("search_params", "steps", "extraction_schema", "pagination_config"):
-                        raw_val = wf.get(col)
-                        empty_default = "[]" if col in _list_cols else "{}"
-                        try:
-                            wf[col] = json.loads(raw_val if isinstance(raw_val, str) else empty_default)
-                        except (json.JSONDecodeError, TypeError):
-                            wf[col] = [] if col in _list_cols else {}
-                    _workflows[wf["id"]] = wf
-                if rows:
-                    logger.info("Loaded %d workflows from SQLite", len(rows))
-                return
-            finally:
-                conn.close()
-    except (ImportError, Exception) as exc:
-        logger.debug("SQLite workflow load unavailable: %s", exc)
-
-    # ── Best-effort JSON file fallback (only when DB returned nothing) ─
-    if _workflows:
-        return
-    path = _workflow_store_path()
-    try:
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            _workflows.update(data.get("workflows", {}))
-            logger.info("Loaded %d workflows from JSON fallback", len(_workflows))
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        logger.warning("Failed to load workflows from JSON: %s", exc)
-
-
-_load_workflows_from_db()
-
-
-def _persist_workflows() -> None:
-    """Persist workflow definitions to SQLite (v9 schema).
-
-    Falls back to best-effort JSON file if the SQLite connection is
-    unavailable (e.g. during test setup before the DB is initialized).
-    """
-    try:
-        from app.job_store import _DB_LOCK, _get_connection
-
-        with _DB_LOCK:
-            conn = _get_connection()
-            try:
-                for wf_id, wf in _workflows.items():
-                    conn.execute(
-                        """INSERT OR REPLACE INTO workflows
-                           (id, name, description, user_id, org_id, project_id,
-                            mode, domain, start_url, original_url,
-                            search_params, steps, extraction_schema, pagination_config,
-                            auth_profile_id, status, version,
-                            created_at, updated_at, last_run_at, last_success_at,
-                            last_failure_reason, last_run_job_id, total_runs)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (
-                            wf_id,
-                            str(wf.get("name") or ""),
-                            str(wf.get("description") or ""),
-                            str(wf.get("user_id") or ""),
-                            str(wf.get("org_id") or ""),
-                            str(wf.get("project_id") or ""),
-                            str(wf.get("mode") or "workflow_replay"),
-                            str(wf.get("domain") or ""),
-                            str(wf.get("start_url") or ""),
-                            str(wf.get("original_url") or ""),
-                            json.dumps(wf.get("search_params") or {}),
-                            json.dumps([s.model_dump() if hasattr(s, "model_dump") else s for s in (wf.get("steps") or [])]),
-                            json.dumps(
-                                [f.model_dump() if hasattr(f, "model_dump") else f for f in (wf.get("extraction_schema") or [])],
-                            ),
-                            json.dumps(_serialize_pagination_config(wf.get("pagination_config"))),
-                            wf.get("auth_profile_id"),
-                            str(wf.get("status") or "draft"),
-                            int(wf.get("version") or 1),
-                            str(wf.get("created_at") or ""),
-                            str(wf.get("updated_at") or ""),
-                            str(wf.get("last_run_at") or ""),
-                            str(wf.get("last_success_at") or ""),
-                            str(wf.get("last_failure_reason") or ""),
-                            str(wf.get("last_run_job_id") or ""),
-                            int(wf.get("total_runs") or 0),
-                        ),
-                    )
-                conn.commit()
-                return
-            finally:
-                conn.close()
-    except (ImportError, Exception) as exc:
-        logger.debug("SQLite workflow persistence unavailable: %s", exc)
-
-    # ── Best-effort JSON fallback ───────────────────────────────────────
-    path = _workflow_store_path()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps({"workflows": _workflows}, indent=2, sort_keys=True), encoding="utf-8")
-        tmp.replace(path)
-    except OSError as exc:
-        logger.warning("Failed to persist workflows: %s", exc)
+    record_id = str(record.get("id") or "")
+    if not record_id:
+        missing_id_message = "workflow dict missing 'id' before write-back"
+        raise RuntimeError(missing_id_message)
+    _workflows.upsert(record_id, record)
 
 
 def _can_access_workflow(item: dict[str, Any], auth: tuple[UserRole, str, str, str]) -> bool:
@@ -250,6 +145,15 @@ def _get_visible_draft(draft_id: str, auth: tuple[UserRole, str, str, str]) -> d
     if item is None or not _can_access_draft(item, auth):
         raise HTTPException(status_code=404, detail="Workflow draft not found")
     return item
+
+
+def _write_back_draft(record: dict[str, Any]) -> None:
+    """Persist a (possibly-mutated) draft record to the file-backed store."""
+    record_id = str(record.get("id") or "")
+    if not record_id:
+        missing_id_message = "workflow draft dict missing 'id' before write-back"
+        raise RuntimeError(missing_id_message)
+    _workflow_drafts.upsert(record_id, record)
 
 
 @draft_router.post("/from-url-analysis", status_code=201)
@@ -293,7 +197,7 @@ async def create_workflow_draft_from_url_analysis(
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
-    _workflow_drafts[draft_id] = draft
+    _workflow_drafts.upsert(draft_id, draft)
     logger.info("Workflow draft created from URL analysis: %s role=%s", draft_id, role.value)
     return draft
 
@@ -320,6 +224,7 @@ async def detect_workflow_draft_fields(
     fields = detect_fields_from_html(req.html_snapshot)
     draft["detected_fields"] = fields
     draft["updated_at"] = _now_iso()
+    _write_back_draft(draft)
     return {
         "draft_id": draft_id,
         "start_url": start_url,
@@ -367,10 +272,10 @@ async def create_workflow_from_manual_mapping(
         project_id=project_id,
         status=WorkflowStatus.DRAFT,
     )
-    _workflows[wf.id] = _workflow_to_dict(wf)
-    _persist_workflows()
+    _workflows.upsert(wf.id, _workflow_to_dict(wf))
     draft["workflow_id"] = wf.id
     draft["updated_at"] = _now_iso()
+    _write_back_draft(draft)
     return _workflow_to_dict(wf)
 
 
@@ -388,6 +293,18 @@ async def create_workflow(
     authenticated context when available.
     """
     _role, user_id, org_id, project_id = auth
+    # URL-safety guard: validate start_url / original_url are public
+    # hosts before persisting. The draft routes already do this; create
+    # / update previously skipped it, allowing an operator to persist a
+    # workflow whose start_url points at an internal host. Once live
+    # Playwright replay lands, those persisted URLs would be fetched
+    # server-side with no guard.
+    for _url in (req.start_url, req.original_url):
+        if _url:
+            try:
+                validate_public_http_url(_url.strip())
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
     wf = Workflow(
         name=req.name.strip(),
         description=req.description.strip() if req.description else "",
@@ -404,8 +321,7 @@ async def create_workflow(
         project_id=project_id,
         status=WorkflowStatus.ACTIVE,
     )
-    _workflows[wf.id] = _workflow_to_dict(wf)
-    _persist_workflows()
+    _workflows.upsert(wf.id, _workflow_to_dict(wf))
     logger.info("Workflow created: %s (%s)", wf.name, wf.id)
     return _workflow_to_dict(wf)
 
@@ -468,6 +384,16 @@ async def update_workflow(
     existing = _get_visible_workflow(workflow_id, auth)
     update_data = req.model_dump(exclude_unset=True)
 
+    # URL-safety guard (R-012): validate any new start_url / original_url
+    # before persisting, matching the create route and the draft routes.
+    for _url_field in ("start_url", "original_url"):
+        _new_url = update_data.get(_url_field)
+        if _new_url:
+            try:
+                validate_public_http_url(str(_new_url).strip())
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     for key, value in update_data.items():
         if value is not None:
             existing[key] = value
@@ -475,7 +401,7 @@ async def update_workflow(
     existing["updated_at"] = _now_iso()
     existing["version"] = existing.get("version", 1) + 1
 
-    _persist_workflows()
+    _write_back(existing)
     logger.info("Workflow updated: %s", workflow_id)
     return existing
 
@@ -503,9 +429,8 @@ async def delete_workflow(
 ):
     """Delete a workflow permanently."""
     _get_visible_workflow(workflow_id, auth)
-    del _workflows[workflow_id]
-    _persist_workflows()
-    logger.info("Workflow deleted: %s", workflow_id)
+    if _workflows.delete(workflow_id):
+        logger.info("Workflow deleted: %s", workflow_id)
 
 
 @router.post("/{workflow_id}/run", status_code=202)
@@ -519,8 +444,12 @@ async def run_workflow(
     """Queue a workflow for execution and return the job ID.
 
     The actual execution is performed asynchronously by the job runner.
+    A run-history record is appended to ``_workflow_runs`` so the
+    UI can show a chronological list of past runs alongside each
+    workflow.
     """
     wf = _get_visible_workflow(workflow_id, auth)
+    _role, user_id, org_id, project_id = auth
 
     # Update run counters
     wf["total_runs"] = wf.get("total_runs", 0) + 1
@@ -529,16 +458,100 @@ async def run_workflow(
     # Generate a job ID for tracking
     job_id = str(uuid.uuid4())
     wf["last_run_job_id"] = job_id
-    _persist_workflows()
+    _write_back(wf)
 
-    logger.info("Workflow queued: %s -> job %s", workflow_id, job_id)
+    # Record the run in the dedicated run-history store so the
+    # UI can show a chronological list. We snapshot the workflow
+    # name at run time so the history is still readable after
+    # the workflow is renamed or deleted.
+    run_id = str(uuid.uuid4())
+    run_record = {
+        "run_id": run_id,
+        "workflow_id": workflow_id,
+        "workflow_name": str(wf.get("name") or ""),
+        "job_id": job_id,
+        "user_id": user_id,
+        "org_id": org_id,
+        "project_id": project_id,
+        "status": "queued",
+        "queued_at": _now_iso(),
+    }
+    _workflow_runs.upsert(run_id, run_record)
+
+    logger.info("Workflow queued: %s -> job %s (run %s)", workflow_id, job_id, run_id)
 
     return {
         "workflow_id": workflow_id,
         "job_id": job_id,
+        "run_id": run_id,
         "status": "queued",
         "message": "Workflow queued for execution. Poll /api/jobs/{job_id} for status.",
     }
+
+
+@router.get("/{workflow_id}/runs", status_code=200)
+async def list_workflow_runs(
+    workflow_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    status: Annotated[
+        str | None,
+        Query(description="Optional status filter (queued, running, succeeded, failed, canceled)"),
+    ] = None,
+) -> dict[str, Any]:
+    """List the run history for a single workflow, newest first.
+
+    Returns only runs the caller is allowed to see (tenant-scoped
+    via the workflow's owner / org / project).
+    """
+    wf = _get_visible_workflow(workflow_id, auth)
+
+    candidates: list[dict[str, Any]] = []
+    for run in _workflow_runs.values():
+        if str(run.get("workflow_id") or "") != workflow_id:
+            continue
+        if status and str(run.get("status") or "") != status:
+            continue
+        # Tenant scope: a run is visible if the caller is allowed to
+        # see the workflow that owns it (the workflow was already
+        # authorised above, so any run linked to it is in scope).
+        candidates.append(dict(run))
+
+    candidates.sort(key=lambda r: str(r.get("queued_at") or ""), reverse=True)
+    truncated = candidates[:limit]
+    return {
+        "workflow_id": workflow_id,
+        "workflow_name": str(wf.get("name") or ""),
+        "total": len(candidates),
+        "returned": len(truncated),
+        "items": truncated,
+    }
+
+
+@router.get("/{workflow_id}/runs/{run_id}", status_code=200)
+async def get_workflow_run(
+    workflow_id: str,
+    run_id: str,
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
+) -> dict[str, Any]:
+    """Fetch a single run-history record by id.
+
+    Authorisation: the caller must be able to see the owning
+    workflow (404 if not, 404 if the run does not exist for that
+    workflow — we deliberately do not leak whether the run id is
+    just unknown vs scoped away).
+    """
+    _get_visible_workflow(workflow_id, auth)
+    run = _workflow_runs.get(run_id)
+    if run is None or str(run.get("workflow_id") or "") != workflow_id:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    return dict(run)
 
 
 @router.post("/{workflow_id}/preview", status_code=200)
@@ -585,5 +598,5 @@ async def preview_workflow(
     else:
         wf["last_failure_reason"] = result.get("failure_type") or result.get("user_message")
     wf["last_run_at"] = _now_iso()
-    _persist_workflows()
+    _write_back(wf)
     return result

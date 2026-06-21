@@ -13,9 +13,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import runtime_deps
+from app.billing.checkout import router as billing_checkout_router
 from app.billing.webhooks import router as billing_webhook_router
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
@@ -115,6 +117,22 @@ def configure_middleware(app: FastAPI) -> None:
     app.middleware("http")(latency_tracking_middleware)
 
 
+class SPAStaticFiles(StaticFiles):
+    """StaticFiles with SPA fallback — serves index.html for any subpath
+    that does not match a real file, enabling client-side routing via
+    JavaScript's History API (e.g. ``/app/jobs``, ``/app/workflows``).
+    """
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                # Fall back to index.html for SPA client-side routing
+                return await super().get_response("index.html", scope)
+            raise
+
+
 def configure_static(app: FastAPI) -> None:
     """Configure static frontend and dashboard mounts if directories exist and not in production."""
     from app.config import settings
@@ -122,12 +140,12 @@ def configure_static(app: FastAPI) -> None:
     if settings.ENV.lower() == "production":
         return
 
-    FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
-    if FRONTEND_DIR.exists():
-        app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-        DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
-        if DASHBOARD_DIR.exists():
-            app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
+    frontend_dir = Path(__file__).parent.parent.parent / "frontend"
+    if frontend_dir.exists():
+        app.mount("/app", SPAStaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+        dashboard_dir = frontend_dir / "dashboard"
+        if dashboard_dir.exists():
+            app.mount("/dashboard", SPAStaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
 
 
 def configure_routes(app: FastAPI) -> None:
@@ -162,6 +180,7 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(scheduled_monitoring_router)
     app.include_router(user_data_router)
     app.include_router(billing_webhook_router)
+    app.include_router(billing_checkout_router)
 
     # Experimental / research routes — gated on the same flag that gates
     # the import-time subsystem initialization. Including this router

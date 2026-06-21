@@ -7,1204 +7,1639 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
-    <title>DataForge</title>
+    <title>Dataforge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
-    <!-- NOTE: Google Fonts removed to comply with strict CSP policy (font-src 'self' only).
-         If custom fonts are needed, vendor them locally in /frontend/fonts/ and reference via @font-face in styles.css -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="stylesheet" href="styles.css" />
+    <!-- Inter Variable, SIL OFL — self-hosted for CSP font-src 'self'. -->
+    <link rel="icon" type="image/svg+xml" href="/app/favicon.svg" />
+    <link rel="stylesheet" href="/app/styles.css?v=2" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <div id="app">
+    <div id="aup-banner" class="aup-banner" role="status" aria-live="polite" style="display: none"></div>
+    <div id="app-layout">
       <!-- ─── Top Bar ─── -->
       <header class="topbar">
         <div class="topbar-left">
-          <span class="brand">DataForge Studio</span>
-          <span class="sep">/</span>
-          <nav class="tabs" role="tablist">
-            <button
-              type="button"
-              class="tab active"
-              data-action="switch-view"
-              data-view="jobs"
-              id="tab-jobs"
-              role="tab"
-              aria-selected="true"
-            >
-              Jobs
-            </button>
-            <button
-              type="button"
-              class="tab"
-              data-action="switch-view"
-              data-view="new"
-              id="tab-new"
-              role="tab"
-              aria-selected="false"
-            >
-              New
-            </button>
-            <button
-              type="button"
-              class="tab recycle-tab"
-              data-action="switch-view"
-              data-view="recycle"
-              id="tab-recycle"
-              role="tab"
-              aria-selected="false"
-            >
-              Recycle Bin
-            </button>
-            <button
-              type="button"
-              class="tab cognition-tab"
-              data-action="switch-view"
-              data-view="cognition"
-              data-experimental="true"
-              id="tab-cognition"
-              role="tab"
-              aria-selected="false"
-              title="Experimental research views — not production-validated"
-            >
-              Cognition 🧪
-            </button>
-            <button
-              type="button"
-              class="tab dashboard-tab"
-              data-action="switch-view"
-              data-view="dashboard"
-              id="tab-dashboard"
-              role="tab"
-              aria-selected="false"
-            >
-              Dashboard
-            </button>
-            <button
-              type="button"
-              class="tab auth-profiles-tab"
-              data-action="switch-view"
-              data-view="auth-profiles"
-              id="tab-auth-profiles"
-              role="tab"
-              aria-selected="false"
-            >
-              Auth Profiles 🔑
-            </button>
-          </nav>
+          <button
+            type="button"
+            class="sidebar-toggle icon-btn"
+            data-action="toggle-sidebar"
+            aria-label="Toggle sidebar"
+          >
+            <span data-icon="more" aria-hidden="true"></span>
+          </button>
+          <a href="#" class="topbar-brand">
+            <span class="brand-name">Dataforge</span>
+          </a>
+        </div>
+        <div class="topbar-center">
+          <div class="global-search">
+            <span class="global-search-icon" data-icon="search" aria-hidden="true"></span>
+            <input type="text" placeholder="Search jobs..." aria-label="Search jobs" />
+          </div>
         </div>
         <div class="topbar-right">
           <button
             type="button"
-            class="btn ghost small"
-            data-action="show-api-key"
-            title="Set API key for production access"
+            class="icon-btn"
+            id="btn-command-palette"
+            title="Command palette (Ctrl+K)"
+            data-action="open-command-palette"
+            aria-label="Command palette"
           >
-            🔑 Key
+            <span data-icon="search" aria-hidden="true"></span>
           </button>
           <button
             type="button"
-            class="btn ghost small"
-            data-action="show-admin-key"
-            title="Set admin key for protected actions"
-          >
-            🛡️ Admin
-          </button>
-          <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
-          <button
-            type="button"
-            class="topbar-btn"
+            class="icon-btn"
             id="btn-shortcuts"
             title="Keyboard shortcuts"
             data-action="show-shortcuts"
+            aria-label="Keyboard shortcuts"
           >
-            ?
+            <span class="icon-btn-label" aria-hidden="true">?</span>
           </button>
           <button
             type="button"
-            class="topbar-btn"
+            class="icon-btn"
             id="btn-theme-toggle"
             title="Toggle dark mode"
             data-action="toggle-theme"
+            aria-label="Toggle dark mode"
           >
-            🌙
+            <span data-icon="moon" aria-hidden="true"></span>
           </button>
-          <span class="engine-status" id="engine-status"
-            ><span class="dot"></span><span id="engine-status-text">Ready</span></span
+          <span class="health-pill" id="health-pill" data-state="unknown" aria-live="polite" title="API health status"
+            >checking…</span
           >
         </div>
       </header>
 
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: Jobs List                     -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view active" id="view-jobs" aria-label="Scraping Jobs">
-        <div class="container">
-          <div class="page-head">
-            <div>
-              <h1>Scraping Jobs</h1>
-              <p class="subtle">Manage and track your data extraction tasks</p>
-            </div>
-            <button type="button" class="btn primary" data-action="switch-view" data-view="new" id="btn-create-new">
-              Create Job
-            </button>
+      <!-- ─── Sidebar ─── -->
+      <aside class="sidebar" id="sidebar">
+        <nav aria-label="Main navigation">
+          <div class="sidebar-section">
+            <span class="sidebar-section-title">Overview</span>
+            <ul class="nav-list">
+              <li>
+                <button type="button" class="nav-item active" data-action="switch-view" data-view="jobs" id="nav-jobs">
+                  <span class="nav-icon" data-icon="briefcase" aria-hidden="true"></span>
+                  <span class="nav-text">Jobs</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="new" id="nav-new">
+                  <span class="nav-icon" data-icon="plus" aria-hidden="true"></span>
+                  <span class="nav-text">New Job</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="dashboard"
+                  id="nav-dashboard"
+                >
+                  <span class="nav-icon" data-icon="gauge" aria-hidden="true"></span>
+                  <span class="nav-text">Dashboard</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="api-keys" id="nav-api-keys">
+                  <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
+                  <span class="nav-text">API Keys</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="settings" id="nav-settings">
+                  <span class="nav-icon" data-icon="gear" aria-hidden="true"></span>
+                  <span class="nav-text">Settings</span>
+                </button>
+              </li>
+            </ul>
           </div>
-
-          <div class="jobs-toolbar">
-            <div class="jobs-toolbar-left">
-              <input type="text" id="jobs-search" placeholder="Search jobs by name..." aria-label="Search jobs" />
-              <select id="jobs-status-filter" aria-label="Filter by status">
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="discovering">Discovering</option>
-                <option value="running">Running</option>
-                <option value="completed">Completed</option>
-                <option value="canceled">Canceled</option>
-                <option value="failed">Failed</option>
-              </select>
-            </div>
-            <div class="jobs-toolbar-right">
-              <span class="jobs-last-updated" id="jobs-last-updated">Never updated</span>
-              <button type="button" class="btn ghost small" data-action="clear-terminal-jobs" id="btn-clear-terminal">
-                Clear terminal
-              </button>
-              <button type="button" class="btn ghost small" data-action="refresh-jobs" id="btn-refresh-jobs">
-                Refresh
-              </button>
-            </div>
+          <details class="sidebar-section advanced-nav">
+            <summary class="sidebar-section-title">Advanced</summary>
+            <ul class="nav-list">
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="workflows"
+                  id="nav-workflows"
+                >
+                  <span class="nav-icon" data-icon="sliders" aria-hidden="true"></span>
+                  <span class="nav-text">Workflows</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="auth-profiles"
+                  id="nav-auth-profiles"
+                >
+                  <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
+                  <span class="nav-text">Auth Profiles</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="recycle" id="nav-recycle">
+                  <span class="nav-icon" data-icon="trash" aria-hidden="true"></span>
+                  <span class="nav-text">Recycle Bin</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
+                  <span class="nav-icon" data-icon="creditCard" aria-hidden="true"></span>
+                  <span class="nav-text">Billing</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item" data-action="switch-view" data-view="audit" id="nav-audit">
+                  <span class="nav-icon" data-icon="scroll" aria-hidden="true"></span>
+                  <span class="nav-text">Audit</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="retention"
+                  id="nav-retention"
+                >
+                  <span class="nav-icon" data-icon="archive" aria-hidden="true"></span>
+                  <span class="nav-text">Retention</span>
+                </button>
+              </li>
+            </ul>
+          </details>
+          <div class="sidebar-section" data-experimental="true">
+            <span class="sidebar-section-title">Experimental</span>
+            <ul class="nav-list">
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="cognition"
+                  id="nav-cognition"
+                >
+                  <span class="nav-icon" data-icon="flask" aria-hidden="true"></span>
+                  <span class="nav-text">Cognition</span>
+                </button>
+              </li>
+            </ul>
           </div>
-
-          <!-- Mini Stats -->
-          <div class="kpi-row" id="kpi-row">
-            <div class="kpi"><span class="kpi-val" id="kpi-total">0</span><span class="kpi-label">Total</span></div>
-            <div class="kpi"><span class="kpi-val" id="kpi-running">0</span><span class="kpi-label">Running</span></div>
-            <div class="kpi"><span class="kpi-val" id="kpi-done">0</span><span class="kpi-label">Done</span></div>
-            <div class="kpi"><span class="kpi-val" id="kpi-records">0</span><span class="kpi-label">Records</span></div>
-          </div>
-
-          <div class="list-head">
-            <span>Job</span>
-            <span>URLs</span>
-            <span>Status</span>
-            <span>Records</span>
-            <span>Actions</span>
-          </div>
-
-          <!-- Jobs List -->
-          <div class="list" id="jobs-list">
-            <div class="empty-state-illustration" id="empty-state">
-              <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect
-                  x="20"
-                  y="30"
-                  width="120"
-                  height="75"
-                  rx="8"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1.5"
-                  fill="none"
-                  class="empty-svg-line"
-                />
-                <rect
-                  x="35"
-                  y="42"
-                  width="36"
-                  height="36"
-                  rx="4"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  fill="none"
-                  class="anim-float"
-                />
-                <rect
-                  x="78"
-                  y="42"
-                  width="50"
-                  height="8"
-                  rx="2"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  fill="none"
-                  stroke-opacity="0.5"
-                />
-                <rect
-                  x="78"
-                  y="54"
-                  width="40"
-                  height="6"
-                  rx="2"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  fill="none"
-                  stroke-opacity="0.35"
-                />
-                <rect
-                  x="78"
-                  y="64"
-                  width="45"
-                  height="6"
-                  rx="2"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  fill="none"
-                  stroke-opacity="0.25"
-                />
-                <circle cx="53" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                <circle cx="70" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                <circle cx="87" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                <circle cx="104" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3" />
-                <path
-                  d="M35 100 Q 50 90, 65 100 T 95 100 T 125 100"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  fill="none"
-                  stroke-opacity="0.2"
-                  class="anim-pulse-slow"
-                />
-              </svg>
-              <div class="empty-state-title">No jobs yet</div>
-              <div class="empty-state-desc">Create your first scraping job to start extracting data from the web.</div>
-              <button type="button" class="empty-state-btn" data-action="switch-view" data-view="new">
-                Create your first job
-              </button>
-            </div>
+        </nav>
+        <div class="sidebar-activity" id="sidebar-activity">
+          <div class="sidebar-activity-title">Recent</div>
+          <div class="sidebar-activity-list" id="sidebar-activity-list">
+            <!-- Populated by JS -->
           </div>
         </div>
-      </section>
+        <div class="sidebar-bottom">
+          <span class="engine-status" id="engine-status"
+            ><span class="dot"></span><span id="engine-status-text">Ready</span></span
+          >
+        </div>
+      </aside>
 
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: Recycle Bin                   -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view" id="view-recycle">
-        <div class="container">
-          <div class="page-head">
-            <div>
-              <h1>Recycle Bin</h1>
-              <p class="subtle">Restore or permanently delete jobs</p>
+      <!-- ─── Main Content ─── -->
+      <main class="main-content" id="main-content" tabindex="-1">
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Jobs List                     -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view active" id="view-jobs" aria-label="Scraping Jobs">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Scraping Jobs</h1>
+                <p class="subtle">Manage and track your data extraction tasks</p>
+              </div>
+              <button type="button" class="btn primary" data-action="switch-view" data-view="new" id="btn-create-new">
+                Create Job
+              </button>
             </div>
-            <button type="button" class="btn ghost small" data-action="clear-recycle-bin" id="btn-clear-recycle">
-              Empty Bin
-            </button>
-          </div>
 
-          <div class="list-head recycle-list-head">
-            <span>Job</span>
-            <span>Status</span>
-            <span>Records</span>
-            <span>Actions</span>
-          </div>
+            <div class="jobs-toolbar">
+              <div class="jobs-toolbar-left">
+                <input type="text" id="jobs-search" placeholder="Search jobs by name..." aria-label="Search jobs" />
+                <select id="jobs-status-filter" aria-label="Filter by status">
+                  <option value="all">All</option>
+                  <option value="running">Running</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div class="jobs-toolbar-right">
+                <span class="jobs-last-updated" id="jobs-last-updated">Never updated</span>
+                <button type="button" class="btn ghost small" data-action="clear-terminal-jobs" id="btn-clear-terminal">
+                  Clear terminal
+                </button>
+                <button type="button" class="btn ghost small" data-action="refresh-jobs" id="btn-refresh-jobs">
+                  Refresh
+                </button>
+              </div>
+            </div>
 
-          <div class="list" id="recycle-list">
-            <div class="empty-state-illustration" id="empty-recycle-state">
-              <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M42 28 L72 28 L82 18 L92 28 L122 28"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1.5"
-                  fill="none"
-                  class="empty-svg-line"
-                />
-                <rect
-                  x="52"
-                  y="40"
-                  width="60"
-                  height="55"
-                  rx="6"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  fill="none"
-                  class="anim-float-reverse"
-                />
-                <line
-                  x1="62"
-                  y1="52"
-                  x2="102"
-                  y2="52"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  stroke-opacity="0.4"
-                />
-                <line x1="62" y1="60" x2="95" y2="60" stroke="var(--ink-faint)" stroke-width="1" stroke-opacity="0.3" />
-                <line x1="62" y1="68" x2="88" y2="68" stroke="var(--ink-faint)" stroke-width="1" stroke-opacity="0.2" />
-                <circle cx="82" cy="82" r="4" fill="var(--accent)" class="anim-pulse-slow" />
-                <path
-                  d="M60 96 L104 96"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1"
-                  stroke-opacity="0.25"
-                  stroke-dasharray="4 3"
-                  class="anim-pulse-slow"
-                />
-              </svg>
-              <div class="empty-state-title">Recycle bin is empty</div>
-              <div class="empty-state-desc">
-                Deleted jobs will appear here. You can restore them or permanently remove them.
+            <!-- Mini Stats -->
+            <div class="kpi-row" id="kpi-row">
+              <div class="kpi"><span class="kpi-val" id="kpi-total">0</span><span class="kpi-label">Total</span></div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-running">0</span><span class="kpi-label">Running</span>
+              </div>
+              <div class="kpi"><span class="kpi-val" id="kpi-done">0</span><span class="kpi-label">Done</span></div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-records">0</span><span class="kpi-label">Records</span>
+              </div>
+            </div>
+
+            <div class="list-head">
+              <span>Job</span>
+              <span>Created</span>
+              <span>URLs</span>
+              <span>Status</span>
+              <span>Records</span>
+              <span>Issues</span>
+              <span>Actions</span>
+            </div>
+
+            <!-- Jobs List -->
+            <div class="list" id="jobs-list">
+              <div class="empty-state" id="empty-state">
+                <span class="empty-icon" data-icon="briefcase" data-size="28" aria-hidden="true"></span>
+                <h3 class="empty-state-title">No jobs yet</h3>
+                <p class="empty-state-desc">Create your first scrape job.</p>
+                <div class="empty-state-actions">
+                  <button type="button" class="btn primary small" data-action="switch-view" data-view="new">
+                    Create your first job
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: Dashboard                      -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view" id="view-dashboard">
-        <div class="container">
-          <div class="page-head">
-            <div>
-              <h1>Operations Dashboard</h1>
-              <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Recycle Bin                   -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-recycle">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Recycle Bin</h1>
+                <p class="subtle">Restore or permanently delete jobs</p>
+              </div>
+              <button type="button" class="btn ghost small" data-action="clear-recycle-bin" id="btn-clear-recycle">
+                Empty Bin
+              </button>
             </div>
-            <div class="flex-row" style="gap: 0.5rem">
-              <button type="button" class="btn primary small" data-action="refresh-dashboard">Refresh ↻</button>
+
+            <div class="list-head recycle-list-head">
+              <span>Job</span>
+              <span>Status</span>
+              <span>Records</span>
+              <span>Actions</span>
+            </div>
+
+            <div class="list" id="recycle-list">
+              <div class="empty-state" id="empty-recycle-state">
+                <span class="empty-icon" data-icon="trash" data-size="28" aria-hidden="true"></span>
+                <h3>Recycle bin is empty</h3>
+                <p>Deleted jobs will appear here. You can restore them or permanently remove them.</p>
+              </div>
             </div>
           </div>
+        </section>
 
-          <!-- Mode Switcher -->
-          <div class="dash-card mode-card">
-            <div class="dash-card-header">
-              <span class="dash-card-title">⚙️ Operator Mode</span>
-              <span class="dash-badge" id="dash-current-mode">loading...</span>
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Dashboard                      -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-dashboard">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Operations Dashboard</h1>
+                <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
+              </div>
+              <div class="flex-row gap-2">
+                <button type="button" class="btn primary small" data-action="refresh-dashboard">Refresh</button>
+              </div>
             </div>
-            <div class="mode-switcher">
-              <button type="button" class="mode-btn" data-mode="production" data-action="switch-operator-mode">
-                Production
-              </button>
-              <button type="button" class="mode-btn" data-mode="benchmark" data-action="switch-operator-mode">
-                Benchmark
-              </button>
-              <button type="button" class="mode-btn" data-mode="forensic" data-action="switch-operator-mode">
-                Forensic
-              </button>
-              <button
-                type="button"
-                class="mode-btn"
-                data-mode="stealth"
-                data-action="switch-operator-mode"
-                data-experimental="true"
-              >
-                Resilient
-              </button>
-              <button type="button" class="mode-btn" data-mode="low_cost" data-action="switch-operator-mode">
-                Low Cost
-              </button>
-            </div>
-            <div id="mode-feedback" class="mode-feedback hidden"></div>
-          </div>
 
-          <!-- Health KPIs Row -->
-          <div class="kpi-row" id="dash-kpi-row">
-            <div class="kpi">
-              <span class="kpi-val" id="dash-status-val">—</span><span class="kpi-label">Status</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="dash-success-rate">—</span><span class="kpi-label">Success Rate</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="dash-active-browsers">—</span><span class="kpi-label">Active Browsers</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="dash-domains-degraded">—</span><span class="kpi-label">Degraded Domains</span>
-            </div>
-          </div>
-
-          <!-- Two-column layout -->
-          <div class="row-2" style="margin-top: 1.5rem">
-            <!-- Left: Governance Dashboard -->
-            <div class="dash-card">
+            <!-- System Info Panel -->
+            <div class="dash-card sysinfo-card">
               <div class="dash-card-header">
-                <span class="dash-card-title">📊 System Governance</span>
+                <span class="dash-card-title">System Info</span>
+                <span class="dash-badge" id="sysinfo-refreshed-at">loading…</span>
               </div>
-              <div id="dash-governance" class="dash-card-body">
-                <div class="dash-loading">Loading governance data...</div>
+              <div id="sysinfo-error" class="sysinfo-error"></div>
+              <div class="kpi-row" id="sysinfo-kpi-row">
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-jobs-total">—</span><span class="kpi-label">Total jobs</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-jobs-active">—</span><span class="kpi-label">Active</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-jobs-completed">—</span><span class="kpi-label">Completed</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-jobs-failed">—</span><span class="kpi-label">Failed</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-recycle">—</span><span class="kpi-label">Recycle bin</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-val" id="sysinfo-backend">—</span><span class="kpi-label">Storage</span>
+                </div>
               </div>
-            </div>
-
-            <!-- Right: Domain Health -->
-            <div class="dash-card">
-              <div class="dash-card-header">
-                <span class="dash-card-title">🌐 Domain Health</span>
-              </div>
-              <div id="dash-domains" class="dash-card-body">
-                <div class="dash-loading">Loading domain data...</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Degradation Predictions -->
-          <div class="dash-card" style="margin-top: 1.5rem">
-            <div class="dash-card-header">
-              <span class="dash-card-title">🔮 Degradation Predictions</span>
-              <span class="dash-badge" id="dash-systemic-risk">—</span>
-            </div>
-            <div id="dash-predictions" class="dash-card-body">
-              <div class="dash-loading">Loading predictions...</div>
-            </div>
-          </div>
-
-          <!-- Telemetry Stats -->
-          <div class="dash-card" style="margin-top: 1.5rem">
-            <div class="dash-card-header">
-              <span class="dash-card-title">📈 Recent Telemetry</span>
-            </div>
-            <div id="dash-telemetry" class="dash-card-body">
-              <div class="dash-loading">Loading telemetry...</div>
-            </div>
-          </div>
-
-          <!-- Rate Limit Stats -->
-          <div class="dash-card" style="margin-top: 1.5rem">
-            <div class="dash-card-header">
-              <span class="dash-card-title">🚦 Rate Limits</span>
-              <span class="dash-badge" id="dash-rate-limit-tier">—</span>
-            </div>
-            <div id="dash-rate-limits" class="dash-card-body">
-              <div class="dash-loading">Loading rate limit stats...</div>
-            </div>
-          </div>
-
-          <!-- Quick Links -->
-          <div class="dash-card" style="margin-top: 1.5rem" data-experimental="true">
-            <div class="dash-card-header">
-              <span class="dash-card-title">📖 Quick Reference</span>
-            </div>
-            <div class="dash-card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; padding: 1rem">
-              <a href="/api/system/status" target="_blank" rel="noopener noreferrer" class="btn ghost small"
-                >System Status API</a
-              >
-              <a href="/api/operator/health" target="_blank" rel="noopener noreferrer" class="btn ghost small"
-                >Health API</a
-              >
-              <a href="/api/operator/dashboard" target="_blank" rel="noopener noreferrer" class="btn ghost small"
-                >Dashboard API</a
-              >
-              <a href="/api/operator/predictions" target="_blank" rel="noopener noreferrer" class="btn ghost small"
-                >Predictions API</a
-              >
-              <a href="/api/system/topology" target="_blank" rel="noopener noreferrer" class="btn ghost small"
-                >Topology API</a
-              >
-              <a href="/docs" target="_blank" rel="noopener noreferrer" class="btn ghost small">API Docs</a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: New Job / Editor              -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view" id="view-new">
-        <div class="container narrow">
-          <div class="page-head">
-            <div>
-              <h1>New Job</h1>
-              <p class="subtle">Configure what data to extract</p>
-            </div>
-          </div>
-
-          <!-- ═══════════════════════════════════ -->
-          <!-- URL Analyzer — Preview Before Scrape  -->
-          <!-- ═══════════════════════════════════ -->
-          <div class="section url-analyzer-section">
-            <div class="section-head-row">
-              <label class="section-label">
-                <span class="analyzer-icon">🔍</span>
-                URL Analyzer
-              </label>
-              <span class="hint">Paste a URL to preview what data can be extracted</span>
-            </div>
-            <p class="hint-block">
-              Enter a URL first, let the scraper analyze it and suggest data fields. Then select what you want and
-              select the fields you need, and start extraction.
-            </p>
-
-            <div class="analyzer-input-row">
-              <input
-                type="url"
-                id="inp-analyze-url"
-                placeholder="https://example.com/products"
-                class="analyzer-url-input"
-                aria-label="URL to analyze"
-              />
-              <button type="button" class="btn primary" data-action="analyze-url" id="btn-analyze-url">
-                <span class="analyze-btn-text">Analyze URL</span>
-                <span class="spinner hidden" id="analyze-spinner"></span>
-              </button>
-            </div>
-
-            <!-- Analysis Results -->
-            <div id="analyze-results" class="analyze-results hidden">
-              <!-- URL Intelligence Panel -->
-              <div id="url-intelligence-panel" class="url-intelligence-panel hidden">
-                <div class="intelligence-header">
-                  <span class="intelligence-title">🔍 URL Intelligence</span>
-                  <span class="intelligence-confidence" id="intelligence-confidence"></span>
-                </div>
-                <div class="intelligence-row">
-                  <span class="intelligence-label">Type:</span>
-                  <span class="intelligence-value" id="intelligence-classification">—</span>
-                </div>
-                <div class="intelligence-row">
-                  <span class="intelligence-label">Risk:</span>
-                  <span class="intelligence-value" id="intelligence-risk">—</span>
-                </div>
-                <div class="intelligence-row">
-                  <span class="intelligence-label">Recommended:</span>
-                  <span class="intelligence-value" id="intelligence-recommended-mode">—</span>
-                </div>
-                <div class="intelligence-row">
-                  <span class="intelligence-label">Reason:</span>
-                  <span class="intelligence-value" id="intelligence-reason">—</span>
-                </div>
-                <div class="intelligence-steps hidden" id="intelligence-steps-container">
-                  <div class="intelligence-label">Next Steps:</div>
-                  <ul id="intelligence-steps" class="intelligence-steps-list"></ul>
-                </div>
-                <div class="intelligence-actions hidden" id="intelligence-actions"></div>
-              </div>
-
-              <div id="workflow-builder-panel" class="workflow-builder-panel hidden">
-                <div class="workflow-builder-header">
-                  <span class="workflow-builder-title">Workflow Builder</span>
-                  <span class="workflow-builder-status" id="workflow-builder-status">draft</span>
-                </div>
-                <div class="workflow-builder-row">
-                  <label for="workflow-builder-start-url">Start URL</label>
-                  <input id="workflow-builder-start-url" type="url" readonly />
-                </div>
-                <div class="workflow-builder-meta">
-                  <div>
-                    <span>Original URL</span>
-                    <code id="workflow-builder-original-url">—</code>
+              <details class="sysinfo-details">
+                <summary>Queue + Workers</summary>
+                <div class="kpi-row" id="sysinfo-queue-row">
+                  <div class="kpi">
+                    <span class="kpi-val" id="sysinfo-queue-pending">—</span
+                    ><span class="kpi-label">Queue pending</span>
                   </div>
-                  <div>
-                    <span>Reason</span>
-                    <p id="workflow-builder-reason">—</p>
+                  <div class="kpi">
+                    <span class="kpi-val" id="sysinfo-queue-running">—</span
+                    ><span class="kpi-label">Queue running</span>
+                  </div>
+                  <div class="kpi">
+                    <span class="kpi-val" id="sysinfo-queue-dead-letter">—</span
+                    ><span class="kpi-label">Dead letter</span>
+                  </div>
+                  <div class="kpi">
+                    <span class="kpi-val" id="sysinfo-queue-max">—</span><span class="kpi-label">Max concurrency</span>
                   </div>
                 </div>
-                <div class="workflow-builder-grid">
-                  <section>
-                    <h4>Detected Fields</h4>
-                    <div id="workflow-builder-fields" class="workflow-builder-fields">
-                      <div class="workflow-empty">No fields detected yet</div>
-                    </div>
-                  </section>
-                  <section>
-                    <h4>Manual Mapping</h4>
-                    <textarea id="workflow-builder-mapping" rows="8" spellcheck="false"></textarea>
-                  </section>
-                  <section>
-                    <h4>Preview</h4>
-                    <div id="workflow-builder-preview-table" class="workflow-builder-preview">
-                      <div class="workflow-empty">No preview run yet</div>
-                    </div>
-                  </section>
-                  <section>
-                    <h4>Step Timeline</h4>
-                    <ol id="workflow-builder-timeline" class="workflow-builder-timeline">
-                      <li>Draft created</li>
-                    </ol>
-                  </section>
+                <div id="sysinfo-workers" class="sysinfo-workers"></div>
+              </details>
+            </div>
+
+            <!-- Recent Activity Panel -->
+            <div class="dash-card recent-activity-card">
+              <div class="dash-card-header">
+                <span class="dash-card-title">Recent Activity</span>
+                <span class="dash-badge" id="recent-activity-refreshed-at">loading…</span>
+              </div>
+              <div id="recent-activity-list">
+                <p class="subtle">Loading…</p>
+              </div>
+            </div>
+
+            <!-- Mode Switcher -->
+            <div class="dash-card mode-card">
+              <div class="dash-card-header">
+                <span class="dash-card-title">Operator Mode</span>
+                <span class="dash-badge" id="dash-current-mode">loading...</span>
+              </div>
+              <div class="mode-switcher">
+                <button type="button" class="mode-btn" data-mode="production" data-action="switch-operator-mode">
+                  Production
+                </button>
+                <button type="button" class="mode-btn" data-mode="benchmark" data-action="switch-operator-mode">
+                  Benchmark
+                </button>
+                <button type="button" class="mode-btn" data-mode="forensic" data-action="switch-operator-mode">
+                  Forensic
+                </button>
+                <button
+                  type="button"
+                  class="mode-btn"
+                  data-mode="stealth"
+                  data-action="switch-operator-mode"
+                  data-experimental="true"
+                >
+                  Resilient
+                </button>
+                <button type="button" class="mode-btn" data-mode="low_cost" data-action="switch-operator-mode">
+                  Low Cost
+                </button>
+              </div>
+              <div id="mode-feedback" class="mode-feedback hidden"></div>
+            </div>
+
+            <!-- Health KPIs Row -->
+            <div class="kpi-row" id="dash-kpi-row">
+              <div class="kpi">
+                <span class="kpi-val" id="dash-status-val">—</span><span class="kpi-label">Status</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="dash-success-rate">—</span><span class="kpi-label">Success Rate</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="dash-active-browsers">—</span><span class="kpi-label">Active Browsers</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="dash-domains-degraded">—</span><span class="kpi-label">Degraded Domains</span>
+              </div>
+            </div>
+
+            <!-- Two-column layout -->
+            <div class="row-2 mt-4">
+              <!-- Left: Governance Dashboard -->
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <span class="dash-card-title">System Governance</span>
                 </div>
-                <div id="workflow-builder-failure" class="workflow-builder-failure hidden"></div>
-                <div class="workflow-builder-actions">
-                  <button type="button" class="btn secondary small" disabled>Detect Fields</button>
-                  <button type="button" class="btn secondary small" disabled>Preview</button>
-                  <button type="button" class="btn primary small" disabled>Save Workflow</button>
-                  <button type="button" class="btn secondary small" disabled>Run Full Scrape</button>
+                <div id="dash-governance" class="dash-card-body">
+                  <div class="dash-loading">Loading governance data...</div>
                 </div>
               </div>
 
-              <!-- Page Info Bar -->
-              <div class="analyze-info-bar" id="analyze-info-bar">
-                <span class="analyze-info-item" id="ai-structure">—</span>
-                <span class="analyze-info-item" id="ai-records">—</span>
-                <span class="analyze-info-item" id="ai-antibot">—</span>
-                <span class="analyze-info-item" id="ai-fetch-time">—</span>
+              <!-- Right: Domain Health -->
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <span class="dash-card-title">Domain Health</span>
+                </div>
+                <div id="dash-domains" class="dash-card-body">
+                  <div class="dash-loading">Loading domain data...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Degradation Predictions -->
+            <div class="dash-card mt-4">
+              <div class="dash-card-header">
+                <span class="dash-card-title">Degradation Predictions</span>
+                <span class="dash-badge" id="dash-systemic-risk">—</span>
+              </div>
+              <div id="dash-predictions" class="dash-card-body">
+                <div class="dash-loading">Loading predictions...</div>
+              </div>
+            </div>
+
+            <!-- Telemetry Stats -->
+            <div class="dash-card mt-4">
+              <div class="dash-card-header">
+                <span class="dash-card-title">Recent Telemetry</span>
+              </div>
+              <div id="dash-telemetry" class="dash-card-body">
+                <div class="dash-loading">Loading telemetry...</div>
+              </div>
+            </div>
+
+            <!-- Rate Limit Stats -->
+            <div class="dash-card mt-4">
+              <div class="dash-card-header">
+                <span class="dash-card-title">Rate Limits</span>
+                <span class="dash-badge" id="dash-rate-limit-tier">—</span>
+              </div>
+              <div id="dash-rate-limits" class="dash-card-body">
+                <div class="dash-loading">Loading rate limit stats...</div>
+              </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="dash-card mt-4" data-experimental="true">
+              <div class="dash-card-header">
+                <span class="dash-card-title">Quick Reference</span>
+              </div>
+              <div class="dash-card-body flex-row gap-4 flex-wrap">
+                <a href="/api/system/status" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                  >System Status API</a
+                >
+                <a href="/api/operator/health" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                  >Health API</a
+                >
+                <a href="/api/operator/dashboard" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                  >Dashboard API</a
+                >
+                <a href="/api/operator/predictions" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                  >Predictions API</a
+                >
+                <a href="/api/system/topology" target="_blank" rel="noopener noreferrer" class="btn ghost small"
+                  >Topology API</a
+                >
+                <a href="/docs" target="_blank" rel="noopener noreferrer" class="btn ghost small">API Docs</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: New Job / Editor              -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-new">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>New Job</h1>
+                <p class="subtle">Configure what data to extract</p>
+              </div>
+            </div>
+
+            <!-- ═══════════════════════════════════ -->
+            <!-- URL Analyzer — Preview Before Scrape  -->
+            <!-- ═══════════════════════════════════ -->
+            <div class="section url-analyzer-section">
+              <div class="section-head-row">
+                <label class="section-label">URL Analyzer</label>
+                <span class="hint">Paste a URL to preview what data can be extracted</span>
+              </div>
+              <p class="hint-block">
+                Enter a URL first, let the scraper analyze it and suggest data fields. Then select what you want and
+                select the fields you need, and start extraction.
+              </p>
+
+              <div class="analyzer-input-row">
+                <input
+                  type="url"
+                  id="inp-analyze-url"
+                  placeholder="https://example.com/products"
+                  class="analyzer-url-input"
+                  aria-label="URL to analyze"
+                />
+                <button type="button" class="btn primary" data-action="analyze-url" id="btn-analyze-url">
+                  <span class="analyze-btn-text">Analyze URL</span>
+                  <span class="spinner hidden" id="analyze-spinner"></span>
+                </button>
               </div>
 
-              <!-- Acquisition Status Banner -->
-              <div id="acquisition-banner" class="acquisition-banner hidden"></div>
+              <!-- Analysis Results -->
+              <div id="analyze-results" class="analyze-results hidden">
+                <!-- URL Intelligence Panel -->
+                <div id="url-intelligence-panel" class="url-intelligence-panel hidden">
+                  <div class="intelligence-header">
+                    <span class="intelligence-title">URL Intelligence</span>
+                    <span class="intelligence-confidence" id="intelligence-confidence"></span>
+                  </div>
+                  <div class="intelligence-row">
+                    <span class="intelligence-label">Type:</span>
+                    <span class="intelligence-value" id="intelligence-classification">—</span>
+                  </div>
+                  <div class="intelligence-row">
+                    <span class="intelligence-label">Risk:</span>
+                    <span class="intelligence-value" id="intelligence-risk">—</span>
+                  </div>
+                  <div class="intelligence-row">
+                    <span class="intelligence-label">Recommended:</span>
+                    <span class="intelligence-value" id="intelligence-recommended-mode">—</span>
+                  </div>
+                  <div class="intelligence-row">
+                    <span class="intelligence-label">Reason:</span>
+                    <span class="intelligence-value" id="intelligence-reason">—</span>
+                  </div>
+                  <div class="intelligence-steps hidden" id="intelligence-steps-container">
+                    <div class="intelligence-label">Next Steps:</div>
+                    <ul id="intelligence-steps" class="intelligence-steps-list"></ul>
+                  </div>
+                  <div class="intelligence-actions hidden" id="intelligence-actions"></div>
+                </div>
 
-              <!-- Detected Fields -->
-              <div class="analyze-fields-header">
-                <span>Detected Fields <span id="analyze-field-count" class="field-count-badge">0</span></span>
-                <div class="analyze-field-actions">
+                <div id="workflow-builder-panel" class="workflow-builder-panel hidden">
+                  <div class="workflow-builder-header">
+                    <span class="workflow-builder-title">Workflow Builder</span>
+                    <span class="workflow-builder-status" id="workflow-builder-status">draft</span>
+                  </div>
+                  <div class="workflow-builder-row">
+                    <label for="workflow-builder-start-url">Start URL</label>
+                    <input id="workflow-builder-start-url" type="url" readonly />
+                  </div>
+                  <div class="workflow-builder-meta">
+                    <div>
+                      <span>Original URL</span>
+                      <code id="workflow-builder-original-url">—</code>
+                    </div>
+                    <div>
+                      <span>Reason</span>
+                      <p id="workflow-builder-reason">—</p>
+                    </div>
+                  </div>
+                  <div class="workflow-builder-grid">
+                    <section>
+                      <h4>Detected Fields</h4>
+                      <div id="workflow-builder-fields" class="workflow-builder-fields">
+                        <div class="workflow-empty">No fields detected yet</div>
+                      </div>
+                    </section>
+                    <section>
+                      <h4>Manual Mapping</h4>
+                      <textarea id="workflow-builder-mapping" rows="8" spellcheck="false"></textarea>
+                    </section>
+                    <section>
+                      <h4>Preview</h4>
+                      <div id="workflow-builder-preview-table" class="workflow-builder-preview">
+                        <div class="workflow-empty">No preview run yet</div>
+                      </div>
+                    </section>
+                    <section>
+                      <h4>Step Timeline</h4>
+                      <ol id="workflow-builder-timeline" class="workflow-builder-timeline">
+                        <li>Draft created</li>
+                      </ol>
+                    </section>
+                  </div>
+                  <div id="workflow-builder-failure" class="workflow-builder-failure hidden"></div>
+                  <div class="workflow-builder-actions">
+                    <button type="button" class="btn secondary small" disabled>Detect Fields</button>
+                    <button type="button" class="btn secondary small" disabled>Preview</button>
+                    <button type="button" class="btn primary small" disabled>Save Workflow</button>
+                    <button type="button" class="btn secondary small" disabled>Run Full Scrape</button>
+                  </div>
+                </div>
+
+                <!-- Page Info Bar -->
+                <div class="analyze-info-bar" id="analyze-info-bar">
+                  <span class="analyze-info-item" id="ai-structure">—</span>
+                  <span class="analyze-info-item" id="ai-records">—</span>
+                  <span class="analyze-info-item" id="ai-antibot">—</span>
+                  <span class="analyze-info-item" id="ai-fetch-time">—</span>
+                </div>
+
+                <!-- Acquisition Status Banner -->
+                <div id="acquisition-banner" class="acquisition-banner hidden"></div>
+
+                <!-- Detected Fields -->
+                <div class="analyze-fields-header">
+                  <span>Detected Fields <span id="analyze-field-count" class="field-count-badge">0</span></span>
+                  <div class="analyze-field-actions">
+                    <button
+                      type="button"
+                      class="btn ghost small"
+                      data-action="toggle-all-fields"
+                      data-select="true"
+                      id="btn-select-all"
+                    >
+                      Select All
+                    </button>
+                    <button type="button" class="btn ghost small" data-action="toggle-all-fields" data-select="false">
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+                <div id="analyze-field-list" class="analyze-field-list">
+                  <div class="empty"><p>No fields detected</p></div>
+                </div>
+
+                <!-- Apply Button -->
+                <div class="analyze-apply-row">
+                  <button type="button" class="btn primary" data-action="apply-fields" id="btn-apply-fields">
+                    Apply Selected Fields to Schema
+                  </button>
+                  <button type="button" class="btn ghost small" data-action="clear-analysis">Clear</button>
+                </div>
+              </div>
+
+              <!-- Error State -->
+              <div id="analyze-error" class="analyze-error hidden">
+                <span data-icon="alertTriangle" aria-hidden="true"></span>
+                <span id="analyze-error-text"></span>
+              </div>
+            </div>
+
+            <form id="job-form" novalidate>
+              <!-- Hidden submit button for WCAG compliance -->
+              <button type="submit" hidden aria-hidden="true"></button>
+              <div id="form-errors" class="form-errors hidden" role="alert" aria-live="polite"></div>
+
+              <!-- Mode Toggle -->
+              <div class="section">
+                <label class="section-label">Source Mode</label>
+                <div class="toggle-group" id="mode-toggle">
                   <button
                     type="button"
-                    class="btn ghost small"
-                    data-action="toggle-all-fields"
-                    data-select="true"
-                    id="btn-select-all"
+                    class="toggle active"
+                    data-mode="manual"
+                    data-action="set-mode"
+                    aria-label="Manual URLs mode"
                   >
-                    Select All
+                    Manual URLs
                   </button>
-                  <button type="button" class="btn ghost small" data-action="toggle-all-fields" data-select="false">
-                    Deselect All
+                  <button
+                    type="button"
+                    class="toggle"
+                    data-mode="auto"
+                    data-action="set-mode"
+                    aria-label="Auto Discover mode"
+                  >
+                    Auto Discover
                   </button>
                 </div>
               </div>
-              <div id="analyze-field-list" class="analyze-field-list">
-                <div class="empty"><p>No fields detected</p></div>
+
+              <!-- Job Name -->
+              <div class="section">
+                <label class="section-label" for="inp-name">Name</label>
+                <input
+                  type="text"
+                  id="inp-name"
+                  placeholder="e.g. Chennai Interior Designers"
+                  required
+                  aria-label="Job name"
+                />
               </div>
 
-              <!-- Apply Button -->
-              <div class="analyze-apply-row">
-                <button type="button" class="btn primary" data-action="apply-fields" id="btn-apply-fields">
-                  Apply Selected Fields to Schema
-                </button>
-                <button type="button" class="btn ghost small" data-action="clear-analysis">Clear</button>
+              <!-- Intent -->
+              <div class="section">
+                <label class="section-label" for="inp-intent">Describe The Data You Want</label>
+                <textarea
+                  id="inp-intent"
+                  rows="3"
+                  placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar."
+                  aria-label="Data description"
+                ></textarea>
+                <div class="form-actions form-actions-inline">
+                  <button
+                    type="button"
+                    class="btn secondary small"
+                    data-action="suggest-schema"
+                    id="btn-suggest-schema"
+                  >
+                    Suggest topic + schema from intent
+                  </button>
+                </div>
+                <p id="suggestion-note" class="hint-block hidden"></p>
               </div>
-            </div>
 
-            <!-- Error State -->
-            <div id="analyze-error" class="analyze-error hidden">
-              <span class="analyze-error-icon">⚠️</span>
-              <span id="analyze-error-text"></span>
-            </div>
-          </div>
-
-          <form id="job-form">
-            <!-- Hidden submit button for WCAG compliance -->
-            <button type="submit" hidden aria-hidden="true"></button>
-
-            <!-- Mode Toggle -->
-            <div class="section">
-              <label class="section-label">Source Mode</label>
-              <div class="toggle-group" id="mode-toggle">
-                <button
-                  type="button"
-                  class="toggle active"
-                  data-mode="manual"
-                  data-action="set-mode"
-                  aria-label="Manual URLs mode"
+              <!-- Manual Mode: URLs -->
+              <div class="section" id="section-manual">
+                <label class="section-label" for="inp-urls"
+                  >Target URLs <span class="hint">one per line, up to 100</span></label
                 >
-                  Manual URLs
-                </button>
-                <button
-                  type="button"
-                  class="toggle"
-                  data-mode="auto"
-                  data-action="set-mode"
-                  aria-label="Auto Discover mode"
-                >
-                  Auto Discover
-                </button>
-              </div>
-            </div>
-
-            <!-- Job Name -->
-            <div class="section">
-              <label class="section-label" for="inp-name">Name</label>
-              <input
-                type="text"
-                id="inp-name"
-                placeholder="e.g. Chennai Interior Designers"
-                required
-                aria-label="Job name"
-              />
-            </div>
-
-            <!-- Intent -->
-            <div class="section">
-              <label class="section-label" for="inp-intent">Describe The Data You Want</label>
-              <textarea
-                id="inp-intent"
-                rows="3"
-                placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar."
-                aria-label="Data description"
-              ></textarea>
-              <div class="form-actions form-actions-inline">
-                <button type="button" class="btn secondary small" data-action="suggest-schema" id="btn-suggest-schema">
-                  Suggest topic + schema from intent
-                </button>
-              </div>
-              <p id="suggestion-note" class="hint-block hidden"></p>
-            </div>
-
-            <!-- Manual Mode: URLs -->
-            <div class="section" id="section-manual">
-              <label class="section-label" for="inp-urls">Target URLs <span class="hint">one per line</span></label>
-              <textarea
-                id="inp-urls"
-                rows="4"
-                placeholder="https://example.com/directory&#10;https://example.com/page2"
-                aria-label="Target URLs"
-              ></textarea>
-            </div>
-
-            <!-- Auto Mode: Topic -->
-            <div class="section hidden" id="section-auto">
-              <label class="section-label" for="inp-topic">What do you want to find?</label>
-              <input
-                type="text"
-                id="inp-topic"
-                placeholder="e.g. Interior designers in Chennai with contact info"
-                aria-label="Search topic"
-              />
-
-              <div class="row-2 mt-0\.75">
-                <div>
-                  <label class="section-label small" for="inp-location">Location focus</label>
-                  <input type="text" id="inp-location" placeholder="e.g. Chennai, India" aria-label="Location focus" />
-                </div>
-                <div>
-                  <label class="section-label small" for="inp-domain">Preferred domain</label>
-                  <input
-                    type="text"
-                    id="inp-domain"
-                    placeholder="e.g. justdial.com (optional)"
-                    aria-label="Preferred domain"
-                  />
-                </div>
-              </div>
-              <div class="row-2 mt-0\.75">
-                <div>
-                  <label class="section-label small" for="inp-origin-location">Origin for radius optimization</label>
-                  <input
-                    type="text"
-                    id="inp-origin-location"
-                    placeholder="e.g. T Nagar, Chennai"
-                    aria-label="Origin location for radius"
-                  />
-                </div>
-                <div>
-                  <label class="section-label small" for="inp-max-distance-km">Max distance (km)</label>
-                  <input
-                    type="number"
-                    id="inp-max-distance-km"
-                    min="0"
-                    step="0.5"
-                    placeholder="e.g. 15"
-                    aria-label="Max distance in km"
-                  />
-                </div>
-              </div>
-              <div class="row-2 mt-0\.75">
-                <div>
-                  <label class="section-label small" for="inp-discover-pages">Max Pages to Discover</label>
-                  <input
-                    type="number"
-                    id="inp-discover-pages"
-                    placeholder="Default: 12"
-                    value="12"
-                    min="1"
-                    max="20"
-                    aria-label="Max pages to discover"
-                  />
-                </div>
-                <div>
-                  <label class="section-label small" for="inp-max-per-domain">Max URLs per domain</label>
-                  <input
-                    type="number"
-                    id="inp-max-per-domain"
-                    placeholder="Default: 4"
-                    value="4"
-                    min="1"
-                    max="25"
-                    aria-label="Max URLs per domain"
-                  />
-                </div>
+                <textarea
+                  id="inp-urls"
+                  rows="4"
+                  placeholder="https://example.com/directory&#10;https://example.com/page2"
+                  aria-label="Target URLs"
+                ></textarea>
               </div>
 
-              <button type="button" class="btn secondary small" data-action="preview-discovery" id="btn-preview">
-                Preview discovered URLs
-              </button>
-              <div id="discovery-preview" class="discovery-preview hidden"></div>
-            </div>
+              <!-- Auto Mode: Topic -->
+              <div class="section hidden" id="section-auto">
+                <label class="section-label" for="inp-topic">What do you want to find?</label>
+                <input
+                  type="text"
+                  id="inp-topic"
+                  placeholder="e.g. Interior designers in Chennai with contact info"
+                  aria-label="Search topic"
+                />
 
-            <!-- Schema -->
-            <div class="section">
-              <label class="section-label" for="inp-source-policy">Source Coverage Policy</label>
-              <select id="inp-source-policy" aria-label="Source coverage policy">
-                <option value="official_plus_directory" selected>Official + Directory (recommended)</option>
-                <option value="official_only">Official only (strict)</option>
-                <option value="all_sources">All sources (max coverage)</option>
-              </select>
-              <p class="hint-block">
-                All-sources gives broader coverage; strict mode gives cleaner official-only data.
-              </p>
-            </div>
-
-            <div class="section">
-              <label class="section-label">Data Schema</label>
-              <p class="hint-block">Define the columns of data you want extracted</p>
-              <div id="schema-container"></div>
-              <button type="button" class="btn ghost small" data-action="add-field" id="btn-add-field">
-                + Add Field
-              </button>
-            </div>
-
-            <!-- Filters -->
-            <div class="section">
-              <div class="section-head-row">
-                <label class="section-label">Filters</label>
-                <span class="hint">optional</span>
-              </div>
-              <p class="hint-block">Remove records that don't match your criteria</p>
-              <div id="filters-container"></div>
-              <button type="button" class="btn ghost small" data-action="add-filter" id="btn-add-filter">
-                + Add Filter
-              </button>
-            </div>
-
-            <!-- Advanced -->
-            <details class="section collapsible">
-              <summary class="section-label clickable" aria-label="Advanced Options">Advanced Options</summary>
-              <div class="advanced-body">
-                <div class="row-2">
-                  <label class="check-label">
-                    <input type="checkbox" id="chk-dedup" checked aria-label="Remove duplicate records" />
-                    <span>Remove duplicate records</span>
-                  </label>
+                <div class="row-2 mt-half">
                   <div>
-                    <label class="section-label small" for="inp-dedup-field">Dedup by field</label>
+                    <label class="section-label small" for="inp-location">Location focus</label>
                     <input
                       type="text"
-                      id="inp-dedup-field"
-                      placeholder="e.g. company_name"
-                      aria-label="Deduplicate by field"
+                      id="inp-location"
+                      placeholder="e.g. Chennai, India"
+                      aria-label="Location focus"
+                    />
+                  </div>
+                  <div>
+                    <label class="section-label small" for="inp-domain">Preferred domain</label>
+                    <input
+                      type="text"
+                      id="inp-domain"
+                      placeholder="e.g. justdial.com (optional)"
+                      aria-label="Preferred domain"
                     />
                   </div>
                 </div>
-                <div class="row-2" style="margin-top: 0.5rem">
-                  <label class="check-label">
-                    <input type="checkbox" id="chk-pagination" aria-label="Follow pagination" />
-                    <span>Follow pagination</span>
-                  </label>
+                <div class="row-2 mt-half">
                   <div>
-                    <label class="section-label small" for="inp-max-pages">Max pages</label>
-                    <input type="number" id="inp-max-pages" value="10" min="1" max="100" aria-label="Max pages" />
+                    <label class="section-label small" for="inp-origin-location">Origin for radius optimization</label>
+                    <input
+                      type="text"
+                      id="inp-origin-location"
+                      placeholder="e.g. T Nagar, Chennai"
+                      aria-label="Origin location for radius"
+                    />
+                  </div>
+                  <div>
+                    <label class="section-label small" for="inp-max-distance-km">Max distance (km)</label>
+                    <input
+                      type="number"
+                      id="inp-max-distance-km"
+                      min="0"
+                      step="0.5"
+                      placeholder="e.g. 15"
+                      aria-label="Max distance in km"
+                    />
                   </div>
                 </div>
-                <div style="margin-top: 0.75rem">
-                  <label class="section-label small" for="inp-min-score">Minimum record quality score (0 to 1)</label>
-                  <input
-                    type="number"
-                    id="inp-min-score"
-                    value="0.35"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    aria-label="Minimum record quality score"
-                  />
+                <div class="row-2 mt-half">
+                  <div>
+                    <label class="section-label small" for="inp-discover-pages">Max Pages to Discover</label>
+                    <input
+                      type="number"
+                      id="inp-discover-pages"
+                      placeholder="Default: 12"
+                      value="12"
+                      min="1"
+                      max="20"
+                      aria-label="Max pages to discover"
+                    />
+                  </div>
+                  <div>
+                    <label class="section-label small" for="inp-max-per-domain">Max URLs per domain</label>
+                    <input
+                      type="number"
+                      id="inp-max-per-domain"
+                      placeholder="Default: 4"
+                      value="4"
+                      min="1"
+                      max="25"
+                      aria-label="Max URLs per domain"
+                    />
+                  </div>
+                </div>
+
+                <button type="button" class="btn secondary small" data-action="preview-discovery" id="btn-preview">
+                  Preview discovered URLs
+                </button>
+                <div id="discovery-preview" class="discovery-preview hidden"></div>
+              </div>
+
+              <!-- Schema -->
+              <div class="section">
+                <label class="section-label" for="inp-source-policy">Source Coverage Policy</label>
+                <select id="inp-source-policy" aria-label="Source coverage policy">
+                  <option value="official_plus_directory" selected>Official + Directory (recommended)</option>
+                  <option value="official_only">Official only (strict)</option>
+                  <option value="all_sources">All sources (max coverage)</option>
+                </select>
+                <p class="hint-block">
+                  All-sources gives broader coverage; strict mode gives cleaner official-only data.
+                </p>
+              </div>
+
+              <div class="section">
+                <label class="section-label">Data Schema</label>
+                <p class="hint-block">Define the columns of data you want extracted</p>
+                <div id="schema-container"></div>
+                <button type="button" class="btn ghost small" data-action="add-field" id="btn-add-field">
+                  + Add Field
+                </button>
+              </div>
+
+              <!-- Filters -->
+              <div class="section">
+                <div class="section-head-row">
+                  <label class="section-label">Filters</label>
+                  <span class="hint">optional</span>
+                </div>
+                <p class="hint-block">Remove records that don't match your criteria</p>
+                <div id="filters-container"></div>
+                <button type="button" class="btn ghost small" data-action="add-filter" id="btn-add-filter">
+                  + Add Filter
+                </button>
+              </div>
+
+              <!-- Advanced -->
+              <details class="section collapsible">
+                <summary class="section-label clickable" aria-label="Advanced Options">Advanced Options</summary>
+                <div class="advanced-body">
+                  <div class="row-2">
+                    <label class="check-label">
+                      <input type="checkbox" id="chk-dedup" checked aria-label="Remove duplicate records" />
+                      <span>Remove duplicate records</span>
+                    </label>
+                    <div>
+                      <label class="section-label small" for="inp-dedup-field">Dedup by field</label>
+                      <input
+                        type="text"
+                        id="inp-dedup-field"
+                        placeholder="e.g. company_name"
+                        aria-label="Deduplicate by field"
+                      />
+                    </div>
+                  </div>
+                  <div class="row-2 mt-2">
+                    <label class="check-label">
+                      <input type="checkbox" id="chk-pagination" aria-label="Follow pagination" />
+                      <span>Follow pagination</span>
+                    </label>
+                    <div>
+                      <label class="section-label small" for="inp-max-pages">Max pages</label>
+                      <input type="number" id="inp-max-pages" value="10" min="1" max="100" aria-label="Max pages" />
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <label class="section-label small" for="inp-min-score">Minimum record quality score (0 to 1)</label>
+                    <input
+                      type="number"
+                      id="inp-min-score"
+                      value="0.35"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      aria-label="Minimum record quality score"
+                    />
+                  </div>
+                </div>
+              </details>
+
+              <!-- Auth Profile Selector -->
+              <div class="section" id="section-auth-profile">
+                <div class="section-head-row">
+                  <label class="section-label">Authentication Profile</label>
+                  <span class="hint">optional</span>
+                </div>
+                <p class="hint-block">Select an existing auth profile if the target site requires login.</p>
+                <select id="inp-auth-profile" aria-label="Authentication profile">
+                  <option value="">None (public access)</option>
+                </select>
+                <p class="hint-block mt-1">
+                  <a href="#" data-action="switch-view" data-view="auth-profiles" class="hint">Manage auth profiles</a>
+                </p>
+              </div>
+
+              <!-- Actions -->
+              <div class="form-actions">
+                <button type="button" class="btn ghost" data-action="switch-view" data-view="jobs">Cancel</button>
+                <button type="submit" class="btn primary" id="btn-submit">Start scraping</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Results Detail                -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-results">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <button type="button" class="btn ghost small" data-action="switch-view" data-view="jobs">Back</button>
+                <h1 id="res-title">Results</h1>
+                <p class="subtle" id="res-meta"></p>
+                <div id="result-warning"></div>
+                <div id="lineage-summary"></div>
+                <div id="res-progress-wrap" class="job-progress-wrap hidden">
+                  <div id="res-progress-bar" class="job-progress-bar" style="width: 0%"></div>
+                  <span id="res-progress-text" class="job-progress-text">0%</span>
                 </div>
               </div>
-            </details>
-
-            <!-- Auth Profile Selector -->
-            <div class="section" id="section-auth-profile">
-              <div class="section-head-row">
-                <label class="section-label">Authentication Profile</label>
-                <span class="hint">optional</span>
-              </div>
-              <p class="hint-block">Select an existing auth profile if the target site requires login.</p>
-              <select id="inp-auth-profile" aria-label="Authentication profile">
-                <option value="">None (public access)</option>
-              </select>
-              <p class="hint-block" style="margin-top: 0.3rem">
-                <a href="#" data-action="switch-view" data-view="auth-profiles" class="hint">Manage auth profiles →</a>
-              </p>
-            </div>
-
-            <!-- Actions -->
-            <div class="form-actions">
-              <button type="button" class="btn ghost" data-action="switch-view" data-view="jobs">Cancel</button>
-              <button type="submit" class="btn primary" id="btn-submit">Start Scraping →</button>
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: Results Detail                -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view" id="view-results">
-        <div class="container">
-          <div class="page-head">
-            <div>
-              <button type="button" class="btn ghost small" data-action="switch-view" data-view="jobs">← Back</button>
-              <h1 id="res-title">Results</h1>
-              <p class="subtle" id="res-meta"></p>
-              <div id="result-warning"></div>
-              <div id="lineage-summary"></div>
-              <div id="res-progress-wrap" class="job-progress-wrap hidden">
-                <div id="res-progress-bar" class="job-progress-bar" style="width: 0%"></div>
-                <span id="res-progress-text" class="job-progress-text">0%</span>
+              <div class="btn-group" id="export-group" style="display: none">
+                <button type="button" class="btn secondary small" data-action="reclean-job" id="btn-reclean">
+                  AI Re-clean
+                </button>
+                <button type="button" class="btn secondary small" data-action="export-csv" id="btn-csv">CSV</button>
+                <button type="button" class="btn secondary small" data-action="export-json" id="btn-json">JSON</button>
+                <button type="button" class="btn secondary small" data-action="export-excel" id="btn-excel">
+                  Excel
+                </button>
+                <button type="button" class="btn secondary small" data-action="copy-sample-row" id="btn-copy-sample">
+                  Copy sample
+                </button>
               </div>
             </div>
-            <div class="btn-group" id="export-group" style="display: none">
-              <button type="button" class="btn secondary small" data-action="reclean-job" id="btn-reclean">
-                AI Re-clean
-              </button>
-              <button type="button" class="btn secondary small" data-action="export-csv" id="btn-csv">CSV ↓</button>
-              <button type="button" class="btn secondary small" data-action="export-json" id="btn-json">JSON ↓</button>
-              <button type="button" class="btn secondary small" data-action="export-excel" id="btn-excel">
-                Excel ↓
-              </button>
+
+            <div id="ai-insight-panel" class="ai-insight hidden">
+              <h4 class="insight-title">AI Data Insight</h4>
+              <p id="ai-insight-text">Analyzing dataset...</p>
             </div>
-          </div>
 
-          <div id="ai-insight-panel" class="ai-insight hidden">
-            <h4 class="insight-title">✨ AI Data Insight</h4>
-            <p id="ai-insight-text">Analyzing dataset...</p>
-          </div>
+            <div id="logs-panel" class="ai-insight hidden">
+              <h4 class="insight-title">Activity Logs</h4>
+              <div id="logs-container" class="logs-container"></div>
+            </div>
 
-          <div id="logs-panel" class="ai-insight hidden">
-            <h4 class="insight-title">Activity Logs</h4>
-            <div id="logs-container" class="logs-container"></div>
-          </div>
+            <div id="quality-panel" class="ai-insight hidden">
+              <h4 class="insight-title">Data Quality Report</h4>
+              <p id="quality-text"></p>
+            </div>
 
-          <div id="quality-panel" class="ai-insight hidden">
-            <h4 class="insight-title">Data Quality Report</h4>
-            <p id="quality-text"></p>
-          </div>
-
-          <div class="results-scrollbar hidden" id="results-scrollbar">
-            <span class="scroll-label">Columns</span>
-            <input
-              type="range"
-              id="results-scroll-slider"
-              min="0"
-              max="0"
-              value="0"
-              step="1"
-              aria-label="Scroll columns"
-            />
-            <span class="scroll-pos" id="results-scroll-pos">0%</span>
-          </div>
-
-          <div class="table-wrap">
-            <div class="results-toolbar" id="results-toolbar">
+            <div class="results-scrollbar hidden" id="results-scrollbar">
+              <span class="scroll-label">Columns</span>
               <input
-                type="text"
-                id="inp-result-search"
-                placeholder="Filter rows in this result set..."
-                aria-label="Filter results"
+                type="range"
+                id="results-scroll-slider"
+                min="0"
+                max="0"
+                value="0"
+                step="1"
+                aria-label="Scroll columns"
               />
-              <span class="table-copy-hint">Double-click a cell to copy</span>
-              <span class="table-count" id="result-count-label">0 rows</span>
+              <span class="scroll-pos" id="results-scroll-pos">0%</span>
             </div>
-            <table id="res-table">
-              <thead id="res-thead"></thead>
-              <tbody id="res-tbody">
-                <tr>
-                  <td class="empty-cell"><p>Select a job to view results</p></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: Cognition State               -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view" id="view-cognition" data-experimental="true">
-        <div class="container">
-          <div class="page-head">
-            <div>
-              <h1>
-                Cognition State
-                <span
-                  style="
-                    font-size: 0.6rem;
-                    background: var(--warning-soft);
-                    color: var(--warning);
-                    padding: 0.15rem 0.45rem;
-                    border-radius: 999px;
-                    vertical-align: middle;
-                    font-weight: 600;
-                    letter-spacing: 0.03em;
-                    text-transform: uppercase;
-                  "
-                  >EXPERIMENTAL</span
+            <div class="table-wrap">
+              <div class="results-toolbar" id="results-toolbar">
+                <input
+                  type="text"
+                  id="inp-result-search"
+                  placeholder="Filter rows in this result set..."
+                  aria-label="Filter results"
+                />
+                <span class="table-copy-hint">Double-click a cell to copy</span>
+                <span class="table-count" id="result-count-label">0 rows</span>
+              </div>
+              <table id="res-table">
+                <thead id="res-thead"></thead>
+                <tbody id="res-tbody">
+                  <tr>
+                    <td class="empty-cell"><p>Select a job to view results</p></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Cognition State               -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-cognition" data-experimental="true">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>
+                  Cognition State
+                  <span class="badge experimental">Experimental</span>
+                </h1>
+                <p class="subtle">Research-only semantic/topology views — not validated for production use</p>
+              </div>
+              <div class="flex-row gap-2">
+                <button type="button" class="btn ghost small" data-action="refresh-cognition">Refresh</button>
+                <a href="/api/system/export/knowledge" download="knowledge-manifold.json" class="btn small"
+                  >Download Knowledge</a
                 >
-              </h1>
-              <p class="subtle">Research-only semantic/topology views — not validated for production use</p>
-            </div>
-            <div style="display: flex; gap: 0.5rem">
-              <button type="button" class="btn ghost small" data-action="refresh-cognition">Refresh</button>
-              <a href="/api/system/export/knowledge" download="knowledge-manifold.json" class="btn small"
-                >Download Knowledge</a
-              >
-            </div>
-          </div>
-
-          <!-- Cognition KPIs -->
-          <div class="kpi-row" id="cognition-kpi-row">
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-pressure">0</span><span class="kpi-label">Field Pressure</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-integrity">0</span><span class="kpi-label">Field Integrity</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-energy">0</span><span class="kpi-label">Global Energy</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-exclusions">0</span><span class="kpi-label">Learned Exclusions</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-basins">0</span><span class="kpi-label">Active Basins</span>
-            </div>
-          </div>
-
-          <!-- Cognition Grid -->
-          <div class="row-2" style="margin-top: 2rem">
-            <!-- Left: Semantic Communities (Macro Scale) -->
-            <div class="ai-insight" style="display: block">
-              <h4 class="insight-title">Semantic Communities</h4>
-              <div class="list" id="community-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto">
-                <div class="empty"><p>No stable communities identified</p></div>
               </div>
             </div>
 
-            <!-- Right: Stable Schema Patterns -->
-            <div class="ai-insight" style="display: block">
-              <h4 class="insight-title">Learned Schema Patterns</h4>
-              <div class="list" id="schema-pattern-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto">
-                <div class="empty"><p>No recurring schemas learned yet</p></div>
+            <!-- Cognition KPIs -->
+            <div class="kpi-row" id="cognition-kpi-row">
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-pressure">0</span><span class="kpi-label">Field Pressure</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-integrity">0</span><span class="kpi-label">Field Integrity</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-energy">0</span><span class="kpi-label">Global Energy</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-exclusions">0</span><span class="kpi-label">Learned Exclusions</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-basins">0</span><span class="kpi-label">Active Basins</span>
+              </div>
+            </div>
+
+            <!-- Cognition Grid -->
+            <div class="row-2 mt-7">
+              <!-- Left: Semantic Communities (Macro Scale) -->
+              <div class="ai-insight cog-panel">
+                <h4 class="insight-title">Semantic Communities</h4>
+                <div class="list cog-scroll-list" id="community-list">
+                  <div class="empty"><p>No stable communities identified</p></div>
+                </div>
+              </div>
+
+              <!-- Right: Stable Schema Patterns -->
+              <div class="ai-insight cog-panel">
+                <h4 class="insight-title">Learned Schema Patterns</h4>
+                <div class="list cog-scroll-list" id="schema-pattern-list">
+                  <div class="empty"><p>No recurring schemas learned yet</p></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row-2 mt-7">
+              <!-- Left: Learned Exclusions -->
+              <div class="ai-insight cog-panel">
+                <h4 class="insight-title">Learned Exclusions</h4>
+                <div class="list cog-scroll-list-tall" id="exclusion-list">
+                  <div class="empty"><p>No exclusions learned yet</p></div>
+                </div>
+              </div>
+
+              <!-- Right: Role Similarities -->
+              <div class="ai-insight cog-panel">
+                <h4 class="insight-title">Manifold Alignment (Similarity)</h4>
+                <div class="list cog-scroll-list-tall" id="role-similarity-list">
+                  <div class="empty"><p>Manifold is cold</p></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Basins (Micro Scale) -->
+            <div class="mt-7">
+              <div class="ai-insight cog-panel">
+                <h4 class="insight-title">Active Field Basins (High Entropy Zones)</h4>
+                <div class="list cog-scroll-list-tall" id="basin-list">
+                  <div class="empty"><p>No active conflict basins</p></div>
+                </div>
               </div>
             </div>
           </div>
+        </section>
 
-          <div class="row-2" style="margin-top: 2rem">
-            <!-- Left: Learned Exclusions -->
-            <div class="ai-insight" style="display: block">
-              <h4 class="insight-title">Learned Exclusions</h4>
-              <div class="list" id="exclusion-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto">
-                <div class="empty"><p>No exclusions learned yet</p></div>
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Auth Profiles                 -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-auth-profiles">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Auth Profiles</h1>
+                <p class="subtle">Manage stored browser sessions for authenticated scraping</p>
               </div>
-            </div>
-
-            <!-- Right: Role Similarities -->
-            <div class="ai-insight" style="display: block">
-              <h4 class="insight-title">Manifold Alignment (Similarity)</h4>
-              <div class="list" id="role-similarity-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto">
-                <div class="empty"><p>Manifold is cold</p></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Active Basins (Micro Scale) -->
-          <div style="margin-top: 2rem">
-            <div class="ai-insight" style="display: block">
-              <h4 class="insight-title">Active Field Basins (High Entropy Zones)</h4>
-              <div class="list" id="basin-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto">
-                <div class="empty"><p>No active conflict basins</p></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ═══════════════════════════════════ -->
-      <!-- VIEW: Auth Profiles                 -->
-      <!-- ═══════════════════════════════════ -->
-      <section class="view" id="view-auth-profiles">
-        <div class="container">
-          <div class="page-head">
-            <div>
-              <h1>Auth Profiles</h1>
-              <p class="subtle">Manage stored browser sessions for authenticated scraping</p>
-            </div>
-            <button
-              type="button"
-              class="btn primary"
-              data-action="switch-view"
-              data-view="new"
-              id="btn-auth-profiles-create-new"
-            >
-              Create Job
-            </button>
-          </div>
-
-          <div class="jobs-toolbar">
-            <div class="jobs-toolbar-left">
-              <input
-                type="text"
-                id="auth-profiles-search"
-                placeholder="Search profiles..."
-                aria-label="Search auth profiles"
-              />
-            </div>
-            <div class="jobs-toolbar-right">
-              <span class="jobs-last-updated" id="auth-profiles-last-updated">Never updated</span>
               <button
                 type="button"
-                class="btn ghost small"
-                data-action="refresh-auth-profiles"
-                id="btn-refresh-auth-profiles"
+                class="btn primary"
+                data-action="switch-view"
+                data-view="new"
+                id="btn-auth-profiles-create-new"
               >
-                Refresh
+                Create Job
               </button>
             </div>
-          </div>
 
-          <!-- Mini Stats -->
-          <div class="kpi-row" id="auth-profiles-kpi-row">
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-total-auth-profiles">0</span><span class="kpi-label">Total</span>
+            <div class="jobs-toolbar">
+              <div class="jobs-toolbar-left">
+                <input
+                  type="text"
+                  id="auth-profiles-search"
+                  placeholder="Search profiles..."
+                  aria-label="Search auth profiles"
+                />
+              </div>
+              <div class="jobs-toolbar-right">
+                <span class="jobs-last-updated" id="auth-profiles-last-updated">Never updated</span>
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="refresh-auth-profiles"
+                  id="btn-refresh-auth-profiles"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-active-auth-profiles">0</span><span class="kpi-label">Active</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-pending-auth-profiles">0</span><span class="kpi-label">Pending</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-val" id="kpi-expired-auth-profiles">0</span><span class="kpi-label">Expired</span>
-            </div>
-          </div>
 
-          <div class="list-head">
-            <span>Profile</span>
-            <span>Domain</span>
-            <span>Status</span>
-            <span>Actions</span>
-          </div>
+            <!-- Mini Stats -->
+            <div class="kpi-row" id="auth-profiles-kpi-row">
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-total-auth-profiles">0</span><span class="kpi-label">Total</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-active-auth-profiles">0</span><span class="kpi-label">Active</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-pending-auth-profiles">0</span><span class="kpi-label">Pending</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="kpi-expired-auth-profiles">0</span><span class="kpi-label">Expired</span>
+              </div>
+            </div>
 
-          <!-- Auth Profiles List -->
-          <div class="list" id="auth-profiles-list">
-            <div class="empty-state-illustration" id="auth-profiles-empty-state">
-              <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect
-                  x="30"
-                  y="20"
-                  width="100"
-                  height="90"
-                  rx="8"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1.5"
-                  fill="none"
-                  class="empty-svg-line"
-                />
-                <circle
-                  cx="80"
-                  cy="55"
-                  r="18"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1.5"
-                  fill="none"
-                  class="empty-svg-line"
-                />
-                <path
-                  d="M60 85 Q70 75, 80 85 T100 85"
-                  stroke="var(--ink-faint)"
-                  stroke-width="1.5"
-                  fill="none"
-                  class="empty-svg-line"
-                />
-              </svg>
-              <div class="empty-state-title">No auth profiles</div>
-              <div class="empty-state-desc">
-                Create an auth profile to store a browser session for authenticated scraping.
+            <div class="list-head">
+              <span>Profile</span>
+              <span>Domain</span>
+              <span>Status</span>
+              <span>Actions</span>
+            </div>
+
+            <!-- Auth Profiles List -->
+            <div class="list" id="auth-profiles-list">
+              <div class="empty-state" id="auth-profiles-empty-state">
+                <span class="empty-icon" data-icon="key" data-size="28" aria-hidden="true"></span>
+                <h3>No auth profiles</h3>
+                <p>Create an auth profile to store a browser session for authenticated scraping.</p>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <!-- ─── Workflows + Run History ─── -->
+        <section class="view" id="view-workflows">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Workflows</h1>
+                <p class="subtle">Saved replay workflows and their execution history</p>
+              </div>
+              <div class="page-head-actions">
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="refresh-workflows"
+                  id="btn-refresh-workflows"
+                >
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  class="btn primary"
+                  data-action="switch-view"
+                  data-view="new"
+                  id="btn-workflows-create-new"
+                >
+                  New Job
+                </button>
+              </div>
+            </div>
+
+            <div class="workflows-layout">
+              <div class="workflows-list-pane">
+                <div class="kpi-row" id="workflows-kpi-row">
+                  <div class="kpi">
+                    <span class="kpi-val" id="workflows-kpi-total">0</span><span class="kpi-label">Workflows</span>
+                  </div>
+                  <div class="kpi">
+                    <span class="kpi-val" id="workflows-kpi-runs">0</span><span class="kpi-label">Total Runs</span>
+                  </div>
+                  <div class="kpi">
+                    <span class="kpi-val" id="workflows-kpi-ok">0</span><span class="kpi-label">Succeeded</span>
+                  </div>
+                  <div class="kpi">
+                    <span class="kpi-val" id="workflows-kpi-fail">0</span><span class="kpi-label">Failed</span>
+                  </div>
+                </div>
+                <div class="list" id="workflows-list">
+                  <div class="empty-state" id="workflows-empty-state">
+                    <span class="empty-icon" data-icon="sliders" data-size="28" aria-hidden="true"></span>
+                    <h3>No workflows yet</h3>
+                    <p>Workflows are saved replay sequences you can re-run against the same target site.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="workflows-detail-pane" id="workflows-detail-pane">
+                <div class="empty-state" id="workflows-detail-empty">
+                  <span class="empty-icon" data-icon="sliders" data-size="28" aria-hidden="true"></span>
+                  <h3>Select a workflow</h3>
+                  <p>Select a workflow to see its details and run history.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Billing ─── -->
+        <section class="view" id="view-billing">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Billing</h1>
+                <p class="subtle">Subscription, plan tier, and usage limits</p>
+              </div>
+              <div class="page-head-actions">
+                <button type="button" class="btn ghost small" data-action="refresh-billing" id="btn-refresh-billing">
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div class="kpi-row" id="billing-kpi-row">
+              <div class="kpi">
+                <span class="kpi-val" id="billing-kpi-tier">—</span>
+                <span class="kpi-label">Plan tier</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="billing-kpi-jobs">—</span>
+                <span class="kpi-label">Max jobs</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="billing-kpi-scrapes">—</span>
+                <span class="kpi-label">Max scrapes</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-val" id="billing-kpi-teammates">—</span>
+                <span class="kpi-label">Teammates</span>
+              </div>
+            </div>
+
+            <div class="billing-grid">
+              <div class="billing-card">
+                <h2>Current subscription</h2>
+                <div id="billing-subscription" class="billing-subscription">
+                  <p class="subtle">Loading subscription…</p>
+                </div>
+              </div>
+
+              <div class="billing-card">
+                <h2>Plan features</h2>
+                <ul id="billing-features" class="billing-features">
+                  <li class="subtle">Loading…</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="billing-card billing-payment-method">
+              <h2>Payment method</h2>
+              <p class="subtle">
+                Payment provider integration is not enabled in this build.
+                <a href="docs/SAAS_MODEL.md" target="_blank" rel="noopener noreferrer"> See SAAS_MODEL.md </a>
+                for the integration plan. Webhook endpoint
+                <code>POST /api/billing/webhook</code> is live and HMAC-verified for when a provider is wired.
+              </p>
+              <div class="billing-payment-actions">
+                <button
+                  type="button"
+                  class="btn primary"
+                  data-action="upgrade-plan"
+                  id="btn-upgrade-plan"
+                  disabled
+                  title="Payment provider integration pending — see docs/SAAS_MODEL.md"
+                >
+                  Upgrade plan (coming soon)
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Audit ─── -->
+        <section class="view" id="view-audit">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Audit log</h1>
+                <p class="subtle">Authentication, authorization, and admin events</p>
+              </div>
+              <div class="page-head-actions">
+                <button type="button" class="btn ghost small" data-action="refresh-audit" id="btn-refresh-audit">
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div class="audit-toolbar">
+              <label class="audit-filter">
+                <span>Filter by category:</span>
+                <select id="audit-category-filter" aria-label="Filter by category">
+                  <option value="">All</option>
+                  <option value="auth">Auth</option>
+                  <option value="rbac">RBAC</option>
+                  <option value="admin">Admin</option>
+                  <option value="data_access">Data access</option>
+                  <option value="job">Job</option>
+                  <option value="system">System</option>
+                </select>
+              </label>
+              <label class="audit-filter">
+                <span>Limit:</span>
+                <select id="audit-limit-filter" aria-label="Audit event limit">
+                  <option value="50">50</option>
+                  <option value="100" selected>100</option>
+                  <option value="200">200</option>
+                  <option value="500">500</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="audit-list" class="audit-list">
+              <p class="subtle">Loading…</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Retention ─── -->
+        <section class="view" id="view-retention">
+          <div class="container">
+            <div class="page-head">
+              <div>
+                <h1>Data retention</h1>
+                <p class="subtle">Lifecycle, purge, and per-user data deletion</p>
+              </div>
+              <div class="page-head-actions">
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="refresh-retention"
+                  id="btn-refresh-retention"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div class="retention-card">
+              <h2>Recycle bin</h2>
+              <p class="subtle">
+                Soft-deleted jobs land here. Items in the recycle bin are permanently purged after 30 days by the
+                background sweep.
+              </p>
+              <div id="retention-recycle-summary" class="retention-summary">
+                <p class="subtle">Loading…</p>
+              </div>
+              <div class="retention-actions">
+                <button type="button" class="btn primary" data-action="delete-my-data" id="btn-delete-my-data">
+                  Delete all my data
+                </button>
+              </div>
+            </div>
+
+            <div class="retention-card">
+              <h2>Audit log retention</h2>
+              <p class="subtle">
+                Audit events are retained indefinitely while their file is on disk. The <code>logs/audit.log</code> file
+                is rotated by the application log handler.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── API Keys ─── -->
+        <section class="view" id="view-api-keys">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>API Keys</h1>
+                <p class="subtle">Manage your API and admin keys for this session</p>
+              </div>
+            </div>
+
+            <div class="api-keys-card">
+              <div class="api-keys-card-header">
+                <span class="api-keys-card-title">API Key</span>
+                <span class="badge" id="api-key-status">Not set</span>
+              </div>
+              <p class="subtle api-keys-desc">
+                Your API key authenticates requests to the Dataforge backend. It is held in memory only and cleared on
+                page reload.
+              </p>
+              <div class="api-keys-input-row">
+                <input
+                  type="password"
+                  id="api-key-input"
+                  class="input"
+                  placeholder="Paste your API key here..."
+                  autocomplete="new-password"
+                  spellcheck="false"
+                  aria-label="API key input"
+                />
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  id="btn-api-key-toggle-vis"
+                  data-action="toggle-api-key-vis"
+                  aria-label="Toggle API key visibility"
+                >
+                  <span data-icon="eye" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="api-keys-actions">
+                <button type="button" class="btn primary small" data-action="save-api-key" id="btn-save-api-key">
+                  Save Key
+                </button>
+                <button type="button" class="btn ghost small" data-action="clear-api-key" id="btn-clear-api-key">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div class="api-keys-card">
+              <div class="api-keys-card-header">
+                <span class="api-keys-card-title">Admin Key</span>
+                <span class="badge" id="admin-key-status">Not set</span>
+              </div>
+              <p class="subtle api-keys-desc">
+                Admin keys enable protected operator actions. Held in memory for this session only.
+              </p>
+              <div class="api-keys-input-row">
+                <input
+                  type="password"
+                  id="admin-key-input"
+                  class="input"
+                  placeholder="Paste your admin key here..."
+                  autocomplete="new-password"
+                  spellcheck="false"
+                  aria-label="Admin key input"
+                />
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  id="btn-admin-key-toggle-vis"
+                  data-action="toggle-admin-key-vis"
+                  aria-label="Toggle admin key visibility"
+                >
+                  <span data-icon="eye" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="api-keys-actions">
+                <button type="button" class="btn primary small" data-action="save-admin-key" id="btn-save-admin-key">
+                  Save Key
+                </button>
+                <button type="button" class="btn ghost small" data-action="clear-admin-key" id="btn-clear-admin-key">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div class="api-keys-card">
+              <div class="api-keys-card-header">
+                <span class="api-keys-card-title">Session</span>
+                <span class="badge" id="session-status">Checking...</span>
+              </div>
+              <div id="session-info" class="api-keys-session-info">
+                <p class="subtle">Loading session info...</p>
+              </div>
+              <div class="api-keys-actions">
+                <button type="button" class="btn ghost small" data-action="refresh-api-keys" id="btn-refresh-api-keys">
+                  Refresh
+                </button>
+                <button type="button" class="btn ghost small" data-action="logout-session" id="btn-logout-session">
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Settings ─── -->
+        <section class="view" id="view-settings">
+          <div class="container narrow">
+            <div class="page-head">
+              <div>
+                <h1>Settings</h1>
+                <p class="subtle">Preferences and configuration</p>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h2>Appearance</h2>
+              <div class="settings-option">
+                <div class="settings-option-info">
+                  <span class="settings-option-label">Theme</span>
+                  <span class="settings-option-desc">Choose your preferred color scheme</span>
+                </div>
+                <div class="toggle-group" id="settings-theme-toggle">
+                  <button
+                    type="button"
+                    class="toggle active"
+                    data-mode="system"
+                    data-action="set-theme-mode"
+                    aria-label="System theme"
+                  >
+                    System
+                  </button>
+                  <button
+                    type="button"
+                    class="toggle"
+                    data-mode="light"
+                    data-action="set-theme-mode"
+                    aria-label="Light theme"
+                  >
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    class="toggle"
+                    data-mode="dark"
+                    data-action="set-theme-mode"
+                    aria-label="Dark theme"
+                  >
+                    Dark
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h2>Keyboard Shortcuts</h2>
+              <div class="settings-shortcuts-grid">
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span>
+                  <span class="settings-shortcut-desc">Command palette</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>N</kbd></span>
+                  <span class="settings-shortcut-desc">New job</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>/</kbd></span>
+                  <span class="settings-shortcut-desc">Focus search</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>Esc</kbd></span>
+                  <span class="settings-shortcut-desc">Close / clear</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>1</kbd>-<kbd>0</kbd></span>
+                  <span class="settings-shortcut-desc">Switch views</span>
+                </div>
+                <div class="settings-shortcut-item">
+                  <span class="settings-shortcut-keys"><kbd>?</kbd></span>
+                  <span class="settings-shortcut-desc">Shortcut help</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h2>About</h2>
+              <div class="settings-about-grid">
+                <span class="settings-about-label">Application</span>
+                <span class="settings-about-value">Dataforge</span>
+                <span class="settings-about-label">Version</span>
+                <span class="settings-about-value">0.1.0</span>
+                <span class="settings-about-label">API</span>
+                <span class="settings-about-value" id="settings-api-url">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
 
     <!-- Toast -->
@@ -1220,8 +1655,8 @@
       aria-describedby="apikey-modal-desc"
     >
       <div class="shortcut-modal">
-        <h2 id="apikey-modal-title">🔑 API Key</h2>
-        <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
+        <h2 id="apikey-modal-title">API Key</h2>
+        <p id="apikey-modal-desc" class="modal-desc">Enter your Dataforge API key for production access.</p>
         <form id="apikey-form" class="api-key-form">
           <input
             type="password"
@@ -1232,13 +1667,13 @@
             spellcheck="false"
             aria-label="API key"
           />
-          <label class="check-label" style="margin-top: 0.5rem">
+          <label class="check-label mt-2">
             <input type="checkbox" id="apikey-toggle-vis" />
             <span>Show key</span>
           </label>
         </form>
         <p id="apikey-error" class="api-key-error hidden"></p>
-        <div class="shortcut-close-row" style="margin-top: 1rem">
+        <div class="shortcut-close-row mt-4">
           <button type="button" class="btn ghost small" data-action="close-apikey" id="btn-apikey-cancel">
             Cancel
           </button>
@@ -1261,7 +1696,7 @@
       <div class="shortcut-modal confirm-modal">
         <h2 id="confirm-modal-title">Confirm</h2>
         <p id="confirm-modal-desc" class="modal-desc">Are you sure?</p>
-        <div class="shortcut-close-row" style="margin-top: 1rem; justify-content: flex-end; gap: 0.5rem">
+        <div class="shortcut-close-row mt-4" style="justify-content: flex-end; gap: 0.5rem">
           <button type="button" class="btn ghost small" data-action="close-confirm" id="btn-confirm-cancel">
             Cancel
           </button>
@@ -1281,7 +1716,7 @@
       aria-labelledby="shortcut-modal-title"
     >
       <div class="shortcut-modal">
-        <h2 id="shortcut-modal-title">⌨️ Keyboard Shortcuts</h2>
+        <h2 id="shortcut-modal-title">Keyboard Shortcuts</h2>
         <div class="shortcut-list">
           <div class="shortcut-item">
             <span class="shortcut-key"><kbd>N</kbd></span>
@@ -1296,8 +1731,11 @@
             <span class="shortcut-desc">Clear search / Close modals</span>
           </div>
           <div class="shortcut-item">
-            <span class="shortcut-key"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd></span>
-            <span class="shortcut-desc">Switch tabs (Jobs, New, Recycle, Cognition, Dashboard)</span>
+            <span class="shortcut-key"><kbd>1</kbd>-<kbd>0</kbd></span>
+            <span class="shortcut-desc"
+              >Switch views (Jobs, New, Dashboard, API Keys, Settings, Workflows, Auth Profiles, Billing, Audit,
+              Retention)</span
+            >
           </div>
           <div class="shortcut-item">
             <span class="shortcut-key"><kbd>?</kbd></span>
@@ -1310,11 +1748,41 @@
       </div>
     </div>
 
+    <!-- Command Palette -->
+    <div
+      id="command-palette-overlay"
+      class="command-palette-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
+    >
+      <div class="command-palette">
+        <div class="command-palette-input-wrap">
+          <span data-icon="search" class="command-palette-search-icon" aria-hidden="true"></span>
+          <input
+            type="text"
+            id="command-palette-input"
+            class="command-palette-input"
+            placeholder="Search views, actions..."
+            aria-label="Search commands"
+          />
+        </div>
+        <div id="command-palette-results" class="command-palette-results">
+          <div class="command-palette-hint">Type to search...</div>
+        </div>
+        <div class="command-palette-footer">
+          <span class="command-palette-footer-hint"><kbd>Up</kbd><kbd>Down</kbd> navigate</span>
+          <span class="command-palette-footer-hint"><kbd>Enter</kbd> select</span>
+          <span class="command-palette-footer-hint"><kbd>Esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+
     <!-- NOTE: Relative asset paths (app.js, styles.css, favicon.svg) resolve
          correctly when the page URL ends with a trailing slash (/app/ not /app).
          FastAPI's StaticFiles mount at /app serves these files from the
          frontend/ directory. Production nginx deployments are unaffected
          (nginx has dedicated location blocks for both /app/ and root paths). -->
-    <script type="module" src="app.js"></script>
+    <script type="module" src="/app/app.js?v=2"></script>
   </body>
 </html>

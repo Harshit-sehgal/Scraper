@@ -69,7 +69,7 @@ def _detect_search_form(html: str) -> dict[str, Any]:
         r"keyword|query",
     ]
 
-    best_form = None
+    best_form: Any = None
     best_fields: list[dict] = []
     best_search_inputs: list[dict] = []
     best_form_score = 0
@@ -412,7 +412,7 @@ async def _try_form_search_recovery(
             "form_info": form_info,
             "error": "Search form submission timed out after 30 seconds",
         }
-    except Exception:
+    except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
         logger.exception("Search form submission failed unexpectedly")
         return {
             "success": False,

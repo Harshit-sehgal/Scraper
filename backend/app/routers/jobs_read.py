@@ -42,37 +42,50 @@ def _can_access_principal(
     org_id: str,
     job_org_id: str,
     job_owner_id: str | None,
+    job_project_id: str | None = None,
+    principal_project_id: str | None = None,
 ) -> bool:
     """P0-SAAS-001 ownership predicate.
 
-    Policy:
+    Policy (delegates to the canonical ``can_access_scoped_resource``
+    so read routes and export/mutation routes share one source of
+    truth and cannot drift):
+
       * Admin role always has all-access.
       * Operator role has all-access ONLY when the caller is an
-        env-backed operator (no ``org_id``). Project-scoped SaaS
-        keys that map to OPERATOR (WRITE scope) are still subject
-        to org_id enforcement, because the role only grants the
-        write capability within the key's own org.
+        env-backed operator (no ``org_id``/``project_id``). Project-
+        scoped SaaS keys that map to OPERATOR (WRITE scope) are still
+        subject to org/project enforcement.
       * User role sees a job if either:
-          - the job's ``org_id`` matches the user's authenticated org, OR
+          - the job's ``project_id`` matches the principal's
+            ``project_id`` (tightest scope), OR
+          - the job's ``org_id`` matches the principal's ``org_id``
+            when no project scope is present, OR
           - the job's legacy ``created_by`` fingerprint matches the
             user's ``user_id`` (env-backed keys have no org scope).
     """
-    if role == UserRole.ADMIN:
-        return True
-    if role == UserRole.OPERATOR and not org_id:
-        return True
-    if org_id and job_org_id and org_id == job_org_id:
-        return True
-    return bool(job_owner_id) and job_owner_id == user_id
+    from app.utils.rbac import can_access_scoped_resource
+
+    return can_access_scoped_resource(
+        role,
+        user_id,
+        org_id,
+        principal_project_id or "",
+        resource_owner_id=job_owner_id,
+        resource_org_id=job_org_id,
+        resource_project_id=job_project_id,
+    )
 
 
-def _summary_visible(summary: dict, role: UserRole, user_id: str, org_id: str) -> bool:
+def _summary_visible(summary: dict, role: UserRole, user_id: str, org_id: str, project_id: str = "") -> bool:
     return _can_access_principal(
         role,
         user_id,
         org_id,
         str(summary.get("org_id") or ""),
         str(summary.get("created_by") or ""),
+        job_project_id=str(summary.get("project_id") or ""),
+        principal_project_id=project_id,
     )
 
 
@@ -80,13 +93,15 @@ def _public_summary(summary: dict) -> dict:
     return {key: value for key, value in summary.items() if key != "created_by"}
 
 
-def _ensure_job_access(job, role: UserRole, user_id: str, org_id: str, action: str) -> None:
+def _ensure_job_access(job, role: UserRole, user_id: str, org_id: str, action: str, project_id: str = "") -> None:
     if _can_access_principal(
         role,
         user_id,
         org_id,
         getattr(job, "org_id", ""),
         getattr(job, "created_by", ""),
+        job_project_id=getattr(job, "project_id", ""),
+        principal_project_id=project_id,
     ):
         return
     log_rbac_event(
@@ -98,7 +113,8 @@ def _ensure_job_access(job, role: UserRole, user_id: str, org_id: str, action: s
         details={
             "owner_id": getattr(job, "created_by", ""),
             "org_id": getattr(job, "org_id", ""),
-            "policy": "mvp_created_by_owner_or_saas_org",
+            "project_id": getattr(job, "project_id", ""),
+            "policy": "mvp_created_by_owner_or_saas_org_project",
         },
     )
     raise HTTPException(status_code=404, detail="Job not found")
@@ -138,7 +154,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         field contains the ``created_at`` of the last returned item;
         when the result set is exhausted it is ``None``.
         """
-        role, user_id, org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         # In worker mode, refresh from repo using a summary projection.
         if is_worker_mode():
             try:
@@ -148,7 +164,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     limit,
                     cursor,
                 )
-                summaries = [s for s in summaries if _summary_visible(s, role, user_id, org_id)]
+                summaries = [s for s in summaries if _summary_visible(s, role, user_id, org_id, project_id)]
                 next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
                 with manager.lock:
                     summary_ids = {s["id"] for s in summaries}
@@ -168,7 +184,15 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             ordered = [
                 job
                 for job in sorted(manager.jobs_store.values(), key=lambda j: j.created_at, reverse=True)
-                if _can_access_principal(role, user_id, org_id, job.org_id, job.created_by)
+                if _can_access_principal(
+                    role,
+                    user_id,
+                    org_id,
+                    job.org_id,
+                    job.created_by,
+                    job_project_id=getattr(job, "project_id", ""),
+                    principal_project_id=project_id,
+                )
             ]
             if cursor:
                 ordered = [j for j in ordered if (j.created_at or "") < cursor]
@@ -206,9 +230,9 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         ],
         include_results: Annotated[bool, Query()] = False,
     ):
-        role, user_id, org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         job = await run_in_threadpool(manager.get_job, job_id)
-        _ensure_job_access(job, role, user_id, org_id, "read_job")
+        _ensure_job_access(job, role, user_id, org_id, "read_job", project_id)
 
         results_list = []
         if include_results:
@@ -241,9 +265,9 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         (storage-split v4) and only fall back to ``job.results``
         for back-compat with v3 deployments.
         """
-        role, user_id, org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         job = await run_in_threadpool(manager.get_job, job_id)
-        _ensure_job_access(job, role, user_id, org_id, "read_job_results")
+        _ensure_job_access(job, role, user_id, org_id, "read_job_results", project_id)
 
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
@@ -307,11 +331,12 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         response shape is stable for clients that poll a long-running
         job for progress.
         """
-        role, user_id, org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         job = await run_in_threadpool(manager.get_job, job_id)
-        _ensure_job_access(job, role, user_id, org_id, "read_job_events")
+        _ensure_job_access(job, role, user_id, org_id, "read_job_events", project_id)
 
         events: list[dict] = []
+        db_backed = False
         try:
             repo = get_job_repository()
             events = await run_in_threadpool(
@@ -321,6 +346,14 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                 offset,
                 level,
             )
+            # ``read_events`` already applies LIMIT/OFFSET in SQL, so the
+            # returned list is a *page*, not the full set. Mark this so the
+            # pagination math below uses the real total (via
+            # ``count_job_events``) instead of ``len(events)`` (which would
+            # be the page size) and does NOT re-slice an already-paginated
+            # list. Re-slicing caused clients to receive events 200-299
+            # (not 100-299) and ``total=200`` (not 500) for a 500-event job.
+            db_backed = bool(events)
         except (AttributeError, RuntimeError):
             events = []
 
@@ -351,8 +384,20 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                 lvl = level.lower()
                 events = [e for e in events if (e.get("level") or "").lower().startswith(lvl)]
 
-        total = len(events)
-        page = events[offset : offset + limit]
+        if db_backed:
+            # DB-backed path: ``events`` is already a page; get the real
+            # total from the dedicated counter instead of the page length.
+            from app.job_store import count_job_events
+
+            try:
+                total = await run_in_threadpool(count_job_events, job_id)
+            except (AttributeError, RuntimeError, OSError):
+                total = len(events)
+            page = events
+        else:
+            # In-memory fallback path: slice the full list.
+            total = len(events)
+            page = events[offset : offset + limit]
         next_offset = offset + limit if (offset + limit) < total else None
 
         return {
@@ -374,22 +419,35 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         cursor: str | None = None,
     ):
-        role, user_id, org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         if is_worker_mode():
-            repo = get_job_repository()
-            summaries = await run_in_threadpool(
-                repo.list_recycle_summaries,
-                limit=limit,
-                cursor=cursor,
-            )
-            summaries = [s for s in summaries if _summary_visible(s, role, user_id, org_id)]
-            return {"jobs": [_public_summary(s) for s in summaries]}
+            try:
+                repo = get_job_repository()
+                summaries = await run_in_threadpool(
+                    repo.list_recycle_summaries,
+                    limit=limit,
+                    cursor=cursor,
+                )
+                summaries = [s for s in summaries if _summary_visible(s, role, user_id, org_id, project_id)]
+                return {"jobs": [_public_summary(s) for s in summaries]}
+            except (AttributeError, ImportError, RuntimeError):
+                # Repo lacks ``list_recycle_summaries`` or DB errored —
+                # fall back to the in-memory snapshot (matching ``list_jobs``).
+                logger.debug("Failed to refresh recycle bin from repo")
 
         with manager.lock:
             ordered = [
                 job
                 for job in sorted(manager.recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
-                if _can_access_principal(role, user_id, org_id, job.org_id, job.created_by)
+                if _can_access_principal(
+                    role,
+                    user_id,
+                    org_id,
+                    job.org_id,
+                    job.created_by,
+                    job_project_id=getattr(job, "project_id", ""),
+                    principal_project_id=project_id,
+                )
             ]
             summaries = []
             for job in ordered:

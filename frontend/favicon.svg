@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#0f8f83"/>
-  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="#ffffff">DF</text>
+  <rect width="32" height="32" rx="6" fill="#ffffff"/>
+  <rect width="32" height="32" rx="6" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <path d="M10 8.5h6.5a7.5 7.5 0 0 1 0 15H10zm3.2 2.8v9.4h3.3a4.7 4.7 0 0 0 0-9.4z" fill="none" stroke="#1a1a1a" stroke-width="1.2"/>
 </svg>

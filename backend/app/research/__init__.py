@@ -7,7 +7,7 @@ kernel or part of the research shell?".
 
 Why this matters
 ----------------
-The repo's deep-research-report and PROJECT_STATUS.md both call out a
+The repo's deep-research-report and AGENTS.md both call out a
 central architectural problem: the product kernel and a large research
 shell (semantic world state, topology, federation, gossip, motif, energy,
 instability, strategy evolution, chaos, replay, etc.) share the same
@@ -72,6 +72,7 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
         "semantic_segmentation",
         "semantic_boundary_engine",
         "semantic_allocation_engine",
+        "semantic_roots",
         # ── Topology / manifold / motif / energy / instability ──────────
         "topology_state",
         "topology_state_types",
@@ -252,6 +253,7 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
                     "segmentation",
                     "boundary_engine",
                     "allocation_engine",
+                    "roots",
                 )
             ),
             "core_types",

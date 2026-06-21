@@ -68,7 +68,7 @@ class DomainIntelligenceRegistry:
                     data = json.load(f)
                     for domain, metrics in data.items():
                         self._registry[domain] = DomainIntelligence(domain, metrics)
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 logger.exception("Failed to load domain intelligence")
 
     def _save(self) -> None:
@@ -83,7 +83,7 @@ class DomainIntelligenceRegistry:
                 json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
             os.replace(tmp_path, self.path)
             tmp_path = None  # ownership transferred via rename
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             logger.exception("Failed to save domain intelligence")
             with contextlib.suppress(OSError):
                 if fd is not None:
@@ -147,7 +147,7 @@ class DomainIntelligenceRegistry:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             return "unknown"
 
 

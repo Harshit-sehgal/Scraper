@@ -59,7 +59,8 @@ class TestReadyEndpoint:
         """Force SQLite backend for tests that assert sqlite-specific behavior."""
         from app.storage_interface import SQLiteJobRepository
 
-        monkeypatch.setattr("app.main.get_job_repository", SQLiteJobRepository)
+        monkeypatch.setattr("app.routers.health.get_job_repository", SQLiteJobRepository)
+        monkeypatch.setattr("app.routers.system.get_job_repository", SQLiteJobRepository)
 
     @pytest.mark.asyncio
     async def test_ready_returns_storage_ok(self) -> None:
@@ -170,7 +171,8 @@ class TestStorageStatusEndpoint:
         """Force SQLite backend for tests that assert sqlite-specific behavior."""
         from app.storage_interface import SQLiteJobRepository
 
-        monkeypatch.setattr("app.main.get_job_repository", SQLiteJobRepository)
+        monkeypatch.setattr("app.routers.health.get_job_repository", SQLiteJobRepository)
+        monkeypatch.setattr("app.routers.system.get_job_repository", SQLiteJobRepository)
 
     @pytest.mark.asyncio
     async def test_storage_status_returns_200(self, monkeypatch) -> None:
@@ -261,11 +263,21 @@ class TestReadyWithMockedPostgres:
             }
         return mock_repo
 
+    def _patch_get_job_repository(self, monkeypatch, mock_repo) -> None:
+        """Patch get_job_repository at all call sites (source + router namespaces)."""
+
+        def _get_repo():
+            return mock_repo
+
+        monkeypatch.setattr("app.storage_interface.get_job_repository", _get_repo)
+        monkeypatch.setattr("app.routers.health.get_job_repository", _get_repo)
+        monkeypatch.setattr("app.routers.system.get_job_repository", _get_repo)
+
     @pytest.mark.asyncio
     async def test_ready_reports_postgres_backend(self, monkeypatch) -> None:
         """/ready should report postgres backend when Postgres repository is active."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
-        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
+        self._patch_get_job_repository(monkeypatch, mock_repo)
 
         response = await client.get("/ready")
         assert response.status_code == 200
@@ -279,7 +291,7 @@ class TestReadyWithMockedPostgres:
     async def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch) -> None:
         """/ready should return 503 when Postgres repository is unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
-        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
+        self._patch_get_job_repository(monkeypatch, mock_repo)
 
         response = await client.get("/ready")
         assert response.status_code == 503
@@ -291,7 +303,7 @@ class TestReadyWithMockedPostgres:
     async def test_storage_status_reports_postgres_counts(self, monkeypatch) -> None:
         """/api/system/storage/status should report postgres backend with counts."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
-        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
+        self._patch_get_job_repository(monkeypatch, mock_repo)
 
         response = await client.get("/api/system/storage/status")
         assert response.status_code == 200
@@ -306,7 +318,7 @@ class TestReadyWithMockedPostgres:
     async def test_storage_status_reports_postgres_unhealthy(self, monkeypatch) -> None:
         """/api/system/storage/status should report postgres as not ok when unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
-        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
+        self._patch_get_job_repository(monkeypatch, mock_repo)
 
         response = await client.get("/api/system/storage/status")
         assert response.status_code == 200
@@ -314,3 +326,70 @@ class TestReadyWithMockedPostgres:
         assert data["backend"] == "postgres"
         assert data["ok"] is False
         assert "error" in data
+
+
+class TestSystemManifest:
+    def test_manifest_returns_version_and_aup(self, client) -> None:
+        """The manifest endpoint should expose the project version and AUP version."""
+        response = client.get("/api/system/manifest")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["project"] == "DataForge Scraper"
+        assert "version" in body and body["version"] != "unknown"
+        assert body["aup_version"]  # non-empty
+        assert "storage_backend" in body
+        assert "encryption_key_version" in body
+
+
+class TestSystemAuditLog:
+    def test_audit_log_requires_admin(self, client, monkeypatch) -> None:
+        """Non-admin callers should not see the audit log."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "user-key", raising=False)
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-key", raising=False)
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key", raising=False)
+        # Operator is not enough.
+        response = client.get(
+            "/api/system/audit-log",
+            headers={"X-API-Key": "operator-key"},
+        )
+        assert response.status_code == 403
+
+    def test_audit_log_admin_returns_empty_or_recent(self, client, monkeypatch) -> None:
+        """Admin gets a JSON envelope (may be empty in test env)."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "user-key", raising=False)
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-key", raising=False)
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key", raising=False)
+        response = client.get(
+            "/api/system/audit-log",
+            headers={"X-API-Key": "admin-key"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert "items" in body
+        assert "limit" in body
+        assert "total" in body
+        assert isinstance(body["items"], list)
+
+    def test_audit_log_limit_is_capped(self, client, monkeypatch) -> None:
+        """Limit must be between 1 and 1000."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", "user-key", raising=False)
+        monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-key", raising=False)
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key", raising=False)
+        # 0 is rejected.
+        response = client.get(
+            "/api/system/audit-log?limit=0",
+            headers={"X-API-Key": "admin-key"},
+        )
+        assert response.status_code == 422
+        # 5000 is rejected.
+        response = client.get(
+            "/api/system/audit-log?limit=5000",
+            headers={"X-API-Key": "admin-key"},
+        )
+        assert response.status_code == 422

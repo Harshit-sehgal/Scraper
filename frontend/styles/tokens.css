@@ -1,0 +1,161 @@
+/* ─── Design Tokens ─────────────────────────────────────
+   Dataforge — Notion-style monochrome palette.
+   Light is default; dark applies via [data-theme="dark"] on <html>. */
+
+:root,
+:root[data-theme="light"] {
+  /* Surfaces */
+  --bg: #fff;
+  --bg-subtle: #fafafa;
+  --bg-muted: #f5f5f5;
+  --bg-active: #ededed;
+  --bg-hover: rgb(0 0 0 / 0.04);
+  --bg-overlay: rgb(15 15 15 / 0.4);
+  --bg-code: #f7f7f7;
+  --bg-sidebar-item-active: rgb(0 0 0 / 0.05);
+  --bg-link-hover: rgb(37 99 235 / 0.06);
+
+  /* Ink — 4-tier (Notion-warm body) */
+  --ink-1: #1a1a1a; /* titles */
+  --ink-2: #37352f; /* body  — Notion warm gray */
+  --ink-3: #787774; /* subtle */
+  --ink-4: #a8a7a3; /* placeholder */
+  --ink-inverse: #fff;
+  --ink-link: #2563eb;
+
+  /* Borders */
+  --border: #eaeaea;
+  --border-strong: #d4d4d4;
+  --border-focus: #1a1a1a;
+
+  /* Spacing — 4px base */
+  --space-1: 0.25rem; /*  4 */
+  --space-2: 0.5rem; /*  8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.25rem; /* 20 */
+  --space-6: 1.5rem; /* 24 */
+  --space-7: 2rem; /* 32 */
+  --space-8: 2.5rem; /* 40 */
+  --space-9: 3rem; /* 48 */
+  --space-10: 4rem; /* 64 */
+  --space-11: 5rem; /* 80 */
+  --space-12: 6rem; /* 96 */
+
+  /* Radius */
+  --radius-xs: 3px;
+  --radius-sm: 4px; /* chips */
+  --radius: 6px; /* default — buttons, inputs */
+  --radius-lg: 8px; /* cards, modals */
+  --radius-pill: 9999px; /* reserved for status badges */
+
+  /* Typography */
+  --font-sans: "Inter", -apple-system, blinkmacsystemfont, "Segoe UI", roboto, sans-serif;
+  --font-mono: ui-monospace, sfmono-regular, "JetBrains Mono", menlo, consolas, monospace;
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-base: 0.875rem; /* 14 */
+  --text-md: 0.9375rem; /* 15 — body default */
+  --text-lg: 1.0625rem; /* 17 */
+  --text-xl: 1.25rem; /* 20 */
+  --text-2xl: 1.5625rem; /* 25 */
+  --text-3xl: 1.875rem; /* 30 */
+  --text-4xl: 2.25rem; /* 36 — landing hero */
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.65;
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+
+  /* Component dimensions */
+  --topbar-height: 48px;
+  --sidebar-width: 252px;
+  --sidebar-collapsed-width: 0px;
+  --control-height: 32px;
+  --control-height-lg: 38px;
+  --focus-ring-offset: 2px;
+
+  /* Status — muted, used only for badges (not buttons) */
+  --status-blue: #1b6189;
+  --status-blue-soft: #e1f2ff;
+  --status-green: #135c44;
+  --status-green-soft: #e2f5ee;
+  --status-amber: #ad8b00;
+  --status-amber-soft: #fbf3db;
+  --status-red: #9c2b23;
+  --status-red-soft: #ffe2dd;
+  --status-gray: #50504e;
+  --status-gray-soft: #f1f1f0;
+  --status-violet: #4f2396;
+  --status-violet-soft: #efe6fc;
+
+  /* Success, danger, warning variables for JS compatibility */
+  --success: var(--status-green);
+  --success-soft: var(--status-green-soft);
+  --danger: var(--status-red);
+  --danger-soft: var(--status-red-soft);
+  --warning: var(--status-amber);
+  --warning-soft: var(--status-amber-soft);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+
+  /* Layout max widths */
+  --container-narrow: 720px;
+  --container-base: 1080px;
+  --container-wide: 1280px;
+  --container-prose: 680px;
+
+  /* Surface elevation — used by popovers, palettes, menus */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.03);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.06), 0 2px 4px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.05);
+
+  /* Z-index scale */
+  --z-sticky: 50;
+  --z-overlay: 1000;
+  --z-toast: 2000;
+  --z-palette: 1100;
+}
+
+:root[data-theme="dark"] {
+  --bg: #191919;
+  --bg-subtle: #202020;
+  --bg-muted: #2a2a2a;
+  --bg-active: #303030;
+  --bg-hover: rgb(255 255 255 / 0.06);
+  --bg-overlay: rgb(0 0 0 / 0.55);
+  --bg-code: #1f1f1f;
+  --bg-sidebar-item-active: rgb(255 255 255 / 0.06);
+  --bg-link-hover: rgb(124 158 255 / 0.08);
+  --ink-1: #ebebeb;
+  --ink-2: #cfcfcf;
+  --ink-3: #8a8a8a;
+  --ink-4: #5f5f5f;
+  --ink-inverse: #191919;
+  --ink-link: #7c9eff;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+  --border-focus: #fff;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2), 0 1px 1px rgb(0 0 0 / 0.15);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.25), 0 2px 4px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.2);
+  --status-blue: #5c92cc;
+  --status-blue-soft: #1d3b53;
+  --status-green: #82c3a5;
+  --status-green-soft: #243d30;
+  --status-amber: #e9c46a;
+  --status-amber-soft: #564526;
+  --status-red: #e07b6e;
+  --status-red-soft: #522e2a;
+  --status-gray: #cfcfcf;
+  --status-gray-soft: #2f2f2f;
+  --status-violet: #a68ce6;
+  --status-violet-soft: #3c2d4f;
+}

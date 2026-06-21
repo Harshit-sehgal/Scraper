@@ -1,5 +1,3 @@
-from typing import Any
-
 """TopologyView — read-only view of the topology graph.
 
 Returns immutable snapshots (RegionSnapshots, dicts) instead of live
@@ -7,6 +5,7 @@ FieldConflictRegion objects. No mutation is possible through this interface.
 """
 
 from collections.abc import Callable
+from typing import Any
 
 from app.core_types import FieldConflictRegion
 from app.topology_state_types import (

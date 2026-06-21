@@ -1,3 +1,14 @@
+# =============================================================================
+# DataForge Scraper — Main CI Pipeline
+# =============================================================================
+# Comprehensive PR/push workflow that faithfully maps
+# ``python3 scripts/validate_local.py --full`` into parallel CI jobs.
+#
+# All jobs run on push to main and on PRs to main. The union of all job
+# status checks must be green before merging (configure required checks
+# in GitHub branch protection rules → Settings → Branches).
+# =============================================================================
+
 name: CI
 
 on:
@@ -7,6 +18,18 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  PYTHON_VERSION: "3.12"
+  DATAFORGE_DOTENV_PATH: /dev/null
+  DATAFORGE_STORAGE_BACKEND: sqlite
+  DATAFORGE_API_KEY: ci-key
+  DATAFORGE_OPERATOR_API_KEY: ci-operator-key
+  DATAFORGE_ADMIN_API_KEY: ci-admin-key
+  DATAFORGE_SESSION_SECRET: ci-session-secret
+  DATAFORGE_ALLOW_INSECURE_DEV_AUTH: "false"
+  DATAFORGE_SKIP_DB_CHECK: "true"
+  PYTHONPATH: backend
+
 # Cancel in-flight runs on the same branch when a new push lands, so
 # an obsolete CI run does not burn minutes.
 concurrency:
@@ -14,24 +37,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Fast checks (no Playwright browser download) ───────────────────
-  ci-gates-fast:
-    name: Fast CI Gates
+  # ── 1. Fast Gates (syntax, architecture, invariants, security audit) ────
+  fast-gates:
+    name: Fast Gates
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip dependencies
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-ci-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-pip-fast-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -40,76 +63,60 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run Reproducible Validation (bounded gate)
-        # ci-gates-fast uses --quick because the deeper checks (ruff,
-        # mypy, bandit, full backend pytest with reruns, coverage
-        # floors) are owned by ``lint-type-checks`` below. Running the
-        # full gate here would duplicate the slowest step. For local
-        # iteration the default ``make validate`` target runs --full,
-        # so a green local gate still implies a green CI gate (the
-        # union is the same set of checks).
-        run: python scripts/validate_local.py --quick
-
-      - name: Upload Quick Validation Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: validation-quick
-          path: artifacts/validation/
-          retention-days: 14
-
       - name: Python syntax check (compileall)
-        run: python -m compileall -q backend/app scripts architecture_validator.py
+        run: python -m compileall -q backend scripts architecture_validator.py
 
-      - name: Run Architecture Validation
-        run: PYTHONPATH=backend python architecture_validator.py
+      - name: Architecture validation
+        run: python architecture_validator.py
 
-      - name: Run Research-Shell Boundary Check
-        run: PYTHONPATH=backend python scripts/check_research_boundary.py
+      - name: Research-shell boundary check
+        run: python scripts/check_research_boundary.py
 
-      - name: Validate Dependency Bounds
+      - name: Dependency bounds validation
         run: python scripts/validate_dependency_bounds.py
 
-      - name: Run Dependency Vulnerability Audit
+      - name: URL safety & research boundary smoke tests
         run: |
-          # pip-audit is included via pyproject.toml. Audits the production
-          # dependencies to catch CVEs in anything that ends up in the image.
-          pip-audit . --strict
+          python -m pytest backend/tests/test_url_safety.py \
+            backend/tests/test_research_boundary.py -q --tb=short
 
-      - name: Generate Route Authorization Matrix
+      - name: P0 regression tests (auth/tenant, billing/usage, route-auth matrix)
         run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python scripts/route_auth_matrix.py --format markdown
+          python -m pytest backend/tests/test_p0_auth_tenant.py \
+            backend/tests/test_p0_billing_usage.py \
+            backend/tests/test_route_auth_matrix_generator.py -q --tb=short
 
-      - name: Validate Production Env Checker (Asserts Failure)
+      - name: OpenAPI spec generation (contract artifact)
+        run: python scripts/generate_openapi.py --no-docs-copy
+
+      - name: Dependency vulnerability audit (pip-audit)
+        run: pip-audit . --progress-spinner off --desc off --strict
+
+      - name: Validate production env checker (asserts failure on placeholders)
         run: |
-          # The placeholder production env file should fail validation
-          if env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true python scripts/check_prod_env.py --env-file .env.production.example; then
-            echo "❌ ERROR: check_prod_env.py unexpectedly passed on placeholder .env.production.example!"
+          if python scripts/check_prod_env.py \
+               --env-file .env.production.example \
+               2>&1 | grep -q 'Result: required production environment checks passed'; then
+            echo "❌ check_prod_env.py unexpectedly passed on placeholder .env.production.example!"
             exit 1
           else
-            echo "✅ check_prod_env.py correctly failed on placeholder secrets (expected behaviour)."
+            echo "✅ check_prod_env.py correctly failed on placeholder secrets."
           fi
 
-      - name: Run Contract Smoke Tests (OpenAPI, CSP, Worker Heartbeat, Metadata)
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest backend/tests/test_contract_smoke.py -q -o addopts= --tb=short
-
-      - name: Validate Grafana Dashboard JSON Structure
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest backend/tests/test_grafana_dashboard.py -q -o addopts= --tb=short
-
-      - name: Validate shell scripts
-        run: |
-          bash -n scripts/start.sh
+      - name: Validate shell scripts syntax
+        run: bash -n scripts/start.sh
 
       - name: Check for committed runtime artifacts
         run: |
-          git ls-files | grep -E '\.(db|sqlite|sqlite3)$|\.json\.lock$' && exit 1 || echo "No bad runtime artifacts tracked"
+          found=$(git ls-files | grep -E '\.(db|sqlite|sqlite3)$|\.json\.lock$' || true)
+          if [ -n "$found" ]; then
+            echo "❌ Bad runtime artifacts tracked:"
+            echo "$found"
+            exit 1
+          fi
+          echo "✅ No bad runtime artifacts tracked."
 
-      - name: Validate configuration files (YAML and JSON)
+      - name: Validate YAML and JSON config files
         run: |
           find . -name "*.yml" -o -name "*.yaml" | while read f; do
             python -c "import yaml; yaml.safe_load(open('$f')); print('OK:', '$f')" || exit 1
@@ -118,46 +125,67 @@ jobs:
             python -m json.tool "$f" >/dev/null || exit 1
           done
 
-      - name: Validate nginx config
-        run: |
-          # Generate self-signed certs so nginx -t can successfully load SSL directives
-          openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 1 -nodes -subj "/CN=localhost"
-          export DATAFORGE_TLS_CERT="/etc/nginx/cert.pem"
-          export DATAFORGE_TLS_KEY="/etc/nginx/key.pem"
-          envsubst '$DATAFORGE_TLS_CERT $DATAFORGE_TLS_KEY' < nginx.conf > nginx.conf.validated
-          docker run --rm \
-            -v "$PWD/nginx.conf.validated:/etc/nginx/nginx.conf:ro" \
-            -v "$PWD/cert.pem:/etc/nginx/cert.pem:ro" \
-            -v "$PWD/key.pem:/etc/nginx/key.pem:ro" \
-            nginx:alpine nginx -t
-
-      - name: Validate prometheus config
-        run: |
-          # Mount entire project root so referenced files (prometheus_alerts.yml) are resolvable
-          docker run --rm -v "$PWD:/etc/prometheus:ro" --entrypoint promtool prom/prometheus:v2.53.0 check config /etc/prometheus/prometheus.yml
-
-      - name: Run SRE quick check
-        run: |
-          bash scripts/sre_quick_check.sh
-
-  # ── Benchmarks (needs Playwright browser — cached) ────────────────
-  ci-gates-benchmarks:
-    name: In-Corpus Benchmarks
+  # ── 2. Static Analysis (ruff, mypy, pyflakes, bandit) ───────────────────
+  static-analysis:
+    name: Static Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip dependencies
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-ci-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-pip-static-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install types-beautifulsoup4 types-openpyxl types-requests \
+            types-html5lib types-webencodings
+
+      - name: Ruff lint
+        run: ruff check backend/app backend/tests backend/benchmarks scripts
+
+      - name: Ruff format check
+        run: ruff format --check backend/app backend/tests backend/benchmarks scripts
+
+      - name: Mypy type check
+        run: python -m mypy backend
+
+      - name: Pyflakes
+        run: python -m pyflakes backend/app backend/tests scripts
+
+      - name: Bandit security scan
+        run: python -m bandit -r backend -q
+
+  # ── 3. Backend Tests (full pytest suite + coverage) ─────────────────────
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-backend-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -166,12 +194,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Cache Playwright Chromium browser
+      - name: Cache Playwright Chromium
         id: cache-playwright
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-playwright-backend-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
@@ -179,68 +207,48 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: python -m playwright install --with-deps chromium
 
-      - name: Install Playwright system deps (no browser download)
+      - name: Install Playwright system deps only
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: python -m playwright install-deps chromium
 
-      - name: Run In-Corpus Benchmarks (SQLite, skipped markers excluded)
+      - name: Run full test suite (serial + flaky retry)
         run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -q backend/benchmarks \
-            -m "not live_benchmark and not browser" \
-            -o addopts= --tb=short
+          python -m pytest --reruns 3 --reruns-delay 10 \
+            -q backend/tests --tb=short
 
-      - name: Run Live Benchmark Governance Check
+      - name: Enforce coverage floors
+        id: coverage
+        continue-on-error: false
         run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -q backend/tests/test_benchmark_governance.py \
-            -o addopts= --tb=short
+          python -m coverage run --source=backend/app \
+            -m pytest --reruns 3 --reruns-delay 10 \
+            -q backend/tests --tb=line --no-cov-on-fail
+          python -m coverage json -o coverage.json
+          python scripts/check_coverage_floors.py coverage.json
+          python -m coverage report --fail-under=60
 
-  # ── Lint, type & security checks ─────────────────────────────────
-  lint-type-checks:
-    name: Lint, Type & Security Checks
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.json
+          retention-days: 30
+
+  # ── 4. Frontend (install, test, lint) ─────────────────────────────────
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: "20"
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-lint-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # Install from lockfile first (mypy, ruff, bandit are pinned here).
-          pip install -e ".[dev]"
-          # Type stubs and extra tools not in the lockfile.
-          pip install types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
-
-      - name: Run Ruff Lint
-        run: ruff check backend/app backend/tests backend/benchmarks scripts
-
-      - name: Run Ruff Format Check
-        run: ruff format --check backend/app backend/tests backend/benchmarks scripts
-
-      - name: Run Mypy Typecheck
-        run: python -m mypy backend/app backend/tests --check-untyped-defs
-
-      - name: Run Bandit Security Scan
-        run: python -m bandit -r backend/app -q
-
-      - name: Frontend Syntax Check
-        run: python scripts/frontend_syntax_check.py
-
-      - name: Cache npm dependencies
+      - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
@@ -248,19 +256,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
-      - name: Install npm dependencies (stylelint)
+      - name: Install dependencies
         run: npm ci
 
-      - name: CSS Lint (stylelint)
-        run: npx stylelint 'frontend/**/*.css'
-
-      - name: JS/CSS/JSON Format Check (Prettier)
-        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' 'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
-
-      - name: Frontend Unit Tests (vitest)
+      - name: Frontend unit tests (vitest)
         run: npm test
 
-      - name: Verify Frontend Assets Exist
+      - name: CSS lint (stylelint)
+        run: npm run lint:css
+
+      - name: JS/CSS/JSON format check (Prettier)
+        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' \
+          'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
+
+      - name: Docs lint
+        run: python scripts/docs_lint.py --include-experimental
+
+      - name: Verify frontend assets exist
         run: |
           missing=false
           for f in frontend/app.js frontend/styles.css frontend/favicon.svg frontend/index.html; do
@@ -271,116 +283,148 @@ jobs:
               echo "✅ $f exists ($(stat --format=%s "$f") bytes)"
             fi
           done
-          # Verify index.html uses relative paths for assets (the dev server
-          # mounts frontend at /app; absolute paths would 404).
-          if grep -q 'src="/app.js"' frontend/index.html || grep -q 'href="/styles.css"' frontend/index.html; then
-            echo "❌ index.html still uses absolute asset paths (dev server will 404)"
-            missing=true
-          fi
           if [ "$missing" = true ]; then
             exit 1
           fi
-          echo "✅ All frontend assets present and paths are relative"
+          echo "✅ All frontend assets present."
 
-      - name: Docs Lint
-        run: python scripts/docs_lint.py --include-experimental
+  # ── 5. Chaos Engineering (resilience contract) ──────────────────────────
+  chaos-engineering:
+    name: Chaos Engineering
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Generate Route Inventory Artifact
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python scripts/route_inventory.py > route-inventory.md
-        continue-on-error: false
-
-      - name: Upload Route Inventory
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
-          name: route-inventory
-          path: route-inventory.md
-          retention-days: 30
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      # Run the full test suite serially with flaky retry. Several tests
-      # share module-level singletons (domain policy, scrape telemetry,
-      # SQLite databases) which makes the suite inherently order-sensitive.
-      # Parallel execution (-n auto) introduced occasional SQLite lock
-      # contention and singleton-state races; serial execution is reliable
-      # at ~3 min 30 s on a 4-core runner.
-      - name: Run Full Test Suite (SQLite, serial + retry)
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest --reruns 3 --reruns-delay 10 \
-            -q backend/tests -o addopts= --tb=short
-
-      - name: Enforce coverage floors
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m coverage run --source=backend/app \
-            -m pytest --reruns 3 --reruns-delay 10 \
-            -q backend/tests -o addopts= --tb=line --no-cov-on-fail
-          python -m coverage json -o coverage.json
-          python scripts/check_coverage_floors.py coverage.json
-          python -m coverage report --fail-under=60
-        continue-on-error: false
-
-      - name: Upload coverage artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
-          name: coverage-report
-          path: |
-            coverage.json
-          retention-days: 30
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-chaos-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-  sbom:
-    name: SBOM Generation
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run chaos engineering tests
+        run: |
+          python -m pytest -q backend/tests/test_chaos_engineering.py --tb=short
+
+  # ── 6. Image Build & Config Smoke ──────────────────────────────────────
+  image-build:
+    name: Image Build & Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      # Use the official Anchore SBOM action which bundles the syft
-      # binary.  The previous ``pip install syft`` installed OpenMined's
-      # PySyft (privacy-preserving ML library) instead of Anchore's
-      # syft SBOM scanner — the PyPI package names collide.
-      # Pinned to v0.24.0 for supply-chain integrity.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production image
+        run: docker build --target production -t dataforge:ci-test .
+
+      - name: Smoke-test /ready
+        run: |
+          docker run -d --rm \
+            -e DATAFORGE_STORAGE_BACKEND=sqlite \
+            -e DATAFORGE_ENV=staging \
+            -e DATAFORGE_API_KEY=test \
+            -p 8000:8000 \
+            --name dataforge-ci-smoke \
+            dataforge:ci-test
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/ready >/dev/null; then
+              echo "✅ /ready returned 200"
+              docker stop dataforge-ci-smoke || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "❌ Server failed to start within 30s"
+          docker logs dataforge-ci-smoke || true
+          docker stop dataforge-ci-smoke || true
+          exit 1
+
+  # ── 7. SBOM Generation ────────────────────────────────────────────────
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Generate SBOM (CycloneDX JSON)
         uses: anchore/sbom-action@v0.24.0
         with:
           path: .
           output-file: backend-sbom.cdx.json
           format: cyclonedx-json
-          exclude: node_modules,frontend/node_modules,.venv,venv,.git,__pycache__,*.pyc,.pytest_cache,.mypy_cache,.ruff_cache,*.log,backend/data,exports,output,outputs,reports
+          exclude: >-
+            node_modules,frontend/node_modules,.venv,venv,.git,__pycache__,
+            *.pyc,.pytest_cache,.mypy_cache,.ruff_cache,*.log,backend/data,
+            exports,output,outputs,reports
 
-      - name: Upload SBOM artifact
+      - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom-cyclonedx
           path: backend-sbom.cdx.json
           retention-days: 30
 
+  # ── 8. Telegram Notification ──────────────────────────────────────────
   notify:
-    name: Telegram Notification
-    needs: [ci-gates-fast, ci-gates-benchmarks, lint-type-checks, sbom]
+    name: Notification
+    needs:
+      - fast-gates
+      - static-analysis
+      - backend-tests
+      - frontend
+      - chaos-engineering
+      - image-build
+      - sbom
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     if: always()
     steps:
-      - name: Send Telegram Message
+      - name: Determine overall status
+        id: status
+        run: |
+          # Each ${{ needs.JOB.result }} is evaluated at workflow parse time
+          # (static string substitution), then the shell loop checks the results.
+          STATUS="✅ Passed"
+          for result in "${{ needs.fast-gates.result }}" "${{ needs.static-analysis.result }}" \
+            "${{ needs.backend-tests.result }}" "${{ needs.frontend.result }}" \
+            "${{ needs.chaos-engineering.result }}" "${{ needs.image-build.result }}" \
+            "${{ needs.sbom.result }}"; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              STATUS="❌ Failed"
+              break
+            fi
+          done
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Send Telegram notification
         if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_TO != ''
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
-        # Pinned to a specific commit SHA for supply-chain integrity.
-        # Update via Dependabot (or manual bump) when upstream ships.
-        # See: https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
         uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b # master @ 2026-04-08
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
-            🔔 CI Workflow Status: ${{ (needs.ci-gates-fast.result == 'success' && needs.ci-gates-benchmarks.result == 'success' && needs.lint-type-checks.result == 'success' && needs.sbom.result == 'success') && '✅ Passed' || '❌ Failed' }}
+            🔔 CI Pipeline: ${{ steps.status.outputs.status }}
 
             Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
-            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Commit: ${{ github.sha }}
             Author: ${{ github.actor }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

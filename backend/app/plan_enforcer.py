@@ -44,6 +44,14 @@ _PLAN_LIMITS: dict[tuple[str, UsageType], int] = {
     ("enterprise", UsageType.API_REQUEST): -1,
 }
 
+# Tiers the enforcement code recognises. Any other string value
+# returning from the billing layer is normalised to ``"free"`` so a
+# corrupted or stale billing record cannot bypass plan limits by
+# carrying an unknown tier name (which would otherwise hit the
+# ``limit is None`` branch in ``check_usage_limit`` and be treated as
+# unlimited).
+KNOWN_TIERS = frozenset({"free", "starter", "pro", "enterprise"})
+
 
 def get_plan_limits(tier: str) -> dict[str, Any]:
     """Return plan limits for a tier.
@@ -62,22 +70,59 @@ def _user_tier(user_id: str) -> str:
     """Return the user's subscription tier.
 
     Uses the Autumn billing service for real tier lookups. Falls back
-    to ``"free"`` when billing is not configured (development mode).
+    to ``"free"`` when billing is not configured (development mode) or
+    when the billing layer returns a tier string we don't recognise
+    (the unknown-tier branch fall-back exists so a corrupted or stale
+    billing record cannot bypass plan enforcement).
     """
     try:
         from app.billing.service import get_user_tier_from_billing
 
         tier = get_user_tier_from_billing(user_id)
-        return tier.value if tier else "free"
+        # ``tier`` should be a ``PlanTierId`` enum but tolerate any
+        # truthy value with a ``.value`` attribute. The ``except``
+        # branches below are split so billing-layer shape regressions
+        # (``AttributeError``) are surfaced at ``WARNING`` (ops-visible)
+        # while ordinary billing flakiness stays at ``DEBUG``.
+        tier_value = tier.value if tier else "free"
     except ImportError:
+        return "free"
+    except AttributeError:
+        logger.warning(
+            "Billing service returned a non-PlanTierId for user=%s; "
+            "falling back to free. This usually indicates a "
+            "billing-layer contract regression — investigate the "
+            "return type of get_user_tier_from_billing.",
+            user_id,
+        )
         return "free"
     except (RuntimeError, ValueError, KeyError, TypeError):
         logger.debug("Failed to look up tier for %s, using free", user_id, exc_info=True)
         return "free"
 
+    return tier_value if tier_value in KNOWN_TIERS else "free"
+
+
+def get_user_tier(user_id: str) -> str:
+    """Return the caller's normalized plan tier (one of ``KNOWN_TIERS``).
+
+    Public read-only accessor over ``_user_tier`` so routers and the
+    ``/api/saas/plan`` informational endpoint can report the current
+    tier without re-implementing the billing lookup + safe fallback.
+    """
+    return _user_tier(user_id)
+
 
 def _auto_set_quota(user_id: str, usage_type: UsageType) -> None:
-    """Ensure the user has a quota row matching their plan tier."""
+    """Ensure the user has a quota row matching their plan tier.
+
+    Also repairs a stale limit after a plan upgrade/downgrade: if a
+    quota row already exists but its ``limit`` no longer matches the
+    current plan's limit, the limit is updated (preserving the current
+    usage count) so a user who upgrades from free (10 jobs) to pro
+    (1000 jobs) mid-cycle actually gets the higher cap instead of
+    staying locked at the old lower limit until a worker restart.
+    """
     tier = _user_tier(user_id)
     limit = _PLAN_LIMITS.get((tier, usage_type))
     if limit is None or limit < 0:
@@ -85,6 +130,10 @@ def _auto_set_quota(user_id: str, usage_type: UsageType) -> None:
     ledger = get_usage_ledger()
     existing = ledger.get_quota(user_id, usage_type)
     if existing is None:
+        ledger.set_quota(user_id, usage_type, limit=limit, period=QuotaPeriod.MONTHLY)
+    elif existing.limit != limit:
+        # Plan changed since the quota row was created — sync the limit
+        # to the current plan while preserving the current usage count.
         ledger.set_quota(user_id, usage_type, limit=limit, period=QuotaPeriod.MONTHLY)
 
 

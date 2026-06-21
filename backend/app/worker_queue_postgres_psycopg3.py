@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings as _settings
 from app.postgres_repository_base import get_database_url
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Connection pool (thread-safe, synchronous, psycopg 3)
 # ───────────────────────────────────────────────────────────────────────
 
-_pool = None
+_pool: Any = None
 _pool_lock = threading.Lock()
 
 
@@ -89,7 +89,7 @@ def _close_pool() -> None:
             if pool is not None:
                 try:
                     pool.close()
-                except Exception:
+                except (RuntimeError, OSError, ValueError, TypeError):
                     logger.debug("Failed to close psycopg3 worker queue pool during shutdown")
                 logger.info("Closed psycopg3 worker queue pool")
 
@@ -113,7 +113,7 @@ def _conn() -> Iterator:
                 from app.metrics_collector import record_error
 
                 record_error("database")
-            except Exception:  # nosec B110  # noqa: RUF100, S110
+            except (RuntimeError, ValueError, TypeError):  # nosec B110  # noqa: RUF100, S110
                 pass
             raise
 
@@ -171,7 +171,7 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
                     from app.metrics_collector import record_error
 
                     record_error("database")
-                except Exception:  # nosec B110  # noqa: RUF100, S110
+                except (RuntimeError, ValueError, TypeError):  # nosec B110  # noqa: RUF100, S110
                     pass
                 raise
 

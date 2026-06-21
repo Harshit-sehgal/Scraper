@@ -7,14 +7,16 @@ import contextlib
 import io
 import json
 import logging
+import os
 import re
 import secrets
 import threading
 import zipfile
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -23,18 +25,13 @@ from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
 from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
+from app.storage_interface import get_job_repository
 from app.url_analyzer import analyze_url as _url_analyze
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["system"])
-
-
-def get_job_repository():
-    import app.main
-
-    return app.main.get_job_repository()
 
 
 class AcquisitionMode(StrEnum):
@@ -68,10 +65,11 @@ async def storage_status(
 ):
     """Detailed storage backend status. Requires operator or admin."""
     repo = get_job_repository()
-    if getattr(repo, "backend", "") == "postgres":
+    backend = getattr(repo, "backend", "")
+    if backend and backend.startswith("postgres"):
         health = await run_in_threadpool(repo.health_check)
         return {
-            "backend": getattr(repo, "backend", "postgres"),
+            "backend": backend,
             "ok": health.get("ok", False),
             "error": health.get("error"),
             "schema_version": health.get("schema_version", 0),
@@ -82,6 +80,48 @@ async def storage_status(
     from app.job_store import get_storage_status
 
     return await run_in_threadpool(get_storage_status)
+
+
+@router.get("/api/system/manifest")
+async def system_manifest(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))],
+):
+    """Live module/version manifest for the dashboard help section.
+
+    Returns the project's metadata, runtime configuration, and the
+    currently-active AUP version so the help panel can show
+    version-aware information without hardcoding values in JS.
+    """
+    from app.config import settings
+    from app.saas import CURRENT_AUP_VERSION
+    from app.utils.encryption import _get_key_version
+
+    pyproject_path = Path(__file__).resolve().parents[3] / "pyproject.toml"
+    project_version = "unknown"
+    if pyproject_path.exists():
+        try:
+            import tomllib  # type: ignore[import-not-found]
+
+            with pyproject_path.open("rb") as f:
+                data = tomllib.load(f)
+            project_version = str(
+                data.get("project", {}).get("version") or data.get("tool", {}).get("poetry", {}).get("version") or "unknown",
+            )
+        except (OSError, KeyError, ValueError):
+            project_version = "unknown"
+
+    return {
+        "project": "DataForge Scraper",
+        "version": project_version,
+        "env": str(getattr(settings, "ENV", "development")),
+        "aup_version": CURRENT_AUP_VERSION,
+        "encryption_key_version": _get_key_version(),
+        "experimental_routes_enabled": bool(
+            getattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False),
+        ),
+        "storage_backend": str(getattr(settings, "STORAGE_BACKEND", "sqlite")),
+        "pg_driver": os.environ.get("DATAFORGE_PG_DRIVER", "psycopg2"),
+    }
 
 
 @router.get("/api/system/status")
@@ -354,7 +394,37 @@ async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_r
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
 
 
-# ─── CSP Violations Endpoint ───────────────────────────────────────────
+# ─── Audit Log Endpoint ────────────────────────────────────────────────
+
+
+@router.get("/api/system/audit-log")
+async def get_audit_log(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    category: Annotated[
+        str | None,
+        Query(description="Filter by event category: auth, rbac, admin, data_access, job, system"),
+    ] = None,
+) -> dict[str, Any]:
+    """Return recent audit-log events parsed from the log file.
+
+    Admin-only because the audit log can include user IDs, IP addresses,
+    and admin-action payloads. ``limit`` caps the number of events
+    returned; ``category`` is a coarse filter on the event ``category``
+    field. Events that fail to parse are silently skipped (the logger
+    falls back to the original line).
+    """
+    from app.audit_logger import get_recent_events
+
+    events = get_recent_events(count=limit)
+    if category:
+        events = [e for e in events if str(e.get("category") or "").lower() == category.lower()]
+    return {
+        "total": len(events),
+        "limit": limit,
+        "category": category or "",
+        "items": events,
+    }
 
 
 @router.post("/api/system/csp-violations")
@@ -472,21 +542,21 @@ async def analyze_url(
     if not req.fetch_preview:
         return intelligence.to_guided_dict(safe_to_fetch=True)
 
-    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
+    url_analyzer_timeout = settings.URL_ANALYZER_TIMEOUT
 
     try:
         result = await asyncio.wait_for(
             analyze_url_for_fields(url=req.url, search_params=req.search_params, acquisition_mode=req.acquisition_mode),
-            timeout=URL_ANALYZER_TIMEOUT,
+            timeout=url_analyzer_timeout,
         )
     except TimeoutError:
-        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, redacted_url)
+        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", url_analyzer_timeout, redacted_url)
         return JSONResponse(
             status_code=408,
             content={
                 "url": redacted_url,
                 "error": (
-                    f"Analysis timed out after {URL_ANALYZER_TIMEOUT} seconds. "
+                    f"Analysis timed out after {url_analyzer_timeout} seconds. "
                     "The page may be too slow, heavy, or protected by anti-bot measures."
                 ),
                 "redirect_info": None,
@@ -609,8 +679,8 @@ def _render_basic_metrics_text() -> str:
         repo = get_job_repository()
         worker_healths = repo.get_all_worker_healths(ttl_seconds=60)
         for wh in worker_healths:
-            wid = wh.get("worker_id", "unknown")
-            hostname = wh.get("hostname", "")
+            wid = str(wh.get("worker_id", "unknown"))
+            hostname = str(wh.get("hostname", ""))
             pid = str(wh.get("pid") or "unknown")
             alive = 1 if wh.get("alive") else 0
             lines.append(
@@ -625,7 +695,7 @@ def _render_basic_metrics_text() -> str:
                 try:
                     import datetime as _dt
 
-                    age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                    age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
                 except (ValueError, TypeError):
                     age = -1.0
             else:
@@ -883,8 +953,8 @@ async def metrics(request: Request):
                 registry=registry,
             )
             for wh in worker_healths:
-                wid = wh.get("worker_id", "unknown")
-                hostname = wh.get("hostname", "")
+                wid = str(wh.get("worker_id", "unknown"))
+                hostname = str(wh.get("hostname", ""))
                 pid = str(wh.get("pid") or "unknown")
                 hb_alive_gauge.labels(worker_id=wid, hostname=hostname, pid=pid).set(1 if wh.get("alive") else 0)
                 last_hb = wh.get("last_heartbeat")
@@ -892,7 +962,7 @@ async def metrics(request: Request):
                     try:
                         import datetime as _dt
 
-                        age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                        age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
                     except (ValueError, TypeError):
                         age = -1.0
                 else:

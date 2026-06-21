@@ -1,5 +1,5 @@
 {
-  "route_count": 139,
+  "route_count": 144,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -144,6 +144,22 @@
       "router_module": "app.routers.auth_profiles",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "create_checkout",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/billing/checkout",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "CheckoutResponse",
+      "router_module": "app.billing.checkout",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown"
     },
     {
       "auth_dependency_if_known": "require_role",
@@ -322,7 +338,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "backfill_job_metadata",
       "method": "POST",
@@ -338,7 +354,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "cancel_job",
       "method": "POST",
@@ -418,7 +434,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "reclean_job",
       "method": "POST",
@@ -1586,6 +1602,22 @@
       "tenant_scoped": "no"
     },
     {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "get_audit_log",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/audit-log",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.system",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
       "auth_dependency_if_known": "require_role, verify_experimental_enabled",
       "category": "experimental API routes",
       "handler_function": "system_crystalline",
@@ -1679,6 +1711,22 @@
       "response_model_if_known": "",
       "router_module": "app.routers.experimental",
       "stable_or_experimental": "experimental",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "system_manifest",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/system/manifest",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "",
+      "router_module": "app.routers.system",
+      "stable_or_experimental": "stable",
       "tenant_scoped": "no"
     },
     {
@@ -2077,6 +2125,38 @@
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
       "response_model_if_known": "",
+      "router_module": "app.routers.workflow",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "list_workflow_runs",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/workflows/{workflow_id}/runs",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.workflow",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "get_workflow_run",
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/workflows/{workflow_id}/runs/{run_id}",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"

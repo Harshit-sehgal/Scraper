@@ -5,6 +5,7 @@ from typing import Never
 import app.main as main_mod
 import pytest
 from app.models import Job, JobStatus, ScrapeMode
+from app.routers import jobs_write  # used by both B025 tests below
 
 
 @pytest.fixture(autouse=True)
@@ -234,11 +235,11 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-key")
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
 
-    # Mock enqueue to raise an error
+    # Mock enqueue to raise an error (RuntimeError so it matches the production except clause)
     class FailingQueue:
         async def enqueue(self, *args, **kwargs) -> Never:
             msg = "Queue is dead"
-            raise Exception(msg)
+            raise RuntimeError(msg)
 
     monkeypatch.setattr("app.worker_queue.get_worker_queue", FailingQueue)
 
@@ -437,3 +438,141 @@ def test_body_size_limit_chunked_oversized(client, monkeypatch) -> None:
     )
     assert resp.status_code == 413
     assert "too large" in resp.json()["detail"]
+
+
+def _make_queue_that_raises(exc: BaseException):
+    """Build a worker_queue stub whose ``enqueue`` raises the given exception.
+
+    Used by both the standalone quota-bypass test and the parametrized
+    queue-error routing test below.
+    """
+
+    class _StubQueue:
+        async def enqueue(self, *args, **kwargs):
+            raise exc
+
+    return _StubQueue
+
+
+# Tests in this file rely on per-function ``monkeypatch`` teardown so cross-test
+# state (e.g. ``jobs_write.get_usage_ledger``, ``app.worker_queue.get_worker_queue``)
+# is reverted automatically. If any of these tests ever flips to a session- or
+# module-scoped monkeypatch fixture, both B025 tests would need to be revisited.
+
+
+def test_create_job_enqueue_quota_bypass(client, monkeypatch) -> None:
+    """Quota ``ValueError`` from the usage ledger short-circuits to 429
+    *before* the worker_queue is touched.
+
+    This case is structurally different from the queue-error scenarios
+    below: it patches the ledger's ``get_usage_ledger`` (cached import
+    inside ``jobs_write``) rather than the worker_queue, and asserts
+    that the queue's ``enqueue`` is never called. Keeping it standalone
+    makes the contract easier to read.
+    """
+    monkeypatch.setattr(jobs_write.settings, "ENV", "production")
+    monkeypatch.setattr(jobs_write.settings, "OPERATOR_API_KEY", "test-key")
+    monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+
+    payload = {
+        "name": "enqueue-exception-routing",
+        "mode": "manual",
+        "urls": ["https://example.com"],
+        "schema_fields": [
+            {"name": "company_name", "field_type": "string", "required": True},
+        ],
+    }
+    headers = {"X-API-Key": "test-key"}
+
+    class _QuotaFullLedger:
+        def record_usage(self, *args, **kwargs):
+            msg = "Scheduled-job quota exceeded"
+            raise ValueError(msg)
+
+    # ``jobs_write`` imports ``get_usage_ledger`` at module load time, so
+    # the cached reference inside ``jobs_write`` is what we must patch
+    # (not the source module attribute).
+    monkeypatch.setattr(
+        jobs_write,
+        "get_usage_ledger",
+        _QuotaFullLedger,
+    )
+
+    _should_not_be_called = _make_queue_that_raises(
+        AssertionError("Quota failure must not reach the worker_queue"),
+    )
+    monkeypatch.setattr("app.worker_queue.get_worker_queue", _should_not_be_called)
+
+    resp = client.post("/api/jobs", json=payload, headers=headers)
+    assert resp.status_code == 429
+    assert "Scheduled-job quota" in resp.json()["detail"]
+    assert len(main_mod.jobs_store) == 0
+
+
+@pytest.mark.parametrize(
+    ("exc_type", "exc_msg", "expected_status", "expected_detail_fragment"),
+    [
+        # RuntimeError from the worker_queue → production-mode 503.
+        # Mirrors a "broker is down" or "serializer unavailable" failure
+        # mode where the queue itself rejected the message.
+        (RuntimeError, "Queue is dead", 503, "Failed to enqueue job"),
+        # OSError from the worker_queue → production-mode 503.
+        # Mirrors a socket/connect failure on the broker transport.
+        (OSError, "Connect call failed", 503, "Failed to enqueue job"),
+        # ValueError from the worker_queue → routes to the quota 429 branch
+        # because ``except ValueError`` sits BEFORE ``except (RuntimeError,
+        # OSError)`` in the enqueue try block. This is the B025 fix's
+        # correctness guarantee: a queue-side invalid state does NOT get
+        # misclassified as a generic enqueue failure. The HTTPException
+        # propagates the original ``ValueError`` message as the detail —
+        # the test asserts that message verbatim below.
+        (ValueError, "Invalid task_type from broker", 429, "Invalid task_type from broker"),
+    ],
+    ids=["runtime_error_503", "os_error_503", "queue_value_error_429"],
+)
+def test_create_job_enqueue_queue_exception_routing(
+    client,
+    monkeypatch,
+    exc_type,
+    exc_msg,
+    expected_status,
+    expected_detail_fragment,
+) -> None:
+    """Durable B025 guard for the worker_queue error-handling branches.
+
+    Asserts that each queue-raised exception produces the expected HTTP
+    status AND leaves ``main_mod.jobs_store`` empty. The shape of the
+    ``except`` clauses in ``jobs_write.create_job`` is load-bearing: if
+    someone reorders them or accidentally widens the second tuple to
+    ``(RuntimeError, OSError, ValueError)`` (which was the original
+    ruff B025 flag), this test pinpoints the broken branch.
+
+    Quota-ValueError is tested separately in
+    ``test_create_job_enqueue_quota_bypass`` because its setup is
+    genuinely different (ledger monkeypatch + unreachable-queue
+    invariant).
+    """
+    monkeypatch.setattr(jobs_write.settings, "ENV", "production")
+    monkeypatch.setattr(jobs_write.settings, "OPERATOR_API_KEY", "test-key")
+    monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+
+    payload = {
+        "name": "enqueue-exception-routing",
+        "mode": "manual",
+        "urls": ["https://example.com"],
+        "schema_fields": [
+            {"name": "company_name", "field_type": "string", "required": True},
+        ],
+    }
+    headers = {"X-API-Key": "test-key"}
+
+    exc = exc_type(exc_msg)
+    stub_queue = _make_queue_that_raises(exc)
+    monkeypatch.setattr("app.worker_queue.get_worker_queue", stub_queue)
+
+    resp = client.post("/api/jobs", json=payload, headers=headers)
+    assert resp.status_code == expected_status, f"expected {expected_status}, got {resp.status_code}: {resp.json()!r}"
+    assert expected_detail_fragment in resp.json()["detail"], (
+        f"detail {resp.json()['detail']!r} does not contain {expected_detail_fragment!r}"
+    )
+    assert len(main_mod.jobs_store) == 0, "orphaned job in in-memory store after queue-raised exception"

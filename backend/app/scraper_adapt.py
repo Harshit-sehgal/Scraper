@@ -87,7 +87,7 @@ async def _run_crawl_frontier_link_discovery(
             if added > 0:
                 logger.debug("[Scraper] Added %d/%d discovered links to frontier from %s", added, len(discovered_links), url)
             return added
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
         logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
     return 0
 
@@ -114,7 +114,7 @@ def _run_selector_decay_prediction(domain: str, selector_hit_rate: float) -> Non
                 prediction.risk_level,
                 prediction.days_until_failure,
             )
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
         logger.debug("[PredictiveAdaptation] Decay prediction failed: %s", e)
 
 
@@ -133,7 +133,7 @@ def _run_domain_evolution_modeling(domain: str, extraction_method: str, anti_bot
             evolution_model.record_mutation(domain)
         if anti_bot_score > 0.5:
             evolution_model.record_anti_bot_escalation(domain, anti_bot_score)
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
         logger.debug("[PredictiveAdaptation] Evolution modeling failed: %s", e)
 
 
@@ -164,7 +164,7 @@ def _run_self_tuning_extraction(
                 "confidence_map": confidence_map or {},
             },
         )
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
         logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
 

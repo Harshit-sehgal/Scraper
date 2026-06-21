@@ -177,8 +177,8 @@ def main() -> int:
     ingress_passed = True
     for url, expected_code, desc in test_urls:
         try:
-            req = urllib.request.Request(url, method="GET")  # noqa: S310
-            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 — hardcoded local probe URLs  # noqa: S310
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 — hardcoded local probe URLs
                 status = resp.status
         except urllib.error.HTTPError as e:
             status = e.code

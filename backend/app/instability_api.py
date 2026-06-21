@@ -7,7 +7,7 @@ High-entropy data sources are quarantined before they can affect stable basins.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class ImmunityLayer:
                 self._quarantined_sources.pop(k, None)
 
 
-_immune_system: ImmunityLayer | None = None
+_immune_system: Any = None
 
 
 def get_immune_system(ws: SemanticWorldState | None = None) -> ImmunityLayer:

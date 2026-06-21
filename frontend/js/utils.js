@@ -2,6 +2,8 @@
    DataForge — Utility Functions
    ═══════════════════════════════════════════ */
 
+import { icon } from "./icons.js";
+
 // ─── HTML Escaping ───
 
 export function esc(s) {
@@ -37,12 +39,26 @@ export function toast(msg, type = "info", duration = 3000) {
   const t = document.createElement("div");
   t.className = `toast ${type}`;
 
+  // Leading monochrome icon — rendered as a raw SVG (not wrapped in a
+  // span) so callers that query the first <span> still receive the
+  // message element, preserving the public toast contract.
+  const TOAST_ICONS = {
+    success: "check",
+    error: "x",
+    warning: "alertTriangle",
+    info: "info",
+  };
+  const iconSvg = icon(TOAST_ICONS[type] || "info", 16, "toast-icon");
+  if (iconSvg) {
+    t.innerHTML = iconSvg;
+  }
+
   // Message content
   const msgSpan = document.createElement("span");
   msgSpan.textContent = msg;
   t.appendChild(msgSpan);
 
-  // Auto-dismiss timer bar
+  // Auto-dismiss timer bar (hidden via CSS; kept for test contract)
   const timer = document.createElement("div");
   timer.className = "toast-timer";
   timer.style.animationDuration = `${duration}ms`;
@@ -108,7 +124,7 @@ export function initTheme() {
     applySystemTheme();
     // Listen for OS-level theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener("change", (e) => {
+    mq.addEventListener("change", (_e) => {
       if (!localStorage.getItem(THEME_KEY)) {
         applySystemTheme();
       }
@@ -153,7 +169,16 @@ export function toggleTheme() {
 function updateThemeToggleIcon(theme) {
   const btn = document.getElementById("btn-theme-toggle");
   if (!btn) return;
-  btn.textContent = theme === "dark" ? "☀️" : "🌙";
+  const iconName = theme === "dark" ? "sun" : "moon";
+  const existingSpan = btn.querySelector("[data-icon]");
+  if (existingSpan) {
+    existingSpan.setAttribute("data-icon", iconName);
+    // Trigger icon hydration
+    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch(() => {});
+  } else {
+    btn.innerHTML = `<span data-icon="${iconName}" aria-hidden="true"></span>`;
+    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch(() => {});
+  }
 }
 
 // ─── Shortcut Help Modal ───

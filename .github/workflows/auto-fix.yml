@@ -1,0 +1,113 @@
+# =============================================================================
+# DataForge Scraper — Auto-Fix Formatting
+# =============================================================================
+# Automatically fixes formatting issues (Prettier, Ruff) on PR branches
+# when the main CI pipeline reports a formatting failure.
+#
+# This keeps the lint gates green without requiring manual fix-up commits
+# from contributors. The bot commits directly to the PR branch using the
+# default `github-actions[bot]` identity.
+#
+# Triggers:
+#   - On PR comment "/format" — manually request a format fix
+#   - On label "auto-format" applied — automatically format the PR
+# =============================================================================
+
+name: Auto-Fix Formatting
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [labeled]
+
+# Use a dedicated token so the resulting push triggers CI checks on the PR
+# branch (the default GITHUB_TOKEN suppresses workflow runs on push).
+# Access: Settings → Developer settings → Personal access tokens → Fine-grained tokens
+# Permissions: "Contents: write", "Pull requests: read/write"
+# Store as: FORMAT_FIX_BOT_TOKEN
+env:
+  GH_TOKEN: ${{ secrets.FORMAT_FIX_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  format-fix:
+    name: Format Fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: |
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/format')) ||
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'labeled' &&
+       github.event.label.name == 'auto-format')
+    steps:
+      - name: Get PR branch ref
+        id: pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_URL="${{ github.event.issue.pull_request.url }}"
+            PR_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$PR_URL")
+            echo "ref=$(echo "$PR_DATA" | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['ref'])")" >> "$GITHUB_OUTPUT"
+            echo "sha=$(echo "$PR_DATA" | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['sha'])")" >> "$GITHUB_OUTPUT"
+            echo "repo=$(echo "$PR_DATA" | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['repo']['full_name'])")" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.head_ref }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.ref }}
+          token: ${{ env.GH_TOKEN }}
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Fix Ruff formatting
+        run: |
+          ruff format backend/app backend/tests backend/benchmarks scripts 2>&1 || true
+
+      - name: Fix Prettier formatting
+        run: |
+          npx prettier --write 'frontend/**/*.{js,css,html,mjs}' \
+            'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc' 2>&1 || true
+
+      - name: Commit and push fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "✅ No formatting changes needed."
+          else
+            git commit -m "style: auto-fix formatting [skip actions]"
+            git push
+            echo "✅ Formatting fixes committed and pushed."
+          fi

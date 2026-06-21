@@ -35,7 +35,6 @@ SECRET_PATTERNS = [
 SAFE_ENV_DEFAULTS = {
     "DATAFORGE_DOTENV_PATH": "/dev/null",
     "DATAFORGE_ENV": "test",
-    "DATAFORGE_STORAGE_BACKEND": "sqlite",
     "DATAFORGE_API_KEY": "user-key",
     "DATAFORGE_OPERATOR_API_KEY": "operator-key",
     "DATAFORGE_ADMIN_API_KEY": "admin-key",
@@ -80,6 +79,11 @@ def command_text(command: list[str]) -> str:
 def safe_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy()
     env.update(SAFE_ENV_DEFAULTS)
+    # Storage backend is intentionally NOT in ``SAFE_ENV_DEFAULTS``: honour the
+    # caller / shell environment (e.g. ``DATAFORGE_STORAGE_BACKEND=postgres``
+    # for proof-of-parity runs against a real DB) and only fall back to the
+    # SQL default if it is unset.
+    env.setdefault("DATAFORGE_STORAGE_BACKEND", "sqlite")
     if overrides:
         env.update(overrides)
     return env
@@ -274,6 +278,12 @@ def backend_quick_checks(py: str) -> list[Check]:
             ],
             180,
         ),
+        Check(
+            "openapi_spec",
+            [py, "scripts/generate_openapi.py", "--no-docs-copy"],
+            120,
+            note="Generates artifacts/audit/openapi.json from the live FastAPI app.",
+        ),
     ]
 
 
@@ -318,6 +328,7 @@ def frontend_checks() -> list[Check]:
         Check("npm_ci", ["npm", "ci"], 600, needs_executable="npm"),
         Check("frontend_tests", ["npm", "run", "test"], 300, needs_executable="npm"),
         Check("frontend_lint_js", ["npm", "run", "lint:js"], 300, needs_executable="npm"),
+        Check("frontend_lint_css", ["npm", "run", "lint:css"], 120, needs_executable="npm"),
     ]
 
 
@@ -411,7 +422,8 @@ def write_summary(summary: dict[str, Any], archive_dir: Path) -> None:
     for result in summary["results"]:
         log_path = Path(result["log_path"]).relative_to(ROOT) if result.get("log_path") else ""
         lines.append(
-            f"| {result['status']} | {str(result['required']).lower()} | {result['name']} | {result['exit_code']} | `{log_path}` |",
+            f"| {result['status']} | {str(result['required']).lower()} | {result['name']} | "
+            f"{result['exit_code']} | `{log_path}` |",
         )
     lines.append("")
     SUMMARY_MD.write_text("\n".join(lines), encoding="utf-8")

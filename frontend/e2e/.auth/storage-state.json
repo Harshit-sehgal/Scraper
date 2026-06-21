@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "dataforge_session",
+      "value": "eyJyb2xlIjoidXNlciIsInVzZXJfaWQiOiIwODQ1ZTM2NThlZGMxYzkxIiwiaWF0IjoxNzgxOTUzNjA1LCJtYXhfYWdlIjo4NjQwMCwic2lkIjoiZmFjYjZjNmMtMjNjZS00OGYxLTgzZWItMGNkYjAzZTFlNDZlIn0.5a596f1f920c4df32accb3e1792063e9427a3cfc14b7c9a8f4efdb968996ddae",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1782040005.641,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": []
+}

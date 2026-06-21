@@ -54,14 +54,13 @@ if TYPE_CHECKING:
     from app.models import SchemaField
     from app.recovery_strategies import AttemptContext
 
-logger = logging.getLogger(__name__)
-
-# ─── Re-exports for backward compatibility ────────────────────────────
-# These symbols are imported by callers throughout the codebase.
+# Re-exports for backward compatibility
 from app.cleaning_engine import ai_clean_and_align_records
 from app.crawl_frontier import get_crawl_frontier
 from app.data_utils import _limit_source_records, process_raw_records
 from app.html_utils import _boost_contacts_with_page_html
+
+logger = logging.getLogger(__name__)
 
 # Avoid pyflakes unused import errors for backward-compatibility re-exports
 _ = (get_crawl_frontier, _boost_contacts_with_page_html, _limit_source_records)
@@ -868,3 +867,115 @@ async def scrape_url(
 
 # Backward-compatible alias used by tests
 _record_extraction_method_safe = record_extraction_method_safe
+
+
+# ─── Public scroll / load-more extraction entry points ──────────────────
+# Closes CAND-P2-EXTRACTION-SCROLL-001. These two helpers expose the
+# infinite-scroll + load-more execution paths through the stable
+# ``backend.app.scraper`` surface so callers packaging an extraction
+# pipeline do not need to reach into ``pagination_executor`` directly.
+# The actual scroll / click loops live in
+# :mod:`backend.app.pagination_executor` and are themselves covered by
+# ``backend.tests.test_pagination_async``; the helpers here are a thin
+# ``ScrapeAttemptResult`` wrapper that aggregates per-page records.
+
+
+async def run_infinite_scroll_extraction(
+    page: Any,
+    url: str,
+    *,
+    pagination_config: Any = None,
+    per_page_extract: Any = None,
+) -> ScrapeAttemptResult:
+    """Execute an infinite-scroll extraction against a live Playwright page.
+
+    Delegates the scroll loop to ``app.pagination_executor.async_paginate``
+    with ``strategy='infinite_scroll'`` and aggregates per-scroll records
+    into a ``ScrapeAttemptResult``. ``per_page_extract`` is the user-supplied
+    async callable that receives the live page and returns the list of
+    records visible at the current scroll position.
+    """
+    return await _run_paginated_extraction(
+        page=page,
+        url=url,
+        strategy="infinite_scroll",
+        pagination_config=pagination_config,
+        per_page_extract=per_page_extract,
+    )
+
+
+async def run_load_more_extraction(
+    page: Any,
+    url: str,
+    *,
+    pagination_config: Any = None,
+    per_page_extract: Any = None,
+) -> ScrapeAttemptResult:
+    """Execute a load-more-button extraction against a live Playwright page.
+
+    Delegates the click loop to ``app.pagination_executor.async_paginate``
+    with ``strategy='load_more'`` and aggregates per-click records into a
+    ``ScrapeAttemptResult``. ``per_page_extract`` is the user-supplied
+    async callable that receives the live page and returns the records
+    appended by the most recent 'Load more' click.
+    """
+    return await _run_paginated_extraction(
+        page=page,
+        url=url,
+        strategy="load_more",
+        pagination_config=pagination_config,
+        per_page_extract=per_page_extract,
+    )
+
+
+async def _run_paginated_extraction(
+    *,
+    page: Any,
+    url: str,
+    strategy: str,
+    pagination_config: Any,
+    per_page_extract: Any,
+) -> ScrapeAttemptResult:
+    """Shared body for the two scroll / load-more entry points above."""
+    from app.pagination_executor import (
+        PaginationConfig as ExecutorPaginationConfig,
+    )
+    from app.pagination_executor import (
+        async_paginate,
+    )
+
+    config = pagination_config if pagination_config is not None else ExecutorPaginationConfig(strategy=strategy)
+    pagination_result = await async_paginate(
+        page=page,
+        config=config,
+        extract_fn=per_page_extract,
+        base_url=url,
+    )
+
+    records = list(pagination_result.records)
+    telemetry = get_scrape_telemetry()
+    telemetry.record(
+        url=url,
+        records_final=len(records),
+        fetch_method=f"browser_{strategy}",
+    )
+    record_extraction_method_safe(strategy)
+
+    return ScrapeAttemptResult(
+        records,
+        html=None,
+        final_url=url,
+        fetch_method=f"browser_{strategy}",
+        telemetry=telemetry,
+        extraction_method=strategy,
+        zero_result_classification=None,
+        data_evidence_score=min(1.0, len(records) / 10.0),
+        # First-class propagation: ``pagination_result.stopped_reason`` is
+        # what ``app.pagination_executor.async_paginate`` records as the
+        # reason the loop exited (button_gone, no_new_records, max_pages,
+        # max_records, timeout, duplicate_page, error). Surface it on the
+        # returned wrapper so downstream ``workflow_executor._paginate_and_extract``
+        # can read it directly without a ``getattr`` fallback.
+        stopped_reason=pagination_result.stopped_reason,
+        warnings=[],
+    )

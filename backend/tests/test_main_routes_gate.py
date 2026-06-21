@@ -16,10 +16,20 @@ from __future__ import annotations
 import sys
 
 
+def _iter_routes(routes):
+    """Yield concrete routes across FastAPI's include-router wrappers."""
+    for route in routes:
+        original_router = getattr(route, "original_router", None)
+        if original_router is not None:
+            yield from _iter_routes(getattr(original_router, "routes", []) or [])
+            continue
+        yield route
+
+
 def _experimental_route_paths(app) -> set[str]:
     """Return the set of path patterns exposed by the experimental router."""
     paths: set[str] = set()
-    for route in app.routes:
+    for route in _iter_routes(app.routes):
         # Each FastAPI route has a `.path` attribute. The experimental
         # router is mounted with the default prefix (no prefix), so
         # its paths are like "/api/system/topology".

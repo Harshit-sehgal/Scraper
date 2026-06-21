@@ -86,7 +86,7 @@ def _get_key(key_version: str = DEFAULT_KEY_VERSION) -> bytes | None:
     if env_key:
         try:
             return base64.b64decode(env_key)
-        except Exception as exc:
+        except (ValueError, TypeError) as exc:
             logger.warning("Failed to decode encryption key from %s: %s", versioned_env_name, exc)
             return None
 
@@ -95,7 +95,7 @@ def _get_key(key_version: str = DEFAULT_KEY_VERSION) -> bytes | None:
     if env_key:
         try:
             return base64.b64decode(env_key)
-        except Exception as exc:
+        except (ValueError, TypeError) as exc:
             logger.warning("Failed to decode encryption key from %s: %s", _ENCRYPTION_KEY_ENV, exc)
             return None
 
@@ -125,7 +125,7 @@ def _get_all_available_keys() -> dict[str, bytes]:
                     key_bytes = base64.b64decode(env_value)
                     version = f"v{version_suffix}" if version_suffix.isdigit() else version_suffix
                     keys[version] = key_bytes
-                except Exception:
+                except (ValueError, TypeError):
                     logger.debug("Skipping invalid key in %s", env_name)
                     continue
 
@@ -138,7 +138,7 @@ def _get_all_available_keys() -> dict[str, bytes]:
             legacy_version = os.environ.get(_ENCRYPTION_KEY_VERSION_ENV, DEFAULT_KEY_VERSION)
             if legacy_version not in keys:
                 keys[legacy_version] = legacy_key
-        except Exception:
+        except (ValueError, TypeError):
             logger.debug("Skipping invalid legacy encryption key")
 
     # Development/test fallback: ensure at least one key exists
@@ -268,15 +268,25 @@ def encrypt(plaintext: str) -> str:
             key_version = next(iter(all_keys))
             key = all_keys[key_version]
         else:
-            # Last resort: dev-only fallback
+            # Last resort: dev-only fallback. Only derive a predictable
+            # test key in development/test (matching ``_get_key``'s
+            # policy at the top of this module). Any other env value
+            # (staging, production, unknown) MUST fail closed — silently
+            # encrypting auth-profile session secrets with a publicly-
+            # known key in staging would be a plaintext-equivalent leak.
             env = os.environ.get("DATAFORGE_ENV", "development").lower()
-            if env == "production":
+            if env in {"development", "test"}:
+                key = _derive_test_key(DEFAULT_KEY_VERSION)
+                key_version = DEFAULT_KEY_VERSION
+            else:
                 env_var = f"{_ENCRYPTION_KEY_V_PREFIX}{key_version.upper()}"
-                msg = f"Encryption key not configured. Set {env_var} environment variable."
+                msg = (
+                    f"Encryption key not configured (env={env!r}). "
+                    f"Set {env_var} (or {env_var} / {_ENCRYPTION_KEY_ENV}) "
+                    f"environment variable. Test-key fallback is only "
+                    f"permitted in development/test."
+                )
                 raise EncryptionError(msg)
-            # In dev/test, derive a test key
-            key = _derive_test_key(DEFAULT_KEY_VERSION)
-            key_version = DEFAULT_KEY_VERSION
 
     ciphertext, tag, nonce = _aes_gcm_encrypt(plaintext.encode("utf-8"), key)
 

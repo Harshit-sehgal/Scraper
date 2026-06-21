@@ -19,9 +19,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from app.saas import CURRENT_AUP_VERSION
 from app.saas.identity_store import SQLiteIdentityStore, reset_identity_store
 from app.saas.models import User, UserStatus
-from app.saas.router import CURRENT_AUP_VERSION
 from app.saas.router import router as saas_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient

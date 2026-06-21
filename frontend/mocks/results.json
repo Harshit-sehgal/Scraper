@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "company_name": "Northstar Studio",
+      "email": "hello@northstar.example",
+      "phone": "+1 555 0101",
+      "website": "https://northstar.example",
+      "source_url": "https://example.com/directory/northstar",
+      "record_score": 0.94
+    },
+    {
+      "company_name": "Cedar Analytics",
+      "email": "team@cedar.example",
+      "phone": "+1 555 0102",
+      "website": "https://cedar.example",
+      "source_url": "https://example.com/directory/cedar",
+      "record_score": 0.89
+    }
+  ]
+}

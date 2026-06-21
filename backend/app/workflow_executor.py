@@ -1,12 +1,21 @@
 """Workflow Executor — replay saved scraping workflows with Playwright.
 
-Provides the execution engine for saved workflows. Each workflow is a
-sequence of steps (open, fill, click, etc.) that are replayed against
-a live Playwright browser. After the steps complete, the configured
-extraction schema is applied to the final page state.
+Experimental — not wired into the production job lifecycle.
+============================================================
+
+This module provides the execution engine for saved workflows. Each
+workflow is a sequence of steps (open, fill, click, etc.) that are
+replayed against a live Playwright browser. After the steps complete,
+the configured extraction schema is applied to the final page state.
 
 Pagination strategies (infinite scroll, load more, next button) are
 handled via ``app.pagination_executor.async_paginate``.
+
+**Status**: Tested but not yet integrated into the production scraper
+pipeline.  To activate, import and call from the job runner.  Until
+then, this module lives alongside the research shell but is not
+registered in ``RESEARCH_MODULES`` because it has a clear near-term
+promotion path (unlike the open-ended research experiments).
 """
 
 from __future__ import annotations
@@ -49,7 +58,7 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
                 await page.goto(step.value or workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
                 try:
                     await page.wait_for_load_state("networkidle", timeout=5000)
-                except Exception:
+                except (RuntimeError, OSError, ValueError):
                     logger.debug("networkidle timeout during goto step %d, continuing", step.order)
                 await asyncio.sleep(PAGE_SETTLE_SECONDS)
                 event["url"] = page.url
@@ -103,7 +112,7 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
                 # EXTRACT is handled separately by the extraction schema
                 event["status"] = "deferred"
 
-        except Exception as exc:
+        except (RuntimeError, OSError, ValueError, TypeError) as exc:
             logger.warning("Workflow step %d (%s) failed: %s", step.order, step.step_type.value, exc)
             event["status"] = "failed"
             event["error"] = str(exc)
@@ -184,7 +193,7 @@ async def _extract_records_from_page(
             }""",
             [{"name": f.name, "field_type": f.field_type.value} for f in workflow.extraction_schema],
         )
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.warning("Page extraction failed: %s", exc)
 
     return records
@@ -197,6 +206,11 @@ async def _paginate_and_extract(
     """Handle pagination if configured and extract all records.
 
     Returns (all_records, pagination_stopped_reason).
+
+    When ``pagination_config.strategy`` is ``load_more`` or ``infinite_scroll``,
+    dispatches through the new ``app.scraper`` helpers so all extraction paths
+    funnel through a single ``ScrapeAttemptResult`` surface. Other strategies
+    fall through to ``app.pagination_executor.async_paginate`` directly.
     """
     pagination_config = workflow.pagination_config
     if not pagination_config or not pagination_config.enabled:
@@ -204,17 +218,53 @@ async def _paginate_and_extract(
         records = await _extract_records_from_page(page, workflow)
         return records, "no_pagination"
 
+    async def _extract(page_arg: Any) -> list[dict[str, Any]]:
+        return await _extract_records_from_page(page_arg, workflow)
+
+    strategy = pagination_config.strategy
+
+    # Funnel scroll-style strategies through the new scraper helpers so the
+    # workflow extraction path shares its ScrapeAttemptResult surface with
+    # the public scrape_url() / run_infinite_scroll_extraction() / etc. APIs.
+    #
+    # ``workflow.pagination_config`` is the API-side model which intentionally
+    # omits executor-only fields like ``max_records``, so we materialise a
+    # full ``PaginationConfig`` here (mirroring the next_button / page_number
+    # fall-through) before passing it through the helper chain.
+    if strategy in ("load_more", "infinite_scroll"):
+        from app import scraper
+        from app.pagination_executor import PaginationConfig as ExecutorPaginationConfig
+        from app.scraper_models import ScrapeAttemptResult
+
+        executor_config = ExecutorPaginationConfig(
+            strategy=strategy,
+            max_pages=pagination_config.max_pages,
+            selector=pagination_config.selector or None,
+            stop_on_duplicates=True,
+        )
+
+        helper = scraper.run_load_more_extraction if strategy == "load_more" else scraper.run_infinite_scroll_extraction
+        # Run the helper under an isolated local so Mypy doesn't reuse this
+        # binding for the next ``sync_paginate`` branch below. ``ScrapeAttemptResult``
+        # subclasses ``list`` so it already satisfies the ``list[dict[str, Any]]`` slot.
+        scroll_result: ScrapeAttemptResult = await helper(
+            page,
+            workflow.start_url,
+            pagination_config=executor_config,
+            per_page_extract=_extract,
+        )
+        # ``stopped_reason`` is now a first-class attribute on ``ScrapeAttemptResult``
+        # (populated by ``_run_paginated_extraction`` from ``pagination_result.stopped_reason``).
+        return scroll_result, scroll_result.stopped_reason
+
     from app.pagination_executor import PaginationConfig, async_paginate
 
     config = PaginationConfig(
-        strategy=pagination_config.strategy,
+        strategy=strategy,
         max_pages=pagination_config.max_pages,
         selector=pagination_config.selector or None,
         stop_on_duplicates=True,
     )
-
-    async def _extract(page: Any) -> list[dict[str, Any]]:
-        return await _extract_records_from_page(page, workflow)
 
     result = await async_paginate(
         page,
@@ -226,12 +276,11 @@ async def _paginate_and_extract(
     return result.records, result.stopped_reason
 
 
-async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[str, Any]:  # noqa: ARG001
+async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
     """Execute a workflow and return extraction results.
 
     Args:
         workflow: The workflow to execute.
-        headless: Whether to run the browser in headless mode.
 
     Returns:
         A dict containing the extracted records, success flag, and metadata.
@@ -255,10 +304,10 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
             await page.goto(workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
             try:
                 await page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
+            except (RuntimeError, OSError, TimeoutError):
                 logger.debug("networkidle timeout during initial navigation")
             await asyncio.sleep(PAGE_SETTLE_SECONDS)
-        except Exception as exc:
+        except (RuntimeError, OSError, ValueError) as exc:
             logger.warning("Failed to navigate to start URL: %s", exc)
             return {
                 "workflow_id": workflow.id,
@@ -277,7 +326,7 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
         try:
             final_url = page.url
             page_title = await page.title()
-        except Exception:
+        except (RuntimeError, OSError, ValueError):
             final_url = workflow.start_url
             page_title = ""
 
@@ -296,7 +345,7 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
             "timestamp": start_time.isoformat(),
         }
 
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.exception("Workflow execution failed for %s", workflow.id)
         return {
             "workflow_id": workflow.id,
@@ -308,7 +357,7 @@ async def execute_workflow(workflow: Workflow, headless: bool = True) -> dict[st
         if page is not None:
             try:
                 await page.close()
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.debug("Failed to close Playwright page after workflow execution")
 
 
@@ -359,7 +408,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
             "warnings": [] if sample_records else ["No sample rows matched the extraction schema."],
         }
 
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         logger.exception("Workflow preview failed for %s", workflow.id)
         return {
             "workflow_id": workflow.id,
@@ -371,5 +420,5 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
         if page is not None:
             try:
                 await page.close()
-            except Exception:
+            except (RuntimeError, OSError, ValueError):
                 logger.debug("Failed to close Playwright page after workflow preview")
