@@ -74,7 +74,7 @@ if __name__ == "__main__":
     print(STAGING_VALIDATION_CHECKLIST)
 
     # Write to file
-    with open("/tmp/STAGING_VALIDATION_CHECKLIST.md", "w") as f:
+    with open("/tmp/STAGING_VALIDATION_CHECKLIST.md", "w") as f:  # noqa: S108
         f.write(STAGING_VALIDATION_CHECKLIST)
 
     print("\n✅ Checklist saved to: /tmp/STAGING_VALIDATION_CHECKLIST.md")

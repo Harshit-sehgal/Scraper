@@ -3,6 +3,7 @@
 import ipaddress
 import logging
 import socket
+from typing import ClassVar
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ class SSRFDefense:
     """Prevent SSRF and DNS-rebinding attacks."""
 
     # Blocked IP ranges
-    BLOCKED_RANGES = [
+    BLOCKED_RANGES: ClassVar[list] = [
         ipaddress.ip_network("127.0.0.0/8"),  # Localhost
         ipaddress.ip_network("10.0.0.0/8"),  # Private
         ipaddress.ip_network("172.16.0.0/12"),  # Private
@@ -42,7 +43,7 @@ class SSRFDefense:
             result = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
 
             if not result:
-                logger.warning(f"DNS resolution failed for {hostname}")
+                logger.warning("DNS resolution failed for %s", hostname)
                 return None
 
             # Check each resolved IP
@@ -51,7 +52,11 @@ class SSRFDefense:
                 ip = sockaddr[0]
 
                 if cls.is_blocked_ip(ip):
-                    logger.warning(f"SSRF blocked: hostname {hostname} resolved to blocked IP {ip}")
+                    logger.warning(
+                        "SSRF blocked: hostname %s resolved to blocked IP %s",
+                        hostname,
+                        ip,
+                    )
                     return None
 
                 resolved_ips.append(ip)
@@ -60,7 +65,7 @@ class SSRFDefense:
             return resolved_ips[0] if resolved_ips else None
 
         except socket.gaierror as e:
-            logger.warning(f"DNS resolution error for {hostname}: {e}")
+            logger.warning("DNS resolution error for %s: %s", hostname, e)
             return None
 
     @classmethod
@@ -84,7 +89,7 @@ class SSRFDefense:
             return True, ip
 
         except Exception as e:
-            logger.exception(f"URL validation error: {e}")
+            logger.exception("URL validation error: %s", e)
             return False, str(e)
 
 
@@ -113,7 +118,12 @@ class DNSRebindingDefense:
                         current_ips = {addr[4][0] for addr in result}
 
                         if current_ips != set(cached_ips):
-                            logger.warning(f"DNS_REBINDING detected: {hostname} changed from {cached_ips} to {current_ips}")
+                            logger.warning(
+                                "DNS_REBINDING detected: %s changed from %s to %s",
+                                hostname,
+                                cached_ips,
+                                current_ips,
+                            )
                             return True
                     except socket.gaierror:
                         pass
@@ -126,5 +136,5 @@ class DNSRebindingDefense:
             return False
 
         except Exception as e:
-            logger.exception(f"DNS rebinding check error: {e}")
+            logger.exception("DNS rebinding check error: %s", e)
             return False

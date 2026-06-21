@@ -15,7 +15,8 @@ const FAILURE_MAP = {
     title: "Login Required",
     message: "This page requires a login session.",
     detail: "The target page returned a login form or redirect to an authentication endpoint.",
-    action: "Create an Auth Profile: go to Auth Profiles, click 'Create', enter the domain, and complete the login flow.",
+    action:
+      "Create an Auth Profile: go to Auth Profiles, click 'Create', enter the domain, and complete the login flow.",
   },
   session_expired: {
     icon: "⏰",
@@ -128,13 +129,23 @@ export function classifyJobFailure(job) {
   if (errorMsg.includes("login") || errorMsg.includes("sign in") || errorMsg.includes("authenticate")) {
     return "login_required";
   }
-  if (errorMsg.includes("captcha") || errorMsg.includes("challenge") || errorMsg.includes("blocked") || errorMsg.includes("403")) {
+  if (
+    errorMsg.includes("captcha") ||
+    errorMsg.includes("challenge") ||
+    errorMsg.includes("blocked") ||
+    errorMsg.includes("403")
+  ) {
     return "blocked";
   }
   if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
     return "timeout";
   }
-  if (errorMsg.includes("dns") || errorMsg.includes("connection") || errorMsg.includes("refused") || errorMsg.includes("econn")) {
+  if (
+    errorMsg.includes("dns") ||
+    errorMsg.includes("connection") ||
+    errorMsg.includes("refused") ||
+    errorMsg.includes("econn")
+  ) {
     return "network_error";
   }
   if (errorMsg.includes("quota") || errorMsg.includes("rate limit") || errorMsg.includes("429")) {
@@ -212,12 +223,16 @@ export function renderFailurePanel(job) {
           <span class="failure-panel-section-label">What happened</span>
           <p class="failure-panel-text">${esc(explanation.detail)}</p>
         </div>
-        ${hasDetail ? `
+        ${
+          hasDetail
+            ? `
           <details class="failure-panel-details">
             <summary>Technical details</summary>
             <pre class="failure-panel-error">${esc(errorMsg)}</pre>
           </details>
-        ` : ""}
+        `
+            : ""
+        }
         <div class="failure-panel-section">
           <span class="failure-panel-section-label">Recommended action</span>
           <p class="failure-panel-text failure-panel-action">${esc(explanation.action)}</p>

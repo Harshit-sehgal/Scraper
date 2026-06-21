@@ -154,9 +154,20 @@ describe("getFailureExplanation()", () => {
 
   it("has all required fields for every failure type", () => {
     const types = [
-      "login_required", "session_expired", "session_url", "selector_not_found",
-      "blocked", "timeout", "network_error", "no_records", "quota_exceeded",
-      "domain_blocked", "browser_crash", "partial_extraction", "low_quality", "unknown",
+      "login_required",
+      "session_expired",
+      "session_url",
+      "selector_not_found",
+      "blocked",
+      "timeout",
+      "network_error",
+      "no_records",
+      "quota_exceeded",
+      "domain_blocked",
+      "browser_crash",
+      "partial_extraction",
+      "low_quality",
+      "unknown",
     ];
     for (const t of types) {
       const exp = getFailureExplanation(t);

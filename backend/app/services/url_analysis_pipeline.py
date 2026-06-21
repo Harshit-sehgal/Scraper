@@ -153,7 +153,9 @@ class URLAnalysisPipeline:
         # ── Stage 3: Page Fetching ───────────────────────────────────
         fetch_ok = await self._stage_fetch_page(ctx)
         if not fetch_ok:
-            assert ctx.error_response is not None
+            if ctx.error_response is None:
+                msg = "fetch stage failed without an error response"
+                raise RuntimeError(msg)
             return ctx.error_response
 
         # ── Stage 4: Search Form Recovery ────────────────────────────

@@ -154,17 +154,37 @@ class JobCreationService:
         Steps:
         1. Resolve user identity and tenant context
         2. Validate and sanitize URLs
-        3. Handle idempotency key (replay or reject conflicts)
-        4. Build and persist the Job object
-        5. Record usage in the ledger
-        6. Enqueue or schedule the job for execution
-        7. Return the result
+        3. M2: Check semantic mode availability if required
+        4. Handle idempotency key (replay or reject conflicts)
+        5. Build and persist the Job object
+        6. Record usage in the ledger
+        7. Enqueue or schedule the job for execution
+        8. Return the result
         """
         # Step 1: Resolve identity and tenant context
         user_id, owner_org_id, owner_project_id = self._resolve_identity(request)
 
         # Step 2: Validate URLs
         urls = self._validate_urls(job_data)
+
+        # M2: Fail fast if semantic mode is required but unavailable
+        mode = str(job_data.mode or "fast").lower()
+        if mode == "semantic":
+            try:
+                from app.semantic_pipeline import get_pipeline_status
+                status = await get_pipeline_status()
+                if not status.get("available", False):
+                    from app.exceptions import JobCreationError
+                    raise JobCreationError(
+                        status_code=400,
+                        detail="M2: Semantic mode is not available. Use 'fast' or 'browser' mode instead."
+                    )
+            except (ImportError, RuntimeError):
+                from app.exceptions import JobCreationError
+                raise JobCreationError(
+                    status_code=503,
+                    detail="M2: Semantic pipeline unavailable; try again later."
+                )
 
         # Step 3: Handle idempotency
         idem_key = self._extract_idempotency_key(request)

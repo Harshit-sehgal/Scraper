@@ -1038,6 +1038,7 @@ class WorkerQueue:
 
     def get_status(self) -> dict[str, Any]:
         """Return queue status for monitoring."""
+        _ensure_schema(db_path=self._db_path)
         conn = self._conn()
         try:
             # ``retrying`` is a future-only TaskStatus value: the queue

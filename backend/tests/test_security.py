@@ -29,12 +29,16 @@ class TestInputValidation:
                 "urls": ["https://example.com"],
             },
         )
-        # Should either reject or sanitize the input
-        assert response.status_code in (400, 422, 200)
-        if response.status_code == 200:
-            data = response.json()
-            # Verify the name was sanitized
-            assert "DROP TABLE" not in data.get("name", "")
+        # Parameterized queries make SQL injection safe; 201 means the literal
+        # string was stored without executing SQL.
+        assert response.status_code in (400, 422, 200, 201)
+        if response.status_code in (200, 201):
+            # Job was created — verify jobs table still works (no injection executed).
+            list_resp = client.get("/api/jobs", headers=auth_headers)
+            assert list_resp.status_code == 200
+            payload = list_resp.json()
+            jobs = payload if isinstance(payload, list) else payload.get("jobs", [])
+            assert isinstance(jobs, list)
 
     def test_xss_in_job_name(self, client: TestClient, auth_headers: dict):
         """Test XSS attempts in job name."""

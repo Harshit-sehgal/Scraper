@@ -1,5 +1,4 @@
 """Load testing for concurrent requests and rate limiting."""
-import pytest
 
 
 def test_concurrent_requests_health(client):

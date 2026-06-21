@@ -11,7 +11,13 @@ import { renderFailurePanel } from "./failure-explanation.js";
 // ─── State ───
 
 export let currentJobId = null;
-let currentResultsCache = [];
+export let currentResultsCache = [];
+
+/** Replace the in-memory results cache (used by duplicate detection etc.).
+ *  This avoids re-fetching from the API after client-side transforms. */
+export function replaceResultsCache(newCache) {
+  currentResultsCache = Array.isArray(newCache) ? newCache : [];
+}
 
 // Pagination state
 let _currentPage = 1;
@@ -391,7 +397,7 @@ export function renderPaginationControls(currentPage, totalPages, totalRows) {
       <span class="pagination-range">${rangeLabel}</span>
       <select class="pagination-size-select" id="pagination-size-select" aria-label="Rows per page">
         ${PAGE_SIZE_OPTIONS.map(
-          (s) => `<option value="${s}"${s === pageSize ? " selected" : ""}>${s} / page</option>`
+          (s) => `<option value="${s}"${s === pageSize ? " selected" : ""}>${s} / page</option>`,
         ).join("")}
       </select>
     </div>

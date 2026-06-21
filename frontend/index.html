@@ -225,14 +225,27 @@
                   <span class="nav-icon" data-icon="sliders" aria-hidden="true"></span>
                   <span class="nav-text">Workflows</span>
                 </button>
-              </li>              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="auth-profiles" id="nav-auth-profiles">
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="auth-profiles"
+                  id="nav-auth-profiles"
+                >
                   <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
                   <span class="nav-text">Auth Profiles</span>
                 </button>
               </li>
               <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="scheduled-monitoring" id="nav-scheduled-monitoring">
+                <button
+                  type="button"
+                  class="nav-item"
+                  data-action="switch-view"
+                  data-view="scheduled-monitoring"
+                  id="nav-scheduled-monitoring"
+                >
                   <span class="nav-icon" data-icon="clock" aria-hidden="true"></span>
                   <span class="nav-text">Scheduled</span>
                 </button>
@@ -1072,9 +1085,9 @@
                 <button type="button" class="btn ghost small" data-action="switch-view" data-view="jobs">Back</button>
                 <h1 id="res-title">Results</h1>
                 <p class="subtle" id="res-meta"></p>
-          <div id="result-warning"></div>
-          <div id="failure-panel-container" style="display: none"></div>
-          <div id="lineage-summary"></div>
+                <div id="result-warning"></div>
+                <div id="failure-panel-container" style="display: none"></div>
+                <div id="lineage-summary"></div>
                 <div id="res-progress-wrap" class="job-progress-wrap hidden">
                   <div id="res-progress-bar" class="job-progress-bar" style="width: 0%"></div>
                   <span id="res-progress-text" class="job-progress-text">0%</span>
@@ -1133,6 +1146,36 @@
                   aria-label="Filter results"
                 />
                 <span class="table-copy-hint">Double-click a cell to copy</span>
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="show-data-profile"
+                  id="btn-data-profile"
+                  title="View data profile and field statistics"
+                >
+                  <span data-icon="chartBar" aria-hidden="true"></span>
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="analyze-cleaning"
+                  id="btn-analyze-cleaning"
+                  title="Detect and fix data formatting issues"
+                >
+                  <span data-icon="wrench" aria-hidden="true"></span>
+                  Clean Data
+                </button>
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="find-duplicates"
+                  id="btn-find-duplicates"
+                  title="Scan for duplicate rows"
+                >
+                  <span data-icon="copy" aria-hidden="true"></span>
+                  Find Duplicates
+                </button>
                 <span class="table-count" id="result-count-label">0 rows</span>
               </div>
               <table id="res-table">
@@ -1143,6 +1186,9 @@
                   </tr>
                 </tbody>
               </table>
+              <div id="profile-panel" class="hidden"></div>
+              <div id="cleaning-panel" class="hidden"></div>
+              <div id="dup-panel" class="hidden"></div>
               <div id="pagination-controls" class="pagination-controls"></div>
             </div>
           </div>
@@ -1325,7 +1371,12 @@
                 <p class="subtle">Recurring scraping jobs and change detection</p>
               </div>
               <div class="page-head-actions">
-                <button type="button" class="btn ghost small" data-action="refresh-scheduled" id="btn-refresh-scheduled">
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  data-action="refresh-scheduled"
+                  id="btn-refresh-scheduled"
+                >
                   Refresh
                 </button>
               </div>

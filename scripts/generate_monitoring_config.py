@@ -101,10 +101,10 @@ receivers:
 """
 
 # Save to files
-with open("/tmp/dataforge-prometheus-rules.yml", "w") as f:
+with open("/tmp/dataforge-prometheus-rules.yml", "w") as f:  # noqa: S108
     f.write(PROMETHEUS_RULES)
 
-with open("/tmp/dataforge-alertmanager-config.yml", "w") as f:
+with open("/tmp/dataforge-alertmanager-config.yml", "w") as f:  # noqa: S108
     f.write(ALERTMANAGER_CONFIG)
 
 print("✅ Prometheus rules: /tmp/dataforge-prometheus-rules.yml")

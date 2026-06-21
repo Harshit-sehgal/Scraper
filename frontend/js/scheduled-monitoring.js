@@ -79,14 +79,16 @@ function _renderJobs(jobs) {
     container.appendChild(row);
 
     // Fetch change detection data asynchronously
-    _fetchChangesForJob(job.id).then((changes) => {
-      if (changes) {
-        const changesEl = row.querySelector(".scheduled-changes");
-        if (changesEl) {
-          changesEl.innerHTML = _buildChangesSummary(changes);
+    _fetchChangesForJob(job.id)
+      .then((changes) => {
+        if (changes) {
+          const changesEl = row.querySelector(".scheduled-changes");
+          if (changesEl) {
+            changesEl.innerHTML = _buildChangesSummary(changes);
+          }
         }
-      }
-    }).catch(() => {});
+      })
+      .catch(() => {});
   }
 }
 
@@ -97,13 +99,14 @@ function _buildJobRow(job) {
   const lastStatus = job.last_run_status || "—";
   const lastRecords = job.last_run_records_count ?? "—";
 
-  const statusClass = {
-    completed: "badge completed",
-    degraded: "badge degraded",
-    empty_result: "badge empty_result",
-    failed: "badge failed",
-    running: "badge running",
-  }[lastStatus] || "badge pending";
+  const statusClass =
+    {
+      completed: "badge completed",
+      degraded: "badge degraded",
+      empty_result: "badge empty_result",
+      failed: "badge failed",
+      running: "badge running",
+    }[lastStatus] || "badge pending";
 
   return `
     <div class="scheduled-row-main">
@@ -158,10 +161,14 @@ function _buildChangesSummary(changes) {
     if (delta !== 0) {
       const direction = delta > 0 ? "↑" : "↓";
       const className = delta > 0 ? "change-positive" : "change-negative";
-      parts.push(`<span class="${className}">${direction} ${Math.abs(delta)} record${Math.abs(delta) !== 1 ? "s" : ""}</span>`);
+      parts.push(
+        `<span class="${className}">${direction} ${Math.abs(delta)} record${Math.abs(delta) !== 1 ? "s" : ""}</span>`,
+      );
     }
     if (statusChanged) {
-      parts.push(`<span class="change-warning">⟳ Status: ${esc(changes.previous_status || "—")} → ${esc(changes.last_status)}</span>`);
+      parts.push(
+        `<span class="change-warning">⟳ Status: ${esc(changes.previous_status || "—")} → ${esc(changes.last_status)}</span>`,
+      );
     }
     parts.push(`<span class="change-detected-badge">Change detected</span>`);
   } else {
@@ -172,9 +179,10 @@ function _buildChangesSummary(changes) {
     parts.push(`<span class="change-warning">⏰ Frequency gap unusual</span>`);
   }
 
-  const recordsLine = changes.last_records_count != null
-    ? `<span class="change-meta">Last run: ${changes.last_records_count} records · ${esc(changes.message || "")}</span>`
-    : "";
+  const recordsLine =
+    changes.last_records_count != null
+      ? `<span class="change-meta">Last run: ${changes.last_records_count} records · ${esc(changes.message || "")}</span>`
+      : "";
 
   return `
     <div class="scheduled-changes-summary ${hasChanges ? "has-changes" : "no-changes"}">

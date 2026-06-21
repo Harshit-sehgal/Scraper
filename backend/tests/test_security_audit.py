@@ -1,5 +1,5 @@
 """Test security audit and PII classification."""
-import pytest
+
 from app.utils.security_audit import PIIClassifier, PIIType, DataAccessAuditor
 from app.utils.ssrf_defense import SSRFDefense, DNSRebindingDefense
 

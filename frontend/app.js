@@ -48,14 +48,29 @@ import {
 } from "./js/form.js";
 import { refreshCognition } from "./js/cognition.js";
 import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
-import { restoreJob, hardDeleteJob, clearRecycleBin } from "./js/recycle.js";
+import { restoreJob, hardDeleteJob, clearRecycleBin, handleRecycleSelectAll, handleRecycleSelectItem, batchRestore, batchHardDelete } from "./js/recycle.js";
 import { cancelJob, deleteJob, clearTerminalJobs } from "./js/jobs.js";
-import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel, copySampleRow, goToFirstPage, goToPrevPage, goToNextPage, goToLastPage, goToPage } from "./js/results.js";
+import {
+  viewResults,
+  recleanCurrentJob,
+  exportCSV,
+  exportJSON,
+  exportExcel,
+  copySampleRow,
+  goToFirstPage,
+  goToPrevPage,
+  goToNextPage,
+  goToLastPage,
+  goToPage,
+} from "./js/results.js";
 import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, checkSession } from "./js/api.js";
 import { setMode } from "./js/views.js";
 import { initAuthProfiles } from "./js/auth-profiles.js";
 import { initScheduledMonitoring, refreshScheduledJobs, deleteScheduledJob } from "./js/scheduled-monitoring.js";
 import { refreshBilling, upgradePlan } from "./js/billing.js";
+import { findDuplicates, removeDuplicates, clearDuplicateState } from "./js/duplicate-detection.js";
+import { analyzeCleaning, applyCleaningAction, clearCleaningState } from "./js/data-cleaning.js";
+import { showDataProfile, clearProfileState } from "./js/data-profile.js";
 import { refreshAudit } from "./js/audit.js";
 import { refreshRetention, deleteMyData } from "./js/retention.js";
 
@@ -162,6 +177,15 @@ function onDocumentClick(e) {
       break;
     case "clear-recycle-bin":
       clearRecycleBin();
+      break;
+    case "recycle-select-all":
+      handleRecycleSelectAll(btn.checked);
+      break;
+    case "recycle-batch-restore":
+      batchRestore();
+      break;
+    case "recycle-batch-delete":
+      batchHardDelete();
       break;
     case "refresh-dashboard":
       refreshDashboard();
@@ -293,6 +317,42 @@ function onDocumentClick(e) {
     case "go-to-last-page":
       goToLastPage();
       break;
+    case "find-duplicates":
+      findDuplicates();
+      break;
+    case "remove-duplicates":
+      removeDuplicates();
+      break;
+    case "analyze-cleaning":
+      analyzeCleaning();
+      break;
+    case "apply-cleaning":
+      applyCleaningAction();
+      break;
+    case "show-data-profile":
+      showDataProfile();
+      break;
+    case "hide-profile-panel":
+      clearProfileState();
+      {
+        const panel = document.getElementById("profile-panel");
+        if (panel) panel.classList.add("hidden");
+      }
+      break;
+    case "hide-cleaning-panel":
+      clearCleaningState();
+      {
+        const panel = document.getElementById("cleaning-panel");
+        if (panel) panel.classList.add("hidden");
+      }
+      break;
+    case "hide-duplicate-panel":
+      clearDuplicateState();
+      {
+        const panel = document.getElementById("dup-panel");
+        if (panel) panel.classList.add("hidden");
+      }
+      break;
     case "go-to-page": {
       const page = btn.getAttribute("data-page");
       if (page) goToPage(page);
@@ -358,6 +418,13 @@ function onDocumentChange(e) {
   if (checkbox) {
     const item = checkbox.closest(".analyze-field-item");
     if (item) item.classList.toggle("selected", checkbox.checked);
+  }
+
+  // Recycle bin individual item checkbox
+  const recycleCheck = e.target.closest(".recycle-check-item");
+  if (recycleCheck) {
+    const id = recycleCheck.getAttribute("data-id");
+    if (id) handleRecycleSelectItem(id, recycleCheck.checked);
   }
 }
 

@@ -190,7 +190,7 @@ def record_export_outcome(fmt: str, success: bool) -> None:
         bucket[outcome] = bucket.get(outcome, 0) + 1
 
 
-def record_browser_launch(success: bool) -> None:
+def record_browser_launch(success: bool, *, reason: str | None = None) -> None:
     """Record a Playwright browser launch outcome.
 
     Used to detect environments where Playwright is missing its
@@ -199,8 +199,7 @@ def record_browser_launch(success: bool) -> None:
     outcome = "success" if success else "failure"
     with _browser_launch_outcomes_lock:
         _browser_launch_outcomes[outcome] = _browser_launch_outcomes.get(outcome, 0) + 1
-    
-    # H9: Meter crash reasons
+
     if not success:
         key = f"browser_crash:{reason}" if reason else "browser_crash:unknown"
         with _ssrf_rejects_lock:

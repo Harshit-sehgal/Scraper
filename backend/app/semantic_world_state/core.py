@@ -603,8 +603,9 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                         continue
                     local_val = self._topology.topological_laws.get(pair, 0.0)
                     new_val = local_val * 0.7 + remote_val * 0.3
-                    # Assert merged value stays valid
-                    assert 0.0 <= new_val <= 1.0, f"H4: Merged law {pair} invalid: {new_val}"
+                    if not (0.0 <= new_val <= 1.0):
+                        logger.warning("H4: Merged law %s invalid: %s", pair, new_val)
+                        continue
                     self._topology.set_topological_law(pair, new_val)
 
             logger.info("FEDERATION: Merged %s topological laws.", len(remote_laws))

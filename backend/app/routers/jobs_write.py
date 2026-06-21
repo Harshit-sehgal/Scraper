@@ -23,7 +23,7 @@ from app.config import settings
 
 # Satisfy pyflakes — `settings` is patched in tests via ``jobs_write.settings``
 # and is also used by service modules that import it through this namespace.
-assert settings  # noqa: S101
+_SETTINGS_IMPORT_GUARD = settings
 
 from app.discovery import (
     DiscoveryDependencyError,

@@ -2350,7 +2350,7 @@
     },
     "/api/auth-profiles/{profile_id}/complete-login": {
       "post": {
-        "description": "Complete the login flow by storing the encrypted browser session.\n\n``storage_state`` is the Playwright storage state (cookies + localStorage)\ncaptured after the user has logged in. It is encrypted before storage.",
+        "description": "Complete the login flow by storing the encrypted browser session.\n\n``storage_state`` is the Playwright storage state (cookies + localStorage)\ncaptured after the user has logged in. It is encrypted before storage.\n\nH12: Use per-user encryption key derived from user_id.",
         "operationId": "complete_login_api_auth_profiles__profile_id__complete_login_post",
         "parameters": [
           {

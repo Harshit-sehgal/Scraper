@@ -3,7 +3,16 @@
    ═══════════════════════════════════════════ */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { renderLogs, applyResultSearch, renderTable, renderPaginationControls, paginateRows, formatPaginationLabel, getCurrentPage, getPageSize } from "./results.js";
+import {
+  renderLogs,
+  applyResultSearch,
+  renderTable,
+  renderPaginationControls,
+  paginateRows,
+  formatPaginationLabel,
+  getCurrentPage,
+  getPageSize,
+} from "./results.js";
 
 // ─── renderLogs ────────────────────────────────────────────────────────────
 

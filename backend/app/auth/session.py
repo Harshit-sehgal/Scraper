@@ -188,9 +188,9 @@ def _unsign(signed: str) -> str | None:
                 expected_old = hmac.new(old_key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
                 if hmac.compare_digest(sig, expected_old):
                     return payload
-    except Exception:
-        pass
-    
+    except (ValueError, TypeError, UnicodeError):
+        return None
+
     return None
 
 

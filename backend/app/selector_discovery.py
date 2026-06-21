@@ -67,14 +67,16 @@ from app.url_value_classification import (
 # because the research boundary checker requires kernel files to import
 # research modules lazily.  They are imported on demand by the pipeline
 # stages that need them.
-assert detect_session_params  # noqa: S101  # used by pipeline._stage_detect_session
-assert EmptyResponseCheck  # noqa: S101  # used by pipeline._stage_quality_check
-assert detect_empty_response  # noqa: S101  # used by pipeline._stage_quality_check
-assert detect_page_structure  # noqa: S101  # used by pipeline._stage_analyze_page
-assert detect_value_patterns  # noqa: S101  # used by pipeline._stage_analyze_page
-assert llm_json  # noqa: S101  # used by pipeline._stage_extract_fields
-assert reset_llm_call_count  # noqa: S101  # used by pipeline.run()
-assert settings  # noqa: S101  # test mock compatibility path
+_PIPELINE_IMPORTS = (
+    detect_session_params,
+    EmptyResponseCheck,
+    detect_empty_response,
+    detect_page_structure,
+    detect_value_patterns,
+    llm_json,
+    reset_llm_call_count,
+    settings,
+)
 
 
 # ── Lazy re-exports for backward compatibility ────────────────────────────

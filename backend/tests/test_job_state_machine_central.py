@@ -1,8 +1,8 @@
 """Test that job state machine is centralized and used consistently."""
 import datetime
-import pytest
+
 from app.models import JobStatus
-from app.services.job_state_machine import can_transition, transition_to, is_terminal
+from app.services.job_state_machine import can_transition, is_terminal
 
 
 def test_state_machine_is_central_source():
