@@ -559,8 +559,14 @@ kbd {
 }
 
 @keyframes empty-border-pulse {
-  0%, 100% { border-color: var(--border); }
-  50% { border-color: var(--border-strong); }
+  0%,
+  100% {
+    border-color: var(--border);
+  }
+
+  50% {
+    border-color: var(--border-strong);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

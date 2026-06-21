@@ -174,10 +174,14 @@ describe("theme helpers", () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
-    // Set up theme toggle button in DOM
+    // Set up theme toggle button in DOM. The UI uses a monochrome SVG
+    // icon hydrated via data-icon="sun|moon" (see icons.js + index.html);
+    // tests assert against the icon name, not emoji text.
     const btn = document.createElement("button");
     btn.id = "btn-theme-toggle";
-    btn.textContent = "🌙";
+    const iconSpan = document.createElement("span");
+    iconSpan.setAttribute("data-icon", "moon");
+    btn.appendChild(iconSpan);
     document.body.appendChild(btn);
     // Set up the #toasts container for toggleTheme
     const toasts = document.createElement("div");
@@ -211,21 +215,23 @@ describe("theme helpers", () => {
     localStorage.setItem(THEME_KEY, "dark");
     initTheme();
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-    expect(document.getElementById("btn-theme-toggle").textContent).toBe("☀️");
+    // Dark-mode active -> toggle shows the "switch back to light" icon (sun).
+    expect(document.querySelector("#btn-theme-toggle [data-icon]").getAttribute("data-icon")).toBe("sun");
   });
 
   it("initTheme restores saved light theme", () => {
     localStorage.setItem(THEME_KEY, "light");
     initTheme();
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
-    expect(document.getElementById("btn-theme-toggle").textContent).toBe("🌙");
+    // Light-mode inactive -> toggle shows the "switch to dark" icon (moon).
+    expect(document.querySelector("#btn-theme-toggle [data-icon]").getAttribute("data-icon")).toBe("moon");
   });
 
   it("toggleTheme switches from light to dark", () => {
     toggleTheme();
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect(localStorage.getItem(THEME_KEY)).toBe("dark");
-    expect(document.getElementById("btn-theme-toggle").textContent).toBe("☀️");
+    expect(document.querySelector("#btn-theme-toggle [data-icon]").getAttribute("data-icon")).toBe("sun");
   });
 
   it("toggleTheme switches from dark to light", () => {
@@ -233,7 +239,7 @@ describe("theme helpers", () => {
     toggleTheme();
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
     expect(localStorage.getItem(THEME_KEY)).toBe("light");
-    expect(document.getElementById("btn-theme-toggle").textContent).toBe("🌙");
+    expect(document.querySelector("#btn-theme-toggle [data-icon]").getAttribute("data-icon")).toBe("moon");
   });
 });
 

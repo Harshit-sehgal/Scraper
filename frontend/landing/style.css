@@ -106,7 +106,9 @@
   height: 2px;
   background: var(--ink-2);
   border-radius: 1px;
-  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
 }
 
 .mobile-menu-toggle.open .hamburger-line:nth-child(1) {
@@ -735,7 +737,7 @@
 
 .cta-banner p {
   font-size: var(--text-md);
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(255 255 255 / 0.7);
   margin-bottom: var(--space-7);
 }
 
@@ -758,12 +760,12 @@
 
 .cta-banner .btn.secondary {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.8);
+  border-color: rgb(255 255 255 / 0.3);
+  color: rgb(255 255 255 / 0.8);
 }
 
 .cta-banner .btn.secondary:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: rgb(255 255 255 / 0.5);
   color: var(--ink-inverse);
 }
 

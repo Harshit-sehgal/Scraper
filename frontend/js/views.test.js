@@ -197,8 +197,8 @@ describe("onGlobalKeydown()", () => {
     expect(document.getElementById("view-jobs").classList.contains("active")).toBe(true);
   });
 
-  it('key "5" switches to dashboard view', () => {
-    const e = new KeyboardEvent("keydown", { key: "5" });
+  it('key "3" switches to dashboard view', () => {
+    const e = new KeyboardEvent("keydown", { key: "3" });
     e.preventDefault = vi.fn();
     onGlobalKeydown(e);
     expect(e.preventDefault).toHaveBeenCalled();

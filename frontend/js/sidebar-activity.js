@@ -16,8 +16,7 @@ export function updateSidebarActivity(jobs) {
   if (!list) return;
 
   if (!jobs || jobs.length === 0) {
-    list.innerHTML =
-      '<span class="sidebar-activity-item">No recent activity</span>';
+    list.innerHTML = '<span class="sidebar-activity-item">No recent activity</span>';
     return;
   }
 
