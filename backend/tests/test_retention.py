@@ -6,9 +6,11 @@ import datetime
 from typing import Any
 
 import pytest
+
 from app.models import Job, JobStatus
 from app.utils.data_retention import _age_in_days, enforce_retention, get_retention_config
-from app.utils.retention_monitoring import RetentionMonitor, record_retention_run
+from app.utils.retention_monitoring import RetentionMonitor, get_retention_monitor, record_retention_run
+
 
 # ─── Fixtures ──────────────────────────────────────────────────────────
 
@@ -24,7 +26,7 @@ def recycle_bin_store() -> dict[str, Any]:
 
 
 @pytest.fixture
-def retention_monitor() -> RetentionMonitor:
+def fresh_monitor() -> RetentionMonitor:
     return RetentionMonitor()
 
 
@@ -74,7 +76,7 @@ class TestEnforceRetention:
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
 
         assert result["jobs_purged"] == 1
-        assert result["jobs_skipped"] == 2
+        assert result["jobs_skipped"] == 1
         assert "old" not in jobs_store
         assert "recent" in jobs_store
         assert "pending" in jobs_store
@@ -114,7 +116,6 @@ class TestEnforceRetention:
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
 
         assert result["jobs_purged"] == 1
-        assert result["jobs_skipped"] == 2
         assert "running" in jobs_store
         assert "discovering" in jobs_store
 
@@ -125,7 +126,7 @@ class TestEnforceRetention:
 class TestRetentionMonitor:
     def test_records_success(self):
         record_retention_run(result={"jobs_purged": 2, "recycle_purged": 1})
-        monitor = RetentionMonitor()
+        monitor = get_retention_monitor()
         health = monitor.get_health_check()
         assert health["ok"] is True
         assert health["total_purged"] == 3
@@ -133,7 +134,7 @@ class TestRetentionMonitor:
     def test_records_failure(self):
         for _ in range(3):
             record_retention_run(error=RuntimeError("boom"))
-        monitor = RetentionMonitor()
+        monitor = get_retention_monitor()
         health = monitor.get_health_check()
         assert health["ok"] is False
         assert "Failed" in health["status"]

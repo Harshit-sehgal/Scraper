@@ -87,12 +87,16 @@ class CheckoutRequest(BaseModel):
     """Request body for POST /api/billing/checkout."""
 
     plan_tier: _PLAN_TIER_LITERAL
-    return_url: str = Field(min_length=1, max_length=2048)
-    cancel_url: str = Field(min_length=1, max_length=2048)
+    return_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    cancel_url: str | None = Field(default=None, min_length=1, max_length=2048)
 
     @field_validator("return_url", "cancel_url")
     @classmethod
-    def _validate_urls(cls, value: str) -> str:
+    def _validate_urls(cls, value: str | None) -> str | None:
+        # None is permitted — the checkout handler will fall back to a
+        # builder-derived URL or the configured billing return URL.
+        if value is None:
+            return value
         # Strict http(s) URLs only — no javascript:, data:, file: schemes.
         # Then enforce SSRF protection against private/loopback ranges
         # (mirrors auth-profile URL validation). Without these checks,

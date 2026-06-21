@@ -265,10 +265,17 @@
         "description": "Request body for POST /api/billing/checkout.",
         "properties": {
           "cancel_url": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Cancel Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Url"
           },
           "plan_tier": {
             "enum": [
@@ -280,16 +287,21 @@
             "type": "string"
           },
           "return_url": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Return Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url"
           }
         },
         "required": [
-          "plan_tier",
-          "return_url",
-          "cancel_url"
+          "plan_tier"
         ],
         "title": "CheckoutRequest",
         "type": "object"
