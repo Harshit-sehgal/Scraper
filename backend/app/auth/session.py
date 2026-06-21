@@ -162,15 +162,36 @@ def _sign(payload: str) -> str:
 
 
 def _unsign(signed: str) -> str | None:
-    """Verify and return the payload from a signed cookie value, or None on failure."""
+    """Verify and return the payload from a signed cookie value, or None on failure.
+    
+    H11: Try primary key, then rotated keys for secret rotation support.
+    """
     try:
         payload, sig = signed.rsplit(".", 1)
     except (ValueError, AttributeError):
         return None
+    
+    # Try primary key
     expected = _sign(payload)
-    if not hmac.compare_digest(sig, expected):
-        return None
-    return payload
+    if hmac.compare_digest(sig, expected):
+        return payload
+    
+    # H11: Try rotated keys
+    try:
+        import os
+        rotated = os.environ.get("DATAFORGE_SESSION_SECRET_ROTATED", "").strip()
+        if rotated:
+            for old_secret in rotated.split(";"):
+                if not old_secret.strip():
+                    continue
+                old_key = hashlib.sha256(old_secret.strip().encode()).digest()[:32]
+                expected_old = hmac.new(old_key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+                if hmac.compare_digest(sig, expected_old):
+                    return payload
+    except Exception:
+        pass
+    
+    return None
 
 
 def create_session_cookie(role: str, user_id: str = "") -> str:

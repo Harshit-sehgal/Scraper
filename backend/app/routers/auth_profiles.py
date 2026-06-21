@@ -231,10 +231,13 @@ async def complete_login(
 
     ``storage_state`` is the Playwright storage state (cookies + localStorage)
     captured after the user has logged in. It is encrypted before storage.
+    
+    H12: Use per-user encryption key derived from user_id.
     """
     profile = _get_visible_profile(profile_id, auth)
     plaintext = json.dumps(storage_state)
-    encrypted = encryption_encrypt(plaintext)
+    _, _, user_id, _ = auth  # H12: Extract user_id from auth tuple
+    encrypted = encryption_encrypt(plaintext, user_id=user_id)
 
     now = _now_iso()
     profile["encrypted_storage_state"] = encrypted
