@@ -19,7 +19,7 @@
 | File | Action | Reason |
 |------|--------|--------|
 | `README.md` | **Rewrite** | Contains stale claims and overstatements |
-| `PROJECT_STATUS.md` | **Rewrite** | Stale test counts (says 1,884 vs actual 2,207), false pass claims |
+| `docs/AGENT_TRUTH.md` | **Rewrite** | Stale test counts (says 1,884 vs actual 2,207), false pass claims |
 | `docs/ARCHITECTURE.md` | **Keep** (minor fixes) | Largely accurate, may need minor updates |
 | `docs/API.md` | **Keep** | Documented routes match actual routes |
 | `docs/SETUP.md` | **Keep** | Setup instructions appear accurate |
@@ -38,10 +38,10 @@
 
 | File | Action | Reason |
 |------|--------|--------|
-| `docs/archive/RELEASE_NOTES.md` | ❌ **Delete** | Stale test counts, old version references, misleading claims |
-| `docs/archive/RELEASE_CANDIDATE_CHECKLIST.md` | ❌ **Delete** | Stale test counts, broken references |
-| `docs/archive/DEPLOYMENT_VALIDATION_CHECKLIST.md` | ❌ **Delete** | Stale version, broken references |
-| `docs/archive/audit/AUDIT_SUMMARY.md` | ❌ **Delete** | Stale maturity percentage (~92%), redundant with AUDIT_INDEX |
+| `docs/archive/RELEASE_NOTES.md` | ✅ **Already deleted** | Removed during 2026-06-22 cleanup (task 61+) |
+| `docs/archive/RELEASE_CANDIDATE_CHECKLIST.md` | ✅ **Already deleted** | Removed during 2026-06-22 cleanup (task 61+) |
+| `docs/archive/DEPLOYMENT_VALIDATION_CHECKLIST.md` | ✅ **Already deleted** | Removed during 2026-06-22 cleanup (task 61+) |
+| `docs/archive/audit/AUDIT_SUMMARY.md` | ✅ **Already deleted** | Removed during 2026-06-22 cleanup (task 61+) |
 | `docs/archive/audit/DELIVERABLE_*.md` (7 remaining) | **Keep** | Historical audit deliverables (D1-D9 excluding D10/D12) |
 
 ---
@@ -80,9 +80,9 @@ docs/
 
 ## Documents to Remove/Rewrite
 
-1. ❌ Delete: `docs/archive/RELEASE_NOTES.md`
-2. ❌ Delete: `docs/archive/RELEASE_CANDIDATE_CHECKLIST.md`
-3. ❌ Delete: `docs/archive/DEPLOYMENT_VALIDATION_CHECKLIST.md`
-4. ❌ Delete: `docs/archive/audit/AUDIT_SUMMARY.md`
+1. ✅ Already deleted: `docs/archive/RELEASE_NOTES.md` (2026-06-22 cleanup)
+2. ✅ Already deleted: `docs/archive/RELEASE_CANDIDATE_CHECKLIST.md` (2026-06-22 cleanup)
+3. ✅ Already deleted: `docs/archive/DEPLOYMENT_VALIDATION_CHECKLIST.md` (2026-06-22 cleanup)
+4. ✅ Already deleted: `docs/archive/audit/AUDIT_SUMMARY.md` (2026-06-22 cleanup)
 5. ✏️ Rewrite: `README.md` (see D9)
-6. ✏️ Rewrite: `PROJECT_STATUS.md` (see D10)
+6. ✏️ Rewrite: `docs/AGENT_TRUTH.md` (see D10)

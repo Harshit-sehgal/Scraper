@@ -11,7 +11,7 @@
 
 1. **Check latest versions** on the official websites above.
 2. **Download** the new version:
-   - Chart.js: `https://cdn.jsdelivr.net/npm/chart.js@<version>/dist/chart.umd.min.js`
+   - Chart.js: `https://cdn.jsdelivr.net/npm/chart.js@<version>/dist/chart.min.js`
    - Tailwind: `https://github.com/tailwindlabs/tailwindcss/releases` (standalone CLI build)
 3. **Verify integrity** by comparing the file hash against the official release checksum.
 4. **Update files** by overwriting the `.min.js` files in this directory.

@@ -66,6 +66,7 @@ test-results/
 .codex/
 .antigravitycli/
 .kilo/
+.claude/
 Instructions_for_ai/
 
 # Generated validation artifacts (large, reproducible)
@@ -84,12 +85,29 @@ shelved/
 
 # Transient AI session artifacts (status reports, gap catalogs, session summaries)
 SESSION_FINAL_STATS.txt
-[CFDSPM]*_REPORT*.md
-[CFDSPM]*_SUMMARY*.md
-[CFDSPM]*_CATALOG*.md
-[CFDSPM]*_STATUS*.md
-[CFDSPM]*_GUIDE*.md
-[CFDSPM]*_AUDIT*.md
-[CFDSPM]*_COMPLETION*.md
-H?_H??_IMPLEMENTATION_GUIDE.md
+*_REPORT*.md
+*_STATUS*.md
+*_SUMMARY*.md
+*_CATALOG*.md
+*_EVIDENCE*.md
+*_EVIDENCE_REPORT*.md
+*_GUIDE*.md
+*_AUDIT*.md
+*_COMPLETION*.md
+*_REVIEW.md
+*_TRIAGE.md
+*_BACKLOG.md
+*_PLAN.md
+*_FIX_REPORT.md
 DEEP_SCAN_*.md
+REMAINING_WORK_*.md
+PHASE*_CHANGES.md
+PHASE*_SUMMARY.md
+PROJECT_STRUCTURE_SUMMARY.md
+PROJECT_UNDERSTANDING.md
+
+# E2E test authentication state
+frontend/e2e/.auth/
+
+# Runtime benchmark results
+artifacts/benchmarks/

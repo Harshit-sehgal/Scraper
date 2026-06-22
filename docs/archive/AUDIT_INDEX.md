@@ -113,23 +113,19 @@ docs/
   LIMITATIONS.md
   HANDOFF.md
   AUDIT_INDEX.md                             — (this file — navigation hub)
-  audit/
-    DELIVERABLE_1_TRUTH_INVENTORY.md         — File inventory
-    DELIVERABLE_2_ARCHITECTURE_MAP.md        — Architecture reality
-    DELIVERABLE_3_CLAIMS_AUDIT.md            — Claims vs evidence
-    DELIVERABLE_4_ERROR_ISSUE_LIST.md        — Issues found
-    DELIVERABLE_5_TEST_TRUTH_REPORT.md       — Test reality
-    DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md  — Benchmark reality
-    DELIVERABLE_7_SECURITY_REPORT.md         — Security reality
-    DELIVERABLE_8_DOCUMENTATION_CLEANUP.md   — Documentation cleanup plan
-    DELIVERABLE_9_CORRECTED_README.md        — Corrected README template
-    DELIVERABLE_10_PROJECT_STATUS.md         — Truth-first status report
-    DELIVERABLE_10_FIELD_LAWS.md             — Field constraints (from prior session)
-    DELIVERABLE_11_EXACT_FIX_PLAN.md         — Ordered fix plan
-    DELIVERABLE_12_FINAL_TRUTH_CHART.md      — Honest maturity chart
-  archive/
-    audit/
-      (historical deliverables D1-D9, D11 from prior sessions)
+  DELIVERABLE_1_TRUTH_INVENTORY.md           — File inventory
+  DELIVERABLE_2_ARCHITECTURE_MAP.md          — Architecture reality
+  DELIVERABLE_3_CLAIMS_AUDIT.md              — Claims vs evidence
+  DELIVERABLE_4_ERROR_ISSUE_LIST.md          — Issues found
+  DELIVERABLE_5_TEST_TRUTH_REPORT.md         — Test reality
+  DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md    — Benchmark reality
+  DELIVERABLE_7_SECURITY_REPORT.md           — Security reality
+  DELIVERABLE_8_DOCUMENTATION_CLEANUP.md     — Documentation cleanup plan
+  DELIVERABLE_9_CORRECTED_README.md          — Corrected README template
+  DELIVERABLE_10_PROJECT_STATUS.md           — Truth-first status report
+  DELIVERABLE_10_FIELD_LAWS.md               — Field constraints (from prior session)
+  DELIVERABLE_11_EXACT_FIX_PLAN.md           — Ordered fix plan
+  DELIVERABLE_12_FINAL_TRUTH_CHART.md        — Honest maturity chart
 ```
 
 ---

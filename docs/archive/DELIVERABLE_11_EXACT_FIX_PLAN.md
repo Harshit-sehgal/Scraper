@@ -243,7 +243,7 @@ Locations to migrate:
 
 ### Implementation
 1. Rewrite `README.md` with corrected, honest content (see D9)
-2. Rewrite `PROJECT_STATUS.md` with truth-first content (see D10)
+2. Rewrite `docs/AGENT_TRUTH.md` with truth-first content (see D10)
 3. Delete stale archive files:
    - `docs/archive/RELEASE_NOTES.md`
    - `docs/archive/RELEASE_CANDIDATE_CHECKLIST.md`

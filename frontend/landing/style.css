@@ -850,10 +850,6 @@
   transition-delay: 0.15s;
 }
 
-.reveal-delay-2 {
-  transition-delay: 0.3s;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     opacity: 1;

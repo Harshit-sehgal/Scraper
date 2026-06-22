@@ -6,7 +6,7 @@
 
 // Wrap the entire dashboard in an IIFE so the module-level state
 // (``_dashboardApiKey``, ``dashboardApiLast403``, ``currentInterval``,
-// ``failedPolls``, ``pollTimer``, ``historyData``) does not leak to
+// ``failedPolls``, ``pollTimer``, ``topologyHistory``) does not leak to
 // the global scope. Without this, vitest or other test harnesses
 // that import the script would accumulate state across runs, and
 // embedding the dashboard in an SPA could collide with sibling
@@ -519,8 +519,6 @@
     setText("metric-regions", Number(m.region_count || 0));
     setText("metric-meso-count", Number(mesoClusters ? mesoClusters.length : 0));
     setText("metric-macro-count", Number(macroContinents ? macroContinents.length : 0));
-    setText("metric-health", Number(health ? health.score || health : 0).toFixed(2));
-
     // Scraper Phase 78 Metrics
     if (browserStats) {
       setText("metric-browser-contexts", browserStats.active_contexts || 0);
@@ -587,7 +585,7 @@
     }
 
     if (health) {
-      setText("metric-health", Number(health.score || 0).toFixed(2));
+      setText("metric-health", Number(health.score || health || 0).toFixed(2));
       const metrics = health.metrics || {};
       const monocultureRisk = Number(metrics.monoculture_risk || 0);
       const diversity = Number(metrics.diversity || 0);
@@ -1042,15 +1040,4 @@
   }
 
   document.addEventListener("DOMContentLoaded", init);
-
-  // Expose the helpers that are referenced by inline ``onclick``
-  // handlers in ``frontend/dashboard/index.html`` so they remain
-  // reachable from the page. The IIFE keeps the rest of the state
-  // (poll timers, API key, backoff counters) private.
-  window.DataForgeDashboard = Object.freeze({
-    getDashboardApiKey,
-    setDashboardApiKey,
-    clearDashboardApiKey,
-    dashboardApiFetch,
-  });
 })();
