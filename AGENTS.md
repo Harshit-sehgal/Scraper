@@ -173,27 +173,41 @@ are proven in the current checkout and target environment.
 | 65 | Drop dead `client.session = {...}` assignment in `backend/tests/conftest.py:810` (TestClient has no such attribute; auth context is provided via the `SESSION_COOKIE` set on the same line). Single leftover mypy error after the test-stub deletes. | ✅ Done |
 | 66 | Delete 8 already-merged local backup branches: `codex/codebase-green-validation-20260618`, `copilot/harshit-sehgal`, `copilot/scraper-commit-update`, `feat/v1.1-observability`, `fix/deep-scan-hardening`, `frontend-foundation`, `scraper-schema-alignment`, `stabilize/phase-0-truth` (all verified ancestor of `main` via `git merge-base --is-ancestor` before delete) | ✅ Done |
 | 67 | Final validation round 2: 23/23 `--full` passes after the cleanup; full backend suite 3912 passed, 92 skipped; ruff + pyflakes + mypy + bandit + pip_audit + frontend tests + frontend lint + stylelint all clean | ✅ Done |
+| 68 | Delete 44 stale AI-session artifacts + fix 6 code/doc P0/P2 issues (CSP, metric-health double-write, dead export, unused CSS, stale comments, VENDORED_DEPS.md URL, docs pointers, .gitignore patterns) | ✅ Done |
+| 69 | Add 14 isolated unit tests for job_mutation_service + close P1-ARCH-ROUTER-001 (verified→fixed, open issues 8→7) + commit lint fixes + regenerate docs | ✅ Done |
 
 ## Active Risks
 
+- `P1-ARCH-ROUTER-001`: `register_jobs_write_routes` complexity — **Resolved (2026-06-22)**: service extracted (3 classes), 26 HTTP characterization tests + 14 unit tests pin the contract. Routes delegate to tested service code.
 - `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
+
+## Open Verified Issues (7 remaining, all P1)
+
+| ID | Category | Summary |
+|----|----------|---------|
+| P1-ARCH-SELECTOR-001 | Architecture | `analyze_url_for_fields` pipeline size (564 LOC); `url_analysis_pipeline.py` extracted Session 4, stage extraction continues |
+| P1-ARCH-STATE-001 | Architecture | Distributed job state machine; `job_state_machine.py` extracted Session 4, runner/startup consolidation remains |
+| P1-ARCH-STORAGE-001 | Architecture | Storage repository boundaries; `storage_mapper.py` extracted Session 4, full parity blocked by Postgres env |
+| P1-BENCHMARK-BASELINE-001 | Quality | Benchmark corpus expansion needed for missing fixture categories |
+| P1-OPS-BACKUP-RESTORE-001 | Ops | Backup/restore drill evidence needed (blocked by staging Postgres) |
+| P1-OPS-LOAD-ALERT-001 | Ops | Load tests + alert delivery proof (blocked by staging environment) |
+| P1-MIGRATION-ROLLBACK-001 | Ops | Migration rollback drill evidence needed (blocked by staging Postgres) |
 
 ## Recently Resolved Risks
 
-- `P1-TEST-STUBS-STALE-001`: 18 stale MEDIUM-gap test-stub files committed broken — Resolved (2026-06-22): referenced removed/refactored symbols (`RateLimiterMiddleware._should_allow`, `SQLiteJobStore`, `_process_scheduled_jobs`, `ScrapeMode.BROWSER`, `Job(mode="fast")`, `cleanup_expired_keys`); all 18 deleted under one atomic commit; deleted files listed in the AGENTS.md task ledger row 64. Validation: pytest `4004 collected, 0 failed, 96 skipped`.
-- `P1-BRANCH-BACKUPS-001`: 8 stale backup branches cluttering the local — Resolved (2026-06-22): all 8 verified ancestor of `main` and deleted. Working tree now contains only `main`.
-
-- `P1-IMPORT-CYCLE-AUP-001`: `CURRENT_AUP_VERSION` circular import via lazy import — Resolved (2026-06-21): constant moved from `app/saas/router.py` to `app/saas/__init__.py`; `app/utils/aup.py`, `app/routers/health.py`, `app/routers/system.py`, and `app/routers/scheduled_monitoring.py` all now do a top-level `from app.saas import CURRENT_AUP_VERSION` instead of dipping inside the function body to dodge a cycle.
-- `P1-DOC-STALE-001`: Six stale markdown "truth" files (`PROJECT_STATUS.md`, `docs/CURRENT_STATUS.md`, `docs/PRODUCTION_READINESS.md`, `docs/ROADMAP.md`, `docs/REFACTOR_PLAN.md`) plus `Instructions_for_ai/` (incl. a `.docx`) — Resolved (2026-06-21): all deleted; surviving doc files now point at `docs/AGENT_TRUTH.md` and `docs/DEPLOYMENT_CHECKLIST.md`; `docs/HANDOFF.md` collapsed to a 9-line pointer so its drift surface is gone.
-- `P1-DEADCODE-GARBAGE-001`: 13 zero-caller / garbage files on disk — Resolved (2026-06-21): `frontend/js/error-boundary.js`, `backend/tests/manual_run_manual_test.py`, `backend/tests/test_page.html`, `verify_compile.py`, `CODE_REVIEW_BUGS.md`, `CODE_SCAN_RESULTS.md`, `frontend/fonts/JetBrainsMono-Variable.woff2` (102-byte ASCII, not a font), plus the discardable `frontend/dist/` and `shelved/` build/cache/Abandoned directories.
-- `P1-SAAS-DELETE-ROUTER-MYC-001`: `DELETE /api/saas/orgs/{id}` and `DELETE /api/saas/projects/{id}` declared in `app/saas/router.py` but no underlying store methods — Resolved (2026-06-21): added abstract `delete_organization` / `delete_project` to `IdentityStore` + cascading concrete implementations on `SQLiteIdentityStore` (api_keys → projects → memberships → user_selections → org); mypy clean.
-- `P1-TEST-NONDETERMINISTIC-USAGE-001`: `TestUsageEndpoint::test_get_usage_returns_defaults_with_no_activity` asserted absolute zeros on a shared dev-fallback user_id — Resolved (2026-06-21): rewritten to assert response shape + non-negative counters (the usage ledger is process-wide state, so zero assertions across tests in the same run are race-prone).
-- `P1-SECURITY-AUDIT-001`: pip_audit failing on cryptography CVEs — Resolved (2026-06-18): `pyproject.toml` cryptography bound bumped to `>=48.0.1,<50.0.0`; `pip_audit` now reports "No known vulnerabilities found"; full validation 23/23 genuinely green.
-- `P1-AUTHPROFILE-002`: Duplicate `AuthProfile` model — Resolved (verified 2026-06-18): only one `class AuthProfile` remains at `backend/app/models.py:514`; `AuthProfileStore` is a store class, not a model. Issue-ledger row closed.
-- `CAND-P2-PAYMENT-001`: Payment provider not integrated — Resolved (2026-06-19, PayPal migration): the billing service now wraps `paypalhttp` (official PayPal REST SDK) and falls back to a deterministic stub approval URL when `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` are unset; the new `POST /api/billing/checkout` endpoint creates a PayPal Order via `OrdersCreateRequest` and returns an `approval_url`; the webhook endpoint (`POST /api/billing/webhook`) normalizes PayPal (`event_type` + `resource`), Stripe (`type` + `data.object`), and legacy Autumn (`event_type` + `data`) dialects into a common `(event_type, customer_id, data)` tuple, and accepts both shared-secret and HMAC-SHA256 signatures via `X-PayPal-Transmission-Sig` / `X-Billing-Webhook-Secret` headers; subscriptions persist cross-process via `DATAFORGE_BILLING_SUBSCRIPTIONS_FILE`; the frontend `billing.js::upgradePlan` reads the rendered tier and POSTs to checkout, with `window.location.href = approval_url`. Production rollout requires `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PLAN_ID_STARTER` / `PAYPAL_PLAN_ID_PRO` / `PAYPAL_PLAN_ID_ENTERPRISE`, and `PAYPAL_WEBHOOK_SECRET`; see `docs/SAAS_MODEL.md` and `docs/BILLING.md`.
-
-- `CAND-P2-FRONTEND-SAAS-001` (subset): Billing, Audit, and Retention tabs in the dashboard — Resolved (prior session): three new top-level tabs (`#view-billing`, `#view-audit`, `#view-retention`) plus matching Vitest tests; the new `/api/system/audit-log` admin-only endpoint (admin-gated, paginated, with category filter) backs the Audit tab.
-- `CAND-P0-STORAGE-001`: Postgres parity needs `--run-postgres` — Resolved (prior session): `clean_db` fixture now installs module-level driver vars via `PostgresJobRepository().health_check()`; 12/12 `--run-postgres` tests pass.
-- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation / multi-key — Resolved (prior session): `backend/app/utils/encryption.py` has `encrypt`, `decrypt`, `reencrypt_payload`, `list_available_key_versions`, `_get_key_version`, `_get_all_available_keys`; `backend/tests/test_encryption_rotation.py` 13/13 pass.
-- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll + load-more — Resolved (prior session, e2e gap closed): `test_pagination_async.py` extended with `TestAsyncPaginateScrollLoadMoreExecutors` covering max_records, max_runtime (timeout), per-page dedup contract (`test_scroll_records_concatenate_across_pages`), mid-iteration load-more button disappearance, and the final `window.scrollTo(0, 0)` reset call via `evaluate.call_args_list` exact-equality check. 21/21 tests pass.
-- `P1-JOBS-MULTIPROCESS-001`: Jobs store multi-worker safety — Resolved (prior session): `backend/tests/test_jobs_store_cross_process.py` (4/4 tests) proves that concurrent writes from N=8 subprocess writers all land in the SQLite-backed jobs DB, that the DB is in WAL mode, and that single-process `persist_state_single` calls from N=16 threads keep the `results` blob intact under contention.
+- `P1-ARCH-ROUTER-001`: 736-line router registration extracted into 3 service classes with 40 tests — Resolved (2026-06-22): `JobCancellerService`, `JobBackfillService`, `JobReclenerService` in `app/services/job_mutation_service.py`; 26 characterization tests pinning HTTP contract; 14 isolated unit tests. Route delegates business decisions. Issue ledger closed: verified→fixed (open 8→7).
+- `P1-TEST-STUBS-STALE-001`: 18 stale MEDIUM-gap test-stub files committed broken — Resolved (2026-06-22): all deleted.
+- `P1-BRANCH-BACKUPS-001`: 8 stale backup branches — Resolved (2026-06-22): all verified ancestor of `main` and deleted.
+- `P1-IMPORT-CYCLE-AUP-001`: `CURRENT_AUP_VERSION` circular import — Resolved (2026-06-21).
+- `P1-DOC-STALE-001`: Six stale markdown truth files — Resolved (2026-06-21): all deleted; surviving docs point at `docs/AGENT_TRUTH.md`.
+- `P1-DEADCODE-GARBAGE-001`: 13 zero-caller/garbage files — Resolved (2026-06-21).
+- `P1-SAAS-DELETE-ROUTER-MYC-001`: SaaS delete endpoints without store methods — Resolved (2026-06-21).
+- `P1-TEST-NONDETERMINISTIC-USAGE-001`: Race-prone usage test — Resolved (2026-06-21).
+- `P1-SECURITY-AUDIT-001`: pip_audit cryptography CVEs — Resolved (2026-06-18).
+- `P1-AUTHPROFILE-002`: Duplicate AuthProfile model — Resolved (2026-06-18).
+- `CAND-P2-PAYMENT-001`: Payment provider — Resolved (2026-06-19, PayPal migration).
+- `CAND-P2-FRONTEND-SAAS-001` (subset): Billing/Audit/Retention dashboard tabs — Resolved.
+- `CAND-P0-STORAGE-001`: Postgres parity — Resolved: 12/12 `--run-postgres` tests pass.
+- `P1-AUTHPROFILE-ENCRYPTION-001`: Encryption key rotation — Resolved: 13/13 tests pass.
+- `CAND-P2-EXTRACTION-SCROLL-001`: Infinite scroll/load-more — Resolved: 21/21 tests pass.
+- `P1-JOBS-MULTIPROCESS-001`: Jobs store multi-worker safety — Resolved: 4/4 cross-process tests pass.
