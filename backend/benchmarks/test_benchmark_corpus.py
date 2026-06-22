@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 class _BenchmarkCorpusHandler(http.server.BaseHTTPRequestHandler):
     """Local HTTP Server simulating static, dynamic, bad HTML, and failure page categories."""
 
-    def log_message(self, format, *args) -> None:  # noqa: A002
+    def log_message(self, _format, *args) -> None:
         pass  # silence server logs during tests
 
     def do_GET(self) -> None:

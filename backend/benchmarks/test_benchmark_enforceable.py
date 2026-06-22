@@ -24,6 +24,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import functools
 import http.server
 import json
 import logging
@@ -81,7 +82,7 @@ THRESHOLDS: dict[str, int | float] = {
 class BenchmarkHandler(http.server.BaseHTTPRequestHandler):
     """HTTP handler for benchmark test pages."""
 
-    def log_message(self, format, *args) -> None:  # noqa: A002
+    def log_message(self, _format, *args) -> None:
         pass
 
     def do_GET(self) -> None:
@@ -781,9 +782,15 @@ async def test_comprehensive_benchmark_report(benchmark_server, accuracy_schema,
 
     # Save report
     report_path = os.path.join(os.path.dirname(__file__), "benchmark_report.json")
-    with open(report_path, "w") as f:  # noqa: ASYNC230
-        json.dump(report, f, indent=2)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, functools.partial(_save_benchmark_report, report_path, report))
 
     # Verify all thresholds
     avg_f1 = sum(m["f1"] for m in report["accuracy"].values()) / len(report["accuracy"])
     assert avg_f1 >= THRESHOLDS["min_f1_score"], f"Average F1 {avg_f1:.3f} below threshold {THRESHOLDS['min_f1_score']}"
+
+
+def _save_benchmark_report(report_path: str, report: dict) -> None:
+    """Sync helper to write benchmark report JSON."""
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)

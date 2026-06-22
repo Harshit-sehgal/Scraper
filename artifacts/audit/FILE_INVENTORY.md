@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-17T07:27:22+00:00 from `28512` files in the current checkout._
+_Generated: 2026-06-22T07:38:44+00:00 from `23026` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,56 +12,53 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 28512 |
-| Project-owned files | 899 |
-| Project-owned files deeply inspected | 896 |
-| Skipped generated/vendor/binary/cache/log/archive files | 27616 |
-| Files needing follow-up | 17 |
+| Total files inventoried | 23026 |
+| Project-owned files | 928 |
+| Project-owned files deeply inspected | 924 |
+| Skipped generated/vendor/binary/cache/log/archive files | 22102 |
+| Files needing follow-up | 11 |
 
 ## By Classification
 
 | Classification | Total | Project-owned | Deep-inspected | Skipped |
 | --- | ---: | ---: | ---: | ---: |
-| backend_source | 279 | 279 | 279 | 0 |
-| frontend_source | 55 | 55 | 55 | 0 |
-| test | 350 | 350 | 349 | 1 |
-| script | 51 | 51 | 51 | 0 |
-| config | 41 | 41 | 39 | 2 |
-| documentation | 110 | 110 | 110 | 0 |
-| docker_deployment | 12 | 12 | 12 | 0 |
+| backend_source | 253 | 253 | 253 | 0 |
+| frontend_source | 96 | 96 | 96 | 0 |
+| test | 367 | 367 | 367 | 0 |
+| script | 52 | 52 | 52 | 0 |
+| config | 47 | 47 | 44 | 3 |
+| documentation | 98 | 98 | 98 | 0 |
+| docker_deployment | 13 | 13 | 13 | 0 |
 | database_migration | 1 | 1 | 1 | 0 |
 | asset | 0 | 0 | 0 | 0 |
-| generated | 154 | 0 | 0 | 154 |
-| vendor | 19938 | 0 | 0 | 19938 |
-| cache | 4550 | 0 | 0 | 4550 |
-| binary | 2 | 0 | 0 | 2 |
-| archive | 1 | 0 | 0 | 1 |
-| log | 2968 | 0 | 0 | 2968 |
-| unknown | 0 | 0 | 0 | 0 |
+| generated | 96 | 0 | 0 | 96 |
+| vendor | 16999 | 0 | 0 | 16999 |
+| cache | 3823 | 0 | 0 | 3823 |
+| binary | 3 | 0 | 0 | 3 |
+| archive | 0 | 0 | 0 | 0 |
+| log | 1177 | 0 | 0 | 1177 |
+| unknown | 1 | 1 | 0 | 1 |
 
 ## Top-Level Counts
 
 | Top-level path | Files |
 | --- | ---: |
-| `.venv/` | 11513 |
-| `node_modules/` | 4989 |
-| `.kilo/` | 3438 |
-| `artifacts/` | 3015 |
-| `backend/` | 1537 |
-| `.ruff_cache/` | 1321 |
-| `.mypy_cache/` | 1217 |
-| `.git/` | 1130 |
-| `docs/` | 91 |
-| `scripts/` | 79 |
-| `frontend/` | 71 |
-| `test-results/` | 22 |
-| `playwright-report/` | 19 |
-| `.github/` | 10 |
-| `Instructions_for_ai/` | 7 |
+| `.venv/` | 10858 |
+| `node_modules/` | 6140 |
+| `backend/` | 1506 |
+| `.ruff_cache/` | 1413 |
+| `.mypy_cache/` | 1219 |
+| `artifacts/` | 1193 |
+| `.git/` | 323 |
+| `frontend/` | 114 |
+| `docs/` | 90 |
+| `scripts/` | 83 |
+| `playwright-report/` | 18 |
+| `.github/` | 11 |
+| `test-results/` | 9 |
 | `.pytest_cache/` | 5 |
 | `grafana/` | 3 |
-| `.commandcode/` | 2 |
-| `.coverage/` | 1 |
+| `.claude/` | 2 |
 | `.dockerignore/` | 1 |
 | `.env/` | 1 |
 | `.env.example/` | 1 |
@@ -76,22 +73,21 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `.stylelintrc.json/` | 1 |
 | `AGENTS.md/` | 1 |
 | `CHANGELOG.md/` | 1 |
-| `CODE_REVIEW_BUGS.md/` | 1 |
-| `CODE_SCAN_RESULTS.md/` | 1 |
 | `Dockerfile/` | 1 |
 | `LICENSE/` | 1 |
 | `Makefile/` | 1 |
-| `PROJECT_STATUS.md/` | 1 |
 | `README.md/` | 1 |
 | `THIRD_PARTY_NOTICES.md/` | 1 |
 | `alertmanager.yml/` | 1 |
 | `architecture_validator.py/` | 1 |
-| `coverage.json/` | 1 |
 | `dataforge_denylist.sqlite/` | 1 |
+| `docker-compose.override.local.yml/` | 1 |
 | `docker-compose.override.yml/` | 1 |
 | `docker-compose.prod.yml/` | 1 |
 | `docker-compose.yml/` | 1 |
+| `eslint.config.js/` | 1 |
 | `nginx.conf/` | 1 |
+| `nginx.local.conf/` | 1 |
 | `package-lock.json/` | 1 |
 | `package.json/` | 1 |
 | `postgres-queries.yaml/` | 1 |
@@ -100,8 +96,6 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `prometheus_web.yml/` | 1 |
 | `pyproject.toml/` | 1 |
 | `uv.lock/` | 1 |
-| `verify_compile.py/` | 1 |
-| `.claude/` | 1 |
 | `.vscode/` | 1 |
 | `__pycache__/` | 1 |
 
@@ -109,36 +103,36 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Extension | Files |
 | --- | ---: |
-| `.py` | 6630 |
-| `(none)` | 3444 |
-| `.md` | 3239 |
-| `.js` | 2860 |
-| `.pyc` | 2851 |
-| `.ts` | 2232 |
-| `.json` | 1765 |
-| `.pyi` | 1187 |
-| `.map` | 1172 |
-| `.cjs` | 620 |
-| `.mjs` | 452 |
-| `.so` | 383 |
-| `.txt` | 187 |
-| `.h` | 165 |
-| `.cts` | 128 |
-| `.log` | 126 |
-| `.typed` | 106 |
+| `.py` | 6837 |
+| `(none)` | 2838 |
+| `.js` | 2743 |
+| `.pyc` | 1875 |
+| `.json` | 1709 |
+| `.md` | 1562 |
+| `.pyi` | 1217 |
+| `.ts` | 888 |
+| `.cjs` | 534 |
+| `.mjs` | 454 |
+| `.so` | 385 |
+| `.map` | 333 |
+| `.txt` | 186 |
+| `.h` | 169 |
+| `.log` | 124 |
+| `.typed` | 111 |
 | `.c` | 99 |
 | `.html` | 79 |
 | `.f90` | 61 |
+| `.yml` | 57 |
 | `.pxd` | 54 |
 | `.jsonl` | 52 |
-| `.yml` | 39 |
+| `.jst` | 50 |
+| `.cts` | 41 |
 | `.pyx` | 37 |
-| `.csv` | 36 |
-| `.mts` | 35 |
-| `.db` | 33 |
+| `.mts` | 37 |
+| `.csv` | 33 |
+| `.css` | 31 |
 | `.sh` | 31 |
 | `.pxi` | 29 |
-| `.css` | 24 |
 
 ## Skip Policy
 

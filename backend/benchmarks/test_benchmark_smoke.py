@@ -538,7 +538,7 @@ def print_report(results: list[SiteResult]) -> None:
 
     # 1. No false success for 0 records
     zero_but_success = [r for r in results if r.records == 0 and r.extraction_method not in ("", "unknown") and not r.error]
-    len(zero_but_success) == 0  # noqa: B015
+    assert len(zero_but_success) == 0
 
     # 2. Visible text captured when rendered
 

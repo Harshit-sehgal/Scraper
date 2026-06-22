@@ -63,6 +63,8 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ALLOWED_INTERNAL_HOSTS` | - | Comma-separated list of allowed internal hosts |
 | `DATAFORGE_DENYLIST_DB_PATH` | - | Optional SQLite path for the operator-managed domain denylist |
 | `DATAFORGE_ENCRYPTION_KEY` | - | Base64 AES-GCM key for auth-profile storage state encryption |
+| `DATAFORGE_ENCRYPTION_SALT` | `default-salt-change-in-prod` | Salt used in encryption key derivation for auth-profile encryption |
+| `DATAFORGE_REDIS_URL` | - | Redis connection URL for rate-limiter distributed storage |
 | `DATAFORGE_ENCRYPTION_KEY_` | - | Prefix for versioned encryption keys such as `DATAFORGE_ENCRYPTION_KEY_V1` |
 | `DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION` | `v1` | Active version used for new encrypted payloads |
 | `DATAFORGE_AUTH_PROFILES_FILE` | `data/auth_profiles.json` | Path to the file-backed auth-profile store (used by `AuthProfileStore` in `app/utils/auth_profile_store.py`) |
@@ -112,6 +114,8 @@ These are acceptable direct environment reads outside the config module:
 | `backend/app/__init__.py` | `DATAFORGE_DOTENV_PATH` | Dotenv loading boundary |
 | `backend/app/utils/env.py` | Generic helper | Environment utility |
 | `backend/app/billing/checkout.py` | `DATAFORGE_PUBLIC_BASE_URL` | Public base URL for constructing checkout approval URLs |
+| `backend/app/rate_limiter.py` | `DATAFORGE_REDIS_URL` | Redis connection URL for distributed rate-limiter storage |
+| `backend/app/utils/encryption.py` | `DATAFORGE_ENCRYPTION_SALT` | Encryption salt for auth-profile key derivation |
 | `scripts/check_prod_env.py` | `DATAFORGE_SKIP_DB_CHECK` | Validation script |
 | `scripts/run_worker.py` | `DATAFORGE_JOB_ID` | Worker script |
 | `scripts/manual_test.py` | `DATAFORGE_API_BASE` | Manual testing |

@@ -1,5 +1,5 @@
 {
-  "route_count": 149,
+  "route_count": 150,
   "routes": [
     {
       "method": "GET",
@@ -1542,6 +1542,18 @@
       "middleware_protected": "yes",
       "notes": "require_role/admin-only dependency",
       "path": "/api/system/retention/enforce",
+      "public_protected_unknown": "protected",
+      "required_role": "admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "require_role/admin-only dependency",
+      "path": "/api/system/retention/health",
       "public_protected_unknown": "protected",
       "required_role": "admin",
       "route_dependency": "require_role",

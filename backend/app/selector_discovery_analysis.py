@@ -64,7 +64,7 @@ def _get_feedback_engine():
         """No-op stub that returns empty motif context."""
 
         @staticmethod
-        def build_motif_context(*args, **kwargs) -> str:  # noqa: ARG004
+        def build_motif_context() -> str:
             return ""
 
     return _NoopFeedbackEngine()
