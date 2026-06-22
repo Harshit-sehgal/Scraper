@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified issues | 8 |
-| Fixed issues | 18 |
+| Open verified issues | 7 |
+| Fixed issues | 19 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 6 |
@@ -276,18 +276,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-ARCH-ROUTER-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** architecture / route_complexity / duplicated_route_logic
-- **file_path:** `backend/app/routers/jobs_write.py`, `artifacts/audit/CODE_COMPLEXITY_REPORT.json`
-- **line/function:** `register_jobs_write_routes`, lines 72-807; 736 LOC in the generated complexity report
-- **evidence:** Prompt 6 generated `artifacts/audit/CODE_COMPLEXITY_REPORT.json`, which reports `register_jobs_write_routes` as a 736-line symbol. Direct inspection shows job creation and write/admin routes in this registration function handle HTTP dependencies plus URL safety, auth context recovery, quota/metering, idempotency, persistence, scheduling, and cleanup concerns.
-- **why_it_matters:** URL Intelligence, Workflow Replay, and SaaS usage enforcement will all touch job creation. Keeping several business concerns inside one router registration function increases regression risk and makes focused tests harder.
-- **impact:** Future feature work can accidentally change auth, quota, job state, or persistence behavior while editing route code.
-- **recommended_fix:** Add characterization tests first, then extract a small job-creation service/domain boundary while leaving routers responsible for request/response wiring and dependency resolution only.
-- **tests_needed:** Job creation response, unsafe URL rejection, owner/org/project stamping, idempotency replay, quota denial, scheduled-job creation, and audit/metering behavior.
-- **acceptance_criteria:** Job creation behavior is covered by focused tests and write routes delegate business decisions to tested service/domain code.
-- **blocked_by:** Full backend suite is still red under `P1-CI-001`.
-- **notes:** Session 4 (2026-06-22) extracted `job_mutation_service.py` from `jobs_write.py` — job creation, update, deletion, and scheduling logic now delegate to the mutation service. The router remains responsible for HTTP/dependency wiring. Stale re-exports were also removed. Full characterization tests still pending.
+- **file_path:** `backend/app/routers/jobs_write.py`, `backend/app/services/job_mutation_service.py`, `backend/tests/test_jobs_write_characterization.py`, `backend/tests/test_job_mutation_service.py`
+- **line/function:** `register_jobs_write_routes`, `JobCancellerService`, `JobBackfillService`, `JobReclenerService`
+- **evidence:** Code verified 2026-06-22: `register_jobs_write_routes` delegates cancel, backfill, and reclean to `JobCancellerService`, `JobBackfillService`, and `JobReclenerService` in `app/services/job_mutation_service.py`. The router handles only HTTP/dependency wiring. 26 characterization tests in `test_jobs_write_characterization.py` (created Session 4) pin the HTTP contract. 14 isolated unit tests in `test_job_mutation_service.py` (added 2026-06-22) exercise service classes directly: cancel lifecycle, tenant isolation, access control, backfill source-type inference, reclean validation guards, and reclean success path.
+- **why_it_matters:** Service extraction and focused tests reduce regression risk when URL Intelligence, Workflow Replay, or SaaS usage enforcement touch job creation.
+- **impact:** Future feature work can change auth, quota, or persistence in the service layer without altering router HTTP wiring.
+- **recommended_fix:** Completed: service extraction + characterization tests + isolated unit tests.
+- **tests_needed:** Covered: 26 HTTP characterization tests (create/cancel/delete/clear/restore/hard-delete) + 14 unit tests (cancel lifecycle, backfill inference, reclean guards/success).
+- **acceptance_criteria:** All 40 tests pass. Routes delegate business decisions to tested service code. `python3 -m pytest tests/test_jobs_write_characterization.py tests/test_job_mutation_service.py -q` exits 0.
+- **blocked_by:** None.
+- **notes:** Fixed 2026-06-22. Service extraction (JobCancellerService, JobBackfillService, JobReclenerService) was done in Session 4. Characterization tests (26) were also added in Session 4. Isolated unit tests (14) added in the current session, covering: missing-job 404, terminal-job early return, pending auto-cancel, running cancel without status change, cross-org denial, admin all-access, backfill source inference, backfill skip when known, reclean running/rejected/no-results/no-schema/denied/success. All 40 tests pass; P0 regression suite (53 tests) also green.
 
 ### P1-ARCH-SELECTOR-001
 
