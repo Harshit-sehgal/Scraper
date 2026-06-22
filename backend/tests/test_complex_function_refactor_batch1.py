@@ -1,6 +1,6 @@
 """Refactor top complex functions - Batch 1."""
-import pytest
-from unittest.mock import MagicMock, patch
+
+from unittest.mock import MagicMock
 
 
 class TestOrchestrationRefactor:
@@ -27,12 +27,12 @@ class TestMetricsEndpointRefactor:
 
     def test_metrics_endpoint_returns_valid_prometheus_format(self) -> None:
         """Metrics should be Prometheus-formatted."""
-        from app.routers.system import metrics
-        
+
         # Mock request
         from fastapi import Request
-        request = MagicMock(spec=Request)
-        
+
+        MagicMock(spec=Request)
+
         # Should return text/plain with metrics
         assert True, "Prometheus format"
 

@@ -806,6 +806,7 @@ def session_client(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", True)
 
     cookies = {SESSION_COOKIE: create_session_cookie(role="admin", user_id="test-admin-id")}
-    client = TestClient(main_mod.app, cookies=cookies)
-    client.session = {"user_id": "test-admin-id", "role": "admin"}
-    return client
+    # `client.session` was historically monkeypatched to a dict of auth
+    # context here. The session is provided via the SESSION_COOKIE above,
+    # so this attribute is unused — drop the dead assignment.
+    return TestClient(main_mod.app, cookies=cookies)

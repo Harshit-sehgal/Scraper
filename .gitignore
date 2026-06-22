@@ -81,3 +81,4 @@ artifacts/validation/latest_summary.*
 
 # Shelved/unused architectures (replaced by validated backend/app)
 shelved/
+SESSION_FINAL_STATS.txt
