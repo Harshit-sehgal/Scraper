@@ -155,7 +155,7 @@ monitoring, alerting, load tests, auth, tenant isolation,
 billing / usage enforcement, benchmark gates, and incident runbooks
 are proven in the current checkout and target environment.
 
-## Latest Tasks Completed (2026-06-21)
+## Latest Tasks Completed (2026-06-21 — 2026-06-22)
 
 | # | Task | Status |
 |---|------|--------|
@@ -169,12 +169,19 @@ are proven in the current checkout and target environment.
 | 61 | Delete stale docs that AGENTS.md already labels as historical: `PROJECT_STATUS.md`, `docs/CURRENT_STATUS.md`, `docs/PRODUCTION_READINESS.md`, `docs/ROADMAP.md`, `docs/REFACTOR_PLAN.md`, `scripts/generate_status.py`; `Instructions_for_ai/` directory entirely (the `DataForge_100_100_SaaS_Master_Plan.docx`, the master plan MD, the prompt, `PROGRESS.md`, and the work-item CSV) | ✅ Done |
 | 62 | Rewire doc pointers in surviving files: `README.md`, `AGENTS.md`, `docs/HANDOFF.md`, `docs/INDEX.md`, `docs/CODE_QUALITY.md`, `docs/STORAGE_SPLIT.md`, `docs/PRODUCTION.md`, `docs/PRODUCTION_STARTUP.md`, `backend/README_DEPLOYMENT.md`, `backend/app/research/__init__.py` all point at `docs/AGENT_TRUTH.md` / `docs/DEPLOYMENT_CHECKLIST.md` instead of the deleted files | ✅ Done |
 | 63 | Final validation: 12/12 `--quick` passes; full backend suite 3708 passed, 87 skipped; ruff+ruff-format+mypy+bandit all clean | ✅ Done |
+| 64 | Delete 18 stale MEDIUM gap-fill test stubs (committed in `5c78231` / `8abd3c2` / `b603583b` / `daa8f660` / `79fb4f6c` "aggressive gap push" sessions): all reference symbols that no longer exist (`RateLimiterMiddleware._should_allow`, `SQLiteJobStore`, `_process_scheduled_jobs`, `ScrapeMode.BROWSER`, `Job(mode="fast")`, `cleanup_expired_keys`); they were committed broken and never ran | ✅ Done |
+| 65 | Drop dead `client.session = {...}` assignment in `backend/tests/conftest.py:810` (TestClient has no such attribute; auth context is provided via the `SESSION_COOKIE` set on the same line). Single leftover mypy error after the test-stub deletes. | ✅ Done |
+| 66 | Delete 8 already-merged local backup branches: `codex/codebase-green-validation-20260618`, `copilot/harshit-sehgal`, `copilot/scraper-commit-update`, `feat/v1.1-observability`, `fix/deep-scan-hardening`, `frontend-foundation`, `scraper-schema-alignment`, `stabilize/phase-0-truth` (all verified ancestor of `main` via `git merge-base --is-ancestor` before delete) | ✅ Done |
+| 67 | Final validation round 2: 23/23 `--full` passes after the cleanup; full backend suite 3912 passed, 92 skipped; ruff + pyflakes + mypy + bandit + pip_audit + frontend tests + frontend lint + stylelint all clean | ✅ Done |
 
 ## Active Risks
 
 - `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
 
 ## Recently Resolved Risks
+
+- `P1-TEST-STUBS-STALE-001`: 18 stale MEDIUM-gap test-stub files committed broken — Resolved (2026-06-22): referenced removed/refactored symbols (`RateLimiterMiddleware._should_allow`, `SQLiteJobStore`, `_process_scheduled_jobs`, `ScrapeMode.BROWSER`, `Job(mode="fast")`, `cleanup_expired_keys`); all 18 deleted under one atomic commit; deleted files listed in the AGENTS.md task ledger row 64. Validation: pytest `4004 collected, 0 failed, 96 skipped`.
+- `P1-BRANCH-BACKUPS-001`: 8 stale backup branches cluttering the local — Resolved (2026-06-22): all 8 verified ancestor of `main` and deleted. Working tree now contains only `main`.
 
 - `P1-IMPORT-CYCLE-AUP-001`: `CURRENT_AUP_VERSION` circular import via lazy import — Resolved (2026-06-21): constant moved from `app/saas/router.py` to `app/saas/__init__.py`; `app/utils/aup.py`, `app/routers/health.py`, `app/routers/system.py`, and `app/routers/scheduled_monitoring.py` all now do a top-level `from app.saas import CURRENT_AUP_VERSION` instead of dipping inside the function body to dodge a cycle.
 - `P1-DOC-STALE-001`: Six stale markdown "truth" files (`PROJECT_STATUS.md`, `docs/CURRENT_STATUS.md`, `docs/PRODUCTION_READINESS.md`, `docs/ROADMAP.md`, `docs/REFACTOR_PLAN.md`) plus `Instructions_for_ai/` (incl. a `.docx`) — Resolved (2026-06-21): all deleted; surviving doc files now point at `docs/AGENT_TRUTH.md` and `docs/DEPLOYMENT_CHECKLIST.md`; `docs/HANDOFF.md` collapsed to a 9-line pointer so its drift surface is gone.
