@@ -81,4 +81,15 @@ artifacts/validation/latest_summary.*
 
 # Shelved/unused architectures (replaced by validated backend/app)
 shelved/
+
+# Transient AI session artifacts (status reports, gap catalogs, session summaries)
 SESSION_FINAL_STATS.txt
+[CFDSPM]*_REPORT*.md
+[CFDSPM]*_SUMMARY*.md
+[CFDSPM]*_CATALOG*.md
+[CFDSPM]*_STATUS*.md
+[CFDSPM]*_GUIDE*.md
+[CFDSPM]*_AUDIT*.md
+[CFDSPM]*_COMPLETION*.md
+H?_H??_IMPLEMENTATION_GUIDE.md
+DEEP_SCAN_*.md

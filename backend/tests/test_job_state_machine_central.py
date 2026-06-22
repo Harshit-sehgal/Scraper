@@ -1,4 +1,5 @@
 """Test that job state machine is centralized and used consistently."""
+
 import datetime
 
 from app.models import JobStatus
@@ -7,6 +8,7 @@ from app.services.job_state_machine import can_transition, is_terminal
 
 def test_state_machine_is_central_source():
     """Verify state machine module is the single source of truth."""
+
     # Create mock job objects
     class MockJob:
         def __init__(self, status):
@@ -30,6 +32,7 @@ def test_state_machine_is_central_source():
 
 def test_all_valid_transitions_defined():
     """Verify all expected transitions are allowed."""
+
     class MockJob:
         def __init__(self, status):
             self.status = status
@@ -52,6 +55,7 @@ def test_all_valid_transitions_defined():
 
 def test_invalid_transitions_blocked():
     """Verify invalid transitions are rejected."""
+
     class MockJob:
         def __init__(self, status):
             self.status = status
@@ -87,6 +91,7 @@ def test_terminal_states_identified():
 
 def test_transition_records_timestamp():
     """Verify transitions record state change metadata."""
+
     class MockJob:
         def __init__(self):
             self.status = JobStatus.PENDING

@@ -423,12 +423,14 @@ def test_ssrf_reject_loopback_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -452,12 +454,14 @@ def test_ssrf_reject_cloud_metadata_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -479,12 +483,14 @@ def test_ssrf_reject_bad_scheme_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -492,9 +498,7 @@ def test_ssrf_reject_bad_scheme_audit_logged(monkeypatch) -> None:
         validate_public_http_url("ftp://example.com")
 
     assert any(
-        e.get("action") == "ssrf_reject"
-        and e.get("outcome") == "denied"
-        and e.get("details", {}).get("reason") == "bad_scheme"
+        e.get("action") == "ssrf_reject" and e.get("outcome") == "denied" and e.get("details", {}).get("reason") == "bad_scheme"
         for e in captured
     ), f"Expected ssrf_reject audit event not found in {captured}"
 
@@ -506,12 +510,14 @@ def test_ssrf_reject_internal_tld_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -519,9 +525,7 @@ def test_ssrf_reject_internal_tld_audit_logged(monkeypatch) -> None:
         validate_public_http_url("http://somehost.local/path")
 
     assert any(
-        e.get("action") == "ssrf_reject"
-        and e.get("outcome") == "denied"
-        and e.get("details", {}).get("reason") == "internal_tld"
+        e.get("action") == "ssrf_reject" and e.get("outcome") == "denied" and e.get("details", {}).get("reason") == "internal_tld"
         for e in captured
     ), f"Expected ssrf_reject audit event not found in {captured}"
 
@@ -533,12 +537,14 @@ def test_ssrf_reject_disallowed_port_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -564,12 +570,14 @@ def test_ssrf_reject_restricted_ip_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -591,12 +599,14 @@ def test_ssrf_reject_empty_url_audit_logged(monkeypatch) -> None:
     captured: list[dict] = []
 
     def _capture(action, resource="", outcome="success", details=None):
-        captured.append({
-            "action": action,
-            "resource": resource,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        captured.append(
+            {
+                "action": action,
+                "resource": resource,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(url_safety_mod, "log_system_event", _capture, raising=False)
 
@@ -604,8 +614,6 @@ def test_ssrf_reject_empty_url_audit_logged(monkeypatch) -> None:
         validate_public_http_url("")
 
     assert any(
-        e.get("action") == "ssrf_reject"
-        and e.get("outcome") == "denied"
-        and e.get("details", {}).get("reason") == "empty_url"
+        e.get("action") == "ssrf_reject" and e.get("outcome") == "denied" and e.get("details", {}).get("reason") == "empty_url"
         for e in captured
     ), f"Expected ssrf_reject audit event not found in {captured}"

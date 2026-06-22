@@ -297,6 +297,7 @@ async def orchestrate_extraction(
 
     # C4: Track page invalidation
     page_closed = False
+
     def _on_page_close():
         nonlocal page_closed
         page_closed = True

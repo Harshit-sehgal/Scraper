@@ -29,20 +29,56 @@ logger = logging.getLogger(__name__)
 
 _CURRENT_SCHEMA_VERSION = 8
 
-_JOB_COLUMNS: frozenset[str] = frozenset({
-    "id", "name", "mode", "intent", "urls", "topic", "location",
-    "preferred_domain", "source_policy", "max_per_domain",
-    "origin_location", "max_distance_km", "schema_fields", "filters",
-    "pagination", "max_pages", "deduplicate", "deduplicate_field",
-    "min_record_score", "selectors_map", "search_params",
-    "cancel_requested", "status", "created_by", "org_id", "project_id",
-    "created_at", "started_at", "completed_at", "total_records",
-    "filtered_records", "error", "results", "analysis",
-    "discovered_urls", "quality_report", "estimated_cost_usd",
-    "total_llm_calls", "logs", "progress_current", "progress_total",
-    "results_on_disk", "results_file_path", "warnings",
-    "acquisition_mode", "deleted_at",
-})
+_JOB_COLUMNS: frozenset[str] = frozenset(
+    {
+        "id",
+        "name",
+        "mode",
+        "intent",
+        "urls",
+        "topic",
+        "location",
+        "preferred_domain",
+        "source_policy",
+        "max_per_domain",
+        "origin_location",
+        "max_distance_km",
+        "schema_fields",
+        "filters",
+        "pagination",
+        "max_pages",
+        "deduplicate",
+        "deduplicate_field",
+        "min_record_score",
+        "selectors_map",
+        "search_params",
+        "cancel_requested",
+        "status",
+        "created_by",
+        "org_id",
+        "project_id",
+        "created_at",
+        "started_at",
+        "completed_at",
+        "total_records",
+        "filtered_records",
+        "error",
+        "results",
+        "analysis",
+        "discovered_urls",
+        "quality_report",
+        "estimated_cost_usd",
+        "total_llm_calls",
+        "logs",
+        "progress_current",
+        "progress_total",
+        "results_on_disk",
+        "results_file_path",
+        "warnings",
+        "acquisition_mode",
+        "deleted_at",
+    }
+)
 
 
 def _validate_cols(cols: list[str]) -> str:
@@ -52,6 +88,7 @@ def _validate_cols(cols: list[str]) -> str:
             msg = f"Unknown column: {c!r}"
             raise ValueError(msg)
     return ", ".join(cols)
+
 
 # Module-level exception tuple for DB operations so we don't swallow
 # programming errors with bare ``except Exception``.
@@ -793,7 +830,6 @@ class PostgresRepositoryBase(JobRepository, ABC):
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         self._ensure()
         with self._conn() as conn:
-
             for job in jobs.values():
                 row = job_to_row(job)
                 safe_keys = [k for k in row if k in _JOB_COLUMNS]

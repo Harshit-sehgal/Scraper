@@ -35,7 +35,7 @@ def classify(rel):
         return "generated", "Generated/cache", "No", "Generated/cache artifact"
 
     # --- Backend source (Python only) ---
-    if (rel.startswith("backend/app/") or rel.startswith("backend/forge_kernel/")) and filename.endswith(".py"):
+    if (rel.startswith(("backend/app/", "backend/forge_kernel/"))) and filename.endswith(".py"):
         return "backend_source", "Python backend source", "Yes", ""
 
     # --- Tests ---
@@ -108,7 +108,7 @@ def classify(rel):
     # --- Binary / data ---
     if filename.endswith((".sqlite", ".db")):
         return "binary", "Database file", "No", ""
-    if (rel.startswith("backend/data/") or rel.startswith("data/")) and any(
+    if (rel.startswith(("backend/data/", "data/"))) and any(
         filename.endswith(ext) for ext in (".json", ".jsonl", ".lock")
     ):
         return "binary", "Data/storage file", "No", ""
@@ -121,8 +121,8 @@ def classify(rel):
 
 
 def main():
-    result = subprocess.run(
-        ["find", REPO, "-type", "f"], capture_output=True, text=True
+    result = subprocess.run(  # noqa: S603 — REPO is a literal "." constant; trusted subprocess input
+        ["find", REPO, "-type", "f"], capture_output=True, text=True, check=False  # noqa: S607
     )
     all_paths = sorted(result.stdout.strip().split("\n"))
     rows = []
@@ -169,7 +169,6 @@ def main():
 
     with open(OUT, "w") as f:
         f.write("".join(lines))
-    print(f"Wrote {len(rows)} entries to {OUT}")
 
 
 if __name__ == "__main__":

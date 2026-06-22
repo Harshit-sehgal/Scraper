@@ -498,9 +498,12 @@ async def csp_violations(request: Request):
 @router.post("/api/system/retention/enforce", status_code=200)
 async def enforce_data_retention(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
-    dry_run: Annotated[bool, Query(
-        description="When true, report what would be deleted without deleting.",
-    )] = True,
+    dry_run: Annotated[
+        bool,
+        Query(
+            description="When true, report what would be deleted without deleting.",
+        ),
+    ] = True,
 ) -> dict[str, Any]:
     """Enforce the data retention policy, purging data older than the configured TTL.
 
@@ -1083,6 +1086,7 @@ async def metrics(request: Request):
                 if last_hb:
                     try:
                         import datetime as _dt
+
                         age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
                     except (ValueError, TypeError):
                         age = -1.0

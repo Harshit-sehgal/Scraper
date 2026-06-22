@@ -261,12 +261,9 @@ def encrypt(plaintext: str, user_id: str | None = None) -> str:
     if user_id:
         try:
             import hmac
+
             salt = os.environ.get("DATAFORGE_ENCRYPTION_SALT", "default-salt-change-in-prod")
-            derived = hmac.new(
-                (user_id + salt).encode("utf-8"),
-                salt.encode("utf-8"),
-                hashlib.sha256
-            ).digest()
+            derived = hmac.new((user_id + salt).encode("utf-8"), salt.encode("utf-8"), hashlib.sha256).digest()
             key = derived[:32]  # Use first 32 bytes as AES-256 key
         except Exception as e:
             logger.warning("Failed to derive per-user key, using app-level: %s", e)

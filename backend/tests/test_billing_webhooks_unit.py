@@ -1,4 +1,5 @@
 """Unit tests for billing webhooks module."""
+
 from app.billing.webhooks import _normalize_webhook, _SubscriptionStore
 
 
@@ -10,7 +11,7 @@ def test_normalize_paypal_webhook():
             "id": "sub_123",
             "status": "ACTIVE",
             "plan_id": "plan_starter",
-        }
+        },
     }
 
     # Normalize should extract common fields
@@ -39,7 +40,7 @@ def test_normalize_stripe_webhook():
                 "customer": "cust_123",
                 "status": "active",
             }
-        }
+        },
     }
 
     normalized = _normalize_webhook(stripe_event)

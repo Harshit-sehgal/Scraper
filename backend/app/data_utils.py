@@ -319,6 +319,7 @@ def process_raw_records(
         except Exception as e:
             # Log but don't fail extraction if semantic pipeline is unavailable
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning("Semantic pipeline unavailable (falling back to raw records): %s", e)
             # Continue with unprocessed results

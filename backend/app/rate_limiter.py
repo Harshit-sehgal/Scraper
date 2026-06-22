@@ -58,6 +58,7 @@ try:
 except ImportError:
     pass
 
+
 # ─── H5: Redis-backed rate limiting for distributed deployments ────────
 class RedisRateLimiter:
     """H5: Distributed rate limiting using Redis for multi-worker deployments."""
@@ -68,6 +69,7 @@ class RedisRateLimiter:
         if self.redis_url:
             try:
                 import redis
+
                 self.redis = redis.from_url(self.redis_url, decode_responses=True)
                 self.redis.ping()
                 logger.info("H5: Redis rate limiter initialized: %s", self.redis_url[:20])
@@ -88,6 +90,7 @@ class RedisRateLimiter:
         except Exception as e:
             logger.warning("H5: Redis check failed, allowing: %s", e)
             return True  # Fail open on Redis errors
+
 
 # ─── Trusted-proxy allowlist ──────────────────────────────────────────
 # Only TCP peers whose address is in this list may inject X-Forwarded-For

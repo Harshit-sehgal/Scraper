@@ -192,14 +192,16 @@ def test_api_request_quota_is_enforced_by_middleware(client, monkeypatch) -> Non
     audit_events: list[dict] = []
 
     def _capture_audit(actor, action, resource, role, outcome, details=None):
-        audit_events.append({
-            "actor": actor,
-            "action": action,
-            "resource": resource,
-            "role": role,
-            "outcome": outcome,
-            "details": details or {},
-        })
+        audit_events.append(
+            {
+                "actor": actor,
+                "action": action,
+                "resource": resource,
+                "role": role,
+                "outcome": outcome,
+                "details": details or {},
+            }
+        )
 
     monkeypatch.setattr(middlewares_mod, "log_rbac_event", _capture_audit, raising=False)
 

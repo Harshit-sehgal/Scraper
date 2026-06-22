@@ -14,8 +14,6 @@ from __future__ import annotations
 import csv
 import hashlib
 import os
-import re
-import subprocess
 import sys
 from collections import Counter
 
@@ -69,7 +67,7 @@ def sha256_of(path: str) -> str:
             for chunk in iter(lambda: f.read(65536), b""):
                 h.update(chunk)
         return h.hexdigest()
-    except (OSError, IOError):
+    except OSError:
         return ""
 
 
@@ -85,17 +83,17 @@ def detect_tier(rel: str) -> str:
         return "Generated"
     if name.endswith((".pyc", ".pyo")):
         return "Generated"
-    if rel.startswith("artifacts/validation/") and (name.endswith(".log") or name.endswith(".txt") or name.endswith(".json")):
+    if rel.startswith("artifacts/validation/") and (name.endswith((".log", ".txt", ".json"))):
         return "Generated"
     if rel.startswith("artifacts/audit/"):
         return "Generated"  # this very report
-    if rel.startswith("backend/data/") or rel.startswith("data/"):
+    if rel.startswith(("backend/data/", "data/")):
         return "Binary"
     if name.endswith((".sqlite", ".db", ".sqlite3")):
         return "Binary"
-    if rel.startswith("coverage/") or rel.startswith(".coverage"):
+    if rel.startswith(("coverage/", ".coverage")):
         return "Generated"
-    if rel.startswith("dist/") or rel.startswith("build/"):
+    if rel.startswith(("dist/", "build/")):
         return "Generated"
 
     # Vendor
@@ -133,7 +131,7 @@ def detect_tier(rel: str) -> str:
         return "Frontend"
 
     # Docs
-    if rel.startswith("docs/") or rel.startswith("Instructions_for_ai/"):
+    if rel.startswith(("docs/", "Instructions_for_ai/")):
         return "Docs"
     if name in {
         "README.md",
@@ -312,12 +310,8 @@ def main() -> int:
     with open(OUT_MD, "w") as f:
         f.write("".join(md))
 
-    print(f"Wrote {len(rows)} ledger rows")
-    print(f"  CSV: {OUT_CSV}")
-    print(f"  MD:  {OUT_MD}")
-    print("Tier counts:")
     for tier, count in sorted(tier_counter.items(), key=lambda kv: -kv[1]):
-        print(f"  {tier:10s} {count}")
+        pass
     return 0
 
 

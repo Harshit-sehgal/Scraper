@@ -179,6 +179,7 @@ def _unsign(signed: str) -> str | None:
     # H11: Try rotated keys
     try:
         import os
+
         rotated = os.environ.get("DATAFORGE_SESSION_SECRET_ROTATED", "").strip()
         if rotated:
             for old_secret in rotated.split(";"):

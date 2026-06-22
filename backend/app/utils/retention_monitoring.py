@@ -75,9 +75,7 @@ class RetentionMonitor:
                 # Alert if nothing was purged in 7 days (likely misconfiguration)
                 days_since_last_purge = (now - self.last_success_at).total_seconds() / 86400
                 if jobs_purged == 0 and recycle_purged == 0 and days_since_last_purge > 7:
-                    logger.warning(
-                        "Data retention: No items purged in 7 days (may indicate misconfiguration)"
-                    )
+                    logger.warning("Data retention: No items purged in 7 days (may indicate misconfiguration)")
 
         return {
             "ok": health_ok,

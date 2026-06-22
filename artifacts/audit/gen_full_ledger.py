@@ -16,9 +16,9 @@ import os
 import re
 import sys
 from collections import Counter
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 REPO = Path(__file__).resolve().parents[2]
 AUDIT_DIR = REPO / "artifacts" / "audit"
@@ -250,9 +250,9 @@ def classify(rel: str) -> tuple[str, str, str, bool, str]:
         return "backend_source", "FastAPI/backend Python source", "", True, "high"
     if rel.startswith("backend/forge_kernel/") and ext == ".py":
         return "backend_source", "Forge kernel backend Python source", "", True, "high"
-    if rel.startswith("backend/tests/") or rel.startswith("backend/benchmarks/"):
+    if rel.startswith(("backend/tests/", "backend/benchmarks/")):
         return "test", "backend test or fixture", "", True, "high"
-    if rel.startswith("frontend/e2e/") or rel.startswith("frontend/smoke/"):
+    if rel.startswith(("frontend/e2e/", "frontend/smoke/")):
         return "test", "frontend end-to-end/smoke test", "", True, "high"
     if rel.startswith("frontend/"):
         if ext in {".html", ".css", ".js", ".mjs", ".ts", ".svg"}:
@@ -265,7 +265,7 @@ def classify(rel: str) -> tuple[str, str, str, bool, str]:
         return "script", "audit generation script", "", True, "high"
     if rel.startswith("artifacts/") and ext == ".py":
         return "script", "audit/validation helper script", "", True, "high"
-    if rel.startswith("docs/") or rel.startswith("Instructions_for_ai/"):
+    if rel.startswith(("docs/", "Instructions_for_ai/")):
         return "documentation", "project documentation", "", True, "high"
     if name in {
         "AGENTS.md",
@@ -279,25 +279,7 @@ def classify(rel: str) -> tuple[str, str, str, bool, str]:
         return "documentation", "root project documentation", "", True, "high"
     if is_lockfile(rel):
         return "config", "lockfile pinning transitive dependencies", "machine-generated lockfile; not deep-inspected", True, "high"
-    if name == ".bandit" or name.startswith(".env") or ext in {
-        ".cfg",
-        ".conf",
-        ".ini",
-        ".json",
-        ".toml",
-        ".yaml",
-        ".yml",
-    } or name in {
-        ".dockerignore",
-        ".gitignore",
-        ".pre-commit-config.yaml",
-        ".prettierignore",
-        ".prettierrc",
-        ".stylelintrc.json",
-        "Makefile",
-        "package.json",
-        "pyproject.toml",
-    } or rel.startswith(".github/") or rel.startswith(".vscode/"):
+    if name == ".bandit" or name.startswith(".env") or ext in {".cfg", ".conf", ".ini", ".json", ".toml", ".yaml", ".yml"} or name in {".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".prettierignore", ".prettierrc", ".stylelintrc.json", "Makefile", "package.json", "pyproject.toml"} or rel.startswith((".github/", ".vscode/")):
         return "config", "project/tooling configuration", "", True, "high"
     if ext in {".csv", ".md", ".rst", ".txt"}:
         return "documentation", "text documentation/data", "", True, "medium"
@@ -347,16 +329,16 @@ def summarize_python(text: str) -> str:
 
 
 SIGNAL_PATTERNS = [
-    ("auth/session/API key", re.compile(r"\b(auth|session|api[_ -]?key|bearer|rbac)\b", re.I)),
-    ("tenant/org/project isolation", re.compile(r"\b(tenant|org_id|project_id|owner_id|membership)\b", re.I)),
-    ("billing/quota/usage", re.compile(r"\b(billing|invoice|quota|usage|meter)\b", re.I)),
-    ("export/recycle/audit", re.compile(r"\b(export|recycle|audit)\b", re.I)),
-    ("URL safety/session URL", re.compile(r"\b(ssrf|url_safety|denylist|session_url|localhost|private ip)\b", re.I)),
-    ("Playwright/browser", re.compile(r"\b(playwright|browser|storage_state)\b", re.I)),
-    ("network capture", re.compile(r"\b(network|request|response|har)\b", re.I)),
-    ("pagination/search forms", re.compile(r"\b(pagination|infinite scroll|search_params|form)\b", re.I)),
-    ("research/experimental", re.compile(r"\b(research|experimental|DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES)\b", re.I)),
-    ("deployment/ops", re.compile(r"\b(docker|compose|prometheus|grafana|nginx|tls|backup|restore)\b", re.I)),
+    ("auth/session/API key", re.compile(r"\b(auth|session|api[_ -]?key|bearer|rbac)\b", re.IGNORECASE)),
+    ("tenant/org/project isolation", re.compile(r"\b(tenant|org_id|project_id|owner_id|membership)\b", re.IGNORECASE)),
+    ("billing/quota/usage", re.compile(r"\b(billing|invoice|quota|usage|meter)\b", re.IGNORECASE)),
+    ("export/recycle/audit", re.compile(r"\b(export|recycle|audit)\b", re.IGNORECASE)),
+    ("URL safety/session URL", re.compile(r"\b(ssrf|url_safety|denylist|session_url|localhost|private ip)\b", re.IGNORECASE)),
+    ("Playwright/browser", re.compile(r"\b(playwright|browser|storage_state)\b", re.IGNORECASE)),
+    ("network capture", re.compile(r"\b(network|request|response|har)\b", re.IGNORECASE)),
+    ("pagination/search forms", re.compile(r"\b(pagination|infinite scroll|search_params|form)\b", re.IGNORECASE)),
+    ("research/experimental", re.compile(r"\b(research|experimental|DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES)\b", re.IGNORECASE)),
+    ("deployment/ops", re.compile(r"\b(docker|compose|prometheus|grafana|nginx|tls|backup|restore)\b", re.IGNORECASE)),
 ]
 
 
@@ -415,8 +397,7 @@ def inspect_file(path: Path, rel: str, classification: str, purpose_seed: str, s
 
 def md_escape(value: object) -> str:
     text = str(value)
-    text = text.replace("\n", " ").replace("|", "\\|")
-    return text
+    return text.replace("\n", " ").replace("|", "\\|")
 
 
 def main() -> int:
@@ -616,14 +597,8 @@ def main() -> int:
         )
     OUT_MD.write_text("".join(md), encoding="utf-8")
 
-    print(f"Wrote {len(rows)} ledger rows")
-    print(f"  Inventory: {OUT_INV}")
-    print(f"  CSV:       {OUT_CSV}")
-    print(f"  MD:        {OUT_MD}")
-    print("\nClassification counts:")
     for tier in CLASSIFICATIONS:
-        print(f"  {tier:20s} {tier_counter.get(tier, 0)}")
-    print(f"\nProject-owned: {owned_total}, deep-inspected: {deep_total}, skipped: {skipped_total}, follow-up: {follow_total}")
+        pass
     return 0
 
 

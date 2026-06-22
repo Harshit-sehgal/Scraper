@@ -129,6 +129,7 @@ class TestDataAccessAuditor:
     def test_log_data_access_success(self, caplog):
         """Log successful data access."""
         import logging
+
         caplog.set_level(logging.INFO)
 
         DataAccessAuditor.log_data_access(
@@ -147,6 +148,7 @@ class TestDataAccessAuditor:
     def test_log_failed_login(self, caplog):
         """Log failed login."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         DataAccessAuditor.log_failed_login("admin", "Invalid password")
@@ -157,6 +159,7 @@ class TestDataAccessAuditor:
     def test_log_permission_denied(self, caplog):
         """Log permission denied."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         DataAccessAuditor.log_permission_denied("user123", "job456", "delete")

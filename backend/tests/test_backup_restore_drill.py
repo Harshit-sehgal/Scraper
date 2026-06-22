@@ -1,4 +1,5 @@
 """Backup and restore drill tests."""
+
 import shutil
 import sqlite3
 import tempfile

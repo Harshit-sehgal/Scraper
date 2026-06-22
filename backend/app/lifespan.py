@@ -489,6 +489,7 @@ async def _data_retention_loop() -> None:
             break
         except Exception as e:
             from app.utils.retention_monitoring import record_retention_run
+
             record_retention_run(result=None, error=e)
             logger.exception("Data retention background task failed (non-blocking)")
 

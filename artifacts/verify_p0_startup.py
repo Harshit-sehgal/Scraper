@@ -6,8 +6,8 @@ This script simulates what the pytest tests do:
 - Set production env with empty session secret → verify RuntimeError
 """
 
-import sys
 import os
+import sys
 
 # Set PYTHONPATH to backend
 sys.path.insert(0, "backend")
@@ -37,20 +37,13 @@ def test_startup_blocks_dev_auth():
             settings.ALLOW_INSECURE_DEV_AUTH = True
             try:
                 create_app()
-                print("FAIL: create_app() did not raise RuntimeError for dev auth")
                 return False
             except RuntimeError as e:
-                if "ALLOW_INSECURE_DEV_AUTH" in str(e):
-                    print("PASS: Dev auth check raises RuntimeError")
-                    return True
-                else:
-                    print(f"FAIL: Wrong error message: {e}")
-                    return False
+                return "ALLOW_INSECURE_DEV_AUTH" in str(e)
             finally:
                 settings.ENV = old_env
                 settings.ALLOW_INSECURE_DEV_AUTH = old_auth
-    except Exception as e:
-        print(f"FAIL: Unexpected exception: {e}")
+    except Exception:
         return False
 
 
@@ -68,33 +61,21 @@ def test_startup_blocks_missing_secret():
         settings.ALLOW_INSECURE_DEV_AUTH = False
         try:
             create_app()
-            print("FAIL: create_app() did not raise RuntimeError for missing secret")
             return False
         except RuntimeError as e:
-            if "SESSION_SECRET" in str(e):
-                print("PASS: Session secret check raises RuntimeError")
-                return True
-            else:
-                print(f"FAIL: Wrong error message: {e}")
-                return False
+            return "SESSION_SECRET" in str(e)
         finally:
             settings.ENV = old_env
             settings.SESSION_SECRET = old_secret
             settings.ALLOW_INSECURE_DEV_AUTH = old_auth
-    except Exception as e:
-        print(f"FAIL: Unexpected exception: {e}")
+    except Exception:
         return False
 
 
 if __name__ == "__main__":
-    print("Running P0 startup checks...")
-    print()
     ok1 = test_startup_blocks_dev_auth()
-    print()
     ok2 = test_startup_blocks_missing_secret()
-    print()
     if ok1 and ok2:
-        print("All checks PASSED.")
+        pass
     else:
-        print("Some checks FAILED.")
         sys.exit(1)
