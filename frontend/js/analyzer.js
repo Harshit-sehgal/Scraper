@@ -14,6 +14,155 @@ let _selectorsMap = null;
 let _lastIntelligence = null;
 let _lastWorkflowDraft = null;
 
+function _workflowDraftId() {
+  return _lastWorkflowDraft?.id || "";
+}
+
+function _workflowId() {
+  return _lastWorkflowDraft?.workflow_id || "";
+}
+
+async function _readJsonResponse(res) {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
+function _builderStartUrl() {
+  const startEl = document.getElementById("workflow-builder-start-url");
+  return startEl?.value?.trim() || _lastWorkflowDraft?.selected_start_url || _lastWorkflowDraft?.start_url || "";
+}
+
+function _setBuilderFailure(message) {
+  const failureEl = document.getElementById("workflow-builder-failure");
+  if (!failureEl) return;
+  failureEl.textContent = message || "";
+  failureEl.classList.toggle("hidden", !message);
+}
+
+function _clearBuilderFailure() {
+  _setBuilderFailure("");
+}
+
+function _readBuilderMapping({ silent = false } = {}) {
+  const mappingEl = document.getElementById("workflow-builder-mapping");
+  const raw = mappingEl?.value?.trim() || "{}";
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    if (!silent) {
+      _setBuilderFailure(`Manual mapping JSON is invalid: ${err.message}`);
+      toast("Manual mapping JSON is invalid", "error");
+    }
+    return null;
+  }
+}
+
+function _readSnapshot({ silent = false } = {}) {
+  const snapshotEl = document.getElementById("workflow-builder-snapshot");
+  const snapshot = snapshotEl?.value?.trim() || "";
+  if (snapshot) return snapshot;
+  const mapping = _readBuilderMapping({ silent: true });
+  const mappedSnapshot = typeof mapping?.html_snapshot === "string" ? mapping.html_snapshot.trim() : "";
+  if (mappedSnapshot) return mappedSnapshot;
+  if (!silent) {
+    _setBuilderFailure("Paste deterministic HTML into Snapshot HTML before detecting fields or previewing.");
+    toast("Snapshot HTML is required", "error");
+  }
+  return "";
+}
+
+function _detectedFieldsToMapping(fields) {
+  const detected = Array.isArray(fields) ? fields : [];
+  const submit = detected.find((field) => field.type === "submit");
+  const inputs = detected
+    .filter((field) => field.type !== "submit")
+    .map((field) => ({
+      label: field.label || field.selector || "Field",
+      selector: field.selector || "",
+      value: "",
+      action: field.type === "select" ? "select" : "fill",
+    }));
+  return {
+    name: "Workflow Replay Draft",
+    start_url: _builderStartUrl(),
+    fields: inputs,
+    submit_action: submit ? { action: "click", selector: submit.selector || "" } : { action: "click", selector: "" },
+    extraction_schema: [],
+  };
+}
+
+function _setBuilderButtons() {
+  const hasDraft = Boolean(_workflowDraftId());
+  const hasWorkflow = Boolean(_workflowId());
+  const detectBtn = document.getElementById("workflow-builder-detect");
+  const saveBtn = document.getElementById("workflow-builder-save");
+  const previewBtn = document.getElementById("workflow-builder-preview");
+  const runBtn = document.getElementById("workflow-builder-run");
+  if (detectBtn) detectBtn.disabled = !hasDraft;
+  if (saveBtn) saveBtn.disabled = !hasDraft;
+  if (previewBtn) previewBtn.disabled = !hasWorkflow;
+  if (runBtn) runBtn.disabled = !hasWorkflow;
+}
+
+function _setBuilderStatus(status) {
+  const statusEl = document.getElementById("workflow-builder-status");
+  if (statusEl) statusEl.textContent = status || "draft";
+}
+
+function _renderWorkflowPreview(result) {
+  const previewEl = document.getElementById("workflow-builder-preview-table");
+  const timelineEl = document.getElementById("workflow-builder-timeline");
+  const failureEl = document.getElementById("workflow-builder-failure");
+  const rows = Array.isArray(result?.sample_rows) ? result.sample_rows : [];
+  const timeline = Array.isArray(result?.timeline) ? result.timeline : [];
+
+  if (previewEl) {
+    if (!rows.length) {
+      previewEl.innerHTML = '<div class="workflow-empty">No sample rows matched</div>';
+    } else {
+      const columns = Object.keys(rows[0] || {});
+      previewEl.innerHTML = `
+        <table class="workflow-preview-table">
+          <thead><tr>${columns.map((col) => `<th>${esc(col)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) =>
+                  `<tr>${columns.map((col) => `<td>${esc(row[col] == null ? "" : String(row[col]))}</td>`).join("")}</tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      `;
+    }
+  }
+
+  if (timelineEl) {
+    timelineEl.innerHTML = timeline.length
+      ? timeline
+          .map((event) => {
+            const action = event.action || "step";
+            const status = event.status || "ok";
+            const selector = event.selector ? ` ${event.selector}` : "";
+            return `<li>${esc(action)}${esc(selector)} <span>${esc(status)}</span></li>`;
+          })
+          .join("")
+      : "<li>Preview completed</li>";
+  }
+
+  if (failureEl) {
+    const failed = result?.preview_status === "failed";
+    failureEl.textContent = failed
+      ? result.user_message || result.recommended_action || result.failure_type || "Workflow preview failed"
+      : "";
+    failureEl.classList.toggle("hidden", !failed);
+  }
+}
+
 // ─── Analyze URL ───
 
 export async function analyzeURL() {
@@ -266,9 +415,155 @@ export function showAuthProfileEntryNotice() {
   toast("Auth Profile setup is recommended for login-required pages", "info");
 }
 
+export async function detectWorkflowDraftFields() {
+  const draftId = _workflowDraftId();
+  if (!draftId) {
+    toast("Create a workflow draft first", "error");
+    return null;
+  }
+  const htmlSnapshot = _readSnapshot();
+  if (!htmlSnapshot) return null;
+  _clearBuilderFailure();
+  try {
+    const res = await apiFetch(endpoints.workflowDraftDetectFields(draftId), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        html_snapshot: htmlSnapshot,
+        start_url: _builderStartUrl() || undefined,
+      }),
+    });
+    const data = await _readJsonResponse(res);
+    if (!res.ok) throw new Error(data.detail || "Could not detect workflow fields");
+    _lastWorkflowDraft = {
+      ..._lastWorkflowDraft,
+      detected_fields: Array.isArray(data.fields) ? data.fields : [],
+      selected_start_url: data.start_url || _builderStartUrl(),
+      html_snapshot: htmlSnapshot,
+    };
+    renderWorkflowDraftPanel(_lastWorkflowDraft);
+    toast(`Detected ${_lastWorkflowDraft.detected_fields.length} workflow field(s)`, "success");
+    return data;
+  } catch (err) {
+    _setBuilderFailure(err.message || "Could not detect workflow fields");
+    toast(`Workflow field detection failed: ${err.message}`, "error");
+    return null;
+  }
+}
+
+export async function saveWorkflowFromBuilder() {
+  const draftId = _workflowDraftId();
+  if (!draftId) {
+    toast("Create a workflow draft first", "error");
+    return null;
+  }
+  const mapping = _readBuilderMapping();
+  if (!mapping) return null;
+  const startUrl = _builderStartUrl() || mapping.start_url || "";
+  if (!startUrl) {
+    _setBuilderFailure("Start URL is required before saving the workflow.");
+    toast("Start URL is required", "error");
+    return null;
+  }
+  _clearBuilderFailure();
+  try {
+    const res = await apiFetch(endpoints.workflowDraftManualMapping(draftId), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: mapping.name || "Workflow Replay Draft",
+        description: mapping.description || "",
+        start_url: startUrl,
+        fields: Array.isArray(mapping.fields) ? mapping.fields : [],
+        submit_action: mapping.submit_action || null,
+        extraction_schema: Array.isArray(mapping.extraction_schema) ? mapping.extraction_schema : [],
+      }),
+    });
+    const data = await _readJsonResponse(res);
+    if (!res.ok) throw new Error(data.detail || "Could not save workflow");
+    _lastWorkflowDraft = {
+      ..._lastWorkflowDraft,
+      workflow_id: data.id,
+      workflow_name: data.name,
+      workflow_status: data.status,
+      status: "saved",
+    };
+    _setBuilderStatus("saved");
+    _setBuilderButtons();
+    toast("Workflow saved", "success");
+    return data;
+  } catch (err) {
+    _setBuilderFailure(err.message || "Could not save workflow");
+    toast(`Workflow save failed: ${err.message}`, "error");
+    return null;
+  }
+}
+
+export async function previewWorkflowFromBuilder() {
+  const workflowId = _workflowId();
+  if (!workflowId) {
+    toast("Save the workflow before previewing", "error");
+    return null;
+  }
+  const htmlSnapshot = _readSnapshot();
+  if (!htmlSnapshot) return null;
+  const mapping = _readBuilderMapping({ silent: true }) || {};
+  _clearBuilderFailure();
+  try {
+    const res = await apiFetch(endpoints.workflowPreview(workflowId), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        html_snapshot: htmlSnapshot,
+        sample_limit: Number(mapping.sample_limit || 5),
+      }),
+    });
+    const data = await _readJsonResponse(res);
+    if (!res.ok) throw new Error(data.detail || "Could not preview workflow");
+    _renderWorkflowPreview(data);
+    toast(
+      data.preview_status === "failed" ? "Workflow preview failed" : "Workflow preview ready",
+      data.preview_status === "failed" ? "warning" : "success",
+    );
+    return data;
+  } catch (err) {
+    _setBuilderFailure(err.message || "Could not preview workflow");
+    toast(`Workflow preview failed: ${err.message}`, "error");
+    return null;
+  }
+}
+
+export async function runWorkflowFromBuilder() {
+  const workflowId = _workflowId();
+  if (!workflowId) {
+    toast("Save the workflow before running it", "error");
+    return null;
+  }
+  _clearBuilderFailure();
+  try {
+    const res = await apiFetch(endpoints.runWorkflow(workflowId), { method: "POST" });
+    const data = await _readJsonResponse(res);
+    if (!res.ok) throw new Error(data.detail || "Could not queue workflow");
+    _setBuilderStatus(data.status || "queued");
+    const timelineEl = document.getElementById("workflow-builder-timeline");
+    if (timelineEl) {
+      const item = document.createElement("li");
+      item.textContent = `Run queued: ${data.job_id || data.run_id || workflowId}`;
+      timelineEl.prepend(item);
+    }
+    toast("Workflow queued", "success");
+    return data;
+  } catch (err) {
+    _setBuilderFailure(err.message || "Could not queue workflow");
+    toast(`Workflow run failed: ${err.message}`, "error");
+    return null;
+  }
+}
+
 export function renderWorkflowDraftPanel(draft) {
   const panel = document.getElementById("workflow-builder-panel");
   if (!panel || !draft) return;
+  _lastWorkflowDraft = { ..._lastWorkflowDraft, ...draft };
 
   const startUrl = draft.selected_start_url || draft.start_url || "";
   const originalUrl = draft.original_url || "";
@@ -282,6 +577,7 @@ export function renderWorkflowDraftPanel(draft) {
   const reasonEl = document.getElementById("workflow-builder-reason");
   const fieldsEl = document.getElementById("workflow-builder-fields");
   const mappingEl = document.getElementById("workflow-builder-mapping");
+  const snapshotEl = document.getElementById("workflow-builder-snapshot");
   const previewEl = document.getElementById("workflow-builder-preview-table");
   const timelineEl = document.getElementById("workflow-builder-timeline");
   const failureEl = document.getElementById("workflow-builder-failure");
@@ -306,16 +602,12 @@ export function renderWorkflowDraftPanel(draft) {
       : '<div class="workflow-empty">No fields detected yet</div>';
   }
   if (mappingEl) {
-    mappingEl.value = JSON.stringify(
-      {
-        start_url: startUrl,
-        suggested_start_urls: suggestions.map((item) => item.url),
-        fields: [],
-        submit_action: { action: "click", selector: "" },
-      },
-      null,
-      2,
-    );
+    const mapping = _detectedFieldsToMapping(fields);
+    mapping.suggested_start_urls = suggestions.map((item) => item.url);
+    mappingEl.value = JSON.stringify(mapping, null, 2);
+  }
+  if (snapshotEl) {
+    snapshotEl.value = draft.html_snapshot || snapshotEl.value || "";
   }
   if (previewEl) {
     previewEl.innerHTML = '<div class="workflow-empty">No preview run yet</div>';
@@ -329,6 +621,7 @@ export function renderWorkflowDraftPanel(draft) {
   }
 
   panel.classList.remove("hidden");
+  _setBuilderButtons();
 }
 
 // ─── Render Field List ───
@@ -535,6 +828,6 @@ export function getSelectorsMap() {
 export function getAnalyzedFields() {
   return _analyzedFields;
 }
-export function getWorkflowDraft() {
+function _getWorkflowDraft() {
   return _lastWorkflowDraft;
 }

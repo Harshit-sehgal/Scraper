@@ -300,14 +300,6 @@ class TestCircularDependencies:
             f"Found {len(cross_layer_cycles)} cross-layer cycles (cycles should stay within layer)"
         )
 
-    def test_cycle_intentionality(self) -> None:
-        """Cycles should be intentional (learning loops, etc.)."""
-        # Known intentional cycles in system (for documentation):
-        # 'selector_engine', 'selector_memory', 'domain_evolution_model'
-        # This test is mostly documentary - cycles exist but are understood
-
-        assert True  # Placeholder for cycle intentionality verification
-
 
 # ============================================================================
 # State Ownership Tests (4 tests)

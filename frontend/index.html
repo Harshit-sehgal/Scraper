@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'"
     />
-    <title>Dataforge</title>
+    <title>DataForge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
-    <!-- Inter Variable, SIL OFL — self-hosted for CSP font-src 'self'. -->
     <link rel="icon" type="image/svg+xml" href="/app/favicon.svg" />
-    <link rel="stylesheet" href="/app/styles.css?v=4" />
+    <link rel="stylesheet" href="/app/styles.css?v=7" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -26,19 +25,29 @@
             data-action="toggle-sidebar"
             aria-label="Toggle sidebar"
           >
-            <span data-icon="more" aria-hidden="true"></span>
+            <span class="material-symbols-outlined" aria-hidden="true">menu</span>
           </button>
-          <a href="#" class="topbar-brand">
-            <span class="brand-name">Dataforge</span>
-          </a>
-        </div>
-        <div class="topbar-center">
-          <div class="global-search">
-            <span class="global-search-icon" data-icon="search" aria-hidden="true"></span>
-            <input type="text" placeholder="Search jobs..." aria-label="Search jobs" />
+          <div class="topbar-search">
+            <span class="material-symbols-outlined topbar-search-icon" aria-hidden="true">search</span>
+            <input
+              type="text"
+              class="topbar-search-input"
+              id="topbar-search-input"
+              placeholder="Search..."
+              aria-label="Search"
+            />
           </div>
         </div>
         <div class="topbar-right">
+          <button
+            type="button"
+            class="icon-btn"
+            id="btn-notifications"
+            title="Notifications"
+            aria-label="Notifications"
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+          </button>
           <button
             type="button"
             class="icon-btn"
@@ -47,7 +56,7 @@
             data-action="open-command-palette"
             aria-label="Command palette"
           >
-            <span data-icon="search" aria-hidden="true"></span>
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
           </button>
           <button
             type="button"
@@ -57,7 +66,7 @@
             data-action="show-shortcuts"
             aria-label="Keyboard shortcuts"
           >
-            <span class="icon-btn-label" aria-hidden="true">?</span>
+            <span class="material-symbols-outlined" aria-hidden="true">help</span>
           </button>
           <button
             type="button"
@@ -67,249 +76,155 @@
             data-action="toggle-theme"
             aria-label="Toggle dark mode"
           >
-            <span data-icon="moon" aria-hidden="true"></span>
+            <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
           </button>
-          <span class="health-pill" id="health-pill" data-state="unknown" aria-live="polite" title="API health status"
-            >checking…</span
-          >
+          <span class="health-pill" id="health-pill" data-state="unknown" aria-live="polite" title="API health status">
+            <span class="health-pill-dot" aria-hidden="true"></span>
+            <span class="health-pill-text" id="health-pill-text">checking…</span>
+          </span>
+          <button type="button" class="icon-btn" id="btn-account" title="Account" aria-label="Account">
+            <span class="material-symbols-outlined" aria-hidden="true">account_circle</span>
+          </button>
         </div>
       </header>
 
       <!-- ─── Sidebar ─── -->
       <aside class="sidebar" id="sidebar">
-        <nav aria-label="Main navigation">
-          <div class="sidebar-section">
-            <span class="sidebar-section-title">Overview</span>
-            <ul class="nav-list">
-              <li>
-                <button type="button" class="nav-item active" data-action="switch-view" data-view="jobs" id="nav-jobs">
-                  <span class="nav-icon" data-icon="briefcase" aria-hidden="true"></span>
-                  <span class="nav-text">Jobs</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="new" id="nav-new">
-                  <span class="nav-icon" data-icon="plus" aria-hidden="true"></span>
-                  <span class="nav-text">New Job</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="dashboard"
-                  id="nav-dashboard"
-                >
-                  <span class="nav-icon" data-icon="gauge" aria-hidden="true"></span>
-                  <span class="nav-text">Dashboard</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="api-keys" id="nav-api-keys">
-                  <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
-                  <span class="nav-text">API Keys</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="settings" id="nav-settings">
-                  <span class="nav-icon" aria-hidden="true"
-                    ><svg
-                      class="icon"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 256 256"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="12"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                      focusable="false"
-                    >
-                      <path
-                        d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"
-                      /></svg
-                  ></span>
-                  <span class="nav-text">Settings</span>
-                </button>
-              </li>
-            </ul>
-          </div>
-          <details class="sidebar-section advanced-nav">
-            <summary class="sidebar-section-title">Account</summary>
-            <ul class="nav-list">
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="email-verification"
-                  id="nav-email-verification"
-                >
-                  <span class="nav-icon" aria-hidden="true"
-                    ><svg
-                      class="icon"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 256 256"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="12"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                      focusable="false"
-                    >
-                      <path
-                        d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48Zm-96,85.15L52.57,64H203.43ZM98.71,128,40,181.81V74.19Zm11.84,10.85,12,11.05a8,8,0,0,0,10.82,0l12-11.05,58,53.15H52.57ZM157.29,128,216,74.18V181.82Z"
-                      /></svg
-                  ></span>
-                  <span class="nav-text">Email Verification</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="password-reset"
-                  id="nav-password-reset"
-                >
-                  <span class="nav-icon" data-icon="refresh" aria-hidden="true"></span>
-                  <span class="nav-text">Password Reset</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="invitations"
-                  id="nav-invitations"
-                >
-                  <span class="nav-icon" aria-hidden="true"
-                    ><svg
-                      class="icon"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 256 256"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="12"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                      focusable="false"
-                    >
-                      <path
-                        d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"
-                      /></svg
-                  ></span>
-                  <span class="nav-text">Invitations</span>
-                </button>
-              </li>
-            </ul>
-          </details>
-          <details class="sidebar-section advanced-nav">
-            <summary class="sidebar-section-title">Advanced</summary>
-            <ul class="nav-list">
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="workflows"
-                  id="nav-workflows"
-                >
-                  <span class="nav-icon" data-icon="sliders" aria-hidden="true"></span>
-                  <span class="nav-text">Workflows</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="auth-profiles"
-                  id="nav-auth-profiles"
-                >
-                  <span class="nav-icon" data-icon="key" aria-hidden="true"></span>
-                  <span class="nav-text">Auth Profiles</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="scheduled-monitoring"
-                  id="nav-scheduled-monitoring"
-                >
-                  <span class="nav-icon" data-icon="clock" aria-hidden="true"></span>
-                  <span class="nav-text">Scheduled</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="recycle" id="nav-recycle">
-                  <span class="nav-icon" data-icon="trash" aria-hidden="true"></span>
-                  <span class="nav-text">Recycle Bin</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
-                  <span class="nav-icon" data-icon="creditCard" aria-hidden="true"></span>
-                  <span class="nav-text">Billing</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="nav-item" data-action="switch-view" data-view="audit" id="nav-audit">
-                  <span class="nav-icon" data-icon="scroll" aria-hidden="true"></span>
-                  <span class="nav-text">Audit</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="retention"
-                  id="nav-retention"
-                >
-                  <span class="nav-icon" data-icon="archive" aria-hidden="true"></span>
-                  <span class="nav-text">Retention</span>
-                </button>
-              </li>
-            </ul>
-          </details>
-          <div class="sidebar-section" data-experimental="true">
-            <span class="sidebar-section-title">Experimental</span>
-            <ul class="nav-list">
-              <li>
-                <button
-                  type="button"
-                  class="nav-item"
-                  data-action="switch-view"
-                  data-view="cognition"
-                  id="nav-cognition"
-                >
-                  <span class="nav-icon" data-icon="flask" aria-hidden="true"></span>
-                  <span class="nav-text">Cognition</span>
-                </button>
-              </li>
-            </ul>
-          </div>
-        </nav>
-        <div class="sidebar-activity" id="sidebar-activity">
-          <div class="sidebar-activity-title">Recent</div>
-          <div class="sidebar-activity-list" id="sidebar-activity-list">
-            <!-- Populated by JS -->
-          </div>
+        <!-- Brand -->
+        <div class="sidebar-brand">
+          <a href="#" class="sidebar-brand-link">
+            <span class="sidebar-brand-mark" aria-hidden="true">DF</span>
+            <div class="sidebar-brand-text">
+              <span class="sidebar-brand-name">DataForge</span>
+              <span class="sidebar-brand-version">Pro Plan</span>
+            </div>
+          </a>
         </div>
-        <div class="sidebar-bottom">
-          <span class="engine-status" id="engine-status"
-            ><span class="dot"></span><span id="engine-status-text">Ready</span></span
+
+        <!-- Navigation -->
+        <nav class="sidebar-nav" aria-label="Main navigation">
+          <div class="sidebar-category-label">Overview</div>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="dashboard" id="nav-dashboard">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">dashboard</span>
+            <span class="nav-text">Dashboard</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="jobs" id="nav-jobs">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">list_alt</span>
+            <span class="nav-text">Jobs</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="new" id="nav-new">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">add_box</span>
+            <span class="nav-text">New Job</span>
+          </button>
+
+          <div class="sidebar-category-label">Advanced</div>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="workflows" id="nav-workflows">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">account_tree</span>
+            <span class="nav-text">Workflows</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="audit" id="nav-audit">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">history</span>
+            <span class="nav-text">Audit Trail</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="api-keys" id="nav-api-keys">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">vpn_key</span>
+            <span class="nav-text">API Keys</span>
+          </button>
+          <button
+            type="button"
+            class="nav-item"
+            data-action="switch-view"
+            data-view="auth-profiles"
+            id="nav-auth-profiles"
           >
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">verified_user</span>
+            <span class="nav-text">Auth Profiles</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="recycle" id="nav-recycle">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">delete</span>
+            <span class="nav-text">Recycle Bin</span>
+          </button>
+          <button
+            type="button"
+            class="nav-item"
+            data-action="switch-view"
+            data-view="scheduled-monitoring"
+            id="nav-scheduled-monitoring"
+          >
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">schedule</span>
+            <span class="nav-text">Scheduled</span>
+          </button>
+
+          <div class="sidebar-category-label">System</div>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">payments</span>
+            <span class="nav-text">Billing</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="settings" id="nav-settings">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">settings</span>
+            <span class="nav-text">Settings</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="retention" id="nav-retention">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">archive</span>
+            <span class="nav-text">Retention</span>
+          </button>
+
+          <div class="sidebar-divider"></div>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-action="switch-view"
+            data-view="email-verification"
+            id="nav-email-verification"
+          >
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">mail</span>
+            <span class="nav-text">Email Verification</span>
+          </button>
+          <button
+            type="button"
+            class="nav-item"
+            data-action="switch-view"
+            data-view="password-reset"
+            id="nav-password-reset"
+          >
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">refresh</span>
+            <span class="nav-text">Password Reset</span>
+          </button>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="invitations" id="nav-invitations">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">group</span>
+            <span class="nav-text">Invitations</span>
+          </button>
+
+          <div class="sidebar-divider"></div>
+
+          <button
+            type="button"
+            class="nav-item experimental-nav"
+            data-action="switch-view"
+            data-view="cognition"
+            id="nav-cognition"
+          >
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">science</span>
+            <span class="nav-text">Cognition</span>
+            <span class="nav-badge">beta</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="sidebar-user" id="sidebar-user">
+            <div class="sidebar-user-avatar">
+              <span class="material-symbols-outlined" aria-hidden="true">person</span>
+            </div>
+            <div class="sidebar-user-info">
+              <span class="sidebar-user-name" id="sidebar-user-name">System Admin</span>
+              <span class="sidebar-user-role" id="sidebar-user-role">SysAdmin</span>
+            </div>
+          </div>
+          <a href="#" class="sidebar-quick-deploy" data-action="switch-view" data-view="new">
+            <span class="material-symbols-outlined" aria-hidden="true">rocket_launch</span>
+            Quick Deploy
+          </a>
         </div>
       </aside>
 
@@ -332,8 +247,23 @@
 
             <div class="jobs-toolbar">
               <div class="jobs-toolbar-left">
-                <input type="text" id="jobs-search" placeholder="Search jobs by name..." aria-label="Search jobs" />
-                <select id="jobs-status-filter" aria-label="Filter by status">
+                <div class="input-with-icon">
+                  <span
+                    class="icon-leading material-symbols-outlined"
+                    data-icon="search"
+                    data-size="18"
+                    aria-hidden="true"
+                    >search</span
+                  >
+                  <input
+                    type="text"
+                    id="jobs-search"
+                    class="input"
+                    placeholder="Search jobs by name..."
+                    aria-label="Search jobs"
+                  />
+                </div>
+                <select id="jobs-status-filter" class="input" aria-label="Filter by status">
                   <option value="all">All</option>
                   <option value="running">Running</option>
                   <option value="completed">Completed</option>
@@ -354,38 +284,81 @@
 
             <!-- Mini Stats -->
             <div class="kpi-row" id="kpi-row">
-              <div class="kpi"><span class="kpi-val" id="kpi-total">0</span><span class="kpi-label">Total</span></div>
-              <div class="kpi">
+              <div class="kpi-metric">
+                <span class="kpi-val" id="kpi-total">0</span><span class="kpi-label">Total</span>
+              </div>
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-running">0</span><span class="kpi-label">Running</span>
               </div>
-              <div class="kpi"><span class="kpi-val" id="kpi-done">0</span><span class="kpi-label">Done</span></div>
-              <div class="kpi">
+              <div class="kpi-metric">
+                <span class="kpi-val" id="kpi-done">0</span><span class="kpi-label">Done</span>
+              </div>
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-records">0</span><span class="kpi-label">Records</span>
               </div>
             </div>
 
-            <div class="list-head">
-              <span>Job</span>
-              <span>Created</span>
-              <span>URLs</span>
-              <span>Status</span>
-              <span>Records</span>
-              <span>Issues</span>
-              <span>Actions</span>
-            </div>
-
-            <!-- Jobs List -->
-            <div class="list" id="jobs-list">
-              <div class="empty-state" id="empty-state">
-                <span class="empty-icon" data-icon="briefcase" data-size="28" aria-hidden="true"></span>
-                <h3 class="empty-state-title">No jobs yet</h3>
-                <p class="empty-state-desc">Create your first scrape job.</p>
-                <div class="empty-state-actions">
-                  <button type="button" class="btn primary small" data-action="switch-view" data-view="new">
-                    Create your first job
-                  </button>
-                </div>
-              </div>
+            <div class="table-jobs-wrap">
+              <table class="table-jobs" id="jobs-table">
+                <thead>
+                  <tr>
+                    <th class="col-job-id">Job ID</th>
+                    <th class="col-job-name">Job</th>
+                    <th class="col-job-created">Created</th>
+                    <th class="col-job-urls">URLs</th>
+                    <th class="col-job-status">Status</th>
+                    <th class="col-job-records">Records</th>
+                    <th class="col-job-issues">Issues</th>
+                    <th class="col-job-actions" aria-label="Actions"></th>
+                  </tr>
+                </thead>
+                <tbody id="jobs-list">
+                  <!-- legacy hook: renderJobs() in jobs.js writes rows into #jobs-list -->
+                  <tr class="empty-row" id="empty-state-row">
+                    <td colspan="8">
+                      <div class="empty-state" id="empty-state">
+                        <span class="empty-icon" data-icon="briefcase" data-size="28" aria-hidden="true"></span>
+                        <h3 class="empty-state-title">No jobs yet</h3>
+                        <p class="empty-state-desc">Create your first scrape job.</p>
+                        <div class="empty-state-actions">
+                          <button type="button" class="btn primary small" data-action="switch-view" data-view="new">
+                            Create your first job
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="8">
+                      <div class="pagination-footer">
+                        <span id="jobs-pagination-range">Showing 0 jobs</span>
+                        <div class="pagination-chevrons">
+                          <button
+                            type="button"
+                            class="pagination-chevron"
+                            data-action="jobs-prev-page"
+                            aria-label="Previous page"
+                            disabled
+                          >
+                            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="pagination-chevron"
+                            data-action="jobs-next-page"
+                            aria-label="Next page"
+                            disabled
+                          >
+                            <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </section>
@@ -398,26 +371,69 @@
             <div class="page-head">
               <div>
                 <h1>Recycle Bin</h1>
-                <p class="subtle">Restore or permanently delete jobs</p>
+                <p class="subtle">Manage deleted jobs. Items are permanently removed after 30 days.</p>
               </div>
               <button type="button" class="btn ghost small" data-action="clear-recycle-bin" id="btn-clear-recycle">
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 18px; margin-right: 4px"
+                  >delete_forever</span
+                >
                 Empty Bin
               </button>
             </div>
 
-            <div class="list-head recycle-list-head">
-              <span>Job</span>
-              <span>Status</span>
-              <span>Records</span>
-              <span>Actions</span>
-            </div>
-
-            <div class="list" id="recycle-list">
-              <div class="empty-state" id="empty-recycle-state">
-                <span class="empty-icon" data-icon="trash" data-size="28" aria-hidden="true"></span>
-                <h3>Recycle bin is empty</h3>
-                <p>Deleted jobs will appear here. You can restore them or permanently remove them.</p>
-              </div>
+            <div class="table-recycle-wrap">
+              <table class="table-recycle" id="recycle-table">
+                <thead>
+                  <tr>
+                    <th class="col-recycle-id">Job ID</th>
+                    <th class="col-recycle-deleted">Deleted At</th>
+                    <th class="col-recycle-url">Target URL</th>
+                    <th class="col-recycle-status">Status</th>
+                    <th class="col-recycle-actions" aria-label="Actions"></th>
+                  </tr>
+                </thead>
+                <tbody id="recycle-list">
+                  <!-- renderRecycleBin() in recycle-bin.js populates rows -->
+                  <tr class="empty-row" id="empty-recycle-state-row">
+                    <td colspan="5">
+                      <div class="empty-state" id="empty-recycle-state">
+                        <span class="empty-icon" data-icon="trash" data-size="28" aria-hidden="true"></span>
+                        <h3>Recycle bin is empty</h3>
+                        <p>Deleted jobs will appear here. You can restore them or permanently remove them.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="5">
+                      <div class="pagination-footer">
+                        <span id="recycle-pagination-range">Showing 0 entries</span>
+                        <div class="pagination-chevrons">
+                          <button
+                            type="button"
+                            class="pagination-chevron"
+                            data-action="recycle-prev-page"
+                            aria-label="Previous page"
+                            disabled
+                          >
+                            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="pagination-chevron"
+                            data-action="recycle-next-page"
+                            aria-label="Next page"
+                            disabled
+                          >
+                            <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </section>
@@ -429,8 +445,13 @@
           <div class="container">
             <div class="page-head">
               <div>
-                <h1>Operations Dashboard</h1>
-                <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
+                <h1>Infrastructure Overview</h1>
+                <p class="subtle">Real-time metrics for active scraping nodes</p>
+                <div class="dash-status-line" id="dash-status-line">
+                  <span class="status-dot-ping"></span>
+                  <span class="status-dot-ping-bg"></span>
+                  <span class="status-dot-label" id="dash-status-label">System Operational</span>
+                </div>
               </div>
               <div class="flex-row gap-2">
                 <button type="button" class="btn primary small" data-action="refresh-dashboard">Refresh</button>
@@ -445,41 +466,41 @@
               </div>
               <div id="sysinfo-error" class="sysinfo-error"></div>
               <div class="kpi-row" id="sysinfo-kpi-row">
-                <div class="kpi">
+                <div class="kpi-metric">
                   <span class="kpi-val" id="sysinfo-jobs-total">—</span><span class="kpi-label">Total jobs</span>
                 </div>
-                <div class="kpi">
+                <div class="kpi-metric">
                   <span class="kpi-val" id="sysinfo-jobs-active">—</span><span class="kpi-label">Active</span>
                 </div>
-                <div class="kpi">
+                <div class="kpi-metric">
                   <span class="kpi-val" id="sysinfo-jobs-completed">—</span><span class="kpi-label">Completed</span>
                 </div>
-                <div class="kpi">
+                <div class="kpi-metric">
                   <span class="kpi-val" id="sysinfo-jobs-failed">—</span><span class="kpi-label">Failed</span>
                 </div>
-                <div class="kpi">
+                <div class="kpi-metric">
                   <span class="kpi-val" id="sysinfo-recycle">—</span><span class="kpi-label">Recycle bin</span>
                 </div>
-                <div class="kpi">
+                <div class="kpi-metric">
                   <span class="kpi-val" id="sysinfo-backend">—</span><span class="kpi-label">Storage</span>
                 </div>
               </div>
               <details class="sysinfo-details">
                 <summary>Queue + Workers</summary>
                 <div class="kpi-row" id="sysinfo-queue-row">
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="sysinfo-queue-pending">—</span
                     ><span class="kpi-label">Queue pending</span>
                   </div>
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="sysinfo-queue-running">—</span
                     ><span class="kpi-label">Queue running</span>
                   </div>
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="sysinfo-queue-dead-letter">—</span
                     ><span class="kpi-label">Dead letter</span>
                   </div>
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="sysinfo-queue-max">—</span><span class="kpi-label">Max concurrency</span>
                   </div>
                 </div>
@@ -493,7 +514,7 @@
                 <span class="dash-card-title">Recent Activity</span>
                 <span class="dash-badge" id="recent-activity-refreshed-at">loading…</span>
               </div>
-              <div id="recent-activity-list">
+              <div class="dash-table-wrap" id="recent-activity-list">
                 <p class="subtle">Loading…</p>
               </div>
             </div>
@@ -532,16 +553,16 @@
 
             <!-- Health KPIs Row -->
             <div class="kpi-row" id="dash-kpi-row">
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="dash-status-val">—</span><span class="kpi-label">Status</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="dash-success-rate">—</span><span class="kpi-label">Success Rate</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="dash-active-browsers">—</span><span class="kpi-label">Active Browsers</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="dash-domains-degraded">—</span><span class="kpi-label">Degraded Domains</span>
               </div>
             </div>
@@ -740,6 +761,10 @@
                       <textarea id="workflow-builder-mapping" rows="8" spellcheck="false"></textarea>
                     </section>
                     <section>
+                      <h4>Snapshot HTML</h4>
+                      <textarea id="workflow-builder-snapshot" rows="8" spellcheck="false"></textarea>
+                    </section>
+                    <section>
                       <h4>Preview</h4>
                       <div id="workflow-builder-preview-table" class="workflow-builder-preview">
                         <div class="workflow-empty">No preview run yet</div>
@@ -754,10 +779,38 @@
                   </div>
                   <div id="workflow-builder-failure" class="workflow-builder-failure hidden"></div>
                   <div class="workflow-builder-actions">
-                    <button type="button" class="btn secondary small" disabled>Detect Fields</button>
-                    <button type="button" class="btn secondary small" disabled>Preview</button>
-                    <button type="button" class="btn primary small" disabled>Save Workflow</button>
-                    <button type="button" class="btn secondary small" disabled>Run Full Scrape</button>
+                    <button
+                      type="button"
+                      class="btn secondary small"
+                      id="workflow-builder-detect"
+                      data-action="workflow-detect-fields"
+                    >
+                      Detect Fields
+                    </button>
+                    <button
+                      type="button"
+                      class="btn secondary small"
+                      id="workflow-builder-preview"
+                      data-action="workflow-preview"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      class="btn primary small"
+                      id="workflow-builder-save"
+                      data-action="workflow-save"
+                    >
+                      Save Workflow
+                    </button>
+                    <button
+                      type="button"
+                      class="btn secondary small"
+                      id="workflow-builder-run"
+                      data-action="workflow-run"
+                    >
+                      Run Full Scrape
+                    </button>
                   </div>
                 </div>
 
@@ -1217,19 +1270,19 @@
 
             <!-- Cognition KPIs -->
             <div class="kpi-row" id="cognition-kpi-row">
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-pressure">0</span><span class="kpi-label">Field Pressure</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-integrity">0</span><span class="kpi-label">Field Integrity</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-energy">0</span><span class="kpi-label">Global Energy</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-exclusions">0</span><span class="kpi-label">Learned Exclusions</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-basins">0</span><span class="kpi-label">Active Basins</span>
               </div>
             </div>
@@ -1296,22 +1349,31 @@
               <button
                 type="button"
                 class="btn primary"
-                data-action="switch-view"
-                data-view="new"
+                data-action="create-auth-profile"
                 id="btn-auth-profiles-create-new"
               >
-                Create Job
+                New Profile
               </button>
             </div>
 
             <div class="jobs-toolbar">
               <div class="jobs-toolbar-left">
-                <input
-                  type="text"
-                  id="auth-profiles-search"
-                  placeholder="Search profiles..."
-                  aria-label="Search auth profiles"
-                />
+                <div class="input-with-icon">
+                  <span
+                    class="icon-leading material-symbols-outlined"
+                    data-icon="search"
+                    data-size="18"
+                    aria-hidden="true"
+                    >search</span
+                  >
+                  <input
+                    type="text"
+                    id="auth-profiles-search"
+                    class="input"
+                    placeholder="Search profiles..."
+                    aria-label="Search auth profiles"
+                  />
+                </div>
               </div>
               <div class="jobs-toolbar-right">
                 <span class="jobs-last-updated" id="auth-profiles-last-updated">Never updated</span>
@@ -1328,34 +1390,74 @@
 
             <!-- Mini Stats -->
             <div class="kpi-row" id="auth-profiles-kpi-row">
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-total-auth-profiles">0</span><span class="kpi-label">Total</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-active-auth-profiles">0</span><span class="kpi-label">Active</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-pending-auth-profiles">0</span><span class="kpi-label">Pending</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="kpi-expired-auth-profiles">0</span><span class="kpi-label">Expired</span>
               </div>
             </div>
 
-            <div class="list-head">
-              <span>Profile</span>
-              <span>Domain</span>
-              <span>Status</span>
-              <span>Actions</span>
-            </div>
-
-            <!-- Auth Profiles List -->
-            <div class="list" id="auth-profiles-list">
-              <div class="empty-state" id="auth-profiles-empty-state">
-                <span class="empty-icon" data-icon="key" data-size="28" aria-hidden="true"></span>
-                <h3>No auth profiles</h3>
-                <p>Create an auth profile to store a browser session for authenticated scraping.</p>
-              </div>
+            <div class="table-auth-wrap">
+              <table class="table-auth" id="auth-profiles-table">
+                <thead>
+                  <tr>
+                    <th class="col-profile-name">Profile Name</th>
+                    <th class="col-profile-domain">Target Domain</th>
+                    <th class="col-profile-last-used">Last Used</th>
+                    <th class="col-profile-expiry">Expiry</th>
+                    <th class="col-profile-status">Status</th>
+                    <th class="col-profile-actions" aria-label="Actions"></th>
+                  </tr>
+                </thead>
+                <tbody id="auth-profiles-list">
+                  <!-- renderAuthProfiles() populates rows -->
+                  <tr class="empty-row" id="auth-profiles-empty-state-row">
+                    <td colspan="6">
+                      <div class="empty-state" id="auth-profiles-empty-state">
+                        <span class="empty-icon" data-icon="key" data-size="28" aria-hidden="true"></span>
+                        <h3>No auth profiles</h3>
+                        <p>Create an auth profile to store a browser session for authenticated scraping.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="6">
+                      <div class="pagination-footer">
+                        <span id="auth-profiles-pagination-range">Showing 0 profiles</span>
+                        <div class="pagination-chevrons">
+                          <button
+                            type="button"
+                            class="pagination-chevron"
+                            data-action="auth-profiles-prev-page"
+                            aria-label="Previous page"
+                            disabled
+                          >
+                            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="pagination-chevron"
+                            data-action="auth-profiles-next-page"
+                            aria-label="Next page"
+                            disabled
+                          >
+                            <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </section>
@@ -1384,16 +1486,16 @@
 
             <!-- KPIs -->
             <div class="kpi-row" id="scheduled-kpi-row">
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="scheduled-kpi-total">0</span><span class="kpi-label">Total</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="scheduled-kpi-enabled">0</span><span class="kpi-label">Active</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="scheduled-kpi-failed">0</span><span class="kpi-label">Failed</span>
               </div>
-              <div class="kpi">
+              <div class="kpi-metric">
                 <span class="kpi-val" id="scheduled-kpi-changes">0</span><span class="kpi-label">Changes</span>
               </div>
             </div>
@@ -1452,16 +1554,16 @@
             <div class="workflows-layout">
               <div class="workflows-list-pane">
                 <div class="kpi-row" id="workflows-kpi-row">
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="workflows-kpi-total">0</span><span class="kpi-label">Workflows</span>
                   </div>
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="workflows-kpi-runs">0</span><span class="kpi-label">Total Runs</span>
                   </div>
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="workflows-kpi-ok">0</span><span class="kpi-label">Succeeded</span>
                   </div>
-                  <div class="kpi">
+                  <div class="kpi-metric">
                     <span class="kpi-val" id="workflows-kpi-fail">0</span><span class="kpi-label">Failed</span>
                   </div>
                 </div>
@@ -1490,8 +1592,10 @@
           <div class="container">
             <div class="page-head">
               <div>
-                <h1>Billing</h1>
-                <p class="subtle">Subscription, plan tier, and usage limits</p>
+                <h1>Billing & Subscriptions</h1>
+                <p class="subtle">
+                  Manage your organizational plan, monitor current cycle usage limits, and view historical invoices.
+                </p>
               </div>
               <div class="page-head-actions">
                 <button type="button" class="btn ghost small" data-action="refresh-billing" id="btn-refresh-billing">
@@ -1500,25 +1604,38 @@
               </div>
             </div>
 
-            <div class="kpi-row" id="billing-kpi-row">
-              <div class="kpi">
-                <span class="kpi-val" id="billing-kpi-tier">—</span>
-                <span class="kpi-label">Plan tier</span>
-              </div>
-              <div class="kpi">
-                <span class="kpi-val" id="billing-kpi-jobs">—</span>
-                <span class="kpi-label">Max jobs</span>
-              </div>
-              <div class="kpi">
-                <span class="kpi-val" id="billing-kpi-scrapes">—</span>
-                <span class="kpi-label">Max scrapes</span>
-              </div>
-              <div class="kpi">
-                <span class="kpi-val" id="billing-kpi-teammates">—</span>
-                <span class="kpi-label">Teammates</span>
+            <!-- Current Cycle Usage — matching stitch billing_app_billing -->
+            <div class="billing-card usage-card">
+              <h2 class="billing-section-heading">Current Cycle Usage</h2>
+              <div class="billing-usage-grid">
+                <div class="billing-meter">
+                  <div class="billing-meter-head">
+                    <span class="billing-meter-label">Plan tier</span>
+                    <span class="billing-meter-value" id="billing-kpi-tier">—</span>
+                  </div>
+                </div>
+                <div class="billing-meter">
+                  <div class="billing-meter-head">
+                    <span class="billing-meter-label">Max jobs</span>
+                    <span class="billing-meter-value" id="billing-kpi-jobs">—</span>
+                  </div>
+                  <div class="billing-meter-bar">
+                    <div class="billing-meter-fill" id="billing-meter-jobs" style="width: 0%"></div>
+                  </div>
+                </div>
+                <div class="billing-meter">
+                  <div class="billing-meter-head">
+                    <span class="billing-meter-label">Max scrapes</span>
+                    <span class="billing-meter-value" id="billing-kpi-scrapes">—</span>
+                  </div>
+                  <div class="billing-meter-bar">
+                    <div class="billing-meter-fill" id="billing-meter-scrapes" style="width: 0%"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
+            <!-- Subscription & Plan Features (side by side) -->
             <div class="billing-grid">
               <div class="billing-card">
                 <h2>Current subscription</h2>
@@ -1609,8 +1726,10 @@
           <div class="container">
             <div class="page-head">
               <div>
-                <h1>Data retention</h1>
-                <p class="subtle">Lifecycle, purge, and per-user data deletion</p>
+                <h1>Data Retention & Lifecycle</h1>
+                <p class="subtle">
+                  Configure automated archival and purge policies for system telemetry and job outputs.
+                </p>
               </div>
               <div class="page-head-actions">
                 <button
@@ -1619,33 +1738,171 @@
                   data-action="refresh-retention"
                   id="btn-refresh-retention"
                 >
-                  Refresh
+                  <span class="material-symbols-outlined" style="font-size: 16px">refresh</span>
+                  Sync State
                 </button>
               </div>
             </div>
 
-            <div class="retention-card">
-              <h2>Recycle bin</h2>
-              <p class="subtle">
-                Soft-deleted jobs land here. Items in the recycle bin are permanently purged after 30 days by the
-                background sweep.
-              </p>
-              <div id="retention-recycle-summary" class="retention-summary">
-                <p class="subtle">Loading…</p>
-              </div>
-              <div class="retention-actions">
-                <button type="button" class="btn primary" data-action="delete-my-data" id="btn-delete-my-data">
-                  Delete all my data
-                </button>
-              </div>
-            </div>
+            <!-- Retention Policy Grid — matching stitch retention_policy_app_settings_retention -->
+            <div class="retention-bento-grid">
+              <!-- Main Settings Column -->
+              <div class="retention-main-col">
+                <!-- Log Expiry Slider Card -->
+                <div class="retention-policy-card">
+                  <div class="retention-policy-head">
+                    <div>
+                      <h2 class="retention-policy-title">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--ink-3)"
+                          >receipt_long</span
+                        >
+                        Operational Log Expiry
+                      </h2>
+                      <p class="retention-policy-desc">
+                        Duration to keep detailed application and audit logs in hot storage before soft deletion.
+                      </p>
+                    </div>
+                    <div class="retention-value-badge">
+                      <span class="retention-value-num" id="retention-log-days">30</span>
+                      <span class="retention-value-unit">Days</span>
+                    </div>
+                  </div>
+                  <div class="retention-slider-wrap">
+                    <input
+                      type="range"
+                      class="retention-slider"
+                      id="slider-log-expiry"
+                      min="1"
+                      max="90"
+                      value="30"
+                      aria-label="Log expiry in days"
+                    />
+                    <div class="retention-slider-ticks">
+                      <span>1d</span><span>30d</span><span>60d</span><span>90d</span>
+                    </div>
+                  </div>
+                </div>
 
-            <div class="retention-card">
-              <h2>Audit log retention</h2>
-              <p class="subtle">
-                Audit events are retained indefinitely while their file is on disk. The <code>logs/audit.log</code> file
-                is rotated by the application log handler.
-              </p>
+                <!-- Metrics Archival Slider Card -->
+                <div class="retention-policy-card">
+                  <div class="retention-policy-head">
+                    <div>
+                      <h2 class="retention-policy-title">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--ink-3)"
+                          >analytics</span
+                        >
+                        Telemetry & Metrics Archival
+                      </h2>
+                      <p class="retention-policy-desc">
+                        Time before rolling up high-resolution metrics into aggregated historical data.
+                      </p>
+                    </div>
+                    <div class="retention-value-badge">
+                      <span class="retention-value-num" id="retention-metrics-days">90</span>
+                      <span class="retention-value-unit">Days</span>
+                    </div>
+                  </div>
+                  <div class="retention-slider-wrap">
+                    <input
+                      type="range"
+                      class="retention-slider"
+                      id="slider-metrics-archival"
+                      min="30"
+                      max="365"
+                      value="90"
+                      step="5"
+                      aria-label="Metrics archival in days"
+                    />
+                    <div class="retention-slider-ticks"><span>30d</span><span>6mo</span><span>1y</span></div>
+                  </div>
+                </div>
+
+                <!-- Cold Storage TTL Slider Card -->
+                <div class="retention-policy-card">
+                  <div class="retention-policy-head">
+                    <div>
+                      <h2 class="retention-policy-title">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--ink-3)"
+                          >ac_unit</span
+                        >
+                        Cold Storage TTL
+                      </h2>
+                      <p class="retention-policy-desc">
+                        Maximum retention period for archived artifacts before permanent cryptographic destruction.
+                      </p>
+                    </div>
+                    <div class="retention-value-badge">
+                      <span class="retention-value-num" id="retention-cold-years">3</span>
+                      <span class="retention-value-unit">Years</span>
+                    </div>
+                  </div>
+                  <div class="retention-slider-wrap">
+                    <input
+                      type="range"
+                      class="retention-slider"
+                      id="slider-cold-ttl"
+                      min="1"
+                      max="7"
+                      value="3"
+                      aria-label="Cold storage TTL in years"
+                    />
+                    <div class="retention-slider-ticks">
+                      <span>1y</span><span>3y</span><span>5y</span><span>7y</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Action Bar -->
+                <div class="retention-action-bar">
+                  <button type="button" class="btn ghost small" id="btn-retention-cancel">Cancel</button>
+                  <button
+                    type="button"
+                    class="btn primary small"
+                    id="btn-retention-save"
+                    data-action="save-retention-policies"
+                  >
+                    Save Policies
+                  </button>
+                </div>
+              </div>
+
+              <!-- Side Panel — Danger Zone / Purge -->
+              <div class="retention-side-col">
+                <div class="retention-purge-card">
+                  <div class="retention-purge-head">
+                    <h2 class="retention-policy-title" style="color: var(--ink-3)">
+                      <span class="material-symbols-outlined" style="font-size: 18px; color: var(--ink-3)"
+                        >delete_sweep</span
+                      >
+                      Purge Stale Data
+                    </h2>
+                    <p class="retention-policy-desc">
+                      Manually trigger the background sweep to permanently delete items currently in the recycle bin or
+                      soft-deleted state. This action ignores standard TTL buffers.
+                    </p>
+                  </div>
+                  <div class="retention-purge-stats">
+                    <div class="retention-purge-stat-row">
+                      <span class="retention-purge-stat-label">Pending Sweep</span>
+                      <span class="retention-purge-stat-val" id="retention-purge-size">—</span>
+                    </div>
+                    <div class="retention-purge-stat-row">
+                      <span class="retention-purge-stat-label">Recycle Bin</span>
+                      <span class="retention-purge-stat-val" id="retention-recycle-count">—</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn retention-purge-btn"
+                    data-action="delete-my-data"
+                    id="btn-delete-my-data"
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 18px">warning</span>
+                    Execute Purge
+                  </button>
+                  <p class="retention-purge-notice">Irreversible Action</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1850,92 +2107,163 @@
 
         <!-- ─── API Keys ─── -->
         <section class="view" id="view-api-keys">
-          <div class="container narrow">
+          <div class="container">
             <div class="page-head">
               <div>
-                <h1>API Keys</h1>
-                <p class="subtle">Manage your API and admin keys for this session</p>
+                <h1>API Keys Management</h1>
+                <p class="subtle">
+                  Manage programmatic access tokens. Treat these keys like passwords and keep them secure.
+                </p>
+              </div>
+              <button type="button" class="btn primary" data-action="generate-api-key" id="btn-generate-key">
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 18px">add</span>
+                Generate New Key
+              </button>
+            </div>
+
+            <!-- Dual Card Layout — matching stitch api_keys_app_api_keys -->
+            <div class="api-keys-dual-grid">
+              <div class="api-keys-card">
+                <div class="api-keys-card-header">
+                  <span class="api-keys-card-title">
+                    <span
+                      class="material-symbols-outlined"
+                      aria-hidden="true"
+                      style="font-size: 18px; color: var(--ink-3)"
+                      >key</span
+                    >
+                    Production API Key
+                  </span>
+                  <span class="badge completed" id="api-key-status">Active</span>
+                </div>
+                <p class="subtle api-keys-desc">
+                  Your API key authenticates requests to the DataForge backend. It is held in memory only and cleared on
+                  page reload.
+                </p>
+                <div class="api-key-display-row">
+                  <span class="api-key-value" id="api-key-display">pk_live_••••••••••••</span>
+                  <div class="api-key-actions-inline">
+                    <button
+                      type="button"
+                      class="btn-icon-only"
+                      id="btn-api-key-toggle-vis"
+                      data-action="toggle-api-key-vis"
+                      title="Show Key"
+                      aria-label="Toggle API key visibility"
+                    >
+                      <span class="material-symbols-outlined" style="font-size: 18px">visibility</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-icon-only"
+                      data-action="copy-api-key"
+                      title="Copy Key"
+                      aria-label="Copy API key"
+                    >
+                      <span class="material-symbols-outlined" style="font-size: 18px">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="api-key-input-section" id="api-key-input-section">
+                  <div class="api-keys-input-row">
+                    <input
+                      type="password"
+                      id="api-key-input"
+                      class="input field-mono"
+                      placeholder="Paste your API key here..."
+                      autocomplete="new-password"
+                      spellcheck="false"
+                      aria-label="API key input"
+                    />
+                  </div>
+                  <div class="api-keys-actions">
+                    <button type="button" class="btn primary small" data-action="save-api-key" id="btn-save-api-key">
+                      Save Key
+                    </button>
+                    <button type="button" class="btn ghost small" data-action="clear-api-key" id="btn-clear-api-key">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div class="api-key-footer">
+                  <span id="api-key-created">Created: —</span>
+                  <span id="api-key-last-used">Last used: —</span>
+                </div>
+              </div>
+
+              <div class="api-keys-card admin-key-card">
+                <div class="admin-key-accent-line" aria-hidden="true"></div>
+                <div class="api-keys-card-header">
+                  <span class="api-keys-card-title">
+                    <span
+                      class="material-symbols-outlined"
+                      aria-hidden="true"
+                      style="font-size: 18px; color: var(--status-amber)"
+                      >admin_panel_settings</span
+                    >
+                    Root Admin Key
+                  </span>
+                  <span class="badge canceled" id="admin-key-status">Inactive</span>
+                </div>
+                <p class="subtle api-keys-desc">
+                  Admin keys enable protected operator actions with unrestricted access. Held in memory for this session
+                  only.
+                </p>
+                <div class="api-key-display-row" style="opacity: 0.7">
+                  <span class="api-key-value" id="admin-key-display">sk_admin_••••••••••••••</span>
+                  <div class="api-key-actions-inline">
+                    <button
+                      type="button"
+                      class="btn-icon-only"
+                      id="btn-admin-key-toggle-vis"
+                      data-action="toggle-admin-key-vis"
+                      title="Show Key"
+                      aria-label="Toggle admin key visibility"
+                    >
+                      <span class="material-symbols-outlined" style="font-size: 18px">visibility</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="admin-key-input-section" id="admin-key-input-section">
+                  <div class="api-keys-input-row">
+                    <input
+                      type="password"
+                      id="admin-key-input"
+                      class="input field-mono"
+                      placeholder="Paste your admin key here..."
+                      autocomplete="new-password"
+                      spellcheck="false"
+                      aria-label="Admin key input"
+                    />
+                  </div>
+                  <div class="api-keys-actions">
+                    <button
+                      type="button"
+                      class="btn primary small"
+                      data-action="save-admin-key"
+                      id="btn-save-admin-key"
+                    >
+                      Save Key
+                    </button>
+                    <button
+                      type="button"
+                      class="btn ghost small"
+                      data-action="clear-admin-key"
+                      id="btn-clear-admin-key"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div class="api-key-footer">
+                  <span id="admin-key-created">Created: —</span>
+                  <span id="admin-key-revoked">Revoked: —</span>
+                </div>
               </div>
             </div>
 
-            <div class="api-keys-card">
-              <div class="api-keys-card-header">
-                <span class="api-keys-card-title">API Key</span>
-                <span class="badge" id="api-key-status">Not set</span>
-              </div>
-              <p class="subtle api-keys-desc">
-                Your API key authenticates requests to the Dataforge backend. It is held in memory only and cleared on
-                page reload.
-              </p>
-              <div class="api-keys-input-row">
-                <input
-                  type="password"
-                  id="api-key-input"
-                  class="input"
-                  placeholder="Paste your API key here..."
-                  autocomplete="new-password"
-                  spellcheck="false"
-                  aria-label="API key input"
-                />
-                <button
-                  type="button"
-                  class="btn ghost small"
-                  id="btn-api-key-toggle-vis"
-                  data-action="toggle-api-key-vis"
-                  aria-label="Toggle API key visibility"
-                >
-                  <span data-icon="eye" aria-hidden="true"></span>
-                </button>
-              </div>
-              <div class="api-keys-actions">
-                <button type="button" class="btn primary small" data-action="save-api-key" id="btn-save-api-key">
-                  Save Key
-                </button>
-                <button type="button" class="btn ghost small" data-action="clear-api-key" id="btn-clear-api-key">
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            <div class="api-keys-card">
-              <div class="api-keys-card-header">
-                <span class="api-keys-card-title">Admin Key</span>
-                <span class="badge" id="admin-key-status">Not set</span>
-              </div>
-              <p class="subtle api-keys-desc">
-                Admin keys enable protected operator actions. Held in memory for this session only.
-              </p>
-              <div class="api-keys-input-row">
-                <input
-                  type="password"
-                  id="admin-key-input"
-                  class="input"
-                  placeholder="Paste your admin key here..."
-                  autocomplete="new-password"
-                  spellcheck="false"
-                  aria-label="Admin key input"
-                />
-                <button
-                  type="button"
-                  class="btn ghost small"
-                  id="btn-admin-key-toggle-vis"
-                  data-action="toggle-admin-key-vis"
-                  aria-label="Toggle admin key visibility"
-                >
-                  <span data-icon="eye" aria-hidden="true"></span>
-                </button>
-              </div>
-              <div class="api-keys-actions">
-                <button type="button" class="btn primary small" data-action="save-admin-key" id="btn-save-admin-key">
-                  Save Key
-                </button>
-                <button type="button" class="btn ghost small" data-action="clear-admin-key" id="btn-clear-admin-key">
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            <div class="api-keys-card">
+            <!-- Session Info Section -->
+            <div class="api-keys-card session-card">
               <div class="api-keys-card-header">
                 <span class="api-keys-card-title">Session</span>
                 <span class="badge" id="session-status">Checking...</span>
@@ -1952,98 +2280,200 @@
                 </button>
               </div>
             </div>
+
+            <!-- Recent Access Logs Table — matching stitch -->
+            <div class="api-keys-access-log-section">
+              <div class="section-head">
+                <h2 class="section-title">Recent Access Logs</h2>
+              </div>
+              <div class="table-access-log-wrap">
+                <table class="table-access-log" id="access-log-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp (UTC)</th>
+                      <th>Key Prefix</th>
+                      <th>Endpoint</th>
+                      <th>IP Address</th>
+                      <th class="text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="access-log-list">
+                    <tr class="empty-row">
+                      <td colspan="5">
+                        <div class="empty-state">
+                          <p class="subtle">No access logs available yet.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
 
         <!-- ─── Settings ─── -->
         <section class="view" id="view-settings">
-          <div class="container narrow">
+          <div class="container">
             <div class="page-head">
               <div>
                 <h1>Settings</h1>
-                <p class="subtle">Preferences and configuration</p>
+                <p class="subtle">Manage your workspace configuration, UI preferences, and data lifecycle policies.</p>
               </div>
             </div>
 
-            <div class="settings-card">
-              <h2>Appearance</h2>
-              <div class="settings-option">
-                <div class="settings-option-info">
-                  <span class="settings-option-label">Theme</span>
-                  <span class="settings-option-desc">Choose your preferred color scheme</span>
+            <!-- Bento Grid Layout — matching stitch settings_app_settings -->
+            <div class="settings-bento-grid">
+              <!-- General Configuration (wide card) -->
+              <section class="settings-bento-card settings-col-wide">
+                <div class="settings-card-heading">
+                  <span class="material-symbols-outlined" style="font-size: 20px; color: var(--primary)">tune</span>
+                  <h2>General Configuration</h2>
                 </div>
-                <div class="toggle-group" id="settings-theme-toggle">
-                  <button
-                    type="button"
-                    class="toggle active"
-                    data-mode="system"
-                    data-action="set-theme-mode"
-                    aria-label="System theme"
-                  >
-                    System
-                  </button>
-                  <button
-                    type="button"
-                    class="toggle"
-                    data-mode="light"
-                    data-action="set-theme-mode"
-                    aria-label="Light theme"
-                  >
-                    Light
-                  </button>
-                  <button
-                    type="button"
-                    class="toggle"
-                    data-mode="dark"
-                    data-action="set-theme-mode"
-                    aria-label="Dark theme"
-                  >
-                    Dark
-                  </button>
+                <div class="settings-form-grid">
+                  <div class="settings-field">
+                    <label class="settings-field-label">Workspace Name</label>
+                    <input
+                      type="text"
+                      class="input field-mono"
+                      value="Production Cluster"
+                      readonly
+                      aria-label="Workspace name"
+                    />
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-label">API Base URL</label>
+                    <span class="settings-field-value-mono" id="settings-api-url">—</span>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-label">Version</label>
+                    <span class="settings-field-value-mono">0.1.0</span>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </section>
 
-            <div class="settings-card">
-              <h2>Keyboard Shortcuts</h2>
-              <div class="settings-shortcuts-grid">
-                <div class="settings-shortcut-item">
-                  <span class="settings-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span>
-                  <span class="settings-shortcut-desc">Command palette</span>
+              <!-- UI Preferences (narrow card) -->
+              <section class="settings-bento-card settings-col-narrow">
+                <div class="settings-card-heading">
+                  <span class="material-symbols-outlined" style="font-size: 20px; color: var(--primary)">palette</span>
+                  <h2>UI Preferences</h2>
                 </div>
-                <div class="settings-shortcut-item">
-                  <span class="settings-shortcut-keys"><kbd>N</kbd></span>
-                  <span class="settings-shortcut-desc">New job</span>
+                <div class="settings-prefs-list">
+                  <div class="settings-pref-item">
+                    <div class="settings-pref-info">
+                      <span class="settings-pref-label">Theme</span>
+                      <span class="settings-pref-desc">Choose your preferred color scheme</span>
+                    </div>
+                    <div class="toggle-group" id="settings-theme-toggle">
+                      <button
+                        type="button"
+                        class="toggle active"
+                        data-mode="system"
+                        data-action="set-theme-mode"
+                        aria-label="System theme"
+                      >
+                        System
+                      </button>
+                      <button
+                        type="button"
+                        class="toggle"
+                        data-mode="light"
+                        data-action="set-theme-mode"
+                        aria-label="Light theme"
+                      >
+                        Light
+                      </button>
+                      <button
+                        type="button"
+                        class="toggle"
+                        data-mode="dark"
+                        data-action="set-theme-mode"
+                        aria-label="Dark theme"
+                      >
+                        Dark
+                      </button>
+                    </div>
+                  </div>
+                  <div class="settings-pref-item">
+                    <div class="settings-pref-info">
+                      <span class="settings-pref-label">Compact Density</span>
+                      <span class="settings-pref-desc">Reduce padding in tables</span>
+                    </div>
+                    <label class="settings-switch">
+                      <input type="checkbox" id="settings-compact-density" aria-label="Toggle compact density" />
+                      <span class="settings-switch-track"></span>
+                    </label>
+                  </div>
+                  <div class="settings-pref-item">
+                    <div class="settings-pref-info">
+                      <span class="settings-pref-label">Auto-refresh</span>
+                      <span class="settings-pref-desc">Live dashboard updates</span>
+                    </div>
+                    <label class="settings-switch">
+                      <input type="checkbox" id="settings-auto-refresh" checked aria-label="Toggle auto-refresh" />
+                      <span class="settings-switch-track"></span>
+                    </label>
+                  </div>
                 </div>
-                <div class="settings-shortcut-item">
-                  <span class="settings-shortcut-keys"><kbd>/</kbd></span>
-                  <span class="settings-shortcut-desc">Focus search</span>
-                </div>
-                <div class="settings-shortcut-item">
-                  <span class="settings-shortcut-keys"><kbd>Esc</kbd></span>
-                  <span class="settings-shortcut-desc">Close / clear</span>
-                </div>
-                <div class="settings-shortcut-item">
-                  <span class="settings-shortcut-keys"><kbd>1</kbd>-<kbd>0</kbd></span>
-                  <span class="settings-shortcut-desc">Switch views</span>
-                </div>
-                <div class="settings-shortcut-item">
-                  <span class="settings-shortcut-keys"><kbd>?</kbd></span>
-                  <span class="settings-shortcut-desc">Shortcut help</span>
-                </div>
-              </div>
-            </div>
+              </section>
 
-            <div class="settings-card">
-              <h2>About</h2>
-              <div class="settings-about-grid">
-                <span class="settings-about-label">Application</span>
-                <span class="settings-about-value">Dataforge</span>
-                <span class="settings-about-label">Version</span>
-                <span class="settings-about-value">0.1.0</span>
-                <span class="settings-about-label">API</span>
-                <span class="settings-about-value" id="settings-api-url">—</span>
-              </div>
+              <!-- Keyboard Shortcuts (full-width card) -->
+              <section class="settings-bento-card settings-col-full">
+                <div class="settings-card-heading">
+                  <span class="material-symbols-outlined" style="font-size: 20px; color: var(--primary)">keyboard</span>
+                  <h2>Keyboard Shortcuts</h2>
+                </div>
+                <div class="settings-shortcuts-grid">
+                  <div class="settings-shortcut-item">
+                    <span class="settings-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span>
+                    <span class="settings-shortcut-desc">Command palette</span>
+                  </div>
+                  <div class="settings-shortcut-item">
+                    <span class="settings-shortcut-keys"><kbd>N</kbd></span>
+                    <span class="settings-shortcut-desc">New job</span>
+                  </div>
+                  <div class="settings-shortcut-item">
+                    <span class="settings-shortcut-keys"><kbd>/</kbd></span>
+                    <span class="settings-shortcut-desc">Focus search</span>
+                  </div>
+                  <div class="settings-shortcut-item">
+                    <span class="settings-shortcut-keys"><kbd>Esc</kbd></span>
+                    <span class="settings-shortcut-desc">Close / clear</span>
+                  </div>
+                  <div class="settings-shortcut-item">
+                    <span class="settings-shortcut-keys"><kbd>1</kbd>-<kbd>0</kbd></span>
+                    <span class="settings-shortcut-desc">Switch views</span>
+                  </div>
+                  <div class="settings-shortcut-item">
+                    <span class="settings-shortcut-keys"><kbd>?</kbd></span>
+                    <span class="settings-shortcut-desc">Shortcut help</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Danger Zone (full-width, dashed border) -->
+              <section class="settings-bento-card settings-col-full settings-danger-zone">
+                <div class="settings-card-heading">
+                  <span class="material-symbols-outlined" style="font-size: 20px; color: var(--ink-3)">warning</span>
+                  <h2>Danger Zone</h2>
+                </div>
+                <div class="settings-danger-row">
+                  <div>
+                    <span class="settings-pref-label">Purge Stale Data</span>
+                    <p class="settings-pref-desc">Permanently delete all data older than the retention policies.</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn ghost small"
+                    data-action="purge-stale-data"
+                    id="btn-purge-stale"
+                    disabled
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 16px">delete_forever</span>
+                    Execute Purge
+                  </button>
+                </div>
+              </section>
             </div>
           </div>
         </section>
@@ -2064,7 +2494,7 @@
     >
       <div class="shortcut-modal">
         <h2 id="apikey-modal-title">API Key</h2>
-        <p id="apikey-modal-desc" class="modal-desc">Enter your Dataforge API key for production access.</p>
+        <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
         <form id="apikey-form" class="api-key-form">
           <input
             type="password"
@@ -2191,6 +2621,6 @@
          FastAPI's StaticFiles mount at /app serves these files from the
          frontend/ directory. Production nginx deployments are unaffected
          (nginx has dedicated location blocks for both /app/ and root paths). -->
-    <script type="module" src="/app/app.js?v=4"></script>
+    <script type="module" src="/app/app.js?v=6"></script>
   </body>
 </html>

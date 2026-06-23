@@ -61,6 +61,18 @@ def _load_fixture(name: str) -> str:
             1,
             ["company"],
         ),
+        (
+            "search_results",
+            [_schema_field("title"), _schema_field("price", FieldType.CURRENCY)],
+            1,
+            ["title"],
+        ),
+        (
+            "infinite_scroll_mock",
+            [_schema_field("title"), _schema_field("price", FieldType.CURRENCY)],
+            1,
+            ["title"],
+        ),
     ],
 )
 @pytest.mark.asyncio
@@ -163,6 +175,14 @@ async def test_blocked_fixture_does_not_produce_false_records(
         )
 
 
+def test_session_expired_fixture_detects_session_params() -> None:
+    """Benchmark corpus: session-expired mock page should contain form + expired session signal."""
+    html = _load_fixture("session_expired")
+    assert "session" in html.lower()
+    assert "expired" in html.lower()
+    assert "sid" in html or "session" in html.lower()
+
+
 def test_login_wall_fixture_signals_login_required() -> None:
     """Benchmark corpus: login-wall mock page should not look like a successful listing."""
     html = _load_fixture("login_wall_mock")
@@ -174,7 +194,7 @@ def test_load_more_fixture_contains_pagination_control() -> None:
     """Benchmark corpus: load-more mock page exposes a load-more control."""
     html = _load_fixture("load_more_mock")
     assert "load-more" in html.lower() or "load more" in html.lower()
-    assert "Item 1" in html
+    assert "Product Alpha" in html
 
 
 # ── Acquisition lineage tests ───────────────────────────────────────────

@@ -1,10 +1,10 @@
 /* ═══════════════════════════════════════════
-   Dataforge — Frontend App Entry Point (ES Module)
+   DataForge — Frontend App Entry Point (ES Module)
    ═══════════════════════════════════════════
    ═══════════════════════════════════════════ */
 
 // ─── Init ───
-import { hydrateIcons, icon, startIconObserver } from "./js/icons.js?v=4";
+import { hydrateIcons, icon, startIconObserver } from "./js/icons.js?v=5";
 import {
   readUIState,
   updateJobsLastUpdatedLabel,
@@ -36,6 +36,10 @@ import {
   clearAnalysis,
   continueWithDirectScrape,
   createWorkflowDraftFromAnalysis,
+  detectWorkflowDraftFields,
+  saveWorkflowFromBuilder,
+  previewWorkflowFromBuilder,
+  runWorkflowFromBuilder,
   showAuthProfileEntryNotice,
 } from "./js/analyzer.js";
 import {
@@ -71,7 +75,7 @@ import {
   goToLastPage,
   goToPage,
 } from "./js/results.js";
-import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, checkSession } from "./js/api.js";
+import { closeKeyModal, saveKeyFromModal, checkSession } from "./js/api.js";
 import { setMode } from "./js/views.js";
 import { initAuthProfiles } from "./js/auth-profiles.js";
 import { initScheduledMonitoring, refreshScheduledJobs, deleteScheduledJob } from "./js/scheduled-monitoring.js";
@@ -131,34 +135,40 @@ function onDocumentClick(e) {
       switchView("api-keys");
       break;
     case "save-api-key":
-      import("./js/api-keys-page.js").then((m) => m.saveApiKeyFromPage()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.saveApiKeyFromPage()).catch((e) => console.warn("Op:", e));
       break;
     case "clear-api-key":
-      import("./js/api-keys-page.js").then((m) => m.clearApiKeyFromPage()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.clearApiKeyFromPage()).catch((e) => console.warn("Op:", e));
       break;
     case "toggle-api-key-vis":
-      import("./js/api-keys-page.js").then((m) => m.toggleApiKeyVisibility()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.toggleApiKeyVisibility()).catch((e) => console.warn("Op:", e));
+      break;
+    case "copy-api-key":
+      import("./js/api-keys-page.js").then((m) => m.copyApiKey()).catch((e) => console.warn("Op:", e));
+      break;
+    case "generate-api-key":
+      import("./js/api-keys-page.js").then((m) => m.generateApiKey()).catch((e) => console.warn("Op:", e));
       break;
     case "save-admin-key":
-      import("./js/api-keys-page.js").then((m) => m.saveAdminKeyFromPage()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.saveAdminKeyFromPage()).catch((e) => console.warn("Op:", e));
       break;
     case "clear-admin-key":
-      import("./js/api-keys-page.js").then((m) => m.clearAdminKeyFromPage()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.clearAdminKeyFromPage()).catch((e) => console.warn("Op:", e));
       break;
     case "toggle-admin-key-vis":
-      import("./js/api-keys-page.js").then((m) => m.toggleAdminKeyVisibility()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.toggleAdminKeyVisibility()).catch((e) => console.warn("Op:", e));
       break;
     case "refresh-api-keys":
-      import("./js/api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch((e) => console.warn("Op:", e));
       break;
     case "logout-session":
-      import("./js/api-keys-page.js").then((m) => m.logoutFromPage()).catch(() => {});
+      import("./js/api-keys-page.js").then((m) => m.logoutFromPage()).catch((e) => console.warn("Op:", e));
       break;
     case "set-theme-mode":
-      import("./js/settings-page.js").then((m) => m.setThemeMode(mode)).catch(() => {});
+      import("./js/settings-page.js").then((m) => m.setThemeMode(mode)).catch((e) => console.warn("Op:", e));
       break;
     case "open-command-palette":
-      import("./js/command-palette.js").then((m) => m.openCommandPalette()).catch(() => {});
+      import("./js/command-palette.js").then((m) => m.openCommandPalette()).catch((e) => console.warn("Op:", e));
       break;
     case "refresh-scheduled":
       refreshScheduledJobs();
@@ -199,7 +209,7 @@ function onDocumentClick(e) {
       refreshDashboard();
       break;
     case "refresh-auth-profiles":
-      import("./js/auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
+      import("./js/auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch((e) => console.warn("Op:", e));
       break;
     case "switch-operator-mode":
       if (mode) switchOperatorMode(mode);
@@ -231,6 +241,9 @@ function onDocumentClick(e) {
     case "refresh-retention":
       refreshRetention();
       break;
+    case "save-retention-policies":
+      import("./js/retention.js").then((m) => m.saveRetentionPolicies()).catch((e) => console.warn("Op:", e));
+      break;
     case "upgrade-plan":
       upgradePlan();
       break;
@@ -238,32 +251,38 @@ function onDocumentClick(e) {
       deleteMyData();
       break;
     case "send-email-verification":
-      import("./js/email-verification.js").then((m) => m.sendEmailVerification()).catch(() => {});
+      import("./js/email-verification.js").then((m) => m.sendEmailVerification()).catch((e) => console.warn("Op:", e));
       break;
     case "verify-email-token":
-      import("./js/email-verification.js").then((m) => m.verifyEmailToken()).catch(() => {});
+      import("./js/email-verification.js").then((m) => m.verifyEmailToken()).catch((e) => console.warn("Op:", e));
       break;
     case "request-password-reset":
-      import("./js/password-reset.js").then((m) => m.requestPasswordReset()).catch(() => {});
+      import("./js/password-reset.js").then((m) => m.requestPasswordReset()).catch((e) => console.warn("Op:", e));
       break;
     case "confirm-password-reset":
-      import("./js/password-reset.js").then((m) => m.confirmPasswordReset()).catch(() => {});
+      import("./js/password-reset.js").then((m) => m.confirmPasswordReset()).catch((e) => console.warn("Op:", e));
       break;
     case "create-invitation":
-      import("./js/invitations.js").then((m) => m.createInvitation()).catch(() => {});
+      import("./js/invitations.js").then((m) => m.createInvitation()).catch((e) => console.warn("Op:", e));
       break;
     case "accept-invitation": {
       const invId = id || btn.getAttribute("data-id") || "";
-      if (invId) import("./js/invitations.js").then((m) => m.respondToInvitation(invId, true)).catch(() => {});
+      if (invId)
+        import("./js/invitations.js")
+          .then((m) => m.respondToInvitation(invId, true))
+          .catch((e) => console.warn("Op:", e));
       break;
     }
     case "decline-invitation": {
       const invId = id || btn.getAttribute("data-id") || "";
-      if (invId) import("./js/invitations.js").then((m) => m.respondToInvitation(invId, false)).catch(() => {});
+      if (invId)
+        import("./js/invitations.js")
+          .then((m) => m.respondToInvitation(invId, false))
+          .catch((e) => console.warn("Op:", e));
       break;
     }
     case "refresh-invitations":
-      import("./js/invitations.js").then((m) => m.refreshInvitations()).catch(() => {});
+      import("./js/invitations.js").then((m) => m.refreshInvitations()).catch((e) => console.warn("Op:", e));
       break;
     case "toggle-all-fields":
       toggleAllFields(btn.getAttribute("data-select") === "true");
@@ -282,6 +301,18 @@ function onDocumentClick(e) {
       break;
     case "url-auth-profile":
       showAuthProfileEntryNotice();
+      break;
+    case "workflow-detect-fields":
+      detectWorkflowDraftFields();
+      break;
+    case "workflow-save":
+      saveWorkflowFromBuilder();
+      break;
+    case "workflow-preview":
+      previewWorkflowFromBuilder();
+      break;
+    case "workflow-run":
+      runWorkflowFromBuilder();
       break;
     case "set-mode":
       if (mode) setMode(mode);
@@ -458,9 +489,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Fetch experimental feature flag from the public root endpoint
   // and reveal experimental UI elements when enabled.
-  fetch("/")
-    .then((r) => r.json())
+  fetch("/", { headers: { Accept: "application/json" } })
+    .then((r) => {
+      const contentType = r.headers.get("content-type") || "";
+      if (!r.ok || !contentType.includes("application/json")) return null;
+      return r.json();
+    })
     .then((data) => {
+      if (!data) return;
       if (data.experimental_enabled) {
         document.body.dataset.experimental = "true";
         // F-003: the cognition-view guards in views.js compare
@@ -480,7 +516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         checkAndRenderAupBanner(data.aup_version);
       }
     })
-    .catch(() => {});
+    .catch((e) => console.warn("Op:", e));
 
   const uiState = readUIState();
 
@@ -559,6 +595,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ── Global keyboard ──
   document.addEventListener("keydown", onGlobalKeydown);
+
+  // ── Topbar search input ──
+  // Focus the topbar search input and pressing Enter opens the command palette
+  const topbarSearchInput = document.getElementById("topbar-search-input");
+  if (topbarSearchInput) {
+    topbarSearchInput.addEventListener("focus", () => {
+      import("./js/command-palette.js")
+        .then((m) => {
+          topbarSearchInput.blur();
+          m.openCommandPalette();
+        })
+        .catch((e) => console.warn("Op:", e));
+    });
+    topbarSearchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        import("./js/command-palette.js").then((m) => m.openCommandPalette()).catch((e) => console.warn("Op:", e));
+      }
+    });
+  }
 
   // ── Window focus / visibility ──
   // Tab-switching in modern browsers fires a flurry of

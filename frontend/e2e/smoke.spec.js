@@ -5,7 +5,7 @@ test.describe("Dashboard UI smoke tests", () => {
   test("page loads and shows the DataForge brand", async ({ page }) => {
     await page.goto("/app/");
     await dismissApiKeyOverlay(page);
-    await expect(page.locator(".brand-name")).toHaveText("Dataforge");
+    await expect(page.locator(".sidebar-brand-name")).toHaveText("DataForge");
   });
 
   test("sidebar nav items are visible", async ({ page }) => {
@@ -17,20 +17,18 @@ test.describe("Dashboard UI smoke tests", () => {
     await expect(page.locator("#nav-dashboard")).toBeVisible();
   });
 
-  test("clicking Create Job navigates to new job view", async ({ page }) => {
+  test("clicking Quick Deploy navigates to new job view", async ({ page }) => {
     await page.goto("/app/");
     await dismissApiKeyOverlay(page);
-    await page.locator("#btn-create-new").click();
+    await page.locator(".sidebar-quick-deploy").click();
     await expect(page.locator("#view-new")).toBeVisible();
   });
 
-  test("theme toggle works", async ({ page }) => {
+  test("desktop shell uses sidebar-only chrome", async ({ page }) => {
     await page.goto("/app/");
     await dismissApiKeyOverlay(page);
-    const toggle = page.locator("#btn-theme-toggle");
-    await toggle.click();
-    // After toggle we should have a toast notification
-    await expect(page.locator(".toast")).toBeVisible();
+    await expect(page.locator(".sidebar")).toBeVisible();
+    await expect(page.locator(".topbar")).toBeHidden();
   });
 
   test("dashboard nav navigates to dashboard view", async ({ page }) => {

@@ -1,0 +1,19 @@
+======================================================================
+Starting DataForge Load Test: http://localhost:8000/health
+Concurrency: 10 workers | Total requests: 100
+======================================================================
+
+Performance metrics:
+  Total time elapsed:  0.287 seconds
+  Successful requests: 100/100 (0 failures)
+  Requests/sec (RPS):  348.14
+  Minimum latency:     7.06 ms
+  Average latency:     18.10 ms
+  p50 (median):        11.97 ms
+  p90:                 17.10 ms
+  p95:                 73.71 ms
+  p99:                 126.71 ms
+  Maximum latency:     142.04 ms
+
+Validation Gate Status:
+  [OK] Load test validation threshold passed successfully.

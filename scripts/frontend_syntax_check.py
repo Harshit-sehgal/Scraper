@@ -41,7 +41,7 @@ def main() -> int:
     failures: list[tuple[Path, str]] = []
     for path in files:
         proc = subprocess.run(
-            ["node", "--check", str(path)],  # noqa: S607
+            ["node", "--check", str(path)],
             check=False,
             capture_output=True,
             text=True,

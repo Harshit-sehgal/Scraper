@@ -19,8 +19,8 @@ Running extraction against these URLs and comparing results against the golden
 - ✅ **Expected output files** exist for all 5 sites in `backend/tests/golden_dataset/expected/`.
 - ⚠️ **Tests are observational** — they log F1 scores but do not assert minimum accuracy
   thresholds. Thresholds must be refined through real-world validation.
-- ❌ **Live benchmark scripts** (`scripts/live_benchmark.py`, `scripts/validate_books.py`)
-  exist but are manual, not automated.
+- ⚠️ **Live benchmark validation** is manual, not automated. Run via the golden-dataset
+  `--run-golden-dataset` flag.
 
 ## Structure
 
@@ -80,6 +80,5 @@ PYTHONPATH=backend python3 -m pytest backend/tests/test_golden_dataset.py --run-
 ## Related Resources
 
 - `backend/benchmarks/` — Fixture-based benchmark framework
-- `scripts/live_benchmark.py` — Manual live benchmark runner
-- `scripts/validate_books.py` — Validation against books.toscrape.com
-- `scripts/validate_flights.py` — Validation against flightsnholidays.co.uk
+- `backend/tests/test_golden_dataset.py --run-golden-dataset` — Golden-dataset runner
+  (network required, observational)

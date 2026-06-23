@@ -1,13 +1,13 @@
-/* ─── Dataforge styles master ─────────────────────────────
+/* ─── DataForge styles master ─────────────────────────────
    Layered architecture. To preserve filename (CI asset-presence
    assertion) and minimise diff in nginx/HMR scripts, we keep
    `frontend/styles.css` as a thin @import cascade. Each layer
    is in `frontend/styles/`. */
 
-@import "./styles/tokens.css?v=2";
-@import "./styles/fonts.css?v=2";
-@import "./styles/base.css?v=2";
-@import "./styles/icons.css?v=2";
-@import "./styles/components.css?v=2";
-@import "./styles/layout.css?v=2";
-@import "./styles/views.css?v=2";
+@import "./styles/tokens.css?v=4";
+@import "./styles/fonts.css?v=4";
+@import "./styles/base.css?v=4";
+@import "./styles/icons.css?v=4";
+@import "./styles/components.css?v=4";
+@import "./styles/layout.css?v=4";
+@import "./styles/views.css?v=4";

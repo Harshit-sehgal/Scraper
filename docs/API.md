@@ -13,6 +13,7 @@ This route list was generated from the FastAPI app during the audit. Production 
 | GET | `/ready` | Public readiness; production response is minimal |
 | GET | `/app` | Static main dashboard |
 | GET | `/dashboard` | Static semantic dashboard |
+| GET | `/landing` | Static landing page preview |
 
 ## Job and Result Routes
 

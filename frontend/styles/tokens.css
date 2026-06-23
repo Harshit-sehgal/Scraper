@@ -1,32 +1,40 @@
 /* ─── Design Tokens ─────────────────────────────────────
-   Dataforge — Notion-style monochrome palette.
+   DataForge — Monochromatic Slate palette.
+   Stitch-extract build (PRD: dataforge_monochromatic_slate_prd.html).
+   High-contrast technical palette: slate-blue primary, deep-charcoal
+   body, sharp 4px radius, 1px structural borders, flat (no shadows).
+   Inter for UI, JetBrains Mono for tabular data.
    Light is default; dark applies via [data-theme="dark"] on <html>. */
 
 :root,
 :root[data-theme="light"] {
   /* Surfaces */
   --bg: #fff;
-  --bg-subtle: #fafafa;
-  --bg-muted: #f5f5f5;
-  --bg-active: #ededed;
+  --bg-subtle: #faf9fc;
+  --bg-muted: #eeedf1;
+  --bg-active: #e3e2e5;
   --bg-hover: rgb(0 0 0 / 0.04);
-  --bg-overlay: rgb(15 15 15 / 0.4);
-  --bg-code: #f7f7f7;
-  --bg-sidebar-item-active: rgb(0 0 0 / 0.05);
-  --bg-link-hover: rgb(37 99 235 / 0.06);
+  --bg-overlay: rgb(26 28 30 / 0.4);
+  --bg-code: #f4f3f6;
+  --bg-sidebar-item-active: #f1f5f9;
+  --bg-link-hover: rgb(59 91 126 / 0.06);
 
-  /* Ink — 4-tier (Notion-warm body) */
-  --ink-1: #1a1a1a; /* titles */
-  --ink-2: #37352f; /* body  — Notion warm gray */
-  --ink-3: #787774; /* subtle */
-  --ink-4: #a8a7a3; /* placeholder */
+  /* Ink — 4-tier (Industrial high-contrast) */
+  --ink-1: #171717; /* titles */
+  --ink-2: #171717; /* body */
+  --ink-3: #737373; /* subtle */
+  --ink-4: #737373; /* placeholder */
   --ink-inverse: #fff;
-  --ink-link: #2563eb;
+  --ink-link: #3b5b7e; /* primary steel blue */
+
+  /* PRD §Color Palette — Primary #3B5B7E (active nav text, links, focus rings) */
+  --primary: #3b5b7e;
+  --primary-hover: #224365; /* PRD Tailwind config primary-hover (#224365) */
 
   /* Borders */
-  --border: #eaeaea;
-  --border-strong: #d4d4d4;
-  --border-focus: #1a1a1a;
+  --border: #e5e5e5;
+  --border-strong: #c3c6cf;
+  --border-focus: #3b5b7e;
 
   /* Spacing — 4px base */
   --space-1: 0.25rem; /*  4 */
@@ -42,16 +50,16 @@
   --space-11: 5rem; /* 80 */
   --space-12: 6rem; /* 96 */
 
-  /* Radius */
-  --radius-xs: 3px;
+  /* Radius — strict 4px (rounded-sm) for technical look, PRD §rounded */
+  --radius-xs: 2px;
   --radius-sm: 4px; /* chips */
-  --radius: 6px; /* default — buttons, inputs */
-  --radius-lg: 8px; /* cards, modals */
-  --radius-pill: 9999px; /* reserved for status badges */
+  --radius: 4px; /* default — buttons, inputs, cards */
+  --radius-lg: 4px; /* cards, modals (same as radius for flat-industrial) */
+  --radius-pill: 9999px; /* reserved for status pills */
 
   /* Typography */
   --font-sans: "Inter", -apple-system, blinkmacsystemfont, "Segoe UI", roboto, sans-serif;
-  --font-mono: ui-monospace, sfmono-regular, "JetBrains Mono", menlo, consolas, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, consolas, monospace;
   --text-xs: 0.75rem; /* 12 */
   --text-sm: 0.8125rem; /* 13 */
   --text-base: 0.875rem; /* 14 */
@@ -65,31 +73,39 @@
   --leading-snug: 1.4;
   --leading-normal: 1.55;
   --leading-relaxed: 1.65;
-  --tracking-tight: -0.015em;
+  --tracking-tight: -0.02em; /* tight tracking for modern feel */
   --tracking-normal: 0;
-  --tracking-wide: 0.02em;
+  --tracking-wide: 0.05em;
 
   /* Component dimensions */
-  --topbar-height: 48px;
-  --sidebar-width: 252px;
+  --topbar-height: 64px; /* Stitch PRD: h-16 */
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 0px;
   --control-height: 32px;
   --control-height-lg: 38px;
   --focus-ring-offset: 2px;
 
-  /* Status — muted, used only for badges (not buttons) */
-  --status-blue: #1b6189;
-  --status-blue-soft: #e1f2ff;
-  --status-green: #135c44;
-  --status-green-soft: #e2f5ee;
-  --status-amber: #ad8b00;
-  --status-amber-soft: #fbf3db;
-  --status-red: #9c2b23;
-  --status-red-soft: #ffe2dd;
-  --status-gray: #50504e;
-  --status-gray-soft: #f1f1f0;
-  --status-violet: #4f2396;
-  --status-violet-soft: #efe6fc;
+  /* Status — desaturated slate tints */
+  --status-blue: #3b5b7e;
+  --status-blue-soft: #f1f5f9;
+
+  /* PRD §Color Palette — pending = #F1F5F9 bg + #334155 text (slate-700) */
+  --status-pending: #334155;
+  --status-pending-soft: #f1f5f9;
+  --status-pending-border: #e2e8f0; /* subtle slate border for pending pills */
+  --status-green: #1e4620;
+  --status-green-soft: #e6f4ea;
+  --status-green-border: #bce3c6; /* subtle green border for success pills */
+  --status-amber: #73531c;
+  --status-amber-soft: #ffddaf;
+  --status-amber-border: #f5c986; /* subtle amber border for warning pills */
+  --status-red: #731919;
+  --status-red-soft: #fce8e8;
+  --status-red-border: #f5c2c2; /* subtle red border for error/failed pills */
+  --status-gray: #646464;
+  --status-gray-soft: #e3e2e2;
+  --status-violet: #5f410a;
+  --status-violet-soft: #ffddaf;
 
   /* Success, danger, warning variables for JS compatibility */
   --success: var(--status-green);
@@ -106,16 +122,18 @@
   --duration-base: 180ms;
   --duration-slow: 240ms;
 
-  /* Layout max widths */
+  /* Layout max widths — PRD §Tailwind config spacing */
   --container-narrow: 720px;
-  --container-base: 1080px;
+  --container-base: 1024px; /* PRD container-max */
   --container-wide: 1280px;
   --container-prose: 680px;
+  --page-padding: 2rem; /* PRD page-padding */
+  --stack-gap: 2rem; /* PRD stack-gap */
 
-  /* Surface elevation — used by popovers, palettes, menus */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.03);
-  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.06), 0 2px 4px rgb(0 0 0 / 0.04);
-  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.05);
+  /* Surface elevation — stripped shadows for flat industrial layout */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
 
   /* Z-index scale */
   --z-sticky: 50;
@@ -125,7 +143,7 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #191919;
+  --bg: #171717;
   --bg-subtle: #202020;
   --bg-muted: #2a2a2a;
   --bg-active: #303030;
@@ -133,21 +151,27 @@
   --bg-overlay: rgb(0 0 0 / 0.55);
   --bg-code: #1f1f1f;
   --bg-sidebar-item-active: rgb(255 255 255 / 0.06);
-  --bg-link-hover: rgb(124 158 255 / 0.08);
+  --bg-link-hover: rgb(169 201 242 / 0.08);
   --ink-1: #ebebeb;
   --ink-2: #cfcfcf;
   --ink-3: #8a8a8a;
   --ink-4: #5f5f5f;
-  --ink-inverse: #191919;
-  --ink-link: #7c9eff;
+  --ink-inverse: #171717;
+  --ink-link: #a9c9f2; /* desaturated slate blue for dark mode link */
+  --primary: #a9c9f2; /* lifted primary for dark active states */
+  --primary-hover: #c8dcf3;
   --border: #2a2a2a;
   --border-strong: #3a3a3a;
-  --border-focus: #fff;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2), 0 1px 1px rgb(0 0 0 / 0.15);
-  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.25), 0 2px 4px rgb(0 0 0 / 0.2);
-  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.2);
-  --status-blue: #5c92cc;
-  --status-blue-soft: #1d3b53;
+  --border-focus: #a9c9f2;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --status-blue: #a9c9f2;
+  --status-blue-soft: #28496b;
+
+  /* Dark-theme pending slate — lift against #28496b bg */
+  --status-pending: #cbd5e1;
+  --status-pending-soft: #28496b;
   --status-green: #82c3a5;
   --status-green-soft: #243d30;
   --status-amber: #e9c46a;
@@ -156,6 +180,6 @@
   --status-red-soft: #522e2a;
   --status-gray: #cfcfcf;
   --status-gray-soft: #2f2f2f;
-  --status-violet: #a68ce6;
+  --status-violet: #ebc07e;
   --status-violet-soft: #3c2d4f;
 }

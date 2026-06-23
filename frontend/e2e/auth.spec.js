@@ -20,7 +20,7 @@ test.describe("Auth flow", () => {
       await dismissApiKeyOverlay(page);
 
       // The brand should be visible
-      await expect(page.locator(".brand-name")).toHaveText("Dataforge");
+      await expect(page.locator(".sidebar-brand-name")).toHaveText("DataForge");
 
       // Navigate to dashboard
       await page.locator("#nav-dashboard").click();
@@ -64,13 +64,13 @@ test.describe("Auth flow", () => {
       await expect(page.locator("#billing-kpi-tier")).toBeVisible();
     });
 
-    test("topbar health pill shows cluster status", async ({ page }) => {
+    test("dashboard header shows cluster status", async ({ page }) => {
       await page.goto("/app/");
       await dismissApiKeyOverlay(page);
 
-      // The health pill should be visible in the top bar
-      const healthPill = page.locator("#health-pill");
-      await expect(healthPill).toBeVisible();
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-status-line")).toBeVisible();
+      await expect(page.locator("#dash-status-label")).toBeVisible();
     });
   });
 });

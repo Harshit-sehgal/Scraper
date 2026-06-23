@@ -236,3 +236,25 @@ async def test_status_for_shadow_user(saas_client) -> None:
     assert body["user_id"] == "env-only"
     assert body["aup_accepted_at"] is None
     assert body["requires_acceptance"] is True
+
+
+@pytest.mark.asyncio
+async def test_status_for_shadow_user_when_identity_user_table_missing(saas_client, monkeypatch) -> None:
+    import sqlite3
+
+    client, store, user_ref, _tmp = saas_client
+    user_ref["value"] = "env-only-missing-users"
+
+    def raise_missing_users_table(user_id):
+        message = "no such table: users"
+        raise sqlite3.OperationalError(message)
+
+    monkeypatch.setattr(store, "get_user", raise_missing_users_table)
+
+    resp = await client.get("/api/saas/aup/status")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["user_id"] == "env-only-missing-users"
+    assert body["aup_accepted_at"] is None
+    assert body["requires_acceptance"] is True

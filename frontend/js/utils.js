@@ -174,10 +174,10 @@ function updateThemeToggleIcon(theme) {
   if (existingSpan) {
     existingSpan.setAttribute("data-icon", iconName);
     // Trigger icon hydration
-    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch(() => {});
+    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch((e) => console.warn("Op:", e));
   } else {
     btn.innerHTML = `<span data-icon="${iconName}" aria-hidden="true"></span>`;
-    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch(() => {});
+    import("./icons.js").then(({ hydrateIcons }) => hydrateIcons()).catch((e) => console.warn("Op:", e));
   }
 }
 

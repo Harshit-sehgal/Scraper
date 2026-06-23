@@ -171,6 +171,9 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     for s in summaries:
                         if s["id"] in manager.jobs_store:
                             cached = manager.jobs_store[s["id"]]
+                            # Cache sync — refresh in-memory object from DB row;
+                            # this is not a state transition, so it bypasses
+                            # job_state_machine.transition_to intentionally.
                             cached.status = JobStatus(s["status"])
                             cached.completed_at = s["completed_at"]  # type: ignore[assignment]
                     stale_ids = [jid for jid in manager.jobs_store if jid not in summary_ids]

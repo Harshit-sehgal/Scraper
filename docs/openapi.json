@@ -23,6 +23,11 @@
           "scope": {
             "default": "read",
             "description": "Key scope: read, write, or admin",
+            "enum": [
+              "read",
+              "write",
+              "admin"
+            ],
             "title": "Scope",
             "type": "string"
           }
@@ -260,10 +265,17 @@
         "description": "Request body for POST /api/billing/checkout.",
         "properties": {
           "cancel_url": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Cancel Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Url"
           },
           "plan_tier": {
             "enum": [
@@ -275,16 +287,21 @@
             "type": "string"
           },
           "return_url": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Return Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url"
           }
         },
         "required": [
-          "plan_tier",
-          "return_url",
-          "cancel_url"
+          "plan_tier"
         ],
         "title": "CheckoutRequest",
         "type": "object"
@@ -482,6 +499,90 @@
         "title": "DiscoveryRequest",
         "type": "object"
       },
+      "EmailVerificationSendResponse": {
+        "description": "Response for requesting email verification.",
+        "properties": {
+          "message": {
+            "default": "Verification email sent. Check your inbox.",
+            "title": "Message",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "EmailVerificationSendResponse",
+        "type": "object"
+      },
+      "EmailVerificationStatusResponse": {
+        "description": "Email verification status for the authenticated user.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "email_verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Verified At"
+          }
+        },
+        "required": [
+          "email",
+          "email_verified",
+          "email_verified_at"
+        ],
+        "title": "EmailVerificationStatusResponse",
+        "type": "object"
+      },
+      "EmailVerifyRequest": {
+        "description": "Request body for verifying an email address.",
+        "properties": {
+          "token": {
+            "description": "Verification token (from email link)",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "EmailVerifyRequest",
+        "type": "object"
+      },
+      "EmailVerifyResponse": {
+        "description": "Response after successful email verification.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "verified",
+          "message"
+        ],
+        "title": "EmailVerifyResponse",
+        "type": "object"
+      },
       "FieldType": {
         "enum": [
           "string",
@@ -586,6 +687,137 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InvitationCreateRequest": {
+        "description": "Request to invite a user to an organization.",
+        "properties": {
+          "email": {
+            "description": "Email address to invite",
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "default": "member",
+            "description": "Role to assign (member/admin/viewer)",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "InvitationCreateRequest",
+        "type": "object"
+      },
+      "InvitationListResponse": {
+        "description": "List of invitations.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "InvitationListResponse",
+        "type": "object"
+      },
+      "InvitationRespondRequest": {
+        "description": "Request to accept or decline an invitation.",
+        "properties": {
+          "accept": {
+            "description": "True to accept, False to decline",
+            "title": "Accept",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accept"
+        ],
+        "title": "InvitationRespondRequest",
+        "type": "object"
+      },
+      "InvitationRespondResponse": {
+        "description": "Response after responding to an invitation.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "message"
+        ],
+        "title": "InvitationRespondResponse",
+        "type": "object"
+      },
+      "InvitationResponse": {
+        "description": "Invitation details.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "invited_by_user_id": {
+            "title": "Invited By User Id",
+            "type": "string"
+          },
+          "invited_email": {
+            "title": "Invited Email",
+            "type": "string"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "invited_email",
+          "invited_by_user_id",
+          "role",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "InvitationResponse",
         "type": "object"
       },
       "JobCreate": {
@@ -858,6 +1090,106 @@
           "created_at"
         ],
         "title": "OrgResponse",
+        "type": "object"
+      },
+      "PasswordResetConfirmRequest": {
+        "description": "Request body to confirm a password reset with a new password.",
+        "properties": {
+          "new_password": {
+            "description": "New password (min 8 characters)",
+            "minLength": 8,
+            "title": "New Password",
+            "type": "string"
+          },
+          "token": {
+            "description": "Reset token (from email link)",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirmRequest",
+        "type": "object"
+      },
+      "PasswordResetConfirmResponse": {
+        "description": "Response after a successful password reset.",
+        "properties": {
+          "message": {
+            "default": "Password has been reset successfully.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "title": "PasswordResetConfirmResponse",
+        "type": "object"
+      },
+      "PasswordResetRequest": {
+        "description": "Request body to initiate a password reset.",
+        "properties": {
+          "email": {
+            "description": "Email address for the account to reset",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest",
+        "type": "object"
+      },
+      "PasswordResetResponse": {
+        "description": "Response after a password reset request.",
+        "properties": {
+          "message": {
+            "default": "If that email exists, a reset link has been sent.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "title": "PasswordResetResponse",
+        "type": "object"
+      },
+      "PendingInvitationResponse": {
+        "description": "Pending invitation details (returned to the invited user).",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "invited_email": {
+            "title": "Invited Email",
+            "type": "string"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "invited_email",
+          "role",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "PendingInvitationResponse",
         "type": "object"
       },
       "PlanInfoResponse": {
@@ -1222,6 +1554,38 @@
           "url"
         ],
         "title": "URLPreviewRequest",
+        "type": "object"
+      },
+      "UsageSummaryResponse": {
+        "description": "Current usage summary for the authenticated user.",
+        "properties": {
+          "ai_structuring": {
+            "default": 0,
+            "title": "Ai Structuring",
+            "type": "integer"
+          },
+          "api_requests": {
+            "default": 0,
+            "title": "Api Requests",
+            "type": "integer"
+          },
+          "jobs_created": {
+            "default": 0,
+            "title": "Jobs Created",
+            "type": "integer"
+          },
+          "pages_fetched": {
+            "default": 0,
+            "title": "Pages Fetched",
+            "type": "integer"
+          },
+          "scheduled_jobs": {
+            "default": 0,
+            "title": "Scheduled Jobs",
+            "type": "integer"
+          }
+        },
+        "title": "UsageSummaryResponse",
         "type": "object"
       },
       "UserProfileResponse": {
@@ -1986,7 +2350,7 @@
     },
     "/api/auth-profiles/{profile_id}/complete-login": {
       "post": {
-        "description": "Complete the login flow by storing the encrypted browser session.\n\n``storage_state`` is the Playwright storage state (cookies + localStorage)\ncaptured after the user has logged in. It is encrypted before storage.",
+        "description": "Complete the login flow by storing the encrypted browser session.\n\n``storage_state`` is the Playwright storage state (cookies + localStorage)\ncaptured after the user has logged in. It is encrypted before storage.\n\nH12: Use per-user encryption key derived from user_id.",
         "operationId": "complete_login_api_auth_profiles__profile_id__complete_login_post",
         "parameters": [
           {
@@ -2150,7 +2514,7 @@
             "name": "live",
             "required": false,
             "schema": {
-              "default": false,
+              "default": true,
               "title": "Live",
               "type": "boolean"
             }
@@ -2223,6 +2587,56 @@
           }
         },
         "summary": "Create Checkout",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/stub-return/{plan_tier}/{request_id}": {
+      "get": {
+        "description": "Render a confirmation page for the dev/stub PayPal approval flow.\n\nReached when the operator follows the URL returned by\n:func:`_stub_approval_url` (i.e., when PayPal credentials are not\nconfigured and the checkout endpoint fell back to a local stub URL).\nWithout this handler the URL would 404 in dev, which is a regression\nfrom the prior behaviour where ``example.com/paypal-stub/...`` was\na real (if unsolicited) third-party URL.\n\nThe handler is intentionally unauthenticated \u2014 it is dev-only and the\nstub flow does not commit any state. Any caller with the ``request_id``\ncan render the page, which is acceptable given the page contains only\nthe request id (already public-unsafe if treated as a secret) and the\nplan tier label.",
+        "operationId": "stub_return_api_billing_stub_return__plan_tier___request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_tier",
+            "required": true,
+            "schema": {
+              "title": "Plan Tier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stub Return",
         "tags": [
           "billing"
         ]
@@ -2500,6 +2914,7 @@
         ]
       },
       "post": {
+        "description": "Create a new scraping job.\n\nDelegates business logic to ``JobCreationService``. This route\nhandler is a thin HTTP adapter that converts domain results\nand exceptions to FastAPI responses.",
         "operationId": "create_job_api_jobs_post",
         "requestBody": {
           "content": {
@@ -2512,7 +2927,7 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {}
@@ -2670,7 +3085,7 @@
     },
     "/api/jobs/{job_id}/backfill-metadata": {
       "post": {
-        "description": "Explicitly backfill source metadata for manual-mode job results.",
+        "description": "Explicitly backfill source metadata for manual-mode job results.\n\nDelegates business logic to ``JobBackfillService``.",
         "operationId": "backfill_job_metadata_api_jobs__job_id__backfill_metadata_post",
         "parameters": [
           {
@@ -2711,6 +3126,7 @@
     },
     "/api/jobs/{job_id}/cancel": {
       "post": {
+        "description": "Cancel a running or pending job.\n\nDelegates business logic to ``JobCancellerService``.",
         "operationId": "cancel_job_api_jobs__job_id__cancel_post",
         "parameters": [
           {
@@ -2942,7 +3358,7 @@
     },
     "/api/jobs/{job_id}/reclean": {
       "post": {
-        "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.",
+        "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.\n\nDelegates business logic to ``JobReclenerService``.",
         "operationId": "reclean_job_api_jobs__job_id__reclean_post",
         "parameters": [
           {
@@ -3373,6 +3789,171 @@
         ]
       }
     },
+    "/api/saas/email-verification/send": {
+      "post": {
+        "description": "Create an email verification token for the authenticated user.\n\nIn the current MVP the token is logged rather than sent via SMTP.\nA real email-sending integration (SendGrid, SES, etc.) will replace\nthis when the project's email transport is wired in.\n\nRate-limited to 3 requests per 5 minutes per user to prevent abuse.",
+        "operationId": "send_email_verification_api_saas_email_verification_send_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationSendResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Send Email Verification",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/email-verification/status": {
+      "get": {
+        "description": "Return the email verification status for the authenticated user.",
+        "operationId": "email_verification_status_api_saas_email_verification_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Email Verification Status",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/email-verification/verify": {
+      "post": {
+        "description": "Verify an email address using a verification token.\n\nRate-limited to 5 attempts per 5 minutes per IP address to prevent\nbrute-force guessing of verification tokens.",
+        "operationId": "verify_email_api_saas_email_verification_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerifyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Email",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/invitations/pending": {
+      "get": {
+        "description": "Return pending invitations for the authenticated user's email.",
+        "operationId": "get_pending_invitations_api_saas_invitations_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PendingInvitationResponse"
+                  },
+                  "title": "Response Get Pending Invitations Api Saas Invitations Pending Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Pending Invitations",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/invitations/{invitation_id}/respond": {
+      "post": {
+        "description": "Accept or decline a team invitation.",
+        "operationId": "respond_to_invitation_api_saas_invitations__invitation_id__respond_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationRespondRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationRespondResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Respond To Invitation",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
     "/api/saas/me": {
       "get": {
         "description": "Return the current user's profile.",
@@ -3397,7 +3978,7 @@
     },
     "/api/saas/memberships/{membership_id}": {
       "delete": {
-        "description": "Remove a member from an organization (admin/operator only).\n\nThe caller must be a member of the target membership's organization\n(env-backed admins retain all-access). Without this check, a\npersistent WRITE key from Org A could remove any member from Org B\nby guessing/obtaining a ``membership_id``.",
+        "description": "Remove a member from an organization (admin/operator only).\n\nThe caller must be a member of the target membership's organization.\nEnv-backed admins and env-backed operators (no org scope) retain\nall-access, matching the ``can_access_scoped_resource`` bypass.\nWithout this check, a persistent WRITE key from Org A could remove\nany member from Org B by guessing/obtaining a ``membership_id``.",
         "operationId": "remove_member_api_saas_memberships__membership_id__delete",
         "parameters": [
           {
@@ -3494,6 +4075,40 @@
       }
     },
     "/api/saas/orgs/{org_id}": {
+      "delete": {
+        "description": "Permanently delete an organization and all its resources.\n\nCascading deletion removes all memberships, projects, API keys,\nand user_selections associated with the org. Only the org owner\nor an env-backed admin/operator may delete an org.\n\nThis is a destructive operation and cannot be undone.",
+        "operationId": "delete_organization_api_saas_orgs__org_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "title": "Org Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Organization",
+        "tags": [
+          "saas"
+        ]
+      },
       "get": {
         "description": "Get a single organization by ID.",
         "operationId": "get_organization_api_saas_orgs__org_id__get",
@@ -3531,6 +4146,116 @@
           }
         },
         "summary": "Get Organization",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/orgs/{org_id}/invitations": {
+      "get": {
+        "description": "List invitations for an organization.",
+        "operationId": "list_org_invitations_api_saas_orgs__org_id__invitations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "title": "Org Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Org Invitations",
+        "tags": [
+          "saas"
+        ]
+      },
+      "post": {
+        "description": "Create a team invitation for an organization.\n\nRequires admin/operator role in the org.\nRate-limited to 10 invitations per 5 minutes per user to prevent spam.",
+        "operationId": "create_invitation_api_saas_orgs__org_id__invitations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "title": "Org Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Invitation",
         "tags": [
           "saas"
         ]
@@ -3626,6 +4351,90 @@
         ]
       }
     },
+    "/api/saas/password-reset/request": {
+      "post": {
+        "description": "Request a password reset token for the given email.\n\nAlways returns 200 to prevent email enumeration. If the email exists,\na reset token is created and logged.\n\nRate-limited to 5 requests per 5 minutes per IP address.",
+        "operationId": "request_password_reset_api_saas_password_reset_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Password Reset",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/password-reset/reset": {
+      "post": {
+        "description": "Confirm a password reset using the token and set a new password.\n\nRate-limited to 10 attempts per 5 minutes per IP address to prevent\nbrute-force guessing of reset tokens.",
+        "operationId": "confirm_password_reset_api_saas_password_reset_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetConfirmResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Password Reset",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
     "/api/saas/plan": {
       "get": {
         "description": "Return the current user's plan and limits.\n\nLooks up the caller's tier via the billing service (falling back to\n``free`` when billing is unconfigured) and derives the usage limits\nfrom the same ``app.plan_enforcer`` source of truth that enforces\nthem at job-creation time, so the informational view and the\nenforcement gate can never drift.",
@@ -3650,7 +4459,7 @@
     },
     "/api/saas/projects": {
       "post": {
-        "description": "Create a new project within an organization.",
+        "description": "Create a new project within an organization.\n\nRequires AUP acceptance.",
         "operationId": "create_project_api_saas_projects_post",
         "requestBody": {
           "content": {
@@ -3691,6 +4500,40 @@
       }
     },
     "/api/saas/projects/{project_id}": {
+      "delete": {
+        "description": "Permanently delete a project and all its API keys.\n\nCascading deletion removes all API keys associated with the project.\nOnly project members with operator-level access or env-backed\nadmins/operators may delete a project.",
+        "operationId": "delete_project_api_saas_projects__project_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Project",
+        "tags": [
+          "saas"
+        ]
+      },
       "get": {
         "description": "Get a single project by ID.",
         "operationId": "get_project_api_saas_projects__project_id__get",
@@ -3776,7 +4619,7 @@
         ]
       },
       "post": {
-        "description": "Create a new API key for a project.\n\nThe raw key is returned **only once** in this response. It is hashed\nbefore storage and cannot be retrieved later.",
+        "description": "Create a new API key for a project.\n\nThe raw key is returned **only once** in this response. It is hashed\nbefore storage and cannot be retrieved later.\n\nRequires AUP acceptance.",
         "operationId": "create_api_key_api_saas_projects__project_id__keys_post",
         "parameters": [
           {
@@ -3874,7 +4717,7 @@
     },
     "/api/saas/signup": {
       "post": {
-        "description": "Create a new user with a default organization and project.",
+        "description": "Create a new user with a default organization and project.\n\nRate-limited to 3 signups per 5 minutes per IP address to prevent\naccount creation spam.",
         "operationId": "signup_api_saas_signup_post",
         "requestBody": {
           "content": {
@@ -3909,6 +4752,28 @@
           }
         },
         "summary": "Signup",
+        "tags": [
+          "saas"
+        ]
+      }
+    },
+    "/api/saas/usage": {
+      "get": {
+        "description": "Return current usage counters for the authenticated user.\n\nUsed by the frontend billing page to show how much of the plan\nquota has been consumed (e.g. \"3 of 10 jobs used this month\").",
+        "operationId": "get_usage_summary_api_saas_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Usage Summary",
         "tags": [
           "saas"
         ]
@@ -3979,7 +4844,7 @@
         ]
       },
       "post": {
-        "description": "Create a new scheduled (recurring) scraping job.",
+        "description": "Create a new scheduled (recurring) scraping job.\n\nRequires AUP acceptance.",
         "operationId": "create_scheduled_job_api_scheduled_post",
         "parameters": [
           {
@@ -4201,7 +5066,7 @@
     },
     "/api/scheduled/{job_id}/changes": {
       "get": {
-        "description": "Report the most recent change signals observed for a scheduled job.\n\nReal, observable signal: the job record carries a ``last_run_status``,\n``last_run_records_count``, ``last_run_at`` and a rolling\n``recent_run_summaries`` list (capped at 10). We compare the two\nmost recent summaries and report a small set of derived facts:\n\n* ``record_count_delta`` \u2014 difference in extracted records between\n  the most recent and previous run (positive means growth).\n* ``status_changed`` \u2014 whether the run-status enum flipped.\n* ``frequency_met`` \u2014 whether the wall-clock gap between the two\n  runs is at least one ``frequency`` interval (best-effort).\n* ``last_records_count`` / ``previous_records_count`` \u2014 convenience\n  fields for the UI.\n\nThis is intentionally a thin, deterministic diff over what the\nscheduler already records. A full record-level diff engine is a\nseparate milestone (see ``docs/ROADMAP.md``).",
+        "description": "Report the most recent change signals observed for a scheduled job.\n\nReal, observable signal: the job record carries a ``last_run_status``,\n``last_run_records_count``, ``last_run_at`` and a rolling\n``recent_run_summaries`` list (capped at 10). We compare the two\nmost recent summaries and report a small set of derived facts:\n\n* ``record_count_delta`` \u2014 difference in extracted records between\n  the most recent and previous run (positive means growth).\n* ``status_changed`` \u2014 whether the run-status enum flipped.\n* ``frequency_met`` \u2014 whether the wall-clock gap between the two\n  runs is at least one ``frequency`` interval (best-effort).\n* ``last_records_count`` / ``previous_records_count`` \u2014 convenience\n  fields for the UI.\n\nThis is intentionally a thin, deterministic diff over what the\nscheduler already records. A full record-level diff engine is a\nseparate milestone tracked in `AGENTS.md` / `artifacts/audit/ISSUE_LEDGER.md`.",
         "operationId": "detect_changes_api_scheduled__job_id__changes_get",
         "parameters": [
           {
@@ -4978,6 +5843,102 @@
           }
         },
         "summary": "Rate Limit Stats",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/retention/config": {
+      "get": {
+        "description": "Return the current data retention policy configuration.",
+        "operationId": "get_retention_config_endpoint_api_system_retention_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Retention Config Endpoint Api System Retention Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Retention Config Endpoint",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/retention/enforce": {
+      "post": {
+        "description": "Enforce the data retention policy, purging data older than the configured TTL.\n\nBy default this runs as a dry-run (reports only). Pass ``?dry_run=false``\nto actually delete expired data.\n\nReturns:\n    - ``jobs_purged``: completed/terminal jobs deleted\n    - ``recycle_purged``: recycle-bin items deleted\n    - ``jobs_skipped``: completed jobs within retention window\n    - ``recycle_skipped``: recycle items within retention window\n    - ``idempotency_keys_purged``: stale idempotency keys deleted\n    - ``config``: current retention policy in days",
+        "operationId": "enforce_data_retention_api_system_retention_enforce_post",
+        "parameters": [
+          {
+            "description": "When true, report what would be deleted without deleting.",
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "When true, report what would be deleted without deleting.",
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Enforce Data Retention Api System Retention Enforce Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enforce Data Retention",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/retention/health": {
+      "get": {
+        "description": "Return health status of data retention enforcement.",
+        "operationId": "get_retention_health_endpoint_api_system_retention_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Retention Health Endpoint Api System Retention Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Retention Health Endpoint",
         "tags": [
           "system"
         ]

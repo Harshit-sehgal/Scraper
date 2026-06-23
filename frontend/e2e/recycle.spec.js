@@ -27,11 +27,12 @@ test.describe("Recycle bin view", () => {
     await expect(page.locator("#empty-recycle-state")).toBeVisible();
   });
 
-  test("shows recycle bin header", async ({ page }) => {
+  test("shows recycle bin header (table)", async ({ page }) => {
     await page.goto("/app/");
     await dismissApiKeyOverlay(page);
     await page.locator("#nav-recycle").click();
-    await expect(page.locator(".recycle-list-head")).toBeVisible();
+    // The table header should be visible
+    await expect(page.locator(".table-recycle")).toBeVisible();
   });
 
   test("recycle list container is present", async ({ page }) => {

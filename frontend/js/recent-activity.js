@@ -31,45 +31,59 @@ function _setText(id, value) {
 function _render(events) {
   const container = document.getElementById("recent-activity-list");
   if (!container) return;
-  container.innerHTML = "";
   if (!events || events.length === 0) {
     container.innerHTML = '<p class="subtle">No recent activity.</p>';
     return;
   }
-  const ol = document.createElement("ol");
-  ol.className = "activity-list";
+
+  let html = `
+    <table class="table-dash-activity">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Target</th>
+          <th>Status</th>
+          <th class="text-right">Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
   for (const ev of events) {
-    const li = document.createElement("li");
-    li.className = "activity-item";
-
-    const time = document.createElement("span");
-    time.className = "activity-time";
     const ts = ev.timestamp || ev.ts;
-    time.textContent = ts ? new Date(ts).toLocaleString() : "—";
-    li.appendChild(time);
-
-    const cat = document.createElement("span");
-    cat.className = `activity-cat activity-cat-${String(ev.category || "system").toLowerCase()}`;
-    cat.textContent = String(ev.category || "—");
-    li.appendChild(cat);
-
-    const action = document.createElement("span");
-    action.className = "activity-action";
-    const detail = ev.detail || ev.message || (ev.payload ? JSON.stringify(ev.payload) : ev.action) || "";
+    const tsStr = ts ? new Date(ts).toLocaleTimeString() : "—";
     const subject = ev.subject || ev.user_id || ev.actor || "—";
-    action.textContent = `${subject} ${detail}`.trim();
-    li.appendChild(action);
+    const detail = ev.detail || ev.message || (ev.payload ? JSON.stringify(ev.payload) : ev.action) || "—";
+    const outcome = ev.outcome || "—";
 
-    if (ev.outcome) {
-      const outcome = document.createElement("span");
-      outcome.className = `activity-outcome activity-outcome-${String(ev.outcome).toLowerCase()}`;
-      outcome.textContent = String(ev.outcome);
-      li.appendChild(outcome);
-    }
+    // Map outcome to badge class
+    const badgeClass =
+      outcome === "success" || outcome === "ok"
+        ? "badge completed"
+        : outcome === "failed" || outcome === "error"
+          ? "badge failed"
+          : "badge pending";
+    const badgeLabel =
+      outcome === "success" || outcome === "ok"
+        ? "Success"
+        : outcome === "failed" || outcome === "error"
+          ? "Failed"
+          : outcome.charAt(0).toUpperCase() + outcome.slice(1);
+    const rowClass = outcome === "failed" || outcome === "error" ? "row-failed" : "";
 
-    ol.appendChild(li);
+    html += `
+        <tr class="${rowClass}">
+          <td class="td-activity-id">${esc(String(subject).slice(0, 10))}</td>
+          <td class="td-activity-target">${esc(String(detail).slice(0, 60))}</td>
+          <td><span class="${badgeClass}">${esc(badgeLabel)}</span></td>
+          <td class="td-activity-ts">${esc(tsStr)}</td>
+        </tr>`;
   }
-  container.appendChild(ol);
+
+  html += `
+      </tbody>
+    </table>`;
+
+  container.innerHTML = html;
 }
 
 function _renderPermissionDenied() {

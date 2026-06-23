@@ -259,21 +259,21 @@ DEFAULT_CSP_REPORT_ONLY_POLICY = (
 )
 
 
-async def csp_report_only_middleware(request: Request, call_next):
-    """Attach a report-only Content-Security-Policy header to every response.
+async def csp_middleware(request: Request, call_next):
+    """Attach a Content-Security-Policy header to every response.
 
-    The header is *report-only* — it never blocks anything — but the browser
-    will POST a violation report to ``/api/system/csp-violations`` when a
-    directive is violated. The endpoint logs the violation and increments
-    ``dataforge_csp_violations_total{directive=...}``.
+    When ``CSP_REPORT_ONLY`` is True (the default), the header is
+    ``Content-Security-Policy-Report-Only`` — violations are logged but
+    never blocked. When False, the header is ``Content-Security-Policy``
+    and the browser enforces the policy. Set to False in production only
+    after confirming your application works with the policy in report-only
+    mode. Set ``CSP_REPORT_ONLY=false`` in ``.env.production`` to enforce.
     """
-    if not getattr(settings, "CSP_REPORT_ONLY", True):
-        return await call_next(request)
-
+    csp_mode = getattr(settings, "CSP_REPORT_ONLY", True)
     response = await call_next(request)
     with suppress(AttributeError, TypeError, ValueError):
         response.headers.setdefault(
-            "Content-Security-Policy-Report-Only",
+            "Content-Security-Policy" if not csp_mode else "Content-Security-Policy-Report-Only",
             DEFAULT_CSP_REPORT_ONLY_POLICY,
         )
     return response

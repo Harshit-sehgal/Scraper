@@ -162,7 +162,9 @@ class TestJobReclenerService:
     def _make_reclean_job() -> Job:
         job = _make_job("j1", JobStatus.COMPLETED)
         job.results = [{"source_url": "https://example.com", "title": "test"}]
-        job.schema_fields = [{"name": "title", "field_type": "string", "required": True}]
+        from app.models import FieldType, SchemaField
+
+        job.schema_fields = [SchemaField(name="title", field_type=FieldType.STRING, description="", required=True)]
         return job
 
     def test_reclean_rejects_running_job(self, anyio_backend) -> None:

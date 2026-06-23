@@ -1,11 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head><title>Load more demo</title></head>
+  <head><title>Load more demo — listings</title></head>
   <body>
-    <main>
-      <article class="card"><h2>Item 1</h2><p>First result</p></article>
-      <article class="card"><h2>Item 2</h2><p>Second result</p></article>
-      <button id="load-more" class="load-more">Load more</button>
-    </main>
+    <h1>Results</h1>
+    <div class="results-grid">
+      <div class="result-item" data-id="1">
+        <h2 class="title">Product Alpha</h2>
+        <p class="description">High-quality alpha product</p>
+        <span class="price">$29.99</span>
+      </div>
+      <div class="result-item" data-id="2">
+        <h2 class="title">Product Beta</h2>
+        <p class="description">Reliable beta version</p>
+        <span class="price">$49.99</span>
+      </div>
+      <div class="result-item" data-id="3">
+        <h2 class="title">Product Gamma</h2>
+        <p class="description">Premium gamma tier</p>
+        <span class="price">$99.99</span>
+      </div>
+      <div class="result-item" data-id="4">
+        <h2 class="title">Product Delta</h2>
+        <p class="description">Budget-friendly option</p>
+        <span class="price">$19.99</span>
+      </div>
+      <div class="result-item" data-id="5">
+        <h2 class="title">Product Epsilon</h2>
+        <p class="description">Enterprise-grade solution</p>
+        <span class="price">$199.99</span>
+      </div>
+    </div>
+    <button id="load-more" class="load-more" data-page="1" data-total="20">Load more</button>
   </body>
 </html>

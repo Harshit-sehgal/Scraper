@@ -71,6 +71,26 @@ def test_session_rejects_invalid_key(client, monkeypatch) -> None:
     assert r.status_code == 403
 
 
+def test_session_env_key_fallback_when_persistent_key_store_missing(client, monkeypatch) -> None:
+    """Env-backed API keys still work when persistent API-key storage is unavailable."""
+    import sqlite3
+
+    from app.saas.service import ApiKeyService
+
+    _set_api_key(monkeypatch, key="test-api-key-123")
+
+    def raise_missing_api_keys_table(self, raw_key):
+        message = "no such table: api_keys"
+        raise sqlite3.OperationalError(message)
+
+    monkeypatch.setattr(ApiKeyService, "authenticate", raise_missing_api_keys_table)
+
+    r = client.post("/api/session", headers={"X-API-Key": "test-api-key-123"})
+
+    assert r.status_code == 200
+    assert r.json()["role"] == "user"
+
+
 def test_session_me_unauthenticated(client) -> None:
     """GET /api/session/me without a session returns unauthenticated."""
     r = client.get("/api/session/me")

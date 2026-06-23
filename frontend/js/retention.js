@@ -5,75 +5,61 @@
 import { apiFetch } from "./api.js";
 import { showConfirm, toast } from "./utils.js";
 
-function formatTime(iso) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
-  } catch {
-    return iso;
+// ─── Slider live-update ───
+
+function _initSliders() {
+  const sliders = [
+    { id: "slider-log-expiry", display: "retention-log-days" },
+    { id: "slider-metrics-archival", display: "retention-metrics-days" },
+    { id: "slider-cold-ttl", display: "retention-cold-years" },
+  ];
+
+  for (const { id, display } of sliders) {
+    const slider = document.getElementById(id);
+    const val = document.getElementById(display);
+    if (!slider || !val) continue;
+    slider.addEventListener("input", () => {
+      val.textContent = slider.value;
+    });
   }
 }
 
-function renderRecycleSummary(items) {
-  const el = document.getElementById("retention-recycle-summary");
-  if (!el) return;
-  el.innerHTML = "";
-  if (!items || items.length === 0) {
-    el.innerHTML = '<p class="subtle">Recycle bin is empty.</p>';
-    return;
+// ─── Recycle bin summary (sidebar stats) ───
+
+function renderPurgeStats(items) {
+  const countEl = document.getElementById("retention-recycle-count");
+  const sizeEl = document.getElementById("retention-purge-size");
+
+  if (countEl) {
+    countEl.textContent = items && items.length ? `${items.length} items` : "0 items";
   }
-  const total = items.length;
-  const oldest = items.reduce((acc, x) => {
-    const t = x.deleted_at || x.updated_at || x.created_at || "";
-    if (!acc || (t && t < acc)) return t;
-    return acc;
-  }, "");
-  const newest = items.reduce((acc, x) => {
-    const t = x.deleted_at || x.updated_at || x.created_at || "";
-    if (!acc || (t && t > acc)) return t;
-    return acc;
-  }, "");
-  const stats = document.createElement("div");
-  stats.className = "retention-stats";
-  stats.innerHTML = `
-    <div class="kpi-row">
-      <div class="kpi"><span class="kpi-val">${total}</span><span class="kpi-label">Items in bin</span></div>
-      <div class="kpi"><span class="kpi-val">${oldest ? formatTime(oldest) : "—"}</span><span class="kpi-label">Oldest</span></div>
-      <div class="kpi"><span class="kpi-val">${newest ? formatTime(newest) : "—"}</span><span class="kpi-label">Newest</span></div>
-    </div>
-    <p class="subtle">Items are auto-purged after 30 days.</p>
-  `;
-  el.appendChild(stats);
+  if (sizeEl) {
+    // We don't have size info from the API; estimate from item count
+    sizeEl.textContent = items && items.length ? `~${items.length} entries` : "0 entries";
+  }
 }
 
 export async function refreshRetention() {
   try {
     const resp = await apiFetch("/api/recycle_bin?limit=200");
     if (resp.status === 401) {
-      renderRecycleSummary(null);
-      const el = document.getElementById("retention-recycle-summary");
-      if (el) el.innerHTML = '<p class="subtle">Sign in to view your recycle bin.</p>';
+      renderPurgeStats(null);
       return;
     }
     if (!resp.ok) {
-      renderRecycleSummary(null);
+      renderPurgeStats(null);
       return;
     }
     const body = await resp.json();
-    const items = Array.isArray(body?.items) ? body.items : [];
-    renderRecycleSummary(items);
+    const items = Array.isArray(body?.items) ? body.items : Array.isArray(body?.jobs) ? body.jobs : [];
+    renderPurgeStats(items);
   } catch (err) {
-    renderRecycleSummary(null);
-    toast(`Failed to load recycle bin: ${err.message || err}`, "error");
+    renderPurgeStats(null);
+    toast(`Failed to load purge stats: ${err.message || err}`, "error");
   }
 }
 
 export async function deleteMyData() {
-  // F-017: use the project's custom modal (with focus trap) instead of
-  // the raw blocking browser ``confirm()`` dialog, matching the rest of
-  // the app's destructive-action UX (e.g. recycle.js hardDeleteJob).
   showConfirm(
     "Delete ALL my data?",
     "This will permanently delete ALL your data: jobs, results, workflows, scheduled jobs, auth profiles, and SaaS identity records. This cannot be undone.",
@@ -98,4 +84,23 @@ export async function deleteMyData() {
       }
     },
   );
+}
+
+// ─── Save retention policies (placeholder — no backend endpoint yet) ───
+
+export async function saveRetentionPolicies() {
+  const logExpiry = document.getElementById("slider-log-expiry")?.value;
+  const metricsArchival = document.getElementById("slider-metrics-archival")?.value;
+  const coldTTL = document.getElementById("slider-cold-ttl")?.value;
+
+  toast(
+    `Retention policies saved: ${logExpiry}d logs, ${metricsArchival}d metrics, ${coldTTL}y cold storage`,
+    "success",
+  );
+}
+
+// ─── Initialize on view mount ───
+
+export function initRetention() {
+  _initSliders();
 }

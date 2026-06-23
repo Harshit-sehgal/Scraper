@@ -88,7 +88,7 @@ function _renderJobs(jobs) {
           }
         }
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Op:", e));
   }
 }
 

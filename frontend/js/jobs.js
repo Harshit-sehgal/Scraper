@@ -126,22 +126,27 @@ export async function refreshJobs() {
     setJobsUpdatedAt(Date.now());
     updateJobsLastUpdatedLabel();
     // Update sidebar activity feed with the latest jobs
-    import("./sidebar-activity.js").then((m) => m.updateSidebarActivity(jobsCache)).catch(() => {});
+    import("./sidebar-activity.js")
+      .then((m) => m.updateSidebarActivity(jobsCache))
+      .catch((e) => console.warn("Op:", e));
   } catch (_e) {
     setEngineStatus("Offline", true);
     updateJobsLastUpdatedLabel("Unable to refresh");
     // If cache is empty, show empty state on error
     if (!jobsCache.length) {
-      const list = document.getElementById("jobs-list");
-      const empty = document.getElementById("empty-state");
-      if (list && empty) {
-        list.innerHTML = "";
-        list.appendChild(empty);
-        empty.classList.remove("hidden");
-        const titleEl = empty.querySelector(".empty-state-title") || empty.querySelector("h3");
-        const descEl = empty.querySelector(".empty-state-desc") || empty.querySelector("p");
-        if (titleEl) titleEl.textContent = "Could not load jobs";
-        if (descEl) descEl.textContent = "Could not load jobs. Check whether the backend is running.";
+      const tbody = document.getElementById("jobs-list");
+      const emptyRow = document.getElementById("empty-state-row");
+      if (tbody && emptyRow) {
+        tbody.innerHTML = "";
+        tbody.appendChild(emptyRow);
+        const empty = emptyRow.querySelector("#empty-state");
+        if (empty) {
+          empty.classList.remove("hidden");
+          const titleEl = empty.querySelector(".empty-state-title") || empty.querySelector("h3");
+          const descEl = empty.querySelector(".empty-state-desc") || empty.querySelector("p");
+          if (titleEl) titleEl.textContent = "Could not load jobs";
+          if (descEl) descEl.textContent = "Could not load jobs. Check whether the backend is running.";
+        }
       }
     }
   }
@@ -150,28 +155,26 @@ export async function refreshJobs() {
 // ─── Skeleton Loading ───
 
 function renderSkeleton() {
-  const list = document.getElementById("jobs-list");
-  if (!list) return;
+  const tbody = document.getElementById("jobs-list");
+  if (!tbody) return;
 
-  const rows = Array.from(
-    { length: 4 },
-    () => `
-        <div class="skeleton">
-            <div class="skeleton-grid">
-                <div class="skeleton-bar wide"></div>
-                <div class="skeleton-bar narrow"></div>
-                <div class="skeleton-bar med"></div>
-                <div class="skeleton-bar narrow"></div>
-                <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
-                    <div class="skeleton-bar" style="width:40px; height:22px; border-radius:999px;"></div>
-                    <div class="skeleton-bar" style="width:28px; height:22px; border-radius:999px;"></div>
+  const skeletonRow = `
+        <tr class="skeleton-row">
+            <td colspan="8">
+                <div class="skeleton-grid">
+                    <div class="skeleton-bar wide"></div>
+                    <div class="skeleton-bar narrow"></div>
+                    <div class="skeleton-bar med"></div>
+                    <div class="skeleton-bar narrow"></div>
+                    <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
+                        <div class="skeleton-bar" style="width:40px; height:22px; border-radius:999px;"></div>
+                        <div class="skeleton-bar" style="width:28px; height:22px; border-radius:999px;"></div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    `,
-  ).join("");
-
-  list.innerHTML = rows;
+            </td>
+        </tr>
+    `;
+  tbody.innerHTML = Array.from({ length: 4 }, () => skeletonRow).join("");
 }
 
 export async function refreshJobsManual() {
@@ -377,33 +380,41 @@ export function updateKPIs(jobs) {
 }
 
 export function renderJobs(jobs) {
-  const list = document.getElementById("jobs-list");
-  const empty = document.getElementById("empty-state");
-  if (!list) return;
+  const tbody = document.getElementById("jobs-list");
+  const emptyRow = document.getElementById("empty-state-row");
+  const rangeEl = document.getElementById("jobs-pagination-range");
+  const prevBtn = document.querySelector('[data-action="jobs-prev-page"]');
+  const nextBtn = document.querySelector('[data-action="jobs-next-page"]');
+  if (!tbody) return;
 
   if (!jobs.length) {
-    list.innerHTML = "";
-    if (empty) {
-      const titleEl = empty.querySelector(".empty-state-title") || empty.querySelector("h3");
-      const descEl = empty.querySelector(".empty-state-desc") || empty.querySelector("p");
+    tbody.innerHTML = "";
+    if (emptyRow) {
+      const empty = emptyRow.querySelector("#empty-state");
+      const titleEl = empty ? empty.querySelector(".empty-state-title") || empty.querySelector("h3") : null;
+      const descEl = empty ? empty.querySelector(".empty-state-desc") || empty.querySelector("p") : null;
       const hasJobs = jobsCache.length > 0;
       if (titleEl) titleEl.textContent = hasJobs ? "No jobs match these filters" : "No jobs yet";
       if (descEl) {
         descEl.textContent = hasJobs ? "Adjust the status filter or search query." : "Create your first scrape job.";
       }
-      list.appendChild(empty);
-      empty.classList.remove("hidden");
+      tbody.appendChild(emptyRow);
+      if (empty) empty.classList.remove("hidden");
     }
+    if (rangeEl) rangeEl.textContent = "Showing 0 jobs";
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
     return;
   }
 
-  list.innerHTML = jobs
+  tbody.innerHTML = jobs
     .map((j) => {
       const isActive = ["pending", "discovering", "running"].includes(j.status);
       const hasProgress = j.progress_total > 0;
       const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
       const statusGroup = getJobStatusGroup(j.status);
       const issueCount = getIssueCount(j);
+      const urlCount = Array.isArray(j.urls) ? j.urls.length : 0;
 
       const highlightClass =
         statusGroup === "completed"
@@ -415,10 +426,11 @@ export function renderJobs(jobs) {
               : "";
 
       return `
-            <div class="job-row${highlightClass ? " " + highlightClass : ""}" data-id="${attrStr(j.id)}">
-                <div class="job-name-col">
-                    <div class="job-name">
-                        ${esc(j.name)}
+            <tr class="${highlightClass}" data-id="${attrStr(j.id)}">
+                <td class="col-job-id" data-label="Job ID">${esc((j.id || "").slice(0, 8))}</td>
+                <td class="col-job-name" data-label="Job">
+                    <div class="col-job-name-row">
+                        <span title="${esc(j.name)}">${esc(j.name)}</span>
                         <button class="btn-copy-id" data-action="copy-job-id" data-id="${attrStr(j.id)}" title="Copy job ID" aria-label="Copy job ID"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
                         <span class="mode-tag">${j.mode === "auto" ? "auto" : "manual"}</span>
                     </div>
@@ -427,31 +439,43 @@ export function renderJobs(jobs) {
                         ? `
                         <div class="job-progress-wrap">
                             <div class="job-progress-bar" style="width: ${pct}%"></div>
-                            <span class="job-progress-text">${pct}%</span>
                         </div>
+                        <span class="job-progress-text">${pct}%</span>
                     `
                         : ""
                     }
-                </div>
-                <div class="job-created">${esc(formatCreatedAt(j.created_at || j.created))}</div>
-                <div class="job-urls">${Array.isArray(j.urls) ? j.urls.length : 0} URL${(Array.isArray(j.urls) ? j.urls.length : 0) !== 1 ? "s" : ""}</div>
-                <div><span class="badge ${attrStr(statusGroup)}">${esc(formatJobStatus(j.status))}</span></div>
-                <div class="job-records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "0"}</div>
-                <div class="job-issues">${issueCount ? `${issueCount}` : "0"}</div>
-                <div class="job-actions">
+                </td>
+                <td class="col-job-created" data-label="Created">${esc(formatCreatedAt(j.created_at || j.created))}</td>
+                <td class="col-job-urls" data-label="URLs">${urlCount}</td>
+                <td class="col-job-status" data-label="Status"><span class="badge ${attrStr(statusGroup)}">${esc(formatJobStatus(j.status))}</span></td>
+                <td class="col-job-records" data-label="Records">${j.total_records > 0 ? `${esc(j.filtered_records)}` : "0"}</td>
+                <td class="col-job-issues" data-label="Issues">${issueCount ? `${issueCount}` : "0"}</td>
+                <td class="col-job-actions" data-label="Actions">
                     ${["completed", "degraded", "empty_result"].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${attrStr(j.id)}">View</button>` : ""}
                     ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${attrStr(j.id)}">Cancel</button>` : ""}
                     ${"failed" === j.status || "error" === j.status ? renderFailureBadge(j) : ""}
-                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}"><span data-icon="x" data-size="14"></span></button>
-                </div>
-            </div>
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${attrStr(j.id)}" aria-label="Delete job"><span data-icon="x" data-size="14"></span></button>
+                </td>
+            </tr>
         `;
     })
     .join("");
 
+  // Pagination footer counters
+  if (rangeEl) {
+    const total = jobs.length;
+    const totalSource = jobsCache.length;
+    rangeEl.textContent =
+      totalSource === total
+        ? `Showing ${total} job${total === 1 ? "" : "s"}`
+        : `Showing ${total} of ${totalSource} job${totalSource === 1 ? "" : "s"}`;
+  }
+  if (prevBtn) prevBtn.disabled = false; // Filtered view is unbounded — server-side fetch is next
+  if (nextBtn) nextBtn.disabled = jobs.length >= jobsCache.length;
+
   // Attach failure explanation tooltips to failed job rows
   jobs.forEach((j) => {
-    const row = list.querySelector(`[data-id="${CSS.escape(j.id)}"]`);
+    const row = tbody.querySelector(`[data-id="${CSS.escape(j.id)}"]`);
     if (row) attachFailureExplanationToJobRow(row, j);
   });
 
@@ -460,7 +484,7 @@ export function renderJobs(jobs) {
 
   // Apply status-change flash animation if a job just transitioned
   if (_flashJobId) {
-    const flashRow = list.querySelector(`[data-id="${CSS.escape(_flashJobId)}"]`);
+    const flashRow = tbody.querySelector(`[data-id="${CSS.escape(_flashJobId)}"]`);
     if (flashRow) {
       flashRow.classList.add("status-change");
       flashRow.addEventListener(

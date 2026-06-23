@@ -2485,7 +2485,7 @@ Replaced the warm cream/sage theme + decorative glows + emoji chrome
 with a neutral, Notion-style palette and monochrome SVG line icons.
 Files touched (frontend only, no backend changes):
 `frontend/styles.css`, `frontend/index.html`, `frontend/favicon.svg`,
-`frontend/js/analyzer.js`, `frontend/js/error-boundary.js`,
+`frontend/js/analyzer.js`,
 `frontend/js/form.js`, `frontend/js/jobs.js`, `frontend/app.js`.
 
 Design tokens flipped to neutral: light `--bg-main #fff` /
@@ -2568,3 +2568,195 @@ Polished the user interface to remove unpolished "AI-generated" dashboard aesthe
 
 - **Removed AI Tool Config & Logs** — Deleted obsolete chat history, tag caches, and metadata folders left behind by other AI tools (`.aider.chat.history.md`, `.aider.input.history`, `.aider.tags.cache.v4`, `.claude`, `.codex`, `.kilo`, and `.commandcode`).
 - **Cleaned Validation Runs** — Purged 248 stale directories from `artifacts/validation/runs/` to free disk space and clean the workspace. All local tests run successfully after cleanup.
+
+## Revert Broken WorkflowStepType Enum & Complete Codebase Health Checks — 2026-06-23
+
+Fixed a compilation failure and test blockers caused by an incomplete previous change to `WorkflowStepType` which introduced undefined `ReprEnum` and custom `__new__` behavior in `backend/app/models.py`. Swapped the base class back to `StrEnum` and deleted the invalid `__new__` method, successfully resolving compilation errors.
+
+### Files modified
+
+- `backend/app/models.py` — Reverted `WorkflowStepType` enum back to inheriting from standard `StrEnum` and removed custom `__new__` method.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick verification tests passed. |
+| `python3 scripts/validate_local.py --frontend` | 0 | PASS; 9/9 frontend linting and testing checks passed. |
+| `python3 scripts/validate_local.py --security` | 0 | PASS; 8/8 security scanning and dependency checks passed. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; all 23/23 full validation tests passed. |
+| `python3 scripts/migration_rollback_test.py` | 0 | PASS; migration rollback drill successfully executed on SQLite with all data surviving. |
+| `DATAFORGE_HOST=127.0.0.1 DATAFORGE_PORT=8090 bash scripts/start_server.sh` | 0 | PASS; started local FastAPI web platform on `http://127.0.0.1:8090/app/`. |
+
+## Stitch-Inspired Frontend Alignment and E2E Pass — 2026-06-23
+
+Aligned the current frontend with the reference files under
+`/home/harshit/Downloads/stitch_extract/stitch/`, using the industrial
+DataForge reference as the target: fixed left sidebar, flat steel-blue
+actions, off-white workspace, thin borders, reduced radii, dashboard-first
+app entry, and local SVG icon hydration instead of blocked Material Symbols
+ligature text. Also fixed the nginx-served landing page asset paths so `/`
+loads the styled landing page instead of unstyled HTML.
+
+### Files modified
+
+- `frontend/index.html`, `frontend/styles.css`, `frontend/styles/layout.css`,
+  `frontend/styles/views.css`, `frontend/app.js`
+- `frontend/js/icons.js`, `frontend/js/icons.test.js`,
+  `frontend/js/views.js`, `frontend/js/views.test.js`
+- `frontend/landing/index.html`, `frontend/landing/style.css`,
+  `frontend/landing/app.js`
+- `frontend/e2e/smoke.spec.js`, `frontend/e2e/form.spec.js`
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before frontend edits: PASS; 12/12 quick checks. |
+| `npm run lint:eslint` | 0 | PASS; eslint clean after icon/layout changes. |
+| `npm run lint:css` | 0 | PASS; stylelint clean after layout/view CSS changes. |
+| `npm run lint:js` | 0 | PASS; Prettier check clean after HTML/JS/CSS updates. |
+| `npm run test -- frontend/js/icons.test.js` | 0 | PASS; 1/1 icon hydration test passed. |
+| `npm run test` | 1 | First run exposed stale expectation: `frontend/js/views.test.js` still expected Jobs as default view. |
+| `npm run test` | 0 | PASS after updating default-view expectation; 37 files, 458 tests. |
+| `DATAFORGE_BASE_URL=http://127.0.0.1:8001 DATAFORGE_OPERATOR_API_KEY=operator-key npm run test:e2e` | 1 | First e2e run exposed stale form setup: 12 form tests timed out clicking hidden `#btn-create-new` after dashboard-first entry. |
+| `DATAFORGE_BASE_URL=http://127.0.0.1:8001 DATAFORGE_OPERATOR_API_KEY=operator-key npm run test:e2e` | 1 | Second e2e run exposed race in form setup: 37 passed, 1 skipped, 1 failed while counting `.field-row` before `dataforge:form-ready`. |
+| `DATAFORGE_RATE_LIMIT_GLOBAL= DATAFORGE_RATE_LIMIT_PER_IP= DATAFORGE_RATE_LIMIT_PER_IP_ENABLED=false DATAFORGE_RATE_LIMIT_JOB_CREATE= DATAFORGE_RATE_LIMIT_DISCOVER= PYTHONPATH=backend python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001` | 0 | Started controlled localhost server for e2e/manual verification at `http://127.0.0.1:8001/app/`. |
+| `DATAFORGE_BASE_URL=http://127.0.0.1:8001 DATAFORGE_OPERATOR_API_KEY=operator-key npm run test:e2e` | 0 | PASS; 38 passed, 1 intentionally skipped. |
+| `npm run lint` | 0 | PASS; stylelint, eslint, and Prettier checks all clean. |
+| `npm run test` | 0 | PASS; 37 files, 458 tests. |
+| `git remote -v && git for-each-ref --format='%(refname:short)' refs/heads refs/remotes && git branch --no-merged main --all --no-color` | 0 | Output only `main`; no remotes and no unmerged branch refs exist in this checkout. |
+| `node --input-type=module ... frontend_review screenshot check against http://127.0.0.1:8000/` | 0 | Landing desktop/mobile loaded with no console warnings/errors; screenshots saved under `artifacts/frontend_review/`. |
+| `node --input-type=module ... app screenshot check against http://127.0.0.1:8001/app/` | 0 | App screenshots saved; `lingeringLigatures: []`. Operator/admin-only API calls returned expected local 403s. |
+| `git diff --check` | 2 | Found pre-existing whitespace warning: `docs/AGENT_TRUTH.md:2590: new blank line at EOF`; cleaned in this evidence update. |
+| `git diff --check` | 0 | PASS; no whitespace errors after evidence update. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final backend/repo quick gate PASS; 12/12 checks. |
+| `python3 scripts/validate_local.py --full` | 0 | Final full gate PASS; 23/23 checks, including `backend_full_tests` passed in 326.09s. |
+
+## Stitch Follow-up, Local Landing Mount, and Static Route Fixes — 2026-06-23
+
+Follow-up validation against `/home/harshit/Downloads/stitch_extract/stitch/`
+found two localhost-only serving gaps after the visual alignment work:
+`/landing/` was not mounted by the non-production FastAPI preview, and
+direct `/app/dashboard` loaded the legacy `frontend/dashboard/` page
+instead of the main SPA shell. While rerunning Playwright, `/api/session`
+also exposed a centralized RBAC fallback bug: when persistent SaaS API-key
+storage is unavailable or missing the `api_keys` table, env-backed API keys
+could 500 before reaching the intended fallback path.
+
+### Files modified
+
+- `backend/app/main.py`, `backend/app/utils/rbac.py`
+- `backend/app/saas/router.py`
+- `backend/tests/test_dashboard_security.py`, `backend/tests/test_session_auth.py`
+- `backend/tests/test_p1_compliance_aup.py`
+- `docs/API.md`
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before follow-up edits: PASS; 12/12 checks. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_session_auth.py::test_session_env_key_fallback_when_persistent_key_store_missing -q` | 1 | RED; reproduced `sqlite3.OperationalError: no such table: api_keys` escaping from persistent API-key lookup. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_session_auth.py::test_session_env_key_fallback_when_persistent_key_store_missing -q` | 0 | GREEN after `app.utils.rbac` catches `sqlite3.Error` and falls back to env-backed keys. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_session_auth.py -q` | 0 | PASS; 11 session-auth tests. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_dashboard_security.py::test_landing_static_page_is_mounted_for_local_preview -q` | 1 | RED; local `/landing/` returned 404 before the static mount. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_dashboard_security.py::test_landing_static_page_is_mounted_for_local_preview -q` | 0 | GREEN after mounting `frontend/landing` at `/landing` for non-production preview. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_dashboard_security.py::test_app_dashboard_route_serves_main_spa_not_legacy_dashboard -q` | 1 | RED; `/app/dashboard` served `/dashboard/dashboard.js` legacy HTML. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_dashboard_security.py::test_app_dashboard_route_serves_main_spa_not_legacy_dashboard -q` | 0 | GREEN after SPA static handler forces known app route prefixes to `index.html`. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_session_auth.py backend/tests/test_dashboard_security.py -q` | 0 | PASS; 16 focused backend tests. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_p1_compliance_aup.py::test_status_for_shadow_user_when_identity_user_table_missing -q` | 1 | RED; reproduced `sqlite3.OperationalError: no such table: users` escaping from `/api/saas/aup/status`. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_p1_compliance_aup.py::test_status_for_shadow_user_when_identity_user_table_missing -q` | 0 | GREEN after `app.saas.router` treats identity-store user lookup failures as the existing shadow-user path. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_p1_compliance_aup.py backend/tests/test_session_auth.py backend/tests/test_dashboard_security.py -q` | 0 | PASS; 24 focused backend tests. |
+| `npm run lint` | 0 | PASS; stylelint, eslint, and Prettier clean. |
+| `npm run test` | 0 | PASS; 37 files, 458 tests. |
+| `DATAFORGE_BASE_URL=http://127.0.0.1:8001 DATAFORGE_OPERATOR_API_KEY=operator-key npm run test:e2e` | 1 | First follow-up e2e attempt exposed `/api/session` 500 from missing `api_keys` table before the RBAC fix. |
+| `DATAFORGE_BASE_URL=http://127.0.0.1:8001 DATAFORGE_OPERATOR_API_KEY=operator-key npm run test:e2e` | 0 | PASS after fixes; 38 passed, 1 intentionally skipped. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; regenerated `docs/ROUTE_INVENTORY.md` and `artifacts/audit/ROUTE_INVENTORY.json` (`routes=161 stable=126 experimental=35`). |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; regenerated route auth matrix (`routes=150 unknown_auth=0 unknown_tenant=0`). |
+| `python3 scripts/verify_docs_match_code.py` | 1 | RED after adding `/landing`; verifier reported `GET /landing` missing from `docs/API.md`. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS after documenting `/landing` in `docs/API.md`. |
+| `curl -sS ... -H 'X-API-Key: operator-key' http://127.0.0.1:8001/api/saas/aup/status` | 0 | PASS after AUP fix; `aup_status=200 application/json`, `requires_acceptance=true`. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 checks. |
+| `python3 scripts/validate_local.py --full` | 1 | First follow-up full gate failed only `ruff_check`; `backend_full_tests` passed in 311.08s and all later security/frontend checks passed. |
+| `python3 -m ruff check backend/app backend/tests backend/benchmarks scripts architecture_validator.py` | 0 | PASS after fixing Ruff EM101 in the new session-auth regression test. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 23/23 checks, including `backend_full_tests` passed in 304.78s. |
+| `DATAFORGE_BASE_URL=http://127.0.0.1:8001 DATAFORGE_OPERATOR_API_KEY=operator-key npm run test:e2e` | 0 | PASS after AUP fix and server restart; 38 passed, 1 intentionally skipped. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final quick gate after AUP fix PASS; 12/12 checks. |
+| `python3 scripts/validate_local.py --full` | 0 | Final full gate after AUP fix PASS; 23/23 checks, including `backend_full_tests` passed in 312.19s. |
+| `git remote -v && git branch --all --no-color -vv && git branch --no-merged main --all --no-color` | 0 | Output only `main`; no remotes and no unmerged branch refs exist in this checkout. |
+| `node --input-type=module ... /landing/ + /app/dashboard + /app/jobs screenshot checks against http://127.0.0.1:8001` | 0 | PASS; screenshots saved under `artifacts/frontend_review/`; `/app/dashboard` had `navDashboard=true`, `legacyDashboardScript=false`, sidebar width `240`, dashboard container width `1024`, and `badLigatures=[]`. |
+| `curl -sS ... http://127.0.0.1:8001/landing/ && curl -sS ... http://127.0.0.1:8001/app/dashboard && curl -sS ... -H 'X-API-Key: operator-key' -X POST http://127.0.0.1:8001/api/session` | 0 | PASS; `landing=200 text/html`, `app_dashboard=200 text/html`, `session=200 application/json`. |
+| `curl -sS ... http://127.0.0.1:8001/landing/ && curl -sS ... http://127.0.0.1:8001/app/dashboard && curl -sS ... -H 'X-API-Key: operator-key' http://127.0.0.1:8001/api/saas/aup/status` | 0 | Final live smoke after AUP fix PASS; `landing=200 text/html`, `app_dashboard=200 text/html`, `aup_status=200 application/json`. |
+| `git diff --check` | 0 | PASS; no whitespace errors after evidence update. |
+| `DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test ... PYTHONPATH=backend python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001` | 0 | Running for user testing at `http://127.0.0.1:8001/app/`; landing preview available at `http://127.0.0.1:8001/landing/`. |
+
+### Postgres Schema Dump & Backup/Restore Drill Verified — 2026-06-23
+
+Extracted PostgreSQL schema from the active `dataforge-postgres` container into the migrations directory to make Postgres schemas portable. Updated `scripts/backup_and_restore_test.py` to run backup operations (`pg_dump`) inside the Postgres Docker container rather than relying on a host executable.
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `docker exec -t dataforge-postgres pg_dump -s -U dataforge -d dataforge > backend/migrations/008_postgres_storage_v8.sql` | 0 | PASS; successfully dumped Postgres schema. |
+| `python3 scripts/backup_and_restore_test.py` | 0 | PASS; backup and restore drill completed successfully inside disposable docker environment with all seed data surviving without row losses. |
+| `python3 scripts/run_benchmark_smoke.py` | 0 | PASS; benchmark smoke suite executed successfully (11 tests passed). |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; all 12/12 quick verification tests passed. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; all 23/23 full validation checks passed. |
+
+## Workflow Builder Frontend Integration Pass — 2026-06-24
+
+Scope: wire the existing backend workflow draft/manual-mapping/preview/run
+API into the dashboard workflow-builder panel. The panel now supports
+deterministic snapshot HTML, field detection, manual mapping save, preview
+sample rendering, and queueing a saved workflow run. This does not claim
+production readiness or live-site Playwright replay.
+
+### Files modified
+
+- `frontend/js/api-contract.js`
+- `frontend/js/analyzer.js`
+- `frontend/app.js`
+- `frontend/index.html`
+- `frontend/styles/views.css`
+- `frontend/js/analyzer.test.js`
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 checks. |
+| `python3 -m pytest backend/tests/test_workflow.py -q` | 0 | PASS; 36 workflow backend tests. |
+| `npm run test -- frontend/js/analyzer.test.js` | 1 | RED after first test addition; the direct-render fixture had no draft `id`, so action buttons correctly stayed disabled. |
+| `npm run test -- frontend/js/analyzer.test.js` | 0 | PASS after fixing the fixture; 29 analyzer tests passed. |
+| `npm run lint:eslint` | 0 | PASS; ESLint reported no frontend JS issues. |
+| `npm run lint:css` | 0 | PASS; stylelint reported no CSS issues. |
+| `npm run lint:js` | 1 | Prettier reported formatting drift in `frontend/index.html`, `frontend/js/analyzer.js`, and `frontend/js/analyzer.test.js`. |
+| `npx prettier --write frontend/index.html frontend/js/analyzer.js frontend/js/analyzer.test.js` | 0 | PASS; formatted only touched frontend files. |
+| `npm run test -- frontend/js/analyzer.test.js` | 0 | PASS after formatting; 29 analyzer tests passed. |
+| `npm run lint:eslint` | 0 | PASS after formatting. |
+| `npm run lint:css` | 0 | PASS after formatting. |
+| `npm run lint:js` | 0 | PASS; all matched frontend/Grafana/config files use Prettier style. |
+| `npm run test` | 0 | PASS; 37 frontend test files, 461 tests. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final quick gate PASS; 12/12 checks. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+| `curl -sS -o /tmp/dataforge_app_check.html -w 'status=%{http_code} content_type=%{content_type}\n' http://127.0.0.1:8001/app/` | 0 | PASS; `status=200 content_type=text/html; charset=utf-8`. |
+| `curl -sS -o /tmp/dataforge_app_check_8000.html -w 'status=%{http_code} content_type=%{content_type}\n' http://127.0.0.1:8000/app/` | 0 | PASS; `status=200 content_type=text/html`. |
+
+## Git Clean/Merge Verification — 2026-06-24
+
+Scope: preserve the current local work on `main`, verify there are no
+unmerged branch refs or index conflicts, and leave the checkout clean.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `git remote` | 0 | PASS; no configured remotes in this checkout. |
+| `git branch --show-current` | 0 | PASS; current branch is `main`. |
+| `git branch --no-merged main` | 0 | PASS; no unmerged local branches were reported. |
+| `git branch --merged main` | 0 | PASS; output contained only `* main`. |
+| `git ls-files -u` | 0 | PASS; no unmerged index entries. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick validation checks passed. |
+| `git diff --cached --check` | 2 | RED before commit; found whitespace in `backend/migrations/008_postgres_storage_v8.sql`, then fixed. |
+| `pre-commit run mypy --all-files` | 0 | PASS after adding `types-redis` to the hook's isolated mypy environment. |

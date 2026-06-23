@@ -641,6 +641,10 @@
   font-size: var(--text-sm);
 }
 
+#view-jobs .jobs-toolbar .input-with-icon input.input {
+  padding-left: 32px;
+}
+
 #view-jobs .jobs-toolbar-left {
   display: flex;
   align-items: center;
@@ -652,6 +656,12 @@
 #view-jobs #jobs-search {
   flex: 1 1 auto;
   min-width: 240px;
+  max-width: 240px; /* PRD §Jobs: control-bar search width */
+}
+
+#view-jobs #jobs-status-filter {
+  flex: 0 0 auto;
+  width: 120px; /* PRD §Jobs: control-bar status dropdown width */
 }
 
 #view-jobs .jobs-toolbar-right {
@@ -665,192 +675,306 @@
 
 #view-jobs #kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
   margin-bottom: var(--space-6);
-  background: var(--bg-subtle);
+  background: transparent;
 }
 
-#view-jobs #kpi-row .kpi {
-  padding: var(--space-4) var(--space-5);
+@media (max-width: 640px) {
+  #view-jobs #kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  #view-jobs #kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+#view-jobs #kpi-row .kpi-metric {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+#view-jobs #kpi-row .kpi-metric:last-child {
   border-right: 1px solid var(--border);
 }
 
-#view-jobs #kpi-row .kpi:last-child {
-  border-right: 0;
-}
-
-#view-jobs #kpi-row .kpi .kpi-val {
+#view-jobs #kpi-row .kpi-metric .kpi-val {
   display: block;
-  font-size: var(--text-xl);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 400;
   color: var(--ink-1);
-  font-feature-settings: "tnum";
-  line-height: 1.2;
+  line-height: 1;
 }
 
-#view-jobs #kpi-row .kpi .kpi-label {
+#view-jobs #kpi-row .kpi-metric .kpi-label {
   display: block;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  text-transform: none;
+  letter-spacing: var(--tracking-normal);
+  font-weight: 500;
   margin-top: var(--space-1);
 }
 
-#view-jobs .list-head {
-  display: grid;
-  grid-template-columns:
-    minmax(190px, 2fr) minmax(110px, 0.8fr) minmax(80px, 0.6fr) minmax(92px, 0.7fr) minmax(72px, 0.6fr)
-    minmax(60px, 0.5fr) auto;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+#view-jobs .table-jobs-wrap {
   border: 1px solid var(--border);
-  border-bottom: 0;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#view-jobs .table-jobs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+#view-jobs .table-jobs th {
+  padding: var(--space-3) var(--space-4);
   background: var(--bg-subtle);
   color: var(--ink-3);
   font-size: var(--text-xs);
   font-weight: 500;
-  text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
 }
 
-#view-jobs .list-head > span:last-child {
+#view-jobs .table-jobs th.col-job-actions {
   text-align: right;
 }
 
-#view-jobs .list {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg);
-  overflow: hidden;
-}
-
-#view-jobs .list.has-head {
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  border-top: 0;
-}
-
-#view-jobs .job-row {
-  display: grid;
-  grid-template-columns:
-    minmax(190px, 2fr) minmax(110px, 0.8fr) minmax(80px, 0.6fr) minmax(92px, 0.7fr) minmax(72px, 0.6fr)
-    minmax(60px, 0.5fr) auto;
-  gap: var(--space-3);
+#view-jobs .table-jobs td {
   padding: var(--space-3) var(--space-4);
-  align-items: center;
-  border-top: 1px solid var(--border);
+  vertical-align: middle;
 }
 
-#view-jobs .list > *:first-child {
-  border-top: 0;
+#view-jobs .table-jobs tbody tr:hover td {
+  background: var(--bg-subtle);
 }
 
-#view-jobs .job-row:hover {
-  background: var(--bg-hover);
+#view-jobs .table-jobs tbody tr:last-child td {
+  border-bottom: 0;
 }
 
-#view-jobs .job-row .col-actions {
+/* Cell-level tweaks that the global `.table` does not cover. */
+#view-jobs .table-jobs td.col-job-actions {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   justify-content: flex-end;
 }
 
-/* job row inner cells */
-#view-jobs .job-row .job-name {
-  color: var(--ink-1);
-  font-weight: 500;
-  font-size: var(--text-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+/* Failed rows (moved from legacy .job-row.failed-highlight selector). */
+#view-jobs .table-jobs tbody tr.failed-highlight td {
+  background: var(--status-red-soft);
 }
 
-#view-jobs .job-row .job-meta {
+#view-jobs .table-jobs tbody tr.failed-highlight:hover td {
+  background: var(--status-red-soft);
+  filter: brightness(0.97);
+}
+
+/* Empty-state row spans the full table. */
+#view-jobs .table-jobs tbody tr.empty-row td {
+  padding: 0;
+  background: var(--bg);
+}
+
+#view-jobs .table-jobs tbody tr.empty-row:hover td {
+  background: var(--bg);
+}
+
+@media (max-width: 860px) {
+  #view-jobs .table-jobs thead {
+    display: none;
+  }
+
+  #view-jobs .table-jobs tbody tr,
+  #view-jobs .table-jobs tbody tr td {
+    display: block;
+    width: 100%;
+  }
+
+  #view-jobs .table-jobs tbody tr td {
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 0;
+  }
+
+  #view-jobs .table-jobs tbody tr {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #view-jobs .table-jobs tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  #view-jobs .table-jobs tbody tr td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    margin-bottom: 2px;
+  }
+
+  #view-jobs .table-jobs tbody tr td.col-job-actions {
+    text-align: left;
+  }
+
+  #view-jobs .table-jobs tbody tr td.col-job-actions::before {
+    display: none;
+  }
+}
+
+/* ═══ Recycle Bin (table layout — matching stitch reference) ═══ */
+
+#view-recycle .table-recycle-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#view-recycle .table-recycle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  min-width: 800px;
+}
+
+#view-recycle .table-recycle th {
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+#view-recycle .table-recycle th.col-recycle-actions {
+  text-align: right;
+}
+
+#view-recycle .table-recycle td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+}
+
+#view-recycle .table-recycle tbody tr:hover td {
+  background: var(--bg-subtle);
+}
+
+#view-recycle .table-recycle tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+#view-recycle .table-recycle .col-recycle-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-1);
+}
+
+#view-recycle .table-recycle .col-recycle-deleted {
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
 
-#view-jobs .job-row .job-progress {
-  height: 4px;
-  background: var(--bg-muted);
-  border-radius: var(--radius-pill);
+#view-recycle .table-recycle .col-recycle-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-1);
+  max-width: 200px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-#view-jobs .job-row .job-progress > .job-progress-fill {
-  height: 100%;
-  background: var(--ink-1);
-  border-radius: inherit;
+/* Hover-reveal action buttons — matching stitch opacity-0 group-hover:opacity-100 */
+#view-recycle .table-recycle .col-recycle-actions {
+  text-align: right;
+  white-space: nowrap;
 }
 
-#view-jobs .job-created,
-#view-jobs .job-urls,
-#view-jobs .job-records,
-#view-jobs .job-issues {
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-feature-settings: "tnum";
+#view-recycle .table-recycle tbody tr .col-recycle-actions .hover-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-@media (max-width: 860px) {
-  #view-jobs .list-head {
-    display: none;
-  }
-
-  #view-jobs .job-row {
-    grid-template-columns: 1fr;
-    gap: var(--space-2);
-  }
-
-  #view-jobs .job-actions {
-    justify-content: flex-start;
-  }
+#view-recycle .table-recycle tbody tr:hover .col-recycle-actions .hover-actions {
+  opacity: 1;
 }
 
-/* ═══ Recycle Bin ═══ */
-
-#view-recycle .recycle-list-head {
-  display: grid;
-  grid-template-columns: 40px 2fr 1fr 1fr auto;
-  gap: var(--space-3);
+#view-recycle .table-recycle .col-recycle-actions .action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius);
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
-#view-recycle .recycle-row {
-  display: grid;
-  grid-template-columns: 40px 2fr 1fr 1fr auto;
-  gap: var(--space-3);
+#view-recycle .table-recycle .col-recycle-actions .action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink-1);
+}
+
+#view-recycle .table-recycle .col-recycle-actions .action-btn.action-danger:hover {
+  background: var(--status-red-soft);
+  color: var(--status-red);
+}
+
+/* Pagination — reuses .pagination-footer pattern */
+#view-recycle .table-recycle tfoot td {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
-  align-items: center;
+  background: var(--bg-subtle);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
-#view-recycle .recycle-row.selected {
-  background: var(--bg-active);
-}
-
-#view-recycle .list {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+/* Empty-state row */
+#view-recycle .table-recycle tbody tr.empty-row td {
+  padding: 0;
   background: var(--bg);
 }
 
-#view-recycle .list > *:first-child {
-  border-top: 0;
+#view-recycle .table-recycle tbody tr.empty-row:hover td {
+  background: var(--bg);
 }
 
-#view-recycle .recycle-row .col-actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}
-
-/* Recycle bin batch bar */
+/* Batch bar (checkboxes) inside table — kept for batch-select feature */
 #view-recycle .recycle-batch-bar {
   display: flex;
   align-items: center;
@@ -890,35 +1014,6 @@
   margin-right: var(--space-2);
 }
 
-#view-recycle .recycle-check-col {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#view-recycle .recycle-check-col input[type="checkbox"],
-#view-recycle .recycle-check-item {
-  cursor: pointer;
-}
-
-#view-recycle .recycle-name {
-  font-weight: 500;
-  color: var(--ink-1);
-  font-size: var(--text-sm);
-}
-
-@media (max-width: 768px) {
-  #view-recycle .recycle-row {
-    grid-template-columns: 1fr;
-    gap: var(--space-2);
-  }
-
-  #view-recycle .recycle-batch-bar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
 #view-recycle .btn.danger-ghost {
   color: var(--ink-2);
   border: 1px solid var(--border);
@@ -936,12 +1031,62 @@
   cursor: not-allowed;
 }
 
+/* Responsive: stack on mobile */
+@media (max-width: 860px) {
+  #view-recycle .table-recycle-wrap {
+    overflow-x: auto;
+  }
+}
+
 /* ═══ Dashboard view ═══ */
+
+/* Animated operational-status dot — matching final_integrated_ecosystem stitch */
+.dash-status-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.status-dot-ping-bg {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.75;
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.status-dot-ping {
+  position: relative;
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+@keyframes ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.status-dot-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
 
 #view-dashboard .dash-card {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: var(--space-5) var(--space-6);
   margin-bottom: var(--space-4);
 }
@@ -964,10 +1109,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--ink-1);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 #view-dashboard .dash-card-body {
@@ -982,7 +1128,7 @@
   gap: var(--space-1);
   padding: 0 var(--space-2);
   height: 22px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg-subtle);
   color: var(--ink-3);
@@ -991,42 +1137,98 @@
   font-family: var(--font-mono);
 }
 
+/* Dashboard activity table — matching stitch final_integrated_ecosystem */
+#view-dashboard .dash-table-wrap {
+  overflow: hidden;
+}
+
+.table-dash-activity {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-dash-activity th {
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table-dash-activity td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+  vertical-align: middle;
+}
+
+.table-dash-activity tbody tr:hover td {
+  background: var(--bg-subtle);
+}
+
+.table-dash-activity tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-dash-activity .td-activity-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.table-dash-activity .td-activity-target {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-1);
+}
+
+.table-dash-activity .td-activity-ts {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-align: right;
+}
+
+/* Failed row highlight — matching stitch bg-accent-error */
+.table-dash-activity tbody tr.row-failed td {
+  background: var(--status-red-soft);
+}
+
 #view-dashboard #dash-kpi-row,
 #view-dashboard .kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
   border: 0;
   background: transparent;
   margin-bottom: var(--space-5);
 }
 
-#view-dashboard .kpi-row .kpi {
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+/* Responsive KPI grid — matching stitch grid-cols-1 md:2 lg:4 */
+@media (max-width: 640px) {
+  #view-dashboard #dash-kpi-row,
+  #view-dashboard .kpi-row {
+    grid-template-columns: 1fr;
+  }
 }
 
-#view-dashboard .kpi-row .kpi:last-child {
-  border-right: 1px solid var(--border);
+@media (min-width: 641px) and (max-width: 900px) {
+  #view-dashboard #dash-kpi-row,
+  #view-dashboard .kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-#view-dashboard .kpi .kpi-val {
-  display: block;
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--ink-1);
-  font-feature-settings: "tnum";
-  line-height: 1.2;
-}
-
-#view-dashboard .kpi .kpi-label {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-  letter-spacing: var(--tracking-normal);
-  margin-top: var(--space-1);
+@media (min-width: 901px) {
+  #view-dashboard #dash-kpi-row,
+  #view-dashboard .kpi-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 #view-dashboard .row-2 {
@@ -1564,82 +1766,6 @@
   font-family: var(--font-mono);
 }
 
-#view-dashboard .activity-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-#view-dashboard .activity-item {
-  display: grid;
-  grid-template-columns: 180px 100px 1fr auto;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-1);
-  border-bottom: 1px solid var(--border);
-  align-items: center;
-  font-size: var(--text-sm);
-}
-
-#view-dashboard .activity-item:last-child {
-  border-bottom: 0;
-}
-
-#view-dashboard .activity-time {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-}
-
-#view-dashboard .activity-cat {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: lowercase;
-  color: var(--ink-3);
-  background: var(--bg-muted);
-  padding: 1px 6px;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-  width: fit-content;
-  text-align: center;
-}
-
-#view-dashboard .activity-cat-auth {
-  color: var(--ink-3);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-}
-
-#view-dashboard .activity-cat-system {
-  color: var(--ink-4);
-  background: var(--bg-muted);
-  border: 1px solid var(--border);
-}
-
-#view-dashboard .activity-cat-billing {
-  color: var(--ink-3);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-}
-
-#view-dashboard .activity-action {
-  color: var(--ink-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#view-dashboard .activity-outcome {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  text-align: right;
-  color: var(--ink-2);
-  background: var(--bg-muted);
-  padding: 1px 6px;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-}
-
 /* ═══ New Job / Editor ═══ */
 
 #view-new .section {
@@ -1787,6 +1913,34 @@
   font-size: var(--text-sm);
   margin-bottom: var(--space-2);
   color: var(--ink-2);
+}
+
+#view-new #workflow-builder-mapping,
+#view-new #workflow-builder-snapshot {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+#view-new .workflow-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+#view-new .workflow-preview-table th,
+#view-new .workflow-preview-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+#view-new .workflow-preview-table th {
+  color: var(--ink-2);
+  background: var(--bg-subtle);
 }
 
 #view-new .workflow-builder-status {
@@ -2055,7 +2209,7 @@
 
 #view-results #results-table-wrap {
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg);
 }
@@ -2090,7 +2244,7 @@
 
 #view-results table th {
   text-align: left;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--bg-subtle);
   color: var(--ink-3);
@@ -2108,7 +2262,7 @@
 }
 
 #view-results table tr:hover td {
-  background: var(--bg-hover);
+  background: var(--bg-subtle);
 }
 
 #view-results table tr:last-child td {
@@ -2213,28 +2367,126 @@
 
 /* ═══ Auth Profiles ═══ */
 
-#view-auth-profiles .profile-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border);
-  align-items: center;
+/* ═══ Auth Profiles (table layout — matching stitch reference) ═══ */
+
+#view-auth-profiles .table-auth-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
 }
 
-#view-auth-profiles .profile-row:last-child {
-  border-bottom: 0;
-}
-
-#view-auth-profiles .profile-name {
-  font-weight: 500;
-  color: var(--ink-1);
+#view-auth-profiles .table-auth {
+  width: 100%;
+  border-collapse: collapse;
   font-size: var(--text-sm);
 }
 
-#view-auth-profiles .profile-meta {
+#view-auth-profiles .table-auth th {
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+#view-auth-profiles .table-auth th.col-profile-actions {
+  text-align: right;
+}
+
+#view-auth-profiles .table-auth td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+}
+
+#view-auth-profiles .table-auth tbody tr:hover td {
+  background: var(--bg-subtle);
+}
+
+#view-auth-profiles .table-auth tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+#view-auth-profiles .table-auth .col-profile-name {
+  font-weight: 500;
+  color: var(--ink-1);
+}
+
+#view-auth-profiles .table-auth .col-profile-domain,
+#view-auth-profiles .table-auth .col-profile-last-used {
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--ink-3);
+}
+
+#view-auth-profiles .table-auth .col-profile-expiry {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+#view-auth-profiles .table-auth .col-profile-expiry.expired {
+  color: var(--status-red);
+}
+
+/* Expired rows — muted like stitch */
+#view-auth-profiles .table-auth tbody tr.profile-expired td {
+  color: var(--ink-3);
+}
+
+#view-auth-profiles .table-auth tbody tr.profile-expired .col-profile-name {
+  color: var(--ink-3);
+}
+
+/* Actions column — hover-reveal for expired/less-used actions */
+#view-auth-profiles .table-auth .col-profile-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+#view-auth-profiles .table-auth .col-profile-actions .action-link {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+#view-auth-profiles .table-auth .col-profile-actions .action-link:hover {
+  color: var(--primary-hover);
+}
+
+#view-auth-profiles .table-auth .col-profile-actions .action-link.action-remove {
+  color: var(--status-red);
+}
+
+#view-auth-profiles .table-auth .col-profile-actions .action-link.action-muted {
+  color: var(--ink-3);
+}
+
+/* Pagination — reuses .pagination-footer pattern */
+#view-auth-profiles .table-auth tfoot td {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* Empty-state row */
+#view-auth-profiles .table-auth tbody tr.empty-row td {
+  padding: 0;
+  background: var(--bg);
+}
+
+#view-auth-profiles .table-auth tbody tr.empty-row:hover td {
+  background: var(--bg);
 }
 
 /* ═══ Workflows ═══ */
@@ -2299,23 +2551,103 @@
 
 /* ═══ Billing ═══ */
 
-#view-billing .billing-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+/* ═══ Billing Page ═══ */
+
+/* Section heading — uppercase tracking, muted, matching stitch */
+#view-billing .billing-section-heading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--ink-3);
   margin-bottom: var(--space-6);
 }
 
-#view-billing .billing-grid .kpi {
-  padding: var(--space-4) var(--space-5);
-  border-right: 1px solid var(--border);
+/* Usage card — full-width container with border */
+#view-billing .usage-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
-#view-billing .billing-grid .kpi:last-child {
-  border-right: 0;
+/* Usage metrics — 3-column grid matching stitch */
+#view-billing .billing-usage-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  #view-billing .billing-usage-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Individual meter item */
+#view-billing .billing-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+#view-billing .billing-meter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+#view-billing .billing-meter-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-1);
+}
+
+#view-billing .billing-meter-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--primary);
+}
+
+/* Progress bar track + fill — matching stitch h-1.5 rounded-full */
+#view-billing .billing-meter-bar {
+  height: 6px;
+  width: 100%;
+  background: var(--bg-muted);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+#view-billing .billing-meter-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+/* Warning fill when >80% */
+#view-billing .billing-meter-fill.fill-warning {
+  background: var(--status-amber);
+}
+
+/* Critical fill when >95% */
+#view-billing .billing-meter-fill.fill-critical {
+  background: var(--status-red);
+}
+
+/* Billing two-column grid (subscription + features side-by-side) */
+#view-billing .billing-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  #view-billing .billing-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 #view-billing .billing-card {
@@ -2403,39 +2735,219 @@
   color: var(--ink-1);
 }
 
-/* ═══ Retention ═══ */
+/* ═══ Retention — Bento Grid with Sliders ═══ */
 
-#view-retention .retention-card {
-  margin-bottom: var(--space-4);
+#view-retention .retention-bento-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
 }
 
-#view-retention .retention-meta {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
+@media (min-width: 768px) {
+  #view-retention .retention-bento-grid {
+    grid-template-columns: 8fr 4fr;
+  }
+}
+
+#view-retention .retention-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Individual slider card */
+#view-retention .retention-policy-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+
+#view-retention .retention-policy-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
+}
+
+#view-retention .retention-policy-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+}
+
+#view-retention .retention-policy-desc {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin: 0;
+}
+
+/* Value badge — large number display */
+#view-retention .retention-value-badge {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  text-align: center;
+  white-space: nowrap;
+}
+
+#view-retention .retention-value-num {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--primary);
+}
+
+#view-retention .retention-value-unit {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin-left: var(--space-1);
+}
+
+/* Range slider — matching stitch style */
+#view-retention .retention-slider-wrap {
+  padding: 0 var(--space-2);
+}
+
+#view-retention .retention-slider {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  background: var(--bg-muted);
+  border-radius: var(--radius-lg);
+  outline: none;
+  cursor: pointer;
+}
+
+#view-retention .retention-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}
+
+#view-retention .retention-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}
+
+#view-retention .retention-slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+/* Action bar (Save / Cancel) */
+#view-retention .retention-action-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+}
+
+/* ── Side Panel — Purge Card ── */
+
+#view-retention .retention-side-col {
+  /* Sticky on larger screens */
+}
+
+@media (min-width: 768px) {
+  #view-retention .retention-side-col {
+    position: sticky;
+    top: 6rem;
+    align-self: flex-start;
+  }
+}
+
+#view-retention .retention-purge-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+
+#view-retention .retention-purge-head {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
-#view-retention .retention-meta:last-child {
-  border-bottom: 0;
+#view-retention .retention-purge-stats {
+  background: var(--bg-subtle);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: var(--space-5);
 }
 
-#view-retention .retention-meta-label {
+#view-retention .retention-purge-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-1) 0;
+}
+
+#view-retention .retention-purge-stat-label {
+  font-size: var(--text-xs);
   color: var(--ink-3);
-  font-size: var(--text-sm);
 }
 
-#view-retention .retention-meta-value {
+#view-retention .retention-purge-stat-val {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--ink-1);
 }
 
-#view-retention .retention-actions {
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--border);
+#view-retention .retention-purge-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--ink-1);
+  color: var(--ink-inverse);
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+#view-retention .retention-purge-btn:hover {
+  opacity: 0.9;
+}
+
+#view-retention .retention-purge-notice {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-align: center;
+  margin-top: var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
 /* ═══ Email Verification ═══ */
@@ -2880,8 +3392,8 @@
 /* Metrics grid (used in Governance, Telemetry, Rate Limits) */
 #view-dashboard .dash-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
   margin-top: var(--space-2);
 }
 
@@ -2889,10 +3401,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-subtle);
+  padding: var(--space-4);
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   transition: border-color var(--duration-base) var(--ease-out);
 }
 
@@ -2901,17 +3413,18 @@
 }
 
 #view-dashboard .dash-metric-label {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--ink-3);
   font-weight: 500;
   letter-spacing: var(--tracking-normal);
 }
 
 #view-dashboard .dash-metric-val {
-  font-size: var(--text-md);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 400;
   color: var(--ink-1);
-  font-feature-settings: "tnum";
+  line-height: 1;
 }
 
 /* Predictions styling */
@@ -3008,7 +3521,7 @@
 #view-api-keys .api-keys-card {
   padding: var(--space-6);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   background: var(--bg);
   margin-bottom: var(--space-5);
 }
@@ -3026,6 +3539,9 @@
   font-weight: 600;
   color: var(--ink-1);
   letter-spacing: var(--tracking-tight);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 #view-api-keys .api-keys-desc {
@@ -3080,48 +3596,395 @@
   font-size: var(--text-xs);
 }
 
-/* ═══ Settings Page ═══ */
+/* ── Dual Card Layout — matching stitch api_keys_app_api_keys ── */
 
-#view-settings .settings-card {
-  padding: var(--space-6);
+#view-api-keys .api-keys-dual-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  #view-api-keys .api-keys-dual-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Key display row — masked value + inline action buttons */
+#view-api-keys .api-key-display-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--bg-subtle);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
 }
 
-#view-settings .settings-card h2 {
+#view-api-keys .api-key-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: all;
+  flex: 1 1 auto;
+}
+
+#view-api-keys .api-key-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* ── Icon-only button (visibility, copy) ── */
+
+#view-api-keys .btn-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+  padding: 0;
+}
+
+#view-api-keys .btn-icon-only:hover {
+  color: var(--ink-1);
+  background: var(--bg-muted);
+}
+
+#view-api-keys .btn-icon-only:active {
+  background: var(--border);
+}
+
+/* ── Input section (below display row, for paste/set flow) ── */
+
+#view-api-keys .api-key-input-section,
+#view-api-keys .admin-key-input-section {
+  margin-bottom: var(--space-4);
+}
+
+/* ── Key footer — created / last-used / revoked metadata ── */
+
+#view-api-keys .api-key-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ── Admin key accent line (top bar) ── */
+
+#view-api-keys .admin-key-card {
+  position: relative;
+  overflow: hidden;
+}
+
+#view-api-keys .admin-key-accent-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--status-amber);
+  opacity: 0.5;
+}
+
+/* ── Session card (full-width below dual grid) ── */
+
+#view-api-keys .session-card {
+  margin-bottom: var(--space-6);
+}
+
+/* ── Access Log Table — matching stitch ── */
+
+#view-api-keys .api-keys-access-log-section {
+  margin-top: var(--space-6);
+}
+
+#view-api-keys .section-head {
+  margin-bottom: var(--space-4);
+}
+
+#view-api-keys .section-title {
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--ink-1);
-  margin-bottom: var(--space-5);
   letter-spacing: var(--tracking-tight);
 }
 
-#view-settings .settings-option {
+#view-api-keys .table-access-log-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+#view-api-keys .table-access-log {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+#view-api-keys .table-access-log th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+#view-api-keys .table-access-log td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-1);
+  vertical-align: middle;
+}
+
+#view-api-keys .table-access-log tbody tr:hover td {
+  background: var(--accent-pending-soft, var(--bg-subtle));
+}
+
+#view-api-keys .table-access-log tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+#view-api-keys .table-access-log .access-status-ok {
+  color: var(--status-green);
+}
+
+#view-api-keys .table-access-log .access-status-err {
+  color: var(--status-red);
+}
+
+#view-api-keys .table-access-log .empty-row td {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+/* ═══ Settings Page — Bento Grid Layout ═══ */
+
+/* 12-column grid matching stitch settings_app_settings */
+#view-settings .settings-bento-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  #view-settings .settings-bento-grid {
+    grid-template-columns: repeat(12, 1fr);
+  }
+}
+
+#view-settings .settings-col-wide {
+  /* General config — 8 of 12 cols on md+ */
+}
+
+@media (min-width: 768px) {
+  #view-settings .settings-col-wide {
+    grid-column: span 8;
+  }
+}
+
+#view-settings .settings-col-narrow {
+  /* UI prefs — 4 of 12 cols on md+ */
+}
+
+@media (min-width: 768px) {
+  #view-settings .settings-col-narrow {
+    grid-column: span 4;
+  }
+}
+
+#view-settings .settings-col-full {
+  /* Full-width sections (shortcuts, danger zone) */
+}
+
+@media (min-width: 768px) {
+  #view-settings .settings-col-full {
+    grid-column: span 12;
+  }
+}
+
+/* Bento card — surface with border */
+#view-settings .settings-bento-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  padding: var(--space-6);
+}
+
+/* Card heading — icon + h2 in a row, with bottom border */
+#view-settings .settings-card-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+#view-settings .settings-card-heading h2 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-1);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin: 0;
+}
+
+/* ── General Configuration fields ── */
+
+#view-settings .settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 768px) {
+  #view-settings .settings-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+#view-settings .settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+#view-settings .settings-field-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+#view-settings .settings-field-value-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#view-settings .settings-field .input {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-subtle);
+}
+
+/* ── UI Preferences section ── */
+
+#view-settings .settings-prefs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex: 1;
+}
+
+#view-settings .settings-pref-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-3) 0;
 }
 
-#view-settings .settings-option-info {
+#view-settings .settings-pref-info {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
 }
 
-#view-settings .settings-option-label {
-  font-size: var(--text-sm);
+#view-settings .settings-pref-label {
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--ink-1);
 }
 
-#view-settings .settings-option-desc {
-  font-size: var(--text-xs);
+#view-settings .settings-pref-desc {
+  font-size: 11px;
   color: var(--ink-3);
+  margin: 0;
 }
+
+/* ── Toggle switch (replacement for toggle-group) ── */
+
+#view-settings .settings-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+#view-settings .settings-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+#view-settings .settings-switch-track {
+  width: 36px;
+  height: 20px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+#view-settings .settings-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  transition: transform 0.2s;
+}
+
+#view-settings .settings-switch input:checked + .settings-switch-track {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+#view-settings .settings-switch input:checked + .settings-switch-track::after {
+  transform: translateX(16px);
+  border-color: var(--bg);
+}
+
+/* ── Keyboard Shortcuts grid ── */
 
 #view-settings .settings-shortcuts-grid {
   display: grid;
@@ -3148,26 +4011,40 @@
   color: var(--ink-2);
 }
 
-#view-settings .settings-about-grid {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: var(--space-2) var(--space-4);
-  font-size: var(--text-sm);
+/* ── Danger Zone ── */
+
+#view-settings .settings-danger-zone {
+  border-style: dashed;
+  background: var(--bg-subtle);
+  margin-top: var(--space-4);
 }
 
-#view-settings .settings-about-label {
+#view-settings .settings-danger-zone .settings-card-heading h2 {
   color: var(--ink-3);
-  font-weight: 500;
 }
 
-#view-settings .settings-about-value {
-  color: var(--ink-1);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+#view-settings .settings-danger-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
 }
+
+@media (min-width: 768px) {
+  #view-settings .settings-danger-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+/* ── Responsive ── */
 
 @media (max-width: 640px) {
-  #view-settings .settings-option {
+  #view-settings .settings-pref-item {
     flex-direction: column;
     align-items: flex-start;
   }

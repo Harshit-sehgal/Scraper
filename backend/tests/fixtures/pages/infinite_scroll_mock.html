@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><title>Infinite scroll listings</title></head>
+  <body>
+    <h1>Product Feed</h1>
+    <div id="feed" data-page="1" data-total-pages="5">
+      <div class="feed-item" data-index="1">
+        <h2 class="item-title">Item Alpha</h2>
+        <p class="item-desc">Description for Alpha</p>
+        <span class="item-price">$12.99</span>
+      </div>
+      <div class="feed-item" data-index="2">
+        <h2 class="item-title">Item Bravo</h2>
+        <p class="item-desc">Description for Bravo</p>
+        <span class="item-price">$24.99</span>
+      </div>
+      <div class="feed-item" data-index="3">
+        <h2 class="item-title">Item Charlie</h2>
+        <p class="item-desc">Description for Charlie</p>
+        <span class="item-price">$39.99</span>
+      </div>
+      <div class="feed-item" data-index="4">
+        <h2 class="item-title">Item Delta</h2>
+        <p class="item-desc">Description for Delta</p>
+        <span class="item-price">$49.99</span>
+      </div>
+      <div class="feed-item" data-index="5">
+        <h2 class="item-title">Item Echo</h2>
+        <p class="item-desc">Description for Echo</p>
+        <span class="item-price">$59.99</span>
+      </div>
+    </div>
+    <div class="scroll-sentinel" data-next-page="2" style="height:1px"></div>
+    <script>
+      // Scroll-based loading placeholder for extraction tests:
+      // Fixture includes sentinel element that would trigger next-page load.
+    </script>
+  </body>
+</html>

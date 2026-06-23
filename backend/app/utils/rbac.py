@@ -6,6 +6,7 @@ Enforces administrative, operator, and user privilege boundaries.
 import hashlib
 import logging
 import secrets
+import sqlite3
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -99,7 +100,7 @@ def _resolve_persistent_api_key_context(raw_key: str) -> AuthContext | None:
         store = get_identity_store()
         service = ApiKeyService(store=store)
         record = service.authenticate(raw_key)
-    except (RuntimeError, ValueError, TypeError) as e:
+    except (RuntimeError, ValueError, TypeError, sqlite3.Error) as e:
         logger.debug("Persistent API key lookup failed: %s", e)
         return None
     if record is None:

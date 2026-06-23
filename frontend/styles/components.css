@@ -57,27 +57,29 @@
   width: 100%;
 }
 
-/* ─── Primary (black on white, white on black) ─── */
+/* ─── Primary (steel blue #3B5B7E, PRD spec) ─── */
 .btn.primary {
-  background: var(--ink-1);
+  background: var(--primary);
   color: var(--ink-inverse);
-  border-color: var(--ink-1);
+  border-color: var(--primary);
 }
 
 .btn.primary:hover {
   opacity: 0.9;
-  border-color: var(--ink-1);
-  background: var(--ink-1);
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--ink-inverse);
 }
 
 :root[data-theme="dark"] .btn.primary {
-  background: var(--ink-1);
-  color: var(--ink-2);
-  border-color: var(--ink-1);
+  background: var(--primary);
+  color: var(--ink-inverse);
+  border-color: var(--primary);
 }
 
 :root[data-theme="dark"] .btn.primary:hover {
   opacity: 0.9;
+  color: var(--ink-inverse);
 }
 
 /* ─── Secondary ─── */
@@ -124,6 +126,77 @@
 .btn.pill {
   border-radius: var(--radius-pill);
   padding: 0 var(--space-4);
+}
+
+/* ─── Warn-ghost (flat-warning action, keep neutral) ─── */
+.btn.warn-ghost {
+  color: var(--ink-2);
+  border-color: var(--border);
+  background: var(--bg);
+  font-weight: 500;
+}
+
+.btn.warn-ghost:hover {
+  background: var(--status-amber-soft);
+  border-color: var(--status-amber);
+  color: var(--ink-1);
+}
+
+/* Old recycle-only rule still wins inside #view-recycle if needed */
+
+#view-recycle .btn.warn-ghost {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+#view-recycle .btn.warn-ghost:hover {
+  background: var(--status-amber-soft);
+}
+
+/* ─── Danger-ghost ─── */
+.btn.danger-ghost {
+  color: var(--ink-2);
+  border-color: var(--border);
+  background: var(--bg);
+  font-weight: 500;
+}
+
+.btn.danger-ghost:hover {
+  background: var(--status-red-soft);
+  border-color: var(--status-red);
+  color: var(--ink-1);
+}
+
+/* Copy-job-id button (small inline icon next to Job ID) */
+.btn-copy-id {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: var(--space-1);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.btn-copy-id:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--ink-1);
+}
+
+.btn-copy-id.copied {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--ink-1);
 }
 
 /* ─── Icon-only button (used in topbar) ─── */
@@ -292,32 +365,64 @@ select.input {
   border-radius: var(--radius-pill);
 }
 
-/* Neutral status variants — all monochrome. */
-.badge.pending,
-.badge.queued,
-.badge.discovering,
+/* Status badge variants — DataForge desaturated tints with colored borders */
 .badge.completed,
 .badge.succeeded,
 .badge.ok,
 .badge.done,
-.badge.degraded,
-.badge.warning,
-.badge.partial,
-.badge.canceled,
-.badge.cancelled,
+.badge.badge-success,
+.badge-success {
+  background: var(--status-green-soft);
+  color: var(--status-green);
+  border-color: var(--status-green-border);
+}
+
 .badge.failed,
 .badge.error,
 .badge.danger,
+.badge.badge-failed,
+.badge-failed {
+  background: var(--status-red-soft);
+  color: var(--status-red);
+  border-color: var(--status-red-border);
+}
+
+.badge.warning,
+.badge.degraded,
+.badge.partial,
+.badge.badge-warning,
+.badge-warning {
+  background: var(--status-amber-soft);
+  color: var(--status-amber);
+  border-color: var(--status-amber-border);
+}
+
+.badge.pending,
+.badge.queued,
+.badge.discovering,
+.badge.info,
 .badge.empty_result,
 .badge.idle,
-.badge.info {
+.badge.badge-pending,
+.badge-pending {
+  background: var(--status-pending-soft);
+  color: var(--status-pending);
+  border-color: var(--status-pending-border);
+}
+
+.badge.canceled,
+.badge.cancelled,
+.badge.badge-canceled,
+.badge-canceled {
   background: var(--bg-muted);
   color: var(--ink-3);
   border-color: var(--border);
 }
 
 /* Active work — filled ink pill, the one visual emphasis. */
-.badge.running {
+.badge.running,
+.badge.badge-running,
+.badge-running {
   background: var(--ink-1);
   color: var(--ink-inverse);
   border-color: var(--ink-1);
@@ -325,9 +430,9 @@ select.input {
 
 .badge.experimental,
 .badge.beta {
-  background: var(--bg-muted);
-  color: var(--ink-3);
-  border-color: var(--border);
+  background: var(--status-violet-soft);
+  color: var(--status-violet);
+  border-color: var(--status-violet-soft);
 }
 
 /* Inline solid dot inside a badge — hidden for Notion theme */
@@ -371,7 +476,7 @@ select.input {
 
 .table-wrap {
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg);
 }
@@ -390,7 +495,8 @@ select.input {
   border-bottom: 1px solid var(--border);
   background: var(--bg-subtle);
   font-size: var(--text-xs);
-  letter-spacing: var(--tracking-normal);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 .table td {
@@ -405,7 +511,7 @@ select.input {
 }
 
 .table tbody tr:hover {
-  background: var(--bg-hover);
+  background: var(--bg-subtle);
 }
 
 .table .col-actions {
@@ -413,6 +519,191 @@ select.input {
   width: 1%;
   white-space: nowrap;
 }
+
+/* ─── Jobs table (PRD §Jobs — ID/Name/Status/Records/Created/Actions) ─── */
+
+.col-job-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  width: 96px;
+  white-space: nowrap;
+}
+
+.col-job-name {
+  color: var(--ink-1);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-job-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.col-job-status {
+  width: 120px;
+  white-space: nowrap;
+}
+
+.col-job-urls {
+  width: 70px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: right;
+  font-feature-settings: "tnum";
+}
+
+.col-job-records {
+  width: 90px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: right;
+  font-feature-settings: "tnum";
+}
+
+.col-job-issues {
+  width: 76px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: right;
+  font-feature-settings: "tnum";
+}
+
+.col-job-actions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.col-job-created {
+  width: 130px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* Failed-row soft red tint — table version of the legacy .job-row.failed-highlight.
+   Scoped so it never bleeds into other list-based views (recycle, auth-profiles). */
+.table-jobs tbody tr.failed-highlight td {
+  background: var(--status-red-soft);
+}
+
+.table-jobs tbody tr.failed-highlight:hover td {
+  background: var(--status-red-soft);
+  filter: brightness(0.97);
+}
+
+.table-jobs tbody tr.running-highlight td {
+  background: var(--bg-subtle);
+}
+
+.table-jobs tbody tr.completed-highlight td {
+  background: var(--bg);
+}
+
+/* Jobs progress bar — sits inside the Job Name cell on active rows. */
+.job-progress-wrap {
+  position: relative;
+  height: 4px;
+  background: var(--bg-muted);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin-top: var(--space-1);
+}
+
+.job-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--primary);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+.job-progress-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  display: block;
+}
+
+/* Jobs pagination footer — matches the PRD §Jobs "Showing X of Y jobs" row. */
+.table-jobs tfoot td {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  font-weight: 500;
+}
+
+.table-jobs .pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.table-jobs .pagination-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.table-jobs .pagination-chevron:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  color: var(--ink-1);
+  border-color: var(--border-strong);
+}
+
+.table-jobs .pagination-chevron:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.table-jobs .pagination-chevrons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Status-change flash — reusable for jobs table rows (legacy list rows used the same class). */
+.status-change {
+  animation: status-flash 1.2s var(--ease-out);
+}
+
+/* stylelint-disable keyframe-declaration-no-important */
+@keyframes status-flash {
+  0% {
+    background: var(--accent-pending) !important;
+  }
+
+  100% {
+    background: inherit;
+  }
+}
+/* stylelint-enable keyframe-declaration-no-important */
 
 /* ═══ Modal / Overlay ═══ */
 
@@ -433,7 +724,7 @@ select.input {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.05);
+  box-shadow: var(--shadow-lg);
   width: min(440px, 100%);
   max-height: calc(100vh - var(--space-7));
   overflow: auto;
@@ -727,7 +1018,7 @@ kbd {
   vertical-align: middle;
 }
 
-/* Health pill (live status indicator in topbar) */
+/* Health pill (live status indicator in topbar) — matches stitch "API: READY" badge */
 
 .health-pill {
   display: inline-flex;
@@ -735,36 +1026,56 @@ kbd {
   gap: var(--space-2);
   padding: 0 var(--space-3);
   height: 24px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg-subtle);
   color: var(--ink-3);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 500;
   white-space: nowrap;
   transition: all var(--duration-base) var(--ease-out);
 }
 
+.health-pill-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.health-pill-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
 .health-pill[data-state="healthy"] {
   color: var(--ink-3);
-  background: var(--bg-hover);
   border-color: var(--border);
+}
+
+.health-pill[data-state="healthy"] .health-pill-dot {
+  background: var(--primary);
 }
 
 .health-pill[data-state="degraded"] {
   color: var(--ink-2);
-  background: var(--bg-active);
   border-color: var(--border-strong);
 }
 
-.health-pill[data-state="down"] {
-  color: var(--ink-1);
-  background: var(--bg-active);
-  border-color: var(--ink-4);
+.health-pill[data-state="degraded"] .health-pill-dot {
+  background: var(--status-amber);
 }
 
-.health-pill .dot {
-  display: none;
+.health-pill[data-state="down"] {
+  color: var(--ink-2);
+  border-color: var(--border-strong);
+}
+
+.health-pill[data-state="down"] .health-pill-dot {
+  background: var(--status-red);
 }
 
 /* Inline status engine dot in sidebar bottom */

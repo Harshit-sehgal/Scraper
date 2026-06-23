@@ -25,7 +25,7 @@ const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 let _pageSize = DEFAULT_PAGE_SIZE;
 
-export function setCurrentJobId(id) {
+function _setCurrentJobId(id) {
   currentJobId = id;
 }
 

@@ -67,7 +67,6 @@ test-results/
 .antigravitycli/
 .kilo/
 .claude/
-Instructions_for_ai/
 
 # Generated validation artifacts (large, reproducible)
 artifacts/audit/FILE_AUDIT_LEDGER.md
@@ -80,8 +79,7 @@ artifacts/validation/commands/
 artifacts/validation/latest_summary.*
 .aider*
 
-# Shelved/unused architectures (replaced by validated backend/app)
-shelved/
+
 
 # Transient AI session artifacts (status reports, gap catalogs, session summaries)
 SESSION_FINAL_STATS.txt

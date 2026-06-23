@@ -1,12 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head><title>Sign in required</title></head>
+  <head><title>Sign in to view listings</title></head>
   <body>
-    <h1>Sign in to continue</h1>
-    <form action="/login" method="post">
-      <label>Email <input type="email" name="email" /></label>
-      <label>Password <input type="password" name="password" /></label>
-      <button type="submit">Log in</button>
-    </form>
+    <div class="login-overlay">
+      <h1>Sign in to continue</h1>
+      <form action="/login" method="post">
+        <label>Email <input type="email" name="email" required /></label>
+        <label>Password <input type="password" name="password" required /></label>
+        <button type="submit">Log in</button>
+      </form>
+    </div>
+    <div class="content-behind-wall" style="display:none">
+      <div class="listing" data-id="1">
+        <h2>Premium Listing 1</h2>
+        <p>Member-only content here</p>
+      </div>
+      <div class="listing" data-id="2">
+        <h2>Premium Listing 2</h2>
+        <p>More member-only content</p>
+      </div>
+    </div>
   </body>
 </html>

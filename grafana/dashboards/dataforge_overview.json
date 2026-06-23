@@ -590,6 +590,6 @@
     {"title": "API Docs", "url": "/docs", "targetBlank": true},
     {"title": "Health API", "url": "/api/operator/health", "targetBlank": true},
     {"title": "Dashboard API", "url": "/api/operator/dashboard", "targetBlank": true},
-    {"title": "Prometheus Targets", "url": "http://localhost:9090/targets", "targetBlank": true}
+    {"title": "Prometheus Targets", "url": "http://prometheus:9090/targets", "targetBlank": true}
   ]
 }

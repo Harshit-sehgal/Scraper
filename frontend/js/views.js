@@ -15,7 +15,7 @@ import { refreshJobs, onJobsFilterChanged } from "./jobs.js";
 import { renderFilteredResults } from "./results.js";
 import { hydrateIcons } from "./icons.js";
 
-export let currentView = "jobs";
+export let currentView = "dashboard";
 export let currentMode = "manual";
 
 // Track the previously-shown view so switchView can stop per-view
@@ -35,7 +35,7 @@ export function setCurrentMode(mode) {
 // ─── Router ───
 
 const VIEW_MAP = {
-  "/": "jobs",
+  "/": "dashboard",
   "/jobs": "jobs",
   "/new": "new",
   "/dashboard": "dashboard",
@@ -88,8 +88,8 @@ export function switchView(name) {
   // so system-info (30s) and recent-activity (60s) timers don't run
   // forever after the first dashboard visit.
   if (_previousView === "dashboard" && name !== "dashboard") {
-    import("./system-info.js").then((m) => m.stopSystemInfo?.()).catch(() => {});
-    import("./recent-activity.js").then((m) => m.stopRecentActivity?.()).catch(() => {});
+    import("./system-info.js").then((m) => m.stopSystemInfo?.()).catch((e) => console.warn("Op:", e));
+    import("./recent-activity.js").then((m) => m.stopRecentActivity?.()).catch((e) => console.warn("Op:", e));
   }
   _previousView = currentView;
   currentView = name;
@@ -139,28 +139,41 @@ export function switchView(name) {
     if (parentDetails) parentDetails.open = true;
   }
 
-  if (name === "jobs") refreshJobs().catch(() => {});
-  if (name === "new") import("./form.js").then((m) => m.initForm()).catch(() => {});
-  if (name === "recycle") import("./recycle.js").then((m) => m.refreshRecycleBin()).catch(() => {});
-  if (name === "cognition") import("./cognition.js").then((m) => m.refreshCognition()).catch(() => {});
+  if (name === "jobs") refreshJobs().catch((e) => console.warn("Op:", e));
+  if (name === "new") import("./form.js").then((m) => m.initForm()).catch((e) => console.warn("Op:", e));
+  if (name === "recycle")
+    import("./recycle.js").then((m) => m.refreshRecycleBin()).catch((e) => console.warn("Op:", e));
+  if (name === "cognition")
+    import("./cognition.js").then((m) => m.refreshCognition()).catch((e) => console.warn("Op:", e));
   if (name === "dashboard") {
-    import("./dashboard.js").then((m) => m.refreshDashboard()).catch(() => {});
-    import("./system-info.js").then((m) => m.startSystemInfo()).catch(() => {});
-    import("./recent-activity.js").then((m) => m.startRecentActivity()).catch(() => {});
+    import("./dashboard.js").then((m) => m.refreshDashboard()).catch((e) => console.warn("Op:", e));
+    import("./system-info.js").then((m) => m.startSystemInfo()).catch((e) => console.warn("Op:", e));
+    import("./recent-activity.js").then((m) => m.startRecentActivity()).catch((e) => console.warn("Op:", e));
   }
-  if (name === "auth-profiles") import("./auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch(() => {});
-  if (name === "workflows") import("./workflows.js").then((m) => m.refreshWorkflows()).catch(() => {});
-  if (name === "billing") import("./billing.js").then((m) => m.refreshBilling()).catch(() => {});
-  if (name === "audit") import("./audit.js").then((m) => m.refreshAudit()).catch(() => {});
-  if (name === "retention") import("./retention.js").then((m) => m.refreshRetention()).catch(() => {});
-  if (name === "api-keys") import("./api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch(() => {});
-  if (name === "settings") import("./settings-page.js").then((m) => m.refreshSettingsPage()).catch(() => {});
+  if (name === "auth-profiles")
+    import("./auth-profiles.js").then((m) => m.refreshAuthProfiles()).catch((e) => console.warn("Op:", e));
+  if (name === "workflows")
+    import("./workflows.js").then((m) => m.refreshWorkflows()).catch((e) => console.warn("Op:", e));
+  if (name === "billing") import("./billing.js").then((m) => m.refreshBilling()).catch((e) => console.warn("Op:", e));
+  if (name === "audit") import("./audit.js").then((m) => m.refreshAudit()).catch((e) => console.warn("Op:", e));
+  if (name === "retention")
+    import("./retention.js")
+      .then((m) => {
+        m.initRetention();
+        m.refreshRetention();
+      })
+      .catch((e) => console.warn("Op:", e));
+  if (name === "api-keys")
+    import("./api-keys-page.js").then((m) => m.refreshApiKeysPage()).catch((e) => console.warn("Op:", e));
+  if (name === "settings")
+    import("./settings-page.js").then((m) => m.refreshSettingsPage()).catch((e) => console.warn("Op:", e));
   if (name === "email-verification")
-    import("./email-verification.js").then((m) => m.refreshEmailVerification()).catch(() => {});
+    import("./email-verification.js").then((m) => m.refreshEmailVerification()).catch((e) => console.warn("Op:", e));
   if (name === "password-reset") {
     // No auto-refresh needed; form-based view
   }
-  if (name === "invitations") import("./invitations.js").then((m) => m.refreshInvitations()).catch(() => {});
+  if (name === "invitations")
+    import("./invitations.js").then((m) => m.refreshInvitations()).catch((e) => console.warn("Op:", e));
 
   writeUIState({ view: name });
 
@@ -215,7 +228,7 @@ export function onGlobalKeydown(e) {
   // Cmd+K / Ctrl+K: open command palette
   if ((e.metaKey || e.ctrlKey) && e.key === "k") {
     e.preventDefault();
-    import("./command-palette.js").then((m) => m.openCommandPalette()).catch(() => {});
+    import("./command-palette.js").then((m) => m.openCommandPalette()).catch((e) => console.warn("Op:", e));
     return;
   }
 
@@ -253,7 +266,7 @@ export function onGlobalKeydown(e) {
     // Close command palette if open
     const cp = document.getElementById("command-palette-overlay");
     if (cp && !cp.classList.contains("hidden")) {
-      import("./command-palette.js").then((m) => m.closeCommandPalette()).catch(() => {});
+      import("./command-palette.js").then((m) => m.closeCommandPalette()).catch((e) => console.warn("Op:", e));
       e.preventDefault();
       return;
     }

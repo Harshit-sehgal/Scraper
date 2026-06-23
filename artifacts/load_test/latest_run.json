@@ -1,0 +1,3 @@
+usage: run_load_test.py [-h] [--url URL] [--concurrency CONCURRENCY]
+                        [--requests REQUESTS]
+run_load_test.py: error: unrecognized arguments: --json

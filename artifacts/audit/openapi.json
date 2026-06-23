@@ -1996,7 +1996,7 @@
         "type": "object"
       },
       "WorkflowStepType": {
-        "description": "Type of action in a workflow step.",
+        "description": "Type of action in a workflow step.\n\nMembers are explicit aliases for historically-used names (OPEN\u2192GOTO,\nWAIT_FOR_TIMEOUT_LIMITED\u2192WAIT); all aliases are first-class \u2014 both names\nresolve to the same string value and both appear in ``list(``cls``)``.",
         "enum": [
           "goto",
           "goto",

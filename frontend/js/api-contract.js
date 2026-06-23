@@ -22,6 +22,8 @@ export const endpoints = {
   schemaSuggest: "/api/schema/suggest",
   urlAnalyze: "/api/url/analyze",
   workflowDraftFromUrlAnalysis: "/api/workflow-drafts/from-url-analysis",
+  workflowDraftDetectFields: (id) => `/api/workflow-drafts/${encodeURIComponent(id)}/detect-fields`,
+  workflowDraftManualMapping: (id) => `/api/workflow-drafts/${encodeURIComponent(id)}/manual-mapping`,
 
   authProfiles: "/api/auth-profiles",
   authProfilesQuery: (query) => `/api/auth-profiles?${query}`,
@@ -36,6 +38,7 @@ export const endpoints = {
 
   workflows: "/api/workflows",
   workflow: (id) => `/api/workflows/${encodeURIComponent(id)}`,
+  workflowPreview: (id) => `/api/workflows/${encodeURIComponent(id)}/preview`,
   workflowRuns: (id, limit = 50) => `/api/workflows/${encodeURIComponent(id)}/runs?limit=${encodeURIComponent(limit)}`,
   runWorkflow: (id) => `/api/workflows/${encodeURIComponent(id)}/run`,
 
@@ -103,7 +106,7 @@ export const endpointGroups = {
     "rateLimitStats",
     "topology",
   ],
-  stalePossiblyRemovable: ["workflowDraftFromUrlAnalysis", "recleanJob"],
+  stalePossiblyRemovable: ["recleanJob"],
 };
 
 export function normalizeApiPath(input) {

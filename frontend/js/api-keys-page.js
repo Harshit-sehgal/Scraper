@@ -18,34 +18,80 @@ import {
   API,
 } from "./api.js";
 import { refreshSystemStatus, refreshJobs } from "./jobs.js";
-import { toast } from "./utils.js";
+import { esc, toast } from "./utils.js";
+
+// ─── Masking helpers ───
+
+function _maskKey(key) {
+  if (!key) return "";
+  if (key.length <= 8) return "••••••••";
+  const prefix = key.slice(0, 8);
+  const suffix = key.slice(-4);
+  return `${prefix}${"•".repeat(Math.min(key.length - 12, 20))}${suffix}`;
+}
+
+function _prefixKey(key) {
+  if (!key) return "—";
+  return key.slice(0, 12) + "…";
+}
+
+// ─── Page refresh ───
 
 export async function refreshApiKeysPage() {
-  // API Key status
+  const apiKey = getApiKey();
+  const adminKey = getAdminKey();
+
+  // ── API Key card ──
   const apiKeyStatus = document.getElementById("api-key-status");
   const apiKeyInput = document.getElementById("api-key-input");
+  const apiKeyDisplay = document.getElementById("api-key-display");
+  const apiKeyCreated = document.getElementById("api-key-created");
+  const apiKeyLastUsed = document.getElementById("api-key-last-used");
+
   if (apiKeyStatus) {
-    const hasKey = !!getApiKey();
-    apiKeyStatus.textContent = hasKey ? "Set" : "Not set";
-    apiKeyStatus.className = "badge" + (hasKey ? " running" : "");
+    apiKeyStatus.textContent = apiKey ? "Active" : "Not set";
+    apiKeyStatus.className = "badge" + (apiKey ? " completed" : "");
   }
   if (apiKeyInput) {
-    apiKeyInput.value = getApiKey() || "";
+    apiKeyInput.value = apiKey || "";
+  }
+  if (apiKeyDisplay) {
+    apiKeyDisplay.textContent = apiKey ? _maskKey(apiKey) : "pk_live_••••••••••••";
+    apiKeyDisplay.dataset.visible = "false";
+  }
+  if (apiKeyCreated) {
+    apiKeyCreated.textContent = "Created: " + (apiKey ? "this session" : "—");
+  }
+  if (apiKeyLastUsed) {
+    apiKeyLastUsed.textContent = "Last used: " + (apiKey ? "just now" : "—");
   }
 
-  // Admin Key status
+  // ── Admin Key card ──
   const adminKeyStatus = document.getElementById("admin-key-status");
   const adminKeyInput = document.getElementById("admin-key-input");
+  const adminKeyDisplay = document.getElementById("admin-key-display");
+  const adminKeyCreated = document.getElementById("admin-key-created");
+  const adminKeyRevoked = document.getElementById("admin-key-revoked");
+
   if (adminKeyStatus) {
-    const hasKey = !!getAdminKey();
-    adminKeyStatus.textContent = hasKey ? "Set" : "Not set";
-    adminKeyStatus.className = "badge" + (hasKey ? " running" : "");
+    adminKeyStatus.textContent = adminKey ? "Set" : "Inactive";
+    adminKeyStatus.className = "badge" + (adminKey ? " running" : " canceled");
   }
   if (adminKeyInput) {
-    adminKeyInput.value = getAdminKey() || "";
+    adminKeyInput.value = adminKey || "";
+  }
+  if (adminKeyDisplay) {
+    adminKeyDisplay.textContent = adminKey ? _maskKey(adminKey) : "sk_admin_••••••••••••••";
+    adminKeyDisplay.dataset.visible = "false";
+  }
+  if (adminKeyCreated) {
+    adminKeyCreated.textContent = "Created: " + (adminKey ? "this session" : "—");
+  }
+  if (adminKeyRevoked) {
+    adminKeyRevoked.textContent = "Revoked: —";
   }
 
-  // Session status
+  // ── Session card ──
   const sessionStatus = document.getElementById("session-status");
   const sessionInfo = document.getElementById("session-info");
   const authed = isSessionAuthenticated();
@@ -62,11 +108,11 @@ export async function refreshApiKeysPage() {
       sessionInfo.innerHTML = `
         <div class="api-keys-session-row">
           <span class="api-keys-session-label">User ID</span>
-          <span class="api-keys-session-value">${user.user_id || "—"}</span>
+          <span class="api-keys-session-value">${esc(user.user_id || "") || "—"}</span>
         </div>
         <div class="api-keys-session-row">
           <span class="api-keys-session-label">Role</span>
-          <span class="api-keys-session-value">${role || "—"}</span>
+          <span class="api-keys-session-value">${esc(role) || "—"}</span>
         </div>
         <div class="api-keys-session-row">
           <span class="api-keys-session-label">Admin access</span>
@@ -82,6 +128,26 @@ export async function refreshApiKeysPage() {
   if (settingsApiUrl) {
     settingsApiUrl.textContent = API;
   }
+
+  // ── Access log table (placeholder — no backend endpoint yet) ──
+  _renderAccessLogPlaceholder();
+}
+
+// ─── Access log rendering ───
+
+function _renderAccessLogPlaceholder() {
+  const tbody = document.getElementById("access-log-list");
+  if (!tbody) return;
+  // If we already have real rows, don't overwrite
+  if (tbody.querySelector("tr:not(.empty-row)")) return;
+  tbody.innerHTML = `
+    <tr class="empty-row">
+      <td colspan="5">
+        <div class="empty-state">
+          <p class="subtle">No access logs available yet.</p>
+        </div>
+      </td>
+    </tr>`;
 }
 
 // ─── Action Handlers ───
@@ -95,12 +161,14 @@ export function saveApiKeyFromPage() {
     return;
   }
   setApiKey(key);
+  // Hide the key input after saving
+  input.type = "password";
   loginWithApiKey(key)
     .then((ok) => {
       if (ok) {
         toast("API key saved and session established", "success");
-        refreshSystemStatus().catch(() => {});
-        refreshJobs().catch(() => {});
+        refreshSystemStatus().catch((e) => console.warn("Op:", e));
+        refreshJobs().catch((e) => console.warn("Op:", e));
       } else {
         toast("Key saved but session could not be established", "warning");
       }
@@ -127,6 +195,7 @@ export function saveAdminKeyFromPage() {
     return;
   }
   setAdminKey(key);
+  input.type = "password";
   toast("Admin key saved for this session", "success");
   refreshApiKeysPage();
 }
@@ -139,16 +208,68 @@ export function clearAdminKeyFromPage() {
 
 export function toggleApiKeyVisibility() {
   const input = document.getElementById("api-key-input");
-  if (input) {
-    input.type = input.type === "password" ? "text" : "password";
+  const display = document.getElementById("api-key-display");
+  const btn = document.getElementById("btn-api-key-toggle-vis");
+
+  const key = getApiKey();
+  if (!key) {
+    // No key set — toggle input field type
+    if (input) input.type = input.type === "password" ? "text" : "password";
+    return;
   }
+
+  // Key is set — toggle the display row
+  if (display) {
+    const isVisible = display.dataset.visible === "true";
+    if (isVisible) {
+      display.textContent = _maskKey(key);
+      display.dataset.visible = "false";
+      if (btn) btn.title = "Show Key";
+    } else {
+      display.textContent = key;
+      display.dataset.visible = "true";
+      if (btn) btn.title = "Hide Key";
+    }
+  }
+  if (input) input.type = "password";
 }
 
 export function toggleAdminKeyVisibility() {
   const input = document.getElementById("admin-key-input");
-  if (input) {
-    input.type = input.type === "password" ? "text" : "password";
+  const display = document.getElementById("admin-key-display");
+  const btn = document.getElementById("btn-admin-key-toggle-vis");
+
+  const key = getAdminKey();
+  if (!key) {
+    if (input) input.type = input.type === "password" ? "text" : "password";
+    return;
   }
+
+  if (display) {
+    const isVisible = display.dataset.visible === "true";
+    if (isVisible) {
+      display.textContent = _maskKey(key);
+      display.dataset.visible = "false";
+      if (btn) btn.title = "Show Key";
+    } else {
+      display.textContent = key;
+      display.dataset.visible = "true";
+      if (btn) btn.title = "Hide Key";
+    }
+  }
+  if (input) input.type = "password";
+}
+
+export function copyApiKey() {
+  const key = getApiKey();
+  if (!key) {
+    toast("No API key to copy", "warning");
+    return;
+  }
+  navigator.clipboard
+    .writeText(key)
+    .then(() => toast("API key copied to clipboard", "success"))
+    .catch(() => toast("Failed to copy key", "error"));
 }
 
 export async function logoutFromPage() {
@@ -160,4 +281,8 @@ export async function logoutFromPage() {
 export async function refreshSession() {
   await checkSession();
   refreshApiKeysPage();
+}
+
+export function generateApiKey() {
+  toast("Key generation requires backend support — use an existing key for now", "info");
 }

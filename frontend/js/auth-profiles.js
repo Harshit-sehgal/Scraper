@@ -10,7 +10,33 @@ let _allProfiles = [];
 let _isLoading = false;
 
 // ─── Helpers ───
+function _formatDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString([], { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function _formatTimestamp(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return (
+    d.toLocaleString([], {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }) + " UTC"
+  );
+}
+
 function _authProfileRow(profile) {
+  const isExpired = profile.status === "expired" || profile.status === "revoked" || profile.status === "failed";
+  const rowClass = isExpired ? "profile-expired" : "";
+  const expiryClass = isExpired ? "expired" : "";
+
   const statusBadgeClass =
     {
       active: "badge completed",
@@ -22,58 +48,77 @@ function _authProfileRow(profile) {
 
   const statusLabel = profile.status.replace(/_/g, " ");
 
+  // Build actions based on status — matching auth_profiles_app_auth_profiles stitch
+  let actions = "";
+  if (profile.status === "active" || profile.status === "pending_login") {
+    actions += `<a class="action-link" data-action="reconnect-auth-profile" data-id="${attrStr(profile.id)}">Edit</a> `;
+    actions += `<a class="action-link action-muted" data-action="validate-auth-profile" data-id="${attrStr(profile.id)}">Test</a> `;
+    actions += `<a class="action-link action-remove" data-action="revoke-auth-profile" data-id="${attrStr(profile.id)}">Remove</a>`;
+  } else if (profile.status === "expired") {
+    actions += `<a class="action-link" data-action="reconnect-auth-profile" data-id="${attrStr(profile.id)}">Renew</a> `;
+    actions += `<a class="action-link action-remove" data-action="revoke-auth-profile" data-id="${attrStr(profile.id)}">Remove</a>`;
+  } else {
+    actions += `<a class="action-link" data-action="reconnect-auth-profile" data-id="${attrStr(profile.id)}">Reconnect</a> `;
+    actions += `<a class="action-link action-remove" data-action="revoke-auth-profile" data-id="${attrStr(profile.id)}">Remove</a>`;
+  }
+
   return `
-    <div class="job-row" data-profile-id="${attrStr(profile.id)}">
-      <div class="job-name-col">
-        <div class="job-name">${esc(profile.name)}</div>
-        <div class="job-urls">${esc(profile.description || "")}</div>
-      </div>
-      <div class="job-urls">${esc(profile.domain)}</div>
-      <div>
-        <span class="${statusBadgeClass}">${esc(statusLabel)}</span>
-      </div>
-      <div class="job-actions">
-        ${profile.status === "active" || profile.status === "expired" ? `<button type="button" class="btn ghost small" data-action="reconnect-auth-profile" data-id="${attrStr(profile.id)}">🔗 Reconnect</button>` : ""}
-        <button type="button" class="btn danger-ghost small" data-action="revoke-auth-profile" data-id="${attrStr(profile.id)}">Revoke</button>
-      </div>
-    </div>
+    <tr class="${rowClass}" data-profile-id="${attrStr(profile.id)}">
+      <td class="col-profile-name" data-label="Profile Name">${esc(profile.name)}</td>
+      <td class="col-profile-domain" data-label="Target Domain">${esc(profile.domain)}</td>
+      <td class="col-profile-last-used" data-label="Last Used">${esc(_formatTimestamp(profile.last_used || profile.updated_at))}</td>
+      <td class="col-profile-expiry ${expiryClass}" data-label="Expiry">${esc(_formatDate(profile.expires_at))}</td>
+      <td class="col-profile-status" data-label="Status"><span class="${statusBadgeClass}">${esc(statusLabel)}</span></td>
+      <td class="col-profile-actions" data-label="Actions">${actions}</td>
+    </tr>
   `;
 }
 
 function _renderProfiles(profiles) {
-  const container = document.getElementById("auth-profiles-list");
-  const emptyState = document.getElementById("auth-profiles-empty-state");
+  const tbody = document.getElementById("auth-profiles-list");
+  const emptyRow = document.getElementById("auth-profiles-empty-state-row");
+  const rangeEl = document.getElementById("auth-profiles-pagination-range");
 
-  if (!container) return;
-
-  // Remove existing rows (keep empty state)
-  Array.from(container.querySelectorAll(".job-row")).forEach((row) => row.remove());
+  if (!tbody) return;
 
   if (profiles.length === 0) {
-    if (emptyState) emptyState.style.display = "";
+    tbody.innerHTML = "";
+    if (emptyRow) {
+      tbody.appendChild(emptyRow);
+      const empty = emptyRow.querySelector("#auth-profiles-empty-state");
+      if (empty) empty.style.display = "";
+    }
+    if (rangeEl) rangeEl.textContent = "Showing 0 profiles";
     return;
   }
 
-  if (emptyState) emptyState.style.display = "none";
+  // Hide empty state
+  tbody.innerHTML = profiles.map((p) => _authProfileRow(p)).join("");
 
-  for (const profile of profiles) {
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML = _authProfileRow(profile);
-    container.appendChild(wrapper.firstElementChild);
+  // Pagination range
+  if (rangeEl) {
+    rangeEl.textContent = `Showing 1 to ${profiles.length} of ${_allProfiles.length} profiles`;
   }
 
   // Re-attach event listeners
-  container.querySelectorAll("[data-action='reconnect-auth-profile']").forEach((btn) => {
+  tbody.querySelectorAll("[data-action='reconnect-auth-profile']").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const id = e.currentTarget.dataset.id;
       reconnectAuthProfile(id);
     });
   });
 
-  container.querySelectorAll("[data-action='revoke-auth-profile']").forEach((btn) => {
+  tbody.querySelectorAll("[data-action='revoke-auth-profile']").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const id = e.currentTarget.dataset.id;
       revokeAuthProfile(id);
+    });
+  });
+
+  tbody.querySelectorAll("[data-action='validate-auth-profile']").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const id = e.currentTarget.dataset.id;
+      validateAuthProfile(id);
     });
   });
 }

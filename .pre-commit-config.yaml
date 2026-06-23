@@ -33,6 +33,7 @@ repos:
           - pydantic-settings
           - types-requests
           - types-beautifulsoup4
+          - types-redis
         # Only scan backend/app; scripts/ and other dirs have module namespace issues
         args: [backend/app, --check-untyped-defs]
         pass_filenames: false

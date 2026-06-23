@@ -45,7 +45,7 @@
     _dashboardApiKey = (key || "").trim();
   }
 
-  function clearDashboardApiKey() {
+  function _clearDashboardApiKey() {
     _dashboardApiKey = "";
   }
 

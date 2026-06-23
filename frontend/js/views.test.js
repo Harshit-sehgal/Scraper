@@ -19,6 +19,7 @@ vi.mock("./utils.js", () => ({
   isShortcutsVisible: vi.fn(() => false),
   closeConfirm: vi.fn(),
   isConfirmVisible: vi.fn(() => false),
+  setEngineStatus: vi.fn(),
 }));
 
 // Import mocked utils after vi.mock so we get the mock implementations
@@ -54,8 +55,8 @@ function setupDOM() {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("view state management", () => {
-  it("starts with jobs view and manual mode", () => {
-    expect(currentView).toBe("jobs");
+  it("starts with dashboard view and manual mode", () => {
+    expect(currentView).toBe("dashboard");
     expect(currentMode).toBe("manual");
   });
 

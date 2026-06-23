@@ -182,8 +182,6 @@ _EXTRA_RESEARCH_MODULES: frozenset[str] = frozenset(
         "event_dispatcher",
         # ── Policy engine (research variant) ───────────────────────────
         "policy_engine",
-        # ── Patch status / patch health ────────────────────────────────
-        "patch_status",
         # ── Visualization (used only by experimental dashboard) ───────
         "visualization",
     },
@@ -354,7 +352,6 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "transaction_context",
             "event_dispatcher",
             "policy_engine",
-            "patch_status",
             "graph_update_scheduler",
         ),
     ),

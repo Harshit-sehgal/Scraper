@@ -7,6 +7,7 @@
    ──────────────────────────────────────────────────────────────*/
 
 const ICON_PATHS = {
+  menu: ["M40 64h176M40 128h176M40 192h176"],
   home: [
     "M218.83 103.77 152.36 37.3a8.36 8.36 0 0 0-11.57 0L24.62 143.51a8.51 8.51 0 0 0-3.83 6.85L20 213.66A20.62 20.62 0 0 0 40.61 234.27h76.27a4 4 0 0 0 4-4V199.94a12 12 0 0 1 12-12h30a12 12 0 0 1 12 12v30.33a4 4 0 0 0 4 4h76.55a20.62 20.62 0 0 0 20.57-20.85l-.81-63.31a8.46 8.46 0 0 0-3.36-6.34Z",
   ],
@@ -129,6 +130,12 @@ const ICON_PATHS = {
   clock: [
     "M128 24a104 104 0 1 0 104 104A104.13 104.13 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm64-104a8 8 0 0 1-8 8h-56a8 8 0 0 1-8-8V64a8 8 0 0 1 16 0v48h48a8 8 0 0 1 8 8Z",
   ],
+  chartBar: [
+    "M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16Zm0 160H40V56h176v144ZM60 168v-28a8 8 0 0 1 16 0v28a8 8 0 0 1-16 0Zm40 0v-52a8 8 0 0 1 16 0v52a8 8 0 0 1-16 0Zm40 0v-76a8 8 0 0 1 16 0v76a8 8 0 0 1-16 0Zm40 0V96a8 8 0 0 1 16 0v72a8 8 0 0 1-16 0Z",
+  ],
+  tag: [
+    "M243.31 136.14 151.88 44.71A15.86 15.86 0 0 0 140.69 40H40a16 16 0 0 0-16 16v100.69a15.86 15.86 0 0 0 4.71 11.19l91.43 91.43a16 16 0 0 0 22.63 0l100.54-100.54a16 16 0 0 0 0-22.63ZM131.31 240 40 148.69V56h92.69L224 147.31ZM92 88a12 12 0 1 1-12 12 12 12 0 0 1 12-12Z",
+  ],
   lock: [
     "M208 80h-32V56a48 48 0 0 0-96 0v24H48a16 16 0 0 0-16 16v112a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V96a16 16 0 0 0-16-16ZM96 56a32 32 0 0 1 64 0v24H96Zm112 152H48V96h160Z",
   ],
@@ -152,6 +159,53 @@ const ICON_PATHS = {
   users: [
     "M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z",
   ],
+  wrench: [
+    "M220.74 66.36a8 8 0 0 0-13.24-3.24l-38.63 38.62-26.61-26.61 38.62-38.63a8 8 0 0 0-3.24-13.24A72 72 0 0 0 90.4 110.5L28.69 172.2a32 32 0 0 0 45.11 45.11l61.7-61.71a72 72 0 0 0 85.24-89.24ZM62.49 206a16 16 0 1 1-22.62-22.62l64-64a8 8 0 0 0 1.8-8.62 56 56 0 0 1 53.66-74l-34.04 34.06a8 8 0 0 0 0 11.31l38.58 38.58a8 8 0 0 0 11.31 0l34.06-34.04a56 56 0 0 1-74 53.66 8 8 0 0 0-8.62 1.8Z",
+  ],
+};
+
+const MATERIAL_ICON_ALIASES = {
+  ac_unit: "archive",
+  account_circle: "user",
+  account_tree: "sliders",
+  add: "plus",
+  add_box: "plus",
+  admin_panel_settings: "shield",
+  analytics: "chartBar",
+  archive: "archive",
+  chevron_left: "chevronLeft",
+  chevron_right: "chevronRight",
+  content_copy: "copy",
+  dashboard: "home",
+  dark_mode: "moon",
+  data_object: "code",
+  delete: "trash",
+  delete_forever: "trash",
+  delete_sweep: "trash",
+  group: "users",
+  help: "info",
+  history: "clock",
+  keyboard: "code",
+  key: "key",
+  list_alt: "briefcase",
+  mail: "mail",
+  menu: "menu",
+  notifications: "bell",
+  palette: "sparkle",
+  payments: "creditCard",
+  person: "user",
+  receipt_long: "fileText",
+  refresh: "refresh",
+  rocket_launch: "arrowUpRight",
+  schedule: "clock",
+  science: "flask",
+  search: "search",
+  settings: "settings",
+  tune: "sliders",
+  verified_user: "shield",
+  visibility: "eye",
+  vpn_key: "key",
+  warning: "alertTriangle",
 };
 
 /**
@@ -174,6 +228,24 @@ export function icon(name, size = 16, extraClasses = "") {
 
 export const ICON_NAMES = Object.keys(ICON_PATHS);
 
+function iconSizeForElement(el) {
+  const explicit = parseInt(el.dataset.size || "", 10);
+  if (Number.isFinite(explicit)) return explicit;
+  const inlineSize = parseInt(el.style?.fontSize || "", 10);
+  if (Number.isFinite(inlineSize)) return inlineSize;
+  if (el.classList?.contains("nav-icon")) return 18;
+  return 16;
+}
+
+function hydrateMaterialIcon(el) {
+  if (el.firstElementChild?.tagName === "svg") return;
+  const ligature = (el.textContent || "").trim();
+  const name = MATERIAL_ICON_ALIASES[ligature];
+  if (!name) return;
+  el.dataset.materialIcon = ligature;
+  el.innerHTML = icon(name, iconSizeForElement(el));
+}
+
 /**
  * Hydrate any [data-icon] element in `root` (default: document) with the
  * named icon SVG. Skips elements already containing an `<svg>`. The element's
@@ -187,6 +259,7 @@ export function hydrateIcons(root = document) {
     const size = parseInt(el.dataset.size || "16", 10);
     el.innerHTML = icon(name, size);
   });
+  root.querySelectorAll(".material-symbols-outlined").forEach((el) => hydrateMaterialIcon(el));
 }
 
 // Auto-hydrate any [data-icon] elements that get added to the DOM after
@@ -216,6 +289,10 @@ export function startIconObserver(target = document.body) {
             const size = parseInt(el.dataset.size || "16", 10);
             el.innerHTML = icon(name, size);
           });
+          if (node.matches?.(".material-symbols-outlined")) {
+            hydrateMaterialIcon(node);
+          }
+          node.querySelectorAll(".material-symbols-outlined").forEach((el) => hydrateMaterialIcon(el));
         }
       });
     }

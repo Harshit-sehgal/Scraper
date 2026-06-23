@@ -1,5 +1,5 @@
 {
-  "route_count": 160,
+  "route_count": 161,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -2494,6 +2494,22 @@
       "required_role_if_known": "",
       "response_model_if_known": "",
       "router_module": "app.routers.health",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "",
+      "category": "docs/openapi/static/dev routes",
+      "handler_function": "Mount",
+      "method": "MOUNT",
+      "middleware_protected": "no",
+      "notes": "mounted ASGI/static route",
+      "path": "/landing",
+      "public_or_protected": "public",
+      "request_model_if_known": "",
+      "required_role_if_known": "",
+      "response_model_if_known": "",
+      "router_module": "starlette.routing",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
     },

@@ -112,7 +112,7 @@ class TestCSPReportOnlyToggle:
         # Re-create the middleware with the toggle off by patching the
         # settings object it reads.
         from app.config import settings
-        from app.middlewares import csp_report_only_middleware
+        from app.middlewares import csp_middleware
 
         original = settings.CSP_REPORT_ONLY
         monkeypatch.setattr(settings, "CSP_REPORT_ONLY", False)
@@ -133,7 +133,7 @@ class TestCSPReportOnlyToggle:
                 return ResponseShim()
 
             request = Request(scope, receive)
-            response = await csp_report_only_middleware(request, call_next)
+            response = await csp_middleware(request, call_next)
             assert "content-security-policy-report-only" not in {k.lower() for k in response.headers}
         finally:
             monkeypatch.setattr(settings, "CSP_REPORT_ONLY", original)

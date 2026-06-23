@@ -107,7 +107,7 @@ test-telegram: ## Print the current Telegram notifier status
 
 test-telegram-ping: ## Send a one-off test message via the configured bot
 	@PYTHONPATH=backend python3 scripts/send_telegram.py --enable \
-		"🔔 DataForge test ping — sent at $(date -u +%FT%TZ)"
+		"DataForge test ping — sent at $$(date -u +%FT%TZ)"
 
 test-telegram-summary: ## Send a fake pass/fail summary via the bot (override RESULT/COUNT via env)
 	@PYTHONPATH=backend python3 scripts/send_telegram.py --enable --summary \

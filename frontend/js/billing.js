@@ -34,10 +34,27 @@ function renderPlan(plan) {
     const el = document.getElementById(id);
     if (el) el.textContent = String(val);
   };
+  const setMeter = (id, pct) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const clamped = Math.min(100, Math.max(0, pct));
+    el.style.width = `${clamped}%`;
+    el.classList.remove("fill-warning", "fill-critical");
+    if (clamped > 95) el.classList.add("fill-critical");
+    else if (clamped > 80) el.classList.add("fill-warning");
+  };
+
   setText("billing-kpi-tier", TIER_LABELS[plan.tier] || plan.tier || "—");
-  setText("billing-kpi-jobs", plan.max_jobs ?? "—");
-  setText("billing-kpi-scrapes", plan.max_scrapes ?? "—");
-  setText("billing-kpi-teammates", plan.max_teammates ?? "—");
+
+  const maxJobs = plan.max_jobs ?? 0;
+  const usedJobs = plan.used_jobs ?? 0;
+  setText("billing-kpi-jobs", maxJobs > 0 ? `${usedJobs} / ${maxJobs}` : String(maxJobs || "—"));
+  setMeter("billing-meter-jobs", maxJobs > 0 ? (usedJobs / maxJobs) * 100 : 0);
+
+  const maxScrapes = plan.max_scrapes ?? 0;
+  const usedScrapes = plan.used_scrapes ?? 0;
+  setText("billing-kpi-scrapes", maxScrapes > 0 ? `${usedScrapes} / ${maxScrapes}` : String(maxScrapes || "—"));
+  setMeter("billing-meter-scrapes", maxScrapes > 0 ? (usedScrapes / maxScrapes) * 100 : 0);
 
   const featuresEl = document.getElementById("billing-features");
   if (featuresEl) {

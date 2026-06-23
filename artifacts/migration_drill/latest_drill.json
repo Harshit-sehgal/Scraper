@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-06-23T14:43:37.884952+00:00",
+  "status": "passed",
+  "rows_initial": {
+    "jobs": 3,
+    "job_results": 1,
+    "idempotency_keys": 1,
+    "recycle_bin": 1
+  },
+  "rows_after_rollback": 3,
+  "rows_after_remigration": 3,
+  "notes": "Migration rollback drill completed. Additive columns can be rolled back without data loss."
+}

@@ -2,7 +2,7 @@
    DataForge — URL Analyzer Tests
    ═══════════════════════════════════════════ */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   toggleAllFields,
   clearAnalysis,
@@ -13,12 +13,18 @@ import {
   renderAcquisitionBanner,
   renderIntelligencePanel,
   renderWorkflowDraftPanel,
+  createWorkflowDraftFromAnalysis,
+  detectWorkflowDraftFields,
+  saveWorkflowFromBuilder,
+  previewWorkflowFromBuilder,
+  runWorkflowFromBuilder,
 } from "./analyzer.js";
 
 // ─── Setup / Teardown ──────────────────────────────────────────────────────
 
 beforeEach(() => {
   document.body.innerHTML = `
+    <div id="toasts"></div>
     <div id="analyze-field-list"></div>
     <div id="analyze-field-count"></div>
     <div id="analyze-results" class="hidden"></div>
@@ -48,16 +54,49 @@ beforeEach(() => {
       <p id="workflow-builder-reason"></p>
       <div id="workflow-builder-fields"></div>
       <textarea id="workflow-builder-mapping"></textarea>
+      <textarea id="workflow-builder-snapshot"></textarea>
       <div id="workflow-builder-preview-table"></div>
       <ol id="workflow-builder-timeline"></ol>
       <div id="workflow-builder-failure" class="hidden"></div>
+      <button id="workflow-builder-detect"></button>
+      <button id="workflow-builder-preview"></button>
+      <button id="workflow-builder-save"></button>
+      <button id="workflow-builder-run"></button>
     </div>
   `;
 });
 
 afterEach(() => {
+  clearAnalysis();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function createDraftWithMock(fetchMock) {
+  document.getElementById("inp-analyze-url").value = "https://example.com/search/results?sessionId=abc123xyz789";
+  fetchMock.mockResolvedValueOnce(
+    jsonResponse(
+      {
+        id: "draft-1",
+        status: "draft",
+        original_url: "https://example.com/search/results?sessionId=abc1...x789",
+        selected_start_url: "https://example.com/search",
+        detected_reason: "session URL test fixture",
+        recommended_start_urls: [{ url: "https://example.com/search", confidence: 0.72 }],
+      },
+      201,
+    ),
+  );
+  return createWorkflowDraftFromAnalysis();
+}
 
 // ─── State Accessors ────────────────────────────────────────────────────────
 
@@ -345,6 +384,7 @@ describe("renderIntelligencePanel()", () => {
 describe("renderWorkflowDraftPanel()", () => {
   it("renders a workflow replay draft handoff with redacted original URL", () => {
     renderWorkflowDraftPanel({
+      id: "draft-1",
       status: "draft",
       original_url: "https://example.com/search/results?sessionId=abc1...x789",
       selected_start_url: "https://example.com/search",
@@ -368,5 +408,126 @@ describe("renderWorkflowDraftPanel()", () => {
     expect(document.getElementById("workflow-builder-fields").textContent).toContain("Keyword");
     expect(document.getElementById("workflow-builder-mapping").value).toContain("suggested_start_urls");
     expect(document.getElementById("workflow-builder-timeline").textContent).toContain("Draft created");
+    expect(document.getElementById("workflow-builder-detect").disabled).toBe(false);
+    expect(document.getElementById("workflow-builder-save").disabled).toBe(false);
+    expect(document.getElementById("workflow-builder-preview").disabled).toBe(true);
+    expect(document.getElementById("workflow-builder-run").disabled).toBe(true);
+  });
+});
+
+describe("workflow builder actions", () => {
+  it("detects fields from snapshot HTML through the draft endpoint", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await createDraftWithMock(fetchMock);
+    document.getElementById("workflow-builder-snapshot").value = `
+      <form>
+        <label for="q">Keyword</label>
+        <input id="q" name="q" type="search">
+        <button id="submit" type="submit">Search</button>
+      </form>
+    `;
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        draft_id: "draft-1",
+        start_url: "https://example.com/search",
+        field_count: 2,
+        fields: [
+          { label: "Keyword", selector: "#q", type: "search", confidence: 0.9 },
+          { label: "Search", selector: "#submit", type: "submit", confidence: 0.8 },
+        ],
+      }),
+    );
+
+    const result = await detectWorkflowDraftFields();
+
+    expect(result.field_count).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain("/api/workflow-drafts/draft-1/detect-fields");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).html_snapshot).toContain("<form>");
+    expect(document.getElementById("workflow-builder-fields").textContent).toContain("Keyword");
+    expect(document.getElementById("workflow-builder-mapping").value).toContain('"selector": "#q"');
+    expect(document.getElementById("workflow-builder-mapping").value).toContain('"selector": "#submit"');
+  });
+
+  it("saves manual mapping and enables preview and run controls", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await createDraftWithMock(fetchMock);
+    document.getElementById("workflow-builder-mapping").value = JSON.stringify({
+      name: "Saved Search",
+      start_url: "https://example.com/search",
+      fields: [{ label: "Keyword", selector: "#q", value: "laptops", action: "fill" }],
+      submit_action: { action: "click", selector: "#submit" },
+      extraction_schema: [{ name: "title", field_type: "string", required: false }],
+    });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          id: "workflow-1",
+          name: "Saved Search",
+          status: "draft",
+        },
+        201,
+      ),
+    );
+
+    const saved = await saveWorkflowFromBuilder();
+
+    expect(saved.id).toBe("workflow-1");
+    expect(fetchMock.mock.calls[1][0]).toContain("/api/workflow-drafts/draft-1/manual-mapping");
+    const payload = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(payload.name).toBe("Saved Search");
+    expect(payload.fields[0].selector).toBe("#q");
+    expect(document.getElementById("workflow-builder-status").textContent).toBe("saved");
+    expect(document.getElementById("workflow-builder-preview").disabled).toBe(false);
+    expect(document.getElementById("workflow-builder-run").disabled).toBe(false);
+  });
+
+  it("previews saved workflow rows and queues a run", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await createDraftWithMock(fetchMock);
+    document.getElementById("workflow-builder-mapping").value = JSON.stringify({
+      name: "Preview Search",
+      start_url: "https://example.com/search",
+      fields: [],
+      extraction_schema: [{ name: "title", field_type: "string", required: false }],
+    });
+    document.getElementById("workflow-builder-snapshot").value =
+      '<div class="result"><span class="title">Laptop Pro</span></div>';
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "workflow-1", name: "Preview Search", status: "draft" }, 201));
+    await saveWorkflowFromBuilder();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        workflow_id: "workflow-1",
+        preview_status: "succeeded",
+        sample_rows: [{ title: "Laptop Pro" }],
+        timeline: [{ action: "goto", selector: "", status: "ok" }],
+      }),
+    );
+
+    const preview = await previewWorkflowFromBuilder();
+
+    expect(preview.preview_status).toBe("succeeded");
+    expect(fetchMock.mock.calls[2][0]).toContain("/api/workflows/workflow-1/preview");
+    expect(document.getElementById("workflow-builder-preview-table").textContent).toContain("Laptop Pro");
+    expect(document.getElementById("workflow-builder-timeline").textContent).toContain("goto");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        workflow_id: "workflow-1",
+        job_id: "job-1",
+        run_id: "run-1",
+        status: "queued",
+      }),
+    );
+
+    const run = await runWorkflowFromBuilder();
+
+    expect(run.status).toBe("queued");
+    expect(fetchMock.mock.calls[3][0]).toContain("/api/workflows/workflow-1/run");
+    expect(document.getElementById("workflow-builder-status").textContent).toBe("queued");
+    expect(document.getElementById("workflow-builder-timeline").textContent).toContain("job-1");
   });
 });

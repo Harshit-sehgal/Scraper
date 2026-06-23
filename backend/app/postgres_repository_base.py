@@ -794,6 +794,10 @@ class PostgresRepositoryBase(JobRepository, ABC):
                         mark_recovered_failed(job)
                         dirty_ids.append(job.id)
                     if dirty_ids:
+                        # Persist the state-machine decision (mark_recovered_failed
+                        # on line 794 already mutated the Python objects) to the DB.
+                        # The raw SQL duplicates what transition_to decided because
+                        # we need to write it atomically in this txn.
                         self._execute(
                             conn,
                             "UPDATE jobs SET status = 'failed',"

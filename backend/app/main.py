@@ -31,7 +31,7 @@ from app.lifespan import (
 from app.middlewares import (
     api_key_middleware,
     body_size_middleware,
-    csp_report_only_middleware,
+    csp_middleware,
     latency_tracking_middleware,
     rate_limiter,
     security_headers_middleware,
@@ -110,7 +110,7 @@ def configure_middleware(app: FastAPI) -> None:
         allow_headers=["authorization", "content-type", "x-api-key"],
     )
     app.middleware("http")(security_headers_middleware)
-    app.middleware("http")(csp_report_only_middleware)
+    app.middleware("http")(csp_middleware)
     app.middleware("http")(body_size_middleware)
     app.middleware("http")(api_key_middleware)
     app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
@@ -123,7 +123,14 @@ class SPAStaticFiles(StaticFiles):
     JavaScript's History API (e.g. ``/app/jobs``, ``/app/workflows``).
     """
 
+    def __init__(self, *args, client_route_prefixes: set[str] | None = None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.client_route_prefixes = frozenset(client_route_prefixes or set())
+
     async def get_response(self, path: str, scope):
+        first_segment = path.strip("/").split("/", 1)[0]
+        if first_segment in self.client_route_prefixes:
+            return await super().get_response("index.html", scope)
         try:
             return await super().get_response(path, scope)
         except StarletteHTTPException as exc:
@@ -142,7 +149,34 @@ def configure_static(app: FastAPI) -> None:
 
     frontend_dir = Path(__file__).parent.parent.parent / "frontend"
     if frontend_dir.exists():
-        app.mount("/app", SPAStaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+        app.mount(
+            "/app",
+            SPAStaticFiles(
+                directory=str(frontend_dir),
+                html=True,
+                client_route_prefixes={
+                    "api-keys",
+                    "audit",
+                    "auth-profiles",
+                    "billing",
+                    "cognition",
+                    "dashboard",
+                    "email-verification",
+                    "invitations",
+                    "jobs",
+                    "new",
+                    "password-reset",
+                    "recycle",
+                    "retention",
+                    "settings",
+                    "workflows",
+                },
+            ),
+            name="frontend",
+        )
+        landing_dir = frontend_dir / "landing"
+        if landing_dir.exists():
+            app.mount("/landing", StaticFiles(directory=str(landing_dir), html=True), name="landing")
         dashboard_dir = frontend_dir / "dashboard"
         if dashboard_dir.exists():
             app.mount("/dashboard", SPAStaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")

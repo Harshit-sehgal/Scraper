@@ -64,4 +64,5 @@ def test_network_marker_is_recognised() -> None:
     raised a ``PytestUnknownMarkWarning`` at collection. The fact that
     it ran is the assertion.
     """
+    # Test ran => @pytest.mark.network is registered and accepted
     assert True

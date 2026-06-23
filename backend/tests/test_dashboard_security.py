@@ -34,3 +34,23 @@ def test_dashboard_static_assets_mime_types(client) -> None:
     # Check favicon
     resp = client.get("/favicon.svg")
     assert resp.status_code in (200, 404)
+
+
+def test_landing_static_page_is_mounted_for_local_preview(client) -> None:
+    """The local FastAPI preview should expose the nginx-served landing page."""
+    resp = client.get("/landing/")
+
+    assert resp.status_code == 200
+    assert "DataForge" in resp.text
+    assert "/landing/style.css" in resp.text
+
+
+def test_app_dashboard_route_serves_main_spa_not_legacy_dashboard(client) -> None:
+    """Client-side /app/dashboard must resolve to the main app shell."""
+    resp = client.get("/app/dashboard")
+    if resp.status_code in {301, 302, 307, 308}:
+        resp = client.get(resp.headers["location"])
+
+    assert resp.status_code == 200
+    assert 'id="nav-dashboard"' in resp.text
+    assert 'src="/app/app.js' in resp.text

@@ -17,8 +17,16 @@ test.describe("New job form interaction", () => {
     // Navigate to the new job view — initForm() runs and dispatches
     // ``dataforge:form-ready`` once it has finished resetting the form
     // (including the awaited auth-profile dropdown refresh).
-    await page.locator("#btn-create-new").click();
+    const formReady = page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          document.addEventListener("dataforge:form-ready", resolve, { once: true });
+        }),
+    );
+    await page.locator(".sidebar-quick-deploy").click();
+    await formReady;
     await expect(page.locator("#view-new")).toBeVisible();
+    await expect(page.locator(".field-row")).toHaveCount(1);
   });
 
   test("navigates to new job view and shows form elements", async ({ page }) => {

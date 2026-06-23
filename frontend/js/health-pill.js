@@ -17,7 +17,13 @@ function setPill(state, label) {
   if (!el) return;
   el.dataset.state = state;
   el.title = label;
-  el.textContent = label;
+  const textEl = document.getElementById("health-pill-text");
+  if (textEl) {
+    textEl.textContent = label;
+  } else {
+    /* Fallback for older DOM without health-pill-text span */
+    el.textContent = label;
+  }
 }
 
 /** Probe /api/health and /api/ready in parallel; update the pill. */

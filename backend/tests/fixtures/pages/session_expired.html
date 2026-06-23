@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><title>Your session has expired</title></head>
+  <body>
+    <div class="session-warning">
+      <h1>Session Expired</h1>
+      <p>Your search session has expired. Please start a new search.</p>
+    </div>
+    <div class="search-form-container">
+      <form action="/search" method="GET">
+        <input type="text" name="q" placeholder="Search..." />
+        <input type="hidden" name="sid" value="expired-session-abc123" />
+        <button type="submit">Search</button>
+      </form>
+    </div>
+    <div class="expired-results" style="display:none">
+      <div class="result-item" data-session="abc123">
+        <h2>Cached Result 1 — Data from expired session</h2>
+        <p>This content was from a previous search.</p>
+      </div>
+      <div class="result-item" data-session="abc123">
+        <h2>Cached Result 2 — More expired data</h2>
+        <p>Additional content from the same session.</p>
+      </div>
+    </div>
+  </body>
+</html>

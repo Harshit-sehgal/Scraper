@@ -1,9 +1,9 @@
 /* ─── Landing page bootstrap ──────────────────────────
-   Dataforge — scroll reveals, nav scroll transition,
+   DataForge — scroll reveals, nav scroll transition,
    mobile menu toggle, icon hydration.                */
 
-import { hydrateIcons, startIconObserver } from "/js/icons.js";
-import { initTheme } from "/js/utils.js";
+import { hydrateIcons, startIconObserver } from "/app/js/icons.js?v=5";
+import { initTheme } from "/app/js/utils.js?v=5";
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();

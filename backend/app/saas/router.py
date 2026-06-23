@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sqlite3
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -81,6 +82,14 @@ def _aup_response_for(
     )
 
 
+def _get_aup_user_or_none(user_id: str) -> Any | None:
+    try:
+        return get_identity_store().get_user(user_id)
+    except (IdentityStoreError, sqlite3.Error) as exc:
+        logger.debug("AUP user lookup failed for %s: %s", user_id, exc)
+        return None
+
+
 @router.post("/aup/accept", response_model=AupStatusResponse)
 async def accept_aup(
     body: AupAcceptRequest,
@@ -96,7 +105,7 @@ async def accept_aup(
     _role, user_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
-    user = get_identity_store().get_user(user_id)
+    user = _get_aup_user_or_none(user_id)
     if user is None:
         log_job_event(
             actor=user_id,
@@ -134,7 +143,7 @@ async def get_aup_status(
     _role, user_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
-    user = get_identity_store().get_user(user_id)
+    user = _get_aup_user_or_none(user_id)
     if user is None:
         return _aup_response_for(user_id=user_id, accepted_at=None, accepted_version=None)
     return _aup_response_for(

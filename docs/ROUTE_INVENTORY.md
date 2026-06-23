@@ -2,13 +2,13 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-22 07:27:18 UTC
+**Generated:** 2026-06-23 16:50:04 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
 development docs/static routes, health/readiness routes, and session/auth routes.
 
-**Total route rows:** 160
+**Total route rows:** 161
 
 ## Stable Api Routes
 
@@ -192,5 +192,6 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `MOUNT` | `/dashboard` | `starlette.routing` | `Mount` | stable | public |  |  |  |  | mounted ASGI/static route |
 | `GET` | `/docs` | `fastapi.applications` | `swagger_ui_html` | stable | public-dev-only | development-docs |  |  |  | FastAPI docs disabled by app config in production |
 | `GET` | `/docs/oauth2-redirect` | `fastapi.applications` | `swagger_ui_redirect` | stable | public-dev-only | development-docs |  |  |  | FastAPI docs disabled by app config in production |
+| `MOUNT` | `/landing` | `starlette.routing` | `Mount` | stable | public |  |  |  |  | mounted ASGI/static route |
 | `GET` | `/openapi.json` | `fastapi.applications` | `openapi` | stable | public-dev-only | development-docs |  |  |  | FastAPI docs disabled by app config in production |
 | `GET` | `/redoc` | `fastapi.applications` | `redoc_html` | stable | public-dev-only | development-docs |  |  |  | FastAPI docs disabled by app config in production |

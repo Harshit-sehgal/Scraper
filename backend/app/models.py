@@ -219,7 +219,7 @@ class JobCreate(BaseModel):
                     ):
                         msg = "Manual mode requires valid http(s) URLs"
                         raise ValueError(msg) from e
-                    msg = f"URL '{u}' failed security check: {e}"
+                    msg = "URL failed security check"
                     raise ValueError(msg) from e
             self.urls = cleaned_urls
 
@@ -343,7 +343,12 @@ class WorkflowStatus(StrEnum):
 
 
 class WorkflowStepType(StrEnum):
-    """Type of action in a workflow step."""
+    """Type of action in a workflow step.
+
+    Members are explicit aliases for historically-used names (OPEN→GOTO,
+    WAIT_FOR_TIMEOUT_LIMITED→WAIT); all aliases are first-class — both names
+    resolve to the same string value and both appear in ``list(``cls``)``.
+    """
 
     GOTO = "goto"
     OPEN = "goto"
