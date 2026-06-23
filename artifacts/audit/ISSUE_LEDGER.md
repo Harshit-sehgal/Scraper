@@ -1,8 +1,8 @@
 # DataForge Scraper - Issue Ledger
 
-Date: 2026-06-23
-Commit: `66444f7`
-Source baseline: `artifacts/audit/VALIDATION_REPORT.md`, `artifacts/audit/VALIDATION_SYSTEM_REVIEW.md`, `artifacts/validation/runs/20260612T162028Z_full/summary.md`, `docs/AGENT_TRUTH.md`, inspected router/test files.
+Date: 2026-06-24
+Commit baseline before this audit update: `40e08ff`
+Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T205930Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
 This ledger records only evidence-backed issues. Rows marked `candidate` are not treated as verified defects until a failing test, runtime reproduction, or direct code path proves the behavior.
 
@@ -10,10 +10,10 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified issues | 3 |
-| Fixed issues | 25 |
+| Open verified/deferred issues | 5 |
+| Fixed issues | 29 |
 | Not reproducible issues | 1 |
-| Candidate issues | 3 |
+| Candidate issues | 4 |
 | P0 issue rows | 6 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 5 |
@@ -63,6 +63,16 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > `P1-MIGRATION-ROLLBACK-001` fixed. Docker environment used to run the backup
 > and restore drill successfully (all seed rows survived). Missing Postgres v8 schema
 > file generated and used to execute the database schemas. (open verified 5 → 3, fixed 23 → 25).
+>
+> Updated 2026-06-24 foundation audit: full validation passed
+> (`20260623T205930Z_full`), route inventory regenerated at 161 routes
+> (126 stable + 35 experimental), route auth matrix regenerated at 150
+> API rows with `unknown_auth=0` and `unknown_tenant=0`, and file
+> ledger generation was fixed so historical validation failures are no
+> longer hardcoded into current per-file rows. Current open
+> verified/deferred rows are `P1-ARCH-STORAGE-001`,
+> `P1-BENCHMARK-BASELINE-001`, `P2-BENCHMARK-CORPUS-001`,
+> `P1-OPS-LOAD-ALERT-001`, and `P2-OBSERVABILITY-METRICS-001`.
 
 
 ## Verified Issues

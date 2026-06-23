@@ -25,7 +25,93 @@ vi.mock("./utils.js", () => ({
 // Import mocked utils after vi.mock so we get the mock implementations
 import { showShortcuts as mockedShowShortcuts, isTypingTarget as mockedIsTypingTarget } from "./utils.js";
 
+vi.mock("./jobs.js", () => ({
+  refreshJobs: vi.fn(() => Promise.resolve()),
+  onJobsFilterChanged: vi.fn(),
+}));
+
+vi.mock("./results.js", () => ({
+  renderFilteredResults: vi.fn(),
+}));
+
+vi.mock("./icons.js", () => ({
+  hydrateIcons: vi.fn(),
+}));
+
+vi.mock("./system-info.js", () => ({
+  startSystemInfo: vi.fn(),
+  stopSystemInfo: vi.fn(),
+}));
+
+vi.mock("./recent-activity.js", () => ({
+  startRecentActivity: vi.fn(),
+  stopRecentActivity: vi.fn(),
+}));
+
+vi.mock("./dashboard.js", () => ({
+  refreshDashboard: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./form.js", () => ({
+  initForm: vi.fn(),
+}));
+
+vi.mock("./recycle.js", () => ({
+  refreshRecycleBin: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./cognition.js", () => ({
+  refreshCognition: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./auth-profiles.js", () => ({
+  refreshAuthProfiles: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./workflows.js", () => ({
+  refreshWorkflows: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./billing.js", () => ({
+  refreshBilling: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./audit.js", () => ({
+  refreshAudit: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./retention.js", () => ({
+  initRetention: vi.fn(),
+  refreshRetention: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./api-keys-page.js", () => ({
+  refreshApiKeysPage: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./settings-page.js", () => ({
+  refreshSettingsPage: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./email-verification.js", () => ({
+  refreshEmailVerification: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./invitations.js", () => ({
+  refreshInvitations: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("./command-palette.js", () => ({
+  openCommandPalette: vi.fn(),
+  closeCommandPalette: vi.fn(),
+}));
+
 // ─── Helpers ────────────────────────────────────────────────────────────
+
+async function flushViewTasks() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 function setupDOM() {
   document.body.innerHTML = `
@@ -49,6 +135,15 @@ function setupDOM() {
     <input id="jobs-search" type="text" />
   `;
 }
+
+afterEach(async () => {
+  await flushViewTasks();
+  document.body.innerHTML = "";
+  mockedIsTypingTarget.mockReturnValue(false);
+  setCurrentView("dashboard");
+  setCurrentMode("manual");
+  vi.clearAllMocks();
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // State management

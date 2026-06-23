@@ -6,6 +6,11 @@
       "path": "backend/tests/fixtures/pages/38714795dea8.html"
     },
     {
+      "classification": "frontend_source",
+      "loc": 3436,
+      "path": "frontend/styles/views.css"
+    },
+    {
       "classification": "test",
       "loc": 2992,
       "path": "backend/tests/fixtures/pages/eb9b319cbca0.html"
@@ -37,18 +42,13 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 2697,
-      "path": "frontend/styles/views.css"
+      "loc": 2511,
+      "path": "frontend/index.html"
     },
     {
       "classification": "test",
       "loc": 2117,
       "path": "backend/tests/fixtures/pages/e19cf6fcf7b7.html"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 2091,
-      "path": "frontend/index.html"
     },
     {
       "classification": "test",
@@ -77,7 +77,7 @@
     },
     {
       "classification": "backend_source",
-      "loc": 1401,
+      "loc": 1408,
       "path": "backend/app/saas/router.py"
     },
     {
@@ -151,6 +151,11 @@
       "path": "backend/app/worker_queue.py"
     },
     {
+      "classification": "frontend_source",
+      "loc": 1091,
+      "path": "frontend/styles/components.css"
+    },
+    {
       "classification": "backend_router",
       "loc": 1018,
       "path": "backend/app/routers/experimental.py"
@@ -169,6 +174,11 @@
       "classification": "backend_source",
       "loc": 955,
       "path": "backend/app/worker_queue_postgres_base.py"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 951,
+      "path": "frontend/landing/style.css"
     },
     {
       "classification": "frontend_source",
@@ -201,19 +211,9 @@
       "path": "backend/app/scraper.py"
     },
     {
-      "classification": "frontend_source",
-      "loc": 837,
-      "path": "frontend/landing/style.css"
-    },
-    {
       "classification": "backend_source",
       "loc": 833,
       "path": "backend/app/extraction_orchestrator.py"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 824,
-      "path": "frontend/styles/components.css"
     },
     {
       "classification": "backend_source",
@@ -246,9 +246,19 @@
       "path": "backend/tests/test_worker_queue_postgres.py"
     },
     {
+      "classification": "frontend_source",
+      "loc": 770,
+      "path": "frontend/styles/layout.css"
+    },
+    {
       "classification": "backend_source",
       "loc": 758,
       "path": "backend/app/container_discovery.py"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 752,
+      "path": "frontend/js/analyzer.js"
     },
     {
       "classification": "backend_source",
@@ -264,6 +274,11 @@
       "classification": "test",
       "loc": 718,
       "path": "backend/tests/test_semantic_segmentation.py"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 714,
+      "path": "frontend/app.js"
     },
     {
       "classification": "test",
@@ -289,16 +304,6 @@
       "classification": "test",
       "loc": 677,
       "path": "backend/tests/conftest.py"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 665,
-      "path": "frontend/styles/layout.css"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 659,
-      "path": "frontend/app.js"
     },
     {
       "classification": "backend_source",
@@ -467,7 +472,7 @@
     },
     {
       "classification": "backend_source",
-      "loc": 502,
+      "loc": 506,
       "path": "backend/app/models.py"
     },
     {
@@ -492,13 +497,8 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 478,
-      "path": "frontend/js/analyzer.js"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 471,
-      "path": "backend/app/semantic_mapper.py"
+      "loc": 474,
+      "path": "frontend/js/analyzer.test.js"
     }
   ],
   "largest_symbols": [
@@ -1247,14 +1247,6 @@
       "path": "scripts/staging_smoke_test.py"
     },
     {
-      "end_lineno": 240,
-      "kind": "function",
-      "lineno": 65,
-      "loc": 176,
-      "name": "main",
-      "path": "scripts/verify_production_deployment.py"
-    },
-    {
       "end_lineno": 269,
       "kind": "class",
       "lineno": 95,
@@ -1301,8 +1293,16 @@
       "loc": 170,
       "name": "run_job",
       "path": "backend/app/services/job_runner.py"
+    },
+    {
+      "end_lineno": 189,
+      "kind": "class",
+      "lineno": 22,
+      "loc": 168,
+      "name": "EventJournal",
+      "path": "backend/app/event_journal.py"
     }
   ],
-  "python_symbol_count": 8985,
-  "source_file_count": 735
+  "python_symbol_count": 8986,
+  "source_file_count": 727
 }

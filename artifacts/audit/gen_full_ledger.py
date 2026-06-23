@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Generate the Phase 0 file inventory and per-file audit ledger.
+"""Generate the current file inventory and per-file audit ledger.
 
 This script intentionally lists every file in the checkout, including
 vendor, cache, generated, binary, archive, and log files. Project-owned
 text files are opened and scanned in full. Skipped files are still
 listed with a concrete skip reason, size, and SHA-256.
+
+The ledger records file metadata and lightweight content signals only.
+Issue status belongs in ISSUE_LEDGER.md and fresh validation logs; do
+not hardcode historical command failures here.
 """
 
 from __future__ import annotations
@@ -123,48 +127,7 @@ STATUS_DOCS = {
     "Instructions_for_ai/PROGRESS.md",
 }
 
-KNOWN_FILE_ISSUES: dict[str, tuple[str, str]] = {
-    "backend/app/models.py": (
-        "Full pytest and pyflakes identify duplicate AuthProfile definitions and model/test mismatch: missing usage_count/storage_state behavior expected by tests.",
-        "Phase 2/4 should reconcile AuthProfile models with tests before claiming full backend suite green.",
-    ),
-    "backend/app/url_analyzer.py": (
-        "Pyflakes/ruff report an unused local variable named parsed at line 478.",
-        "Remove or use the variable in a focused lint cleanup after the audit baseline.",
-    ),
-    "backend/app/routers/auth_profiles.py": (
-        "Pyflakes/ruff report unused AuthProfileStatus import; related auth-profile tests fail against the current model.",
-        "Reconcile router/model contract and remove unused imports in a focused fix.",
-    ),
-    "backend/app/saas/router.py": (
-        "Pyflakes/ruff report unused User/UserStatus imports; route auth matrix flags user-level mutation routes for review.",
-        "Review SaaS mutation authorization semantics and remove unused imports in a focused fix.",
-    ),
-    "backend/tests/test_auth_profiles.py": (
-        "Full pytest fails two assertions in this file: missing usage_count and storage_state exposure mismatch.",
-        "Update code or tests after deciding the intended AuthProfile contract.",
-    ),
-    "backend/tests/test_scheduled_monitoring.py": (
-        "Full pytest fails because LocalASGIClient has no put() helper for update tests; pyflakes also reports unused pytest import.",
-        "Add client verb support or adjust tests in a focused test infrastructure fix.",
-    ),
-    "backend/tests/test_workflow.py": (
-        "Full pytest fails because LocalASGIClient has no put() helper for update tests.",
-        "Add client verb support or adjust tests in a focused test infrastructure fix.",
-    ),
-    "backend/tests/test_pyflakes_fixes.py": (
-        "Full pytest fails because pyflakes currently reports seven warnings/errors.",
-        "Run a lint cleanup after preserving this baseline evidence.",
-    ),
-    "backend/tests/test_route_auth_matrix_generator.py": (
-        "Full pytest fails: route-auth-matrix generator flags POST /api/saas/orgs, POST /api/saas/projects, and POST /api/saas/signup as user-level mutation routes needing review.",
-        "Decide whether these routes should be operator/admin-only or explicitly allowlisted with documented rationale.",
-    ),
-    "frontend/styles.css": (
-        "npm run lint:js reports Prettier formatting drift in this file.",
-        "Run the formatter in a focused frontend formatting cleanup.",
-    ),
-}
+KNOWN_FILE_ISSUES: dict[str, tuple[str, str]] = {}
 
 
 def relpath(path: Path) -> str:
@@ -231,7 +194,13 @@ def classify(rel: str) -> tuple[str, str, str, bool, str]:
         "gen_audit_ledger.py",
         "gen_inventory.py",
     }:
-        return "generated", "audit report artifact", "generated audit report; current row records pre-regeneration metadata", False, "high"
+        return (
+            "generated",
+            "audit report artifact",
+            "generated audit report; current row records pre-regeneration metadata",
+            False,
+            "high",
+        )
     if starts_any(rel, ("backend/data/", "backend/backend/data/", "data/")):
         return "generated", "runtime data/checkpoint artifact", "runtime/generated data; not deep-inspected", False, "medium"
     if ext in ARCHIVE_EXTS:
@@ -278,8 +247,32 @@ def classify(rel: str) -> tuple[str, str, str, bool, str]:
     }:
         return "documentation", "root project documentation", "", True, "high"
     if is_lockfile(rel):
-        return "config", "lockfile pinning transitive dependencies", "machine-generated lockfile; not deep-inspected", True, "high"
-    if name == ".bandit" or name.startswith(".env") or ext in {".cfg", ".conf", ".ini", ".json", ".toml", ".yaml", ".yml"} or name in {".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".prettierignore", ".prettierrc", ".stylelintrc.json", "Makefile", "package.json", "pyproject.toml"} or rel.startswith((".github/", ".vscode/")):
+        return (
+            "config",
+            "lockfile pinning transitive dependencies",
+            "machine-generated lockfile; not deep-inspected",
+            True,
+            "high",
+        )
+    if (
+        name == ".bandit"
+        or name.startswith(".env")
+        or ext in {".cfg", ".conf", ".ini", ".json", ".toml", ".yaml", ".yml"}
+        or name
+        in {
+            ".dockerignore",
+            ".gitignore",
+            ".pre-commit-config.yaml",
+            ".prettierignore",
+            ".prettierrc",
+            ".stylelintrc.json",
+            "eslint.config.js",
+            "Makefile",
+            "package.json",
+            "pyproject.toml",
+        }
+        or rel.startswith((".github/", ".vscode/"))
+    ):
         return "config", "project/tooling configuration", "", True, "high"
     if ext in {".csv", ".md", ".rst", ".txt"}:
         return "documentation", "text documentation/data", "", True, "medium"
@@ -344,7 +337,7 @@ SIGNAL_PATTERNS = [
 
 def detect_signals(text: str) -> str:
     signals = [name for name, pattern in SIGNAL_PATTERNS if pattern.search(text)]
-    return ", ".join(signals[:6]) if signals else "no tracked Phase 0 signal keywords"
+    return ", ".join(signals[:6]) if signals else "no tracked audit signal keywords"
 
 
 def inspect_file(path: Path, rel: str, classification: str, purpose_seed: str, skip: str) -> tuple[str, str, str, str, str]:
@@ -354,11 +347,13 @@ def inspect_file(path: Path, rel: str, classification: str, purpose_seed: str, s
         issues, recommendation = issue
         follow = "yes"
     elif rel in STATUS_DOCS:
-        issues = "Documentation contains historical or aspirational readiness claims that current validation does not fully reproduce."
+        issues = (
+            "Documentation contains historical or aspirational readiness claims that current validation does not fully reproduce."
+        )
         recommendation = "Treat as historical unless claims are reproduced by fresh commands."
         follow = "yes"
     else:
-        issues = "No file-specific issue recorded in Phase 0."
+        issues = "No file-specific issue recorded by the current inventory generator."
         recommendation = "Keep; inspect this file again before making related changes."
         follow = "no"
 
@@ -420,26 +415,33 @@ def main() -> int:
         sha = sha256_of(abspath)
         lockfile = is_lockfile(rel)
 
-        if owned and not skip and not lockfile and (
-            ext_of(rel) in TEXT_EXTS
-            or Path(rel).name.startswith(".env")
-            or classification
-            in {
-                "backend_source",
-                "config",
-                "database_migration",
-                "docker_deployment",
-                "documentation",
-                "frontend_source",
-                "script",
-                "test",
-            }
+        if (
+            owned
+            and not skip
+            and not lockfile
+            and (
+                ext_of(rel) in TEXT_EXTS
+                or Path(rel).name.startswith(".env")
+                or classification
+                in {
+                    "backend_source",
+                    "config",
+                    "database_migration",
+                    "docker_deployment",
+                    "documentation",
+                    "frontend_source",
+                    "script",
+                    "test",
+                }
+            )
         ):
             deep = True
             purpose, findings, issues, recommendation, follow = inspect_file(abspath, rel, classification, purpose_seed, "")
         else:
             deep = False
-            actual_skip = skip or ("machine-generated lockfile; not deep-inspected" if lockfile else "non-text or skipped by classification")
+            actual_skip = skip or (
+                "machine-generated lockfile; not deep-inspected" if lockfile else "non-text or skipped by classification"
+            )
             purpose, findings, issues, recommendation, follow = inspect_file(
                 abspath,
                 rel,
@@ -450,8 +452,8 @@ def main() -> int:
 
         if classification == "unknown":
             follow = "yes"
-            if issues == "No file-specific issue recorded in Phase 0.":
-                issues = "Unclassified by Phase 0 inventory heuristics."
+            if issues == "No file-specific issue recorded by the current inventory generator.":
+                issues = "Unclassified by current inventory heuristics."
                 recommendation = "Classify this file before making related changes."
 
         row: dict[str, str | int] = {
@@ -518,7 +520,9 @@ def main() -> int:
     inv.append("# DataForge Scraper - File Inventory\n\n")
     inv.append(f"_Generated: {generated_at} from `{len(rows)}` files in the current checkout._\n\n")
     inv.append("This inventory accounts for every file found by `os.walk()` from the repository root. ")
-    inv.append("Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.\n\n")
+    inv.append(
+        "Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.\n\n"
+    )
     inv.append("## Required Field Coverage\n\n")
     inv.append("The complete per-file records with the required fields live in `FILE_AUDIT_LEDGER.csv`. ")
     inv.append("The Markdown ledger mirrors those rows for human review.\n\n")
@@ -546,7 +550,9 @@ def main() -> int:
     for ext, count in ext_counter.most_common(30):
         inv.append(f"| `{ext}` | {count} |\n")
     inv.append("\n## Skip Policy\n\n")
-    inv.append("Deep inspection was skipped for vendor dependencies, virtualenv files, Git metadata, cache directories, generated reports, build outputs, runtime data, logs, archives, and binary files. Each skipped file still has a CSV/Markdown row with `skip_reason_if_any`.\n\n")
+    inv.append(
+        "Deep inspection was skipped for vendor dependencies, virtualenv files, Git metadata, cache directories, generated reports, build outputs, runtime data, logs, archives, and binary files. Each skipped file still has a CSV/Markdown row with `skip_reason_if_any`.\n\n"
+    )
     inv.append("## See Also\n\n")
     inv.append("- `FILE_AUDIT_LEDGER.csv` - complete machine-readable per-file ledger.\n")
     inv.append("- `FILE_AUDIT_LEDGER.md` - complete human-readable per-file ledger.\n")
@@ -559,7 +565,9 @@ def main() -> int:
     md: list[str] = []
     md.append("# DataForge Scraper - File Audit Ledger\n\n")
     md.append(f"_Generated: {generated_at} from `{len(rows)}` files in the current checkout._\n\n")
-    md.append("This ledger lists every file found in the repository, including skipped vendor/cache/generated/binary/log/archive files. ")
+    md.append(
+        "This ledger lists every file found in the repository, including skipped vendor/cache/generated/binary/log/archive files. "
+    )
     md.append("The CSV version is canonical for automation and includes the same required fields plus full SHA-256 values.\n\n")
     md.append("## Summary by Classification\n\n")
     md.append("| Classification | Total | Project-owned | Deep-inspected | Skipped |\n| --- | ---: | ---: | ---: | ---: |\n")

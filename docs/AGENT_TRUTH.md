@@ -1,12 +1,15 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-18 from working tree.
-Last verified: follow-up codebase cleanup and SaaS frontend
-professionalization fixes. Full validation is green at 24/24 checks,
-including backend full tests, ruff, pyflakes, mypy, bandit, pip_audit,
-npm ci, frontend tests, prettier, stylelint, and ESLint. Backend test
-collection is 3787 tests; frontend tests are 290/290 passing; current
-route inventory is 143 routes (108 stable + 35 experimental)._
+_Truth source current as of 2026-06-24 local time from the working tree.
+Last verified: foundation audit and audit-ledger cleanup. Full
+validation is green with all validation steps passing, including
+backend full tests, ruff, pyflakes, mypy, bandit, pip_audit, npm ci,
+frontend tests, prettier, stylelint, and ESLint. Current route
+inventory is 161 routes (126 stable + 35 experimental); route auth
+matrix has 150 API rows with `unknown_auth=0` and `unknown_tenant=0`.
+The regenerated file inventory lists 24,015 files, 931 project-owned
+files, 927 deeply inspected project-owned files, and 0 file-ledger
+follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
@@ -2760,3 +2763,46 @@ unmerged branch refs or index conflicts, and leave the checkout clean.
 | `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick validation checks passed. |
 | `git diff --cached --check` | 2 | RED before commit; found whitespace in `backend/migrations/008_postgres_storage_v8.sql`, then fixed. |
 | `pre-commit run mypy --all-files` | 0 | PASS after adding `types-redis` to the hook's isolated mypy environment. |
+
+## Foundation Audit and Audit-Ledger Cleanup — 2026-06-24
+
+Scope: run fresh repository validation, regenerate current route/file
+audit artifacts, remove stale historical failure claims from the file
+ledger generator, and document remaining foundation work without
+production-readiness overclaims.
+
+### Confirmed Current State
+
+- Full local validation passes.
+- Stable docs match registered code.
+- Route inventory/auth matrix are current and have no unknown auth or
+  tenant-scope rows.
+- Complexity gate has no threshold violations.
+- `artifacts/audit/gen_full_ledger.py` no longer hardcodes historical
+  validation failures into per-file ledger rows. Current issue status
+  belongs in `artifacts/audit/ISSUE_LEDGER.md` and fresh validation
+  logs, not in generated file metadata.
+- Remaining foundation work is readiness/product quality work:
+  benchmark corpus breadth, staging alert proof, workflow browser
+  replay, durable workflow storage parity, and future refactor
+  characterization maps.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick checks. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/analyze_code_complexity.py --check` | 0 | PASS; `files=727 symbols=8986`, no threshold violations. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; 114 stable routes match between app and `docs/API.md`. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; full validation run `20260623T205930Z_full`, all checks passed. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; regenerated 161 routes (126 stable + 35 experimental). |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; regenerated 150 API rows, `unknown_auth=0`, `unknown_tenant=0`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated 24,015 file rows, 931 project-owned, 927 deep-inspected, 0 follow-up rows. |
+| `PYTHONPATH=backend python3 -m pytest backend/tests/test_audit_ledger_generator.py -q` | 0 | PASS; 2 tests pin no hardcoded stale validation failures and root `eslint.config.js` classification. |
+| `python3 -m ruff check artifacts/audit/gen_full_ledger.py backend/tests/test_audit_ledger_generator.py` | 0 | PASS. |
+| `python3 -m ruff format --check artifacts/audit/gen_full_ledger.py backend/tests/test_audit_ledger_generator.py` | 0 | PASS. |
+| `python3 scripts/validate_local.py --full` | 1 | RED; first full rerun failed only `frontend_tests` due a Vitest unhandled teardown error from `frontend/js/views.test.js`. |
+| `npm run test -- frontend/js/views.test.js` | 0 | PASS; focused file passed before and after adding mocks/cleanup for view side-effect modules. |
+| `npm run test` | 0 | PASS after isolating `views.test.js`; 37 frontend files, 461 tests, no unhandled errors. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS after the frontend test isolation fix; run id `20260623T212546Z_full`, 24/24 validation steps passed. |
