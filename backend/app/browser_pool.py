@@ -181,7 +181,22 @@ class BrowserPool:
                             mask_proxy_url(proxy_config["server"]),
                         )
 
-            context = await self._browser.new_context(**context_options)
+            try:
+                context = await self._browser.new_context(**context_options)
+            except (Error, OSError, RuntimeError):
+                try:
+                    from app.metrics_collector import record_browser_context_failed
+
+                    record_browser_context_failed()
+                except (ImportError, RuntimeError, ValueError):
+                    logger.debug("[BrowserPool] Failed to record browser context failure metric")
+                raise
+            try:
+                from app.metrics_collector import record_browser_context_created
+
+                record_browser_context_created()
+            except (ImportError, RuntimeError, ValueError):
+                logger.debug("[BrowserPool] Failed to record browser context creation metric")
 
             # Register page tracking
             def register_page_tracking(ctx) -> None:

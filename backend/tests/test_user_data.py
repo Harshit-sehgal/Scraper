@@ -42,7 +42,14 @@ def _isolate_billing_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """
     target = tmp_path / "billing_subscriptions.json"
     monkeypatch.setenv("DATAFORGE_BILLING_SUBSCRIPTIONS_FILE", str(target))
-    importlib.reload(importlib.import_module("app.billing.webhooks"))
+    module = importlib.reload(importlib.import_module("app.billing.webhooks"))
+    for name in (
+        "_process_webhook_event",
+        "_subscription_store",
+        "get_customer_subscription",
+        "set_customer_subscription",
+    ):
+        monkeypatch.setitem(globals(), name, getattr(module, name))
 
 
 def _webhook_signature(secret: str, body: bytes) -> str:

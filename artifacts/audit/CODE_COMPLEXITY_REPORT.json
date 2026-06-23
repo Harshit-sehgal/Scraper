@@ -126,14 +126,14 @@
       "path": "backend/tests/fixtures/pages/fedc56bcbc35.html"
     },
     {
+      "classification": "backend_router",
+      "loc": 1236,
+      "path": "backend/app/routers/system.py"
+    },
+    {
       "classification": "test",
       "loc": 1174,
       "path": "backend/tests/fixtures/pages/10933defd606.html"
-    },
-    {
-      "classification": "backend_router",
-      "loc": 1159,
-      "path": "backend/app/routers/system.py"
     },
     {
       "classification": "backend_source",
@@ -615,6 +615,14 @@
       "path": "backend/app/semantic_inference_engine.py"
     },
     {
+      "end_lineno": 1426,
+      "kind": "function",
+      "lineno": 933,
+      "loc": 494,
+      "name": "metrics",
+      "path": "backend/app/routers/system.py"
+    },
+    {
       "end_lineno": 544,
       "kind": "class",
       "lineno": 59,
@@ -655,18 +663,10 @@
       "path": "backend/app/job_store.py"
     },
     {
-      "end_lineno": 1339,
-      "kind": "function",
-      "lineno": 909,
-      "loc": 431,
-      "name": "metrics",
-      "path": "backend/app/routers/system.py"
-    },
-    {
-      "end_lineno": 435,
+      "end_lineno": 450,
       "kind": "class",
       "lineno": 27,
-      "loc": 409,
+      "loc": 424,
       "name": "BrowserPool",
       "path": "backend/app/browser_pool.py"
     },
@@ -959,10 +959,10 @@
       "path": "backend/app/selector_decay_predictor.py"
     },
     {
-      "end_lineno": 297,
+      "end_lineno": 309,
       "kind": "function",
-      "lineno": 58,
-      "loc": 240,
+      "lineno": 67,
+      "loc": 243,
       "name": "run_scraping_phase",
       "path": "backend/app/services/scraping.py"
     },
@@ -981,6 +981,14 @@
       "loc": 235,
       "name": "TestPostgresJobRepositoryIntegration",
       "path": "backend/tests/test_postgres_integration.py"
+    },
+    {
+      "end_lineno": 929,
+      "kind": "function",
+      "lineno": 697,
+      "loc": 233,
+      "name": "_render_basic_metrics_text",
+      "path": "backend/app/routers/system.py"
     },
     {
       "end_lineno": 540,
@@ -1039,6 +1047,14 @@
       "path": "backend/tests/test_selector_profile_loader_extended.py"
     },
     {
+      "end_lineno": 278,
+      "kind": "function",
+      "lineno": 60,
+      "loc": 219,
+      "name": "get_context",
+      "path": "backend/app/browser_pool.py"
+    },
+    {
       "end_lineno": 230,
       "kind": "class",
       "lineno": 14,
@@ -1087,14 +1103,6 @@
       "path": "backend/tests/test_domain_health_stress.py"
     },
     {
-      "end_lineno": 905,
-      "kind": "function",
-      "lineno": 697,
-      "loc": 209,
-      "name": "_render_basic_metrics_text",
-      "path": "backend/app/routers/system.py"
-    },
-    {
       "end_lineno": 230,
       "kind": "class",
       "lineno": 25,
@@ -1117,14 +1125,6 @@
       "loc": 205,
       "name": "TestInvitationAPI",
       "path": "backend/tests/test_saas_email_identity.py"
-    },
-    {
-      "end_lineno": 263,
-      "kind": "function",
-      "lineno": 60,
-      "loc": 204,
-      "name": "get_context",
-      "path": "backend/app/browser_pool.py"
     },
     {
       "end_lineno": 407,
@@ -1303,6 +1303,6 @@
       "path": "backend/app/event_journal.py"
     }
   ],
-  "python_symbol_count": 8991,
+  "python_symbol_count": 9007,
   "source_file_count": 733
 }

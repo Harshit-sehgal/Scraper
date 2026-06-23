@@ -55,6 +55,15 @@ def _record_page_fetch(job: Any, url: str) -> bool:
         return True
 
 
+def _record_page_fetch_duration_metric(started_at: float) -> None:
+    try:
+        from app.metrics_collector import record_page_fetch_duration
+
+        record_page_fetch_duration(time.monotonic() - started_at)
+    except (ImportError, RuntimeError, ValueError, TypeError):
+        logger.debug("Page-fetch duration metric skipped")
+
+
 async def run_scraping_phase(
     job: Any,
     *,
@@ -161,6 +170,7 @@ async def run_scraping_phase(
             from app.semantic_world_state import get_world_state
 
             ws = get_world_state()
+            fetch_started_at = time.monotonic()
             try:
                 reset_llm_call_count()
 
@@ -255,6 +265,8 @@ async def run_scraping_phase(
                 await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
                 await _mark_completed()
                 return idx, [], False, {}
+            finally:
+                _record_page_fetch_duration_metric(fetch_started_at)
 
     scrape_tasks = [asyncio.create_task(_scrape_single_url(idx, url)) for idx, url in enumerate(job.urls, start=1)]
 

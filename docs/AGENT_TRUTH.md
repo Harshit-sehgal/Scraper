@@ -2846,3 +2846,46 @@ coverage in `backend/tests/test_benchmark_fixtures.py`.
 benchmarking still needs versioned expected outputs, precision/recall/F1
 thresholds, duplicate/type checks, runtime/timeout reporting, and CI
 enforcement per category.
+
+## Observability Metrics Implementation Pass — 2026-06-24
+
+Scope: close the local implementation gap in
+`P2-OBSERVABILITY-METRICS-001` without overclaiming staging readiness.
+The pass added stable required metric counters, job/page duration
+metrics, browser-context creation/failure counters, and per-domain
+failure-rate export. Staging Prometheus scrape and alert delivery proof
+remain tracked by `P1-OPS-LOAD-ALERT-001`.
+
+### Files Changed
+
+- `backend/app/metrics_collector.py`
+- `backend/app/routers/system.py`
+- `backend/app/browser_pool.py`
+- `backend/app/domain_runtime_policy.py`
+- `backend/app/services/finalization.py`
+- `backend/app/services/scraping.py`
+- `backend/tests/test_metrics_observability.py`
+- `docs/OBSERVABILITY.md`
+- `artifacts/audit/ISSUE_LEDGER.md`
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; run id `20260623T215752Z_quick`; 13 passed, 0 failed, 0 skipped, 0 timed out. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_metrics_observability.py -q -o addopts=` | 1 | RED before implementation; 7 failed, 26 passed. Failures proved missing product-counter defaults, browser-context counters, duration helpers, and `dataforge_domain_failure_rate`. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_metrics_observability.py -q -o addopts=` | 0 | PASS after implementation; 33 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_metrics.py backend/tests/test_metrics_observability.py backend/tests/test_domain_runtime_policy.py -q -o addopts=` | 0 | PASS; 71 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_browser_pool.py -q -o addopts=` | 0 | PASS; 39 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_p0_billing_usage.py -q -o addopts=` | 0 | PASS; 28 passed. |
+| `python3 -m ruff check backend/app/metrics_collector.py backend/app/routers/system.py backend/app/browser_pool.py backend/app/domain_runtime_policy.py backend/app/services/finalization.py backend/app/services/scraping.py backend/tests/test_metrics_observability.py` | 0 | PASS. |
+| `python3 -m ruff format --check backend/app/metrics_collector.py backend/app/routers/system.py backend/app/browser_pool.py backend/app/domain_runtime_policy.py backend/app/services/finalization.py backend/app/services/scraping.py backend/tests/test_metrics_observability.py` | 0 | PASS; 7 files already formatted. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/analyze_code_complexity.py --check` | 0 | PASS; `files=733 symbols=9007`, no threshold violations. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated file inventory and ledger artifacts. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12 displayed quick checks passed. |
+| `python3 scripts/validate_local.py --full` | 1 | RED; run id `20260623T220400Z_full`; only `backend_full_tests` failed. Failure: `backend/tests/test_user_data.py::TestWebhookProcessing::test_event_without_customer_id_is_skipped` saw leaked `_subscription_store` state. All later ruff, pyflakes, mypy, bandit, pip-audit, npm, frontend, and lint checks passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_user_data.py -q -o addopts=` | 0 | PASS after rebinding the test module globals to the reloaded webhook module; 27 passed. |
+| `python3 -m ruff check backend/tests/test_user_data.py backend/tests/test_metrics_observability.py backend/app/metrics_collector.py backend/app/routers/system.py backend/app/browser_pool.py backend/app/domain_runtime_policy.py backend/app/services/finalization.py backend/app/services/scraping.py` | 0 | PASS. |
+| `python3 -m ruff format --check backend/tests/test_user_data.py backend/tests/test_metrics_observability.py backend/app/metrics_collector.py backend/app/routers/system.py backend/app/browser_pool.py backend/app/domain_runtime_policy.py backend/app/services/finalization.py backend/app/services/scraping.py` | 0 | PASS; 8 files already formatted. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260623T221113Z_full`; 24 passed, 0 failed, 0 skipped, 0 timed out. Backend suite passed in 312.59s; frontend tests/lints and security checks passed. |

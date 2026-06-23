@@ -6,6 +6,7 @@ and terminal persistence.
 
 from __future__ import annotations
 
+import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -19,6 +20,34 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_job_timestamp(value: Any) -> datetime.datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime.UTC)
+    return parsed.astimezone(datetime.UTC)
+
+
+def _record_job_duration_metric(job: Any) -> None:
+    started = _parse_job_timestamp(getattr(job, "started_at", None) or getattr(job, "created_at", None))
+    completed = _parse_job_timestamp(getattr(job, "completed_at", None))
+    if not started or not completed:
+        return
+    duration = (completed - started).total_seconds()
+    if duration < 0:
+        return
+    try:
+        from app.metrics_collector import record_job_duration
+
+        record_job_duration(duration)
+    except (ImportError, RuntimeError, ValueError, TypeError):
+        logger.debug("Job-duration metric skipped for job %s", getattr(job, "id", ""))
 
 
 def _record_job_completed_usage(job: Any) -> None:
@@ -98,6 +127,7 @@ async def run_finalization(
         error=error_message,
         cancel_requested=False,
     )
+    _record_job_duration_metric(job)
     try:
         from app.metrics_collector import record_job_failed, record_job_succeeded
 

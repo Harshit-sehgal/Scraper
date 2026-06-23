@@ -21,6 +21,14 @@ _worker_failures_lock = threading.Lock()
 _health_check_latencies: list[float] = []
 _health_check_latencies_lock = threading.Lock()
 
+# Product job durations (seconds) — ring buffer
+_job_durations: list[float] = []
+_job_durations_lock = threading.Lock()
+
+# Page fetch durations (seconds) — ring buffer
+_page_fetch_durations: list[float] = []
+_page_fetch_durations_lock = threading.Lock()
+
 # Generic error counters: type -> count (e.g. database, network, scraper)
 _errors_total: dict[str, int] = {}
 _errors_total_lock = threading.Lock()
@@ -103,6 +111,8 @@ _PRODUCT_COUNTER_NAMES = (
     "exports_created_total",
     "workflow_preview_total",
     "workflow_run_total",
+    "browser_context_created_total",
+    "browser_context_failed_total",
 )
 _retention_ops_lock = threading.Lock()
 
@@ -142,6 +152,26 @@ def record_health_check_latency(duration_seconds: float) -> None:
         _health_check_latencies.append(duration_seconds)
         if len(_health_check_latencies) > _MAX_METRIC_SAMPLES:
             _health_check_latencies = _health_check_latencies[-_MAX_METRIC_SAMPLES:]
+
+
+def record_job_duration(duration_seconds: float) -> None:
+    """Record a terminal job runtime duration for metrics export."""
+    global _job_durations
+    duration = max(0.0, float(duration_seconds))
+    with _job_durations_lock:
+        _job_durations.append(duration)
+        if len(_job_durations) > _MAX_METRIC_SAMPLES:
+            _job_durations = _job_durations[-_MAX_METRIC_SAMPLES:]
+
+
+def record_page_fetch_duration(duration_seconds: float) -> None:
+    """Record a single page-fetch attempt duration for metrics export."""
+    global _page_fetch_durations
+    duration = max(0.0, float(duration_seconds))
+    with _page_fetch_durations_lock:
+        _page_fetch_durations.append(duration)
+        if len(_page_fetch_durations) > _MAX_METRIC_SAMPLES:
+            _page_fetch_durations = _page_fetch_durations[-_MAX_METRIC_SAMPLES:]
 
 
 def record_error(error_type: str) -> None:
@@ -441,6 +471,14 @@ def record_workflow_run() -> None:
     record_workflow_op("run")
 
 
+def record_browser_context_created() -> None:
+    increment_product_counter("browser_context_created_total")
+
+
+def record_browser_context_failed() -> None:
+    increment_product_counter("browser_context_failed_total")
+
+
 def get_auth_profile_ops() -> dict[str, int]:
     with _auth_profile_ops_lock:
         return dict(_auth_profile_ops)
@@ -468,7 +506,17 @@ def get_retention_ops() -> dict[str, int]:
 
 def get_product_totals() -> dict[str, int]:
     with _product_totals_lock:
-        return dict(_product_totals)
+        return {name: _product_totals.get(name, 0) for name in _PRODUCT_COUNTER_NAMES}
+
+
+def get_job_durations() -> list[float]:
+    with _job_durations_lock:
+        return list(_job_durations)
+
+
+def get_page_fetch_durations() -> list[float]:
+    with _page_fetch_durations_lock:
+        return list(_page_fetch_durations)
 
 
 def get_rate_limit_global_hits() -> int:
@@ -490,6 +538,10 @@ def reset_for_testing() -> None:
         _worker_failures.clear()
     with _health_check_latencies_lock:
         _health_check_latencies.clear()
+    with _job_durations_lock:
+        _job_durations.clear()
+    with _page_fetch_durations_lock:
+        _page_fetch_durations.clear()
     with _errors_total_lock:
         _errors_total.clear()
     with _llm_calls_total_lock:

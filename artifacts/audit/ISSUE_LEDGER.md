@@ -1,8 +1,8 @@
 # DataForge Scraper - Issue Ledger
 
 Date: 2026-06-24
-Commit baseline before this audit update: `40e08ff`
-Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T205930Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
+Commit baseline before this audit update: `b062c0a`
+Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T214036Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
 This ledger records only evidence-backed issues. Rows marked `candidate` are not treated as verified defects until a failing test, runtime reproduction, or direct code path proves the behavior.
 
@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 4 |
-| Fixed issues | 30 |
+| Open verified/deferred issues | 3 |
+| Fixed issues | 31 |
 | Not reproducible issues | 1 |
 | Candidate issues | 4 |
 | P0 issue rows | 6 |
@@ -82,6 +82,15 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > `python3 scripts/run_benchmark_smoke.py` passes. `P1-BENCHMARK-BASELINE-001`
 > remains deferred because launch-grade precision/recall/F1 thresholds
 > and per-category expected-output gates are still product-quality work.
+>
+> Updated 2026-06-24 observability metrics pass:
+> `P2-OBSERVABILITY-METRICS-001` fixed for local implementation and
+> endpoint contract. Added required product-counter defaults, job/page
+> duration metrics, browser-context creation/failure counters, and
+> per-domain failure-rate export. `backend/tests/test_metrics_observability.py`
+> now enforces required metrics; adjacent metrics/domain/browser/billing
+> suites pass. Staging scrape and alert delivery proof remains tracked by
+> `P1-OPS-LOAD-ALERT-001`.
 
 
 ## Verified Issues
@@ -489,18 +498,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P2-OBSERVABILITY-METRICS-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** observability / metrics_baseline
 - **file_path:** `docs/OBSERVABILITY.md`, `backend/app/metrics_collector.py`, `backend/app/routers/system.py`
 - **line/function:** required future metrics and events
-- **evidence:** Prompt 7 created `docs/OBSERVABILITY.md` with required metrics/events. Existing metrics and `/metrics` route exist, but Prompt 7 did not map every required metric to code or prove Prometheus ingestion.
+- **evidence:** Current `backend/tests/test_metrics_observability.py` enforces the required local product counters, duration metrics, browser-context counters, and domain failure-rate metric. `/metrics` emits the required series in the fallback renderer and the `prometheus_client` renderer. Adjacent metrics/domain/browser/billing suites pass.
 - **why_it_matters:** Operators need stable signals for jobs, browser failures, quota denials, auth failures, tenant denials, exports, workflows, and domain health.
 - **impact:** Missing or unmapped metrics delay incident detection and launch readiness.
-- **recommended_fix:** Map required metrics to implementation, add missing counters/histograms, and prove ingestion in staging.
-- **tests_needed:** Metrics endpoint tests for required series; staging scrape proof; alert threshold tests.
+- **recommended_fix:** Fixed for local implementation and endpoint contract. Keep staging scrape and alert threshold proof under `P1-OPS-LOAD-ALERT-001`.
+- **tests_needed:** Covered locally by `backend/tests/test_metrics_observability.py`, `backend/tests/test_metrics.py`, `backend/tests/test_domain_runtime_policy.py`, `backend/tests/test_browser_pool.py`, and `backend/tests/test_p0_billing_usage.py`.
 - **acceptance_criteria:** Required metrics/events are implemented or explicitly deferred with rationale and tests.
-- **blocked_by:** Observability implementation pass.
-- **notes:** Session 2 (2026-06-22): Core product counters implemented in `metrics_collector.py`, wired via audit logger / job creation / finalization / exports / workflow routes, exposed on `/metrics`. Staging scrape proof and alert thresholds remain ops follow-up. See `docs/OBSERVABILITY.md` mapping table.
+- **blocked_by:** None.
+- **notes:** Session 2 (2026-06-22): Core product counters implemented in `metrics_collector.py`, wired via audit logger / job creation / finalization / exports / workflow routes, exposed on `/metrics`. Fixed 2026-06-24: product counters now have stable zero defaults, normal metrics rendering exposes them, job/page duration histograms are recorded, browser-context counters are wired to `BrowserPool`, and domain failure rate is exported from `DomainRuntimePolicy`. Staging scrape proof and alert thresholds remain ops follow-up in `P1-OPS-LOAD-ALERT-001`.
 
 ### P1-MIGRATION-ROLLBACK-001
 

@@ -86,6 +86,9 @@ class DomainPolicyEntry:
     total_attempts: int = 0
     """Total fetch attempts recorded for this domain."""
 
+    total_failures: int = 0
+    """Total failed fetch attempts recorded for this domain."""
+
 
 class DomainRuntimePolicy:
     """Lightweight per-domain runtime policy store.
@@ -154,6 +157,7 @@ class DomainRuntimePolicy:
         entry = self.get_or_create(url)
         entry.recent_failures += 1
         entry.total_attempts += 1
+        entry.total_failures += 1
 
         if "rate_limit" in failure_type.lower() or "429" in failure_type:
             entry.recent_rate_limits += 1
@@ -233,6 +237,8 @@ class DomainRuntimePolicy:
                 "recent_rate_limits": e.recent_rate_limits,
                 "recent_antibot_blocks": e.recent_antibot_blocks,
                 "total_attempts": e.total_attempts,
+                "total_failures": e.total_failures,
+                "failure_rate": (e.total_failures / e.total_attempts) if e.total_attempts else 0.0,
             }
             for key, e in self._entries.items()
         }

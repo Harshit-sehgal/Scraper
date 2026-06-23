@@ -94,10 +94,31 @@ class TestBrowserLaunchOutcomes:
 
 
 class TestProductCounters:
+    def test_required_counter_defaults_are_stable(self, reset_metrics) -> None:
+        from app.metrics_collector import get_product_totals
+
+        totals = get_product_totals()
+        for counter_name in (
+            "job_created_total",
+            "job_succeeded_total",
+            "job_failed_total",
+            "quota_rejected_total",
+            "auth_failed_total",
+            "tenant_access_denied_total",
+            "exports_created_total",
+            "workflow_preview_total",
+            "workflow_run_total",
+            "browser_context_created_total",
+            "browser_context_failed_total",
+        ):
+            assert totals[counter_name] == 0
+
     def test_record_and_get(self, reset_metrics) -> None:
         from app.metrics_collector import (
             get_product_totals,
             record_auth_failed,
+            record_browser_context_created,
+            record_browser_context_failed,
             record_job_created,
             record_quota_rejected,
             record_tenant_access_denied,
@@ -107,11 +128,33 @@ class TestProductCounters:
         record_auth_failed()
         record_quota_rejected()
         record_tenant_access_denied()
+        record_browser_context_created()
+        record_browser_context_failed()
         totals = get_product_totals()
         assert totals["job_created_total"] == 1
         assert totals["auth_failed_total"] == 1
         assert totals["quota_rejected_total"] == 1
         assert totals["tenant_access_denied_total"] == 1
+        assert totals["browser_context_created_total"] == 1
+        assert totals["browser_context_failed_total"] == 1
+
+
+class TestDurationMetrics:
+    def test_record_and_get_job_duration_ring_buffer(self, reset_metrics) -> None:
+        from app.metrics_collector import get_job_durations, record_job_duration
+
+        record_job_duration(0.25)
+        record_job_duration(1.5)
+
+        assert get_job_durations() == [0.25, 1.5]
+
+    def test_record_and_get_page_fetch_duration_ring_buffer(self, reset_metrics) -> None:
+        from app.metrics_collector import get_page_fetch_durations, record_page_fetch_duration
+
+        record_page_fetch_duration(0.1)
+        record_page_fetch_duration(0.3)
+
+        assert get_page_fetch_durations() == [0.1, 0.3]
 
 
 class TestSsrfRejects:
@@ -157,6 +200,77 @@ class TestRepoQueryLatency:
 
 
 class TestMetricsEndpointExposesNewGauges:
+    def test_metrics_endpoint_contains_required_product_counters(self, client, reset_metrics) -> None:
+        from app.metrics_collector import (
+            record_auth_failed,
+            record_browser_context_created,
+            record_browser_context_failed,
+            record_export_created,
+            record_job_created,
+            record_job_failed,
+            record_job_succeeded,
+            record_quota_rejected,
+            record_tenant_access_denied,
+            record_workflow_preview,
+            record_workflow_run,
+        )
+
+        record_job_created()
+        record_job_succeeded()
+        record_job_failed()
+        record_quota_rejected()
+        record_auth_failed()
+        record_tenant_access_denied()
+        record_export_created()
+        record_workflow_preview()
+        record_workflow_run()
+        record_browser_context_created()
+        record_browser_context_failed()
+
+        r = client.get("/metrics")
+        assert r.status_code == 200
+        text = r.text
+        for metric_name in (
+            "dataforge_job_created_total",
+            "dataforge_job_succeeded_total",
+            "dataforge_job_failed_total",
+            "dataforge_quota_rejected_total",
+            "dataforge_auth_failed_total",
+            "dataforge_tenant_access_denied_total",
+            "dataforge_exports_created_total",
+            "dataforge_workflow_preview_total",
+            "dataforge_workflow_run_total",
+            "dataforge_browser_context_created_total",
+            "dataforge_browser_context_failed_total",
+        ):
+            assert metric_name in text, text
+
+    def test_metrics_endpoint_contains_required_duration_histograms(self, client, reset_metrics) -> None:
+        from app.metrics_collector import record_job_duration, record_page_fetch_duration
+
+        record_job_duration(1.25)
+        record_page_fetch_duration(0.45)
+
+        r = client.get("/metrics")
+        assert r.status_code == 200
+        text = r.text
+        assert "dataforge_job_duration_seconds" in text, text
+        assert "dataforge_page_fetch_duration_seconds" in text, text
+
+    def test_metrics_endpoint_contains_domain_failure_rate(self, client, reset_metrics) -> None:
+        from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+
+        reset_domain_runtime_policy()
+        policy = get_domain_runtime_policy()
+        policy.record_failure("https://metrics-domain.example/page", failure_type="timeout")
+        policy.record_success("https://metrics-domain.example/ok")
+
+        r = client.get("/metrics")
+        assert r.status_code == 200
+        text = r.text
+        assert "dataforge_domain_failure_rate" in text, text
+        assert 'domain="metrics-domain.example"' in text, text
+
     def test_metrics_endpoint_contains_extraction_method(self, client, reset_metrics) -> None:
         from app.metrics_collector import (
             get_extraction_method_counts,

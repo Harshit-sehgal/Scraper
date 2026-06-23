@@ -705,7 +705,9 @@ def _render_basic_metrics_text() -> str:
         get_export_outcomes,
         get_extraction_method_counts,
         get_health_check_latencies,
+        get_job_durations,
         get_llm_calls,
+        get_page_fetch_durations,
         get_product_totals,
         get_rate_limit_global_hits,
         get_rate_limit_per_ip_hits,
@@ -846,6 +848,16 @@ def _render_basic_metrics_text() -> str:
             lines.append(_basic_metric_line("dataforge_backend_health_check_duration_seconds_count", len(health_latencies)))
             lines.append(_basic_metric_line("dataforge_backend_health_check_duration_seconds_sum", sum(health_latencies)))
 
+        job_durations = get_job_durations()
+        if job_durations:
+            lines.append(_basic_metric_line("dataforge_job_duration_seconds_count", len(job_durations)))
+            lines.append(_basic_metric_line("dataforge_job_duration_seconds_sum", sum(job_durations)))
+
+        page_fetch_durations = get_page_fetch_durations()
+        if page_fetch_durations:
+            lines.append(_basic_metric_line("dataforge_page_fetch_duration_seconds_count", len(page_fetch_durations)))
+            lines.append(_basic_metric_line("dataforge_page_fetch_duration_seconds_sum", sum(page_fetch_durations)))
+
     lines.append(_basic_metric_line("dataforge_metrics_collection_error_total", METRICS_COLLECTION_ERRORS))
 
     errors_dict = get_errors()
@@ -875,6 +887,18 @@ def _render_basic_metrics_text() -> str:
         lines.append(_basic_metric_line("dataforge_browser_launch_total", count, {"outcome": outcome}))
     for reason, count in get_ssrf_rejects().items():
         lines.append(_basic_metric_line("dataforge_ssrf_rejects_total", count, {"reason": reason}))
+
+    try:
+        from app.domain_runtime_policy import get_domain_runtime_policy
+
+        for domain, summary in get_domain_runtime_policy().get_summary().items():
+            total_attempts = int(summary.get("total_attempts", 0) or 0)
+            if total_attempts <= 0:
+                continue
+            rate = float(summary.get("failure_rate", 0.0) or 0.0)
+            lines.append(_basic_metric_line("dataforge_domain_failure_rate", rate, {"domain": domain}))
+    except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
+        logger.debug("Metrics fallback: domain failure-rate collection failed")
 
     repo_latencies = get_repo_query_latencies()
     if repo_latencies:
@@ -1099,7 +1123,12 @@ async def metrics(request: Request):
         logger.debug("Metrics: worker heartbeat collection failed")
 
     # Request duration histogram
-    from app.metrics_collector import get_health_check_latencies, get_request_latencies
+    from app.metrics_collector import (
+        get_health_check_latencies,
+        get_job_durations,
+        get_page_fetch_durations,
+        get_request_latencies,
+    )
 
     if settings.METRICS_ENABLE_HISTOGRAMS:
         req_latencies = get_request_latencies()
@@ -1128,6 +1157,30 @@ async def metrics(request: Request):
             for v in health_latencies:
                 health_hist.observe(v)
 
+    if settings.METRICS_ENABLE_HISTOGRAMS:
+        buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
+        job_durations = get_job_durations()
+        if job_durations:
+            job_hist = Histogram(
+                "dataforge_job_duration_seconds",
+                "Terminal job duration in seconds",
+                buckets=buckets,
+                registry=registry,
+            )
+            for v in job_durations:
+                job_hist.observe(v)
+
+        page_fetch_durations = get_page_fetch_durations()
+        if page_fetch_durations:
+            page_fetch_hist = Histogram(
+                "dataforge_page_fetch_duration_seconds",
+                "Page fetch attempt duration in seconds",
+                buckets=buckets,
+                registry=registry,
+            )
+            for v in page_fetch_durations:
+                page_fetch_hist.observe(v)
+
     # Cumulative collection errors
     error_total_gauge = Gauge(
         "dataforge_metrics_collection_error_total",
@@ -1153,6 +1206,17 @@ async def metrics(request: Request):
     # Cumulative requests count
     requests_gauge = Gauge("dataforge_requests_total", "Total requests count", registry=registry)
     requests_gauge.set(get_requests_total())
+
+    # Product-level counters required by docs/OBSERVABILITY.md.
+    from app.metrics_collector import get_product_totals
+
+    for counter_name, counter_value in get_product_totals().items():
+        product_gauge = Gauge(
+            f"dataforge_{counter_name}",
+            f"Product counter {counter_name}",
+            registry=registry,
+        )
+        product_gauge.set(counter_value)
 
     # Extraction-method distribution. One row per method so a
     # spike in ``regex`` is visible alongside the structured
@@ -1233,6 +1297,29 @@ async def metrics(request: Request):
         )
         for reason, count in ssrf_rejects.items():
             ssrf_gauge.labels(reason=reason).set(count)
+
+    # Domain failure rate from the runtime policy store.
+    try:
+        from app.domain_runtime_policy import get_domain_runtime_policy
+
+        domain_summaries = get_domain_runtime_policy().get_summary()
+        if domain_summaries:
+            domain_failure_gauge = Gauge(
+                "dataforge_domain_failure_rate",
+                "Per-domain failure ratio from recorded fetch attempts",
+                ["domain"],
+                registry=registry,
+            )
+            for domain, summary in domain_summaries.items():
+                total_attempts = int(summary.get("total_attempts", 0) or 0)
+                if total_attempts <= 0:
+                    continue
+                rate = float(summary.get("failure_rate", 0.0) or 0.0)
+                domain_failure_gauge.labels(domain=domain).set(rate)
+    except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
+        with _METRICS_ERRORS_LOCK:
+            METRICS_COLLECTION_ERRORS += 1
+        logger.debug("Metrics: domain failure-rate collection failed")
 
     # Repository query latencies — p50 / p95 derived from the ring buffer.
     repo_latencies = get_repo_query_latencies()
