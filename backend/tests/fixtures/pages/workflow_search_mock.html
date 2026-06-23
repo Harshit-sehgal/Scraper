@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Workflow Search Mock</title>
+  </head>
+  <body>
+    <main data-fixture="workflow-search">
+      <h1>Supplier Search</h1>
+      <form id="supplier-search" action="/suppliers/search" method="get" data-workflow-start="true">
+        <label for="q">Search suppliers</label>
+        <input id="q" name="q" type="search" value="" placeholder="product or company" />
+        <label for="region">Region</label>
+        <select id="region" name="region">
+          <option value="">Any region</option>
+          <option value="west">West</option>
+          <option value="east">East</option>
+        </select>
+        <button type="submit">Search</button>
+      </form>
+
+      <section id="results" data-workflow-output="supplier-results">
+        <article class="result-card" data-rank="1">
+          <h2 class="supplier-name">Apex Components</h2>
+          <p class="supplier-category">Industrial fasteners</p>
+          <a class="supplier-url" href="/suppliers/apex-components">View supplier</a>
+        </article>
+        <article class="result-card" data-rank="2">
+          <h2 class="supplier-name">Northstar Parts</h2>
+          <p class="supplier-category">Replacement motors</p>
+          <a class="supplier-url" href="/suppliers/northstar-parts">View supplier</a>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

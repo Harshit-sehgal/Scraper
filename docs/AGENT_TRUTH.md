@@ -7,8 +7,8 @@ backend full tests, ruff, pyflakes, mypy, bandit, pip_audit, npm ci,
 frontend tests, prettier, stylelint, and ESLint. Current route
 inventory is 161 routes (126 stable + 35 experimental); route auth
 matrix has 150 API rows with `unknown_auth=0` and `unknown_tenant=0`.
-The regenerated file inventory lists 24,015 files, 931 project-owned
-files, 927 deeply inspected project-owned files, and 0 file-ledger
+The regenerated file inventory lists 24,129 files, 938 project-owned
+files, 934 deeply inspected project-owned files, and 0 file-ledger
 follow-up rows._
 
 This file is the starting point for future agents. Treat older status
@@ -2806,3 +2806,43 @@ production-readiness overclaims.
 | `npm run test -- frontend/js/views.test.js` | 0 | PASS; focused file passed before and after adding mocks/cleanup for view side-effect modules. |
 | `npm run test` | 0 | PASS after isolating `views.test.js`; 37 frontend files, 461 tests, no unhandled errors. |
 | `python3 scripts/validate_local.py --full` | 0 | PASS after the frontend test isolation fix; run id `20260623T212546Z_full`, 24/24 validation steps passed. |
+
+## Benchmark Corpus Fixture Coverage Pass — 2026-06-24
+
+Scope: continue the foundation audit by closing the current
+fixture-coverage gap in `docs/BENCHMARK_PLAN.md` and
+`artifacts/audit/ISSUE_LEDGER.md`. Added named local fixtures for every
+required corpus category that was missing or only implicit, then pinned
+coverage in `backend/tests/test_benchmark_fixtures.py`.
+
+### Files Added
+
+- `backend/tests/fixtures/pages/workflow_search_mock.html`
+- `backend/tests/fixtures/pages/network_catalog_page.html`
+- `backend/tests/fixtures/pages/network_catalog_payload.json`
+- `backend/tests/fixtures/pages/table_catalog.html`
+- `backend/tests/fixtures/pages/empty_results.html`
+- `backend/tests/fixtures/pages/malformed_listing.html`
+- `backend/tests/fixtures/pages/challenge_mock.html`
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 quick checks. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_benchmark_fixtures.py -q -o addopts=` | 0 | PASS; 28 passed, 2 skipped. |
+| `python3 -m ruff check backend/tests/test_benchmark_fixtures.py` | 0 | PASS. |
+| `python3 -m ruff format --check backend/tests/test_benchmark_fixtures.py` | 0 | PASS. |
+| `python3 scripts/run_benchmark_smoke.py` | 0 | PASS; wrote `artifacts/benchmarks/latest_smoke.json` and `.md`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated 24,129 file rows, 938 project-owned, 934 deep-inspected, 0 follow-up rows. |
+| `python3 scripts/analyze_code_complexity.py --check` | 0 | PASS; `files=733 symbols=8991`, no threshold violations. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260623T214036Z_full`; 24 passed, 0 failed, 0 skipped, 0 timed out. Backend suite passed in 375.77s; frontend tests passed 37 files / 461 tests. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final quick gate PASS after ledger regeneration; run id `20260623T215252Z_quick`; 13 passed, 0 failed, 0 skipped, 0 timed out. |
+
+### Remaining Benchmark Work
+
+`P2-BENCHMARK-CORPUS-001` is fixed for fixture presence. The broader
+`P1-BENCHMARK-BASELINE-001` remains open/deferred because launch-grade
+benchmarking still needs versioned expected outputs, precision/recall/F1
+thresholds, duplicate/type checks, runtime/timeout reporting, and CI
+enforcement per category.

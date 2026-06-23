@@ -32,6 +32,29 @@ The benchmark corpus should include:
 - login-required mock pages
 - blocked/challenge mock pages
 
+## Current Local Corpus Coverage
+
+Updated 2026-06-24 from `backend/tests/test_benchmark_fixtures.py`.
+Every required category below has at least one named local fixture and
+is enforced by `test_required_benchmark_corpus_categories_have_local_fixtures`.
+
+| Category | Fixture(s) |
+| --- | --- |
+| static product pages | `travel_site.html` |
+| listing pages | `legacy_directory.html` |
+| tables | `table_catalog.html` |
+| articles | `messy_blog.html` |
+| search result pages | `search_results.html` |
+| pagination | `search_results.html` |
+| infinite scroll | `infinite_scroll_mock.html` |
+| load-more | `load_more_mock.html` |
+| session/workflow mock pages | `session_expired.html`, `workflow_search_mock.html` |
+| network JSON-backed pages | `network_catalog_page.html`, `network_catalog_payload.json` |
+| empty/no-result pages | `empty_results.html` |
+| malformed HTML | `malformed_listing.html` |
+| login-required mock pages | `login_wall_mock.html` |
+| blocked/challenge mock pages | `challenge_mock.html` |
+
 ## Required Metrics
 
 Each benchmark report should include:
@@ -76,7 +99,7 @@ python3 -m pytest -v backend/tests/test_golden_dataset.py --run-golden-dataset -
 
 Do not use benchmark results as launch proof until:
 
-- all required local corpus categories exist
+- all required local corpus categories exist and remain enforced
 - expected outputs are versioned
 - thresholds are documented per category
 - failures produce actionable classification

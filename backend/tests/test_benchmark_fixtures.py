@@ -8,6 +8,7 @@ depend on live websites. They assert:
   - Acquisition lineage truthfulness
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -37,7 +38,42 @@ def _load_fixture(name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _load_json_fixture(name: str) -> dict:
+    path = FIXTURES_DIR / name
+    if not path.suffix:
+        path = path.with_suffix(".json")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+REQUIRED_CORPUS_FIXTURES = {
+    "static product pages": ("travel_site.html",),
+    "listing pages": ("legacy_directory.html",),
+    "tables": ("table_catalog.html",),
+    "articles": ("messy_blog.html",),
+    "search result pages": ("search_results.html",),
+    "pagination": ("search_results.html",),
+    "infinite scroll": ("infinite_scroll_mock.html",),
+    "load-more": ("load_more_mock.html",),
+    "session/workflow mock pages": ("session_expired.html", "workflow_search_mock.html"),
+    "network JSON-backed pages": ("network_catalog_page.html", "network_catalog_payload.json"),
+    "empty/no-result pages": ("empty_results.html",),
+    "malformed HTML": ("malformed_listing.html",),
+    "login-required mock pages": ("login_wall_mock.html",),
+    "blocked/challenge mock pages": ("challenge_mock.html",),
+}
+
+
 # ── Fixture-based extraction tests ───────────────────────────────────────
+
+
+@pytest.mark.parametrize(("category", "fixture_names"), REQUIRED_CORPUS_FIXTURES.items())
+def test_required_benchmark_corpus_categories_have_local_fixtures(category: str, fixture_names: tuple[str, ...]) -> None:
+    """Every required benchmark-plan category has named local fixture files."""
+    assert category
+    for fixture_name in fixture_names:
+        path = FIXTURES_DIR / fixture_name
+        assert path.exists(), f"Missing fixture for {category}: {fixture_name}"
+        assert path.stat().st_size > 100, f"Fixture for {category} is too small: {fixture_name}"
 
 
 @pytest.mark.parametrize(
@@ -72,6 +108,12 @@ def _load_fixture(name: str) -> str:
             [_schema_field("title"), _schema_field("price", FieldType.CURRENCY)],
             1,
             ["title"],
+        ),
+        (
+            "table_catalog",
+            [_schema_field("name"), _schema_field("price", FieldType.CURRENCY)],
+            1,
+            ["name"],
         ),
     ],
 )
@@ -195,6 +237,59 @@ def test_load_more_fixture_contains_pagination_control() -> None:
     html = _load_fixture("load_more_mock")
     assert "load-more" in html.lower() or "load more" in html.lower()
     assert "Product Alpha" in html
+
+
+def test_workflow_mock_fixture_has_stable_start_form_and_extractable_results() -> None:
+    """Benchmark corpus: workflow mock has form inputs plus deterministic result cards."""
+    from bs4 import BeautifulSoup
+
+    html = _load_fixture("workflow_search_mock")
+    soup = BeautifulSoup(html, "html.parser")
+
+    form = soup.select_one("form[data-workflow-start='true']")
+    assert form is not None
+    assert form.get("action") == "/suppliers/search"
+    assert not any(token in form.get("action", "").lower() for token in ("sid=", "session=", "token="))
+    assert {field.get("name") for field in form.select("input[name], select[name]")} >= {"q", "region"}
+
+    cards = soup.select(".result-card")
+    assert len(cards) == 2
+    assert cards[0].select_one(".supplier-name").get_text(strip=True) == "Apex Components"
+    assert cards[1].select_one(".supplier-url")["href"] == "/suppliers/northstar-parts"
+
+
+def test_network_json_fixture_pairs_shell_page_with_expected_payload() -> None:
+    """Benchmark corpus: network JSON page has a versioned local payload with records."""
+    from bs4 import BeautifulSoup
+
+    html = _load_fixture("network_catalog_page")
+    payload = _load_json_fixture("network_catalog_payload")
+    soup = BeautifulSoup(html, "html.parser")
+
+    root = soup.select_one("[data-json-source='network_catalog_payload.json']")
+    assert root is not None
+    assert soup.select_one("[data-api]")["data-api"] == "/api/catalog?page=1"
+
+    records = payload["items"]
+    assert payload["total"] == 3
+    assert len(records) == 3
+    assert {record["id"] for record in records} == {"sku-100", "sku-101", "sku-102"}
+    assert all(record["title"] and record["price"] > 0 for record in records)
+
+
+def test_empty_and_malformed_fixtures_are_explicit_local_corpus_members() -> None:
+    """Benchmark corpus: empty and malformed pages are named and parseable."""
+    from bs4 import BeautifulSoup
+
+    empty_html = _load_fixture("empty_results")
+    malformed_html = _load_fixture("malformed_listing")
+
+    empty_soup = BeautifulSoup(empty_html, "html.parser")
+    malformed_soup = BeautifulSoup(malformed_html, "html.parser")
+
+    assert "no matching records" in empty_soup.get_text(" ", strip=True).lower()
+    assert len(malformed_soup.select(".card")) >= 1
+    assert "Loose Card Alpha" in malformed_soup.get_text(" ", strip=True)
 
 
 # ── Acquisition lineage tests ───────────────────────────────────────────

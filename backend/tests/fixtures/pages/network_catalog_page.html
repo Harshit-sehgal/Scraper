@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Network Catalog Fixture</title>
+  </head>
+  <body>
+    <main data-fixture="network-json-catalog" data-api="/api/catalog?page=1">
+      <h1>Catalog Shell</h1>
+      <p>This page renders product cards from a JSON API response.</p>
+      <div id="catalog-root" data-json-source="network_catalog_payload.json"></div>
+      <script type="application/json" id="catalog-bootstrap">
+        {
+          "endpoint": "/api/catalog?page=1",
+          "record_selector": "$.items[*]",
+          "fields": ["id", "title", "price", "availability"]
+        }
+      </script>
+    </main>
+  </body>
+</html>

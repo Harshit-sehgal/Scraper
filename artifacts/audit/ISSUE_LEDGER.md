@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 5 |
-| Fixed issues | 29 |
+| Open verified/deferred issues | 4 |
+| Fixed issues | 30 |
 | Not reproducible issues | 1 |
 | Candidate issues | 4 |
 | P0 issue rows | 6 |
@@ -70,9 +70,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > API rows with `unknown_auth=0` and `unknown_tenant=0`, and file
 > ledger generation was fixed so historical validation failures are no
 > longer hardcoded into current per-file rows. Current open
-> verified/deferred rows are `P1-ARCH-STORAGE-001`,
+> verified/deferred rows at that point were `P1-ARCH-STORAGE-001`,
 > `P1-BENCHMARK-BASELINE-001`, `P2-BENCHMARK-CORPUS-001`,
 > `P1-OPS-LOAD-ALERT-001`, and `P2-OBSERVABILITY-METRICS-001`.
+>
+> Updated 2026-06-24 benchmark corpus pass: `P2-BENCHMARK-CORPUS-001`
+> fixed. Added named local fixtures for workflow search, network
+> JSON-backed catalog, table, empty results, malformed HTML, and
+> challenge pages. `test_required_benchmark_corpus_categories_have_local_fixtures`
+> now enforces every required category in `docs/BENCHMARK_PLAN.md`.
+> `python3 scripts/run_benchmark_smoke.py` passes. `P1-BENCHMARK-BASELINE-001`
+> remains deferred because launch-grade precision/recall/F1 thresholds
+> and per-category expected-output gates are still product-quality work.
 
 
 ## Verified Issues
@@ -384,34 +393,34 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-BENCHMARK-BASELINE-001
 
 - **priority:** P1
-- **status:** deferred (needs broader fixture corpus)
+- **status:** deferred (needs scoring thresholds and expected-output gates)
 - **category:** benchmark_readiness / quality_baseline
 - **file_path:** `artifacts/audit/BENCHMARK_READINESS_REVIEW.md`, `docs/BENCHMARK_PLAN.md`, `scripts/run_benchmark_smoke.py`
 - **line/function:** Prompt 7 benchmark baseline
 - **evidence:** Prompt 7 local benchmark smoke passed with `python3 scripts/run_benchmark_smoke.py`, writing `artifacts/benchmarks/latest_smoke.json` and `.md`. The review records that this is smoke/config/fixture coverage only and does not prove broad extraction quality.
 - **why_it_matters:** Product feature work needs a repeatable quality baseline before changing extraction and workflow behavior.
 - **impact:** Without a fuller baseline, URL Intelligence, Workflow Replay, and extraction-depth work can regress quality without a clear signal.
-- **recommended_fix:** Expand local fixture corpus and expected outputs, then enforce smoke/corpus benchmark thresholds in CI.
-- **tests_needed:** Local corpus tests for static, listing, table, article, search, pagination, infinite scroll, load-more, workflow mock, network JSON, empty, malformed, login-required mock, and challenge mock pages.
+- **recommended_fix:** Add per-category expected outputs and enforce precision/recall/F1 thresholds in CI.
+- **tests_needed:** Benchmark scoring tests for field precision, field recall, row precision, row recall, F1, missing required fields, duplicates, invalid types, runtime, timeout rate, and browser failures.
 - **acceptance_criteria:** Benchmark report includes precision, recall, F1, missing fields, duplicates, invalid types, runtime, timeout rate, and browser failures for every required corpus category.
-- **blocked_by:** Broader benchmark fixtures and product schema decisions.
-- **notes:** Existing live golden tests are observational and must not be used as deterministic proof. Deferred 2026-06-22 — corpus expansion is product-quality work, not a safety defect. Session 4 follow-up (2026-06-22): added 4 new fixture HTML pages (`search_results.html`, `session_expired.html`, enhanced `load_more_mock.html`, enhanced `login_wall_mock.html`). Session 5 (2026-06-22): added `infinite_scroll_mock.html` with extraction test. search_results and infinite_scroll now wired into `test_fixture_extraction_yields_records`. Remaining missing categories: workflow mock pages, network JSON-backed fixtures (server-side only).
+- **blocked_by:** Product schema decisions for per-category thresholds.
+- **notes:** Existing live golden tests are observational and must not be used as deterministic proof. Deferred 2026-06-22 — corpus expansion is product-quality work, not a safety defect. Session 4 follow-up (2026-06-22): added 4 new fixture HTML pages (`search_results.html`, `session_expired.html`, enhanced `load_more_mock.html`, enhanced `login_wall_mock.html`). Session 5 (2026-06-22): added `infinite_scroll_mock.html` with extraction test. search_results and infinite_scroll now wired into `test_fixture_extraction_yields_records`. 2026-06-24: all required fixture categories now have named local fixtures and an enforcement test; remaining work is benchmark scoring/threshold maturity, not missing corpus files.
 
 ### P2-BENCHMARK-CORPUS-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** benchmark_corpus / fixture_coverage
 - **file_path:** `backend/tests/fixtures/pages`, `backend/tests/golden_dataset`, `artifacts/audit/BENCHMARK_READINESS_REVIEW.md`
 - **line/function:** required corpus coverage table
-- **evidence:** Prompt 7 review marks infinite scroll, load-more, session/workflow mock pages, and login-required mock pages as missing from the verified local benchmark corpus. Several other categories are only partial.
+- **evidence:** Current corpus coverage is enforced by `backend/tests/test_benchmark_fixtures.py::test_required_benchmark_corpus_categories_have_local_fixtures`. Named fixtures now cover static product, listing, table, article, search, pagination, infinite scroll, load-more, session/workflow, network JSON-backed, empty/no-result, malformed HTML, login-required, and challenge pages.
 - **why_it_matters:** Extraction quality cannot be compared across releases without representative local fixtures.
 - **impact:** Feature work can optimize for a narrow fixture set and miss common user workflows.
-- **recommended_fix:** Add local fixtures and expected outputs for missing categories before launch-gate benchmark claims.
-- **tests_needed:** Fixture-backed tests for missing categories with expected rows and failure classifications.
+- **recommended_fix:** Fixed for fixture coverage. Keep expected-output and threshold work under `P1-BENCHMARK-BASELINE-001`.
+- **tests_needed:** Covered by `backend/tests/test_benchmark_fixtures.py`; local benchmark smoke uses no live-site dependency.
 - **acceptance_criteria:** Required corpus categories are present, documented, and run without live-site dependency.
-- **blocked_by:** Benchmark fixture authoring.
-- **notes:** This is product-quality readiness, not a P0 safety defect.
+- **blocked_by:** None.
+- **notes:** Fixed 2026-06-24. Added `workflow_search_mock.html`, `network_catalog_page.html`, `network_catalog_payload.json`, `table_catalog.html`, `empty_results.html`, `malformed_listing.html`, and `challenge_mock.html`; `python3 scripts/run_benchmark_smoke.py` passes.
 
 ### P1-OPS-BACKUP-RESTORE-001
 

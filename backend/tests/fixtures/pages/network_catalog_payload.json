@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "availability": "in_stock",
+      "id": "sku-100",
+      "price": 29.99,
+      "title": "Portable Pump"
+    },
+    {
+      "availability": "low_stock",
+      "id": "sku-101",
+      "price": 44.5,
+      "title": "Carbon Filter"
+    },
+    {
+      "availability": "in_stock",
+      "id": "sku-102",
+      "price": 18.75,
+      "title": "Valve Kit"
+    }
+  ],
+  "next_page": "/api/catalog?page=2",
+  "total": 3
+}
