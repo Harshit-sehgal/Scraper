@@ -41,6 +41,12 @@ _ACTIVE_KEY_VERSION_ENV = "DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION"
 # Default key version for new encryptions
 DEFAULT_KEY_VERSION = "v1"
 
+# Default salt used as a last-resort in development/test when
+# ``DATAFORGE_ENCRYPTION_SALT`` is unset. This is a `development`-
+# only marker; in any non-dev env, ``encrypt()`` raises
+# :class:`EncryptionError` rather than using this value. See F-ENC-001.
+_DEFAULT_PER_USER_SALT = "dataforge-dev-only-per-user-salt-do-not-use-in-prod"
+
 # GCM nonce size (12 bytes is standard / recommended by NIST)
 _GCM_NONCE_SIZE = 12
 # GCM tag size (16 bytes = 128 bits)
@@ -249,22 +255,57 @@ def _aes_gcm_decrypt(ciphertext: bytes, tag: bytes, nonce: bytes, key: bytes) ->
 def encrypt(plaintext: str, user_id: str | None = None) -> str:
     """Encrypt a plaintext string with optional per-user key derivation.
 
-    C8: When user_id is provided, derive key from user_id + salt instead of app-level key.
-    This ensures per-user encryption so one key compromise doesn't expose all users' data.
+    C8: When ``user_id`` is provided, a per-user key is derived via
+    ``hmac(user_id + salt, salt, sha256)`` rather than using the app-level
+    encryption key. This ensures per-user encryption so one key compromise
+    doesn't expose all users' data.
+
+    Operational contract (F-ENC-001):
+      - In ``{development, test}`` envs, the salt fallback policy of
+        :data:`_DEFAULT_PER_USER_SALT` is permitted so local contributors
+        don't have to configure ``DATAFORGE_ENCRYPTION_SALT``.
+      - In any other env (``production``, ``staging``, or any unknown value
+        reported by ``DATAFORGE_ENV``), unset ``DATAFORGE_ENCRYPTION_SALT``
+        raises :class:`EncryptionError`. Silently deriving per-user keys
+        from a source-visible default salt would be a plaintext-equivalent
+        leak — anyone reading the repo who knows ``user_id`` could
+        reproduce the per-user derived key.
+
+    The encrypt function records a ``pu`` flag in the payload so :func:`decrypt`
+    can re-derive the same per-user key when handed the matching ``user_id``.
     """
     import hashlib
 
     key_version = _get_key_version()
     key: bytes | None = None
+    per_user: bool = False
 
     # C8: Per-user encryption
     if user_id:
         try:
             import hmac
 
-            salt = os.environ.get("DATAFORGE_ENCRYPTION_SALT", "default-salt-change-in-prod")
+            salt = os.environ.get("DATAFORGE_ENCRYPTION_SALT")
+            if not salt:
+                env = os.environ.get("DATAFORGE_ENV", "development").lower()
+                if env in {"development", "test"}:
+                    salt = _DEFAULT_PER_USER_SALT
+                    logger.warning(
+                        "DATAFORGE_ENCRYPTION_SALT is unset; using _DEFAULT_PER_USER_SALT in env=%r. "
+                        "Set DATAFORGE_ENCRYPTION_SALT in production.",
+                        env,
+                    )
+                else:
+                    msg = (
+                        f"DATAFORGE_ENCRYPTION_SALT is required for per-user encryption in env={env!r}. "
+                        "Refusing to derive per-user keys from a default salt in non-development envs."
+                    )
+                    raise EncryptionError(msg)
             derived = hmac.new((user_id + salt).encode("utf-8"), salt.encode("utf-8"), hashlib.sha256).digest()
             key = derived[:32]  # Use first 32 bytes as AES-256 key
+            per_user = True
+        except EncryptionError:
+            raise
         except Exception as e:
             logger.warning("Failed to derive per-user key, using app-level: %s", e)
             key = _get_key(key_version)
@@ -307,12 +348,30 @@ def encrypt(plaintext: str, user_id: str | None = None) -> str:
         "n": base64.b64encode(nonce).decode("ascii"),
         "t": base64.b64encode(tag).decode("ascii"),
     }
+    if per_user:
+        # Signal to ``decrypt`` that this ciphertext was produced by a
+        # per-user derived key. Decrypt needs the matching ``user_id``
+        # argument to reproduce the same key. ``user_id`` is non-None
+        # here (the if-per-user branch above is gated on truthy user_id)
+        # so the cast is safe; mypy does not infer that across the
+        # try/except boundary.
+        if user_id is None:
+            # Should not happen because the branch above is gated on a
+            # truthy user_id, but encode the invariant explicitly so
+            # ``python -O`` and mypy both stay satisfied.
+            msg = "Per-user encrypt branch entered without user_id"
+            raise EncryptionError(msg)
+        payload["pu"] = "1"
+        payload["uid"] = user_id
+        # ``user_id`` only refers to which key subclass was used; the
+        # challenge remains reproducing hmac(user_id + salt, salt)
+        # without the salt.
     import json
 
     return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
 
 
-def decrypt(encrypted_payload: str) -> str:
+def decrypt(encrypted_payload: str, user_id: str | None = None) -> str:
     """Decrypt an encrypted payload back to the original plaintext string.
 
     Attempts to decrypt using the key version stored in the payload.
@@ -320,11 +379,23 @@ def decrypt(encrypted_payload: str) -> str:
     trying ALL available keys — supporting key rotation where data
     encrypted with old keys can still be decrypted.
 
+    For per-user encrypted payloads (those produced with
+    ``encrypt(plaintext, user_id=...)``, signalled by the ``pu`` flag
+    in the payload), the cipher was produced by an HMAC-derived key
+    from ``DATAFORGE_ENCRYPTION_SALT`` and ``user_id``. The matching
+    ``user_id`` must be passed to :func:`decrypt` so the same key is
+    re-derived; otherwise decryption fails closed.
+
     Args:
         encrypted_payload: The base64-encoded payload returned by :func:`encrypt`.
+        user_id: The user_id used when encrypting. Required iff the payload
+            carries the per-user ``pu`` flag; otherwise it is ignored.
 
     Raises:
-        DecryptionError: If decryption fails with all known keys.
+        DecryptionError: If decryption fails with all known keys, or if a
+            per-user payload is decrypted without a matching ``user_id``,
+            or if the per-user payload was created in a non-dev env
+            (which fails closed — see F-ENC-001).
     """
     try:
         import json
@@ -336,32 +407,68 @@ def decrypt(encrypted_payload: str) -> str:
         raise DecryptionError(msg) from exc
 
     stored_key_version = payload.get("v", DEFAULT_KEY_VERSION)
+    is_per_user = payload.get("pu") == "1"
+    payload_uid = payload.get("uid")
+
+    if is_per_user:
+        if not user_id:
+            msg = "Cannot decrypt per-user payload without the matching user_id. Re-call decrypt(payload, user_id=...)."
+            raise DecryptionError(msg)
+        if payload_uid and payload_uid != user_id:
+            # Defense in depth: the payload echoes the user_id it was
+            # encrypted for. A mismatched user_id should not silently
+            # fall through to attempt other keys.
+            msg = "user_id does not match the payload's recorded user_id"
+            raise DecryptionError(msg)
+        # Re-derive per-user key via the same policy as encrypt(). Refuse
+        # to derive in non-dev envs where the salt is unset.
+        salt = os.environ.get("DATAFORGE_ENCRYPTION_SALT")
+        if not salt:
+            env = os.environ.get("DATAFORGE_ENV", "development").lower()
+            if env not in {"development", "test"}:
+                msg = f"Cannot decrypt per-user payload: DATAFORGE_ENCRYPTION_SALT is unset in env={env!r}. "
+                msg += "Set the salt environment variable before decrypting."
+                raise DecryptionError(msg)
+            salt = _DEFAULT_PER_USER_SALT
+        import hashlib as _hashlib
+        import hmac as _hmac
+
+        derived = _hmac.new((user_id + salt).encode("utf-8"), salt.encode("utf-8"), _hashlib.sha256).digest()
+        candidate_keys: list[tuple[str, bytes]] = [("per_user", derived[:32])]
+    else:
+        candidate_keys = []
 
     # Try the stored key version first
     key = _get_key(stored_key_version)
     if key is not None:
-        try:
-            ciphertext = base64.b64decode(payload["c"])
-            nonce = base64.b64decode(payload["n"])
-            tag = base64.b64decode(payload["t"])
-            return _aes_gcm_decrypt(ciphertext, tag, nonce, key).decode("utf-8")
-        except (KeyError, ValueError, DecryptionError) as exc:
-            logger.debug("Decryption with version %s failed: %s", stored_key_version, exc)
+        candidate_keys.append((stored_key_version, key))
 
-    # Fall back to trying all available keys (key rotation support)
-    all_keys = _get_all_available_keys()
-    for version, fallback_key in all_keys.items():
-        if version == stored_key_version:
-            continue  # already tried above
+    for ver, k in candidate_keys:
         try:
             ciphertext = base64.b64decode(payload["c"])
             nonce = base64.b64decode(payload["n"])
             tag = base64.b64decode(payload["t"])
-            result = _aes_gcm_decrypt(ciphertext, tag, nonce, fallback_key)
-            logger.info("Decrypted payload with fallback key version %s (stored: %s)", version, stored_key_version)
-            return result.decode("utf-8")
-        except (KeyError, ValueError, DecryptionError):
-            continue
+            return _aes_gcm_decrypt(ciphertext, tag, nonce, k).decode("utf-8")
+        except (KeyError, ValueError, DecryptionError) as exc:
+            logger.debug("Decryption with version %s failed: %s", ver, exc)
+
+    # Fall back to trying all available keys (key rotation support) —
+    # only when the payload is NOT per-user-mode; per-user payloads are
+    # anchored to the explicit derived key.
+    if not is_per_user:
+        all_keys = _get_all_available_keys()
+        for version, fallback_key in all_keys.items():
+            if version == stored_key_version:
+                continue  # already tried above
+            try:
+                ciphertext = base64.b64decode(payload["c"])
+                nonce = base64.b64decode(payload["n"])
+                tag = base64.b64decode(payload["t"])
+                result = _aes_gcm_decrypt(ciphertext, tag, nonce, fallback_key)
+                logger.info("Decrypted payload with fallback key version %s (stored: %s)", version, stored_key_version)
+                return result.decode("utf-8")
+            except (KeyError, ValueError, DecryptionError):
+                continue
 
     msg = f"Decryption failed — no available key for version {stored_key_version} and no fallback key succeeded"
     raise DecryptionError(msg)

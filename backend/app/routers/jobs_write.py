@@ -46,7 +46,7 @@ from app.services.job_creation_service import (
 from app.services.job_mutation_service import (
     JobBackfillService,
     JobCancellerService,
-    JobReclenerService,
+    JobRecleanerService,
 )
 from app.storage_interface import get_job_repository
 from app.utils.rbac import (
@@ -203,10 +203,10 @@ def register_jobs_write_routes(
     ):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.
 
-        Delegates business logic to ``JobReclenerService``.
+        Delegates business logic to ``JobRecleanerService``.
         """
         role, user_id, org_id, project_id = _auth_tuple(auth)
-        service = JobReclenerService(manager)
+        service = JobRecleanerService(manager)
         return await service.reclean_job(job_id, role, user_id, org_id, project_id)
 
     @router.delete("/api/jobs/{job_id}")

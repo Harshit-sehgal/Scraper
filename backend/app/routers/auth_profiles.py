@@ -241,6 +241,10 @@ async def complete_login(
 
     now = _now_iso()
     profile["encrypted_storage_state"] = encrypted
+    # Record the user_id used at encrypt-time so the matching decrypt can
+    # re-derive the same per-user key. The actor may differ from the
+    # profile owner across sessions; this field pins which key was used.
+    profile["encrypted_by_user_id"] = user_id
     profile["status"] = AuthProfileStatus.ACTIVE.value
     profile["updated_at"] = now
     profile["last_validated_at"] = now
@@ -276,7 +280,10 @@ async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | N
         return None
 
     try:
-        plaintext = encryption_decrypt(encrypted)
+        plaintext = encryption_decrypt(
+            encrypted,
+            user_id=str(profile.get("encrypted_by_user_id") or profile.get("user_id") or ""),
+        )
         storage_state = json.loads(plaintext)
     except (ValueError, TypeError):
         logger.debug("Could not decrypt storage state for live check", exc_info=True)
@@ -476,7 +483,10 @@ def get_decrypted_storage_state(profile_id: str, expected_domain: str) -> dict[s
     if not encrypted:
         raise HTTPException(status_code=403, detail="No stored session state")
 
-    plaintext = encryption_decrypt(encrypted)
+    plaintext = encryption_decrypt(
+        encrypted,
+        user_id=str(profile.get("encrypted_by_user_id") or profile.get("user_id") or ""),
+    )
     # Update usage stats
     profile["last_used_at"] = _now_iso()
     profile["usage_count"] = int(profile.get("usage_count", 0) or 0) + 1

@@ -106,3 +106,58 @@ class TestEncryptionKeyFallbackPolicy:
         monkeypatch.setenv("DATAFORGE_ENV", "some-unknown-env")
         with pytest.raises(EncryptionError):
             encrypt("unknown-env-secret")
+
+
+class TestPerUserEncryptionSaltPolicy:
+    """F-ENC-001: per-user encryption previously fell back to a source-visible
+    literal default salt ``"default-salt-change-in-prod"`` whenever
+    ``DATAFORGE_ENCRYPTION_SALT`` was unset. The result was that any reader
+    who knew ``user_id`` could reproduce the per-user derived AES key and
+    decrypt AuthProfile ciphertext — a plaintext-equivalent leak in any
+    non-dev env where the operator forgot to set the salt.
+
+    Fix: the per-user branch rejects unset ``DATAFORGE_ENCRYPTION_SALT`` in
+    any env other than ``{development, test}``; the salt is permitted (any
+    value) in dev/test so local contributors don't have to set it.
+    """
+
+    _SALT_ENV = "DATAFORGE_ENCRYPTION_SALT"
+
+    def _no_salt_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv(self._SALT_ENV, raising=False)
+
+    def test_staging_env_fails_closed_without_salt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._no_salt_env(monkeypatch)
+        monkeypatch.setenv("DATAFORGE_ENV", "staging")
+        with pytest.raises(EncryptionError):
+            encrypt("user-payload", user_id="user-abc")
+
+    def test_production_env_fails_closed_without_salt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._no_salt_env(monkeypatch)
+        monkeypatch.setenv("DATAFORGE_ENV", "production")
+        with pytest.raises(EncryptionError):
+            encrypt("user-payload", user_id="user-abc")
+
+    def test_dev_env_uses_per_user_key_when_salt_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # In dev, we accept dev-mode encryption but the per-user path
+        # should still succeed when an explicit salt is set.
+        monkeypatch.setenv("DATAFORGE_ENV", "development")
+        monkeypatch.setenv(self._SALT_ENV, "dev-salt-value")
+        encrypted = encrypt("dev-payload", user_id="user-xyz")
+        # Round-trip requires the same user_id at decrypt; the per-user
+        # marker in the payload forbids decrypt without it.
+        assert decrypt(encrypted, user_id="user-xyz") == "dev-payload"
+
+    def test_per_user_decrypt_without_user_id_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DATAFORGE_ENV", "development")
+        monkeypatch.setenv(self._SALT_ENV, "dev-salt-value")
+        encrypted = encrypt("user-secret", user_id="user-123")
+        with pytest.raises(DecryptionError):
+            decrypt(encrypted)  # missing user_id
+
+    def test_per_user_decrypt_with_wrong_user_id_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DATAFORGE_ENV", "development")
+        monkeypatch.setenv(self._SALT_ENV, "dev-salt-value")
+        encrypted = encrypt("user-secret", user_id="user-123")
+        with pytest.raises(DecryptionError):
+            decrypt(encrypted, user_id="user-456")

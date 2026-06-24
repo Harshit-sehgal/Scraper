@@ -58,7 +58,7 @@ def test_job_results_disk_offload_and_retrieval(client, monkeypatch) -> None:
         return rows[:1002], {}
 
     # ARCH-001 refactoring moved reclean logic from jobs_write.py into
-    # JobReclenerService (app.services.job_mutation_service.py), which
+    # JobRecleanerService (app.services.job_mutation_service.py), which
     # imports ai_clean_and_align_records lazily from app.scraper inside
     # the method body.  Patching the source module (app.scraper) ensures
     # the lazy import resolves to the mock regardless of the caller.

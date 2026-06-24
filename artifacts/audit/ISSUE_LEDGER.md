@@ -770,4 +770,1086 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **blocked_by:** Verified frontend E2E backend wiring.
 - **notes:** Closed 2026-06-22 session 2: `frontend/e2e/auth-flow.spec.js` submits a job via the UI and verifies it appears in the jobs list.
 
-## End of ledger
+## Session 80 — New findings added 2026-06-25 (consolidated pre-existing scan)
+
+This section adds 61 pre-existing problems found across infrastructure
+(Docker/nginx/CI/monitoring/db migrations/env/scripts), security
+(encryption/auth/tenant), and code-quality sweeps. Severity totals:
+
+| Priority | Count |
+|---|---|
+| P0 | 9 |
+| P1 | 22 |
+| P2 | 30 |
+| P3 | 5 |
+| **Total** | **66** |
+
+Every entry uses the same shape as the rest of the ledger
+(priority / status / category / file_path / line_function /
+evidence / why_it_matters / impact / recommended_fix /
+tests_needed / acceptance_criteria / blocked_by / notes).
+Status is `verified` unless noted.
+
+### F-ENC-001
+
+- **priority:** P0
+- **status:** verified
+- **category:** security / encryption / silent_default_salt
+- **file_path:** `backend/app/utils/encryption.py`
+- **line_function:** `encrypt`; line 265
+- **evidence:** `salt = os.environ.get("DATAFORGE_ENCRYPTION_SALT", "default-salt-change-in-prod")`. If `DATAFORGE_ENCRYPTION_SALT` is unset in production, per-user AES keys are derived via `hmac.new((user_id + salt).encode(...), salt.encode(...), hashlib.sha256)` — and `salt` is the source-visible literal string `"default-salt-change-in-prod"`. Anyone reading the repo who can guess or enumerate `user_id` strings can reproduce the per-user derived key and decrypt any AuthProfile/session-secret ciphertext.
+- **why_it_matters:** Plaintext-equivalent leak for encrypted AuthProfile and session-secret fields. The non-dev path for app-level keys (lines 286-300) fails closed, but the per-user branch silently succeeds with the default salt.
+- **impact:** Cross-account decryption of encrypted AuthProfile/session data if operators run without setting `DATAFORGE_ENCRYPTION_SALT`.
+- **recommended_fix:** Remove the silent default; raise `EncryptionError` (or, in dev/test only, keep the fallback) when `DATAFORGE_ENCRYPTION_SALT` is unset in non-dev envs.
+- **tests_needed:** Unit test asserting that encrypt with a `user_id` and unset `DATAFORGE_ENCRYPTION_SALT` raises in non-dev envs; existing round-trip tests continue to pass.
+- **acceptance_criteria:** No code path derives AES keys from the literal `"default-salt-change-in-prod"` in staging or production.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80). 5-line fix in `encryption.py`.
+
+### F-DOCKER-001
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / docker / default_target_reload_debug
+- **file_path:** `Dockerfile`, `docker-compose.yml`
+- **line_function:** `Dockerfile:91` (dev stage CMD); `docker-compose.yml:22-27` (`target: dev`)
+- **evidence:** Default target in `docker-compose.yml` is `dev`. Dev stage CMD runs `uvicorn app.main:app --reload --log-level debug`. Override mounts `./backend:/app/backend` and `./scripts:/app/scripts` from host. Combine with `PYTHONDEVMODE=1` in `docker-compose.override.yml:14` and Playwright browser contexts restart on every code reload.
+- **why_it_matters:** A fresh `docker compose up` starts a debugger-enabled, host-write-watched reload loop. Tracebacks leak to container logs; `.pyc` files written as user `dataforge` against host UID-owned mounts.
+- **impact:** Operators expecting a dev stack actually get noisy traceback logs, broken Playwright contexts on reload, and silent permission-denied issues.
+- **recommended_fix:** Make `target: production` the default in `docker-compose.yml`; gate `--reload` and `--log-level debug` on `DATAFORGE_ENABLE_RELOAD` env. Optionally rename `dev` → `local-dev`.
+- **tests_needed:** `python3 scripts/validate_local.py --quick` exits 0 after the change. `make up` no longer restarts the browser process on a host edit to unrelated files.
+- **acceptance_criteria:** Default `docker compose up` does not pass `--reload`.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-003
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / nginx / path_traversal_rate_limit_bypass
+- **file_path:** `nginx.conf`
+- **line_function:** `location /dashboard/` block at lines 264-270
+- **evidence:** `/dashboard/` uses `proxy_pass http://dataforge_api;` without a URI component. nginx normalizes `..` segments before proxying: `/dashboard/../api/admin/foo` resolves to `proxy_pass http://dataforge_api/api/admin/foo` after normalization. The `/api/` location has `limit_req zone=api burst=20 nodelay`, but the `/dashboard/../api/...` path bypasses that throttle entirely.
+- **why_it_matters:** Unbounded request rate to `/api/admin/*` (and the rest of `/api/`) via the `/dashboard/` front-door. Combined with no `/api/admin` deny block in `nginx.local.conf`, attackers reach protected FastAPI routes at unlimited rate.
+- **impact:** Admin endpoint probing, brute force, and DoS are all enabled by this single nginx config drift.
+- **recommended_fix:** Move the rate-limit guard to `location ~ ^/(api|dashboard)/` regex block, or add `rewrite ^/dashboard/(.*)$ /dashboard/$1 break;` to force normalization before rate limiting.
+- **tests_needed:** Integration test: burst 100 requests to `/dashboard/../api/health` and assert nginx returns 503/429 after the limit. Verify legitimate `/api/health` still answers.
+- **acceptance_criteria:** Requests for `/api/...` paths trigger the `limit_req` regardless of the prefix used.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-001
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / monitoring / alertmanager_silent_drop
+- **file_path:** `alertmanager.yml`, `docker-compose.prod.yml:387-391`
+- **line_function:** `global.smtp_smarthost`, `routes.critical`
+- **evidence:** `smtp_smarthost: '__ALERTMANAGER_SMTP_HOST__'` substitutes `''` (empty) if env unset. Same pattern for `__ALERTMANAGER_SLACK_WEBHOOK_URL__`. If both channels are empty, all `critical`/`warning`/`info` alerts are silently dropped. `scripts/run_alert_delivery_drill.py` exists but is not wired into `scripts/smoke_prod_stack.sh`.
+- **why_it_matters:** Operators may believe the alerting pipeline works (Alertmanager shows alerts as "firing"), but no email/Slack delivery occurs. The drag-fail to deploy phase is invisible.
+- **impact:** On-call never pages during real incidents; MTTR climbs; the "production-ready" claim is misleading.
+- **recommended_fix:** Add a healthcheck to Alertmanager that asserts both channels reachable. Wire `python3 scripts/run_alert_delivery_drill.py` into `scripts/smoke_prod_stack.sh` so missing-channel deploys fail.
+- **tests_needed:** Smoke test asserts a synthetic alert's receipt on each enabled channel; fails deployment if any channel is empty.
+- **acceptance_criteria:** `make prod` cannot succeed when both `ALERTMANAGER_SMTP_HOST` and `ALERTMANAGER_SLACK_WEBHOOK_URL` are unset.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80). Mitigates the existing `P1-OPS-LOAD-ALERT-001` gap.
+
+### F-DB-001
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / db_migrations / non_idempotent_dump
+- **file_path:** `backend/migrations/008_postgres_storage_v8.sql`
+- **line_function:** file header `\restrict` macro (line 1) and pg_dump 16 artifact metadata
+- **evidence:** The file begins with `\restrict fRKAyhUraWQwVaATmxbYMFspXTvDR27nZM2IShtu4LmwPtevKjM07DEsQblPrmN` and contains `CREATE EXTENSION` + `COPY` statements that are not idempotent. Replaying the file against an existing schema fails on duplicates.
+- **why_it_matters:** Operators cannot bootstrap a fresh Postgres cluster via the migrations directory. The pattern is a per-version raw dump, not a migration step.
+- **impact:** Disaster recovery from a `pg_dump` alone is not safe; `init-db/init.sql:13-21` only creates extensions (`uuid-ossp`, `pg_trgm`) and leaves schema creation to `app.postgres_repository._ensure_schema()`. There is no way to know which schema versions are applied from outside the app.
+- **recommended_fix:** Use `pg_dump --schema-only --no-owner --no-privileges` for per-version DDL files. Drop `COPY` data. Track schema versions in a `schema_version` table that `_ensure_schema()` reads on boot.
+- **tests_needed:** Restart-from-empty Postgres applies DDL files in order with no errors. `_ensure_schema()` idempotency test on already-migrated DB.
+- **acceptance_criteria:** `psql -f migrations/<N>.sql` is replayable against any state and reports its version.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-001
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / ci / unsanctioned_auto_merge
+- **file_path:** `.github/workflows/dependabot-auto-merge.yml`
+- **line_function:** `Approve PR` step at lines 38-43, `Enable auto-merge` at lines 47-48
+- **evidence:** Approval runs unconditionally on any Dependabot PR; auto-merge gates only on `semver-patch OR semver-minor` after that approval. Major-version bumps (e.g. FastAPI 0→1) carry a bot approval mark and auto-merge without human review.
+- **why_it_matters:** Misleading audit trail. A breaking change can land via Dependabot without any human changelog review. The audit log shows a bot approval as if a maintainer blessed it.
+- **impact:** Sudden major-version regressions in FastAPI, SQLAlchemy, requests, etc.
+- **recommended_fix:** Restrict approval AND auto-merge to `version-update:semver-patch` only. Leave `semver-minor` and `semver-major` for human review.
+- **tests_needed:** Synthetic Dependabot PR with `semver-major` label does not auto-merge; `/approve` step is skipped.
+- **acceptance_criteria:** No Dependabot major/minor PR lands without human approval.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-002
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / ci / token_scope_bloat
+- **file_path:** `.github/workflows/dependabot-auto-merge.yml`
+- **line_function:** workflow-level `permissions` block at lines 21-23
+- **evidence:** Workflow runs with `contents: write + pull-requests: write` at the workflow level for every Dependabot PR. `secrets.GITHUB_TOKEN` only narrows to merge-time, not to step scope.
+- **why_it_matters:** A compromised step or injection race inherits write permissions through the lifetime of the run. Combined with mutable-tag `uses:` refs (F-CI-003) this is a vector for repo-wide takeover.
+- **impact:** Repo-wide privilege escalation if any step in a Dependabot run is compromised.
+- **recommended_fix:** Set `permissions: {}` at the workflow level, then per-job `permissions: { contents: read, pull-requests: write }`, escalating only at the merge step.
+- **tests_needed:** Inspect job token scopes via `gh api` or a fixture workflow that asserts no `contents: write` until the explicit merge step.
+- **acceptance_criteria:** No job in this workflow exposes write scope before its merge step runs.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-007
+
+- **priority:** P0
+- **status:** verified
+- **category:** infrastructure / docker / hardcoded_credentials
+- **file_path:** `docker-compose.override.local.yml`
+- **line_function:** lines 27, 41, 55, 107
+- **evidence:** Hardcoded plaintext credentials:
+  - line 27: `DATAFORGE_DATABASE_URL=postgresql://dataforge:wxXv4_eSGypDSVxiZlxIRQ@postgres:5432/dataforge`
+  - line 41: same credential
+  - line 55: `GF_SECURITY_ADMIN_PASSWORD=Nz4HdRUjt_GnwrP9-TzFkA`
+  - line 107: `DATA_SOURCE_NAME=postgresql://dataforge:wxXv4_eSGypDSVxiZlxIRQ@postgres:5432/dataforge?sslmode=disable`
+  - plus dummy Slack webhook URL at line 74.
+  The same DB password appears in `.env.production` (mode 0600). Anyone rebuilding the local stack from a fresh clone commits these credentials to memory; if a remote `postgres` host exposes port 5432, those creds work.
+- **why_it_matters:** A file marked "local testing override" is actually wiring production-environment-mirror credentials. Anyone with a `git clone` can reuse them against an exposed remote.
+- **impact:** Database takeover + Grafana admin takeover via the committed local override.
+- **recommended_fix:** Replace hardcoded credentials with `${DATAFORGE_DB_PASSWORD}` / `${GRAFANA_PASSWORD}` substitution. Delete the dummy Slack webhook URL. Document the env-var requirements in `.env.example`.
+- **tests_needed:** `grep -E "postgresql://[^:]+:[^@]+@"` over the committed override returns 0 matches.
+- **acceptance_criteria:** Override file contains no literal database password, no literal Grafana admin password, and no literal Slack webhook.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-ENV-004
+
+- **priority:** P0
+- **status:** verified
+- **category:** security / env / secrets_outside_docker_secrets
+- **file_path:** `.env`
+- **line_function:** API key + session secret lines
+- **evidence:** `DATAFORGE_API_KEY`, `DATAFORGE_OPERATOR_API_KEY`, `DATAFORGE_ADMIN_API_KEY`, `DATAFORGE_SESSION_SECRET` sit in `.env` (intended to be ignored — it is via `.env.*`). Unlike `DATAFORGE_DB_PASSWORD`, `GRAFANA_PASSWORD`, and `ALERTMANAGER_SLACK_WEBHOOK_URL` (all mounted as Docker secrets in `docker-compose.prod.yml:435-441`), the API keys are NOT in a `secrets:` block.
+- **why_it_matters:** Operators shipping Docker on shared hosts leave `.env` in backups, log archives, and operator mail threads. The Docker secrets path is the only end-to-end safe transport; passing through the host filesystem is not.
+- **impact:** API keys leak via host backups / shared mount / unintended rotat.
+- **recommended_fix:** Adopt the same Docker-secrets pattern used for `alertmanager.slack_webhook` for API keys as well.
+- **tests_needed:** `docker-compose -f docker-compose.prod.yml config | grep DATAFORGE_DB_PASSWORD` shows a `bind`-style secrets mount; equivalent greps exist for API keys.
+- **acceptance_criteria:** Production API keys are sourced via Docker secrets, not file mounts.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CONFIG-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** config / env_drift / pg_driver
+- **file_path:** `backend/app/storage_interface.py`, `backend/app/worker_queue_postgres.py`, `backend/app/worker_queue_postgres_base.py`, `backend/app/routers/system.py`
+- **line_function:** `DATAFORGE_PG_DRIVER` reads at lines 244, 1061, 969, 109
+- **evidence:** Three storage/worker paths read the env var with empty-string default (`worker_queue_postgres.py:244`, `worker_queue_postgres_base.py:1061`, `storage_interface.py:969`). The diagnostics endpoint `routers/system.py:109` uses `"psycopg2"` as default. The two paths diverge: when `DATAFORGE_PG_DRIVER` is unset, `storage_interface.py:973-975` warns that production requires `psycopg3`, while `routers/system.py:109` reports `psycopg2`.
+- **why_it_matters:** Operator sees the wrong driver in the diagnostics panel while the actual code path resolves to empty/psycopg3. Driver drift between the API surface and the worker/storage code.
+- **impact:** Confusing support diagnostics; operator may switch drivers based on the wrong info.
+- **recommended_fix:** Centralize `DATAFORGE_PG_DRIVER` resolution into one helper in `app.config`, fail closed in production if unset, single default across all readers.
+- **tests_needed:** Unit test on the helper; assert `routers/system.py::readiness` returns the same driver as the storage initializer.
+- **acceptance_criteria:** Removing `DATAFORGE_PG_DRIVER` from `.env` exposes the same driver from `/api/system/info` as the storage layer uses.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-002
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / docker / mount_permission_drift
+- **file_path:** `docker-compose.yml:22-61`
+- **line_function:** dev service mounts at lines 36-38
+- **evidence:** Dev service mounts `./backend:/app/backend` and `./frontend:/app/frontend` from host while the container runs as user `dataforge` (UID != host user). `--reload` writes `.pyc` and `.pytest_cache` with mismatched UID → "Permission denied" noise on Linux when host UID ≠ 1000.
+- **why_it_matters:** Contributors hit confusing errors on every reload; workaround is undocumented `chown -R 1000:1000 .` on host.
+- **impact:** Friction for all contributors on non-UID-1000 hosts.
+- **recommended_fix:** Pass `user: "${UID:-1000}:${GID:-1000}"` to the dev service; or run as root in dev with a clear env flag.
+- **tests_needed:** Manual smoke on a UID-500 host; documents `make up` works without `chown`.
+- **acceptance_criteria:** Default `make up` works on a non-UID-1000 host without manual `chown`.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-005
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / docker / rolling_redeploy_drift
+- **file_path:** `docker-compose.prod.yml:28, 91`
+- **line_function:** image references
+- **evidence:** Both `dataforge` and `worker` services use `image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}`. Default unpinned tag means rolling `docker compose -f … up -d` without rebuild pulls whatever the registry holds as `latest`. There is no `--pull=never` flag, so Compose fetches from registry on every restart.
+- **why_it_matters:** Defeats the explicit "image digest is pinned" comment at `Dockerfile:14-16`. Production deploy becomes non-reproducible.
+- **impact:** A malicious or stale upstream release can silently deploy on next restart.
+- **recommended_fix:** Generate image tags from CI (`dataforge:${GITHUB_SHA}` or `dataforge:${RELEASE_VERSION}`) and bake the SHA into `.env.production`. Add `--pull=never` to compose commands in prod runbooks.
+- **tests_needed:** `make prod` fails when `.env.production` lacks `DATAFORGE_IMAGE_TAG`.
+- **acceptance_criteria:** Production deploy uses an immutable tag.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DRIFT-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / docker / readonly_bypass
+- **file_path:** `docker-compose.prod.yml:48-49, 73, 142`
+- **line_function:** both services `read_only: true` plus `volumes:` block
+- **evidence:** Both prod services have `read_only: true` (root fs locked) but `volumes: - dataforge_data:/app/backend/data` mounts on top **rw** by default — read-only protection is bypassed for that path. A compromised uvicorn can overwrite `semantic_state.json`, logs, etc.
+- **why_it_matters:** Read-only filesystem is a defense in depth against process compromise; the data volume is wide open, weakening it.
+- **impact:** Lateral damage after any process compromise within `/app/backend/data`.
+- **recommended_fix:** Mount subpaths (`dataforge_data:/app/backend/data/logs:rw`, `dataforge_data:/app/backend/data/semantic:ro`); narrow the writable surface.
+- **tests_needed:** Run a compromised process and assert it cannot write `semantic_state.json` while still writing logs.
+- **acceptance_criteria:** Compromise from the API process cannot tamper with `semantic_state.json`.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-003
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / ci / mutable_action_refs
+- **file_path:** all `.github/workflows/*.yml` (10 files)
+- **line_function:** every `uses:` for third-party actions
+- **evidence:** `actions/checkout@v4`, `actions/setup-python@v5`, `actions/setup-node@v4`, `actions/cache@v4`, `actions/stale@v9`, `actions/upload-artifact@v4`, `actions/stale@v9`, `anchore/sbom-action@v0.24.0`, `dependabot/fetch-metadata@v2`, `docker/build-push-action@v5`, `docker/setup-buildx-action@v3` are all mutable tags. Only `appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b` is SHA-pinned (the desired model).
+- **why_it_matters:** Supply-chain compromise vector. Tag ref allows attacker (or accidental push) to swap the action contents and the next CI build runs them.
+- **impact:** Repo hijack via action ref push.
+- **recommended_fix:** SHA-pin all `uses: third/party/action@<full-40-char-sha>` references. Use Dependabot to refresh the SHAs.
+- **tests_needed:** Add a CI step that fails the workflow if any `uses:` is not SHA-pinned.
+- **acceptance_criteria:** Zero mutable-tag third-party actions in any workflow.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-004
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / ci / fork_pr_token_pivot
+- **file_path:** `.github/workflows/auto-fix.yml:25-30`
+- **line_function:** `on: issue_comment: [created]` + `pull_request: [labeled]`
+- **evidence:** Any commenter with `/format` triggers a `ruff` / `prettier` push via `GITHUB_TOKEN`. No `if: github.event.pull_request.head.repo.full_name == github.repository` filter — fork PRs can call the workflow. The workflow has `contents: write` globally.
+- **why_it_matters:** Combined with mutable-tag actions (F-CI-003), forked PR comments can trigger arbitrary shell-equivalent commands via formatter wrappers.
+- **impact:** Arbitrary code-in-shell via misleading `prettier --write` calls against fake paths.
+- **recommended_fix:** Filter to `head.repo.full_name == github.repository`; pin action SHAs (F-CI-003); switch fallback token to repo-scoped PAT with PR-only scope.
+- **tests_needed:** Synthetic fork PR with `/format` comment — workflow does not push.
+- **acceptance_criteria:** No fork can trigger a `contents: write` step in auto-fix.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-005
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / ci / detect_secret_emptiness
+- **file_path:** `.github/workflows/ci.yml:414-431`, `browser-e2e.yml:120-136`, `optional-suites.yml:114-132`, `postgres-tests.yml:75-87`, `nightly-integration.yml:51-69`, `golden-dataset.yml:51-72`, `validate-production.yml:463-479`
+- **line_function:** `if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_TO != ''`
+- **evidence:** GHA substitutes empty strings for unset secrets. The guard `!= ''` always succeeds if the secret slot exists, even if the value is empty. So a misconfigured chat ID/bot token combination silently runs the action step with empty values.
+- **why_it_matters:** A misconfigured Telegram integration is silently accepted; the absence of a notification is invisible.
+- **impact:** Lost alerts during incidents when Telegram is half-configured.
+- **recommended_fix:** Test for non-empty values with explicit length check, `if: length(env.TELEGRAM_TOKEN) > 0 && …`.
+- **tests_needed:** Synthetic workflow run with `TELEGRAM_TOKEN=` empty value — step skips.
+- **acceptance_criteria:** Notification step is skipped when either secret is empty.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-008
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / ci / image_smoke_runner_exposure
+- **file_path:** `.github/workflows/ci.yml:322-355`
+- **line_function:** `image-build` job `docker run` step
+- **evidence:** `image-build` builds then runs the production image on the same runner. No `--network=none --read-only --cap-drop ALL --security-opt no-new-privileges`.
+- **why_it_matters:** A poisoned production image (via Dependabot dep update) executes inline on the runner — full container surface exposed.
+- **impact:** Runner takeover via malicious image.
+- **recommended_fix:** Add `--network=none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534` to the smoke `docker run` invocation.
+- **tests_needed:** `gh run view `<run-id>` --json jobs[]` shows the smoke container's caps.
+- **acceptance_criteria:** Smoke container runs with the listed hardening flags.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-010
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / ci / mutable_action_refs
+- **file_path:** `.github/workflows/stale-cleanup.yml:30`
+- **line_function:** `uses: actions/stale@v9`
+- **evidence:** Mutable `@v9` tag (vs SHA or `@v9.0.0` SemVer pin).
+- **why_it_matters:** Provider can publish a malicious or breaking 9.x release at any time.
+- **impact:** Silent change in stale cleanup semantics.
+- **recommended_fix:** SHA-pin (per F-CI-003 pattern).
+- **tests_needed:** Same SHA-pin enforcer as F-CI-003.
+- **acceptance_criteria:** `actions/stale` is SHA-pinned.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / nginx / missing_admin_acl
+- **file_path:** `nginx.local.conf:75-224`
+- **line_function:** `location /api/` proxy at lines 108-124
+- **evidence:** Production `nginx.conf` has `/api/admin` deny block; `nginx.local.conf` does not. CSP includes `connect-src 'self' ws: wss:` which is essentially no TLS pinning. `/api/` proxy passes everything to FastAPI without IP allow-list.
+- **why_it_matters:** In local TLS-bypass mode (used by `docker-compose.override.local.yml:118-121`), the entire nginx HTTP server is the *only* firewall between host network and the FastAPI app. Any future refactor that exposes a sensitive endpoint under `/api/` flows unconditionally through the proxy.
+- **impact:** Local-dev HTTP exposure of admin paths.
+- **recommended_fix:** Add a `/api/admin` deny block to `nginx.local.conf` matching the production file. Or add an IP allow-list `127.0.0.1` only.
+- **tests_needed:** Curl admin paths from a non-loopback NIC — returns 403.
+- **acceptance_criteria:** Local nginx refuses `/api/admin/*` and `/api/system/admin/*` paths.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-002
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / nginx / plaintext_health
+- **file_path:** `nginx.conf:351-366`
+- **line_function:** Server block B (HTTP→HTTPS redirect) for `/health` and `/ready`
+- **evidence:** The block proxies `/health` and `/ready` plaintext back to `http://dataforge_api`. CWE-200: liveness state fingerprintable.
+- **why_it_matters:** Cleartext monitoring endpoints are routinely probed by uptime services and hostile observers. A network observer fingerprints the deployment's health.
+- **impact:** Reconnaissance advantage during incident response.
+- **recommended_fix:** Add `return 301 https://$host$request_uri;` for `/health` and `/ready` too. Update the smoke test to use HTTPS.
+- **tests_needed:** Curl `http://host/health` returns 301.
+- **acceptance_criteria:** All /health, /ready redirects are TLS-only.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-004
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / nginx / duplicated_security_headers
+- **file_path:** `nginx.conf:138-306`
+- **line_function:** 10+ `add_header` blocks per `location`
+- **evidence:** Same 5-header block (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, Content-Security-Policy) repeated across 10+ locations.
+- **why_it_matters:** Header drift bugs. A new `location ~ \.js$` block added without copying the security headers silently bypasses CSP.
+- **impact:** Inconsistent header enforcement; future drift undetected.
+- **recommended_fix:** Use `add_header` in a shared file via `include /etc/nginx/security_headers.conf;` plus top-level `map` in `http {}`.
+- **tests_needed:** Smoke test: every endpoint (not under SSL) returns CSP.
+- **acceptance_criteria:** Single source for security headers; per-location overrides only when intentional.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-002
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / monitoring / cardinality_bomb
+- **file_path:** `prometheus_alerts.yml:102-110`, `metrics_collector.py:63-65`
+- **line_function:** `HighSSRFBlockRate` alert, `_ssrf_rejects` dict
+- **evidence:** `_ssrf_rejects` is keyed by caller-supplied `reason` (essentially URL patterns). Alert expression sums across reason labels. An attacker driving many distinct URLs adds many `reason` series.
+- **why_it_matters:** Unbounded label cardinality → Prometheus TSDB OOM.
+- **impact:** DoS on observability; alert masking as well.
+- **recommended_fix:** Bound reason label via an allow-list (`private_ip`, `loopback`, `dns_filter`, `scheme`, `port`, `unspecified`); collapse unknown reasons to `other`.
+- **tests_needed:** Synthetic load test with 10k distinct URLs; series cardinality stays bounded.
+- **acceptance_criteria:** `_ssrf_rejects` never exceeds 7 distinct `reason` values.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-003
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / monitoring / single_instance_amber
+- **file_path:** `prometheus.yml:36-38`, `docker-compose.prod.yml:403`
+- **line_function:** `alertmanagers.targets` and alertmanager `--cluster.listen-address=`
+- **evidence:** Single alertmanager instance with empty cluster gossip address. If the container dies, all alerts drop. No `AlertmanagerDown` alert because alertmanager isn't a Prometheus scrape target.
+- **why_it_matters:** SPOF for alerting pipeline; notification routes do not failover.
+- **impact:** Total alert loss during alertmanager outage.
+- **recommended_fix:** Either run alertmanager with HA (2+ replicas + gossip) or document single-instance trade-off and add `DataForgeAlertmanagerDown` alert.
+- **tests_needed:** Synthetic alertmanager kill → on-call pages within 60s.
+- **acceptance_criteria:** Either failover works or explicit down-alert fires.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-007
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / monitoring / alert_fatigue_duplicate
+- **file_path:** `alertmanager.yml:78-87`
+- **line_function:** `critical` route `continue: true`
+- **evidence:** `continue: true` causes critical alerts to deliver both to `critical` (line 116-141) AND `default` (lines 109-114) receiver. 5 critical alerts produce 10 email + 5 Slack = 15 outbound.
+- **why_it_matters:** Alert fatigue. Operators start ignoring `critical` because there are too many duplicate messages.
+- **impact:** Real incidents lost in the noise.
+- **recommended_fix:** Drop `continue: true`; ensure `critical` receiver owns all delivery paths. Use `mute_time_intervals` correctly.
+- **tests_needed:** Synthetic critical alert delivers exactly 1 email + 1 Slack.
+- **acceptance_criteria:** No duplicate notifications in alertmanager routes.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOC-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** docs / readme / validate_gate_mislabeled
+- **file_path:** `README.md`, `Makefile`
+- **line_function:** `README.md:52`, `Makefile:169-170`
+- **evidence:** README states "Passes with `make validate`" but `make validate` actually runs `python3 scripts/validate_local.py --full` (the unbounded, slower gate). README also lists `python3 scripts/validate_local.py --quick` and `make validate` separately as if they're different.
+- **why_it_matters:** Operators expect `make validate` to be the quick local-gate; they get the slow, full-local check. Documentation drift hides the actual default gate.
+- **impact:** Confusing contributor interpretation; possible time wasted on full runs.
+- **recommended_fix:** Either: (a) make `make validate` run `--quick`, or (b) update README to say "Passes with `make validate` (runs `--full`)". Pick one and document.
+- **tests_needed:** Manual: `make -n validate` shows the actual `--full` execution.
+- **acceptance_criteria:** README, Makefile, and AGENTS.md all agree on which mode `make validate` runs.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-009
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / monitoring / alert_query_against_unrelated_metric
+- **file_path:** `prometheus_alerts.yml:124`, `metrics_collector.py:267-281`
+- **line_function:** `RepoQueryLatencyDegraded` alert (line 124) vs Python list[float] ring buffer (line 267-281)
+- **evidence:** Alert expression `dataforge_repo_query_latency_seconds{quantile="0.95"} > 0.5` implies a PromQL summary metric. The metric in code is a Python list ring buffer with no `quantile` label. PromQL returns no series; alert never fires.
+- **why_it_matters:** This alert will **never fire** in current setup. Operators expect it to catch Postgres latency regressions.
+- **impact:** Silent regression-monitoring gap during incident response.
+- **recommended_fix:** Either expose `dataforge_repo_query_latency_seconds_bucket` as a real Histogram (use `histogram_quantile(0.95, …)`) or switch the alert expression to a derived gauge.
+- **tests_needed:** Force slow query; assert `DataForge...Instance...alert-test` evaluation returns firing.
+- **acceptance_criteria:** Alert can fire on real latency regression.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NAMING-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** code_quality / naming_typo / public_export
+- **file_path:** `backend/app/services/job_mutation_service.py`, `backend/app/routers/jobs_write.py`
+- **line_function:** `JobReclenerService` class at line 196
+- **evidence:** Class name is `JobReclenerService` (typo for "Recleaner"). Imported in `routers/jobs_write.py:49, 209, 211, 213, 215` and exposes API surface for `/api/jobs/<id>/reclean`.
+- **why_it_matters:** Typo propagates to user-visible API surface (OpenAPI schema, swagger docs) and the docstrings.
+- **impact:** Permanent documentation defect; harder to grep for "recleaner" across the codebase.
+- **recommended_fix:** Rename `JobReclenerService` → `JobRecleanerService`. Update imports and test references.
+- **tests_needed:** Existing 26 characterization tests pass with the new name; no external caller breaks.
+- **acceptance_criteria:** Class name is `JobRecleanerService` throughout.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-ENV-002
+
+- **priority:** P1
+- **status:** verified
+- **category:** docs / env_example / drift
+- **file_path:** `.env.example`, `.env.production.example`
+- **line_function:** `.env.example:96-99, 134-138` vs `.env.production.example`
+- **evidence:** `.env.example` lists `DATAFORGE_TELEGRAM_BOT_TOKEN`, `DATAFORGE_TELEGRAM_CHAT_ID`, `DATAFORGE_TELEGRAM_ENABLED`. `.env.production.example` lists NONE of these.
+- **why_it_matters:** Operators porting dev templates to production miss notification config entirely; no comment notes the omission.
+- **impact:** Production deploys have inconsistent notification behavior vs dev.
+- **recommended_fix:** Add a `# Notifications (optional)` block to `.env.production.example` matching the dev env structure.
+- **tests_needed:** `diff` after the change shows only env-var-key equality, not value drift.
+- **acceptance_criteria:** Both files document all notification env vars.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-ENV-003
+
+- **priority:** P1
+- **status:** verified
+- **category:** security / env / check_prod_env_missing
+- **file_path:** `scripts/check_prod_env.py:24-33`, `docker-compose.prod.yml:321`
+- **line_function:** `REQUIRED_VARS` list
+- **evidence:** `GRAFANA_USER` and `GRAFANA_PASSWORD` not in `REQUIRED_VARS`. A misconfigured `GRAFANA_USER=ops` set in `.env.production` slips past the gate.
+- **why_it_matters:** Single-user Grafana admin with no rotation slips through the gate.
+- **impact:** Misconfigured Grafana admin user; permission misassignment post-deploy.
+- **recommended_fix:** Add `GRAFANA_USER` + `GRAFANA_PASSWORD` to `REQUIRED_VARS` with placeholder/weak-secret check (the existing `--weak-password` style).
+- **tests_needed:** Synthetic run with `GRAFANA_USER=ops` triggers gate failure.
+- **acceptance_criteria:** `scripts/check_prod_env.py` fails deploy when user/password drift detected.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-ENV-005
+
+- **priority:** P1
+- **status:** verified
+- **category:** config / env / llm_fallback_silent
+- **file_path:** `.env.example:30-35`, `scripts/check_prod_env.py`
+- **line_function:** GROQ API key configuration
+- **evidence:** `DATAFORGE_GROQ_API_KEY=` in `.env.example` with no operator-visible warning that AI structuring fails when unset. `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false` mentions fail-closed but the operator signal is missing.
+- **why_it_matters:** Operators don't know whether their deployment is fully functional until they hit an LLM-call path.
+- **impact:** Silent degraded paths; customers see partial data without operator awareness.
+- **recommended_fix:** Extend `scripts/check_prod_env.py` to assert `DATAFORGE_GROQ_API_KEY` (or LLM) is set when AI structuring is enabled.
+- **tests_needed:** Empty `DATAFORGE_GROQ_API_KEY` with `LLM=true` triggers gate failure.
+- **acceptance_criteria:** Deploy fails when LLM-required deploy lacks LLM credentials.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DB-002
+
+- **priority:** P1
+- **status:** verified
+- **category:** infrastructure / db_migrations / no_schema_version_tracking
+- **file_path:** `backend/init-db/init.sql:13-21`
+- **line_function:** init.sql header + comments
+- **evidence:** Tables are created by `app.postgres_repository._ensure_schema()` at runtime, not by versioned DDL files. There is no `schema_version` table to track applied migrations.
+- **why_it_matters:** Multiple app versions running against the same database could race on schema apply. Operators cannot rebuild the schema by replaying files (see F-DB-001).
+- **impact:** Schema drift during rolling deploys.
+- **recommended_fix:** Export `_ensure_schema()` DDL into versioned files. Add a `schema_version` table the app reads on boot to determine whether migrations should run.
+- **tests_needed:** Boot against an empty DB applies migrations in order; boot against a migrated DB skips migrations.
+- **acceptance_criteria:** Schema version is queryable from outside the app process.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-003
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / docker / browser_image_double_install
+- **file_path:** `Dockerfile:30-36, 66, 102-103`
+- **line_function:** base stage OS libs; dev stage `playwright install` line 66; prod stage line 103
+- **evidence:** Base stage installs Playwright OS libraries; prod stage calls `playwright install chromium` only (no `install-deps`). Dev stage chromium at line 66 is layered but not used by either `dev` or `prod`. Cache compresses both — first build downloads chromium twice.
+- **why_it_matters:** Unused Chromium in dev image adds ~150MB. Pinned SHA base + mutable Playwright Chromium version is a reproducible-build risk.
+- **impact:** Slower CI; cache pollution.
+- **recommended_fix:** Add `ARG PLAYWRIGHT_BROWSERS_VERSION=...` and pin in `pyproject.toml` to a tested combo. Verify in CI that the cached image's node binary actually launches.
+- **tests_needed:** `docker build` image size delta before/after pinning.
+- **acceptance_criteria:** `make up` image is reproducible; CI cache hit rate > 90%.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-004
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / docker / dockerignore_gaps
+- **file_path:** `.dockerignore`
+- **line_function:** excludes for `.env.*`, `*.sqlite`, `data/`
+- **evidence:** `.dockerignore` covers most secrets but misses `backend/data/`, `.secrets/`, `backend/init-db/`, `*.dump`, `*.sql.gz`, `*.bak`. If an operator drops `.secrets/sql.dump`, build context copies plaintext dump into image layers.
+- **why_it_matters:** Operator-driven footgun; first build pulls a few MB of irrelevant junk.
+- **impact:** Higher attack surface on the build context.
+- **recommended_fix:** Add the missing paths to `.dockerignore`.
+- **tests_needed:** Synthetic `touch .secrets/dump.sql`; verify it doesn't appear in `docker build . -t test`. `docker run test ls /app/.secrets` returns empty.
+- **acceptance_criteria:** No `.secrets/` files in any build context.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-006
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / docker / path_traversal_alias
+- **file_path:** `docker-compose.prod.yml:250-251`, `nginx.conf:319-321`
+- **line_function:** `/landing/` alias without `try_files` guarding
+- **evidence:** `/landing/` alias resolves to `/usr/share/nginx/html/frontend/landing/`. The mount is read-only but if `.git/` exists under `frontend/` (operator-deployed dev version), `/landing/.git/config` is served.
+- **why_it_matters:** Operational fidelity risk; leaks git config.
+- **impact:** Information disclosure if dev `.git/` not cleaned before prod mount.
+- **recommended_fix:** Add `location ~ /\.(git|env|docker|aws) { deny all; return 404; }`.
+- **tests_needed:** Curl `/landing/.git/config` returns 404.
+- **acceptance_criteria:** Operator-deployed dev artifacts are not served.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DOCKER-008
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / docker / drift_in_env_template_grep
+- **file_path:** `docker-compose.override.local.yml:80-92`, `docker-compose.prod.yml:395-398`
+- **line_function:** substitution grep
+- **evidence:** Local override's grep is `__ALERTMANAGER_` (prefix) vs production full-list. New `__ALERTMANAGER_NEW_VAR__` slips through local override silently.
+- **why_it_matters:** Local-override renders with unsubstituted placeholder; alertmanager rejects first reload later.
+- **impact:** Confusing failure mode divergence between local and prod.
+- **recommended_fix:** Mirror the production grep exactly; promote to shared `command:` via `x-anchor` YAML.
+- **tests_needed:** Synthetic local override with `__ALERTMANAGER_NEW_VAR__` should fail the build.
+- **acceptance_criteria:** Local and prod grep are byte-identical.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-FRONTEND-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** frontend / monolithic_css / no_build
+- **file_path:** `frontend/index.html`, `frontend/landing.html`, `frontend/styles/views.css`, `frontend/styles/components.css`
+- **line_function:** static SPA structure
+- **evidence:** Vanilla JS, no build pipeline. Two HTML surfaces. Monolithic CSS: `views.css` 3,436 LOC, `components.css` 1,091 LOC.
+- **why_it_matters:** Edit-and-publish model. Any CSP/header change requires editing 10+ locations. CSS is monolithic and not tree-shaken.
+- **impact:** Friction for future contributors; larger than-needed first-paint payloads.
+- **recommended_fix:** Introduce a minimal bundler (esbuild) with code splitting; tree-shake CSS.
+- **tests_needed:** `npm run build` (new) succeeds; bundle size drops.
+- **acceptance_criteria:** First-paint CSS < 200KB; components are lazy-loadable.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-005
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / nginx / catch_all_host_header
+- **file_path:** `nginx.conf:117`
+- **line_function:** `server_name _;` + `absolute_redirect off` at line 118
+- **evidence:** `server_name _;` means any host header reaching HTTPS server is honored. Attacker-set hosts work.
+- **why_it_matters:** Host header injection if app uses `Host:` for cookie scoping or canonical URL generation. Phishing/cache-poisoning risk.
+- **impact:** Potential phishing surface if any future route uses `$host`.
+- **recommended_fix:** Set `server_name your.domain.example.com;` and reject unknown hosts.
+- **tests_needed:** Synthetic curl with `Host: evil.com` returns 444.
+- **acceptance_criteria:** Unknown host returns 444.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-006
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / nginx / keepalive_default
+- **file_path:** `nginx.conf:25-29`
+- **line_function:** global `worker_connections 1024`
+- **evidence:** `worker_connections 1024` + `multi_accept on` globally. nginx defaults `keepalive_requests=1000` post-v1.19.7.
+- **why_it_matters:** Load tests may show non-linear latency scaling under concurrent keep-alive reuse.
+- **impact:** Hidden capacity cliff during load tests.
+- **recommended_fix:** Pin `keepalive_requests 10000;` on HTTPS server block.
+- **tests_needed:** Synthetic `ab -c 200 -n 10000 …` shows consistent p95.
+- **acceptance_criteria:** No keep-alive cliff triggering under load.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-006
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / ci / postgres_port_collision
+- **file_path:** `.github/workflows/optional-suites.yml:24-26`, `validate-production.yml:222-224`, `postgres-tests.yml:22-24`
+- **line_function:** `services.postgres` config
+- **evidence:** Hardcoded `postgresql://testuser:testpassword@…:5432/`. Port collisions on shared self-hosted runners.
+- **why_it_matters:** Reliability — not security — but ports collide on multi-job runners.
+- **impact:** Random CI run failures on shared infra.
+- **recommended_fix:** Use `POSTGRES_HOST_AUTH_METHOD: trust` and skip the mapped port, or set custom port with `options: "--port=5433"`.
+- **tests_needed:** Two parallel jobs running the workflow on the same runner both pass.
+- **acceptance_criteria:** No port collision during parallel run.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-007
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / ci / cancel_in_progress
+- **file_path:** all cron workflows (5 files)
+- **line_function:** `concurrency:` blocks
+- **evidence:** `concurrency:` with `cancel-in-progress: true` — manual `workflow_dispatch` cancels the cron run mid-flight.
+- **why_it_matters:** Operational visibility loss during incident response.
+- **impact:** Confusing nightly status during incidents.
+- **recommended_fix:** Use `cancel-in-progress: false` to allow queuing.
+- **tests_needed:** Manual dispatch during the cron run does not cancel it.
+- **acceptance_criteria:** Concurrent runs queue, never cancel.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-CI-009
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / ci / stale_pr_autoclose
+- **file_path:** `.github/workflows/stale-cleanup.yml:30, 56-60`
+- **line_function:** `operations-per-run: 100` + label exempt
+- **evidence:** `operations-per-run: 100` and `exempt-pr-labels: keep-open,dependencies,security`. Mislabeled hot-fix release PR could be auto-closed.
+- **why_it_matters:** Wrong label policy → auto-close on a hot-fix release PR.
+- **impact:** Loss of work-in-progress PRs during bot misclassification.
+- **recommended_fix:** Add `dry-run` input via `workflow_dispatch`; real cleanup only on explicit confirmation.
+- **tests_needed:** Synthetic PR without labels run against `dry-run` shows intended close list without closing.
+- **acceptance_criteria:** Stale cleanup never closes without explicit `workflow_dispatch` confirmation.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NPM-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** frontend / package_json / caret_drift
+- **file_path:** `package.json:8-16`
+- **line_function:** every dep
+- **evidence:** Every dep (`eslint`, `prettier`, `stylelint`, etc.) uses `^`. While `package-lock.json` pins exact versions, `npm install` outside the lockfile (e.g. through a Dockerfile-style npm flow or after `npm update <pkg>`) drifts.
+- **why_it_matters:** Inconsistent CI vs local.
+- **impact:** Random major jumps (e.g. eslint 9 → 10) on stray `npm update`.
+- **recommended_fix:** Default to exact versions or `~`. Use `npm ci` everywhere (already the case in CI workflows).
+- **tests_needed:** `npm install` outside CI produces identical lockfile diff as `npm ci`.
+- **acceptance_criteria:** Lockfile-only installs work reliably.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NPM-002
+
+- **priority:** P2
+- **status:** verified
+- **category:** frontend / package_lock / integrity
+- **file_path:** `package-lock.json`
+- **line_function:** file-level integrity
+- **evidence:** File exists; CI uses `npm ci`. No `npm audit signatures` integrity check.
+- **why_it_matters:** Lockfile can be silently compromised by malicious dep bump without CI noticing.
+- **impact:** Supply-chain compromise via dep.
+- **recommended_fix:** Add `npm audit signatures` step to `ci.yml` or `validate-production.yml`.
+- **tests_needed:** Synthetic tampering of lockfile is caught.
+- **acceptance_criteria:** Lockfile integrity is checked before tests run.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NPM-003
+
+- **priority:** P2
+- **status:** verified
+- **category:** frontend / package_json / no_prod_deps
+- **file_path:** `package.json:7-17`
+- **line_function:** `dependencies`/`devDependencies`
+- **evidence:** 0 production deps; everything in devDeps. Correct for static SPA — a contributor might `npm install somelib` thinking it's used at runtime.
+- **why_it_matters:** Structural risk for future contributors.
+- **impact:** Drift into prod dep tree.
+- **recommended_fix:** Add CI step `npm ls --prod` (or `npm install --omit=dev --dry-run`) to fail if production deps sneak in.
+- **tests_needed:** Synthetic prod-deps list fails the CI step.
+- **acceptance_criteria:** CI refuses prod deps in `package.json`.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-004
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / monitoring / missing_alerts
+- **file_path:** `prometheus_alerts.yml`
+- **line_function:** file-level coverage
+- **evidence:** 14 alert rules cover app signals. None for PG disk, container OOM, TLS cert expiry, `AlertmanagerDown`, `node-exporter`, `blackbox-exporter HTTPS`.
+- **why_it_matters:** Operator blind spots in incident response.
+- **impact:** Real outages missed because no alert fires.
+- **recommended_fix:** Add scrape jobs for `node_exporter`, `cadvisor`, `blackbox_exporter`; add corresponding rules.
+- **tests_needed:** Each new alert fires under synthetic condition.
+- **acceptance_criteria:** Comprehensive alerting on infra signals.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-005
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / monitoring / self_scrape_pollution
+- **file_path:** `prometheus.yml:27-34, 53-54`
+- **line_function:** `alert_relabel_configs` vs self-scrape
+- **evidence:** Self-monitoring scrape of `prometheus:9090` produces duplicate series tagged `instance="prometheus:9090"`. `alert_relabel_configs` only acts on alerts, not series.
+- **why_it_matters:** Latent bug: any future alert referencing `up{job="prometheus"}` is ambiguous.
+- **impact:** Future alert tests are flaky.
+- **recommended_fix:** Add an `instance` labelrewrite or document exclusion list.
+- **tests_needed:** Synthetic scrape with `instance_label_inconsistency` test passes.
+- **acceptance_criteria:** Self-metrics labels are uniquely tagged.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-006
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / monitoring / lifecycle_auth_missing
+- **file_path:** `prometheus_web.yml:18`, `docker-compose.prod.yml:303`
+- **line_function:** `--web.enable-lifecycle` + empty `basic_auth_users`
+- **evidence:** Lifecycle enabled but no basic-auth users → reload POST returns 401. Reload requires container restart.
+- **why_it_matters:** Config reload requires container recreation; restart = TS DB drop.
+- **impact:** Operator friction; unnecessary restarts.
+- **recommended_fix:** Either disable lifecycle or add at least one `basic_auth_users` (e.g. `reload:`) and document the password.
+- **tests_needed:** Synthetic `curl -X POST /-/reload` succeeds.
+- **acceptance_criteria:** Reload works without container restart.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-008
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / monitoring / slack_channel_silent_miss
+- **file_path:** `alertmanager.yml:132, 145, 156`
+- **line_function:** `channel: '#alerts-critical'` etc.
+- **evidence:** Channel ID never validated against Slack workspace. Mistyped/private channels return message to no one.
+- **why_it_matters:** Operators see alerts as firing in Alertmanager but they never reach Slack.
+- **impact:** Invisible alert pipeline failure.
+- **recommended_fix:** Augment `scripts/run_alert_delivery_drill.py` with `--channel-assert-reachable` calling Slack `conversations.info`. Add to deploy gate.
+- **tests_needed:** Synthetic channel-typo deploy fails the gate.
+- **acceptance_criteria:** Slack channel reachability is asserted on every prod deploy.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-MON-010
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / monitoring / api_down_rootcause_ambiguity
+- **file_path:** `prometheus.yml:60-61`
+- **line_function:** `DataForgeAPIInstanceDown` alert
+- **evidence:** Alert uses `up{job="dataforge"} == 0`. If the Bearer token env (`__DATAFORGE_METRICS_TOKEN__`) leaves the placeholder unsubstituted, the scrape returns 401 → `up{job="dataforge"} = 0` → alert fires with **wrong** root cause label.
+- **why_it_matters:** Noisy pages from misconfig.
+- **impact:** Operator pages on-call for a config bug.
+- **recommended_fix:** Add a separate alert `MetricsTokenInvalid` firing when metrics endpoint returns 401/403, or use `probe_success` from `blackbox_exporter` against `/ready`.
+- **tests_needed:** Synthetic 401 state fires `MetricsTokenInvalid`, not `DataForgeAPIInstanceDown`.
+- **acceptance_criteria:** Pages are labelled with the correct root cause.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DB-003
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / db_migrations / tenant_index_verification
+- **file_path:** `backend/migrations/008_postgres_storage_v8.sql`
+- **line_function:** tenant indexes
+- **evidence:** Need verification: tenant column indexes (`org_id`, `created_by`) not directly visible in the read portion of the dump (lines 50+).
+- **why_it_matters:** If indexes are missing, tenant queries scan, not index.
+- **impact:** Tenant scoping degrades as data grows.
+- **recommended_fix:** Run `grep -E "CREATE INDEX" backend/migrations/008_postgres_storage_v8.sql | grep -E "tenant|org_id|user_id|project_id"` to confirm tenant indexes; if missing, add them.
+- **tests_needed:** EXPLAIN ANALYZE on tenant query uses index.
+- **acceptance_criteria:** Tenant queries are indexed in both SQLite and Postgres.
+- **blocked_by:** Verification step.
+- **notes:** New finding (Session 80).
+
+### F-DB-004
+
+- **priority:** P2
+- **status:** verified
+- **category:** security / db_migrations / schema_dump_leak
+- **file_path:** `backend/migrations/008_postgres_storage_v8.sql`
+- **line_function:** file contents
+- **evidence:** Snapshot file is unencrypted plaintext — contains the complete schema (potentially including column names with sensitive shapes like `email`, `ip_address`).
+- **why_it_matters:** Public repo = data-model mapping attack. Attacker learns column names.
+- **impact:** Reconnaissance advantage.
+- **recommended_fix:** Strip dump to DDL-only via `pg_dump --schema-only --no-owner --no-privileges`; mask any sensitive column names.
+- **tests_needed:** Synthetic diff shows no semantic data in committed dump.
+- **acceptance_criteria:** Committed migration file contains schema only, no data.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-BACKUP-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / backup / gzip_only
+- **file_path:** `scripts/backup_postgres.sh:142-148`
+- **line_function:** `chmod 600 ...; gunzip -t`
+- **evidence:** Validates gzip integrity only — does not validate that the file contains a recognizable `pg_dump` shape. Empty-garbage payload would pass gunzip -t.
+- **why_it_matters:** A backup that "passes" gunzip can still be missing tables/data.
+- **impact:** Silent restore failures.
+- **recommended_fix:** Pipe through `head -c 4096 | grep -q "PostgreSQL database dump"`; add row-count compare (`SELECT count(*) FROM jobs`) vs source DB.
+- **tests_needed:** Synthetic empty-dump backup fails the integrity gate.
+- **acceptance_criteria:** Backup file passes identity + gzip integrity + row count.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-BACKUP-002
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / backup / no_rotation
+- **file_path:** `scripts/backup_postgres.sh:17-19`
+- **line_function:** `BACKUP_DIR` assignment
+- **evidence:** No `find ... -mtime +30 -delete` cleanup. Backups accumulate indefinitely.
+- **why_it_matters:** Disk fills; yesterday's 6-hourly backup eventually OOMs the disk.
+- **impact:** Storage exhaustion on long-running prod.
+- **recommended_fix:** Add `DATAFORGE_BACKUP_KEEP_DAYS=30` knob; cleanup at end of script.
+- **tests_needed:** Synthetic 31-day-old backup is deleted.
+- **acceptance_criteria:** Backups older than retention are removed.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-BACKUP-003
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / backup / restore_no_verify
+- **file_path:** `scripts/restore_postgres.sh:138-148`
+- **line_function:** `psql` pipe + `echo SUCCESS`
+- **evidence:** Success printed purely on psql exit code. A partial restore could half-succeed.
+- **why_it_matters:** Operator sees SUCCESS but data is incomplete.
+- **impact:** False-positive restore; recovery is silently broken.
+- **recommended_fix:** Post-restore `psql -c "SELECT count(*) FROM jobs"` compare to a snapshot count captured at backup time.
+- **tests_needed:** Synthetic partial restore fails the verification step.
+- **acceptance_criteria:** Restore verification rejects non-equivalent row counts.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-NGINX-SEC-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** infrastructure / nginx / methodless_rate_limit
+- **file_path:** `nginx.local.conf:108-124`
+- **line_function:** `location /api/`
+- **evidence:** `/api/` proxy forwards all methods and paths to FastAPI without method-specific rate limiting.
+- **why_it_matters:** No pre-auth throttle; admin paths exposed at unlimited rate.
+- **impact:** Brute force / flood risk.
+- **recommended_fix:** Add `limit_req` for write methods (`POST/PUT/DELETE`) at stricter burst than reads.
+- **tests_needed:** Synthetic burst of 1k POSTs to `/api/jobs` returns 503/429.
+- **acceptance_criteria:** Write methods are throttled at strict rate.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-EXCEPTION-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** code_quality / error_handling / generic_500
+- **file_path:** `backend/app/routers/experimental.py`, `backend/app/routers/scraper.py`, `backend/app/services/job_mutation_service.py:399`
+- **line_function:** 20+ `raise HTTPException(status_code=500, ...)` sites
+- **evidence:** 20+ inline `raise HTTPException(status_code=500, detail="...")` with generic detail strings ("failed", "internal error"); hides root cause.
+- **why_it_matters:** Operator error responses lack correlation IDs and root cause.
+- **impact:** Slow incident triage.
+- **recommended_fix:** Add a custom exception handler that includes trace_id and a meaningful structured detail.
+- **tests_needed:** Synthetic 500 response includes `trace_id`.
+- **acceptance_criteria:** All 500 responses surface a correlation ID.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-RBAC-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** security / rbac / static_grep_blindspot
+- **file_path:** all routers
+- **line_function:** import of `require_principal`/`require_role`/etc.
+- **evidence:** 6 routers import no auth dependency: `intelligence.py`, `jobs.py`, `jobs_state.py`, `session.py`, `health.py`, `__init__.py`. Verified legitimate (`jobs.py` is a façade mounting child routers; `health.py` is intentionally unauthed; `session.py` is **the** auth route). But the static-grep "every router imports a require_*" check can't differentiate façade from real non-auth access.
+- **why_it_matters:** A future router added with imports of `APIRouter()` only would silently slip past the static check while exposing protected data.
+- **impact:** Future drift.
+- **recommended_fix:** Add a generator test that, given the `Route Auth Matrix`, asserts every non-public endpoint row has at least one `require_*` deps in code.
+- **tests_needed:** A synthetic uncovered route triggers the static test to fail.
+- **acceptance_criteria:** Route auth matrix + static-grep work in tandem.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-SCRIPT-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** scripts / hardcoded_localhost
+- **file_path:** `scripts/run_alert_delivery_drill.py`, `scripts/run_load_test.py`, `scripts/backup_and_restore_test.py`, `scripts/manual_test.py:33`
+- **line_function:** default URL constants
+- **evidence:** Drill scripts reach back to localhost by default; designed for "the server is also on this host". A CI runner on a different host or remote dev container fails silently.
+- **why_it_matters:** Drill scripts that target `localhost` produce false-positive alerts in CI logs.
+- **impact:** Misleading CI signal.
+- **recommended_fix:** Default to localhost but ASSERT the host via env var before proceeding.
+- **tests_needed:** Synthetic remote-host drill fails loudly.
+- **acceptance_criteria:** Drill refuses to run without explicit `--url-prefix` on non-localhost targets.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-SCRIPT-002
+
+- **priority:** P2
+- **status:** verified
+- **category:** scripts / env_parser / partial_comment
+- **file_path:** `scripts/check_prod_env.py:82-110`
+- **line_function:** `load_env_file`
+- **evidence:** Custom parser strips trailing `#` comments from `value` (`value.partition("#")[0].strip()`). For multi-line or values with embedded `#`, this mangles them.
+- **why_it_matters:** `KEY=value#with#hashes` parsed as `value`, bypassing weak-credential gate.
+- **impact:** Operator can ship `GRAFANA_PASSWORD=Nz4HdRU#not-a-real-password` and pass the check while shipping an unexpected value.
+- **recommended_fix:** Switch to `dotenv` parser; support line-continuation per POSIX dotenv.
+- **tests_needed:** Synthetic hash-bearing values pass through unchanged.
+- **acceptance_criteria:** Env file parsing matches `dotenv`'s behavior.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-SCRIPT-003
+
+- **priority:** P2
+- **status:** verified
+- **category:** scripts / start_sh / silent_copy
+- **file_path:** `scripts/start.sh:36-44`
+- **line_function:** env creation block
+- **evidence:** If `.env` missing, `cp .env.example .env` silently runs, producing a placeholder-keyed .env that the server happily boots with disabled auth/DB.
+- **why_it_matters:** Operator sees "server started" with placeholder keys and learns the failure later.
+- **impact:** Footgun time-loss; possible credentials leak in transit logs.
+- **recommended_fix:** Refuse to start if `.env` missing; print clear instructions. Never `cp .env.example` into a working `.env`.
+- **tests_needed:** Synthetic missing-`.env` start fails.
+- **acceptance_criteria:** `start.sh` exits non-zero when `.env` missing.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-SCRIPT-005
+
+- **priority:** P2
+- **status:** verified
+- **category:** scripts / backup_drill / collides_with_local_dev
+- **file_path:** `scripts/backup_and_restore_test.py:95`
+- **line_function:** DSN assembly
+- **evidence:** Writes its own DSN to `localhost:5432`. Does not confirm the local Postgres is the **drill instance** vs developer's `localhost:5432` with real data.
+- **why_it_matters:** Accidental prod DB write via stale `localhost` reference.
+- **impact:** Data loss in developer's local DB.
+- **recommended_fix:** Require `--drill-instance-port=...`; refuse to run against `localhost:5432` unless `--allow-collision` is passed.
+- **tests_needed:** Synthetic developer-DB-target drill fails loudly.
+- **acceptance_criteria:** Drill only writes to the disposable instance it created.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-SCRIPT-004
+
+- **priority:** P3
+- **status:** verified
+- **category:** scripts / cli_args_in_ps_history
+- **file_path:** `scripts/send_telegram.py:67-75, 111-114`
+- **line_function:** argparse `--token` and `--chat-id`
+- **evidence:** Token + chat ID accepted as CLI args; secret now in `argv` and visible in `ps aux`, `top`, shell history, audit logs.
+- **why_it_matters:** Operational secret leakage via process tables.
+- **impact:** Telegram bot token leak in CI logs.
+- **recommended_fix:** Use `--token-file` and `--chat-id-file` paths or `getpass.getpass()`.
+- **tests_needed:** Synthetic `--token` arg is never present in `ps aux` output after fix.
+- **acceptance_criteria:** Token is read from an env ref or file, not argv.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-OPSDOC-001
+
+- **priority:** P3
+- **status:** verified
+- **category:** scripts / missing_tests
+- **file_path:** `scripts/run_worker.py`
+- **line_function:** CLI
+- **evidence:** 6930 LOC CLI without `backend/tests/test_run_worker_cli.py`. The CI flow uses `pytest backend/tests` — no test exercises the CLI's `--once` mode, signal handling, or env-var override.
+- **why_it_matters:** Subprocess behavior untested.
+- **impact:** Regressions possible; no early warning.
+- **recommended_fix:** Add `backend/tests/test_run_worker_cli.py` with subprocess-based tests.
+- **tests_needed:** Subprocess tests for `--once`, `SIGTERM`, env override.
+- **acceptance_criteria:** CLI covered by unit tests.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-OPSDOC-002
+
+- **priority:** P3
+- **status:** verified
+- **category:** docs / missing_artifacts_index
+- **file_path:** `scripts/backup_and_restore_test.py`
+- **line_function:** artifact write path
+- **evidence:** Writes `artifacts/backup_drill/latest_drill.json`; no `docs/ARTIFACTS.md` (or BACKUPS.md) explains the artifact for downstream tooling or humans.
+- **why_it_matters:** Auditors/CD pipelines reading the artifact without context.
+- **impact:** Forensic ambiguity.
+- **recommended_fix:** Add a brief one-page doc explaining the artifact.
+- **tests_needed:** Doc lint that asserts `docs/ARTIFACTS.md` exists when artifacts/ grows.
+- **acceptance_criteria:** Each artifacts subdirectory has a docs entry.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-OPSDOC-003
+
+- **priority:** P3
+- **status:** verified
+- **category:** scripts / healthcheck_no_tests
+- **file_path:** `scripts/worker_healthcheck.py`
+- **line_function:** Docker HEALTHCHECK target
+- **evidence:** Used by `docker-compose.prod.yml:124` as `HEALTHCHECK`. No tests in `backend/tests/` cover this script directly.
+- **why_it_matters:** Misclassifies healthy/unhealthy state.
+- **impact:** Wrong container lifecycle decisions.
+- **recommended_fix:** Add a test that simulates a healthy heartbeat (within TTL) and stale heartbeat (older than TTL) and asserts the script's exit code.
+- **tests_needed:** Unit tests for happy/stale paths.
+- **acceptance_criteria:** Healthcheck covered by unit tests.
+- **blocked_by:** None.
+- **notes:** New finding (Session 80).
+
+### F-DRIFT-002
+
+- **priority:** P3
+- **status:** verified
+- **category:** infrastructure / docker / worker_image_mismatch
+- **file_path:** `docker-compose.prod.yml:91, 124`
+- **line_function:** both services' image tag
+- **evidence:** Both `dataforge` and `worker` use the same image tag (good — atomic deploy), but rebuilding only one causes split-brain: `dataforge` v2 writes a state shape that `worker` v1 cannot consume.
+- **why_it_matters:** Manual selective rebuild creates version mismatch.
+- **impact:** Subtle data-state drift between services.
+- **recommended_fix:** Enforce in CI release pipeline that both images build and publish as an atomic pair.
+- **tests_needed:** CI release rejects partial rebuild.
+- **acceptance_criteria:** Single-image rebuild publishes dataforge + worker as a shared tag.
+- **blocked_by:** CI release pipeline.
+- **notes:** New finding (Session 80).
+
+## End of ledger entries — total 105 (39 historical + 66 added 2026-06-25)

@@ -189,11 +189,11 @@ class JobBackfillService:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# JobReclenerService
+# JobRecleanerService
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-class JobReclenerService:
+class JobRecleanerService:
     """Encapsulates the business logic for re-running AI cleaning on job results.
 
     Handles AI structuring, result filtering, deduplication, source-metadata

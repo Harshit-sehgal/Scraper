@@ -1,7 +1,7 @@
 """Unit tests for ``app.services.job_mutation_service``.
 
 Tests each service class (JobCancellerService, JobBackfillService,
-JobReclenerService) in isolation using mock stores and monkeypatched
+JobRecleanerService) in isolation using mock stores and monkeypatched
 dependencies so no real HTTP, AI, or disk I/O is needed.
 """
 
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from app.models import Job, JobStatus
 from app.routers.jobs_state import JobStoreManager
-from app.services.job_mutation_service import JobBackfillService, JobCancellerService, JobReclenerService
+from app.services.job_mutation_service import JobBackfillService, JobCancellerService, JobRecleanerService
 from app.utils.rbac import UserRole
 from fastapi import HTTPException
 
@@ -153,11 +153,11 @@ class TestJobBackfillService:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# JobReclenerService
+# JobRecleanerService
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-class TestJobReclenerService:
+class TestJobRecleanerService:
     @staticmethod
     def _make_reclean_job() -> Job:
         job = _make_job("j1", JobStatus.COMPLETED)
@@ -170,7 +170,7 @@ class TestJobReclenerService:
     def test_reclean_rejects_running_job(self, anyio_backend) -> None:
         job = _make_job("j1", JobStatus.RUNNING)
         manager = _make_manager({"j1": job})
-        service = JobReclenerService(manager)
+        service = JobRecleanerService(manager)
         with pytest.raises(HTTPException) as exc_info:
             import anyio
 
@@ -181,7 +181,7 @@ class TestJobReclenerService:
         job = self._make_reclean_job()
         job.results = []
         manager = _make_manager({"j1": job})
-        service = JobReclenerService(manager)
+        service = JobRecleanerService(manager)
         with pytest.raises(HTTPException) as exc_info:
             import anyio
 
@@ -192,7 +192,7 @@ class TestJobReclenerService:
         job = self._make_reclean_job()
         job.schema_fields = []
         manager = _make_manager({"j1": job})
-        service = JobReclenerService(manager)
+        service = JobRecleanerService(manager)
         with pytest.raises(HTTPException) as exc_info:
             import anyio
 
@@ -203,7 +203,7 @@ class TestJobReclenerService:
         job = self._make_reclean_job()
         job.org_id = "org-a"
         manager = _make_manager({"j1": job})
-        service = JobReclenerService(manager)
+        service = JobRecleanerService(manager)
         with pytest.raises(HTTPException):
             import anyio
 
@@ -212,7 +212,7 @@ class TestJobReclenerService:
     def test_reclean_success_path(self, anyio_backend) -> None:
         job = self._make_reclean_job()
         manager = _make_manager({"j1": job})
-        service = JobReclenerService(manager)
+        service = JobRecleanerService(manager)
         ai_report = {
             "applied": True,
             "input_records": 0,
