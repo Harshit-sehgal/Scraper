@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 2 |
-| Fixed issues | 33 |
+| Open verified/deferred issues | 1 |
+| Fixed issues | 34 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 6 |
@@ -113,6 +113,16 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > with 33 passed, 2 skipped, 1 deselected and writes
 > `artifacts/benchmarks/latest_local_corpus.*`. (open verified 3 → 2;
 > fixed 32 → 33).
+>
+> Updated 2026-06-24 storage parity pass:
+> `P1-ARCH-STORAGE-001` fixed. Fresh optional Postgres storage tests
+> exposed a real soft-delete restore parity bug: Postgres `save_single`
+> upserts left `deleted_at` populated, so restored jobs stayed hidden
+> from active reads. `PostgresRepositoryBase.save_all` and
+> `save_single` now clear `deleted_at` on active-job upserts. The
+> storage boundary docs now reflect the current mapper/migration/health
+> split. `--run-postgres` storage suites pass with 77 passed. (open
+> verified 2 → 1; fixed 33 → 34).
 
 
 ## Verified Issues
@@ -408,18 +418,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-ARCH-STORAGE-001
 
 - **priority:** P1
-- **status:** partially addressed (Postgres parity deferred)
+- **status:** fixed
 - **category:** architecture / storage_repository_boundaries
-- **file_path:** `backend/app/storage_interface.py`, `backend/app/job_store.py`, `backend/app/postgres_repository_base.py`, `docs/STORAGE_BOUNDARIES.md`
+- **file_path:** `backend/app/storage_interface.py`, `backend/app/job_store.py`, `backend/app/postgres_repository_base.py`, `backend/app/storage_mapper.py`, `backend/app/storage_migrations.py`, `backend/app/storage_health.py`, `docs/STORAGE_BOUNDARIES.md`
 - **line/function:** `JobRepository`, `SQLiteJobRepository`, `PostgresRepositoryBase`
-- **evidence:** Prompt 6 complexity output reports `backend/app/job_store.py` at 1207 LOC, `backend/app/postgres_repository_base.py` at 1156 LOC, `SQLiteJobRepository` at 527 LOC, and `PostgresRepositoryBase` at 723 LOC. Source inspection shows repository code spans schema setup, serialization, CRUD behavior, restart recovery, and companion-table persistence.
+- **evidence:** Fresh optional Postgres suite on 2026-06-24: `python3 -m pytest --run-postgres backend/tests/test_repository_parity.py backend/tests/test_postgres_repository.py backend/tests/test_postgres_integration.py -q -o addopts= --tb=short` failed before the fix on two soft-delete restore tests, then passed after the fix with 77 passed. `docs/STORAGE_BOUNDARIES.md` now reflects the current split: `storage_mapper.py` owns row serialization, `storage_migrations.py` owns DDL/migrations, `storage_health.py` owns health/status checks, and routers call repository interface methods.
 - **why_it_matters:** Tenant isolation, retention/deletion, exports, audit logs, and workflow storage all depend on clear repository boundaries.
 - **impact:** Storage changes can drift between SQLite and Postgres or bypass owner/org/project persistence expectations.
-- **recommended_fix:** Document and enforce mapper/schema/repository responsibilities, add parity tests, then split storage responsibilities in small tested steps.
-- **tests_needed:** SQLite and Postgres ownership round trips, result/event/export/recycle persistence, restart recovery, and migration/backfill behavior.
+- **recommended_fix:** Fixed for current boundary and parity scope. Continue future storage work through repository interfaces plus mapper/migration/health helper modules; do not add new router imports of storage-private helpers.
+- **tests_needed:** Covered by `backend/tests/test_repository_parity.py`, `backend/tests/test_postgres_repository.py`, `backend/tests/test_postgres_integration.py`, `backend/tests/test_storage_mapper.py`, and SQLite repository tests.
 - **acceptance_criteria:** Repository interfaces expose explicit ownership-aware methods and SQLite/Postgres behavior is covered by parity tests.
-- **blocked_by:** Postgres test environment for full parity.
-- **notes:** Session 4 (2026-06-22) created `storage_mapper.py` to deduplicate serialization/deserialization between `job_store.py` and `postgres_repository_base.py`. Postgres schema v8 was added. SQLite ownership parity tests were added (+6 tests). Remaining refactoring blocked by Postgres test environment. Deferred 2026-06-22 — full Postgres parity requires `--run-postgres` environment. Session 4 follow-up (2026-06-22): added 36 direct `storage_mapper` unit tests in `test_storage_mapper.py`. Session 5 (2026-06-22): added 13 SQLite repository unit tests in `test_sqlite_repository_untested.py` covering `is_cancel_requested`, `save_world_state`/`load_world_state`, `count_jobs_by_status`, `record_worker_heartbeat`/`get_worker_health`/`get_all_worker_healths`. 7 previously untested SQLite methods now have coverage.
+- **blocked_by:** None for local Docker/testcontainers parity. Production/staging failover, backups, and alert delivery remain separate ops evidence categories.
+- **notes:** Session 4 (2026-06-22) created `storage_mapper.py` to deduplicate serialization/deserialization between `job_store.py` and `postgres_repository_base.py`. Postgres schema v8 was added. SQLite ownership parity tests were added (+6 tests). Session 4 follow-up (2026-06-22): added 36 direct `storage_mapper` unit tests in `test_storage_mapper.py`. Session 5 (2026-06-22): added 13 SQLite repository unit tests in `test_sqlite_repository_untested.py` covering `is_cancel_requested`, `save_world_state`/`load_world_state`, `count_jobs_by_status`, `record_worker_heartbeat`/`get_worker_health`/`get_all_worker_healths`. 2026-06-24: current code has `storage_migrations.py` and `storage_health.py`, storage status/ready routes use repository interface methods, and fresh `--run-postgres` storage suites pass. The same run exposed and fixed Postgres active upserts over soft-deleted rows by clearing `deleted_at` in `PostgresRepositoryBase.save_all` and `save_single`.
 
 ### P1-BENCHMARK-BASELINE-001
 

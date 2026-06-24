@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-24T08:20:19+00:00 from `24791` files in the current checkout._
+_Generated: 2026-06-24T08:38:23+00:00 from `24877` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,10 +12,10 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 24791 |
+| Total files inventoried | 24877 |
 | Project-owned files | 944 |
 | Project-owned files deeply inspected | 940 |
-| Skipped generated/vendor/binary/cache/log/archive files | 23851 |
+| Skipped generated/vendor/binary/cache/log/archive files | 23937 |
 | Files needing follow-up | 0 |
 
 ## By Classification
@@ -31,12 +31,12 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | docker_deployment | 13 | 13 | 13 | 0 |
 | database_migration | 2 | 2 | 2 | 0 |
 | asset | 0 | 0 | 0 | 0 |
-| generated | 90 | 0 | 0 | 90 |
+| generated | 91 | 0 | 0 | 91 |
 | vendor | 15988 | 0 | 0 | 15988 |
-| cache | 4662 | 0 | 0 | 4662 |
+| cache | 4691 | 0 | 0 | 4691 |
 | binary | 38 | 0 | 0 | 38 |
 | archive | 1 | 0 | 0 | 1 |
-| log | 3068 | 0 | 0 | 3068 |
+| log | 3124 | 0 | 0 | 3124 |
 | unknown | 0 | 0 | 0 | 0 |
 
 ## Top-Level Counts
@@ -45,11 +45,11 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | --- | ---: |
 | `.venv/` | 9847 |
 | `node_modules/` | 6140 |
-| `artifacts/` | 3127 |
-| `backend/` | 1553 |
+| `artifacts/` | 3184 |
+| `backend/` | 1554 |
 | `.mypy_cache/` | 1459 |
-| `.ruff_cache/` | 1437 |
-| `.git/` | 868 |
+| `.ruff_cache/` | 1438 |
+| `.git/` | 895 |
 | `frontend/` | 115 |
 | `docs/` | 90 |
 | `scripts/` | 76 |
@@ -104,13 +104,13 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | Extension | Files |
 | --- | ---: |
 | `.py` | 6831 |
-| `.md` | 3431 |
-| `(none)` | 3403 |
+| `.md` | 3484 |
+| `(none)` | 3431 |
 | `.js` | 2744 |
-| `.json` | 2063 |
+| `.json` | 2067 |
 | `.pyi` | 1217 |
 | `.ts` | 888 |
-| `.pyc` | 876 |
+| `.pyc` | 877 |
 | `.cjs` | 534 |
 | `.mjs` | 454 |
 | `.so` | 385 |

@@ -2911,6 +2911,60 @@ as production readiness: staging alert delivery, browser/nightly
 performance, golden-live trend watching, and operational load proof
 remain separate evidence categories.
 
+## Storage Boundary and Postgres Parity Pass — 2026-06-24
+
+Scope: verify whether `P1-ARCH-STORAGE-001` was still open or stale,
+then close only the evidence-backed portion. Current code already had
+the mapper/migration/health split, but `docs/STORAGE_BOUNDARIES.md`
+and `artifacts/audit/ISSUE_LEDGER.md` still reflected the older
+partially addressed state.
+
+### Findings
+
+- `backend/app/storage_mapper.py` is the shared row/model mapper for
+  SQLite and Postgres.
+- `backend/app/storage_migrations.py` owns SQLite/Postgres schema and
+  migration helpers.
+- `backend/app/storage_health.py` owns SQLite/Postgres health/status
+  helpers.
+- `backend/app/routers/system.py` and `backend/app/routers/health.py`
+  use repository interface methods instead of importing SQLite-private
+  helpers from `job_store`.
+- Fresh optional Postgres tests exposed a real parity bug: active
+  Postgres upserts over a soft-deleted row did not clear `deleted_at`,
+  so `load_all()` and `get_job()` continued to hide the restored job.
+
+### Fix
+
+`backend/app/postgres_repository_base.py` now clears `deleted_at` on
+active-job upserts in both `save_all()` and `save_single()`. This
+matches the repository read contract that active jobs are the rows with
+`deleted_at IS NULL`.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 quick checks. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_ENV=test python3 -m pytest --run-postgres backend/tests/test_repository_parity.py -q -o addopts= --tb=short` | 0 | PASS; 37 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_ENV=test python3 -m pytest --run-postgres backend/tests/test_repository_parity.py backend/tests/test_postgres_repository.py backend/tests/test_postgres_integration.py -q -o addopts= --tb=short` | 1 | Failing repro before fix: 75 passed, 2 failed. Failures were `test_postgres_save_single_restores_soft_deleted_job_id` and `test_soft_deleted_job_restored_by_save_single`. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_ENV=test python3 -m pytest --run-postgres backend/tests/test_postgres_repository.py::TestPostgresIntegration::test_postgres_save_single_restores_soft_deleted_job_id backend/tests/test_postgres_integration.py::TestPostgresSchemaRepairIntegration::test_soft_deleted_job_restored_by_save_single -q -o addopts= --tb=short` | 0 | PASS after fix; 2 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_ENV=test python3 -m pytest --run-postgres backend/tests/test_repository_parity.py backend/tests/test_postgres_repository.py backend/tests/test_postgres_integration.py -q -o addopts= --tb=short` | 0 | PASS after fix; 77 passed. |
+| `python3 -m ruff check backend/app/postgres_repository_base.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/app/postgres_repository_base.py` | 0 | PASS; 1 file already formatted. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_ENV=test python3 -m pytest backend/tests/test_storage_endpoints.py backend/tests/test_storage_mapper.py backend/tests/test_sqlite_repository_untested.py -q -o addopts= --tb=short` | 0 | PASS; 73 passed. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated `artifacts/audit/FILE_INVENTORY.md` and local ledger artifacts. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match code. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick checks. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260624T083900Z_full`; 24 passed, 0 failed, 0 skipped, 0 timed out. Backend full tests passed in 305.80s; frontend tests/lints passed. |
+
+### Remaining Boundary
+
+`P1-ARCH-STORAGE-001` is fixed for current local repository-boundary
+and SQLite/Postgres parity evidence. Production failover, staging
+alert delivery, backups, and deployment drills remain separate ops
+evidence categories and must not be inferred from these local tests.
+
 ## Observability Metrics Implementation Pass — 2026-06-24
 
 Scope: close the local implementation gap in

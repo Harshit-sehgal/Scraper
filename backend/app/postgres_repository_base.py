@@ -692,7 +692,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                 safe_keys = [k for k in row if k in _JOB_COLUMNS]
                 cols = _validate_cols(safe_keys)
                 ph = ", ".join("%s" for _ in safe_keys)
-                update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id")
+                update_cols = ", ".join([f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id"] + ["deleted_at = NULL"])
                 self._execute(
                     conn,
                     f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608  # noqa: RUF100, S608
@@ -742,7 +742,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
             safe_keys = [k for k in row if k in _JOB_COLUMNS]
             cols = _validate_cols(safe_keys)
             ph = ", ".join("%s" for _ in safe_keys)
-            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id")
+            update_cols = ", ".join([f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id"] + ["deleted_at = NULL"])
             self._execute(
                 conn,
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608  # noqa: RUF100, S608

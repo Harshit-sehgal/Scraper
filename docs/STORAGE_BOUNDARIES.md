@@ -9,8 +9,11 @@ This document records the current storage/repository boundary and the safer targ
 | Layer | Current files | Responsibility |
 | --- | --- | --- |
 | Repository interface | `backend/app/storage_interface.py` | Defines `JobRepository` and selects SQLite/Postgres repository implementation. |
-| SQLite implementation | `backend/app/storage_interface.py`, `backend/app/job_store.py` | `SQLiteJobRepository` delegates many operations to `job_store` internals such as `_DB_LOCK`, `_get_connection`, and row helpers. |
-| Postgres implementation | `backend/app/postgres_repository.py`, `backend/app/psycopg3_repository.py`, `backend/app/postgres_repository_base.py` | Driver wrappers inherit from `PostgresRepositoryBase`, which owns schema, serialization, migrations, CRUD, result/event companion tables, and health checks. |
+| Row mapping | `backend/app/storage_mapper.py` | Canonical `Job` to row and row to `Job` serialization shared by SQLite and Postgres. |
+| Schema and migrations | `backend/app/storage_migrations.py` | SQLite and Postgres DDL/migration helpers. Repository implementations delegate schema setup here. |
+| Health and status | `backend/app/storage_health.py` | SQLite and Postgres health/status checks. Routers call repository interface methods instead of importing storage-private helpers. |
+| SQLite implementation | `backend/app/storage_interface.py`, `backend/app/job_store.py` | `SQLiteJobRepository` implements the public repository contract and delegates legacy SQLite CRUD to `job_store` internals. |
+| Postgres implementation | `backend/app/postgres_repository.py`, `backend/app/psycopg3_repository.py`, `backend/app/postgres_repository_base.py` | Driver wrappers inherit from `PostgresRepositoryBase`, which owns common CRUD, companion-table persistence, restart recovery, and delegates schema/health work to the storage helper modules. |
 | Companion tables | `job_results`, `job_events`, idempotency key helpers | Used for paginated result/event reads and job creation idempotency. |
 | In-memory cache | `backend/app/routers/jobs_state.py`, `backend/app/globals.py` | Shared in-process `jobs_store` and `recycle_bin_store` guarded by a global lock. |
 
@@ -22,7 +25,10 @@ Job ownership and tenant fields are present in the storage schema and serializer
 - `org_id`
 - `project_id`
 
-These fields are critical for tenant isolation. Postgres parity remains a candidate risk because optional Postgres integration tests were not run in the current Prompt 6 environment.
+These fields are critical for tenant isolation. Current optional
+Postgres evidence is recorded in `docs/AGENT_TRUTH.md`: on 2026-06-24
+the storage parity/repository/integration suite passed with
+`--run-postgres` (`77 passed`).
 
 ## Current Source-Of-Truth Model
 
@@ -35,10 +41,10 @@ See `docs/STATE_MODEL.md` for historical in-memory-vs-persistent-store notes. Cu
 
 ## Boundary Risks
 
-- SQLite repository methods reach into `app.job_store` private helpers, so repository behavior is not fully isolated.
-- `PostgresRepositoryBase` is broad: schema management, row serialization, CRUD, recovery, companion tables, and health checks are in one large class.
-- Adding new persistent entities such as workflow drafts, auth profile storage state, retention records, or billing plan state can duplicate mapping logic unless a clearer schema/serialization pattern is established.
-- SQLite/Postgres parity for ownership fields needs current optional Postgres evidence.
+- SQLite repository methods still delegate to legacy `app.job_store` helper functions, so the SQLite implementation is not a pure standalone repository.
+- `PostgresRepositoryBase` is still broad: common CRUD, restart recovery, companion-table persistence, and worker-heartbeat operations remain in one class.
+- Adding new persistent entities such as workflow drafts, auth profile storage state, retention records, or billing plan state should follow the mapper/migration/health split instead of duplicating storage logic in routers.
+- Postgres parity is currently covered by optional tests, but it is still not part of the default quick gate because it requires Docker/testcontainers.
 
 ## Target Boundary
 
@@ -54,9 +60,16 @@ Future storage changes should move toward:
 ## Tests Required Before Refactor
 
 - SQLite create/read/list/filter ownership parity.
-- Postgres create/read/list/filter ownership parity when a Postgres test environment exists.
+- Postgres create/read/list/filter ownership parity with `--run-postgres`.
 - Migration handles existing rows with safe defaults.
 - Companion result/event pagination works on SQLite and Postgres.
 - Recycle-bin move/restore/hard-delete preserves ownership and audit expectations.
 
-No storage refactor was performed in Prompt 6.
+## Current Evidence
+
+Current local evidence is recorded in `docs/AGENT_TRUTH.md` and
+`artifacts/validation/latest_summary.md`. The most relevant commands:
+
+- `python3 scripts/validate_local.py --quick` passed before the latest storage change.
+- `python3 -m pytest --run-postgres backend/tests/test_repository_parity.py -q -o addopts= --tb=short` passed with `37 passed`.
+- `python3 -m pytest --run-postgres backend/tests/test_repository_parity.py backend/tests/test_postgres_repository.py backend/tests/test_postgres_integration.py -q -o addopts= --tb=short` initially exposed a Postgres soft-delete restore bug, then passed after the fix with `77 passed`.

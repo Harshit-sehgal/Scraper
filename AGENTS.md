@@ -182,22 +182,23 @@ are proven in the current checkout and target environment.
 | 74 | Add 6 fixture-backed characterization tests for selector-discovery primitives (`legacy_directory`, `table_catalog`, `travel_site`); close `CAND-P1-ARCH-CHARTEST-001` (candidate 4 → 3, fixed 31 → 32); refresh `AGENT_TRUTH.md` with characterization pass evidence; record task in ledger | ✅ Done |
 | 75 | Final validation pass: 12/12 quick validation green, full backend suite unchanged; auto-regenerated `docs/API_*.md` timestamps refreshed; `ISSUE_LEDGER.md` Date header updated to the 2026-06-24 observability-metrics commit baseline | ✅ Done |
 | 76 | Close `P1-BENCHMARK-BASELINE-001` for deterministic local corpus: versioned expected outputs, per-case thresholds, precision/recall/F1, duplicate/type/runtime/timeout/browser-failure metrics, and negative-page false-success prevention; smoke now writes `latest_local_corpus.*` | ✅ Done |
+| 77 | Close `P1-ARCH-STORAGE-001`: fresh `--run-postgres` storage suites exposed and fixed Postgres soft-delete restore parity; storage boundary docs now match mapper/migration/health split; 77 optional Postgres storage tests pass | ✅ Done |
 
 ## Active Risks
 
 - `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
 
-## Open Verified Issues (2 remaining, all P1)
+## Open Verified Issues (1 remaining, P1)
 
 | ID | Category | Summary |
 |----|----------|---------|
-| P1-ARCH-STORAGE-001 | Architecture | Storage repository boundaries; `storage_mapper.py` extracted Session 4, full parity blocked by Postgres env; 36 mapper + 13 SQLite repo unit tests added |
 | P1-OPS-LOAD-ALERT-001 | Ops | Load tests (RPS 348, p95 74ms proven); alert delivery proof blocked by staging |
 
 ## Recently Resolved Risks
 
 - `P1-ARCH-ROUTER-001`: 736-line router registration extracted into 3 service classes with 40 tests — Resolved (2026-06-22): `JobCancellerService`, `JobBackfillService`, `JobReclenerService` in `app/services/job_mutation_service.py`; 26 characterization tests pinning HTTP contract; 14 isolated unit tests. Route delegates business decisions. Issue ledger closed: verified→fixed (open 8→7).
 - `P1-ARCH-SELECTOR-001`: 564-line pipeline extracted into 8 stages (`url_analysis_pipeline.py`); 12 unit tests added in `test_url_analysis_pipeline.py` — Resolved (2026-06-22): all 8 stages pinned with error/empty/success/escalation tests. Issue ledger: verified→fixed (open 7→6).
+- `P1-ARCH-STORAGE-001`: Storage repository boundaries and Postgres parity — Resolved (2026-06-24): mapper/migration/health helpers are split from CRUD paths; `--run-postgres` storage suites pass with 77 tests after fixing active upserts over soft-deleted Postgres rows.
 - `P1-ARCH-STATE-001`: Distributed state machine fully centralized (`job_state_machine.py`); 22 mutation unit tests added — Resolved (2026-06-22): `transition_to`, `mark_canceled`, `mark_recovered_failed` with H7 guard. Inline assignments documented. Issue ledger: verified→fixed (open 6→5).
 - `P1-BENCHMARK-BASELINE-001`: Deterministic local corpus expected-output and threshold gate — Resolved (2026-06-24): `backend/benchmarks/local_corpus_expected.json`, `backend/benchmarks/local_corpus.py`, and `backend/benchmarks/test_local_corpus_baseline.py`; 14 local cases, row/field F1 1.0, zero false-positive records, no live sites/browser required.
 - `P1-TEST-STUBS-STALE-001`: 18 stale MEDIUM-gap test-stub files committed broken — Resolved (2026-06-22): all deleted.
