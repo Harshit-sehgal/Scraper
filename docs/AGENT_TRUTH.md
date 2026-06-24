@@ -2944,3 +2944,26 @@ their committed values after this run.
 
 See `artifacts/validation/latest_summary.md` (mode: full, run_id:
 `20260624T000018Z_full`, `passed: 24, failed: 0, skipped: 0`).
+
+## 2026-06-24 — Decoupled Storage Monitoring and Repository Boundaries (P1-ARCH-STORAGE-001)
+
+Addressed storage boundary risks by isolating database schema management, migrations, and health checks from core CRUD/repository implementations, and resolving routers' dependency on storage-private helper functions.
+
+### Files Changed
+
+- [storage_migrations.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/storage_migrations.py) — created to centralize schema migration logics for SQLite and Postgres.
+- [storage_health.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/storage_health.py) — created to centralize health check and status collection logics for SQLite and Postgres.
+- [job_store.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/job_store.py) — delegated `get_storage_health` and `get_storage_status` SQLite implementations to `storage_health.py` helpers.
+- [storage_interface.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/storage_interface.py) — defined the abstract `get_storage_status` method on `JobRepository`, implemented it in `SQLiteJobRepository`, and updated `SQLiteJobRepository.health_check` to use `check_sqlite_health`.
+- [postgres_repository_base.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/postgres_repository_base.py) — updated `health_check` and `get_storage_status` to delegate to `storage_health.py` Postgres helpers, and `ensure_schema` to delegate to `storage_migrations.py`.
+- [system.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/routers/system.py) — updated the `/api/system/storage/status` route to call `repo.get_storage_status()` directly instead of importing `get_storage_status` from `job_store`.
+- [health.py](file:///home/harshit/Documents/Work/Money/scraper/backend/app/routers/health.py) — updated `/ready` endpoint to call `repo.health_check()` directly instead of importing `get_storage_health` from `job_store`.
+- [test_storage_endpoints.py](file:///home/harshit/Documents/Work/Money/scraper/backend/tests/test_storage_endpoints.py) — mocked `repo.get_storage_status` in mock Postgres repository to align with the new router flow.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick validation checks passed. |
+| `python3 -m pytest backend/tests/test_storage_endpoints.py -q` | 0 | PASS; 24 test cases passed successfully. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 23/23 full validation checks passed (including backend_full_tests 321.54s, frontend_tests, pip_audit, code quality lints, type checks, styling lints). Run ID: `20260624T003814Z_full`. |
