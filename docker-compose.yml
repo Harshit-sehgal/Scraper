@@ -23,7 +23,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: dev
+      # Default to the production stage so a fresh ``docker compose up``
+      # does not boot a hot-reload, debug-logging stack. Developers who
+      # need live-reload opt in explicitly via the
+      # ``docker-compose.override.yml`` file (sets ``target: dev`` and
+      # ``DATAFORGE_ENABLE_RELOAD=1``).
+      target: production
     image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
     container_name: dataforge-scraper
     ports:

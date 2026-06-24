@@ -88,7 +88,17 @@ HEALTHCHECK --interval=15s --timeout=6s --start-period=10s --retries=3 \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+# Run as a small shell wrapper so the dev reload flag is gated on an env
+# var (matches the docker-compose override policy). Without this guard,
+# every ``docker compose up`` ships --reload --log-level debug and a
+# hot-mounted backend tree, which leaks full tracebacks to container
+# logs and re-starts Playwright contexts on unrelated file edits.
+CMD ["sh", "-c", "\
+if [ \"${DATAFORGE_ENABLE_RELOAD:-}\" = \"1\" ] || [ \"${DATAFORGE_ENABLE_RELOAD:-}\" = \"true\" ]; then \
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug; \
+else \
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000; \
+fi"]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 3: Production

@@ -9,8 +9,14 @@
 
 services:
   dataforge:
-    # Extra environment for local debugging + forward host API key
+    # Opt into the dev Docker stage and enable uvicorn --reload. This is
+    # no longer the default — both flags must be set explicitly so a
+    # fresh ``docker compose up`` against the production stack ships the
+    # safe base config.
+    build:
+      target: dev
     environment:
+      - DATAFORGE_ENABLE_RELOAD=1
       - PYTHONDEVMODE=1
       - DATAFORGE_LOGGING_LEVEL=DEBUG
       - GROQ_API_KEY=${GROQ_API_KEY:-}

@@ -793,7 +793,7 @@ Status is `verified` unless noted.
 ### F-ENC-001
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** security / encryption / silent_default_salt
 - **file_path:** `backend/app/utils/encryption.py`
 - **line_function:** `encrypt`; line 265
@@ -804,15 +804,15 @@ Status is `verified` unless noted.
 - **tests_needed:** Unit test asserting that encrypt with a `user_id` and unset `DATAFORGE_ENCRYPTION_SALT` raises in non-dev envs; existing round-trip tests continue to pass.
 - **acceptance_criteria:** No code path derives AES keys from the literal `"default-salt-change-in-prod"` in staging or production.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80). 5-line fix in `encryption.py`.
+- **notes:** New finding (Session 80). **Fix shipped:** salt constant renamed to `_DEFAULT_PER_USER_SALT = "dataforge-dev-only-per-user-salt-do-not-use-in-prod"` and the literal `"default-salt-change-in-prod"` is no longer used. `encrypt()` raises `EncryptionError` (and `decrypt()` raises `DecryptionError`) when `DATAFORGE_ENCRYPTION_SALT` is unset in any non-`{development,test}` env. Per-user payloads carry a `pu` flag + recorded `uid`; decrypt re-derives the same HMAC key only when the matching `user_id` is supplied. `auth_profiles.py` records `encrypted_by_user_id` alongside the ciphertext so `get_decrypted_storage_state` / `_try_live_session_check` can pass the right key. Guarded by `backend/tests/test_encryption.py::TestPerUserEncryptionSaltPolicy` (5 new tests).
 
 ### F-DOCKER-001
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / default_target_reload_debug
-- **file_path:** `Dockerfile`, `docker-compose.yml`
-- **line_function:** `Dockerfile:91` (dev stage CMD); `docker-compose.yml:22-27` (`target: dev`)
+- **file_path:** `Dockerfile`, `docker-compose.yml`, `docker-compose.override.yml`
+- **line_function:** Dockerfile `CMD` (dev stage, formerly line 91); `docker-compose.yml` build target; `docker-compose.override.yml` target + env var.
 - **evidence:** Default target in `docker-compose.yml` is `dev`. Dev stage CMD runs `uvicorn app.main:app --reload --log-level debug`. Override mounts `./backend:/app/backend` and `./scripts:/app/scripts` from host. Combine with `PYTHONDEVMODE=1` in `docker-compose.override.yml:14` and Playwright browser contexts restart on every code reload.
 - **why_it_matters:** A fresh `docker compose up` starts a debugger-enabled, host-write-watched reload loop. Tracebacks leak to container logs; `.pyc` files written as user `dataforge` against host UID-owned mounts.
 - **impact:** Operators expecting a dev stack actually get noisy traceback logs, broken Playwright contexts on reload, and silent permission-denied issues.
@@ -820,7 +820,7 @@ Status is `verified` unless noted.
 - **tests_needed:** `python3 scripts/validate_local.py --quick` exits 0 after the change. `make up` no longer restarts the browser process on a host edit to unrelated files.
 - **acceptance_criteria:** Default `docker compose up` does not pass `--reload`.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped (Session 80 follow-up):** dev-stage `CMD` now runs a small shell wrapper that branches on `${DATAFORGE_ENABLE_RELOAD:-}` so `--reload --log-level debug` is opt-in. `docker-compose.yml` default flips from `target: dev` to `target: production`; `docker-compose.override.yml` now opts in to dev mode via `build.target: dev` plus `DATAFORGE_ENABLE_RELOAD=1`. Guarded by `backend/tests/test_docker_dev_target.py` (4 tests).
 
 ### F-NGINX-003
 
@@ -1215,18 +1215,18 @@ Status is `verified` unless noted.
 ### F-NAMING-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** code_quality / naming_typo / public_export
 - **file_path:** `backend/app/services/job_mutation_service.py`, `backend/app/routers/jobs_write.py`
-- **line_function:** `JobReclenerService` class at line 196
-- **evidence:** Class name is `JobReclenerService` (typo for "Recleaner"). Imported in `routers/jobs_write.py:49, 209, 211, 213, 215` and exposes API surface for `/api/jobs/<id>/reclean`.
+- **line_function:** `JobRecleanerService` class
+- **evidence:** Class name was `JobReclenerService` (typo for "Recleaner"). Imported in `routers/jobs_write.py:49, 209, 211, 213, 215` and exposes API surface for `/api/jobs/<id>/reclean`.
 - **why_it_matters:** Typo propagates to user-visible API surface (OpenAPI schema, swagger docs) and the docstrings.
 - **impact:** Permanent documentation defect; harder to grep for "recleaner" across the codebase.
 - **recommended_fix:** Rename `JobReclenerService` → `JobRecleanerService`. Update imports and test references.
 - **tests_needed:** Existing 26 characterization tests pass with the new name; no external caller breaks.
 - **acceptance_criteria:** Class name is `JobRecleanerService` throughout.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** class renamed to `JobRecleanerService` in `app/services/job_mutation_service.py:196`, all callers in `routers/jobs_write.py`, plus matching `TestJobRecleanerService` test class in `tests/test_job_mutation_service.py` and the test reference update in `tests/test_ga_hardening.py`. No behavior change. 26 characterization tests pass.
 
 ### F-ENV-002
 
