@@ -72,6 +72,33 @@ Each benchmark report should include:
 - runtime
 - browser failures
 
+## Current Local Corpus Gate
+
+Updated 2026-06-24 from
+`backend/benchmarks/local_corpus_expected.json` and
+`backend/benchmarks/local_corpus.py`.
+
+The local corpus now has versioned expected outputs and per-case
+thresholds for every required category. The scorer is deterministic and
+uses only checked-in HTML/JSON fixtures: no live sites, no browser, and
+no LLM calls.
+
+Current artifact paths:
+
+- `artifacts/benchmarks/latest_local_corpus.json`
+- `artifacts/benchmarks/latest_local_corpus.md`
+
+Current local corpus result:
+
+| Metric | Value |
+| --- | ---: |
+| version | `2026-06-24.local-corpus.v1` |
+| cases | 14 |
+| row F1 | 1.0 |
+| field F1 | 1.0 |
+| false-positive records on negative pages | 0 |
+| browser failures | 0 |
+
 ## Current Commands
 
 Local-only smoke:
@@ -80,11 +107,18 @@ Local-only smoke:
 python3 scripts/run_benchmark_smoke.py
 ```
 
+Local-only corpus scorer:
+
+```bash
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+python3 -m benchmarks.local_corpus
+```
+
 Existing in-corpus benchmark command:
 
 ```bash
 PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-python3 -m pytest backend/tests/test_benchmark_fixtures.py backend/benchmarks/test_benchmark_smoke.py \
+python3 -m pytest backend/tests/test_benchmark_fixtures.py backend/benchmarks/test_local_corpus_baseline.py backend/benchmarks/test_benchmark_smoke.py \
   -q -m "not live_benchmark and not browser and not golden_dataset" -o addopts=
 ```
 
@@ -99,9 +133,17 @@ python3 -m pytest -v backend/tests/test_golden_dataset.py --run-golden-dataset -
 
 Do not use benchmark results as launch proof until:
 
-- all required local corpus categories exist and remain enforced
-- expected outputs are versioned
-- thresholds are documented per category
-- failures produce actionable classification
-- benchmark reports are archived as artifacts
-- CI enforces smoke/corpus gates without live-site dependency
+- all required local corpus categories exist and remain enforced: current
+  local gate satisfies this for checked-in fixtures
+- expected outputs are versioned: current local gate satisfies this via
+  `backend/benchmarks/local_corpus_expected.json`
+- thresholds are documented per category: current local gate satisfies
+  this for local fixture extraction
+- failures produce actionable classification: current local negative
+  fixtures enforce empty/login/challenge/session-expired classifications
+- benchmark reports are archived as artifacts: current local gate writes
+  `artifacts/benchmarks/latest_local_corpus.*`
+- CI enforces smoke/corpus gates without live-site dependency: local
+  pytest coverage exists under `backend/benchmarks`; keep production
+  readiness claims blocked on staging, browser, golden-live, load, and
+  operational evidence

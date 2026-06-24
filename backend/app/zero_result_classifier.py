@@ -153,6 +153,14 @@ def classify_zero_result(
             return _build("session_bound_url", 0.80)
         return _build("search_replay_required", 0.75)
 
+    # Stage 3b: Expired session page content, even when the original URL has
+    # already been canonicalized or the session token only appears in a form.
+    if _has_session_expired_patterns(visible_text, html):
+        has_forms = len(detected_forms) > 0
+        if has_forms:
+            return _build("session_bound_url", 0.80)
+        return _build("search_replay_required", 0.75)
+
     # Stage 4: Blank page (very short HTML)
     if html_length < settings.ZERO_RESULT_EMPTY_HTML_LEN:
         return _build("empty_response", 0.95)
@@ -208,6 +216,19 @@ def _has_auth_patterns(text: str) -> bool:
 
     text_lower = text.lower()
     return any(re.search(r"\b" + re.escape(pattern) + r"\b", text_lower) for pattern in settings.ZERO_RESULT_AUTH_PATTERNS)
+
+
+def _has_session_expired_patterns(visible_text: str, html: str) -> bool:
+    """Check for explicit expired-session messages in visible text or source."""
+    import re
+
+    content = f"{visible_text} {html}".lower()
+    patterns = (
+        r"\b(search\s+)?session\s+(has\s+)?expired\b",
+        r"\bexpired\s+(search\s+)?session\b",
+        r"\bplease\s+start\s+a\s+new\s+search\b",
+    )
+    return any(re.search(pattern, content) for pattern in patterns)
 
 
 def _has_anti_bot_patterns(html: str, visible_text: str) -> bool:

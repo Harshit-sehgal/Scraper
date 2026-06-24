@@ -1,0 +1,251 @@
+{
+  "version": "2026-06-24.local-corpus.v1",
+  "required_categories": [
+    "static product pages",
+    "listing pages",
+    "tables",
+    "articles",
+    "search result pages",
+    "pagination",
+    "infinite scroll",
+    "load-more",
+    "session/workflow mock pages",
+    "network JSON-backed pages",
+    "empty/no-result pages",
+    "malformed HTML",
+    "login-required mock pages",
+    "blocked/challenge mock pages"
+  ],
+  "aggregate_thresholds": {
+    "min_row_f1": 0.9,
+    "min_field_f1": 0.9,
+    "max_timeout_rate": 0.0,
+    "max_browser_failures": 0
+  },
+  "cases": [
+    {
+      "id": "travel_site_flights",
+      "categories": ["static product pages"],
+      "fixture": "travel_site.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "airline", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["airline", "price"],
+      "expected_records": [
+        {"airline": "British Airways", "price": "£245.50"},
+        {"airline": "Air France", "price": "£199.00"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "legacy_directory_listing",
+      "categories": ["listing pages"],
+      "fixture": "legacy_directory.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "company", "type": "string", "required": true},
+        {"name": "phone", "type": "phone", "required": true},
+        {"name": "website", "type": "url", "required": true}
+      ],
+      "required_fields": ["company", "phone", "website"],
+      "expected_records": [
+        {"company": "Acme Corp", "phone": "+1-555-0101", "website": "http://acme.example.com"},
+        {"company": "Globex Inc", "phone": "+1-555-0202", "website": "http://globex.example.com"},
+        {"company": "Soylent Green Co", "phone": "+1-555-0303", "website": "http://soylent.example.com"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "table_catalog_prices",
+      "categories": ["tables"],
+      "fixture": "table_catalog.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "name", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["name", "price"],
+      "expected_records": [
+        {"name": "Brass Fitting", "price": "$4.20"},
+        {"name": "Steel Clamp", "price": "$2.85"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "messy_blog_articles",
+      "categories": ["articles"],
+      "fixture": "messy_blog.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "author", "type": "string", "required": true}
+      ],
+      "required_fields": ["title", "author"],
+      "expected_records": [
+        {"title": "Quantum Computing is Here", "author": "John Doe"},
+        {"title": "The Future of AI Agents", "author": "Jane Smith"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "search_results_widgets",
+      "categories": ["search result pages", "pagination"],
+      "fixture": "search_results.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["title", "price"],
+      "expected_records": [
+        {"title": "Red Widget — Durable & Affordable", "price": "$15.99"},
+        {"title": "Blue Widget — Premium Edition", "price": "$24.99"},
+        {"title": "Green Widget — Eco Friendly", "price": "$19.99"},
+        {"title": "Black Widget Pro", "price": "$49.99"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "infinite_scroll_items",
+      "categories": ["infinite scroll"],
+      "fixture": "infinite_scroll_mock.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["title", "price"],
+      "expected_records": [
+        {"title": "Item Alpha", "price": "$12.99"},
+        {"title": "Item Bravo", "price": "$24.99"},
+        {"title": "Item Charlie", "price": "$39.99"},
+        {"title": "Item Delta", "price": "$49.99"},
+        {"title": "Item Echo", "price": "$59.99"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "load_more_products",
+      "categories": ["load-more"],
+      "fixture": "load_more_mock.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["title", "price"],
+      "expected_records": [
+        {"title": "Product Alpha", "price": "$29.99"},
+        {"title": "Product Beta", "price": "$49.99"},
+        {"title": "Product Gamma", "price": "$99.99"},
+        {"title": "Product Delta", "price": "$19.99"},
+        {"title": "Product Epsilon", "price": "$199.99"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "workflow_supplier_results",
+      "categories": ["session/workflow mock pages"],
+      "fixture": "workflow_search_mock.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "supplier", "type": "string", "required": true},
+        {"name": "url", "type": "url", "required": true}
+      ],
+      "required_fields": ["supplier", "url"],
+      "expected_records": [
+        {"supplier": "Apex Components", "url": "https://fixtures.local/suppliers/apex-components"},
+        {"supplier": "Northstar Parts", "url": "https://fixtures.local/suppliers/northstar-parts"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "network_catalog_payload",
+      "categories": ["network JSON-backed pages"],
+      "fixture": "network_catalog_payload.json",
+      "extractor": "json_items",
+      "schema": [
+        {"name": "id", "type": "code", "required": true},
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "number", "required": true},
+        {"name": "availability", "type": "string", "required": true}
+      ],
+      "required_fields": ["id", "title", "price", "availability"],
+      "expected_records": [
+        {"id": "sku-100", "title": "Portable Pump", "price": 29.99, "availability": "in_stock"},
+        {"id": "sku-101", "title": "Carbon Filter", "price": 44.5, "availability": "low_stock"},
+        {"id": "sku-102", "title": "Valve Kit", "price": 18.75, "availability": "in_stock"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "malformed_listing_recovery",
+      "categories": ["malformed HTML"],
+      "fixture": "malformed_listing.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [
+        {"title": "Loose Card Alpha"},
+        {"title": "Loose Card Bravo"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "empty_results_page",
+      "categories": ["empty/no-result pages"],
+      "fixture": "empty_results.html",
+      "extractor": "negative_html",
+      "schema": [
+        {"name": "title", "type": "string", "required": true}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [],
+      "expected_failure_classes": ["empty_response", "genuinely_empty"],
+      "thresholds": {"max_false_positive_records": 0}
+    },
+    {
+      "id": "login_wall_page",
+      "categories": ["login-required mock pages"],
+      "fixture": "login_wall_mock.html",
+      "extractor": "negative_html",
+      "schema": [
+        {"name": "title", "type": "string", "required": true}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [],
+      "expected_failure_classes": ["auth_required"],
+      "thresholds": {"max_false_positive_records": 0}
+    },
+    {
+      "id": "challenge_block_page",
+      "categories": ["blocked/challenge mock pages"],
+      "fixture": "challenge_mock.html",
+      "extractor": "negative_html",
+      "schema": [
+        {"name": "title", "type": "string", "required": true}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [],
+      "expected_failure_classes": ["anti_bot_block"],
+      "thresholds": {"max_false_positive_records": 0}
+    },
+    {
+      "id": "session_expired_page",
+      "categories": ["session/workflow mock pages"],
+      "fixture": "session_expired.html",
+      "extractor": "negative_html",
+      "schema": [
+        {"name": "title", "type": "string", "required": true}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [],
+      "expected_failure_classes": ["session_bound_url", "search_replay_required"],
+      "thresholds": {"max_false_positive_records": 0}
+    }
+  ]
+}

@@ -18,6 +18,149 @@ from app.models import FieldType, SchemaField
 logger = logging.getLogger(__name__)
 
 
+_ACCESS_CHALLENGE_PATTERNS = (
+    "g-recaptcha",
+    "h-captcha",
+    "recaptcha",
+    "hcaptcha",
+    "captcha",
+    "cloudflare",
+    "cf-browser-verification",
+    "checking your browser",
+    "verify you are human",
+    "verify that you are human",
+    "access denied",
+    "security challenge",
+    "bot protection",
+    "dd-captcha",
+    "px-captcha",
+)
+
+_AUTH_GATE_TEXT_RE = re.compile(
+    r"\b("
+    r"sign\s*in\s+to\s+(continue|view|access)|"
+    r"log\s*in\s+to\s+(continue|view|access)|"
+    r"please\s+(log|sign)\s*in|"
+    r"create\s+(an?\s+)?account\s+to\s+continue"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_SESSION_EXPIRED_TEXT_RE = re.compile(
+    r"\b("
+    r"(search\s+)?session\s+(has\s+)?expired|"
+    r"expired\s+(search\s+)?session|"
+    r"please\s+start\s+a\s+new\s+search"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_RECORD_CONTAINER_CLASS_RE = re.compile(r"item|card|listing|row|result|entry|quote", re.IGNORECASE)
+
+
+def _remove_non_visible_nodes(soup: BeautifulSoup) -> None:
+    """Remove nodes that raw BeautifulSoup parsing would treat as extractable text."""
+    for tag in list(soup(["script", "style", "noscript", "svg", "link", "meta", "template"])):
+        tag.decompose()
+
+    for node in list(soup.find_all(True)):
+        if node.parent is None or node.attrs is None:
+            continue
+        style = str(node.get("style") or "")
+        cls_val = node.get("class")
+        classes = " ".join(cls_val) if isinstance(cls_val, list) else str(cls_val or "")
+        hidden_by_attr = node.has_attr("hidden") or str(node.get("aria-hidden", "")).lower() == "true"
+        hidden_by_style = bool(re.search(r"(display\s*:\s*none|visibility\s*:\s*hidden)", style, re.IGNORECASE))
+        hidden_by_class = bool(re.search(r"\b(hidden|visually-hidden|sr-only)\b", classes, re.IGNORECASE))
+        if hidden_by_attr or hidden_by_style or hidden_by_class:
+            node.decompose()
+
+
+def _looks_like_access_block_page(soup: BeautifulSoup) -> bool:
+    """Detect pages where fallback extraction would convert an access block into false records."""
+    text = _compact_text(soup.get_text(separator=" ", strip=True))
+    text_lower = text.lower()
+    if any(pattern in text_lower for pattern in _ACCESS_CHALLENGE_PATTERNS):
+        return True
+
+    has_password_input = soup.find("input", attrs={"type": re.compile(r"password", re.IGNORECASE)}) is not None
+    has_login_form = any(
+        re.search(r"\b(log\s*in|login|signin|sign-in|auth)\b", str(form.get("action", "")), re.IGNORECASE)
+        for form in soup.find_all("form")
+    )
+    if (has_password_input or has_login_form) and _AUTH_GATE_TEXT_RE.search(text):
+        return True
+
+    return bool(_SESSION_EXPIRED_TEXT_RE.search(text))
+
+
+def _filter_nested_record_containers(containers: list[Any]) -> list[Any]:
+    """Drop aggregate list/grid wrappers when their child record containers are present."""
+    filtered = []
+    for container in containers:
+        nested_records = container.find_all(
+            ["article", "li", "tr", "div"],
+            class_=_RECORD_CONTAINER_CLASS_RE,
+        )
+        if len(nested_records) >= 2:
+            continue
+        filtered.append(container)
+    return filtered
+
+
+def _table_headers_for_row(row) -> list[str]:
+    table = row.find_parent("table")
+    if not table:
+        return []
+    header_row = table.find("tr")
+    if not header_row:
+        return []
+    return [_compact_text(cell.get_text(" ", strip=True)).lower() for cell in header_row.find_all(["th", "td"], recursive=False)]
+
+
+def _header_matches_field(header: str, field: SchemaField) -> bool:
+    field_name = field.name.lower()
+    aliases = {field_name, field_name.replace("_", " "), field_name.replace("_", "-")}
+    if field.field_type == FieldType.CURRENCY:
+        aliases.update({"price", "unit price", "cost", "amount"})
+    elif field.field_type in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT):
+        aliases.update({"quantity", "qty", "count", "minimum order", "order"})
+    elif field.field_type == FieldType.CODE:
+        aliases.update({"sku", "id", "code"})
+    elif field.field_type == FieldType.URL:
+        aliases.update({"url", "website", "link"})
+    elif field.field_type == FieldType.STRING and field_name == "name":
+        aliases.update({"name", "title", "product"})
+    return any(alias and alias in header for alias in aliases)
+
+
+def _extract_table_cell_for_field(row, field: SchemaField) -> str | None:
+    if getattr(row, "name", "") != "tr":
+        return None
+    cells = row.find_all(["td", "th"], recursive=False)
+    if not cells:
+        return None
+    for idx, header in enumerate(_table_headers_for_row(row)):
+        if idx < len(cells) and _header_matches_field(header, field):
+            if field.field_type == FieldType.URL:
+                link = cells[idx].find("a")
+                if link:
+                    href = link.get("href")
+                    if isinstance(href, list):
+                        return href[0] if href else None
+                    return str(href) if href else None
+            return cells[idx].get_text(" ", strip=True)
+    return None
+
+
+def _extract_byline_author(text: str) -> str | None:
+    match = re.search(r"\b[Bb]y\s+([A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){0,3})\b", text)
+    if not match:
+        return None
+    author = match.group(1).strip()
+    return author if len(author) <= settings.SELECTOR_HEADING_FALLBACK_LEN else None
+
+
 def _detect_table_headers(html: str) -> list[dict]:
     """Detect table / grid headers from HTML to understand column semantics."""
     soup = BeautifulSoup(html, "html.parser")
@@ -621,6 +764,9 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     ratings.
     """
     soup = BeautifulSoup(html, "html.parser")
+    _remove_non_visible_nodes(soup)
+    if _looks_like_access_block_page(soup):
+        return []
 
     # Remove obvious noise before searching for containers
     for noise in soup.select("header, footer, nav, aside, .ads, .sidebar"):
@@ -632,9 +778,10 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     containers = list(
         soup.find_all(
             ["article", "li", "tr", "div"],
-            class_=re.compile(r"item|card|listing|row|result|entry|quote", re.IGNORECASE),
+            class_=_RECORD_CONTAINER_CLASS_RE,
         ),
     )
+    containers = _filter_nested_record_containers(containers)
 
     # Priority 2: Headings and their parents
     if not containers:
@@ -682,6 +829,15 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
             if ft == FieldType.STRING:
                 ft = _infer_string_field_semantic_type(field.name, field.description) or ft
             val = None
+
+            table_val = _extract_table_cell_for_field(container, field)
+            if table_val is not None:
+                record[field.name] = (
+                    _sanitize_regex_string_value(field, table_val, base_url=base_url)
+                    if ft == FieldType.STRING
+                    else _sanitize_field_value(field, table_val, base_url=base_url)
+                )
+                continue
 
             if ft == FieldType.URL:
                 link = container.find("a")
@@ -826,8 +982,13 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     val = _sanitize_regex_string_value(field, candidate, base_url=base_url)
                 else:
                     # Secondary string fields: prefer a field-specific child,
-                    # otherwise fall back to compact container text.
-                    val = _sanitize_regex_string_value(field, text[:200], base_url=base_url) if text else None
+                    # then common byline patterns, otherwise compact text.
+                    byline_author = _extract_byline_author(text) if "author" in field.name.lower() else None
+                    val = (
+                        _sanitize_regex_string_value(field, byline_author, base_url=base_url)
+                        if byline_author
+                        else (_sanitize_regex_string_value(field, text[:200], base_url=base_url) if text else None)
+                    )
 
             # DATE or unknown — extract the most prominent text
             elif field.name == desc_field:

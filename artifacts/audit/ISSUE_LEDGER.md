@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 3 |
-| Fixed issues | 32 |
+| Open verified/deferred issues | 2 |
+| Fixed issues | 33 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 6 |
@@ -100,6 +100,19 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > primitive contracts on `legacy_directory.html`, `table_catalog.html`,
 > and `travel_site.html`. 54/54 selector_discovery tests pass;
 > 12/12 quick validation green. (candidate 4 → 3; fixed 31 → 32).
+>
+> Updated 2026-06-24 benchmark baseline pass:
+> `P1-BENCHMARK-BASELINE-001` fixed for deterministic local corpus
+> evidence. Added `backend/benchmarks/local_corpus_expected.json`,
+> `backend/benchmarks/local_corpus.py`, and
+> `backend/benchmarks/test_local_corpus_baseline.py`. The local corpus
+> now enforces versioned expected outputs, per-case thresholds,
+> precision/recall/F1, missing fields, invalid types, duplicates,
+> runtime, timeout rate, browser failures, and false-success prevention
+> for negative pages. `python3 scripts/run_benchmark_smoke.py` passes
+> with 33 passed, 2 skipped, 1 deselected and writes
+> `artifacts/benchmarks/latest_local_corpus.*`. (open verified 3 → 2;
+> fixed 32 → 33).
 
 
 ## Verified Issues
@@ -411,18 +424,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-BENCHMARK-BASELINE-001
 
 - **priority:** P1
-- **status:** deferred (needs scoring thresholds and expected-output gates)
+- **status:** fixed
 - **category:** benchmark_readiness / quality_baseline
-- **file_path:** `artifacts/audit/BENCHMARK_READINESS_REVIEW.md`, `docs/BENCHMARK_PLAN.md`, `scripts/run_benchmark_smoke.py`
+- **file_path:** `backend/benchmarks/local_corpus_expected.json`, `backend/benchmarks/local_corpus.py`, `backend/benchmarks/test_local_corpus_baseline.py`, `docs/BENCHMARK_PLAN.md`, `scripts/run_benchmark_smoke.py`
 - **line/function:** Prompt 7 benchmark baseline
-- **evidence:** Prompt 7 local benchmark smoke passed with `python3 scripts/run_benchmark_smoke.py`, writing `artifacts/benchmarks/latest_smoke.json` and `.md`. The review records that this is smoke/config/fixture coverage only and does not prove broad extraction quality.
+- **evidence:** `python3 scripts/run_benchmark_smoke.py` passed on 2026-06-24 with 33 passed, 2 skipped, 1 deselected. `artifacts/benchmarks/latest_local_corpus.json` records 14 deterministic local cases, `row_f1=1.0`, `field_f1=1.0`, `false_positive_records=0`, `browser_failures=0`, and no live sites.
 - **why_it_matters:** Product feature work needs a repeatable quality baseline before changing extraction and workflow behavior.
 - **impact:** Without a fuller baseline, URL Intelligence, Workflow Replay, and extraction-depth work can regress quality without a clear signal.
-- **recommended_fix:** Add per-category expected outputs and enforce precision/recall/F1 thresholds in CI.
-- **tests_needed:** Benchmark scoring tests for field precision, field recall, row precision, row recall, F1, missing required fields, duplicates, invalid types, runtime, timeout rate, and browser failures.
+- **recommended_fix:** Fixed for deterministic local corpus. Keep staging/browser/golden-live/load proof tracked separately and do not treat local corpus success as production readiness.
+- **tests_needed:** Covered by `backend/benchmarks/test_local_corpus_baseline.py`, `backend/tests/test_extraction_precision.py`, and `backend/tests/test_zero_result_classifier.py`.
 - **acceptance_criteria:** Benchmark report includes precision, recall, F1, missing fields, duplicates, invalid types, runtime, timeout rate, and browser failures for every required corpus category.
-- **blocked_by:** Product schema decisions for per-category thresholds.
-- **notes:** Existing live golden tests are observational and must not be used as deterministic proof. Deferred 2026-06-22 — corpus expansion is product-quality work, not a safety defect. Session 4 follow-up (2026-06-22): added 4 new fixture HTML pages (`search_results.html`, `session_expired.html`, enhanced `load_more_mock.html`, enhanced `login_wall_mock.html`). Session 5 (2026-06-22): added `infinite_scroll_mock.html` with extraction test. search_results and infinite_scroll now wired into `test_fixture_extraction_yields_records`. 2026-06-24: all required fixture categories now have named local fixtures and an enforcement test; remaining work is benchmark scoring/threshold maturity, not missing corpus files.
+- **blocked_by:** None for local deterministic corpus.
+- **notes:** Existing live golden tests are observational and must not be used as deterministic proof. Deferred 2026-06-22 — corpus expansion is product-quality work, not a safety defect. Session 4 follow-up (2026-06-22): added 4 new fixture HTML pages (`search_results.html`, `session_expired.html`, enhanced `load_more_mock.html`, enhanced `login_wall_mock.html`). Session 5 (2026-06-22): added `infinite_scroll_mock.html` with extraction test. search_results and infinite_scroll now wired into `test_fixture_extraction_yields_records`. 2026-06-24: all required fixture categories now have named local fixtures and an enforcement test. 2026-06-24 follow-up: local expected outputs and thresholds are versioned in `backend/benchmarks/local_corpus_expected.json`; smoke now runs `backend/benchmarks/test_local_corpus_baseline.py` and writes `artifacts/benchmarks/latest_local_corpus.*`.
 
 ### P2-BENCHMARK-CORPUS-001
 

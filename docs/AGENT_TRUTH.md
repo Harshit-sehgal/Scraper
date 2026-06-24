@@ -2839,13 +2839,77 @@ coverage in `backend/tests/test_benchmark_fixtures.py`.
 | `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260623T214036Z_full`; 24 passed, 0 failed, 0 skipped, 0 timed out. Backend suite passed in 375.77s; frontend tests passed 37 files / 461 tests. |
 | `python3 scripts/validate_local.py --quick` | 0 | Final quick gate PASS after ledger regeneration; run id `20260623T215252Z_quick`; 13 passed, 0 failed, 0 skipped, 0 timed out. |
 
-### Remaining Benchmark Work
+### Follow-up Boundary
 
-`P2-BENCHMARK-CORPUS-001` is fixed for fixture presence. The broader
-`P1-BENCHMARK-BASELINE-001` remains open/deferred because launch-grade
-benchmarking still needs versioned expected outputs, precision/recall/F1
-thresholds, duplicate/type checks, runtime/timeout reporting, and CI
-enforcement per category.
+`P2-BENCHMARK-CORPUS-001` is fixed for fixture presence. At this point
+`P1-BENCHMARK-BASELINE-001` still needed versioned expected outputs,
+precision/recall/F1 thresholds, duplicate/type checks,
+runtime/timeout reporting, and CI enforcement per category. That local
+deterministic gap was closed in the benchmark baseline pass below.
+
+## Benchmark Baseline Pass — 2026-06-24
+
+Scope: close the local deterministic benchmark baseline without
+overclaiming production readiness. Added versioned expected outputs and
+per-case thresholds for every required local corpus category, then fixed
+regex fallback false-success behavior that the corpus exposed on login
+walls, challenge pages, and expired-session pages.
+
+### Files Added
+
+- `backend/benchmarks/local_corpus_expected.json`
+- `backend/benchmarks/local_corpus.py`
+- `backend/benchmarks/test_local_corpus_baseline.py`
+
+### Files Changed
+
+- `backend/app/selector_engine.py`
+- `backend/app/zero_result_classifier.py`
+- `backend/tests/test_extraction_precision.py`
+- `backend/tests/test_zero_result_classifier.py`
+- `scripts/run_benchmark_smoke.py`
+- `docs/BENCHMARK_PLAN.md`
+- `artifacts/audit/ISSUE_LEDGER.md`
+- `AGENTS.md`
+
+### Local Corpus Result
+
+`artifacts/benchmarks/latest_local_corpus.json` records:
+
+- version: `2026-06-24.local-corpus.v1`
+- cases: 14
+- row F1: 1.0
+- field F1: 1.0
+- false-positive records on negative pages: 0
+- browser failures: 0
+- live sites used: false
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 quick checks. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_extraction_precision.py::test_regex_fallback_does_not_extract_access_block_pages -q -o addopts=` | 1 | Expected failing repro before fix: 3 failed; login wall, challenge page, and expired-session page produced false-positive regex records. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_extraction_precision.py::test_regex_fallback_does_not_extract_access_block_pages -q -o addopts=` | 0 | PASS after selector fallback guard; 3 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_extraction_precision.py backend/tests/test_selector_engine.py::TestExtractWithRegex -q -o addopts=` | 0 | PASS; 12 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_zero_result_classifier.py::TestZeroResultClassification::test_expired_session_content_with_replay_form_is_session_bound backend/tests/test_zero_result_classifier.py::TestZeroResultClassification::test_session_has_priority_over_auth -q -o addopts=` | 0 | PASS; 2 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/benchmarks/test_local_corpus_baseline.py -q -o addopts=` | 0 | PASS; 4 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m benchmarks.local_corpus` | 0 | PASS; wrote `artifacts/benchmarks/latest_local_corpus.json` and `.md`. |
+| `python3 scripts/run_benchmark_smoke.py` | 0 | PASS; 33 passed, 2 skipped, 1 deselected; wrote `artifacts/benchmarks/latest_smoke.*` and `latest_local_corpus.*`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated the tracked `artifacts/audit/FILE_INVENTORY.md` and refreshed local `FILE_AUDIT_LEDGER.*` artifacts. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match code. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_extraction_precision.py backend/tests/test_selector_engine.py::TestExtractWithRegex backend/tests/test_zero_result_classifier.py::TestZeroResultClassification::test_expired_session_content_with_replay_form_is_session_bound backend/benchmarks/test_local_corpus_baseline.py -q -o addopts=` | 0 | PASS; 17 passed. |
+| `python3 -m ruff check backend/app/selector_engine.py backend/app/zero_result_classifier.py backend/tests/test_extraction_precision.py backend/tests/test_zero_result_classifier.py backend/benchmarks/local_corpus.py backend/benchmarks/test_local_corpus_baseline.py scripts/run_benchmark_smoke.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/app/selector_engine.py backend/app/zero_result_classifier.py backend/tests/test_extraction_precision.py backend/tests/test_zero_result_classifier.py backend/benchmarks/local_corpus.py backend/benchmarks/test_local_corpus_baseline.py scripts/run_benchmark_smoke.py` | 0 | PASS; 7 files already formatted. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick checks passed. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260624T082103Z_full`; 24 passed, 0 failed, 0 skipped, 0 timed out. Backend full tests passed in 306.31s; frontend tests/lints passed. |
+
+### Remaining Benchmark Boundary
+
+The local deterministic benchmark baseline is fixed. Do not treat this
+as production readiness: staging alert delivery, browser/nightly
+performance, golden-live trend watching, and operational load proof
+remain separate evidence categories.
 
 ## Observability Metrics Implementation Pass — 2026-06-24
 

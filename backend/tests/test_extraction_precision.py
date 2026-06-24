@@ -7,6 +7,7 @@ without requiring live network or LLM calls.
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from app.models import FieldType, SchemaField
 from app.selector_engine import apply_selectors, extract_with_regex
 
@@ -130,6 +131,24 @@ def test_quote_card_regex_extraction_uses_named_child_nodes() -> None:
         {"text": "Be yourself; everyone else is already taken.", "author": "Oscar Wilde"},
         {"text": "So many books, so little time.", "author": "Frank Zappa"},
     ]
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    [
+        "login_wall_mock.html",
+        "challenge_mock.html",
+        "session_expired.html",
+    ],
+)
+def test_regex_fallback_does_not_extract_access_block_pages(fixture_name: str) -> None:
+    html = load_fixture(fixture_name)
+    fields = [
+        SchemaField(name="title", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
+    ]
+
+    assert extract_with_regex(html, fields) == []
 
 
 def test_selector_application_precision() -> None:

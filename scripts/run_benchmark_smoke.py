@@ -25,6 +25,7 @@ COMMAND = [
     "-m",
     "pytest",
     "backend/tests/test_benchmark_fixtures.py",
+    "backend/benchmarks/test_local_corpus_baseline.py",
     "backend/benchmarks/test_benchmark_smoke.py",
     "-q",
     "-m",
@@ -78,9 +79,26 @@ def main() -> int:
         stdout = _redact(exc.stdout or "")
         stderr = _redact(exc.stderr or "benchmark smoke timed out after 120 seconds")
 
+    status = "timeout" if timed_out else ("passed" if exit_code == 0 else "failed")
+    corpus_report = None
+    corpus_error = ""
+
+    if exit_code == 0:
+        try:
+            sys.path.insert(0, str(REPO_ROOT / "backend"))
+            from benchmarks.local_corpus import run_local_corpus
+
+            corpus_report = run_local_corpus(write_artifacts=True)
+            if corpus_report["status"] != "passed":
+                exit_code = 1
+                status = "failed"
+        except Exception as exc:
+            corpus_error = _redact(str(exc))
+            exit_code = 1
+            status = "failed"
+
     ended = datetime.now(UTC)
     duration = round(time.monotonic() - start, 3)
-    status = "timeout" if timed_out else ("passed" if exit_code == 0 else "failed")
 
     payload = {
         "generated_at": ended.isoformat(),
@@ -93,6 +111,20 @@ def main() -> int:
         "command": COMMAND,
         "stdout": stdout,
         "stderr": stderr,
+        "local_corpus": (
+            {
+                "status": corpus_report["status"],
+                "version": corpus_report["version"],
+                "case_count": corpus_report["aggregate"]["case_count"],
+                "row_f1": corpus_report["aggregate"]["row_f1"],
+                "field_f1": corpus_report["aggregate"]["field_f1"],
+                "false_positive_records": corpus_report["aggregate"]["false_positive_records"],
+                "artifacts": corpus_report.get("artifacts", {}),
+            }
+            if corpus_report
+            else None
+        ),
+        "local_corpus_error": corpus_error,
         "artifacts": {
             "json": str(JSON_PATH.relative_to(REPO_ROOT)),
             "markdown": str(MD_PATH.relative_to(REPO_ROOT)),
@@ -111,6 +143,24 @@ def main() -> int:
                 f"- duration_seconds: {duration}",
                 "- live_sites_used: false",
                 f"- command: `{' '.join(COMMAND)}`",
+                "",
+                "## Local Corpus",
+                "",
+                (
+                    "\n".join(
+                        [
+                            f"- status: {corpus_report['status']}",
+                            f"- version: {corpus_report['version']}",
+                            f"- case_count: {corpus_report['aggregate']['case_count']}",
+                            f"- row_f1: {corpus_report['aggregate']['row_f1']}",
+                            f"- field_f1: {corpus_report['aggregate']['field_f1']}",
+                            f"- false_positive_records: {corpus_report['aggregate']['false_positive_records']}",
+                            f"- artifacts: `{corpus_report.get('artifacts', {})}`",
+                        ],
+                    )
+                    if corpus_report
+                    else f"- error: {corpus_error or 'not run'}"
+                ),
                 "",
                 "## Stdout",
                 "",

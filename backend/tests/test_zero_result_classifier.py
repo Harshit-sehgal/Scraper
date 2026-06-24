@@ -79,6 +79,14 @@ class TestZeroResultClassification:
         )
         assert result.failure_class == "search_replay_required"
 
+    def test_expired_session_content_with_replay_form_is_session_bound(self) -> None:
+        result = classify_zero_result(
+            html="<html><body><h1>Session Expired</h1><form action='/search'></form></body></html>",
+            visible_text="Session Expired. Your search session has expired. Please start a new search.",
+            detected_forms=[{"action": "/search", "method": "GET"}],
+        )
+        assert result.failure_class == "session_bound_url"
+
     def test_blank_html_classified_as_empty_response(self) -> None:
         result = classify_zero_result(html="<html></html>")
         assert result.failure_class == "empty_response"
