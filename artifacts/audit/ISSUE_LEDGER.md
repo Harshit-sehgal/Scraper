@@ -1,7 +1,7 @@
 # DataForge Scraper - Issue Ledger
 
 Date: 2026-06-24
-Commit baseline before this audit update: `e2bfb1b`
+Commit baseline before this audit update: `918aaf02`
 Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T221113Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
 This ledger records only evidence-backed issues. Rows marked `candidate` are not treated as verified defects until a failing test, runtime reproduction, or direct code path proves the behavior.
@@ -123,6 +123,15 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > storage boundary docs now reflect the current mapper/migration/health
 > split. `--run-postgres` storage suites pass with 77 passed. (open
 > verified 2 → 1; fixed 33 → 34).
+>
+> Updated 2026-06-24 load-alert reproducibility pass:
+> restored `scripts/run_load_test.py`, added JSON artifact support and
+> unit tests, replaced the corrupt `artifacts/load_test/latest_run.json`
+> with valid machine-readable output, and tightened
+> `scripts/smoke_prod_stack.sh` so local production smoke checks
+> Alertmanager readiness in addition to Prometheus/Grafana. The issue
+> remains open/deferred because real staging alert delivery still needs
+> a configured on-call destination.
 
 
 ## Verified Issues
@@ -486,14 +495,14 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **category:** ops_readiness / load_tests_alerting
 - **file_path:** `artifacts/audit/OPS_READINESS_REVIEW.md`, `docs/OPS_READINESS_CHECKLIST.md`
 - **line/function:** load tests and alert delivery
-- **evidence:** Prompt 7 ops review marks load testing as missing and alert delivery as unverified. Monitoring/alert configs and incident docs exist, but no current load-test or alert-delivery proof was found.
+- **evidence:** Prompt 7 ops review marked load testing as missing and alert delivery as unverified. Local load-test evidence now exists and is reproducible with `scripts/run_load_test.py`; staging alert delivery remains unverified.
 - **why_it_matters:** Scraper workloads can exhaust browser, queue, storage, or target-domain budgets under load.
 - **impact:** Production incidents may not alert operators or may appear only after user-facing degradation.
 - **recommended_fix:** Add bounded load tests and a staging alert-delivery drill with documented thresholds and recipients.
 - **tests_needed:** Load test for job creation/queue/browser caps; alert test for worker heartbeat, failed-job rate, auth failures, and quota denials.
 - **acceptance_criteria:** Load and alert drill artifacts exist and are linked from ops readiness docs.
 - **blocked_by:** Staging environment and alert destination.
-- **notes:** No product behavior was changed in Prompt 7. Session 4 follow-up (2026-06-22): `python3 scripts/run_load_test.py --requests 100 --concurrency 10` ran against local `/health`: 100/100 success, 348 RPS, p50 12ms, p95 74ms, p99 127ms, 0 failures. Evidence recorded in `artifacts/load_test/latest_run.txt`. Load test tooling is ready; alert delivery drill remains blocked by staging environment.
+- **notes:** No product behavior was changed in Prompt 7. Session 4 follow-up (2026-06-22): `python3 scripts/run_load_test.py --requests 100 --concurrency 10` ran against local `/health`: 100/100 success, 348 RPS, p50 12ms, p95 74ms, p99 127ms, 0 failures. 2026-06-24 reproducibility pass restored the deleted load runner, added `--json` / `--json-file`, regenerated `artifacts/load_test/latest_run.json` as valid JSON, and reran local `/health`: 100/100 success, 340.26 RPS, p50 12.59ms, p95 73.62ms, p99 127.57ms, 0 failures. `scripts/smoke_prod_stack.sh` now requires Alertmanager to be running and checks Prometheus readiness/rules, Grafana health, and Alertmanager readiness. Alert delivery drill remains blocked by staging environment and a real destination.
 
 ### P1-COMPLIANCE-RETENTION-001
 

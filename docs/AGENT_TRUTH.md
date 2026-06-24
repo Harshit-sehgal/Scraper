@@ -3085,3 +3085,60 @@ Addressed storage boundary risks by isolating database schema management, migrat
 | `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick validation checks passed. |
 | `python3 -m pytest backend/tests/test_storage_endpoints.py -q` | 0 | PASS; 24 test cases passed successfully. |
 | `python3 scripts/validate_local.py --full` | 0 | PASS; 23/23 full validation checks passed (including backend_full_tests 321.54s, frontend_tests, pip_audit, code quality lints, type checks, styling lints). Run ID: `20260624T003814Z_full`. |
+
+## 2026-06-24 — Load-Test Reproducibility and Alert Smoke Coverage (P1-OPS-LOAD-ALERT-001)
+
+Scope: repair the evidence chain for the only remaining open
+verified/deferred issue. Current checkout showed three concrete
+problems: `docs/OPS_READINESS_CHECKLIST.md` still marked load testing
+as missing, `artifacts/load_test/latest_run.json` contained an argparse
+error instead of JSON, and the referenced `scripts/run_load_test.py`
+had been deleted. The production smoke script also reported monitoring
+OK without checking Alertmanager.
+
+### Files Changed
+
+- `scripts/run_load_test.py` — restored as a bounded HTTP load runner
+  with `--json` and `--json-file` support.
+- `backend/tests/test_run_load_test.py` — added unit tests for
+  percentile math, validation gates, and header parsing.
+- `artifacts/load_test/latest_run.txt` and
+  `artifacts/load_test/latest_run.json` — regenerated from a real
+  local `/health` run.
+- `scripts/smoke_prod_stack.sh` — now requires Alertmanager to be
+  running and checks Prometheus readiness/rules, Grafana health, and
+  Alertmanager readiness.
+- `docs/OPS_READINESS_CHECKLIST.md`, `docs/PRODUCTION.md`,
+  `AGENTS.md`, `artifacts/audit/ISSUE_LEDGER.md`, and
+  `artifacts/audit/FILE_INVENTORY.md` — updated to match current
+  evidence.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 displayed quick checks passed. |
+| `python3 -m pytest backend/tests/test_run_load_test.py -q -o addopts=` | 0 | PASS; 5 passed. |
+| `python3 -m pytest backend/tests/test_run_load_test.py backend/tests/test_health_smoke.py -q -o addopts=` | 0 | PASS; 10 passed. |
+| `python3 -m ruff check scripts/run_load_test.py backend/tests/test_run_load_test.py` | 0 | PASS. |
+| `python3 -m ruff format --check scripts/run_load_test.py backend/tests/test_run_load_test.py` | 0 | PASS; 2 files already formatted. |
+| `bash -n scripts/smoke_prod_stack.sh` | 0 | PASS; shell syntax valid after adding monitoring checks. |
+| `python3 scripts/run_load_test.py --url http://localhost:8000/health --requests 100 --concurrency 10 --json-file artifacts/load_test/latest_run.json > artifacts/load_test/latest_run.txt` | 0 | PASS; 100/100 successful requests, 0 failures, 340.26 RPS, p50 12.59ms, p95 73.62ms, p99 127.57ms. |
+| `python3 -m json.tool artifacts/load_test/latest_run.json` | 0 | PASS; regenerated artifact is valid JSON. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; file inventory now includes the restored runner and its test. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after edits; 12/12 displayed quick checks passed. |
+| `python3 scripts/validate_local.py --full` | 1 | RED intermediate run `20260624T085650Z_full`; only `mypy` failed because `backend/tests/test_run_load_test.py` used a loose `**dict[str, object]` helper against `LoadTestConfig`. Backend full tests and every later security/frontend check passed in that run. |
+| `/usr/bin/python3 -m mypy backend` | 0 | PASS after replacing the test helper with typed parameters; 548 source files checked. |
+| `python3 -m mypy --explicit-package-bases scripts/run_load_test.py` | 0 | PASS; load runner type-checks directly. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS full run `20260624T090327Z_full`; archived summary reports `passed: 24`, `failed: 0`, `skipped: 0`, `timed_out: 0`. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after the truth-log update; 12/12 displayed quick checks passed. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS after the truth-log update; routes and environment variables match docs. |
+| `git diff --check` | 0 | PASS after the truth-log update; no whitespace errors. |
+
+### Current Status
+
+The local load-test portion of `P1-OPS-LOAD-ALERT-001` is now
+reproducible from tracked code and valid artifacts. The issue remains
+open/deferred because real staging alert delivery still requires a
+configured staging environment and on-call destination.

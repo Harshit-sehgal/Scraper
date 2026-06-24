@@ -15,9 +15,9 @@ Status values: ready, partial, missing, unverified.
 | Backup | partial | `scripts/backup_postgres.sh` | Schedule backup and verify artifact integrity |
 | Restore | partial | `scripts/restore_postgres.sh` | Complete restore drill on disposable DB |
 | Logs | partial | audit logger and Docker log rotation | Centralize logs and retention policy |
-| Metrics | partial | metrics endpoint and Prometheus config | Prove scrape auth and dashboard data |
-| Alerts | unverified | alert docs/configs exist | Deliver test alert to real on-call channel |
-| Load testing | missing | no verified Prompt 7 load test | Add bounded load test and target thresholds |
+| Metrics | partial | metrics endpoint and Prometheus config | Prove scrape auth and dashboard data in staging |
+| Alerts | unverified | alert docs/configs exist; `scripts/smoke_prod_stack.sh` now checks local Alertmanager readiness | Deliver test alert to real on-call channel |
+| Load testing | partial | `scripts/run_load_test.py`; `artifacts/load_test/latest_run.txt`; `artifacts/load_test/latest_run.json` | Run bounded load tests against staging job creation, queue, and browser paths |
 | Incident runbook | partial | `docs/INCIDENT_RUNBOOK.md` | Replace placeholder contacts and rehearse |
 | Playwright runtime | partial | Chromium installed in image | Verify launch and cleanup under worker load |
 | Data retention | partial | recycle/bin delete paths exist | Document retention and hard-delete policy |

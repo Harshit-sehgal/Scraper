@@ -183,6 +183,7 @@ are proven in the current checkout and target environment.
 | 75 | Final validation pass: 12/12 quick validation green, full backend suite unchanged; auto-regenerated `docs/API_*.md` timestamps refreshed; `ISSUE_LEDGER.md` Date header updated to the 2026-06-24 observability-metrics commit baseline | ✅ Done |
 | 76 | Close `P1-BENCHMARK-BASELINE-001` for deterministic local corpus: versioned expected outputs, per-case thresholds, precision/recall/F1, duplicate/type/runtime/timeout/browser-failure metrics, and negative-page false-success prevention; smoke now writes `latest_local_corpus.*` | ✅ Done |
 | 77 | Close `P1-ARCH-STORAGE-001`: fresh `--run-postgres` storage suites exposed and fixed Postgres soft-delete restore parity; storage boundary docs now match mapper/migration/health split; 77 optional Postgres storage tests pass | ✅ Done |
+| 78 | Restore reproducible load-test tooling: `scripts/run_load_test.py` is back with JSON artifact support and unit tests; corrupt `artifacts/load_test/latest_run.json` replaced with valid output; production smoke now checks Alertmanager readiness instead of only Prometheus/Grafana | ✅ Done |
 
 ## Active Risks
 
@@ -192,7 +193,7 @@ are proven in the current checkout and target environment.
 
 | ID | Category | Summary |
 |----|----------|---------|
-| P1-OPS-LOAD-ALERT-001 | Ops | Load tests (RPS 348, p95 74ms proven); alert delivery proof blocked by staging |
+| P1-OPS-LOAD-ALERT-001 | Ops | Local load runner/artifacts are reproducible (100/100, p95 73.62ms); alert delivery proof blocked by staging |
 
 ## Recently Resolved Risks
 

@@ -4,16 +4,16 @@ Concurrency: 10 workers | Total requests: 100
 ======================================================================
 
 Performance metrics:
-  Total time elapsed:  0.287 seconds
+  Total time elapsed:  0.294 seconds
   Successful requests: 100/100 (0 failures)
-  Requests/sec (RPS):  348.14
-  Minimum latency:     7.06 ms
-  Average latency:     18.10 ms
-  p50 (median):        11.97 ms
-  p90:                 17.10 ms
-  p95:                 73.71 ms
-  p99:                 126.71 ms
-  Maximum latency:     142.04 ms
+  Requests/sec (RPS):  340.26
+  Minimum latency:     6.42 ms
+  Average latency:     18.61 ms
+  p50 (median):        12.59 ms
+  p90:                 15.10 ms
+  p95:                 73.62 ms
+  p99:                 127.57 ms
+  Maximum latency:     142.84 ms
 
 Validation Gate Status:
   [OK] Load test validation threshold passed successfully.

@@ -164,7 +164,7 @@ echo -e "  $INFO  Waiting for services to start (30s)..."
 sleep 30
 
 # Check all containers are running (including monitoring services)
-for svc in dataforge worker postgres nginx prometheus grafana; do
+for svc in dataforge worker postgres nginx prometheus grafana alertmanager; do
     if "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml ps "$svc" --format json 2>/dev/null | grep -q '"State":"running"'; then
         echo -e "  $PASS  $svc is running"
     else
@@ -297,9 +297,63 @@ if [ -n "$JOB_ID" ]; then
     fi
 fi
 
-# ───── Step 10: Check worker logs ──────────────────────────────────────────
+# ───── Step 10: Monitoring runtime checks ─────────────────────────────────
 echo ""
-echo "─── Step 10: Worker logs (last 20 lines) ──────────────────────────────"
+echo "─── Step 10: Monitoring runtime checks ───────────────────────────────"
+
+_internal_get() {
+    local url="$1"
+    "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml exec -T dataforge python3 - "$url" <<'PY'
+import json
+import sys
+import urllib.request
+
+url = sys.argv[1]
+try:
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        body = resp.read(500_000).decode("utf-8", errors="replace")
+        print(json.dumps({"status": resp.status, "body": body}))
+except Exception as exc:
+    print(json.dumps({"status": 0, "body": str(exc)}))
+    raise SystemExit(1)
+PY
+}
+
+PROM_READY=$(_internal_get "http://prometheus:9090/-/ready" 2>/dev/null || true)
+if echo "$PROM_READY" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('status') == 200" 2>/dev/null; then
+    echo -e "  $PASS  Prometheus readiness endpoint is reachable"
+else
+    echo -e "  $FAIL  Prometheus readiness check failed: $PROM_READY"
+    ALL_PASS=false
+fi
+
+PROM_RULES=$(_internal_get "http://prometheus:9090/api/v1/rules" 2>/dev/null || true)
+if echo "$PROM_RULES" | python3 -c "import json,sys; d=json.load(sys.stdin); body=json.loads(d['body']); rules=sum(len(g.get('rules', [])) for g in body.get('data', {}).get('groups', [])); assert d.get('status') == 200 and body.get('status') == 'success' and rules >= 10" 2>/dev/null; then
+    echo -e "  $PASS  Prometheus alert rules are loaded"
+else
+    echo -e "  $FAIL  Prometheus alert rules check failed: $PROM_RULES"
+    ALL_PASS=false
+fi
+
+GRAFANA_HEALTH=$(_internal_get "http://grafana:3000/api/health" 2>/dev/null || true)
+if echo "$GRAFANA_HEALTH" | python3 -c "import json,sys; d=json.load(sys.stdin); body=json.loads(d['body']); assert d.get('status') == 200 and body.get('database') == 'ok'" 2>/dev/null; then
+    echo -e "  $PASS  Grafana health endpoint reports database ok"
+else
+    echo -e "  $FAIL  Grafana health check failed: $GRAFANA_HEALTH"
+    ALL_PASS=false
+fi
+
+ALERT_READY=$(_internal_get "http://alertmanager:9093/-/ready" 2>/dev/null || true)
+if echo "$ALERT_READY" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('status') == 200" 2>/dev/null; then
+    echo -e "  $PASS  Alertmanager readiness endpoint is reachable"
+else
+    echo -e "  $FAIL  Alertmanager readiness check failed: $ALERT_READY"
+    ALL_PASS=false
+fi
+
+# ───── Step 11: Check worker logs ──────────────────────────────────────────
+echo ""
+echo "─── Step 11: Worker logs (last 20 lines) ──────────────────────────────"
 
 "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
 
@@ -316,6 +370,7 @@ if [ "$ALL_PASS" = true ]; then
     echo "    - PostgreSQL: OK"
     echo "    - Prometheus: OK"
     echo "    - Grafana: OK"
+    echo "    - Alertmanager: OK"
     echo "======================================================================"
     exit 0
 else

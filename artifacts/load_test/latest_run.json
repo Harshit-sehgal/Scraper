@@ -1,3 +1,23 @@
-usage: run_load_test.py [-h] [--url URL] [--concurrency CONCURRENCY]
-                        [--requests REQUESTS]
-run_load_test.py: error: unrecognized arguments: --json
+{
+  "average_latency_ms": 18.61,
+  "completed": 100,
+  "concurrency": 10,
+  "expected_status": 200,
+  "failure_reason": "",
+  "failures": 0,
+  "generated_at": "2026-06-24T08:53:59.288099+00:00",
+  "max_failures": 0,
+  "max_latency_ms": 142.84,
+  "min_latency_ms": 6.42,
+  "p50_latency_ms": 12.59,
+  "p90_latency_ms": 15.1,
+  "p95_latency_ms": 73.62,
+  "p95_threshold_ms": 250.0,
+  "p99_latency_ms": 127.57,
+  "passed": true,
+  "requested": 100,
+  "requests_per_second": 340.26,
+  "successful": 100,
+  "target_url": "http://localhost:8000/health",
+  "total_elapsed_seconds": 0.293889
+}
