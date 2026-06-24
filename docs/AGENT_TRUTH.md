@@ -1,15 +1,16 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-24 local time from the working tree.
-Last verified: foundation audit and audit-ledger cleanup. Full
-validation is green with all validation steps passing, including
-backend full tests, ruff, pyflakes, mypy, bandit, pip_audit, npm ci,
-frontend tests, prettier, stylelint, and ESLint. Current route
-inventory is 161 routes (126 stable + 35 experimental); route auth
-matrix has 150 API rows with `unknown_auth=0` and `unknown_tenant=0`.
-The regenerated file inventory lists 24,129 files, 938 project-owned
-files, 934 deeply inspected project-owned files, and 0 file-ledger
-follow-up rows._
+Last verified: load-alert reproducibility and remote-branch merge audit.
+Archived full validation is green (`20260624T090327Z_full`) with all
+24 validation checks passing, including backend full tests, ruff,
+pyflakes, mypy, bandit, pip_audit, npm ci, frontend tests, frontend JS
+lint, and frontend CSS lint. The latest quick validation is also green
+(`20260624T130513Z_quick`). Current route inventory is 161 routes;
+route auth matrix has 150 API rows with `unknown_auth=0` and
+`unknown_tenant=0`. The regenerated file inventory lists 25,770 files,
+946 project-owned files, 942 deeply inspected project-owned files, and
+0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
@@ -3142,3 +3143,68 @@ The local load-test portion of `P1-OPS-LOAD-ALERT-001` is now
 reproducible from tracked code and valid artifacts. The issue remains
 open/deferred because real staging alert delivery still requires a
 configured staging environment and on-call destination.
+
+## 2026-06-24 — Remote Branch Merge Audit
+
+Scope: verify the "fully merged" state from current remote refs after
+`git fetch --prune origin`, without assuming older branch names or
+status docs are accurate.
+
+### Current Git State
+
+- Local working tree is clean.
+- Local `main` is ahead of `origin/main` by 3 commits:
+  `d33e4f9b` (benchmark baseline), `918aaf02` (Postgres soft-delete
+  restore parity), and `ef2d89e3` (load-alert reproducibility).
+- `git push -u origin main` was attempted after `ef2d89e3` and failed
+  because the environment has no GitHub HTTPS credentials:
+  `fatal: could not read Username for 'https://github.com': No such device or address`.
+
+### Remote Branch Findings
+
+| Branch | Ahead/behind vs `main` | Patch-equivalent vs non-equivalent | Direct merge simulation |
+| --- | ---: | ---: | --- |
+| `origin/codex/codebase-green-validation-20260618` | 306 ahead / 380 behind | 278 equivalent / 27 non-equivalent | `git merge-tree --write-tree main origin/codex/codebase-green-validation-20260618` exited 1 |
+| `origin/frontend-foundation` | 313 ahead / 380 behind | 283 equivalent / 29 non-equivalent | `git merge-tree --write-tree main origin/frontend-foundation` exited 1 |
+| `origin/stabilize/phase-0-truth` | 246 ahead / 381 behind | 244 equivalent / 2 non-equivalent | `git merge-tree --write-tree main origin/stabilize/phase-0-truth` exited 1 |
+
+Direct diffs are too large and stale for a safe wholesale merge:
+
+- `origin/codex/codebase-green-validation-20260618`: 4,456 files
+  changed versus `main`, including 4,104 under `artifacts/`; non-artifact
+  diff still touches 352 files. It would re-add historical files such as
+  `PROJECT_STATUS.md`, `CODE_REVIEW_BUGS.md`, `CODE_SCAN_RESULTS.md`,
+  and `Instructions_for_ai/`, and it conflicts with current
+  `AGENTS.md`, audit artifacts, route artifacts, and backend files.
+- `origin/frontend-foundation`: 761 files changed versus `main`,
+  including 498 under `artifacts/`; non-artifact diff still touches 263
+  files. It would re-add deleted research/test files and delete current
+  benchmark fixtures/tests such as the local corpus baseline.
+- `origin/stabilize/phase-0-truth`: 690 files changed versus `main`
+  and the non-artifact diff touches 638 files. It would delete current
+  files including `AGENTS.md`, `docs/AGENT_TRUTH.md`,
+  `scripts/run_load_test.py`, and `backend/tests/test_run_load_test.py`.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `git fetch --prune origin` | 0 | PASS; remote refs refreshed. |
+| `git status --short --branch` | 0 | `## main...origin/main [ahead 3]`; no dirty files before this truth-log update. |
+| `git branch -r --no-merged main` | 0 | Three refs remain: `origin/codex/codebase-green-validation-20260618`, `origin/frontend-foundation`, `origin/stabilize/phase-0-truth`. |
+| `git rev-list --count main..<branch>` / `<branch>..main` | 0 | Counts shown in the table above. |
+| `git cherry main <branch>` | 0 | Most branch commits are patch-equivalent to current `main`; non-equivalent counts shown above. |
+| `git diff --shortstat main..<branch>` | 0 | Large stale diffs: 4,456 files / 761 files / 690 files respectively. |
+| `git merge-tree --write-tree main <branch>` | 1 | All three direct merge simulations reported conflicts without modifying the working tree. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS after this audit update; regenerated file inventory lists 25,770 files, 946 project-owned files, 942 deeply inspected project-owned files, and 0 follow-up rows. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS after this audit update; routes and environment variables match docs. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after this audit update; run id `20260624T130513Z_quick`, 13 passed, 0 failed. |
+| `git diff --check` | 0 | PASS after this audit update; no whitespace errors. |
+
+### Current Status
+
+Do not merge these remote branches wholesale. The safe path is to push
+the current clean `main` once credentials are available, then either
+delete those stale remote refs after human confirmation or cherry-pick
+specific still-wanted commits into fresh topic branches with targeted
+tests.

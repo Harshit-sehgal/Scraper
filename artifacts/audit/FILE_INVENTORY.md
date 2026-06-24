@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-24T08:55:28+00:00 from `24952` files in the current checkout._
+_Generated: 2026-06-24T13:04:41+00:00 from `25770` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,10 +12,10 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 24952 |
+| Total files inventoried | 25770 |
 | Project-owned files | 946 |
 | Project-owned files deeply inspected | 942 |
-| Skipped generated/vendor/binary/cache/log/archive files | 24010 |
+| Skipped generated/vendor/binary/cache/log/archive files | 24828 |
 | Files needing follow-up | 0 |
 
 ## By Classification
@@ -33,10 +33,10 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | asset | 0 | 0 | 0 | 0 |
 | generated | 91 | 0 | 0 | 91 |
 | vendor | 15988 | 0 | 0 | 15988 |
-| cache | 4708 | 0 | 0 | 4708 |
+| cache | 5444 | 0 | 0 | 5444 |
 | binary | 38 | 0 | 0 | 38 |
 | archive | 1 | 0 | 0 | 1 |
-| log | 3180 | 0 | 0 | 3180 |
+| log | 3262 | 0 | 0 | 3262 |
 | unknown | 0 | 0 | 0 | 0 |
 
 ## Top-Level Counts
@@ -45,11 +45,11 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | --- | ---: |
 | `.venv/` | 9847 |
 | `node_modules/` | 6140 |
-| `artifacts/` | 3240 |
-| `backend/` | 1556 |
+| `artifacts/` | 3322 |
+| `.git/` | 1646 |
+| `backend/` | 1557 |
 | `.mypy_cache/` | 1459 |
 | `.ruff_cache/` | 1438 |
-| `.git/` | 911 |
 | `frontend/` | 115 |
 | `docs/` | 90 |
 | `scripts/` | 77 |
@@ -104,13 +104,13 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | Extension | Files |
 | --- | ---: |
 | `.py` | 6833 |
-| `.md` | 3537 |
-| `(none)` | 3447 |
+| `(none)` | 4182 |
+| `.md` | 3615 |
 | `.js` | 2744 |
-| `.json` | 2070 |
+| `.json` | 2074 |
 | `.pyi` | 1217 |
 | `.ts` | 888 |
-| `.pyc` | 878 |
+| `.pyc` | 879 |
 | `.cjs` | 534 |
 | `.mjs` | 454 |
 | `.so` | 385 |
