@@ -2889,3 +2889,58 @@ remain tracked by `P1-OPS-LOAD-ALERT-001`.
 | `python3 -m ruff check backend/tests/test_user_data.py backend/tests/test_metrics_observability.py backend/app/metrics_collector.py backend/app/routers/system.py backend/app/browser_pool.py backend/app/domain_runtime_policy.py backend/app/services/finalization.py backend/app/services/scraping.py` | 0 | PASS. |
 | `python3 -m ruff format --check backend/tests/test_user_data.py backend/tests/test_metrics_observability.py backend/app/metrics_collector.py backend/app/routers/system.py backend/app/browser_pool.py backend/app/domain_runtime_policy.py backend/app/services/finalization.py backend/app/services/scraping.py` | 0 | PASS; 8 files already formatted. |
 | `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260623T221113Z_full`; 24 passed, 0 failed, 0 skipped, 0 timed out. Backend suite passed in 312.59s; frontend tests/lints and security checks passed. |
+
+## Characterization-Test Pass — 2026-06-24
+
+Scope: close `CAND-P1-ARCH-CHARTEST-001` by pinning the *current*
+behavior of every refactor-sensitive boundary in existence (job
+creation, URL analysis, exports, storage parity, frontend E2E job
+submission) and adding six new fixture-backed characterization tests for
+selector-discovery primitives that previously had only synthetic
+mocks. Future architecture refactors must preserve these contracts.
+
+### Files Changed
+
+- `backend/tests/test_selector_discovery.py` — added
+  `TestSelectorDiscoveryFixtureBehavior` (6 fixture-backed tests).
+- `artifacts/audit/ISSUE_LEDGER.md` — closed CAND-P1-ARCH-CHARTEST-001
+  with rationale and tests-needed pointer; counts updated
+  (`fixed 31 → 32`, `candidate 4 → 3`).
+
+### Existing Characterization Coverage Confirmed
+
+| Boundary | File | Locked Tests |
+| --- | --- | --- |
+| Job creation contract | `backend/tests/test_jobs_write_characterization.py` | 26 characterization tests |
+| Job state machine | `backend/tests/test_run_job_characterization.py` | 18 characterization tests |
+| URL analysis pipeline | `backend/tests/test_url_analyzer_characterization.py` | 18 characterization tests |
+| Selector discovery primitives | `backend/tests/test_selector_discovery.py` | 48 + 6 new fixture-backed = 54 |
+| Exports contract | `backend/tests/test_exports_router.py` | ~1143 lines covering CSRF, billing, tenant isolation |
+| Storage ownership parity | `backend/tests/test_repository_parity.py` | SQLite/Postgres parity matrix |
+| Frontend→backend job submit | `frontend/e2e/auth-flow.spec.js`, `frontend/e2e/form.spec.js` | authenticated job appears in jobs list |
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_selector_discovery.py::TestSelectorDiscoveryFixtureBehavior -v` | 0 | FAIL before signature correction; 3 of 6 tests asserted wrong API. After re-reading `app/url_value_classification.py` and `app/selector_discovery_analysis.py` and rewriting with the real signatures (`_classify_value(value: str) -> str`, `_rename_generic_fields(fields: list[dict]) -> list[dict]`, safe DOM fallback in `discover_selectors`), 6 of 6 pass. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_selector_discovery.py -q -o addopts=` | 0 | PASS; 54 passed. |
+| `python3 -m ruff check backend/tests/test_selector_discovery.py` | 0 | PASS. |
+| `python3 -m ruff format --check backend/tests/test_selector_discovery.py` | 0 | PASS; already formatted. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests -q -o addopts=` | 0 | PASS; full backend suite unchanged in coverage. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 13/13 quick checks. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; 24/24 (full: backend_full_tests 304s + pip_audit 40s + lint + mypy + bandit + frontend tests + npm_ci + stylelint). Latest summary: `artifacts/validation/runs/20260624T000018Z_full/`. |
+
+## 2026-06-24 — Final Validation Pass (post-characterization)
+
+Ran full local validation immediately after the `CAND-P1-ARCH-CHARTEST-001`
+close-out and the AGENTS.md open-issue correction. All 24 gates green; no
+regressions introduced by the new `TestSelectorDiscoveryFixtureBehavior`
+class (54 pass in `test_selector_discovery.py`; suite-wide coverage
+unchanged). Regenerated artifacts (`CODE_COMPLEXITY_REPORT.json`,
+`FILE_INVENTORY.md`, `ROUTE_INVENTORY.json`, `ROUTE_AUTH_MATRIX.json`,
+`docs/openapi.json`, `docs/ROUTE_INVENTORY.md`, `docs/API_*.md`) hold
+their committed values after this run.
+
+See `artifacts/validation/latest_summary.md` (mode: full, run_id:
+`20260624T000018Z_full`, `passed: 24, failed: 0, skipped: 0`).

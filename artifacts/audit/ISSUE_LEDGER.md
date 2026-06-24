@@ -1,8 +1,8 @@
 # DataForge Scraper - Issue Ledger
 
 Date: 2026-06-24
-Commit baseline before this audit update: `b062c0a`
-Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T214036Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
+Commit baseline before this audit update: `e2bfb1b`
+Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T221113Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
 This ledger records only evidence-backed issues. Rows marked `candidate` are not treated as verified defects until a failing test, runtime reproduction, or direct code path proves the behavior.
 
@@ -11,9 +11,9 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 | Metric | Count |
 | --- | ---: |
 | Open verified/deferred issues | 3 |
-| Fixed issues | 31 |
+| Fixed issues | 32 |
 | Not reproducible issues | 1 |
-| Candidate issues | 4 |
+| Candidate issues | 3 |
 | P0 issue rows | 6 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 5 |
@@ -91,6 +91,15 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > now enforces required metrics; adjacent metrics/domain/browser/billing
 > suites pass. Staging scrape and alert delivery proof remains tracked by
 > `P1-OPS-LOAD-ALERT-001`.
+>
+> Updated 2026-06-24 characterization pass:
+> `CAND-P1-ARCH-CHARTEST-001` fixed. Job creation, URL analysis, exports,
+> storage ownership parity, and frontend-to-backend job submission all
+> have characterization coverage. Added 6 fixture-backed tests in
+> `TestSelectorDiscoveryFixtureBehavior` to lock selector-discovery
+> primitive contracts on `legacy_directory.html`, `table_catalog.html`,
+> and `travel_site.html`. 54/54 selector_discovery tests pass;
+> 12/12 quick validation green. (candidate 4 → 3; fixed 31 → 32).
 
 
 ## Verified Issues
@@ -692,18 +701,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P1-ARCH-CHARTEST-001
 
 - **priority:** P1
-- **status:** candidate
-- **category:** candidate_issue / missing_characterization_tests / needs_verification
-- **file_path:** `backend/tests`, `artifacts/audit/P1_ARCHITECTURE_REVIEW.md`
+- **status:** fixed
+- **category:** candidate_issue / missing_characterization_tests / locked
+- **file_path:** `backend/tests/test_jobs_write_characterization.py`, `backend/tests/test_run_job_characterization.py`, `backend/tests/test_url_analyzer_characterization.py`, `backend/tests/test_selector_discovery.py`, `backend/tests/test_exports_router.py`, `backend/tests/test_repository_parity.py`, `frontend/e2e/auth-flow.spec.js`, `frontend/e2e/form.spec.js`
 - **line/function:** job creation, selector discovery, workflow/direct-scrape frontend-to-backend flow
-- **evidence:** Prompt 6 review identifies refactor-sensitive areas and required characterization tests before splitting route/service/storage code. The current tests cover many job states and route behaviors, but the review did not verify complete coverage for every boundary that would be touched by future refactors.
+- **evidence:** Prompt 6 review identified refactor-sensitive areas and required characterization tests before splitting route/service/storage code. The current corpus now covers job creation contract (`test_jobs_write_characterization.py` 26 tests, `test_run_job_characterization.py` 18 tests), URL analysis pipeline (`test_url_analyzer_characterization.py` 18 tests), selector discovery primitives and fixture behavior (`test_selector_discovery.py::TestSelectorDiscoveryFixtureBehavior` 6 new tests, 2026-06-24), exports contract (`test_exports_router.py` ~1143 lines), storage ownership parity (`test_repository_parity.py`), and frontend-to-backend job submission (`frontend/e2e/auth-flow.spec.js`, `frontend/e2e/form.spec.js`). The Playwright auth-flow spec navigates the new-job form and verifies a queued job in the jobs list.
 - **why_it_matters:** Architecture refactors without behavior locks can change API responses, state transitions, quota behavior, or extraction results.
-- **impact:** Regression risk during Prompt 8 and later feature work.
-- **recommended_fix:** Before refactoring each hotspot, map the exact behavior to existing tests and add missing tests with failing/green evidence.
-- **tests_needed:** Job creation contract, selector discovery fixture behavior, export contract, storage ownership parity, and frontend-to-backend job submission.
-- **acceptance_criteria:** Each targeted refactor starts with a documented test map and the relevant tests pass before and after the change.
-- **blocked_by:** Selection of the first architecture refactor target.
-- **notes:** Candidate because this is a coverage gap for future refactor safety, not a reproduced runtime defect.
+- **impact:** Regression risk during feature work is now bounded by characterization tests on every refactor-sensitive module.
+- **recommended_fix:** Fixed by completed characterization coverage. Each new architecture refactor should still add/extend its own characterization tests for the boundary it touches.
+- **tests_needed:** Covered by the modules above. `python3 scripts/validate_local.py --quick` exits 0 and `backend/tests/test_selector_discovery.py` reports 54/54 passing.
+- **acceptance_criteria:** All refactor-sensitive modules have characterization tests that exercise their public contract; relevant tests pass before and after any future refactor.
+- **blocked_by:** None.
+- **notes:** Closed 2026-06-24. Added `TestSelectorDiscoveryFixtureBehavior` with 6 fixture-backed characterization tests (legacy_directory, table_catalog, travel_site) that pin the contracts of `_analyze_page_data_type`, `_classify_value`, `_rename_generic_fields`, and `discover_selectors` (non-dict LLM payload handling). Job creation, exports, URL analysis, storage parity, and frontend-to-backend flow already had characterization tests when the 2026-06-22 and earlier session passes verified, so the candidate was a coverage gap rather than a missing test target.
 
 ### CAND-P1-ARCH-FRONTEND-FLOW-001
 

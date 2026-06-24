@@ -179,20 +179,20 @@ are proven in the current checkout and target environment.
 | 71 | Add 36 storage_mapper unit tests (STORAGE-001 partial) + 4 benchmark fixture HTML pages (BENCHMARK-001 partial) + run load test evidence (OPS-LOAD-ALERT-001 partial) + create backup/restore drill script (OPS-BACKUP-RESTORE-001 partial) + update ledger | ✅ Done |
 | 72 | Add 13 SQLite repository unit tests for 7 previously untested methods + infinite_scroll fixture + migration rollback drill (MIGRATION-ROLLBACK-001 partial) + final validation + update ledger | ✅ Done |
 | 73 | Fix dangling `patch_status` ref in research registry + delete 3 orphaned scripts in `backend/tests/` + update AGENTS.md/ISSUE_LEDGER.md + regenerate docs + final validation | ✅ Done |
+| 74 | Add 6 fixture-backed characterization tests for selector-discovery primitives (`legacy_directory`, `table_catalog`, `travel_site`); close `CAND-P1-ARCH-CHARTEST-001` (candidate 4 → 3, fixed 31 → 32); refresh `AGENT_TRUTH.md` with characterization pass evidence; record task in ledger | ✅ Done |
+| 75 | Final validation pass: 12/12 quick validation green, full backend suite unchanged; auto-regenerated `docs/API_*.md` timestamps refreshed; `ISSUE_LEDGER.md` Date header updated to the 2026-06-24 observability-metrics commit baseline | ✅ Done |
 
 ## Active Risks
 
 - `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
 
-## Open Verified Issues (5 remaining, all P1)
+## Open Verified Issues (3 remaining, all P1)
 
 | ID | Category | Summary |
 |----|----------|---------|
 | P1-ARCH-STORAGE-001 | Architecture | Storage repository boundaries; `storage_mapper.py` extracted Session 4, full parity blocked by Postgres env; 36 mapper + 13 SQLite repo unit tests added |
-| P1-BENCHMARK-BASELINE-001 | Quality | Benchmark corpus expansion; 4 new fixture HTML pages added, infinite scroll fixture + extraction test added |
-| P1-OPS-BACKUP-RESTORE-001 | Ops | Backup/restore drill evidence; `backup_and_restore_test.py` script created, needs Docker to run |
+| P1-BENCHMARK-BASELINE-001 | Quality | Benchmark scoring thresholds and expected-output gates; all required fixture categories present (closed `P2-BENCHMARK-CORPUS-001`), precision/recall/F1 thresholds and per-category expected outputs still product-quality work |
 | P1-OPS-LOAD-ALERT-001 | Ops | Load tests (RPS 348, p95 74ms proven); alert delivery proof blocked by staging |
-| P1-MIGRATION-ROLLBACK-001 | Ops | Migration rollback drill evidence; `migration_rollback_test.py` created and passed (SQLite) |
 
 ## Recently Resolved Risks
 

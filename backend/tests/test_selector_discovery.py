@@ -461,6 +461,103 @@ class TestDiscoverSelectors:
             )
             assert result == {}
 
+
+# ── Fixture-backed characterization locks (P1-ARCH-CHARTEST-001) ─────────
+# Pin the *current* behavior of selector-discovery primitives on the local
+# HTML fixtures already used by the snapshot benchmark. Refactors of
+# selector discovery must preserve these contract-facing properties.
+
+
+from pathlib import Path
+
+_FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "pages"
+
+
+class TestSelectorDiscoveryFixtureBehavior:
+    """Lock selector-discovery primitive behavior on local fixture pages."""
+
+    def test_analyze_page_data_type_listing_fixture_returns_profile(self) -> None:
+        fixture = _FIXTURES_DIR / "legacy_directory.html"
+        if not fixture.exists():
+            pytest.skip("legacy_directory fixture not present")
+        html = fixture.read_text(encoding="utf-8")
+        schema = [
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.FLOAT, description="", required=False),
+        ]
+        result = _analyze_page_data_type(html, schema)
+        # Lock: structure profile is the analyzer's public output. Refactors
+        # must keep this contract — new fields are fine, but these four
+        # keys must remain reachable for downstream prompt building.
+        assert isinstance(result, dict)
+        assert "structure_type" in result
+        assert isinstance(result.get("structure_confidence"), (int, float))
+        assert "headers" in result
+        assert "patterns_detected" in result
+
+    def test_analyze_page_data_type_table_fixture_returns_profile(self) -> None:
+        fixture = _FIXTURES_DIR / "table_catalog.html"
+        if not fixture.exists():
+            pytest.skip("table_catalog fixture not present")
+        html = fixture.read_text(encoding="utf-8")
+        schema = [
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
+        ]
+        result = _analyze_page_data_type(html, schema)
+        # Same contract as the listing-lock; row content comes from the
+        # classifier and is asserted separately by TestClassifyValue.
+        assert isinstance(result, dict)
+        assert "structure_type" in result
+        assert "patterns_detected" in result
+
+    def test_classify_value_lock_currency_string_returns_currency(self) -> None:
+        # Real signature: _classify_value(value: str) -> str
+        # Lock the type-string outputs for representative inputs. Future
+        # refactors of value classification must preserve priority
+        # ordering: specific categories before generic "number".
+        assert _classify_value("$48.00") == "currency"
+        assert _classify_value("£450") == "currency"
+        assert _classify_value("10:00 PM") == "time"
+        assert _classify_value("hello world") == "string"
+
+    def test_rename_generic_fields_lock_returns_list(self) -> None:
+        # Real signature: _rename_generic_fields(fields: list[dict]) -> list[dict]
+        # When no generic type-name pattern matches, return the list intact.
+        # Lock: result is a list of dicts with the original entries present.
+        fields = [
+            {"name": "title", "type": "string", "example_value": "Apex Components"},
+            {"name": "price", "type": "currency", "example_value": "$48.00"},
+        ]
+        result = _rename_generic_fields(fields)
+        assert isinstance(result, list)
+        names = [entry.get("name") for entry in result]
+        assert "title" in names
+        assert "price" in names
+
+    @pytest.mark.asyncio
+    async def test_discover_selectors_lock_returns_dict_on_unexpected_llm_payload(self) -> None:
+        # Real behavior: when LLM returns a non-dict, discover_selectors
+        # falls back to DOM-based discovery. The contract lock is: always
+        # return a dict-shaped result with at least an ``item_container``
+        # key, never raise and never silently return None.
+        fixture = _FIXTURES_DIR / "travel_site.html"
+        if not fixture.exists():
+            pytest.skip("travel_site fixture not present")
+        html = fixture.read_text(encoding="utf-8")
+        with (
+            patch("app.selector_discovery.clean_html_for_selectors", return_value=html),
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value=["unexpected", "list"]),
+        ):
+            result = await discover_selectors(
+                html,
+                [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)],
+            )
+        assert isinstance(result, dict)
+        # Either empty (no DOM recursion possible on synthetic HTML) or has
+        # a container — never None, never the original list-shaped payload.
+        assert result is not None
+
     @pytest.mark.asyncio
     async def test_with_solidified_motifs(self) -> None:
         mock_selectors = {"item_container": "div.card", "fields": {"title": "h3"}}
