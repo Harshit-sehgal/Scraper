@@ -245,7 +245,7 @@ class TestReadyWithMockedPostgres:
         mock_repo.backend = "postgres"
 
         if healthy:
-            mock_repo.health_check.return_value = {
+            status_val = {
                 "ok": True,
                 "backend": "postgres",
                 "schema_version": 2,
@@ -253,14 +253,18 @@ class TestReadyWithMockedPostgres:
                 "job_count": 5,
                 "recycle_bin_count": 2,
             }
+            mock_repo.health_check.return_value = status_val
+            mock_repo.get_storage_status.return_value = status_val
         else:
-            mock_repo.health_check.return_value = {
+            status_val = {
                 "ok": False,
                 "backend": "postgres",
                 "error": "Connection refused",
                 "schema_version": 0,
                 "expected_version": 2,
             }
+            mock_repo.health_check.return_value = status_val
+            mock_repo.get_storage_status.return_value = status_val
         return mock_repo
 
     def _patch_get_job_repository(self, monkeypatch, mock_repo) -> None:

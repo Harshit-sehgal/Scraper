@@ -65,21 +65,7 @@ async def storage_status(
 ):
     """Detailed storage backend status. Requires operator or admin."""
     repo = get_job_repository()
-    backend = getattr(repo, "backend", "")
-    if backend and backend.startswith("postgres"):
-        health = await run_in_threadpool(repo.health_check)
-        return {
-            "backend": backend,
-            "ok": health.get("ok", False),
-            "error": health.get("error"),
-            "schema_version": health.get("schema_version", 0),
-            "expected_version": health.get("expected_version", 0),
-            "job_count": health.get("job_count", 0),
-            "recycle_bin_count": health.get("recycle_bin_count", 0),
-        }
-    from app.job_store import get_storage_status
-
-    return await run_in_threadpool(get_storage_status)
+    return await run_in_threadpool(repo.get_storage_status)
 
 
 @router.get("/api/system/manifest")

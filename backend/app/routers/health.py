@@ -74,12 +74,7 @@ async def ready():
     start_time = time.time()
     repo = get_job_repository()
     try:
-        if getattr(repo, "backend", "") == "postgres":
-            health_info = await run_in_threadpool(repo.health_check)
-        else:
-            from app.job_store import get_storage_health
-
-            health_info = await run_in_threadpool(get_storage_health)
+        health_info = await run_in_threadpool(repo.health_check)
 
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency as _rchl

@@ -330,156 +330,9 @@ def _migrate_worker_heartbeats_v6(conn) -> None:
 
 def ensure_schema(conn) -> None:
     """Run schema migrations to ensure tables exist and are up to date."""
-    execute(
-        conn,
-        "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)",
-    )
-    row = _fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
-    current = row["version"] if row and row.get("version") is not None else 0
+    from app.storage_migrations import run_postgres_migrations
 
-    ensure_required_tables(conn)
-
-    if current < _CURRENT_SCHEMA_VERSION:
-        if current < 3:
-            execute(
-                conn,
-                """CREATE TABLE IF NOT EXISTS world_state (
-                    id TEXT PRIMARY KEY,
-                    payload TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )""",
-            )
-
-        if current < 4:
-            execute(
-                conn,
-                """CREATE TABLE IF NOT EXISTS job_results (
-                    job_id TEXT NOT NULL,
-                    result_index INTEGER NOT NULL,
-                    payload TEXT NOT NULL,
-                    PRIMARY KEY (job_id, result_index),
-                    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
-                )""",
-            )
-            execute(
-                conn,
-                """CREATE TABLE IF NOT EXISTS job_events (
-                    event_id BIGSERIAL PRIMARY KEY,
-                    job_id TEXT NOT NULL,
-                    timestamp TEXT NOT NULL DEFAULT '',
-                    level TEXT NOT NULL DEFAULT 'info',
-                    message TEXT NOT NULL,
-                    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
-                )""",
-            )
-            execute(conn, "CREATE INDEX IF NOT EXISTS idx_job_events_job_id ON job_events(job_id, event_id)")
-            execute(conn, "CREATE INDEX IF NOT EXISTS idx_job_results_job_id ON job_results(job_id)")
-            execute(
-                conn,
-                """CREATE TABLE IF NOT EXISTS idempotency_keys (
-                    idem_key TEXT PRIMARY KEY,
-                    job_id TEXT NOT NULL,
-                    request_fingerprint TEXT NOT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-                )""",
-            )
-            execute(conn, "CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)")
-
-        if current < 5:
-            execute(
-                conn,
-                """CREATE TABLE IF NOT EXISTS worker_heartbeats (
-                    worker_id TEXT PRIMARY KEY,
-                    last_heartbeat TEXT NOT NULL,
-                    hostname TEXT NOT NULL DEFAULT '',
-                    pid INTEGER NOT NULL DEFAULT 0,
-                    started_at TEXT NOT NULL DEFAULT ''
-                )""",
-            )
-
-        if current < 6:
-            # v6: Make the worker_heartbeats primary key composite
-            # (worker_id, pid) so two workers on the same host — sharing
-            # the same resolved worker_id (hostname) — do not overwrite
-            # each other's heartbeat. The old single-column PK is dropped
-            # and a composite PK is added. Existing rows are preserved;
-            # any historical collision (where the same worker_id had two
-            # pids) is resolved by keeping the most recent row per pid.
-            _migrate_worker_heartbeats_v6(conn)
-
-        if current < 7:
-            # v7 (P0-SAAS-001): add org_id and project_id columns for
-            # persistent API key tenant ownership. ``IF NOT EXISTS`` on
-            # the ALTER is idempotent and matches the SQLite v8
-            # migration. The indexes are created above in
-            # ``ensure_required_tables`` so they exist regardless of the
-            # ``current < _CURRENT_SCHEMA_VERSION`` branch.
-            try:
-                execute(conn, "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS org_id TEXT DEFAULT ''")
-            except _DB_OPS_ERRORS:
-                logger.debug("ALTER TABLE jobs ADD COLUMN org_id failed (ignored)")
-            try:
-                execute(conn, "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS project_id TEXT DEFAULT ''")
-            except _DB_OPS_ERRORS:
-                logger.debug("ALTER TABLE jobs ADD COLUMN project_id failed (ignored)")
-            try:
-                execute(conn, "ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS org_id TEXT DEFAULT ''")
-            except _DB_OPS_ERRORS:
-                logger.debug("ALTER TABLE recycle_bin ADD COLUMN org_id failed (ignored)")
-            try:
-                execute(conn, "ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS project_id TEXT DEFAULT ''")
-            except _DB_OPS_ERRORS:
-                logger.debug("ALTER TABLE recycle_bin ADD COLUMN project_id failed (ignored)")
-
-        if current < 8:
-            # v8 (ARCH-004): add workflows table, matching SQLite v9.
-            # Workflows were previously stored in-memory with best-effort
-            # JSON file backup.  This table provides durable, transactional
-            # persistence with owner/org/project isolation matching the
-            # jobs table.
-            execute(
-                conn,
-                """CREATE TABLE IF NOT EXISTS workflows (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL DEFAULT '',
-                    description TEXT DEFAULT '',
-                    user_id TEXT DEFAULT '',
-                    org_id TEXT DEFAULT '',
-                    project_id TEXT DEFAULT '',
-                    mode TEXT DEFAULT 'workflow_replay',
-                    domain TEXT DEFAULT '',
-                    start_url TEXT DEFAULT '',
-                    original_url TEXT DEFAULT '',
-                    search_params TEXT DEFAULT '{}',
-                    steps TEXT DEFAULT '[]',
-                    extraction_schema TEXT DEFAULT '[]',
-                    pagination_config TEXT DEFAULT '{}',
-                    auth_profile_id TEXT DEFAULT NULL,
-                    status TEXT DEFAULT 'draft',
-                    version INTEGER DEFAULT 1,
-                    created_at TEXT DEFAULT '',
-                    updated_at TEXT DEFAULT '',
-                    last_run_at TEXT DEFAULT '',
-                    last_success_at TEXT DEFAULT '',
-                    last_failure_reason TEXT DEFAULT '',
-                    last_run_job_id TEXT DEFAULT '',
-                    total_runs INTEGER DEFAULT 0
-                )""",
-            )
-            for idx_sql in [
-                "CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id)",
-                "CREATE INDEX IF NOT EXISTS idx_workflows_org_id ON workflows(org_id)",
-                "CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)",
-                "CREATE INDEX IF NOT EXISTS idx_workflows_project_id ON workflows(project_id)",
-            ]:
-                try:
-                    execute(conn, idx_sql)
-                except _DB_OPS_ERRORS:
-                    logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
-
-        execute(conn, "DELETE FROM schema_version")
-        execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
-        logger.info("Postgres schema migrated to version %d", _CURRENT_SCHEMA_VERSION)
+    run_postgres_migrations(conn, execute, _fetch_one)
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -1245,26 +1098,39 @@ class PostgresRepositoryBase(JobRepository, ABC):
         try:
             self._ensure()
             with self._conn() as conn:
-                row = self._fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
-                version = row["version"] if row else 0
-                count_row = self._fetch_one(conn, "SELECT COUNT(*) AS cnt FROM jobs WHERE deleted_at IS NULL")
-                job_count = count_row["cnt"] if count_row else 0
-                recycle_row = self._fetch_one(conn, "SELECT COUNT(*) AS cnt FROM recycle_bin")
-                recycle_count = recycle_row["cnt"] if recycle_row else 0
-                return {
-                    "ok": True,
-                    "backend": self.backend,
-                    "schema_version": version or 0,
-                    "expected_version": _CURRENT_SCHEMA_VERSION,
-                    "job_count": job_count or 0,
-                    "recycle_bin_count": recycle_count or 0,
-                }
+                from app.storage_health import check_postgres_health
+
+                return check_postgres_health(conn, self.backend, self._fetch_one)
         except _DB_OPS_ERRORS as e:
+            from app.storage_migrations import POSTGRES_SCHEMA_VERSION
+
             logger.exception("Postgres health check failed")
             return {
                 "ok": False,
                 "backend": self.backend,
                 "error": str(e),
                 "schema_version": 0,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
+                "expected_version": POSTGRES_SCHEMA_VERSION,
+            }
+
+    def get_storage_status(self) -> dict[str, Any]:
+        """Return detailed Postgres storage status."""
+        try:
+            self._ensure()
+            with self._conn() as conn:
+                from app.postgres_repository_base import get_database_url
+                from app.storage_health import get_postgres_status
+
+                return get_postgres_status(conn, self.backend, self._fetch_one, get_database_url())
+        except _DB_OPS_ERRORS as e:
+            from app.storage_migrations import POSTGRES_SCHEMA_VERSION
+
+            return {
+                "backend": self.backend,
+                "error": str(e),
+                "schema_version": 0,
+                "latest_schema_version": POSTGRES_SCHEMA_VERSION,
+                "job_count": -1,
+                "recycle_bin_count": -1,
+                "wal_mode": "unknown",
             }

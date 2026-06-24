@@ -275,6 +275,10 @@ class JobRepository(ABC):
         """Check repository health. Returns a dict with 'ok' key and backend info."""
         return {"ok": True, "backend": self.__class__.__name__}
 
+    @abstractmethod
+    def get_storage_status(self) -> dict[str, Any]:
+        """Return detailed storage backend status."""
+
     # ─── Worker heartbeat ────────────────────────────────────────────
 
     def record_worker_heartbeat(self, worker_id: str, hostname: str, pid: int) -> None:
@@ -405,19 +409,39 @@ class SQLiteJobRepository(JobRepository):
         ``/ready`` endpoint behaves consistently across storage drivers.
         """
         try:
-            from app.job_store import _CURRENT_SCHEMA_VERSION, get_storage_health
+            from app.job_store import _get_connection
+            from app.storage_health import check_sqlite_health
 
-            return get_storage_health()
+            health = check_sqlite_health(_get_connection)
+            if health.get("ok"):
+                status = self.get_storage_status()
+                health.update(
+                    {
+                        "job_count": status.get("job_count", 0),
+                        "recycle_bin_count": status.get("recycle_bin_count", 0),
+                        "backend": "sqlite",
+                    }
+                )
+            return health
         except (OSError, RuntimeError, ImportError, ValueError, AttributeError, TypeError) as exc:
+            from app.storage_migrations import SQLITE_SCHEMA_VERSION
+
             return {
                 "ok": False,
                 "backend": "sqlite",
                 "error": str(exc),
                 "schema_version": 0,
-                "expected_version": _CURRENT_SCHEMA_VERSION,
+                "expected_version": SQLITE_SCHEMA_VERSION,
                 "job_count": -1,
                 "recycle_bin_count": -1,
             }
+
+    def get_storage_status(self) -> dict[str, Any]:
+        """Return detailed SQLite storage status."""
+        from app.job_store import _get_connection, _get_db_path
+        from app.storage_health import get_sqlite_status
+
+        return get_sqlite_status(_get_connection, _get_db_path())
 
     def load_jobs(self) -> dict[str, Job]:
         from app.job_store import load_state
