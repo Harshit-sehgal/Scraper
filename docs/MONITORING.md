@@ -246,6 +246,29 @@ route:
   repeat_interval: 4h
 ```
 
+### Synthetic Alert Drill
+
+Use the drill script to prove Alertmanager accepts alerts and exposes
+the synthetic alert through its API:
+
+```bash
+python3 scripts/run_alert_delivery_drill.py \
+  --url http://localhost:9093 \
+  --json-file artifacts/alert_drill/latest_drill.json
+```
+
+For staging readiness, require real out-of-band evidence from Slack,
+email, or the incident ticket. Alertmanager API state alone does not
+prove notification delivery:
+
+```bash
+python3 scripts/run_alert_delivery_drill.py \
+  --url "$ALERTMANAGER_URL" \
+  --require-notification-evidence \
+  --notification-evidence "Slack thread or incident ticket URL" \
+  --json-file artifacts/alert_drill/latest_drill.json
+```
+
 ## Loki Setup
 
 ### Installation

@@ -1,15 +1,14 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-24 local time from the working tree.
-Last verified: load-alert reproducibility and remote-branch merge audit.
-Archived full validation is green (`20260624T090327Z_full`) with all
-24 validation checks passing, including backend full tests, ruff,
+Last verified: synthetic alert-drill tooling and remote-branch merge
+audit. Full validation is green (`20260624T131152Z_full`) with all 24
+validation checks passing, including backend full tests, ruff,
 pyflakes, mypy, bandit, pip_audit, npm ci, frontend tests, frontend JS
-lint, and frontend CSS lint. The latest quick validation is also green
-(`20260624T130513Z_quick`). Current route inventory is 161 routes;
+lint, and frontend CSS lint. Current route inventory is 161 routes;
 route auth matrix has 150 API rows with `unknown_auth=0` and
-`unknown_tenant=0`. The regenerated file inventory lists 25,770 files,
-946 project-owned files, 942 deeply inspected project-owned files, and
+`unknown_tenant=0`. The regenerated file inventory lists 25,811 files,
+948 project-owned files, 944 deeply inspected project-owned files, and
 0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
@@ -3208,3 +3207,52 @@ the current clean `main` once credentials are available, then either
 delete those stale remote refs after human confirmation or cherry-pick
 specific still-wanted commits into fresh topic branches with targeted
 tests.
+
+## 2026-06-24 — Synthetic Alert Drill Tooling (P1-OPS-LOAD-ALERT-001)
+
+Scope: improve the remaining alert-delivery foundation without
+overclaiming production readiness. Alertmanager readiness checks already
+exist in `scripts/smoke_prod_stack.sh`, but there was no tracked drill
+that could post a synthetic alert, verify Alertmanager API visibility,
+and require real Slack/email/ticket evidence for staging readiness.
+
+### Files Changed
+
+- `scripts/run_alert_delivery_drill.py` — new Alertmanager v2 drill.
+  It posts a synthetic alert, polls `/api/v2/alerts`, writes JSON
+  artifacts, and supports `--require-notification-evidence` so staging
+  gates fail unless a human supplies real notification evidence.
+- `backend/tests/test_alert_delivery_drill.py` — unit tests for URL
+  handling, label parsing, payload generation, alert matching, and
+  notification-evidence gate behavior.
+- `docs/MONITORING.md`, `docs/OPS_READINESS_CHECKLIST.md`,
+  `docs/PRODUCTION.md`, `AGENTS.md`, and
+  `artifacts/audit/ISSUE_LEDGER.md` — documented the exact drill command
+  and kept the real staging delivery proof open.
+- `artifacts/audit/FILE_INVENTORY.md` — regenerated after adding the
+  script and tests.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 displayed quick checks passed. |
+| `python3 -m pytest backend/tests/test_alert_delivery_drill.py -q -o addopts=` | 0 | PASS; 5 passed. |
+| `python3 -m pytest backend/tests/test_alert_delivery_drill.py backend/tests/test_run_load_test.py -q -o addopts=` | 0 | PASS; 10 passed. |
+| `python3 -m ruff check scripts/run_alert_delivery_drill.py backend/tests/test_alert_delivery_drill.py` | 0 | PASS after import cleanup. |
+| `python3 -m ruff format --check scripts/run_alert_delivery_drill.py backend/tests/test_alert_delivery_drill.py` | 0 | PASS; 2 files already formatted. |
+| `python3 -m mypy --explicit-package-bases scripts/run_alert_delivery_drill.py` | 0 | PASS; drill script type-checks directly. |
+| `python3 scripts/run_alert_delivery_drill.py --help` | 0 | PASS; CLI exposes `--json-file`, `--notification-evidence`, and `--require-notification-evidence`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; file inventory now lists 25,811 files, 948 project-owned files, 944 deeply inspected project-owned files, and 0 follow-up rows. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match docs. |
+| `python3 -m py_compile scripts/run_alert_delivery_drill.py && bash -n scripts/smoke_prod_stack.sh` | 0 | PASS. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after edits; 12/12 displayed quick checks passed. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260624T131152Z_full`, 24 passed, 0 failed, 0 skipped, 0 timed out. |
+
+### Current Status
+
+The repo now has reproducible local load-test tooling and reproducible
+synthetic Alertmanager drill tooling. `P1-OPS-LOAD-ALERT-001` remains
+open/deferred because the drill still must be run in staging with a real
+on-call channel and recorded notification evidence.

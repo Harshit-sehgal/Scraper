@@ -16,6 +16,7 @@ The repository includes production deployment files. A local Compose smoke passe
 - `grafana/`
 - `.env.production.example`
 - `scripts/run_load_test.py`
+- `scripts/run_alert_delivery_drill.py`
 - `scripts/start_server.sh`
 - `scripts/start_worker.sh`
 - `scripts/check_prod_env.py`
@@ -33,6 +34,7 @@ The repository includes production deployment files. A local Compose smoke passe
 | Prometheus/Grafana runtime behavior | Prometheus config loaded alert rules and targets were `up`; Grafana `/api/health` returned database `ok`; login/dashboards were not checked | Partially validated locally |
 | Bounded local load test | `python3 scripts/run_load_test.py --url http://localhost:8000/health --requests 100 --concurrency 10 --json-file artifacts/load_test/latest_run.json` passed with 100/100 success, 0 failures, and p95 73.62 ms | Validated locally |
 | Production smoke monitoring coverage | `scripts/smoke_prod_stack.sh` now checks Prometheus readiness, loaded alert rules, Grafana health, and Alertmanager readiness | Script coverage added; rerun in target stack |
+| Synthetic alert drill tooling | `scripts/run_alert_delivery_drill.py` can post a synthetic alert to Alertmanager, poll `/api/v2/alerts`, and fail staging gates unless real notification evidence is supplied | Tooling validated locally; run in staging |
 
 ## Required Env Validation
 
@@ -59,7 +61,7 @@ The Dockerfile installs Python packages from `pyproject.toml` (the single source
 - Verify Postgres persistence, backup, restore, and migration behavior.
 - Verify browser extraction inside the built image.
 - Verify CORS/CSP with the intended production domain.
-- Verify Prometheus scrape path, alert rules, Alertmanager routing, alert delivery, and Grafana provisioning/login.
+- Verify Prometheus scrape path, alert rules, Alertmanager routing, alert delivery, and Grafana provisioning/login. Use `scripts/run_alert_delivery_drill.py --require-notification-evidence --notification-evidence "<Slack/email/ticket URL>" --json-file artifacts/alert_drill/latest_drill.json` in staging.
 - Run staging load tests against health, job creation, queue, and browser extraction paths.
 - Run failure drills.
 
