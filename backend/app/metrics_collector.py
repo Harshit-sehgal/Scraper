@@ -5,9 +5,31 @@ This module is deliberately separate from main.py to avoid circular imports
 when worker_queue.py or other modules need to record metrics.
 """
 
+import re
 import threading
 
 _MAX_METRIC_SAMPLES = 1000
+
+_ALLOWED_SSRF_REJECT_REASONS = frozenset(
+    {
+        "private_ip",
+        "loopback",
+        "dns_filter",
+        "scheme",
+        "port",
+        "unspecified",
+        "other",
+    },
+)
+_PRIVATE_IP_RE = re.compile(
+    r"\b(?:"
+    r"10(?:\.\d{1,3}){3}|"
+    r"192\.168(?:\.\d{1,3}){2}|"
+    r"172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2}|"
+    r"169\.254(?:\.\d{1,3}){2}"
+    r")\b",
+)
+_LOOPBACK_RE = re.compile(r"\b(?:127(?:\.\d{1,3}){3}|::1)\b")
 
 # Ring buffer for API request durations (seconds)
 _request_latencies: list[float] = []
@@ -123,6 +145,46 @@ _rate_limit_global_hits: int = 0
 _rate_limit_global_hits_lock = threading.Lock()
 _rate_limit_per_ip_hits: int = 0
 _rate_limit_per_ip_hits_lock = threading.Lock()
+
+
+def _normalise_ssrf_reject_reason(reason: str | None) -> str:
+    """Collapse SSRF reject reasons into a bounded label set.
+
+    Prometheus label values must be low-cardinality. Callers may pass
+    specific URLs, IPs, hostnames, or exception strings; those details
+    belong in logs/audit events, not in metric labels.
+    """
+    raw = (reason or "").strip().lower()
+    if not raw or raw in {"empty", "none", "null", "empty_url", "unspecified"}:
+        return "unspecified"
+    if raw in _ALLOWED_SSRF_REJECT_REASONS:
+        return raw
+    if "metadata" in raw or "cloud_metadata" in raw or "restricted_ip" in raw or _PRIVATE_IP_RE.search(raw):
+        return "private_ip"
+    if "loopback" in raw or "localhost" in raw or _LOOPBACK_RE.search(raw):
+        return "loopback"
+    if "disallowed_port" in raw or " port" in raw or raw.startswith("port"):
+        return "port"
+    if "bad_scheme" in raw or "scheme" in raw or ("://" in raw and not raw.startswith(("http://", "https://"))):
+        return "scheme"
+    if (
+        "internal_tld" in raw
+        or "no_hostname" in raw
+        or "empty_domain" in raw
+        or "dns" in raw
+        or ".internal" in raw
+        or ".local" in raw
+        or ".lan" in raw
+        or ".corp" in raw
+    ):
+        return "dns_filter"
+    return "other"
+
+
+def _increment_ssrf_reject(reason: str | None) -> None:
+    label = _normalise_ssrf_reject_reason(reason)
+    with _ssrf_rejects_lock:
+        _ssrf_rejects[label] = _ssrf_rejects.get(label, 0) + 1
 
 
 def record_request_latency(duration_seconds: float) -> None:
@@ -248,8 +310,7 @@ def record_browser_launch(success: bool, *, reason: str | None = None) -> None:
 
     if not success:
         key = f"browser_crash:{reason}" if reason else "browser_crash:unknown"
-        with _ssrf_rejects_lock:
-            _ssrf_rejects[key] = _ssrf_rejects.get(key, 0) + 1
+        _increment_ssrf_reject(key)
 
 
 def record_ssrf_reject(reason: str) -> None:
@@ -258,10 +319,7 @@ def record_ssrf_reject(reason: str) -> None:
     Operators can use this to spot scraping attempts that target
     private address space and to tune the SSRF guard.
     """
-    if not reason:
-        reason = "unspecified"
-    with _ssrf_rejects_lock:
-        _ssrf_rejects[reason] = _ssrf_rejects.get(reason, 0) + 1
+    _increment_ssrf_reject(reason)
 
 
 def record_repo_query_latency(duration_seconds: float) -> None:

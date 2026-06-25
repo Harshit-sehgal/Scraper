@@ -165,7 +165,7 @@ class TestSsrfRejects:
         record_ssrf_reject("loopback_name")
         record_ssrf_reject("cloud_metadata")
         counts = get_ssrf_rejects()
-        assert counts == {"loopback_name": 2, "cloud_metadata": 1}
+        assert counts == {"loopback": 2, "private_ip": 1}
 
     def test_empty_reason_normalised(self, reset_metrics) -> None:
         from app.metrics_collector import get_ssrf_rejects, record_ssrf_reject
@@ -173,6 +173,26 @@ class TestSsrfRejects:
         record_ssrf_reject("")
         counts = get_ssrf_rejects()
         assert counts == {"unspecified": 1}
+
+    def test_reason_labels_are_bounded(self, reset_metrics) -> None:
+        from app.metrics_collector import get_ssrf_rejects, record_ssrf_reject
+
+        for index in range(50):
+            record_ssrf_reject(f"private address 10.0.0.{index} blocked")
+            record_ssrf_reject(f"unknown-host-{index}.internal rejected")
+
+        counts = get_ssrf_rejects()
+        assert set(counts) == {"private_ip", "dns_filter"}
+        assert counts == {"private_ip": 50, "dns_filter": 50}
+
+    def test_browser_failure_reasons_do_not_create_unbounded_ssrf_labels(self, reset_metrics) -> None:
+        from app.metrics_collector import get_ssrf_rejects, record_browser_launch
+
+        for index in range(25):
+            record_browser_launch(False, reason=f"chromium crash pid={index}")
+
+        counts = get_ssrf_rejects()
+        assert counts == {"other": 25}
 
 
 class TestRepoQueryLatency:
@@ -300,6 +320,23 @@ class TestMetricsEndpointExposesNewGauges:
         r = client.get("/metrics")
         if r.status_code == 200:
             assert "dataforge_export_outcomes_total" in r.text, r.text
+
+    def test_metrics_endpoint_bounds_ssrf_reason_labels(self, client, reset_metrics) -> None:
+        from app.metrics_collector import record_ssrf_reject
+
+        record_ssrf_reject("blocked 10.1.2.3 after dns resolution")
+        record_ssrf_reject("blocked 10.9.8.7 after dns resolution")
+        record_ssrf_reject("http://metadata.google.internal/latest")
+        record_ssrf_reject("unexpected user supplied string")
+
+        r = client.get("/metrics")
+        if r.status_code == 200:
+            text = r.text
+            assert 'dataforge_ssrf_rejects_total{reason="private_ip"} 3' in text, text
+            assert 'dataforge_ssrf_rejects_total{reason="other"} 1' in text, text
+            assert "10.1.2.3" not in text
+            assert "metadata.google.internal" not in text
+            assert "unexpected user supplied string" not in text
 
 
 class TestExtractionMethodCallSiteWiring:

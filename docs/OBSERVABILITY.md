@@ -70,7 +70,7 @@ control.
 | `workflow_preview_total` | workflow preview route | `dataforge_workflow_preview_total` |
 | `workflow_run_total` | workflow run route | `dataforge_workflow_run_total` |
 | `domain_failure_rate` | `DomainRuntimePolicy.get_summary()` | `dataforge_domain_failure_rate{domain=...}` |
-| SSRF / URL safety blocks | `record_ssrf_reject()` | `dataforge_ssrf_rejects_total` |
+| SSRF / URL safety blocks | `record_ssrf_reject()` with bounded `reason` labels: `private_ip`, `loopback`, `dns_filter`, `scheme`, `port`, `unspecified`, `other` | `dataforge_ssrf_rejects_total{reason=...}` |
 | Job counts by status | in-memory jobs store snapshot | `dataforge_jobs_total{status=...}` |
 | Request latency | middleware | `dataforge_request_duration_seconds_*` |
 

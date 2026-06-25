@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 26 |
-| Fixed issues | 75 |
+| Open verified/deferred issues | 25 |
+| Fixed issues | 76 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -210,6 +210,13 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > Guarded by `backend/tests/test_nginx_plaintext_health_redirect.py`,
 > `backend/tests/test_docker_nginx_tls_ingress.py`, and updated nginx
 > rate-limit guards.
+>
+> Updated 2026-06-26 Session 91: closed `F-MON-002`. SSRF reject metric
+> reasons now normalize to seven bounded labels (`private_ip`,
+> `loopback`, `dns_filter`, `scheme`, `port`, `unspecified`, `other`)
+> before storage/export, preventing caller-supplied URLs, IPs,
+> hostnames, or exception strings from becoming Prometheus series.
+> Guarded by `backend/tests/test_metrics_observability.py`.
 
 
 ## Verified Issues
@@ -1207,7 +1214,7 @@ Status is `verified` unless noted.
 ### F-MON-002
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / cardinality_bomb
 - **file_path:** `prometheus_alerts.yml:102-110`, `metrics_collector.py:63-65`
 - **line_function:** `HighSSRFBlockRate` alert, `_ssrf_rejects` dict
@@ -1218,7 +1225,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic load test with 10k distinct URLs; series cardinality stays bounded.
 - **acceptance_criteria:** `_ssrf_rejects` never exceeds 7 distinct `reason` values.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **tests_added:** `backend/tests/test_metrics_observability.py`
+- **notes:** New finding (Session 80). **Fixed Session 91:** `record_ssrf_reject()` and the browser-failure path now pass through a single normalizer before touching `_ssrf_rejects`. The only exported `reason` labels are `private_ip`, `loopback`, `dns_filter`, `scheme`, `port`, `unspecified`, and `other`; high-cardinality strings remain available only through logs/audit details. A 20,000-event synthetic check produced only `private_ip` and `other` labels.
 
 ### F-MON-003
 

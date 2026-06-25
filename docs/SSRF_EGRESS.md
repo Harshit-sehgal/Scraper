@@ -202,6 +202,12 @@ Prometheus alert (already defined in `prometheus_alerts.yml`):
     summary: "SSRF connection blocked ({{ $value }} req/s)"
 ```
 
+The `reason` label is intentionally bounded to
+`private_ip`, `loopback`, `dns_filter`, `scheme`, `port`,
+`unspecified`, and `other`. Specific rejected URLs, IPs, hostnames, and
+exception strings belong in logs or audit details, not Prometheus label
+values.
+
 ---
 
 ## 3. Testing egress hardening

@@ -1,13 +1,13 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-26 local time from the working tree.
-Last verified: Session 90 nginx plaintext-health / TLS-ingress follow-up.
-Quick validation is green (`20260625T203553Z_quick`, 13/13 passed) and
+Last verified: Session 91 SSRF metric cardinality follow-up. Quick
+validation is green (`20260625T204758Z_quick`, 13/13 passed) and
 security validation is green (`20260625T013939Z_security`,
 9/9 passed, including Bandit, pip-audit, and the expected-failing
 production env template check). `artifacts/audit/ISSUE_LEDGER.md` /
-`.csv` now agree on 105 issue IDs: 26 open verified/deferred
-lower-priority rows, 75 fixed rows, 3 candidate rows, 1
+`.csv` now agree on 105 issue IDs: 25 open verified/deferred
+lower-priority rows, 76 fixed rows, 3 candidate rows, 1
 not-reproducible row, and 0 open P0 rows.
 Current route inventory is 161 routes; route auth matrix has 150 API
 rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
@@ -17,6 +17,44 @@ inspected project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 91 SSRF Metric Cardinality Follow-up - 2026-06-26
+
+Scope: close `F-MON-002`, the verified monitoring cardinality risk in
+`dataforge_ssrf_rejects_total{reason=...}`.
+
+### Issues Fixed
+
+- `F-MON-002`: SSRF reject reasons now normalize before they enter
+  `_ssrf_rejects` or `/metrics`. The only possible Prometheus
+  `reason` label values are `private_ip`, `loopback`, `dns_filter`,
+  `scheme`, `port`, `unspecified`, and `other`.
+- The existing browser-launch failure side path that wrote into the
+  SSRF reject bucket now also flows through the same normalizer, so
+  process IDs or exception strings cannot create one series per crash.
+- `docs/OBSERVABILITY.md` and `docs/SSRF_EGRESS.md` now document the
+  bounded SSRF label set.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before editing passed; run id `20260625T204034Z_quick`, 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_metrics_observability.py::TestSsrfRejects backend/tests/test_metrics_observability.py::TestMetricsEndpointExposesNewGauges::test_metrics_endpoint_bounds_ssrf_reason_labels -q -o addopts=` | 1 | RED before fix; 3 failures showed 50 private/internal variants and 25 browser-crash PIDs becoming distinct raw labels, and `/metrics` exporting raw URL/IP strings. |
+| `python3 -m pytest backend/tests/test_metrics_observability.py::TestSsrfRejects backend/tests/test_metrics_observability.py::TestMetricsEndpointExposesNewGauges::test_metrics_endpoint_bounds_ssrf_reason_labels -q -o addopts=` | 0 | PASS after normalization; 5 SSRF metrics tests passed. |
+| `python3 -m pytest backend/tests/test_metrics_observability.py backend/tests/test_metrics.py backend/tests/test_url_safety.py backend/tests/test_production_simulation.py -q -o addopts=` | 0 | PASS; 94 metrics, URL-safety, and production-simulation tests passed. |
+| `python3 -m ruff check backend/app/metrics_collector.py backend/tests/test_metrics_observability.py && python3 -m ruff format --check backend/app/metrics_collector.py backend/tests/test_metrics_observability.py` | 0 | PASS; edited code/tests linted and formatted. |
+| `python3 - <<'PY' ... from app.metrics_collector ... PY` | 1 | Expected harness failure without `PYTHONPATH`; Python could not import `app`. |
+| `PYTHONPATH=backend python3 - <<'PY' ... 20,000 SSRF reject events ... PY` | 0 | PASS; 10,000 private-IP variants + 10,000 random-host variants produced only `{'private_ip': 10000, 'other': 10000}`, `label_count=2`. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables still match docs after observability docs update. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv counts ... PY` | 0 | PASS; 105 issue rows, statuses `fixed=76`, `verified=24`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=11`, `P2=14`; `F-MON-002` is fixed. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after all edits; run id `20260625T204758Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+This prevents SSRF reject label-cardinality blowups. It does not prove
+staging scrape behavior or alert delivery; that remains tracked by
+`P1-OPS-LOAD-ALERT-001`.
 
 ## Session 90 Nginx Plaintext Health + TLS Ingress Follow-up - 2026-06-26
 
