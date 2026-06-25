@@ -13,6 +13,7 @@ import secrets
 import sys
 
 TARGET_FILE = ".env.production"
+SECRET_DIR = ".secrets"
 
 
 def generate_strong_secret(length: int = 32) -> str:
@@ -39,6 +40,7 @@ def main():
     api_key = generate_strong_secret()
     operator_key = generate_strong_secret()
     admin_key = generate_strong_secret()
+    session_secret = generate_strong_secret()
     metrics_token = generate_strong_secret()
     db_password = generate_strong_password()
     grafana_password = generate_strong_password()
@@ -60,10 +62,13 @@ def main():
 # Central environment indicator
 DATAFORGE_ENV=production
 
-# Core API credentials (strong random keys)
-DATAFORGE_API_KEY={api_key}
-DATAFORGE_OPERATOR_API_KEY={operator_key}
-DATAFORGE_ADMIN_API_KEY={admin_key}
+# Core API/session credentials. These point to Docker-secret-compatible
+# files generated next to this env file so the plaintext values do not
+# appear in docker inspect environment output.
+DATAFORGE_API_KEY_FILE=./.secrets/dataforge_api_key
+DATAFORGE_OPERATOR_API_KEY_FILE=./.secrets/dataforge_operator_api_key
+DATAFORGE_ADMIN_API_KEY_FILE=./.secrets/dataforge_admin_api_key
+DATAFORGE_SESSION_SECRET_FILE=./.secrets/dataforge_session_secret
 
 # Metrics scrape token for Prometheus scraping
 DATAFORGE_METRICS_TOKEN={metrics_token}
@@ -80,7 +85,8 @@ DATAFORGE_WORKER_QUEUE=true
 DATAFORGE_DB_PASSWORD={db_password}
 DATAFORGE_DATABASE_URL=postgresql://dataforge:{db_password}@{db_host}/dataforge
 
-# Infrastructure passwords
+# Infrastructure passwords. Grafana also receives this via
+# ./.secrets/grafana_admin_password in docker-compose.prod.yml.
 GRAFANA_PASSWORD={grafana_password}
 
 # -----------------------------------------------------------------------------
@@ -103,6 +109,29 @@ GRAFANA_PASSWORD={grafana_password}
 """
 
     try:
+        os.makedirs(SECRET_DIR, mode=0o700, exist_ok=True)
+        secret_files = {
+            "dataforge_api_key": api_key,
+            "dataforge_operator_api_key": operator_key,
+            "dataforge_admin_api_key": admin_key,
+            "dataforge_session_secret": session_secret,
+            "pg_exporter_user": "dataforge",
+            "pg_exporter_password": db_password,
+            "grafana_admin_password": grafana_password,
+            # Empty placeholder so docker compose can render; fill this
+            # with a real webhook before relying on Slack delivery.
+            "slack_webhook": "",
+        }
+        for filename, value in secret_files.items():
+            secret_path = os.path.join(SECRET_DIR, filename)
+            fd_secret = os.open(
+                secret_path,
+                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                0o600,
+            )
+            with os.fdopen(fd_secret, "w") as f:
+                f.write(value)
+
         # Create the file with mode 0o600 atomically. Setting the
         # umask before ``open`` closes the small window during which
         # the file existed with the user's default umask (typically
@@ -129,6 +158,7 @@ GRAFANA_PASSWORD={grafana_password}
             raise
         print(f"\n[SUCCESS] Secure production configuration successfully written to '{TARGET_FILE}'.")
         print("          File permissions set to owner read/write only (chmod 600).")
+        print(f"          Docker secret files written under '{SECRET_DIR}/' (chmod 600).")
         print("          Remember: Keep this file secure and NEVER commit it to Git.")
     except Exception as e:
         print(f"\n[ERROR] Failed to write '{TARGET_FILE}': {e}")
@@ -140,6 +170,7 @@ GRAFANA_PASSWORD={grafana_password}
     print("   (SMTP_HOST, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO,")
     print("   SLACK_WEBHOOK_URL). The generator does NOT create them because")
     print("   they are operator-specific (your mail relay, your Slack workspace).")
+    print(f"   If you use Slack, write the webhook URL to {SECRET_DIR}/slack_webhook.")
     print("3. Run the environment validator to verify your newly generated configuration:")
     print(f"   python3 scripts/check_prod_env.py --env-file {TARGET_FILE}")
     print("=" * 60)

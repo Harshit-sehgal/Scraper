@@ -54,9 +54,7 @@ def _active_server_block(text: str) -> str:
 
 def _location_block(server_block: str, prefix: str) -> str:
     """Return the text inside ``location {prefix}{...}`` for an exact prefix match."""
-    pattern = (
-        r"location\s+" + re.escape(prefix) + r"\s*\{(?P<body>[^}]*)\}"
-    )
+    pattern = r"location\s+" + re.escape(prefix) + r"\s*\{(?P<body>[^}]*)\}"
     m = re.search(pattern, server_block)
     assert m, f"{prefix!r} location block not found"
     return m.group("body")
@@ -66,8 +64,7 @@ def _nginx_local_dashboard_block() -> str:
     """``nginx.local.conf`` only has one server block; extract the ``/dashboard/`` location."""
     text = NGINX_LOCAL_CONF.read_text(encoding="utf-8")
     assert NGINX_LOCAL_CONF.is_file(), f"missing {NGINX_LOCAL_CONF}"
-    block = _location_block(text, "/dashboard/")
-    return block
+    return _location_block(text, "/dashboard/")
 
 
 # ---------------------------------------------------------------------------
@@ -85,9 +82,7 @@ class TestDashboardRateLimitApplied:
         # Must mention the ``api`` zone — the same zone used by /api/.
         # We accept both ``zone=api`` and the directive to fail closed if
         # someone refactors the rate-limit zone name.
-        assert re.search(r"limit_req\s+zone=\S+", block), (
-            "nginx.conf: /dashboard/ location no longer applies a limit_req"
-        )
+        assert re.search(r"limit_req\s+zone=\S+", block), "nginx.conf: /dashboard/ location no longer applies a limit_req"
         # And specifically the same zone that /api/ uses (defense in
         # depth: a fresh zone would defend only ``/dashboard/`` and
         # leave ``/api/`` empty, defeating the throttle under
@@ -99,12 +94,8 @@ class TestDashboardRateLimitApplied:
 
     def test_local_nginx_dashboard_has_limit_req(self) -> None:
         block = _nginx_local_dashboard_block()
-        assert re.search(r"limit_req\s+zone=\S+", block), (
-            "nginx.local.conf: /dashboard/ location no longer applies a limit_req"
-        )
-        assert "zone=api" in block, (
-            "nginx.local.conf: /dashboard/ does not share the api rate-limit zone"
-        )
+        assert re.search(r"limit_req\s+zone=\S+", block), "nginx.local.conf: /dashboard/ location no longer applies a limit_req"
+        assert "zone=api" in block, "nginx.local.conf: /dashboard/ does not share the api rate-limit zone"
 
 
 class TestProdServerBlockOnlyOneActiveDashboardLocation:
@@ -120,7 +111,4 @@ class TestProdServerBlockOnlyOneActiveDashboardLocation:
         text = NGINX_CONF.read_text(encoding="utf-8")
         block = _active_server_block(text)
         count = len(re.findall(r"location\s+/dashboard/", block))
-        assert count == 1, (
-            "nginx.conf: expected exactly one ``location /dashboard/`` "
-            f"in the active server block, found {count}"
-        )
+        assert count == 1, f"nginx.conf: expected exactly one ``location /dashboard/`` in the active server block, found {count}"

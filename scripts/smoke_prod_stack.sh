@@ -61,16 +61,17 @@ echo ""
 _get_env() {
     local key="$1"
     local default="${2:-}"
-    python3 -c "
+python3 -c "
 import json, sys
+from pathlib import Path
+env_path = Path('.env')
 try:
     from dotenv import dotenv_values
-    vals = dotenv_values('.env')
+    vals = dotenv_values(env_path)
 except ImportError:
     try:
-        from pathlib import Path
         vals = {}
-        for line in Path('.env').read_text().splitlines():
+        for line in env_path.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
@@ -79,7 +80,17 @@ except ImportError:
                 vals[k.strip()] = v.strip().strip('\"').strip(\"'\")
     except Exception:
         vals = {}
-print(vals.get('${key}', '${default}'))
+value = vals.get('${key}', '') or ''
+file_ref = vals.get('${key}_FILE', '') or ''
+if not value and file_ref:
+    secret_path = Path(file_ref)
+    if not secret_path.is_absolute():
+        secret_path = env_path.parent / secret_path
+    try:
+        value = secret_path.read_text().strip()
+    except OSError:
+        value = ''
+print(value or '${default}')
 "
 }
 

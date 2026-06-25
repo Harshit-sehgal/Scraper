@@ -1,6 +1,6 @@
 # DataForge Scraper - Issue Ledger
 
-Date: 2026-06-24
+Date: 2026-06-25
 Commit baseline before this audit update: `918aaf02`
 Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T221113Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
@@ -10,13 +10,13 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 1 |
-| Fixed issues | 34 |
+| Open verified/deferred issues | 57 |
+| Fixed issues | 44 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
-| P0 issue rows | 6 |
+| P0 issue rows | 15 |
 | Open verified P0 issue rows | 0 |
-| Fixed P0 issue rows | 5 |
+| Fixed P0 issue rows | 14 |
 
 > Updated 2026-06-18: `P1-AUTHPROFILE-002` and `P1-SECURITY-AUDIT-001`
 > moved from `verified` → `fixed` (open verified 18 → 16, fixed 8 → 10).
@@ -140,6 +140,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > `--require-notification-evidence`. This improves reproducibility but
 > still does not close the issue until it is run against staging with
 > real Slack/email/ticket evidence.
+>
+> Updated 2026-06-25 P0 hardening pass: `F-MON-001`, `F-CI-001`,
+> `F-CI-002`, `F-DOCKER-007`, and `F-ENV-004` fixed. Production smoke
+> now fails closed when no alert delivery channel is configured and
+> drills a synthetic Alertmanager alert. Dependabot auto-approval /
+> auto-merge is patch-only, and the workflow default token permissions
+> are `{}` with `contents: write` restricted to the patch merge job.
+> Local production-stack override credentials now require caller
+> substitution instead of committed literals. App/worker production API
+> and session secrets now use Docker secrets plus `DATAFORGE_*_FILE`
+> loader support. `ISSUE_LEDGER.csv` was also synchronized with the
+> Markdown ledger (105 issue IDs); no P0 rows remain open.
 
 
 ## Verified Issues
@@ -873,7 +885,7 @@ Status is `verified` unless noted.
 ### F-CI-001
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / unsanctioned_auto_merge
 - **file_path:** `.github/workflows/dependabot-auto-merge.yml`
 - **line_function:** `Approve PR` step at lines 38-43, `Enable auto-merge` at lines 47-48
@@ -884,12 +896,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic Dependabot PR with `semver-major` label does not auto-merge; `/approve` step is skipped.
 - **acceptance_criteria:** No Dependabot major/minor PR lands without human approval.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `.github/workflows/dependabot-auto-merge.yml` now splits metadata, `approve-patch`, `enable-patch-auto-merge`, and human-review jobs. Only `version-update:semver-patch` PRs are auto-approved and auto-merged; minor/major updates require human review. Guarded by `backend/tests/test_dependabot_auto_merge.py`.
 
 ### F-CI-002
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / token_scope_bloat
 - **file_path:** `.github/workflows/dependabot-auto-merge.yml`
 - **line_function:** workflow-level `permissions` block at lines 21-23
@@ -900,12 +912,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Inspect job token scopes via `gh api` or a fixture workflow that asserts no `contents: write` until the explicit merge step.
 - **acceptance_criteria:** No job in this workflow exposes write scope before its merge step runs.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** workflow-level permissions are `{}`. Metadata/approval jobs only receive read or pull-request write scope; `contents: write` exists only on the patch merge job. Guarded by `backend/tests/test_dependabot_auto_merge.py`.
 
 ### F-DOCKER-007
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / hardcoded_credentials
 - **file_path:** `docker-compose.override.local.yml`
 - **line_function:** lines 27, 41, 55, 107
@@ -922,15 +934,15 @@ Status is `verified` unless noted.
 - **tests_needed:** `grep -E "postgresql://[^:]+:[^@]+@"` over the committed override returns 0 matches.
 - **acceptance_criteria:** Override file contains no literal database password, no literal Grafana admin password, and no literal Slack webhook.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `docker-compose.override.local.yml` now requires `${DATAFORGE_DB_PASSWORD:?}`, `${GRAFANA_PASSWORD:?}`, and `${ALERTMANAGER_SLACK_WEBHOOK_URL:?}` instead of committing literal DB/Grafana/Slack credentials. `.env.example` documents those local override inputs. Guarded by `backend/tests/test_docker_local_override_secrets.py`.
 
 ### F-ENV-004
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** security / env / secrets_outside_docker_secrets
-- **file_path:** `.env`
-- **line_function:** API key + session secret lines
+- **file_path:** `docker-compose.prod.yml`, `.env.production.example`, `scripts/load_runtime_secrets.sh`, `scripts/start_server.sh`, `scripts/start_worker.sh`, `scripts/check_prod_env.py`, `scripts/generate_prod_env.py`
+- **line_function:** API/session Docker secret wiring and runtime loader
 - **evidence:** `DATAFORGE_API_KEY`, `DATAFORGE_OPERATOR_API_KEY`, `DATAFORGE_ADMIN_API_KEY`, `DATAFORGE_SESSION_SECRET` sit in `.env` (intended to be ignored — it is via `.env.*`). Unlike `DATAFORGE_DB_PASSWORD`, `GRAFANA_PASSWORD`, and `ALERTMANAGER_SLACK_WEBHOOK_URL` (all mounted as Docker secrets in `docker-compose.prod.yml:435-441`), the API keys are NOT in a `secrets:` block.
 - **why_it_matters:** Operators shipping Docker on shared hosts leave `.env` in backups, log archives, and operator mail threads. The Docker secrets path is the only end-to-end safe transport; passing through the host filesystem is not.
 - **impact:** API keys leak via host backups / shared mount / unintended rotat.
@@ -938,7 +950,7 @@ Status is `verified` unless noted.
 - **tests_needed:** `docker-compose -f docker-compose.prod.yml config | grep DATAFORGE_DB_PASSWORD` shows a `bind`-style secrets mount; equivalent greps exist for API keys.
 - **acceptance_criteria:** Production API keys are sourced via Docker secrets, not file mounts.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** production compose now mounts `dataforge_api_key`, `dataforge_operator_api_key`, `dataforge_admin_api_key`, and `dataforge_session_secret` into both app and worker containers, and passes only `DATAFORGE_*_FILE` env vars. The shared `scripts/load_runtime_secrets.sh` loader exports canonical env names before validation/startup. `check_prod_env.py` resolves file-backed secrets and requires `DATAFORGE_SESSION_SECRET`; `generate_prod_env.py` writes `.secrets/` files plus `_FILE` refs. Guarded by `backend/tests/test_docker_prod_secret_wiring.py` and `backend/tests/test_check_prod_env.py`.
 
 ### F-CONFIG-001
 

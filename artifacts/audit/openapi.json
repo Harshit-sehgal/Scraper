@@ -3358,7 +3358,7 @@
     },
     "/api/jobs/{job_id}/reclean": {
       "post": {
-        "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.\n\nDelegates business logic to ``JobReclenerService``.",
+        "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.\n\nDelegates business logic to ``JobRecleanerService``.",
         "operationId": "reclean_job_api_jobs__job_id__reclean_post",
         "parameters": [
           {

@@ -1,19 +1,63 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-24 local time from the working tree.
-Last verified: synthetic alert-drill tooling and remote-branch merge
-audit. Full validation is green (`20260624T131152Z_full`) with all 24
-validation checks passing, including backend full tests, ruff,
-pyflakes, mypy, bandit, pip_audit, npm ci, frontend tests, frontend JS
-lint, and frontend CSS lint. Current route inventory is 161 routes;
-route auth matrix has 150 API rows with `unknown_auth=0` and
-`unknown_tenant=0`. The regenerated file inventory lists 25,811 files,
-948 project-owned files, 944 deeply inspected project-owned files, and
-0 file-ledger follow-up rows._
+_Truth source current as of 2026-06-25 local time from the working tree.
+Last verified: Session 80 P0 hardening follow-up. Quick validation is
+green (`20260625T014026Z_quick`, 13/13 passed) and security validation
+is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
+pip-audit, and the expected-failing production env template check).
+`artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
+57 open verified/deferred lower-priority rows, 44 fixed rows, 3
+candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
+route inventory is 161 routes; route auth matrix has 150 API rows with
+`unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
+lists 25,811 files, 948 project-owned files, 944 deeply inspected
+project-owned files, and 0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 80 P0 Hardening Follow-up - 2026-06-25
+
+Scope: close the remaining verified Session 80 P0 infrastructure/security
+rows, synchronize the issue ledger artifacts, and prove the local gates.
+
+### Issues Fixed
+
+- `F-MON-001`: `scripts/smoke_prod_stack.sh` now fails closed when both
+  alerting channels are absent and runs `scripts/run_alert_delivery_drill.py`
+  against in-network Alertmanager.
+- `F-CI-001` / `F-CI-002`: Dependabot auto-approval and auto-merge are
+  patch-only; workflow-level permissions are `{}`, with `contents: write`
+  only on the patch merge job.
+- `F-DOCKER-007`: `docker-compose.override.local.yml` no longer commits
+  literal DB/Grafana/Slack credentials; it requires caller-provided
+  `DATAFORGE_DB_PASSWORD`, `GRAFANA_PASSWORD`, and
+  `ALERTMANAGER_SLACK_WEBHOOK_URL`.
+- `F-ENV-004`: production app/worker API keys and session secret now use
+  Docker secrets plus `DATAFORGE_*_FILE` runtime loader support. The
+  production env validator resolves file-backed secrets and requires
+  `DATAFORGE_SESSION_SECRET`.
+- `artifacts/audit/ISSUE_LEDGER.md` and `.csv` were synchronized to the same
+  105 IDs and current statuses; no P0 rows remain open.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_dependabot_auto_merge.py backend/tests/test_docker_local_override_secrets.py backend/tests/test_docker_prod_secret_wiring.py backend/tests/test_check_prod_env.py backend/tests/test_alerting_channel_smoke.py backend/tests/test_nginx_rate_limit.py -q -o addopts=` | 0 | PASS; 69 tests passed. |
+| `python3 -m ruff check backend/tests/test_dependabot_auto_merge.py backend/tests/test_docker_local_override_secrets.py backend/tests/test_docker_prod_secret_wiring.py backend/tests/test_check_prod_env.py scripts/check_prod_env.py scripts/generate_prod_env.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/tests/test_dependabot_auto_merge.py backend/tests/test_docker_local_override_secrets.py backend/tests/test_docker_prod_secret_wiring.py backend/tests/test_check_prod_env.py scripts/check_prod_env.py scripts/generate_prod_env.py` | 0 | PASS; 6 files already formatted. |
+| `bash -n scripts/load_runtime_secrets.sh scripts/start_server.sh scripts/start_worker.sh scripts/smoke_prod_stack.sh` | 0 | PASS; shell syntax valid. |
+| `python3 -m py_compile scripts/check_prod_env.py scripts/generate_prod_env.py` | 0 | PASS; scripts compile. |
+| `python3 scripts/validate_local.py --security` | 0 | PASS; run id `20260625T013939Z_security`, 9/9 checks passed. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T014026Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+The project is still pre-production until staging deployment, TLS, real
+secret-store/on-call delivery, backups, restore drill, load tests, monitoring
+alerts, and incident runbooks are proven in the target environment.
 
 ## Codebase Cleanup + SaaS Frontend Professionalization Follow-up - 2026-06-18
 

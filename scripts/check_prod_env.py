@@ -23,6 +23,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 REQUIRED_VARS = [
     "DATAFORGE_API_KEY",
+    "DATAFORGE_SESSION_SECRET",
     "DATAFORGE_CORS_ORIGINS",
     "DATAFORGE_DB_PASSWORD",
     "DATAFORGE_STORAGE_BACKEND",
@@ -31,6 +32,13 @@ REQUIRED_VARS = [
     "DATAFORGE_METRICS_TOKEN",
     "DATAFORGE_ENV",
 ]
+
+FILE_BACKED_SECRET_VARS = (
+    "DATAFORGE_API_KEY",
+    "DATAFORGE_OPERATOR_API_KEY",
+    "DATAFORGE_ADMIN_API_KEY",
+    "DATAFORGE_SESSION_SECRET",
+)
 
 DEFAULT_DB_PASSWORD_VALUES = {
     "dataforge",
@@ -114,7 +122,26 @@ def load_effective_env(path: Path) -> dict[str, str]:
     """Load env-file values and overlay process environment variables."""
     env = load_env_file(path)
     env.update({key: value for key, value in os.environ.items() if key.startswith(("DATAFORGE_", "GRAFANA_"))})
+    _load_file_backed_secrets(env, path.parent)
     return env
+
+
+def _load_file_backed_secrets(env: dict[str, str], base_dir: Path) -> None:
+    """Resolve DATAFORGE_*_FILE values into the canonical secret env vars."""
+    for name in FILE_BACKED_SECRET_VARS:
+        file_ref = env.get(f"{name}_FILE", "").strip()
+        if not file_ref:
+            continue
+        secret_path = Path(file_ref)
+        if not secret_path.is_absolute():
+            secret_path = base_dir / secret_path
+        try:
+            value = secret_path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            print(f"  [FAIL]  {name}_FILE points to unreadable secret file: {secret_path} ({exc})")
+            env[name] = ""
+            continue
+        env[name] = value
 
 
 def check_var(
@@ -321,6 +348,11 @@ def check_database_url(value: str) -> bool:
 def check_api_key(value: str) -> bool:
     """Validate DATAFORGE_API_KEY is not a default/placeholder value."""
     return _check_api_key_not_default("DATAFORGE_API_KEY", value)
+
+
+def check_session_secret(value: str) -> bool:
+    """Validate DATAFORGE_SESSION_SECRET is not a default/placeholder value."""
+    return _check_api_key_not_default("DATAFORGE_SESSION_SECRET", value)
 
 
 def check_db_password(value: str) -> bool:
@@ -578,6 +610,12 @@ def main() -> int:
             True,
             lambda v: _check_api_key_not_default("DATAFORGE_ADMIN_API_KEY", v),
             'Admin key for system-level operations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"',
+        ),
+        (
+            "DATAFORGE_SESSION_SECRET",
+            True,
+            check_session_secret,
+            'Session cookie signing secret. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"',
         ),
         (
             "GRAFANA_PASSWORD",

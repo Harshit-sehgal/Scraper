@@ -127,23 +127,13 @@
     },
     {
       "classification": "backend_router",
-      "loc": 1236,
+      "loc": 1223,
       "path": "backend/app/routers/system.py"
     },
     {
       "classification": "test",
       "loc": 1174,
       "path": "backend/tests/fixtures/pages/10933defd606.html"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 1154,
-      "path": "backend/app/job_store.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 1146,
-      "path": "backend/app/postgres_repository_base.py"
     },
     {
       "classification": "backend_source",
@@ -159,6 +149,11 @@
       "classification": "backend_router",
       "loc": 1018,
       "path": "backend/app/routers/experimental.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 1014,
+      "path": "backend/app/postgres_repository_base.py"
     },
     {
       "classification": "backend_source",
@@ -192,12 +187,17 @@
     },
     {
       "classification": "backend_source",
+      "loc": 923,
+      "path": "backend/app/selector_engine.py"
+    },
+    {
+      "classification": "backend_source",
       "loc": 909,
       "path": "backend/app/semantic_world_state/core.py"
     },
     {
       "classification": "backend_source",
-      "loc": 880,
+      "loc": 900,
       "path": "backend/app/storage_interface.py"
     },
     {
@@ -229,11 +229,6 @@
       "classification": "backend_source",
       "loc": 802,
       "path": "backend/app/topology_state.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 785,
-      "path": "backend/app/selector_engine.py"
     },
     {
       "classification": "backend_source",
@@ -347,6 +342,11 @@
     },
     {
       "classification": "backend_source",
+      "loc": 629,
+      "path": "backend/app/storage_migrations.py"
+    },
+    {
+      "classification": "backend_source",
       "loc": 617,
       "path": "backend/app/url_safety.py"
     },
@@ -354,6 +354,11 @@
       "classification": "test",
       "loc": 616,
       "path": "backend/tests/test_postgres_repository.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 608,
+      "path": "backend/app/job_store.py"
     },
     {
       "classification": "backend_service",
@@ -494,11 +499,6 @@
       "classification": "backend_router",
       "loc": 480,
       "path": "backend/app/routers/exports.py"
-    },
-    {
-      "classification": "frontend_source",
-      "loc": 474,
-      "path": "frontend/js/analyzer.test.js"
     }
   ],
   "largest_symbols": [
@@ -551,10 +551,10 @@
       "path": "backend/app/saas/identity_store.py"
     },
     {
-      "end_lineno": 1270,
+      "end_lineno": 1136,
       "kind": "class",
-      "lineno": 549,
-      "loc": 722,
+      "lineno": 402,
+      "loc": 735,
       "name": "PostgresRepositoryBase",
       "path": "backend/app/postgres_repository_base.py"
     },
@@ -575,20 +575,20 @@
       "path": "backend/app/manifold_state.py"
     },
     {
+      "end_lineno": 920,
+      "kind": "class",
+      "lineno": 374,
+      "loc": 547,
+      "name": "SQLiteJobRepository",
+      "path": "backend/app/storage_interface.py"
+    },
+    {
       "end_lineno": 819,
       "kind": "function",
       "lineno": 274,
       "loc": 546,
       "name": "orchestrate_extraction",
       "path": "backend/app/extraction_orchestrator.py"
-    },
-    {
-      "end_lineno": 896,
-      "kind": "class",
-      "lineno": 370,
-      "loc": 527,
-      "name": "SQLiteJobRepository",
-      "path": "backend/app/storage_interface.py"
     },
     {
       "end_lineno": 614,
@@ -615,9 +615,9 @@
       "path": "backend/app/semantic_inference_engine.py"
     },
     {
-      "end_lineno": 1426,
+      "end_lineno": 1412,
       "kind": "function",
-      "lineno": 933,
+      "lineno": 919,
       "loc": 494,
       "name": "metrics",
       "path": "backend/app/routers/system.py"
@@ -653,14 +653,6 @@
       "loc": 443,
       "name": "get_all_scenarios",
       "path": "backend/app/chaos_scenarios.py"
-    },
-    {
-      "end_lineno": 566,
-      "kind": "function",
-      "lineno": 133,
-      "loc": 434,
-      "name": "_run_migrations",
-      "path": "backend/app/job_store.py"
     },
     {
       "end_lineno": 450,
@@ -727,6 +719,14 @@
       "path": "backend/app/routers/exports.py"
     },
     {
+      "end_lineno": 444,
+      "kind": "function",
+      "lineno": 94,
+      "loc": 351,
+      "name": "run_sqlite_migrations",
+      "path": "backend/app/storage_migrations.py"
+    },
+    {
       "end_lineno": 426,
       "kind": "class",
       "lineno": 77,
@@ -791,6 +791,14 @@
       "path": "backend/app/scraper.py"
     },
     {
+      "end_lineno": 371,
+      "kind": "class",
+      "lineno": 60,
+      "loc": 312,
+      "name": "JobRepository",
+      "path": "backend/app/storage_interface.py"
+    },
+    {
       "end_lineno": 419,
       "kind": "class",
       "lineno": 111,
@@ -807,20 +815,20 @@
       "path": "backend/tests/test_worker_queue_postgres.py"
     },
     {
-      "end_lineno": 367,
-      "kind": "class",
-      "lineno": 60,
-      "loc": 308,
-      "name": "JobRepository",
-      "path": "backend/app/storage_interface.py"
-    },
-    {
       "end_lineno": 400,
       "kind": "class",
       "lineno": 96,
       "loc": 305,
       "name": "GossipSubstrate",
       "path": "backend/app/gossip_substrate.py"
+    },
+    {
+      "end_lineno": 1062,
+      "kind": "function",
+      "lineno": 759,
+      "loc": 304,
+      "name": "extract_with_regex",
+      "path": "backend/app/selector_engine.py"
     },
     {
       "end_lineno": 426,
@@ -853,14 +861,6 @@
       "loc": 290,
       "name": "TestThreeWayAcquisition",
       "path": "backend/tests/test_three_way_acquisition.py"
-    },
-    {
-      "end_lineno": 901,
-      "kind": "function",
-      "lineno": 616,
-      "loc": 286,
-      "name": "extract_with_regex",
-      "path": "backend/app/selector_engine.py"
     },
     {
       "end_lineno": 355,
@@ -983,9 +983,9 @@
       "path": "backend/tests/test_postgres_integration.py"
     },
     {
-      "end_lineno": 929,
+      "end_lineno": 915,
       "kind": "function",
-      "lineno": 697,
+      "lineno": 683,
       "loc": 233,
       "name": "_render_basic_metrics_text",
       "path": "backend/app/routers/system.py"
@@ -1175,6 +1175,14 @@
       "path": "backend/tests/test_check_prod_env.py"
     },
     {
+      "end_lineno": 219,
+      "kind": "class",
+      "lineno": 29,
+      "loc": 191,
+      "name": "TestZeroResultClassification",
+      "path": "backend/tests/test_zero_result_classifier.py"
+    },
+    {
       "end_lineno": 402,
       "kind": "function",
       "lineno": 214,
@@ -1197,14 +1205,6 @@
       "loc": 184,
       "name": "SelectorQualityPredictor",
       "path": "backend/app/selector_ml_optimizer.py"
-    },
-    {
-      "end_lineno": 211,
-      "kind": "class",
-      "lineno": 29,
-      "loc": 183,
-      "name": "TestZeroResultClassification",
-      "path": "backend/tests/test_zero_result_classifier.py"
     },
     {
       "end_lineno": 199,
@@ -1303,6 +1303,6 @@
       "path": "backend/app/event_journal.py"
     }
   ],
-  "python_symbol_count": 9013,
-  "source_file_count": 733
+  "python_symbol_count": 9086,
+  "source_file_count": 739
 }

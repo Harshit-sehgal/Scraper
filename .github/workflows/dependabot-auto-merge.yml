@@ -2,14 +2,15 @@
 # DataForge Scraper — Dependabot Auto-Merge
 # =============================================================================
 # Automatically approves and merges Dependabot pull requests for safe
-# dependency updates (patch and minor version bumps) when all required
-# CI checks pass.
+# dependency updates (patch version bumps only) when all required CI
+# checks pass.
 #
 # This keeps dependency updates flowing without manual triage while
 # ensuring every merged PR has passed the full CI pipeline.
 #
-# Security: Only auto-merges PRs opened by Dependabot. Major version
-# bumps require manual review.
+# Security: Only auto-approves and auto-merges PRs opened by
+# Dependabot, and only for patch updates. Minor and major version bumps
+# require human review.
 # =============================================================================
 
 name: Dependabot Auto-Merge
@@ -18,16 +19,19 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
-  auto-merge:
-    name: Auto-Merge Dependabot PR
+  metadata:
+    name: Inspect Dependabot PR
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.actor == 'dependabot[bot]' || github.actor == 'dependabot-preview[bot]'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      update-type: ${{ steps.metadata.outputs.update-type }}
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
@@ -35,25 +39,49 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  approve-patch:
+    name: Approve patch update
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: metadata
+    if: needs.metadata.outputs.update-type == 'version-update:semver-patch'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
       - name: Approve PR
         run: |
           gh pr review "${{ github.event.pull_request.number }}" --approve \
-            --body "✅ Auto-approved by Dependabot Auto-Merge workflow."
+            --body "Auto-approved by Dependabot Auto-Merge workflow for a patch dependency update."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  enable-patch-auto-merge:
+    name: Enable patch auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [metadata, approve-patch]
+    if: needs.metadata.outputs.update-type == 'version-update:semver-patch'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
       - name: Enable auto-merge (squash)
-        if: |
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         run: |
           gh pr merge "${{ github.event.pull_request.number }}" \
             --squash --auto \
-            --body "🤖 Auto-merging ${{ steps.metadata.outputs.update-type }} dependency update."
+            --body "Auto-merging ${{ needs.metadata.outputs.update-type }} dependency update."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Skip major version updates
-        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+  require-human-review:
+    name: Require human review for non-patch updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: metadata
+    if: needs.metadata.outputs.update-type != 'version-update:semver-patch'
+    permissions: {}
+    steps:
+      - name: Skip non-patch update
         run: |
-          echo "⚠️  Major version update — manual review required. Skipping auto-merge."
+          echo "Dependency update type '${{ needs.metadata.outputs.update-type }}' requires human review. Skipping approval and auto-merge."

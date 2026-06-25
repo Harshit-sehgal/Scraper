@@ -108,6 +108,34 @@ class TestCheckProdEnvCore:
         assert "strong-password-123" not in masked
         assert masked == "postgresql://dataforge:****@postgres:5432/dataforge"
 
+    def test_load_effective_env_resolves_file_backed_runtime_secrets(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """DATAFORGE_*_FILE entries should populate canonical secret vars."""
+        mod = self._import_module()
+        secret_values = {
+            "DATAFORGE_API_KEY": "user-secret-file-value-123",
+            "DATAFORGE_OPERATOR_API_KEY": "operator-secret-file-value-123",
+            "DATAFORGE_ADMIN_API_KEY": "admin-secret-file-value-123",
+            "DATAFORGE_SESSION_SECRET": "session-secret-file-value-123",
+        }
+        for name, value in secret_values.items():
+            monkeypatch.delenv(name, raising=False)
+            monkeypatch.delenv(f"{name}_FILE", raising=False)
+            (tmp_path / name.lower()).write_text(value + "\n", encoding="utf-8")
+
+        env_file = tmp_path / ".env.production"
+        env_file.write_text(
+            "\n".join(f"{name}_FILE=./{name.lower()}" for name in secret_values) + "\n",
+            encoding="utf-8",
+        )
+
+        env = mod.load_effective_env(env_file)
+        for name, value in secret_values.items():
+            assert env[name] == value
+
 
 class TestCheckProdEnvValidators:
     """Specific validator function tests."""
@@ -223,6 +251,17 @@ class TestCheckProdEnvValidators:
         mod = self._import_module()
         assert mod.check_api_key("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4")
 
+    def test_check_session_secret_rejects_default_placeholders(self) -> None:
+        """Session cookie secret must not be a known placeholder."""
+        mod = self._import_module()
+        assert not mod.check_session_secret("change-me")
+        assert not mod.check_session_secret("CHANGE_ME_GENERATE_STRONG_SESSION_SECRET")
+
+    def test_check_session_secret_accepts_strong_secret(self) -> None:
+        """A strong session secret should pass."""
+        mod = self._import_module()
+        assert mod.check_session_secret("session-secret-a1b2c3d4e5f6")
+
     def test_check_db_password_rejects_default_placeholders(self) -> None:
         """Known default DB password values should fail."""
         mod = self._import_module()
@@ -251,6 +290,7 @@ class TestCheckProdEnvValidators:
             "DATAFORGE_API_KEY": "same-strong-key-value-123",
             "DATAFORGE_OPERATOR_API_KEY": "same-strong-key-value-123",
             "DATAFORGE_ADMIN_API_KEY": "different-strong-key-value-123",
+            "DATAFORGE_SESSION_SECRET": "session-strong-key-value-123",
         }
         assert not mod.check_distinct_api_keys(env)
 
@@ -261,6 +301,7 @@ class TestCheckProdEnvValidators:
             "DATAFORGE_API_KEY": "user-strong-key-value-123",
             "DATAFORGE_OPERATOR_API_KEY": "operator-strong-key-value-123",
             "DATAFORGE_ADMIN_API_KEY": "admin-strong-key-value-123",
+            "DATAFORGE_SESSION_SECRET": "session-strong-key-value-123",
         }
         assert mod.check_distinct_api_keys(env)
 
@@ -322,6 +363,7 @@ class TestCheckProdEnvIntegration:
                 "DATAFORGE_QUEUE_BACKEND": "postgres",
                 "DATAFORGE_METRICS_TOKEN": "metrics-token-a1b2c3d4e5f6a1b2",
                 "DATAFORGE_ENV": "production",
+                "DATAFORGE_SESSION_SECRET": "session-secret-a1b2c3d4e5f6",
                 "GRAFANA_PASSWORD": "strong-grafana-password-123",
             },
         )
@@ -338,6 +380,7 @@ class TestCheckProdEnvIntegration:
             ("DATAFORGE_QUEUE_BACKEND", True, mod.check_queue_backend),
             ("DATAFORGE_METRICS_TOKEN", True, lambda v: mod._check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v)),
             ("DATAFORGE_ENV", True, None),
+            ("DATAFORGE_SESSION_SECRET", True, mod.check_session_secret),
             ("GRAFANA_PASSWORD", True, mod.check_grafana_password),
         ]
         for name, required, validator in checks_list:
@@ -440,6 +483,7 @@ class TestCheckProdEnvIntegration:
                 "DATAFORGE_QUEUE_BACKEND": "postgres",
                 "DATAFORGE_METRICS_TOKEN": "metrics-token-strong-value-xyz",
                 "DATAFORGE_ENV": "production",
+                "DATAFORGE_SESSION_SECRET": "session-secret-a1b2c3d4e5f6",
                 "GRAFANA_PASSWORD": "strong-grafana-password-xyz",
             },
         )
@@ -460,6 +504,7 @@ class TestCheckProdEnvIntegration:
                 validator=lambda v: mod._check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v),
             ),
             mod.check_var(env, "DATAFORGE_ENV", required=True, validator=mod.check_env),
+            mod.check_var(env, "DATAFORGE_SESSION_SECRET", required=True, validator=mod.check_session_secret),
             mod.check_var(env, "GRAFANA_PASSWORD", required=True, validator=mod.check_grafana_password),
         ]
         assert all(checks), f"All checks should pass: {checks}"
@@ -549,6 +594,7 @@ class TestCheckProdEnvPgDriver:
                 "DATAFORGE_METRICS_TOKEN": "metrics-token-a1b2c3d4e5f6a1b2",
                 "DATAFORGE_ENV": "production",
                 "DATAFORGE_PG_DRIVER": "psycopg3",
+                "DATAFORGE_SESSION_SECRET": "session-secret-a1b2c3d4e5f6",
                 "GRAFANA_PASSWORD": "strong-grafana-password-123",
             },
         )
