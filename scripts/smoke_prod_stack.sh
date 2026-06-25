@@ -351,6 +351,61 @@ else
     ALL_PASS=false
 fi
 
+# F-MON-001: Fail-closed check that at least one notification channel is wired.
+# Alertmanager v0.27+ silently drops alerts when both `smtp_smarthost`
+# and `slack_api_url` are empty. Operators can read "Alertmanager alerts
+# firing" in Prometheus UI and conclude the pipeline works, but no
+# human ever receives a page. Refuse to ship a deploy that lacks BOTH
+# channels: read the env files the smoke stack is built from.
+if [ -f ".env.production" ]; then
+    ENV_FILE=".env.production"
+elif [ -f ".env" ]; then
+    ENV_FILE=".env"
+else
+    ENV_FILE=""
+fi
+
+if [ -z "$ENV_FILE" ]; then
+    echo -e "  $FAIL  Cannot assert notification channel — no .env.production or .env file present"
+    ALL_PASS=false
+else
+    SMTP_HOST=$(grep -E '^[[:space:]]*ALERTMANAGER_SMTP_HOST[[:space:]]*=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '[:space:]' || true)
+    SLACK_URL=$(grep -E '^[[:space:]]*ALERTMANAGER_SLACK_WEBHOOK_URL[[:space:]]*=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '[:space:]' || true)
+    if [ -z "$SMTP_HOST" ] && [ -z "$SLACK_URL" ]; then
+        echo -e "  $FAIL  No alerting channel configured. Set ALERTMANAGER_SMTP_HOST or ALERTMANAGER_SLACK_WEBHOOK_URL in $ENV_FILE before deploying."
+        ALL_PASS=false
+    else
+        STATUS_PHRASES=""
+        if [ -n "$SMTP_HOST" ]; then STATUS_PHRASES="${STATUS_PHRASES}smtp=$SMTP_HOST "; fi
+        if [ -n "$SLACK_URL" ]; then STATUS_PHRASES="${STATUS_PHRASES}slack=<redacted> "; fi
+        echo -e "  $PASS  Alerting channel(s) configured: ${STATUS_PHRASES% }"
+    fi
+fi
+
+# Drill a synthetic alert through Alertmanager. The drill proves the
+# alertmanager daemon accepted the alert (POST returns 200/202) and that
+# the `/api/v2/alerts` endpoint sees it — useful as a regression
+# sentinel for misconfigured `web.external-url` and broken routing.
+# Full delivery confirmation requires the operator to attach
+# `--notification-evidence` to a follow-up run-in-prod call; we
+# deliberately do NOT enable `--require-notification-evidence` in this
+# smoke so that CI can run the gate without a real mailbox.
+DRILL_OUTPUT=$("${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml exec -T dataforge python3 /app/scripts/run_alert_delivery_drill.py \
+    --url http://alertmanager:9093 \
+    --alertname "dataforge.smoke.delivery.drill" \
+    --severity info \
+    --drill-id "smoke-$(date +%s)" \
+    --timeout 5 \
+    --poll-interval 1 \
+    --json 2>&1 || true)
+if echo "$DRILL_OUTPUT" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert d.get('ready_status_code') == 200 and d.get('post_status_code') in (200, 202)" 2>/dev/null; then
+    echo -e "  $PASS  Alertmanager delivery drill accepted (ready=200 POST=accepted)"
+else
+    echo -e "  $FAIL  Alertmanager delivery drill failed — drill output:"
+    echo "$DRILL_OUTPUT" | sed 's/^/    /'
+    ALL_PASS=false
+fi
+
 # ───── Step 11: Check worker logs ──────────────────────────────────────────
 echo ""
 echo "─── Step 11: Worker logs (last 20 lines) ──────────────────────────────"

@@ -841,18 +841,18 @@ Status is `verified` unless noted.
 ### F-MON-001
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / alertmanager_silent_drop
-- **file_path:** `alertmanager.yml`, `docker-compose.prod.yml:387-391`
-- **line_function:** `global.smtp_smarthost`, `routes.critical`
-- **evidence:** `smtp_smarthost: '__ALERTMANAGER_SMTP_HOST__'` substitutes `''` (empty) if env unset. Same pattern for `__ALERTMANAGER_SLACK_WEBHOOK_URL__`. If both channels are empty, all `critical`/`warning`/`info` alerts are silently dropped. `scripts/run_alert_delivery_drill.py` exists but is not wired into `scripts/smoke_prod_stack.sh`.
+- **file_path:** `scripts/smoke_prod_stack.sh`, `backend/tests/test_alerting_channel_smoke.py`
+- **line_function:** new pre-drill step in smoke_prod_stack.sh, after `ALERT_READY` check, before worker logs
+- **evidence:** `smtp_smarthost: '__ALERTMANAGER_SMTP_HOST__'` substitutes `''` (empty) if env unset. Same pattern for `__ALERTMANAGER_SLACK_WEBHOOK_URL__`. The pre-fix smoke only checked `/-/ready` which serves 200 even when both channels are empty. If both channels are empty, all `critical`/`warning`/`info` alerts are silently dropped. `scripts/run_alert_delivery_drill.py` exists but was not wired into `scripts/smoke_prod_stack.sh`.
 - **why_it_matters:** Operators may believe the alerting pipeline works (Alertmanager shows alerts as "firing"), but no email/Slack delivery occurs. The drag-fail to deploy phase is invisible.
 - **impact:** On-call never pages during real incidents; MTTR climbs; the "production-ready" claim is misleading.
 - **recommended_fix:** Add a healthcheck to Alertmanager that asserts both channels reachable. Wire `python3 scripts/run_alert_delivery_drill.py` into `scripts/smoke_prod_stack.sh` so missing-channel deploys fail.
 - **tests_needed:** Smoke test asserts a synthetic alert's receipt on each enabled channel; fails deployment if any channel is empty.
 - **acceptance_criteria:** `make prod` cannot succeed when both `ALERTMANAGER_SMTP_HOST` and `ALERTMANAGER_SLACK_WEBHOOK_URL` are unset.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80). Mitigates the existing `P1-OPS-LOAD-ALERT-001` gap.
+- **notes:** New finding (Session 80). Mitigates the existing `P1-OPS-LOAD-ALERT-001` gap. **Fix shipped:** added a fail-closed pre-drill check to `scripts/smoke_prod_stack.sh` that reads `.env.production` (falling back to `.env`) and refuses deploy when both `ALERTMANAGER_SMTP_HOST` and `ALERTMANAGER_SLACK_WEBHOOK_URL` are unset. Added the synthetic alert delivery drill via `scripts/run_alert_delivery_drill.py` inside the dataforge container as a follow-up regression sentinel. Guarded by `backend/tests/test_alerting_channel_smoke.py` (5 tests).
 
 ### F-DB-001
 
