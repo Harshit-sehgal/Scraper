@@ -41,7 +41,7 @@ _VALUES_ROWS = re.compile(r"VALUES\b", re.IGNORECASE)
 # middle of a column name such as `updated_at`. We anchor on a leading
 # boundary so an earlier column name (e.g., ``updated_at``) does not
 # trigger a false positive.
-_DML_STATEMENT = re.compile(r"(?:^|[\n;])[ \t]*(?P<verb>UPDATE|DELETE\s+FROM|SELECT)\b", re.IGNORECASE)
+_DML_STATEMENT = re.compile(r"(?:^|[\n;])[ \t]*(?:UPDATE|DELETE\s+FROM|SELECT)\b", re.IGNORECASE)
 
 
 class TestPostgresMigrationIsDDLOnly:
@@ -74,7 +74,6 @@ class TestPostgresMigrationIsDDLOnly:
         text = _read(MIGRATION)
         bad = []
         for m in _DML_STATEMENT.finditer(text):
-            verb = m.group("verb").upper()
             # Find the line number for the offending token.
             line_no = text.count("\n", 0, m.start()) + 1
             line = text.splitlines()[line_no - 1].strip()

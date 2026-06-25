@@ -66,10 +66,12 @@ class TestSmokeSyntaxAndPeripherals:
     """The smoke script still parses and references the drill file."""
 
     def test_bash_syntax_parses(self) -> None:
+        import shutil
         import subprocess
 
+        bash = shutil.which("bash") or "/usr/bin/env bash"
         result = subprocess.run(
-            ["/bin/sh", "-n", str(SMOKE_SCRIPT)],
+            [bash, "-n", str(SMOKE_SCRIPT)],
             capture_output=True,
             text=True,
             check=False,
