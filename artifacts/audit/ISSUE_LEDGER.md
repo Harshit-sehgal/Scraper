@@ -1364,7 +1364,7 @@ Status is `verified` unless noted.
 ### F-DOCKER-004
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / dockerignore_gaps
 - **file_path:** `.dockerignore`
 - **line_function:** excludes for `.env.*`, `*.sqlite`, `data/`
@@ -1375,7 +1375,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic `touch .secrets/dump.sql`; verify it doesn't appear in `docker build . -t test`. `docker run test ls /app/.secrets` returns empty.
 - **acceptance_criteria:** No `.secrets/` files in any build context.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_dockerignore_blocks_secrets.py`
+- **notes:** Fixed Session 88: `.dockerignore` now denies `.secrets/`, `backend/init-db/`, `*.dump`, `*.sql.gz`, and `*.bak` so an operator-dropped plaintext pg_dump never reaches the build context. Regression test `backend/tests/test_dockerignore_blocks_secrets.py` parses the ignore file to confirm each pattern is listed and runs `git check-ignore` against a synthetic `.secrets/synthetic_dump.sql` to confirm the deny rule actually fires.
 
 ### F-DOCKER-006
 
@@ -1508,7 +1509,7 @@ Status is `verified` unless noted.
 ### F-NPM-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** frontend / package_json / caret_drift
 - **file_path:** `package.json:8-16`
 - **line_function:** every dep
@@ -1519,7 +1520,8 @@ Status is `verified` unless noted.
 - **tests_needed:** `npm install` outside CI produces identical lockfile diff as `npm ci`.
 - **acceptance_criteria:** Lockfile-only installs work reliably.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_npm_pin_no_range.py`
+- **notes:** Fixed Session 88: every dev-dependency in `package.json` is pinned to its exact lockfile-resolved version (no `^` / `~` / `>=` / `*` etc.). Regression test `backend/tests/test_npm_pin_no_range.py` asserts no range tokens remain in any deps group AND every pin matches `package-lock.json`'s `packages/*/version` field — locking in the install/career-drift invariant.
 
 ### F-NPM-002
 
@@ -1541,7 +1543,7 @@ Status is `verified` unless noted.
 ### F-NPM-003
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** frontend / package_json / no_prod_deps
 - **file_path:** `package.json:7-17`
 - **line_function:** `dependencies`/`devDependencies`
@@ -1552,7 +1554,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic prod-deps list fails the CI step.
 - **acceptance_criteria:** CI refuses prod deps in `package.json`.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_npm_no_prod_deps.py`
+- **notes:** Fixed Session 88: the existing all-devDep layout of `package.json` is now pinned by the new regression test `backend/tests/test_npm_no_prod_deps.py` which refuses a non-empty `dependencies` block. A future contributor who adds a runtime dep must consciously edit the test to document the exception.
 
 ### F-MON-004
 
@@ -1817,7 +1820,7 @@ Status is `verified` unless noted.
 ### F-SCRIPT-005
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / backup_drill / collides_with_local_dev
 - **file_path:** `scripts/backup_and_restore_test.py:95`
 - **line_function:** DSN assembly
@@ -1828,7 +1831,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic developer-DB-target drill fails loudly.
 - **acceptance_criteria:** Drill only writes to the disposable instance it created.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_backup_drill_port_collision_guard.py`
+- **notes:** Fixed Session 88: `scripts/backup_and_restore_test.py` now exposes `--drill-instance-port` for portable CI use and refuses to run when the chosen port is already in use unless `--allow-collision` is supplied. The preflight runs `socket.connect` against `127.0.0.1:<port>` and exits with code 2 on collision. Regression test `backend/tests/test_backup_drill_port_collision_guard.py` confirms both flags are accepted and `host_port_in_use` is a real OS probe (not a constant).
 
 ### F-SCRIPT-004
 

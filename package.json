@@ -5,15 +5,15 @@
   "type": "module",
   "description": "DataForge Studio — frontend tooling (CSS lint)",
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
-    "@vitest/ui": "^4.1.8",
-    "eslint": "^9.39.4",
-    "globals": "^17.6.0",
-    "jsdom": "^29.1.1",
-    "prettier": "^3.8.3",
-    "stylelint": "^16.26.1",
-    "stylelint-config-standard": "^36.0.1",
-    "vitest": "^4.1.8"
+    "@playwright/test": "1.60.0",
+    "@vitest/ui": "4.1.8",
+    "eslint": "9.39.4",
+    "globals": "17.6.0",
+    "jsdom": "29.1.1",
+    "prettier": "3.8.3",
+    "stylelint": "16.26.1",
+    "stylelint-config-standard": "36.0.1",
+    "vitest": "4.1.8"
   },
   "scripts": {
     "lint": "npm run lint:css && npm run lint:eslint && npm run lint:js",

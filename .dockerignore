@@ -68,6 +68,15 @@ backend/.coverage
 backend/data/
 *.csv
 *.xlsx
+*.dump
+*.sql.gz
+*.bak
+
+# ─── Secrets & DB Init (explicit deny — do not ship plaintext dumps ────────
+# F-DOCKER-004: developer drop point for raw ``pg_dump`` output and seed
+# scripts. They must never enter the build context.
+.secrets/
+backend/init-db/
 
 # ─── CI/CD ──────────────────────────────────────────────────────────────────
 .github/

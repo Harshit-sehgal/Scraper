@@ -3,21 +3,30 @@
 can be restored with full data integrity.
 
 Usage:
-    python3 scripts/backup_and_restore_test.py
+    python3 scripts/backup_and_restore_test.py \
+        [--drill-instance-port 15432] [--allow-collision]
+
+The drill refuses to start if ``--drill-instance-port`` (default 15432)
+is already bound by another Postgres unless ``--allow-collision`` is
+supplied. This guards against accidentally shadowing a developer's
+local dev-stack database.
 
 Requirements:
     - Docker (``docker`` command available)
-    - The port 15432 must be free (not used by another Postgres)
+    - The chosen drill-instance port must be free (or ``--allow-collision``)
 
 On success the script exits 0 and writes a summary to
 ``artifacts/backup_drill/``.
 On failure it prints diagnostic info and exits 1.
+On a port-collision preflight failure it exits 2.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -27,10 +36,11 @@ from pathlib import Path
 ARTIFACTS_DIR = Path("artifacts/backup_drill")
 CONTAINER_NAME = "dataforge-drill-pg"
 PG_IMAGE = "postgres:15-alpine"
-PG_PORT = 15432
+DEFAULT_PG_PORT = 15432
 PG_USER = "drill"
 PG_PASSWORD = "drill-secret"
 PG_DB = "dataforge_drill"
+PG_PORT = DEFAULT_PG_PORT  # mutated by ``parse_args`` when --drill-instance-port is supplied
 
 REQUIRED_TABLES = [
     "jobs",
@@ -256,7 +266,70 @@ def cleanup() -> None:
     )
 
 
+def host_port_in_use(port: int) -> bool:
+    """Return True if anything is listening on the host ``port``.
+
+    Used by the F-SCRIPT-005 preflight so the drill refuses to overlap
+    a developer's running dev-stack Postgres without an explicit opt-out.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+        try:
+            probe.connect(("127.0.0.1", port))
+        except OSError:
+            return False
+        return True
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI flags for the drill.
+
+    ``--drill-instance-port`` lets a CI runner pick a free host port
+    dynamically (the random-port CI workflow uses this) instead of
+    being pinned to ``15432``. ``--allow-collision`` is the escape
+    hatch that lets a developer with a dev Postgres already on the
+    configured port still run the drill — but it forces the operator
+    to consciously accept the overlap rather than silently race.
+    """
+    parser = argparse.ArgumentParser(
+        description=(
+            "Backup/Restore drill — spins a disposable Postgres,"
+            " seeds it, backs up, restores, and verifies row counts."
+        ),
+    )
+    parser.add_argument(
+        "--drill-instance-port",
+        type=int,
+        default=DEFAULT_PG_PORT,
+        help="Host port to bind the disposable Postgres to"
+        f" (default: {DEFAULT_PG_PORT}).",
+    )
+    parser.add_argument(
+        "--allow-collision",
+        action="store_true",
+        help=(
+            "Opt-in override that lets the drill shadow a Postgres"
+            " already listening on ``--drill-instance-port``."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
 def main() -> int:
+    global PG_PORT
+    args = parse_args()
+    PG_PORT = args.drill_instance_port
+
+    if host_port_in_use(PG_PORT) and not args.allow_collision:
+        log(
+            f"❌ Port {PG_PORT} is already in use on this host."
+            " Refusing to start the drill to avoid shadowing a"
+            " developer's local Postgres. Re-run with"
+            " --allow-collision if the overlap is intentional, or"
+            " pass --drill-instance-port=<free-port> for a CI runner."
+        )
+        return 2
+
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     check_docker()
     row_counts_before: dict[str, int] = {}
