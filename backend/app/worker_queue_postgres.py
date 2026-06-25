@@ -26,7 +26,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from contextlib import contextmanager
 
@@ -235,13 +234,15 @@ _queue_lock = threading.Lock()
 def get_postgres_worker_queue():
     """Get or create the global PostgresWorkerQueue instance.
 
-    Selects the driver based on ``DATAFORGE_PG_DRIVER``. Default is psycopg2.
+    Selects the driver through ``app.config.resolve_pg_driver``.
     """
     global _queue_instance
     if _queue_instance is None:
         with _queue_lock:
             if _queue_instance is None:
-                pg_driver = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
+                from app.config import resolve_pg_driver, settings
+
+                pg_driver = resolve_pg_driver(runtime_env=settings.ENV)
                 if pg_driver == "psycopg3":
                     try:
                         from app.worker_queue_postgres_psycopg3 import (

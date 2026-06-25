@@ -1,5 +1,4 @@
 import logging
-import os
 import threading
 from abc import ABC, abstractmethod
 from typing import Any
@@ -948,7 +947,7 @@ def get_job_repository() -> JobRepository:
         if _repository_instance is not None:
             return _repository_instance
 
-        from app.config import settings
+        from app.config import resolve_pg_driver, settings
 
         storage_backend = settings.STORAGE_BACKEND
 
@@ -962,23 +961,7 @@ def get_job_repository() -> JobRepository:
                 raise RuntimeError(
                     msg,
                 )
-            # Phase A: driver selection via DATAFORGE_PG_DRIVER. Defaults to
-            # psycopg2 in dev (preserves existing behaviour) but FAILS FAST in
-            # production if not set, because the production image ships only
-            # psycopg3 and psycopg2 would crash the worker on first use.
-            pg_driver_env = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
-            if not pg_driver_env and settings.ENV.lower() == "production":
-                msg = (
-                    "DATAFORGE_PG_DRIVER is not set. Production requires "
-                    "DATAFORGE_PG_DRIVER=psycopg3 because the production image "
-                    "installs only psycopg3 (psycopg2 is intentionally excluded). "
-                    "Set DATAFORGE_PG_DRIVER=psycopg3 in the dataforge and worker "
-                    "service environment in docker-compose.prod.yml."
-                )
-                raise RuntimeError(
-                    msg,
-                )
-            pg_driver = pg_driver_env or "psycopg2"
+            pg_driver = resolve_pg_driver(runtime_env=settings.ENV)
 
             if pg_driver == "psycopg3":
                 try:

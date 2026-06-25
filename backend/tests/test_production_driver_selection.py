@@ -8,6 +8,47 @@ only psycopg3.
 from __future__ import annotations
 
 import pytest
+from app.utils.rbac import UserRole
+
+
+def test_resolve_pg_driver_defaults_to_psycopg2_outside_production(monkeypatch) -> None:
+    """The central helper preserves the legacy dev default."""
+    monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)
+
+    from app.config import resolve_pg_driver
+
+    assert resolve_pg_driver(runtime_env="development") == "psycopg2"
+
+
+def test_resolve_pg_driver_fails_closed_when_missing_in_production(monkeypatch) -> None:
+    """Production must not silently default to the psycopg2 driver."""
+    monkeypatch.delenv("DATAFORGE_PG_DRIVER", raising=False)
+
+    from app.config import resolve_pg_driver
+
+    with pytest.raises(RuntimeError, match="DATAFORGE_PG_DRIVER"):
+        resolve_pg_driver(runtime_env="production")
+
+
+def test_resolve_pg_driver_normalizes_explicit_driver(monkeypatch) -> None:
+    """Whitespace/case normalization belongs in one helper."""
+    monkeypatch.setenv("DATAFORGE_PG_DRIVER", "  Psycopg3  ")
+
+    from app.config import resolve_pg_driver
+
+    assert resolve_pg_driver(runtime_env="development") == "psycopg3"
+
+
+@pytest.mark.asyncio
+async def test_system_manifest_reports_central_pg_driver(monkeypatch) -> None:
+    """The diagnostics endpoint must not hardcode a separate PG-driver default."""
+    monkeypatch.setenv("DATAFORGE_PG_DRIVER", "psycopg3")
+
+    from app.config import resolve_pg_driver
+    from app.routers.system import system_manifest
+
+    body = await system_manifest(UserRole.USER)
+    assert body["pg_driver"] == resolve_pg_driver()
 
 
 def test_production_without_pg_driver_fails_fast(monkeypatch) -> None:

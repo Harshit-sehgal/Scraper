@@ -165,4 +165,34 @@ class Settings(
         return self
 
 
+_VALID_PG_DRIVERS = {"psycopg2", "psycopg3"}
+
+
+def resolve_pg_driver(*, runtime_env: str | None = None) -> str:
+    """Resolve the configured Postgres driver from one policy point.
+
+    Development preserves the legacy psycopg2 default. Production fails
+    closed when the variable is absent because the production image and
+    compose files intentionally select psycopg3.
+    """
+    raw = (os.environ.get("DATAFORGE_PG_DRIVER") or "").strip().lower()
+    if raw:
+        if raw not in _VALID_PG_DRIVERS:
+            msg = f"Invalid DATAFORGE_PG_DRIVER={raw!r}. Expected one of: psycopg2, psycopg3."
+            raise RuntimeError(msg)
+        return raw
+
+    env = (runtime_env or os.environ.get("DATAFORGE_ENV") or settings.ENV).strip().lower()
+    if env == "production":
+        msg = (
+            "DATAFORGE_PG_DRIVER is not set. Production requires "
+            "DATAFORGE_PG_DRIVER=psycopg3 because the production image "
+            "installs only psycopg3 (psycopg2 is intentionally excluded). "
+            "Set DATAFORGE_PG_DRIVER=psycopg3 in the dataforge and worker "
+            "service environment in docker-compose.prod.yml."
+        )
+        raise RuntimeError(msg)
+    return "psycopg2"
+
+
 settings = Settings()

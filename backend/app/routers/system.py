@@ -7,7 +7,6 @@ import contextlib
 import io
 import json
 import logging
-import os
 import re
 import secrets
 import threading
@@ -21,7 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from app.config import settings
+from app.config import resolve_pg_driver, settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
 from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
@@ -78,7 +77,6 @@ async def system_manifest(
     currently-active AUP version so the help panel can show
     version-aware information without hardcoding values in JS.
     """
-    from app.config import settings
     from app.saas import CURRENT_AUP_VERSION
     from app.utils.encryption import _get_key_version
 
@@ -106,7 +104,7 @@ async def system_manifest(
             getattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False),
         ),
         "storage_backend": str(getattr(settings, "STORAGE_BACKEND", "sqlite")),
-        "pg_driver": os.environ.get("DATAFORGE_PG_DRIVER", "psycopg2"),
+        "pg_driver": resolve_pg_driver(runtime_env=settings.ENV),
     }
 
 

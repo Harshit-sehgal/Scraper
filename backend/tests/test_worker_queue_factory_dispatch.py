@@ -15,15 +15,15 @@ from unittest.mock import patch
 import pytest
 
 
-def _driver_selection() -> str:
+def _driver_selection(*, runtime_env: str = "development") -> str:
     """Return the driver name the factory would select for current env.
 
-    Mirrors the dispatch logic in ``get_postgres_worker_queue`` exactly
+    Delegates to the central resolver used by ``get_postgres_worker_queue``
     so we can verify the decision without opening a DB connection.
     """
-    import os
+    from app.config import resolve_pg_driver
 
-    return os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
+    return resolve_pg_driver(runtime_env=runtime_env)
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +34,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_factory_default_driver_is_psycopg2() -> None:
     """With no DATAFORGE_PG_DRIVER set, the factory selects the psycopg2 driver."""
-    assert _driver_selection() != "psycopg3"
+    assert _driver_selection() == "psycopg2"
 
 
 def test_factory_psycopg3_env_selects_psycopg3(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,7 +46,7 @@ def test_factory_psycopg3_env_selects_psycopg3(monkeypatch: pytest.MonkeyPatch) 
 def test_factory_psycopg2_env_explicit_selects_psycopg2(monkeypatch: pytest.MonkeyPatch) -> None:
     """DATAFORGE_PG_DRIVER=psycopg2 must select the psycopg2 driver."""
     monkeypatch.setenv("DATAFORGE_PG_DRIVER", "psycopg2")
-    assert _driver_selection() != "psycopg3"
+    assert _driver_selection() == "psycopg2"
 
 
 def test_factory_env_whitespace_and_case_normalised(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -57,6 +57,12 @@ def test_factory_env_whitespace_and_case_normalised(monkeypatch: pytest.MonkeyPa
     assert _driver_selection() == "psycopg3"
     monkeypatch.setenv("DATAFORGE_PG_DRIVER", "PSYCOPG2")
     assert _driver_selection() == "psycopg2"
+
+
+def test_factory_missing_driver_fails_closed_in_production() -> None:
+    """Production must not silently default to a legacy driver."""
+    with pytest.raises(RuntimeError, match="DATAFORGE_PG_DRIVER"):
+        _driver_selection(runtime_env="production")
 
 
 def test_factory_singleton_returns_same_instance() -> None:

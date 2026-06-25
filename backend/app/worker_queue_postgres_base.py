@@ -1041,10 +1041,9 @@ _queue_lock = threading.Lock()
 def get_postgres_worker_queue_base() -> PostgresWorkerQueueBase:
     """Get or create the global PostgresWorkerQueueBase instance.
 
-    The factory selects the right driver (psycopg2 vs psycopg 3) based on
-    ``DATAFORGE_PG_DRIVER`` environment variable. The returned
-    instance is cached as a module-level singleton so all callers share
-    the same instance.
+    The factory selects the right driver (psycopg2 vs psycopg 3) through
+    ``app.config.resolve_pg_driver``. The returned instance is cached as
+    a module-level singleton so all callers share the same instance.
     """
     global _queue_instance
     if _queue_instance is None:
@@ -1056,9 +1055,9 @@ def get_postgres_worker_queue_base() -> PostgresWorkerQueueBase:
 
 def _build_postgres_worker_queue() -> PostgresWorkerQueueBase:
     """Build a fresh PostgresWorkerQueueBase using the configured driver."""
-    import os
+    from app.config import resolve_pg_driver, settings
 
-    pg_driver = os.environ.get("DATAFORGE_PG_DRIVER", "").strip().lower()
+    pg_driver = resolve_pg_driver(runtime_env=settings.ENV)
     if pg_driver == "psycopg3":
         try:
             from app.worker_queue_postgres_psycopg3 import PostgresWorkerQueuePsycopg3

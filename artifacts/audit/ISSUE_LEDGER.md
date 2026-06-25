@@ -955,7 +955,7 @@ Status is `verified` unless noted.
 ### F-CONFIG-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** config / env_drift / pg_driver
 - **file_path:** `backend/app/storage_interface.py`, `backend/app/worker_queue_postgres.py`, `backend/app/worker_queue_postgres_base.py`, `backend/app/routers/system.py`
 - **line_function:** `DATAFORGE_PG_DRIVER` reads at lines 244, 1061, 969, 109
@@ -963,10 +963,10 @@ Status is `verified` unless noted.
 - **why_it_matters:** Operator sees the wrong driver in the diagnostics panel while the actual code path resolves to empty/psycopg3. Driver drift between the API surface and the worker/storage code.
 - **impact:** Confusing support diagnostics; operator may switch drivers based on the wrong info.
 - **recommended_fix:** Centralize `DATAFORGE_PG_DRIVER` resolution into one helper in `app.config`, fail closed in production if unset, single default across all readers.
-- **tests_needed:** Unit test on the helper; assert `routers/system.py::readiness` returns the same driver as the storage initializer.
-- **acceptance_criteria:** Removing `DATAFORGE_PG_DRIVER` from `.env` exposes the same driver from `/api/system/info` as the storage layer uses.
+- **tests_needed:** Unit test on the helper; assert `routers/system.py::system_manifest` returns the same driver as the central resolver/storage initializer.
+- **acceptance_criteria:** Removing `DATAFORGE_PG_DRIVER` outside production exposes the same driver from `/api/system/manifest` as the storage layer uses; production fails closed if the variable is missing.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `app.config.resolve_pg_driver()` now owns runtime PG driver normalization, invalid-value rejection, and production missing-driver fail-closed behavior. `storage_interface.py`, both Postgres worker queue factories, and `routers/system.py::system_manifest` now call the same helper, so diagnostics and storage/worker runtime paths report/select the same driver. Guarded by helper/manifest tests in `backend/tests/test_production_driver_selection.py` and worker dispatch tests in `backend/tests/test_worker_queue_factory_dispatch.py`.
 
 ### F-DOCKER-002
 

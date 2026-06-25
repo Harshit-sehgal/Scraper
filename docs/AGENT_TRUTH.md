@@ -1,12 +1,12 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 80 P0 hardening follow-up. Quick validation is
-green (`20260625T014026Z_quick`, 13/13 passed) and security validation
+Last verified: Session 81 P1 config follow-up. Quick validation is
+green (`20260625T021150Z_quick`, 13/13 passed) and security validation
 is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
 pip-audit, and the expected-failing production env template check).
 `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-57 open verified/deferred lower-priority rows, 44 fixed rows, 3
+56 open verified/deferred lower-priority rows, 45 fixed rows, 3
 candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
 route inventory is 161 routes; route auth matrix has 150 API rows with
 `unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
@@ -16,6 +16,36 @@ project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 81 P1 Config Follow-up - 2026-06-25
+
+Scope: close one verified P1 runtime configuration drift issue while
+preserving the existing production-safety contract.
+
+### Issue Fixed
+
+- `F-CONFIG-001`: runtime Postgres driver selection now resolves through
+  `app.config.resolve_pg_driver()`. The storage repository factory, both
+  Postgres worker queue factories, and `routers/system.py::system_manifest`
+  now use the same normalized/fail-closed driver value instead of each
+  reading `DATAFORGE_PG_DRIVER` separately.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_production_driver_selection.py -q -o addopts=` | 1 | RED before fix; new helper/manifest tests failed with `ImportError: cannot import name 'resolve_pg_driver' from 'app.config'`. |
+| `python3 -m pytest backend/tests/test_production_driver_selection.py backend/tests/test_worker_queue_factory_dispatch.py backend/tests/test_check_prod_env.py -q -o addopts=` | 0 | PASS; 68 tests passed. |
+| `python3 -m ruff check backend/app/config/__init__.py backend/app/storage_interface.py backend/app/worker_queue_postgres.py backend/app/worker_queue_postgres_base.py backend/app/routers/system.py backend/tests/test_production_driver_selection.py backend/tests/test_worker_queue_factory_dispatch.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/app/config/__init__.py backend/app/storage_interface.py backend/app/worker_queue_postgres.py backend/app/worker_queue_postgres_base.py backend/app/routers/system.py backend/tests/test_production_driver_selection.py backend/tests/test_worker_queue_factory_dispatch.py` | 0 | PASS; 7 files already formatted. |
+| `python3 -c "import csv; from collections import Counter; rows=list(csv.DictReader(open('artifacts/audit/ISSUE_LEDGER.csv', newline='', encoding='utf-8'))); statuses=Counter(row['status'] for row in rows); open_by_priority=Counter(row['priority'] for row in rows if row['status'] in {'verified','deferred (blocked by staging environment)'}); fconfig=[row['status'] for row in rows if row['issue_id']=='F-CONFIG-001'][0]; print({'rows': len(rows), 'statuses': dict(statuses), 'open_by_priority': dict(open_by_priority), 'F-CONFIG-001': fconfig})"` | 0 | PASS; 105 issue rows, statuses `fixed=45`, `verified=55`, `deferred=1`, `candidate=3`, `not_reproducible=1`; `F-CONFIG-001` is `fixed`. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T021150Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+The project remains pre-production until staging deployment, TLS, real
+secret-store/on-call delivery, backups, restore drill, load tests, monitoring
+alerts, and incident runbooks are proven in the target environment.
 
 ## Session 80 P0 Hardening Follow-up - 2026-06-25
 
