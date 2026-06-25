@@ -1,12 +1,12 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 82 P1 dev Compose ownership follow-up. Quick validation is
-green (`20260625T075812Z_quick`, 13/13 passed) and security validation
+Last verified: Session 84 P1 CI action-pinning follow-up. Quick validation is
+green (`20260625T091425Z_quick`, 13/13 passed) and security validation
 is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
 pip-audit, and the expected-failing production env template check).
 `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-55 open verified/deferred lower-priority rows, 46 fixed rows, 3
+51 open verified/deferred lower-priority rows, 50 fixed rows, 3
 candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
 route inventory is 161 routes; route auth matrix has 150 API rows with
 `unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
@@ -16,6 +16,80 @@ project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 84 P1 CI Action-Pinning Follow-up - 2026-06-25
+
+Scope: close verified P1 GitHub Actions supply-chain and fork-trigger
+issues while preserving Dependabot maintainability for pinned action SHAs.
+
+### Issues Fixed
+
+- `F-CI-003`: all third-party workflow `uses:` references are now pinned
+  to full 40-character commit SHAs instead of mutable tags like `@v4`.
+  `.github/dependabot.yml` now includes a weekly `github-actions` update
+  entry so Dependabot can refresh the pins, and
+  `scripts/check_workflow_action_pins.py` now runs from CI with
+  `backend/tests/test_workflow_action_pins.py` covering the checker and
+  maintenance path.
+- `F-CI-004`: `.github/workflows/auto-fix.yml` no longer exposes
+  workflow-level `contents: write`, the `pull_request` label path is
+  same-repo only, and every checkout/install/format/push step is gated
+  behind the fetched PR-head repository equality check for `/format`
+  comments. Auto-fix pushes require the dedicated `FORMAT_FIX_BOT_TOKEN`
+  instead of falling back to the workflow `GITHUB_TOKEN`.
+- `F-CI-010`: the stale cleanup workflow's `actions/stale` reference is
+  SHA-pinned and covered by the all-workflow action-pin checker.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before adding the guard passed; run id `20260625T083927Z_quick`, 13/13 checks passed. |
+| `python3 scripts/check_workflow_action_pins.py .github/workflows` | 0 | PASS; no mutable workflow action refs reported. |
+| `python3 -m pytest backend/tests/test_auto_fix_fork_filter.py -q -o addopts=` | 1 | RED before F-CI-004 fix; 2 failed and 2 passed because `auto-fix.yml` lacked the fork-head repo filter. |
+| `python3 -m pytest backend/tests/test_auto_fix_fork_filter.py backend/tests/test_workflow_action_pins.py backend/tests/test_dependabot_auto_merge.py -q -o addopts=` | 0 | PASS; 17 tests passed. |
+| `python3 -m ruff check scripts/check_workflow_action_pins.py backend/tests/test_auto_fix_fork_filter.py backend/tests/test_workflow_action_pins.py backend/tests/test_dependabot_auto_merge.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check scripts/check_workflow_action_pins.py backend/tests/test_auto_fix_fork_filter.py backend/tests/test_workflow_action_pins.py backend/tests/test_dependabot_auto_merge.py` | 0 | PASS; 4 files already formatted. |
+| `python3 -c "import csv; from collections import Counter; rows=list(csv.DictReader(open('artifacts/audit/ISSUE_LEDGER.csv', newline='', encoding='utf-8'))); print({'rows':len(rows),'statuses':dict(Counter(r['status'] for r in rows)),'open_by_priority':dict(Counter(r['priority'] for r in rows if r['status'] in {'verified','deferred (blocked by staging environment)'})),'F-CI-003':[r['status'] for r in rows if r['issue_id']=='F-CI-003'][0], 'F-CI-004':[r['status'] for r in rows if r['issue_id']=='F-CI-004'][0], 'F-CI-010':[r['status'] for r in rows if r['issue_id']=='F-CI-010'][0], 'F-DRIFT-001':[r['status'] for r in rows if r['issue_id']=='F-DRIFT-001'][0]})"` | 0 | PASS; 105 issue rows, statuses `fixed=50`, `verified=50`, `deferred=1`, `candidate=3`, `not_reproducible=1`; `F-CI-003`, `F-CI-004`, and `F-CI-010` are `fixed`, `F-DRIFT-001` remains `verified`. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T091425Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+`F-DRIFT-001` is intentionally still open: the existing regression tests
+only pin the current `read_only: true` and `/tmp` tmpfs posture. They do
+not prove the acceptance criterion because `/app/backend/data` remains a
+writable named volume for normal runtime state.
+
+## Session 83 P1 Production Image-Tag Follow-up - 2026-06-25
+
+Scope: close one verified P1 production redeploy reproducibility issue.
+
+### Issue Fixed
+
+- `F-DOCKER-005`: production Compose no longer falls back to
+  `dataforge:latest`. `DATAFORGE_IMAGE_TAG` is required for both app and
+  worker images; production build/deploy Makefile targets require the tag,
+  `make prod` uses `--pull=never`, and the production env validator rejects
+  empty, placeholder, and `latest` tag values.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_docker_image_tag_pinning.py backend/tests/test_docker_prod_image_tag.py -q -o addopts=` | 1 | RED before final fix/consolidation; image-tag guards failed on service lookup/env-template/runbook expectations. |
+| `python3 -m pytest backend/tests/test_docker_image_tag_pinning.py backend/tests/test_check_prod_env.py -q -o addopts=` | 0 | PASS; 61 tests passed. |
+| `python3 -m ruff check backend/tests/test_docker_image_tag_pinning.py backend/tests/test_check_prod_env.py scripts/check_prod_env.py backend/tests/test_alerting_channel_smoke.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/tests/test_docker_image_tag_pinning.py backend/tests/test_check_prod_env.py scripts/check_prod_env.py backend/tests/test_alerting_channel_smoke.py` | 0 | PASS; 4 files already formatted. |
+| `DATAFORGE_DB_PASSWORD=strong-password-xyz DATAFORGE_METRICS_TOKEN=metrics-token-xyz docker compose -f docker-compose.prod.yml config -q; echo missing_tag_exit:$?` | 0 | PASS; Compose emitted a missing `DATAFORGE_IMAGE_TAG` interpolation error and printed `missing_tag_exit:1`. |
+| `DATAFORGE_IMAGE_TAG=v-test DATAFORGE_DB_PASSWORD=strong-password-xyz DATAFORGE_METRICS_TOKEN=metrics-token-xyz docker compose -f docker-compose.prod.yml config \| rg -n "image: dataforge:v-test\|image: dataforge:latest\|DATAFORGE_IMAGE_TAG"` | 0 | PASS; rendered config contained `image: dataforge:v-test` for app and worker and no `dataforge:latest` match. |
+| `python3 -c "import csv; from collections import Counter; rows=list(csv.DictReader(open('artifacts/audit/ISSUE_LEDGER.csv', newline='', encoding='utf-8'))); statuses=Counter(row['status'] for row in rows); open_by_priority=Counter(row['priority'] for row in rows if row['status'] in {'verified','deferred (blocked by staging environment)'}); print({'rows': len(rows), 'statuses': dict(statuses), 'open_by_priority': dict(open_by_priority), 'F-DOCKER-005': [r['status'] for r in rows if r['issue_id']=='F-DOCKER-005'][0]})"` | 0 | PASS; 105 issue rows, statuses `fixed=47`, `verified=53`, `deferred=1`, `candidate=3`, `not_reproducible=1`; `F-DOCKER-005` is `fixed`. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T082837Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+The project remains pre-production until staging deployment, TLS, real
+secret-store/on-call delivery, backups, restore drill, load tests, monitoring
+alerts, and incident runbooks are proven in the target environment.
 
 ## Session 82 P1 Dev Compose Ownership Follow-up - 2026-06-25
 

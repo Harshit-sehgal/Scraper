@@ -33,3 +33,22 @@ updates:
     # npm ecosystem does not support groups natively — each dep gets
     # its own PR, which is fine given the small devDependency set.
     rebase-strategy: "rebase"
+
+  # F-CI-003 keep third-party GitHub Actions SHA-pinned. The workflow
+  # files pin actions by their 40-char SHA, so a tag push by the
+  # upstream action maintainer cannot silently swap the contents
+  # that CI runs. Dependabot refreshes the SHAs whenever a new tag
+  # is published. Patch and minor bumps of those SHAs go through
+  # `dependabot-auto-merge.yml` (F-CI-001 / F-CI-002).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "Asia/Kolkata"
+    groups:
+      github-actions-pins:
+        patterns:
+          - "*"
+    rebase-strategy: "rebase"

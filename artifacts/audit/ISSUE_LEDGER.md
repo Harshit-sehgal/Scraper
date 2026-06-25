@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 57 |
-| Fixed issues | 44 |
+| Open verified/deferred issues | 51 |
+| Fixed issues | 50 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -152,6 +152,19 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > and session secrets now use Docker secrets plus `DATAFORGE_*_FILE`
 > loader support. `ISSUE_LEDGER.csv` was also synchronized with the
 > Markdown ledger (105 issue IDs); no P0 rows remain open.
+>
+> Updated 2026-06-25 CI action-pinning/fork-filter pass: `F-CI-003`,
+> `F-CI-004`, and `F-CI-010` fixed. All third-party workflow `uses:`
+> references are pinned to full 40-character commit SHAs, `.github/dependabot.yml`
+> has a `github-actions` update entry to refresh those pins,
+> `scripts/check_workflow_action_pins.py` runs from CI, and
+> `backend/tests/test_workflow_action_pins.py` covers the checker plus
+> the Dependabot maintenance path. `auto-fix.yml` now uses read-only
+> default token permissions, gates same-repo `pull_request` labels at
+> job dispatch, and gates all checkout/install/format/push steps behind
+> a fetched PR-head repo equality check for `/format` comments. Auto-fix
+> pushes require the dedicated `FORMAT_FIX_BOT_TOKEN` instead of falling
+> back to the workflow `GITHUB_TOKEN`.
 
 
 ## Verified Issues
@@ -1014,12 +1027,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Run a compromised process and assert it cannot write `semantic_state.json` while still writing logs.
 - **acceptance_criteria:** Compromise from the API process cannot tamper with `semantic_state.json`.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80). **Partial fix shipped:** regression test `backend/tests/test_read_only_root_fs.py` (6 tests) now asserts the existing `read_only: true` lockdown on both dataforge and worker services, the `/tmp` tmpfs scratch on each, the precise `/app/backend/data` named-volume mount, and the absence of any hidden `read_only: false` override. The deeper recommendation (splitting `/app/backend/data` into `:ro` subpaths for `semantic` and `:rw` subpaths for `logs`) is NOT applied because `backend/app/semantic_persistence.py::save_semantic_state` writes the semantic state during normal runtime (lines 78-99); making it `:ro` would break the live runtime. Splitting requires an app-level cache split between in-memory and persisted footprint, which is deferred to a separate follow-up.
+- **notes:** New finding (Session 80). **Partial guard shipped, issue still open:** regression test `backend/tests/test_read_only_root_fs.py` (6 tests) asserts the existing `read_only: true` lockdown on both dataforge and worker services, the `/tmp` tmpfs scratch on each, the precise `/app/backend/data` named-volume mount, and the absence of any hidden `read_only: false` override. This does NOT satisfy the acceptance criterion because `/app/backend/data` remains writable by the app process. The deeper recommendation (splitting `/app/backend/data` into `:ro` subpaths for `semantic` and `:rw` subpaths for `logs`) is NOT applied because `backend/app/semantic_persistence.py::save_semantic_state` writes the semantic state during normal runtime (lines 78-99); making it `:ro` would break the live runtime. Splitting requires an app-level cache split between in-memory and persisted footprint, which remains a follow-up.
 
 ### F-CI-003
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / mutable_action_refs
 - **file_path:** all `.github/workflows/*.yml` (10 files)
 - **line_function:** every `uses:` for third-party actions
@@ -1030,12 +1043,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Add a CI step that fails the workflow if any `uses:` is not SHA-pinned.
 - **acceptance_criteria:** Zero mutable-tag third-party actions in any workflow.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** all third-party workflow `uses:` references are pinned to full 40-character commit SHAs, `.github/dependabot.yml` includes a weekly `github-actions` update entry to refresh those pins, and `backend/tests/test_workflow_action_pins.py` guards both the SHA-pinning invariant and the Dependabot maintenance path. CI's `fast-gates` job invokes `scripts/check_workflow_action_pins.py` to keep the invariant honest.
 
 ### F-CI-004
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / fork_pr_token_pivot
 - **file_path:** `.github/workflows/auto-fix.yml:25-30`
 - **line_function:** `on: issue_comment: [created]` + `pull_request: [labeled]`
@@ -1046,12 +1059,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic fork PR with `/format` comment — workflow does not push.
 - **acceptance_criteria:** No fork can trigger a `contents: write` step in auto-fix.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** workflow-level `contents` permission is read-only, the `pull_request` labeled path requires `github.event.pull_request.head.repo.full_name == github.repository`, the `/format` comment path fetches the PR head repo before checkout, every checkout/install/format/push step is gated by `steps.pr.outputs.allowed == 'true'`, and auto-fix pushes require the dedicated `FORMAT_FIX_BOT_TOKEN` instead of falling back to `GITHUB_TOKEN`. Guarded by `backend/tests/test_auto_fix_fork_filter.py`.
 
 ### F-CI-005
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / detect_secret_emptiness
 - **file_path:** `.github/workflows/ci.yml:414-431`, `browser-e2e.yml:120-136`, `optional-suites.yml:114-132`, `postgres-tests.yml:75-87`, `nightly-integration.yml:51-69`, `golden-dataset.yml:51-72`, `validate-production.yml:463-479`
 - **line_function:** `if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_TO != ''`
@@ -1062,7 +1075,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic workflow run with `TELEGRAM_TOKEN=` empty value — step skips.
 - **acceptance_criteria:** Notification step is skipped when either secret is empty.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `stale-cleanup.yml` now uses a full 40-character SHA for `actions/stale`, and `scripts/check_workflow_action_pins.py` plus `backend/tests/test_workflow_action_pins.py` guard the all-workflow SHA-pinning invariant.
 
 ### F-CI-008
 
