@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 37 |
-| Fixed issues | 64 |
+| Open verified/deferred issues | 27 |
+| Fixed issues | 74 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -192,6 +192,13 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > `${{ job.services.postgres.ports[5432] }}` so concurrent runs do not
 > bind the same host port. Guarded by
 > `backend/tests/test_postgres_workflow_service_ports.py`.
+>
+> Updated 2026-06-26 Session 89: synchronized Markdown/CSV status drift
+> for `F-DRIFT-001` and `F-CI-010`, then closed `F-CI-008`. The CI
+> production-image smoke now runs a one-shot, no-network, read-only,
+> no-new-privileges container with all Linux capabilities dropped and an
+> explicit non-root user. Guarded by
+> `backend/tests/test_ci_image_smoke_hardening.py`.
 
 
 ## Verified Issues
@@ -1043,7 +1050,7 @@ Status is `verified` unless noted.
 ### F-DRIFT-001
 
 - **priority:** P1
-- **status:** fixed
+- **status:** verified
 - **category:** infrastructure / docker / readonly_bypass
 - **file_path:** `docker-compose.prod.yml:48-49, 73, 142` (dataforge), 119, 160 (worker)
 - **line_function:** both services `read_only: true` plus `volumes:` block
@@ -1108,7 +1115,7 @@ Status is `verified` unless noted.
 ### F-CI-008
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / image_smoke_runner_exposure
 - **file_path:** `.github/workflows/ci.yml:322-355`
 - **line_function:** `image-build` job `docker run` step
@@ -1119,12 +1126,12 @@ Status is `verified` unless noted.
 - **tests_needed:** `gh run view `<run-id>` --json jobs[]` shows the smoke container's caps.
 - **acceptance_criteria:** Smoke container runs with the listed hardening flags.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). Fixed in Session 89: the CI image smoke no longer runs a detached HTTP server or publishes host port 8000. It runs a one-shot in-container `app.main` import check under `--network=none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--user 65534:65534`, and a constrained `/tmp` tmpfs. Guarded by `backend/tests/test_ci_image_smoke_hardening.py`; adjacent workflow guards passed.
 
 ### F-CI-010
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / mutable_action_refs
 - **file_path:** `.github/workflows/stale-cleanup.yml:30`
 - **line_function:** `uses: actions/stale@v9`
@@ -1135,7 +1142,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Same SHA-pin enforcer as F-CI-003.
 - **acceptance_criteria:** `actions/stale` is SHA-pinned.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). Fix shipped: `stale-cleanup.yml` now uses a full 40-character SHA for `actions/stale`; the workflow action-pin checker and tests guard this invariant.
 
 ### F-NGINX-001
 

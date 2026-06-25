@@ -352,27 +352,26 @@ jobs:
       - name: Build production image
         run: docker build --target production -t dataforge:ci-test .
 
-      - name: Smoke-test /ready
+      - name: Smoke-test production image under hardened container
         run: |
-          docker run -d --rm \
+          docker run --rm \
+            --network=none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --user 65534:65534 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            -e HOME=/tmp \
             -e DATAFORGE_STORAGE_BACKEND=sqlite \
-            -e DATAFORGE_ENV=staging \
+            -e DATAFORGE_ENV=test \
             -e DATAFORGE_API_KEY=test \
-            -p 8000:8000 \
-            --name dataforge-ci-smoke \
-            dataforge:ci-test
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8000/ready >/dev/null; then
-              echo "✅ /ready returned 200"
-              docker stop dataforge-ci-smoke || true
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "❌ Server failed to start within 30s"
-          docker logs dataforge-ci-smoke || true
-          docker stop dataforge-ci-smoke || true
-          exit 1
+            -e DATAFORGE_OPERATOR_API_KEY=test-operator \
+            -e DATAFORGE_ADMIN_API_KEY=test-admin \
+            -e DATAFORGE_SESSION_SECRET=ci-smoke-session-secret \
+            -e DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false \
+            -e DATAFORGE_SKIP_DB_CHECK=true \
+            dataforge:ci-test \
+            python -c "import importlib; app = importlib.import_module('app.main').app; assert app is not None; print('✅ production image imports app.main successfully')"
 
   # ── 7. SBOM Generation ────────────────────────────────────────────────
   sbom:

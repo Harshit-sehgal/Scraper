@@ -1,13 +1,13 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 88b supply-chain + DB-migration + docker + drill
-follow-up. Quick validation is green (`20260625T161803Z_quick`, 12/12
-passed) and security validation is green (`20260625T013939Z_security`,
+_Truth source current as of 2026-06-26 local time from the working tree.
+Last verified: Session 89 CI image-smoke hardening follow-up. Quick
+validation is green (`20260625T201608Z_quick`, 13/13 passed) and
+security validation is green (`20260625T013939Z_security`,
 9/9 passed, including Bandit, pip-audit, and the expected-failing
 production env template check). `artifacts/audit/ISSUE_LEDGER.md` /
-`.csv` now agree on 105 issue IDs: 28 open verified/deferred
-lower-priority rows, 72 fixed rows, 3 candidate rows, 1
+`.csv` now agree on 105 issue IDs: 27 open verified/deferred
+lower-priority rows, 74 fixed rows, 3 candidate rows, 1
 not-reproducible row, and 0 open P0 rows.
 Current route inventory is 161 routes; route auth matrix has 150 API
 rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
@@ -17,6 +17,45 @@ inspected project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 89 CI Image-Smoke Hardening Follow-up - 2026-06-26
+
+Scope: close `F-CI-008` and repair stale ledger status/CSV drift found
+before selecting the next P1 issue.
+
+### Issues Fixed
+
+- `F-CI-008`: CI still builds the production image, but the smoke step no
+  longer runs a detached HTTP server on the GitHub runner. The smoke now
+  runs a one-shot in-container `app.main` import under `--network=none`,
+  `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`,
+  `--user 65534:65534`, and a constrained `/tmp` tmpfs.
+- Ledger hygiene: `artifacts/audit/ISSUE_LEDGER.md` and `.csv` now agree
+  on all 105 issue statuses, and the CSV has 14 columns on every row.
+  The repair corrected stale status drift around `F-DRIFT-001` /
+  `F-CI-010` and malformed Session 88 CSV rows.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before editing passed; run id `20260625T200222Z_quick`, 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_ci_image_smoke_hardening.py -q -o addopts=` | 1 | RED before fix; 3 failures caught missing `--network=none`, missing runtime hardening flags, and missing in-container Python app check. |
+| `python3 -m pytest backend/tests/test_ci_image_smoke_hardening.py backend/tests/test_workflow_action_pins.py backend/tests/test_npm_audit_signatures.py backend/tests/test_telegram_ci_secret_guards.py -q -o addopts=` | 0 | PASS after workflow fix; 17 workflow guard tests passed. |
+| `python3 -m ruff format backend/tests/test_ci_image_smoke_hardening.py && python3 -m ruff check backend/tests/test_ci_image_smoke_hardening.py && python3 -m ruff format --check backend/tests/test_ci_image_smoke_hardening.py && python3 - <<'PY' ... yaml.safe_load('.github/workflows/ci.yml') ... PY` | 0 | PASS; test formatted/linted and CI workflow YAML parsed. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv + Markdown status agreement check ... PY` | 0 | PASS after CSV repair; 105 rows, 14 columns, 0 malformed rows; statuses `fixed=74`, `verified=26`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=13`, `P2=14`; Markdown/CSV status mismatch list empty. |
+| `docker build --target production -t dataforge:ci-test .` | 0 | PASS; production image built locally. Legacy Docker builder also walked the dev stage because of Dockerfile stage order; that duplicate browser install remains tracked by `F-DOCKER-003`. |
+| `docker run --rm --network=none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --tmpfs /tmp:rw,noexec,nosuid,size=64m ... dataforge:ci-test python -c "import importlib; app = importlib.import_module('app.main').app; assert app is not None; print(...)"` | 0 | PASS; hardened no-network smoke imported `app.main` successfully inside the production image. |
+| `python3 -m pytest backend/tests/test_ci_image_smoke_hardening.py backend/tests/test_workflow_action_pins.py backend/tests/test_npm_audit_signatures.py backend/tests/test_telegram_ci_secret_guards.py -q -o addopts=` | 0 | PASS; 17 workflow guard tests passed after final docs/ledger updates. |
+| `python3 -m ruff check backend/tests/test_ci_image_smoke_hardening.py && python3 -m ruff format --check backend/tests/test_ci_image_smoke_hardening.py` | 0 | PASS; lint and format checks clean. |
+| `python3 scripts/verify_docs_match_code.py && git diff --check` | 0 | PASS; route/env docs match code and no whitespace errors. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T201608Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+This proves the CI smoke command can run locally in a hardened
+container. It does not replace the older `/ready` runtime health check
+used by the Dockerfile and compose health checks.
 
 ## Session 88b Supply-chain + DB Migration + Docker + Drill Follow-up - 2026-06-25
 
