@@ -825,18 +825,18 @@ Status is `verified` unless noted.
 ### F-NGINX-003
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / path_traversal_rate_limit_bypass
-- **file_path:** `nginx.conf`
-- **line_function:** `location /dashboard/` block at lines 264-270
-- **evidence:** `/dashboard/` uses `proxy_pass http://dataforge_api;` without a URI component. nginx normalizes `..` segments before proxying: `/dashboard/../api/admin/foo` resolves to `proxy_pass http://dataforge_api/api/admin/foo` after normalization. The `/api/` location has `limit_req zone=api burst=20 nodelay`, but the `/dashboard/../api/...` path bypasses that throttle entirely.
+- **file_path:** `nginx.conf`, `nginx.local.conf`
+- **line_function:** `location /dashboard/` block in both files
+- **evidence:** `location /dashboard/` used `proxy_pass http://dataforge_api;` without a URI component. nginx normalizes `..` segments before proxying: `/dashboard/../api/admin/foo` resolves to `proxy_pass http://dataforge_api/api/admin/foo` after normalization. The `/api/` location has `limit_req zone=api burst=20 nodelay`, but the `/dashboard/../api/...` path matches the prefix location and bypasses that throttle entirely. The same block in `nginx.local.conf` (used by `docker-compose.override.local.yml`) also lacks rate-limiting.
 - **why_it_matters:** Unbounded request rate to `/api/admin/*` (and the rest of `/api/`) via the `/dashboard/` front-door. Combined with no `/api/admin` deny block in `nginx.local.conf`, attackers reach protected FastAPI routes at unlimited rate.
 - **impact:** Admin endpoint probing, brute force, and DoS are all enabled by this single nginx config drift.
 - **recommended_fix:** Move the rate-limit guard to `location ~ ^/(api|dashboard)/` regex block, or add `rewrite ^/dashboard/(.*)$ /dashboard/$1 break;` to force normalization before rate limiting.
 - **tests_needed:** Integration test: burst 100 requests to `/dashboard/../api/health` and assert nginx returns 503/429 after the limit. Verify legitimate `/api/health` still answers.
 - **acceptance_criteria:** Requests for `/api/...` paths trigger the `limit_req` regardless of the prefix used.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `nginx.conf` and `nginx.local.conf` `location /dashboard/` blocks both apply `limit_req zone=api burst=20 nodelay;` (same zone as `/api/`). Guarded by `backend/tests/test_nginx_rate_limit.py` (3 tests) which parses the uncommented server block from `nginx.conf`, extracts the `/dashboard/` location body, and asserts the zone is `api` (so a future refactor that introduces a fresh zone for dashboard would still fail).
 
 ### F-MON-001
 
@@ -857,18 +857,18 @@ Status is `verified` unless noted.
 ### F-DB-001
 
 - **priority:** P0
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / db_migrations / non_idempotent_dump
-- **file_path:** `backend/migrations/008_postgres_storage_v8.sql`
-- **line_function:** file header `\restrict` macro (line 1) and pg_dump 16 artifact metadata
-- **evidence:** The file begins with `\restrict fRKAyhUraWQwVaATmxbYMFspXTvDR27nZM2IShtu4LmwPtevKjM07DEsQblPrmN` and contains `CREATE EXTENSION` + `COPY` statements that are not idempotent. Replaying the file against an existing schema fails on duplicates.
-- **why_it_matters:** Operators cannot bootstrap a fresh Postgres cluster via the migrations directory. The pattern is a per-version raw dump, not a migration step.
-- **impact:** Disaster recovery from a `pg_dump` alone is not safe; `init-db/init.sql:13-21` only creates extensions (`uuid-ossp`, `pg_trgm`) and leaves schema creation to `app.postgres_repository._ensure_schema()`. There is no way to know which schema versions are applied from outside the app.
+- **file_path:** `backend/migrations/008_postgres_storage_v8.sql`, `scripts/normalize_migration_008.py`, `backend/migrations/008_postgres_storage_v8.sql.original`
+- **line_function:** post-normalized file is structured as CREATE EXTENSION → CREATE TABLE IF NOT EXISTS → CREATE INDEX IF NOT EXISTS → guarded ALTER OWNER DO blocks → schema_version upsert
+- **evidence:** Original file began with `\restrict fRKAyhUraWQwVaATmxbYMFspXTvDR27nZM2IShtu4LmwPtevKjM07DEsQblPrmN` and contained raw pg_dump 16 artifact metadata + bare CREATE TABLE / CREATE INDEX / ALTER OWNER lines that were not idempotent against a partially-migrated database.
+- **why_it_matters:** Operators cannot bootstrap a fresh Postgres cluster via the migrations directory. The pattern was a per-version raw dump, not a migration step. The leading `\restrict` macro also breaks any tool that runs migrations through stdin (psql anti-paste token).
+- **impact:** Disaster recovery from a `pg_dump` alone was not safe; `init-db/init.sql:13-21` only creates extensions (`uuid-ossp`, `pg_trgm`) and the actual schema creation is delegated to `app.postgres_repository._ensure_schema()`. There was no way to know which schema versions are applied from outside the app.
 - **recommended_fix:** Use `pg_dump --schema-only --no-owner --no-privileges` for per-version DDL files. Drop `COPY` data. Track schema versions in a `schema_version` table that `_ensure_schema()` reads on boot.
 - **tests_needed:** Restart-from-empty Postgres applies DDL files in order with no errors. `_ensure_schema()` idempotency test on already-migrated DB.
 - **acceptance_criteria:** `psql -f migrations/<N>.sql` is replayable against any state and reports its version.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** added `scripts/normalize_migration_008.py` (a deterministic, idempotent-on-itself transformer) and regenerated `backend/migrations/008_postgres_storage_v8.sql` from the raw dump (kept alongside as `.original` for forensic reference). The new file strips `\restrict`/`\unrestrict`, pg-dump session SETs, owner comments; rewrites CREATE TABLE / CREATE INDEX / CREATE SEQUENCE / CREATE UNIQUE INDEX to IF NOT EXISTS; wraps every `ALTER TABLE / SEQUENCE … OWNER TO` in a `DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '<role>')` guard so missing roles no-op; and tail-appends a `schema_version` upsert so operators can verify replay. Guarded by `backend/tests/test_db_migrations_008.py` (8 tests) including a fixed-point round-trip that runs the normalizer twice and asserts byte equality on the second pass.
 
 ### F-CI-001
 
