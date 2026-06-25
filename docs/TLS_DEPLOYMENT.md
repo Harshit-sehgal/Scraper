@@ -13,7 +13,7 @@ runtime checks operators should run after deployment.
 | Block | Listener | Status | Purpose |
 |-------|----------|--------|---------|
 | A     | 443      | active | Production HTTPS with HSTS, security headers, ACME-friendly front |
-| B     | 80       | active | 301 → HTTPS for everything except `/.well-known/acme-challenge/` and the `/health` / `/ready` probes |
+| B     | 80       | active | 301 → HTTPS for everything except `/.well-known/acme-challenge/` |
 | C     | 80       | commented | HTTP-only fallback for environments that cannot obtain a cert (local docker-compose, behind a TLS-terminating proxy) |
 
 HSTS is emitted **only** on the 443 listener. MDN documents that
@@ -23,7 +23,8 @@ port 80 is a no-op that misleads operators — we do not do that.
 The `backend/tests/test_nginx_tls_posture.py` static test asserts:
 
 * HSTS is inside the HTTPS server block, not the HTTP one.
-* HTTP block has a 301 redirect to HTTPS (preserving the path and query).
+* HTTP block has a 301 redirect to HTTPS (preserving the path and query),
+  including `/health` and `/ready`.
 * The dev HTTP-only block is commented out and clearly marked
   HSTS-disabled.
 
@@ -53,8 +54,10 @@ curl -sI https://api.example.com/ | grep -i strict-transport-security
 curl -sI http://api.example.com/ | grep -i strict-transport-security \
   || echo "✅ no HSTS on HTTP (correct)"
 
-# 6. Plain HTTP redirects to HTTPS
+# 6. Plain HTTP redirects to HTTPS, including health probes
 curl -sI http://api.example.com/api/jobs | grep -i location
+curl -sI http://api.example.com/health | grep -i location
+curl -sI http://api.example.com/ready | grep -i location
 
 # 7. The dashboard HTML does not reference http:// assets
 curl -fsS https://api.example.com/app/ | grep -E "http://[a-z]" \
@@ -70,10 +73,10 @@ Expected results:
 |---|----------|
 | 1 | `notBefore` in the past, `notAfter` ≥ 30 days out, `issuer` is a trusted CA |
 | 2 | `status=200` |
-| 3 | 200 with `{"status": "ok"}` or `"ok\n"` |
-| 4 | `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` |
+| 3 | 200 with `{"status": "ready"}` |
+| 4 | `Strict-Transport-Security: max-age=63072000; includeSubDomains` |
 | 5 | "no HSTS on HTTP (correct)" |
-| 6 | `location: https://api.example.com/api/jobs` |
+| 6 | `location: https://api.example.com/...` for `/api/jobs`, `/health`, and `/ready` |
 | 7 | "no mixed-content references" |
 | 8 | 200 or 404 — never 301 |
 

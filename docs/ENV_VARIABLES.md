@@ -19,6 +19,13 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_JOB_STORE_PATH` | - | Override SQLite job-store database path |
 | `DATAFORGE_SEMANTIC_STATE_PATH` | `data/semantic_state.json` | Path to semantic state file |
 
+## Production Ingress
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_NGINX_SSL_DIR` | `./.secrets/nginx` | Directory mounted into production nginx at `/etc/nginx/ssl`; must contain `fullchain.pem` and `privkey.pem` for real TLS deployments |
+| `DATAFORGE_CERTBOT_WEBROOT` | `./.secrets/certbot/www` | Directory mounted into production nginx at `/var/www/certbot` for ACME http-01 challenge files |
+
 ## Authentication
 
 | Variable | Default | Description |

@@ -82,24 +82,17 @@ class TestDashboardRateLimitApplied:
         text = NGINX_CONF.read_text(encoding="utf-8")
         assert NGINX_CONF.is_file(), f"missing {NGINX_CONF}"
         block = _location_block(_active_server_block(text), "/dashboard/")
-        # F-NGINX-003: accept either ``zone=api`` (legacy static) or
-        # ``zone=$api_bucket`` (F-NGINX-SEC-001 method-aware bucket —
-        # GETs land in the read ``api`` zone; writes in ``api_write``).
-        # Both bristle against the path-normalization bypass: ``GET
-        # /dashboard/../api/admin/...`` still throttled, ``POST
-        # /dashboard/../api/admin/...`` throttled by the write bucket.
-        # The dashboard block MUST share the same per-method throttle
-        # as ``/api/`` so an attacker cannot pivot through
-        # ``/dashboard/`` to evade the API throttle.
+        # F-NGINX-003/F-NGINX-SEC-001: the dashboard block MUST share
+        # the same read/write literal throttle zones as ``/api/`` so
+        # an attacker cannot pivot through ``/dashboard/`` to evade
+        # the API throttle. nginx rejects variable zone names such as
+        # ``zone=$api_bucket`` at runtime.
         assert re.search(r"limit_req\s+zone=\S+", block), (
-            "nginx.conf: /dashboard/ location no longer applies a limit_req;"
-            " the F-NGINX-003 path-normalization bypass is back."
+            "nginx.conf: /dashboard/ location no longer applies a limit_req; the F-NGINX-003 path-normalization bypass is back."
         )
-        assert ("zone=api" in block) or ("zone=$api_bucket" in block), (
-            "nginx.conf: /dashboard/ does not share a rate-limit zone with"
-            " /api/; the F-NGINX-003 path-normalization bypass"
-            " (/dashboard/../api/admin/) is exploitable again."
-        )
+        assert "limit_req zone=api burst=20 nodelay;" in block
+        assert "limit_req zone=api_write burst=10 nodelay;" in block
+        assert "zone=$api_bucket" not in block
 
     def test_local_nginx_dashboard_has_limit_req(self) -> None:
         block = _nginx_local_dashboard_block()
@@ -107,10 +100,9 @@ class TestDashboardRateLimitApplied:
             "nginx.local.conf: /dashboard/ location no longer applies a limit_req;"
             " the F-NGINX-003 path-normalization bypass is back."
         )
-        assert ("zone=api" in block) or ("zone=$api_bucket" in block), (
-            "nginx.local.conf: /dashboard/ does not share a rate-limit zone with"
-            " /api/; the F-NGINX-003 bypass is exploitable in the local stack."
-        )
+        assert "limit_req zone=api burst=20 nodelay;" in block
+        assert "limit_req zone=api_write burst=10 nodelay;" in block
+        assert "zone=$api_bucket" not in block
 
 
 class TestProdServerBlockOnlyOneActiveDashboardLocation:

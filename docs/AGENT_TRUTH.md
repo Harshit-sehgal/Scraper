@@ -1,13 +1,13 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-26 local time from the working tree.
-Last verified: Session 89 CI image-smoke hardening follow-up. Quick
-validation is green (`20260625T201608Z_quick`, 13/13 passed) and
+Last verified: Session 90 nginx plaintext-health / TLS-ingress follow-up.
+Quick validation is green (`20260625T203553Z_quick`, 13/13 passed) and
 security validation is green (`20260625T013939Z_security`,
 9/9 passed, including Bandit, pip-audit, and the expected-failing
 production env template check). `artifacts/audit/ISSUE_LEDGER.md` /
-`.csv` now agree on 105 issue IDs: 27 open verified/deferred
-lower-priority rows, 74 fixed rows, 3 candidate rows, 1
+`.csv` now agree on 105 issue IDs: 26 open verified/deferred
+lower-priority rows, 75 fixed rows, 3 candidate rows, 1
 not-reproducible row, and 0 open P0 rows.
 Current route inventory is 161 routes; route auth matrix has 150 API
 rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
@@ -17,6 +17,55 @@ inspected project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 90 Nginx Plaintext Health + TLS Ingress Follow-up - 2026-06-26
+
+Scope: close `F-NGINX-002`, make the production nginx ingress runnable
+over HTTPS from Compose, and correct a runtime nginx rate-limit bug
+found during validation.
+
+### Issues Fixed
+
+- `F-NGINX-002`: production HTTP `/health` and `/ready` no longer proxy
+  plaintext upstream. They now redirect to
+  `https://$host$request_uri`; ACME http-01 remains available over
+  plain HTTP.
+- Production Compose/smoke alignment: `docker-compose.prod.yml` now
+  publishes both `HTTP_PORT` and `HTTPS_PORT`, mounts
+  `DATAFORGE_NGINX_SSL_DIR` and `DATAFORGE_CERTBOT_WEBROOT`, and
+  `scripts/smoke_prod_stack.sh` probes `https://localhost` by default.
+  The smoke script generates a temporary localhost cert if the
+  configured TLS directory is absent or incomplete.
+- `F-NGINX-SEC-001` correction: runtime `nginx -t` proved the earlier
+  `limit_req zone=$api_bucket` form invalid. Production and local nginx
+  now use `$api_read_key` / `$api_write_key` maps with literal
+  `zone=api` and `zone=api_write` directives.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before editing passed; run id `20260625T201859Z_quick`, 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_nginx_plaintext_health_redirect.py -q -o addopts=` | 1 | RED before fix; `/health` still proxied plaintext to `http://dataforge_api/health`. |
+| `python3 -m pytest backend/tests/test_docker_nginx_tls_ingress.py -q -o addopts=` | 1 | RED before compose/smoke fix; 3 failures caught missing `HTTP_PORT`/`HTTPS_PORT`, missing TLS/ACME mounts, and HTTP-only smoke probes. |
+| `docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$TMPDIR/ssl:/etc/nginx/ssl:ro" nginx:1.27-alpine nginx -t` | 1 | RED before rate-limit correction; nginx reported `zero size shared memory zone "$api_bucket"`. |
+| `python3 -m pytest backend/tests/test_nginx_method_rate_limit.py -q -o addopts=` | 1 | RED after tightening the guard; 4 failures rejected the invalid dynamic-zone rate-limit form. |
+| `python3 -m pytest backend/tests/test_docker_nginx_tls_ingress.py backend/tests/test_docker_atomic_image_pair.py backend/tests/test_docker_image_tag_pinning.py backend/tests/test_docker_prod_secret_wiring.py backend/tests/test_compose_alertmanager_template_gate.py backend/tests/test_production_hardening.py backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py backend/tests/test_nginx_landing_alias_lockdown.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py backend/tests/test_nginx_tls_posture.py backend/tests/test_nginx_plaintext_health_redirect.py backend/tests/test_nginx_method_rate_limit.py backend/tests/test_alerting_channel_smoke.py -q -o addopts=` | 0 | PASS; 75 docker/nginx/smoke regression tests passed. |
+| `python3 -m ruff check backend/tests/test_docker_nginx_tls_ingress.py backend/tests/test_nginx_method_rate_limit.py backend/tests/test_nginx_rate_limit.py backend/tests/test_nginx_plaintext_health_redirect.py && python3 -m ruff format --check ...` | 0 | PASS; edited test files linted and formatted. |
+| `bash -n scripts/smoke_prod_stack.sh && DATAFORGE_IMAGE_TAG=v-test DATAFORGE_DB_PASSWORD=strong-password-xyz DATAFORGE_METRICS_TOKEN=metrics-token-xyz docker compose -f docker-compose.prod.yml config -q` | 0 | PASS; smoke script syntax and production Compose rendering are valid. |
+| `docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$TMPDIR/ssl:/etc/nginx/ssl:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; production nginx config syntax is valid with a temporary self-signed cert. |
+| `docker run --rm -v "$PWD/nginx.local.conf:/etc/nginx/nginx.conf:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; local nginx config syntax is valid. |
+| `python3 scripts/verify_docs_match_code.py` | 1 | FAIL before env-doc update; `DATAFORGE_CERTBOT_WEBROOT` was present in code/scripts but missing from docs. |
+| `python3 scripts/verify_docs_match_code.py && git diff --check` | 0 | PASS after documenting `DATAFORGE_CERTBOT_WEBROOT`; routes/env docs match code and no whitespace errors. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv counts ... PY` | 0 | PASS; 105 issue rows, statuses `fixed=75`, `verified=25`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=12`, `P2=14`; `F-NGINX-002` and `F-NGINX-SEC-001` are fixed. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after all edits; run id `20260625T203553Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+This closes the plaintext health ingress bug and proves nginx syntax in
+the local Docker nginx image. It does not prove target-environment TLS
+certificate validity, renewal, staging alert delivery, backups/restore,
+load tests, or failover behavior.
 
 ## Session 89 CI Image-Smoke Hardening Follow-up - 2026-06-26
 

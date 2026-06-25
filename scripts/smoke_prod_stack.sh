@@ -34,11 +34,6 @@ else
     DOCKER_COMPOSE=("docker" "compose")
 fi
 
-# Ensure the prod stack is torn down on script exit — success OR failure.
-# Without this, a failed smoke test leaves containers running and the
-# next developer/CI run collides with a half-up stack.
-trap '"${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml down' EXIT
-
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -49,6 +44,18 @@ FAIL="${RED}[FAIL]${NC}"
 INFO="${YELLOW}[INFO]${NC}"
 
 ALL_PASS=true
+SMOKE_TMP_DIR=""
+
+# Ensure the prod stack is torn down on script exit — success OR failure.
+# Without this, a failed smoke test leaves containers running and the
+# next developer/CI run collides with a half-up stack.
+cleanup() {
+    "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml down || true
+    if [ -n "${SMOKE_TMP_DIR:-}" ]; then
+        rm -rf "$SMOKE_TMP_DIR"
+    fi
+}
+trap cleanup EXIT
 
 echo "======================================================================"
 echo "  DataForge Production Docker Smoke Test"
@@ -106,13 +113,68 @@ echo -e "  $PASS  .env file exists"
 # Read env values safely through Python
 DATAFORGE_API_KEY="$(_get_env DATAFORGE_API_KEY)"
 DATAFORGE_OPERATOR_API_KEY="$(_get_env DATAFORGE_OPERATOR_API_KEY)"
-SMOKE_PORT="$(_get_env PORT 80)"
-if [ "${SMOKE_PORT}" = "80" ]; then
-    SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://localhost}"
+SMOKE_HTTP_PORT="${HTTP_PORT:-$(_get_env HTTP_PORT 80)}"
+SMOKE_HTTPS_PORT="${HTTPS_PORT:-$(_get_env HTTPS_PORT 443)}"
+if [ "${SMOKE_HTTPS_PORT}" = "443" ]; then
+    SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://localhost}"
 else
-    SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://localhost:${SMOKE_PORT}}"
+    SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://localhost:${SMOKE_HTTPS_PORT}}"
 fi
-echo -e "  $INFO  Smoke HTTP base URL: $SMOKE_BASE_URL"
+
+DATAFORGE_NGINX_SSL_DIR="${DATAFORGE_NGINX_SSL_DIR:-$(_get_env DATAFORGE_NGINX_SSL_DIR)}"
+DATAFORGE_CERTBOT_WEBROOT="${DATAFORGE_CERTBOT_WEBROOT:-$(_get_env DATAFORGE_CERTBOT_WEBROOT)}"
+SMOKE_CURL_ARGS=()
+
+if [ -z "${DATAFORGE_NGINX_SSL_DIR:-}" ] \
+    || [ ! -f "$DATAFORGE_NGINX_SSL_DIR/fullchain.pem" ] \
+    || [ ! -f "$DATAFORGE_NGINX_SSL_DIR/privkey.pem" ]; then
+    if ! command -v openssl > /dev/null 2>&1; then
+        echo -e "  $FAIL  openssl is required to generate the temporary localhost TLS certificate"
+        ALL_PASS=false
+    else
+        if [ -n "${DATAFORGE_NGINX_SSL_DIR:-}" ]; then
+            echo -e "  $INFO  Configured TLS directory is missing fullchain.pem or privkey.pem; using a temporary smoke certificate"
+        fi
+        SMOKE_TMP_DIR="$(mktemp -d)"
+        DATAFORGE_NGINX_SSL_DIR="$SMOKE_TMP_DIR/nginx-ssl"
+        DATAFORGE_CERTBOT_WEBROOT="${DATAFORGE_CERTBOT_WEBROOT:-$SMOKE_TMP_DIR/certbot-webroot}"
+        mkdir -p "$DATAFORGE_NGINX_SSL_DIR" "$DATAFORGE_CERTBOT_WEBROOT"
+        if ! openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+            -keyout "$DATAFORGE_NGINX_SSL_DIR/privkey.pem" \
+            -out "$DATAFORGE_NGINX_SSL_DIR/fullchain.pem" \
+            -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+            > /dev/null 2>&1; then
+            if ! openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+                -keyout "$DATAFORGE_NGINX_SSL_DIR/privkey.pem" \
+                -out "$DATAFORGE_NGINX_SSL_DIR/fullchain.pem" \
+                -subj "/CN=localhost" \
+                > /dev/null 2>&1; then
+                echo -e "  $FAIL  failed to generate the temporary localhost TLS certificate"
+                ALL_PASS=false
+            fi
+        fi
+        if [ -f "$DATAFORGE_NGINX_SSL_DIR/fullchain.pem" ] && [ -f "$DATAFORGE_NGINX_SSL_DIR/privkey.pem" ]; then
+            SMOKE_CURL_INSECURE="${SMOKE_CURL_INSECURE:-true}"
+            echo -e "  $INFO  Generated temporary localhost TLS certificate for nginx"
+        fi
+    fi
+else
+    SMOKE_CURL_INSECURE="${SMOKE_CURL_INSECURE:-false}"
+fi
+
+if [ -n "${DATAFORGE_NGINX_SSL_DIR:-}" ]; then
+    export DATAFORGE_NGINX_SSL_DIR
+fi
+if [ -n "${DATAFORGE_CERTBOT_WEBROOT:-}" ]; then
+    export DATAFORGE_CERTBOT_WEBROOT
+fi
+if [ "${SMOKE_CURL_INSECURE:-false}" = "true" ]; then
+    SMOKE_CURL_ARGS=(-k)
+fi
+export HTTP_PORT="$SMOKE_HTTP_PORT"
+export HTTPS_PORT="$SMOKE_HTTPS_PORT"
+echo -e "  $INFO  Smoke HTTPS base URL: $SMOKE_BASE_URL"
 
 if [ -z "${DATAFORGE_OPERATOR_API_KEY:-}" ]; then
     echo -e "  $INFO  DATAFORGE_OPERATOR_API_KEY not set — job creation may fail if ADMIN is required"
@@ -190,7 +252,7 @@ echo ""
 echo "─── Step 5: Health and readiness probes ──────────────────────────────"
 
 # /health — liveness
-HEALTH=$(curl -s "$SMOKE_BASE_URL/health" 2>/dev/null || echo '{"status":"unreachable"}')
+HEALTH=$(curl -s "${SMOKE_CURL_ARGS[@]}" "$SMOKE_BASE_URL/health" 2>/dev/null || echo '{"status":"unreachable"}')
 if echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'" 2>/dev/null; then
     echo -e "  $PASS  /health returns ok"
 else
@@ -201,7 +263,7 @@ fi
 # /ready — readiness: in production the endpoint returns only {"status":"ready"}
 # to avoid leaking backend/schema details. We check only status=='ready' here.
 # Backend verification is done via the authenticated /api/system/storage/status.
-READY=$(curl -s "$SMOKE_BASE_URL/ready" 2>/dev/null || echo '{"status":"unreachable"}')
+READY=$(curl -s "${SMOKE_CURL_ARGS[@]}" "$SMOKE_BASE_URL/ready" 2>/dev/null || echo '{"status":"unreachable"}')
 if echo "$READY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ready'" 2>/dev/null; then
     echo -e "  $PASS  /ready returns ready"
 else
@@ -213,7 +275,7 @@ fi
 echo ""
 echo "─── Step 6: API authenticated endpoints ──────────────────────────────"
 
-STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" "$SMOKE_BASE_URL/api/system/status" 2>/dev/null || echo '{"status":"unreachable"}')
+STATUS=$(curl -s "${SMOKE_CURL_ARGS[@]}" -H "X-API-Key: $DATAFORGE_API_KEY" "$SMOKE_BASE_URL/api/system/status" 2>/dev/null || echo '{"status":"unreachable"}')
 if echo "$STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='online'; assert d.get('backend')=='postgres'" 2>/dev/null; then
     echo -e "  $PASS  /api/system/status returns online+postgres"
 else
@@ -221,7 +283,7 @@ else
     ALL_PASS=false
 fi
 
-STORAGE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" "$SMOKE_BASE_URL/api/system/storage/status" 2>/dev/null || echo '{"backend":"unreachable"}')
+STORAGE=$(curl -s "${SMOKE_CURL_ARGS[@]}" -H "X-API-Key: $DATAFORGE_API_KEY" "$SMOKE_BASE_URL/api/system/storage/status" 2>/dev/null || echo '{"backend":"unreachable"}')
 if echo "$STORAGE" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('backend')=='postgres'; assert d.get('ok')==True" 2>/dev/null; then
     echo -e "  $PASS  /api/system/storage/status returns postgres+ok"
 else
@@ -244,7 +306,7 @@ fi
 echo ""
 echo "─── Step 8: Create a job against local smoke page ────────────────────"
 
-JOB_RESPONSE=$(curl -s -X POST \
+JOB_RESPONSE=$(curl -s "${SMOKE_CURL_ARGS[@]}" -X POST \
     -H "X-API-Key: $DATAFORGE_OPERATOR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"name":"Smoke Test Job","mode":"manual","urls":["http://nginx/smoke/records.html"],"schema_fields":[{"name":"name","field_type":"string","required":true},{"name":"email","field_type":"email","required":true},{"name":"role","field_type":"string","required":true},{"name":"team","field_type":"string","required":true}]}' \
@@ -271,7 +333,7 @@ if [ -n "$JOB_ID" ]; then
     JOB_SCRAPE_SUCCEEDED=false
     POLL_DEADLINE=$((SECONDS + 90))
     while [ $SECONDS -lt $POLL_DEADLINE ]; do
-        JOB_STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
+        JOB_STATUS=$(curl -s "${SMOKE_CURL_ARGS[@]}" -H "X-API-Key: $DATAFORGE_API_KEY" \
             "$SMOKE_BASE_URL/api/jobs/$JOB_ID" 2>/dev/null || echo '{"status":"unreachable"}')
         STATUS_VALUE=$(echo "$JOB_STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null || echo "unknown")
 
@@ -295,7 +357,7 @@ if [ -n "$JOB_ID" ]; then
         ALL_PASS=false
     else
         # Assert expected record count from local smoke HTML page
-        RESULTS_RESPONSE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
+        RESULTS_RESPONSE=$(curl -s "${SMOKE_CURL_ARGS[@]}" -H "X-API-Key: $DATAFORGE_API_KEY" \
             "$SMOKE_BASE_URL/api/jobs/$JOB_ID/results" 2>/dev/null || echo '{"results":[]}')
         RECORD_COUNT=$(echo "$RESULTS_RESPONSE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('results', [])))" 2>/dev/null || echo "0")
 

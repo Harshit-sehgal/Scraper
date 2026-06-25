@@ -1,6 +1,6 @@
 # DataForge Scraper - Issue Ledger
 
-Date: 2026-06-25
+Date: 2026-06-26
 Commit baseline before this audit update: `918aaf02`
 Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T221113Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 27 |
-| Fixed issues | 74 |
+| Open verified/deferred issues | 26 |
+| Fixed issues | 75 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -199,6 +199,17 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > no-new-privileges container with all Linux capabilities dropped and an
 > explicit non-root user. Guarded by
 > `backend/tests/test_ci_image_smoke_hardening.py`.
+>
+> Updated 2026-06-26 Session 90: closed `F-NGINX-002`. Production HTTP
+> `/health` and `/ready` now redirect to HTTPS; production Compose
+> publishes 443 and mounts TLS/ACME directories; the production smoke
+> script probes HTTPS and can generate a temporary localhost cert for
+> local runs. The pass also corrected the earlier `F-NGINX-SEC-001`
+> implementation after `nginx -t` proved `limit_req zone=$api_bucket`
+> invalid; read/write throttling now uses mapped keys plus literal zones.
+> Guarded by `backend/tests/test_nginx_plaintext_health_redirect.py`,
+> `backend/tests/test_docker_nginx_tls_ingress.py`, and updated nginx
+> rate-limit guards.
 
 
 ## Verified Issues
@@ -1163,10 +1174,10 @@ Status is `verified` unless noted.
 ### F-NGINX-002
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / plaintext_health
-- **file_path:** `nginx.conf:351-366`
-- **line_function:** Server block B (HTTP→HTTPS redirect) for `/health` and `/ready`
+- **file_path:** `nginx.conf`, `docker-compose.prod.yml`, `scripts/smoke_prod_stack.sh`
+- **line_function:** Server block B (HTTP→HTTPS redirect) for `/health` and `/ready`; production nginx ingress smoke wiring
 - **evidence:** The block proxies `/health` and `/ready` plaintext back to `http://dataforge_api`. CWE-200: liveness state fingerprintable.
 - **why_it_matters:** Cleartext monitoring endpoints are routinely probed by uptime services and hostile observers. A network observer fingerprints the deployment's health.
 - **impact:** Reconnaissance advantage during incident response.
@@ -1174,7 +1185,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Curl `http://host/health` returns 301.
 - **acceptance_criteria:** All /health, /ready redirects are TLS-only.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **tests_added:** `backend/tests/test_nginx_plaintext_health_redirect.py`, `backend/tests/test_docker_nginx_tls_ingress.py`
+- **notes:** New finding (Session 80). **Fixed Session 90:** production HTTP `/health` and `/ready` now return `301 https://$host$request_uri`; ACME http-01 remains plain HTTP. Production Compose publishes `HTTP_PORT`/`HTTPS_PORT`, mounts `DATAFORGE_NGINX_SSL_DIR` at `/etc/nginx/ssl`, and mounts `DATAFORGE_CERTBOT_WEBROOT` at `/var/www/certbot`. `scripts/smoke_prod_stack.sh` now defaults to `https://localhost`, passes TLS curl args consistently, and generates a temporary localhost certificate when no cert directory is supplied.
 
 ### F-NGINX-004
 
@@ -1732,7 +1744,7 @@ Status is `verified` unless noted.
 - **status:** fixed
 - **category:** infrastructure / nginx / methodless_rate_limit
 - **file_path:** `nginx.conf`, `nginx.local.conf`
-- **line_function:** `/api/` location + `map $request_method $api_bucket`
+- **line_function:** `/api/` and `/dashboard/` locations + `$api_read_key` / `$api_write_key` maps
 - **evidence:** Pre-fix `/api/` location block applied the identical read-bucket rate limit (`zone=api burst=20 nodelay`) to every HTTP method, leaving POST/PUT/PATCH/DELETE unthrottled at a stricter posture.
 - **why_it_matters:** Read traffic has natural polling cadence, so a generous rate is appropriate; write traffic trades off against the storage backend's write throughput and needs a harder ceiling.
 - **impact:** Brute force / flood risk on write endpoints.
@@ -1741,7 +1753,7 @@ Status is `verified` unless noted.
 - **acceptance_criteria:** Write methods are throttled at strict rate.
 - **blocked_by:** None.
 - **tests_added:** `backend/tests/test_nginx_method_rate_limit.py`
-- **notes:** New finding (Session 80). **Fixed Session 88:** `nginx.conf` and `nginx.local.conf` both define `limit_req_zone ... zone=api_write:10m rate=10r/s`, a `map $request_method $api_bucket` block classifies POST/PUT/PATCH/DELETE into the write zone, and the `/api/` plus `/dashboard/` locations apply `limit_req zone=$api_bucket burst=20 nodelay`. Regression test `backend/tests/test_nginx_method_rate_limit.py` guards the dual-zone map+location form across both nginx configs.
+- **notes:** New finding (Session 80). **Fixed Session 88, corrected Session 90:** `nginx.conf` and `nginx.local.conf` now define `$api_read_key` and `$api_write_key` maps. Read methods populate only the read key; POST/PUT/PATCH/DELETE populate only the write key. The two `limit_req_zone` directives use those keys, and `/api/` plus `/dashboard/` apply literal `zone=api` and `zone=api_write` directives. This preserves method-specific throttling while satisfying `nginx -t`; nginx rejects variable zone names such as `zone=$api_bucket`.
 
 ### F-EXCEPTION-001
 

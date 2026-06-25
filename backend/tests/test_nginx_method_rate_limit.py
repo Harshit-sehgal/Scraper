@@ -11,19 +11,16 @@ closed rather than melt.
 
 Lock-in:
 
-1. The ``http {}`` context MUST define **two** ``limit_req_zone``
-   directives:
-   - ``zone=api`` for the read bucket
-   - ``zone=api_write`` for the write bucket
-2. A ``map $request_method`` block must classify ``POST/PUT/PATCH/
-   DELETE`` into the write zone and everything else into the read
-   zone.
-3. The ``/api/`` location block must apply ``limit_req
-   zone=$api_bucket ...`` (dynamic per-method assignment) rather
-   than a literal ``zone=api`` that ignores writes.
+1. The ``http {}`` context MUST define separate request keys:
+   - ``$api_read_key`` is populated for read methods only.
+   - ``$api_write_key`` is populated for write methods only.
+2. The two ``limit_req_zone`` directives must use those keys, with
+   ``zone=api`` for reads and ``zone=api_write`` for writes.
+3. The ``/api/`` location block must apply both static zones.
 
-This is text-only; ``nginx -t`` would also catch malformed syntax but
-is heavyweight and depends on a local nginx install.
+nginx does not support variables in the ``limit_req zone=...`` name.
+The invalid ``zone=$api_bucket`` form passes naive text tests but
+fails ``nginx -t`` at runtime.
 """
 
 from __future__ import annotations
@@ -43,20 +40,17 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-_MAP_BLOCK = re.compile(
-    r"map\s+\$request_method\s+\$api_bucket\s*\{(?P<body>[^}]*)\}",
+_READ_MAP_BLOCK = re.compile(
+    r"map\s+\$request_method\s+\$api_read_key\s*\{(?P<body>[^}]*)\}",
     re.MULTILINE,
 )
-_API_ZONE = re.compile(r"limit_req_zone\s+\$binary_remote_addr\s+zone=[\"']?api[\"']?:")
-_WRITE_ZONE = re.compile(r"limit_req_zone\s+\$binary_remote_addr\s+zone=[\"']?api_write[\"']?:")
-_API_LOCATION_DYNAMIC = re.compile(
-    r"location\s+/api/\s*\{[^{}]*?\n[^{}]*?limit_req\s+zone=\$api_bucket",
+_WRITE_MAP_BLOCK = re.compile(
+    r"map\s+\$request_method\s+\$api_write_key\s*\{(?P<body>[^}]*)\}",
     re.MULTILINE,
 )
-_API_LOCATION_STATIC = re.compile(
-    r"location\s+/api/\s*\{[^{}]*?\n[^{}]*?limit_req\s+zone=api\b",
-    re.MULTILINE,
-)
+_API_ZONE = re.compile(r"limit_req_zone\s+\$api_read_key\s+zone=[\"']?api[\"']?:")
+_WRITE_ZONE = re.compile(r"limit_req_zone\s+\$api_write_key\s+zone=[\"']?api_write[\"']?:")
+_DYNAMIC_LIMIT_ZONE = re.compile(r"limit_req\s+zone=\$")
 
 
 def _strip_commented_out_locations(text: str) -> str:
@@ -91,20 +85,43 @@ def _strip_commented_out_locations(text: str) -> str:
     return "\n".join(out_lines)
 
 
-def _map_zone_for_write(text: str) -> bool:
-    m = _MAP_BLOCK.search(text)
-    if not m:
+def _method_line(body: str, method: str) -> str:
+    return next(
+        (line.strip() for line in body.splitlines() if method in line and line.strip().lower().startswith(method.lower())),
+        "",
+    )
+
+
+def _is_empty_key(value: str) -> bool:
+    return '""' in value or "''" in value
+
+
+def _map_keys_for_method_buckets(text: str) -> bool:
+    read_match = _READ_MAP_BLOCK.search(text)
+    write_match = _WRITE_MAP_BLOCK.search(text)
+    if not read_match or not write_match:
         return False
-    body = m.group("body")
-    # All four write methods must end up in ``api_write``.
+
+    read_body = read_match.group("body")
+    write_body = write_match.group("body")
+    if "default $binary_remote_addr;" not in read_body:
+        return False
+    if not _is_empty_key(_method_line(write_body, "default")):
+        return False
+
     for method in ("POST", "PUT", "PATCH", "DELETE"):
-        line = next(
-            (line.strip() for line in body.splitlines() if method in line and line.strip().lower().startswith(method.lower())),
-            "",
-        )
-        if "api_write" not in line:
+        if not _is_empty_key(_method_line(read_body, method)):
+            return False
+        if "$binary_remote_addr" not in _method_line(write_body, method):
             return False
     return True
+
+
+def _location_body(text: str, location: str) -> str:
+    pattern = r"location\s+" + re.escape(location) + r"\s*\{(?P<body>[^{}]*)\}"
+    match = re.search(pattern, text, flags=re.DOTALL)
+    assert match, f"missing `location {location}` block"
+    return match.group("body")
 
 
 class TestNginxWriteMethodRateLimit:
@@ -129,38 +146,27 @@ class TestNginxWriteMethodRateLimit:
             "nginx.local.conf is the developer-facing mirror and must follow the same F-NGINX-SEC-001 throttle posture."
         )
 
-    def test_method_map_routes_writes_to_strict_zone(self) -> None:
+    def test_method_maps_populate_only_one_bucket_per_request(self) -> None:
         for path in NGINX_CONFIGS:
             if not path.is_file():
                 continue
             text = _read(path)
-            assert _MAP_BLOCK.search(text), (
-                f"{path.name}: must define ``map $request_method"
-                " $api_bucket`` so the limit_req lookup can pick the"
-                " right zone per verb. F-NGINX-SEC-001."
-            )
-            assert _map_zone_for_write(text), (
-                f"{path.name}: every flow-modifying verb in the map body must map to ``api_write``. F-NGINX-SEC-001."
+            assert _map_keys_for_method_buckets(text), (
+                f"{path.name}: must define $api_read_key and $api_write_key maps"
+                " so each request is counted in exactly one method-aware"
+                " limit_req_zone. F-NGINX-SEC-001."
             )
 
-    def test_api_location_uses_dynamic_bucket(self) -> None:
+    def test_api_location_applies_both_static_buckets(self) -> None:
         for path in NGINX_CONFIGS:
             if not path.is_file():
                 continue
             text = _strip_commented_out_locations(_read(path))
-            assert _API_LOCATION_DYNAMIC.search(text), (
-                f"{path.name}: ``/api/`` location block must apply"
-                " ``limit_req zone=$api_bucket ...`` so the"
-                " write-method throttle is actually engaged."
-                " F-NGINX-SEC-001 forbids the static ``zone=api``"
-                " form here because it ignores writes."
+            body = _location_body(text, "/api/")
+            assert "limit_req zone=api burst=20 nodelay;" in body, f"{path.name}: ``/api/`` must apply the read throttle zone."
+            assert "limit_req zone=api_write burst=10 nodelay;" in body, (
+                f"{path.name}: ``/api/`` must apply the stricter write throttle zone."
             )
-            # The static form indicates someone reverted to the
-            # pre-fix posture.
-            assert not _API_LOCATION_STATIC.search(text), (
-                f"{path.name}: ``/api/`` location block still has the"
-                " static ``limit_req zone=api`` form. This is the"
-                " F-NGINX-SEC-001 regression path: writes go through"
-                " the read bucket and the stricter throttle is"
-                " silently disabled."
+            assert not _DYNAMIC_LIMIT_ZONE.search(body), (
+                f"{path.name}: nginx rejects variable zone names such as ``zone=$api_bucket`` at runtime."
             )
