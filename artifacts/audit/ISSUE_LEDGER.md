@@ -1524,10 +1524,10 @@ Status is `verified` unless noted.
 ### F-NPM-002
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** frontend / package_lock / integrity
-- **file_path:** `package-lock.json`
-- **line_function:** file-level integrity
+- **file_path:** `ci.yml`, `validate-production.yml`, `browser-e2e.yml`, `auto-fix.yml`
+- **line_function:** npm CI install step
 - **evidence:** File exists; CI uses `npm ci`. No `npm audit signatures` integrity check.
 - **why_it_matters:** Lockfile can be silently compromised by malicious dep bump without CI noticing.
 - **impact:** Supply-chain compromise via dep.
@@ -1535,7 +1535,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic tampering of lockfile is caught.
 - **acceptance_criteria:** Lockfile integrity is checked before tests run.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **tests_added:** `backend/tests/test_npm_audit_signatures.py`
+- **notes:** New finding (Session 80). **Fixed Session 88:** every workflow that runs `npm ci` (`ci.yml`, `validate-production.yml`, `browser-e2e.yml`, `auto-fix.yml`) now follows it with `npm audit signatures` so a tampered lockfile or compromised package signature halts the run before tests start. Regression test `backend/tests/test_npm_audit_signatures.py` locks in the install→audit ordering across all four workflows.
 
 ### F-NPM-003
 
@@ -1636,23 +1637,24 @@ Status is `verified` unless noted.
 ### F-DB-003
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / db_migrations / tenant_index_verification
 - **file_path:** `backend/migrations/008_postgres_storage_v8.sql`
-- **line_function:** tenant indexes
-- **evidence:** Need verification: tenant column indexes (`org_id`, `created_by`) not directly visible in the read portion of the dump (lines 50+).
+- **line_function:** CREATE INDEX statements for tenant columns
+- **evidence:** Migration shipped `idx_jobs_org_id`, `idx_jobs_project_id`, `idx_jobs_created_by` — but `recycle_bin` also stored `org_id` / `project_id` columns without a matching index.
 - **why_it_matters:** If indexes are missing, tenant queries scan, not index.
 - **impact:** Tenant scoping degrades as data grows.
 - **recommended_fix:** Run `grep -E "CREATE INDEX" backend/migrations/008_postgres_storage_v8.sql | grep -E "tenant|org_id|user_id|project_id"` to confirm tenant indexes; if missing, add them.
 - **tests_needed:** EXPLAIN ANALYZE on tenant query uses index.
 - **acceptance_criteria:** Tenant queries are indexed in both SQLite and Postgres.
 - **blocked_by:** Verification step.
-- **notes:** New finding (Session 80).
+- **tests_added:** `backend/tests/test_postgres_tenant_indexes.py`
+- **notes:** New finding (Session 80). **Fixed Session 88:** `idx_recycle_bin_org_id` and `idx_recycle_bin_project_id` added to the postgres migration so the recycle-bin tenant columns are indexed. Regression test `backend/tests/test_postgres_tenant_indexes.py` parses the migration and asserts the four required indexes (`jobs.org_id`, `jobs.project_id`, `jobs.created_by`, plus at least one tenant index on a non-jobs table) are present, locking in the F-DB-003 invariant.
 
 ### F-DB-004
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** security / db_migrations / schema_dump_leak
 - **file_path:** `backend/migrations/008_postgres_storage_v8.sql`
 - **line_function:** file contents
@@ -1663,7 +1665,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic diff shows no semantic data in committed dump.
 - **acceptance_criteria:** Committed migration file contains schema only, no data.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_postgres_migration_ddl_only.py`
+- **notes:** Fixed Session 88: the regression file `backend/tests/test_postgres_migration_ddl_only.py` parses the migration and asserts (a) no `COPY FROM stdin` bulk-load token, (b) the only allowable `INSERT INTO` target is `public.schema_version`, (c) no top-level `UPDATE` / `DELETE FROM` / `SELECT` statements, and (d) every `VALUES` clause belongs to the schema-version stamp. Verified by mutation: poisoning the migration with a synthetic `INSERT INTO public.jobs` triggered `test_inserts_limited_to_schema_version` exactly as expected, and the original file passes all four assertions.
 
 ### F-BACKUP-001
 

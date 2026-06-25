@@ -272,6 +272,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # F-NPM-002: lockfile-integrity gate. ``npm audit signatures``
+      # exits non-zero when a package's signature can no longer be
+      # verified against the registry's published keys — a leading
+      # indicator of a supply-chain compromise in the resolved tree.
+      - name: Verify lockfile signatures
+        run: npm audit signatures
+
       - name: Frontend unit tests (vitest)
         run: npm test
 

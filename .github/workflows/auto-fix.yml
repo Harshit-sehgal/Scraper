@@ -115,7 +115,11 @@ jobs:
 
       - name: Install Node deps
         if: steps.pr.outputs.allowed == 'true'
-        run: npm ci
+        run: |
+          npm ci
+          # F-NPM-002: lockfile-integrity gate — refuse to run
+          # automated fixes against a tampered lockfile.
+          npm audit signatures
 
       - name: Fix Ruff formatting
         if: steps.pr.outputs.allowed == 'true'

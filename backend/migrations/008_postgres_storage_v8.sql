@@ -378,6 +378,11 @@ CREATE INDEX IF NOT EXISTS idx_queue_tasks_status_priority ON public.queue_tasks
 CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON public.rate_limits USING btree (key, "timestamp");
 -- Name: idx_recycle_bin_created_at; Type: INDEX; Schema: public; Owner: dataforge
 CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON public.recycle_bin USING btree (created_at DESC);
+-- F-DB-003: tenant indexes for ``recycle_bin`` so org/project-scoped
+-- admin queries don't fall back to a full table scan as the recycle
+-- volume grows.
+CREATE INDEX IF NOT EXISTS idx_recycle_bin_org_id ON public.recycle_bin USING btree (org_id);
+CREATE INDEX IF NOT EXISTS idx_recycle_bin_project_id ON public.recycle_bin USING btree (project_id);
 -- Name: job_events job_events_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: dataforge
 ALTER TABLE ONLY public.job_events
     ADD CONSTRAINT job_events_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE CASCADE;

@@ -73,7 +73,12 @@ jobs:
             ${{ runner.os }}-npm-
 
       - name: Install npm dependencies (Playwright test runner)
-        run: npm ci
+        run: |
+          npm ci
+          # F-NPM-002: lockfile-integrity gate before any Playwright
+          # run starts, so a tampered package tree cannot reach the
+          # test driver.
+          npm audit signatures
 
       - name: Run Frontend E2E (Playwright smoke tests)
         run: |
