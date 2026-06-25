@@ -99,6 +99,7 @@ regenerated from code by `scripts/generate_route_inventory.py` and
 | [`COVERAGE_REPORT.md`](COVERAGE_REPORT.md) | Latest coverage numbers |
 | [`CI_STATUS.md`](CI_STATUS.md) | GitHub Actions job status |
 | [`CODE_QUALITY.md`](CODE_QUALITY.md) | Coding standards |
+| [`ARTIFACTS.md`](ARTIFACTS.md) | Index of `artifacts/**` outputs (validation, backup drill, audit, etc.) |
 
 ## 8. Observability, monitoring, audit
 

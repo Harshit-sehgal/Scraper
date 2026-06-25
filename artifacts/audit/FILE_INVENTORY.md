@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-24T13:11:14+00:00 from `25811` files in the current checkout._
+_Generated: 2026-06-25T13:57:20+00:00 from `26520` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,10 +12,10 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 25811 |
-| Project-owned files | 948 |
-| Project-owned files deeply inspected | 944 |
-| Skipped generated/vendor/binary/cache/log/archive files | 24867 |
+| Total files inventoried | 26520 |
+| Project-owned files | 973 |
+| Project-owned files deeply inspected | 969 |
+| Skipped generated/vendor/binary/cache/log/archive files | 25551 |
 | Files needing follow-up | 0 |
 
 ## By Classification
@@ -24,19 +24,19 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | --- | ---: | ---: | ---: | ---: |
 | backend_source | 254 | 254 | 254 | 0 |
 | frontend_source | 97 | 97 | 97 | 0 |
-| test | 382 | 382 | 381 | 1 |
-| script | 46 | 46 | 46 | 0 |
+| test | 402 | 402 | 401 | 1 |
+| script | 49 | 49 | 49 | 0 |
 | config | 53 | 53 | 50 | 3 |
-| documentation | 101 | 101 | 101 | 0 |
+| documentation | 102 | 102 | 102 | 0 |
 | docker_deployment | 13 | 13 | 13 | 0 |
-| database_migration | 2 | 2 | 2 | 0 |
+| database_migration | 3 | 3 | 3 | 0 |
 | asset | 0 | 0 | 0 | 0 |
-| generated | 91 | 0 | 0 | 91 |
+| generated | 92 | 0 | 0 | 92 |
 | vendor | 15988 | 0 | 0 | 15988 |
-| cache | 5453 | 0 | 0 | 5453 |
+| cache | 5739 | 0 | 0 | 5739 |
 | binary | 38 | 0 | 0 | 38 |
 | archive | 1 | 0 | 0 | 1 |
-| log | 3292 | 0 | 0 | 3292 |
+| log | 3689 | 0 | 0 | 3689 |
 | unknown | 0 | 0 | 0 | 0 |
 
 ## Top-Level Counts
@@ -45,14 +45,14 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | --- | ---: |
 | `.venv/` | 9847 |
 | `node_modules/` | 6140 |
-| `artifacts/` | 3352 |
-| `.git/` | 1653 |
-| `backend/` | 1559 |
+| `artifacts/` | 3750 |
+| `.git/` | 1893 |
+| `backend/` | 1624 |
 | `.mypy_cache/` | 1459 |
 | `.ruff_cache/` | 1438 |
 | `frontend/` | 115 |
-| `docs/` | 90 |
-| `scripts/` | 79 |
+| `docs/` | 91 |
+| `scripts/` | 84 |
 | `playwright-report/` | 18 |
 | `.github/` | 11 |
 | `.pytest_cache/` | 5 |
@@ -103,14 +103,14 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Extension | Files |
 | --- | ---: |
-| `.py` | 6835 |
-| `(none)` | 4189 |
-| `.md` | 3643 |
+| `.py` | 6857 |
+| `(none)` | 4429 |
+| `.md` | 4016 |
 | `.js` | 2744 |
-| `.json` | 2076 |
+| `.json` | 2102 |
 | `.pyi` | 1217 |
+| `.pyc` | 927 |
 | `.ts` | 888 |
-| `.pyc` | 881 |
 | `.cjs` | 534 |
 | `.mjs` | 454 |
 | `.so` | 385 |
@@ -132,7 +132,7 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `.log` | 34 |
 | `.csv` | 33 |
 | `.db` | 32 |
-| `.css` | 31 |
+| `.sh` | 32 |
 
 ## Skip Policy
 

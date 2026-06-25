@@ -10,7 +10,18 @@ Usage
 * Override the bot token / chat id on the command line::
 
       python3 scripts/send_telegram.py \\
-          --token "123:abc" --chat-id 987654 "manual ping"
+          --token-file /run/secrets/telegram_bot_token \\
+          --chat-id-file /run/secrets/telegram_chat_id "manual ping"
+
+  Avoid passing the token directly via ``--token`` so the secret does
+  not land in shell history, ``ps``, or process accounting. The
+  ``--token`` / ``--chat-id`` overrides remain available for trusted
+  local use, but prefer the file-based variants in CI.
+
+* Prompt for the token interactively (useful in shell scripts)::
+
+      python3 scripts/send_telegram.py \\
+          --token-prompt --chat-id-prompt "manual ping"
 
 * Print the current status without sending anything::
 
@@ -36,6 +47,7 @@ the bot is not configured, and 1 on any other failure.
 from __future__ import annotations
 
 import argparse
+import getpass
 import os
 import sys
 from pathlib import Path
@@ -66,12 +78,39 @@ def _build_argparser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--token",
         default=None,
-        help="Override the bot token (otherwise read from env / .env).",
+        help=(
+            "Override the bot token (otherwise read from env / .env). "
+            "Prefer --token-file or --token-prompt to avoid leaking the "
+            "secret into shell history or process accounting."
+        ),
+    )
+    parser.add_argument(
+        "--token-file",
+        default=None,
+        help=("Read the bot token from the first line of PATH, trimmed of trailing whitespace. Safer than --token."),
+    )
+    parser.add_argument(
+        "--token-prompt",
+        action="store_true",
+        help="Prompt for the bot token via getpass instead of passing it on argv.",
     )
     parser.add_argument(
         "--chat-id",
         default=None,
-        help="Override the chat id (otherwise read from env / .env).",
+        help=(
+            "Override the chat id (otherwise read from env / .env). "
+            "Prefer --chat-id-file or --chat-id-prompt to avoid leaking it."
+        ),
+    )
+    parser.add_argument(
+        "--chat-id-file",
+        default=None,
+        help="Read the chat id from the first line of PATH.",
+    )
+    parser.add_argument(
+        "--chat-id-prompt",
+        action="store_true",
+        help="Prompt for the chat id via getpass instead of passing it on argv.",
     )
     parser.add_argument(
         "--enable",
@@ -103,15 +142,40 @@ def _build_argparser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_secret(arg_value: str | None, file_path: str | None, prompt: bool, *, name: str) -> str | None:
+    """Resolve a CLI-supplied secret from the value, file, or interactive prompt.
+
+    Priority: explicit ``arg_value`` > ``file_path`` > ``prompt``. Returns
+    ``None`` when none of the options provided the secret.
+    """
+    if arg_value:
+        return arg_value
+    if file_path:
+        try:
+            return Path(file_path).read_text(encoding="utf-8").splitlines()[0].strip()
+        except (FileNotFoundError, IndexError, PermissionError, OSError) as exc:
+            print(f"ERROR: cannot read {name} from {file_path}: {exc}", file=sys.stderr)
+            return None
+    if prompt:
+        try:
+            return getpass.getpass(f"Enter {name}: ")
+        except (EOFError, KeyboardInterrupt):
+            print(f"ERROR: {name} prompt aborted.", file=sys.stderr)
+            return None
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_argparser().parse_args(argv)
 
     # Apply CLI overrides to the environment BEFORE importing the
     # notifier module, so the notifier picks them up.
-    if args.token:
-        os.environ["TELEGRAM_BOT_TOKEN"] = args.token
-    if args.chat_id:
-        os.environ["TELEGRAM_CHAT_ID"] = args.chat_id
+    token_override = _resolve_secret(args.token, args.token_file, args.token_prompt, name="bot token")
+    chat_id_override = _resolve_secret(args.chat_id, args.chat_id_file, args.chat_id_prompt, name="chat id")
+    if token_override is not None:
+        os.environ["TELEGRAM_BOT_TOKEN"] = token_override
+    if chat_id_override is not None:
+        os.environ["TELEGRAM_CHAT_ID"] = chat_id_override
     if args.enable:
         os.environ["TELEGRAM_ENABLED"] = "true"
 
@@ -131,7 +195,8 @@ def main(argv: list[str] | None = None) -> int:
             "Telegram notifier is not configured.\n"
             "Set DATAFORGE_TELEGRAM_BOT_TOKEN, DATAFORGE_TELEGRAM_CHAT_ID, and\n"
             "DATAFORGE_TELEGRAM_ENABLED=true in your environment or .env,\n"
-            "or pass --token / --chat-id / --enable on the command line.",
+            "or pass --token-file / --chat-id-file / --token-prompt / --chat-id-prompt\n"
+            "(or --token / --chat-id for trusted local use).",
             file=sys.stderr,
         )
         return 2

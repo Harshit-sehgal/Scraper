@@ -10,6 +10,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 |----------|---------|-------------|
 | `DATAFORGE_ENV` | `development` | Environment: `development`, `staging`, `production` |
 | `DATAFORGE_DEBUG` | `false` | Enable debug mode |
+| `DATAFORGE_ENABLE_RELOAD` | `false` | Enable uvicorn `--reload` / debug logging in the dev container target; leave unset for production/default compose runs |
 | `DATAFORGE_DOTENV_PATH` | `.env` | Path to dotenv file |
 | `DATAFORGE_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `postgres` |
 | `DATAFORGE_DATABASE_URL` | - | PostgreSQL connection URL (required for postgres backend) |
@@ -44,6 +45,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 |----------|---------|-------------|
 | `DATAFORGE_WORKER_QUEUE` | `memory` | Queue backend: `memory`, `postgres` |
 | `DATAFORGE_WORKER_HEARTBEAT_ID` | - | Worker heartbeat identifier |
+| `DATAFORGE_WORKER_HEARTBEAT_TTL` | `60` | Worker heartbeat freshness window in seconds for the worker healthcheck |
 
 ## Notifications
 

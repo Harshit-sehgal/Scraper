@@ -122,8 +122,10 @@ psql "$DATAFORGE_DATABASE_URL" -c "SELECT 1"
 # Copy Nginx config to target
 sudo cp nginx.conf /etc/nginx/sites-available/dataforge
 
-# Update server name and certificate paths in config
-sudo sed -i 's/yourdomain.com/your-actual-domain.com/g' /etc/nginx/sites-available/dataforge
+# Update the explicit server name and certificate paths in config.
+# Unknown Host headers hit the default 443 server and return 444, so the
+# placeholder must be replaced before public traffic reaches nginx.
+sudo sed -i 's/dataforge.example.com/your-actual-domain.com/g' /etc/nginx/sites-available/dataforge
 sudo sed -i 's|/path/to/cert.pem|/etc/letsencrypt/live/your-domain.com/fullchain.pem|g' /etc/nginx/sites-available/dataforge
 sudo sed -i 's|/path/to/key.pem|/etc/letsencrypt/live/your-domain.com/privkey.pem|g' /etc/nginx/sites-available/dataforge
 

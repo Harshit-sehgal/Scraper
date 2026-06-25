@@ -425,7 +425,10 @@ jobs:
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
       - name: Send Telegram notification
-        if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_TO != ''
+        # F-CI-005: GHA substitutes empty strings for unset secrets, so a
+        # direct truthiness guard keeps a misconfigured chat ID/bot token
+        # combination from calling the action with empty values.
+        if: env.TELEGRAM_TOKEN && env.TELEGRAM_TO
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}

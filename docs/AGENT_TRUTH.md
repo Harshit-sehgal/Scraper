@@ -1,21 +1,88 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 84 P1 CI action-pinning follow-up. Quick validation is
-green (`20260625T091425Z_quick`, 13/13 passed) and security validation
+Last verified: Session 85 ops/script/CI guard follow-up. Quick validation is
+green (`20260625T141822Z_quick`, 13/13 passed) and security validation
 is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
 pip-audit, and the expected-failing production env template check).
 `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-51 open verified/deferred lower-priority rows, 50 fixed rows, 3
+40 open verified/deferred lower-priority rows, 61 fixed rows, 3
 candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
 route inventory is 161 routes; route auth matrix has 150 API rows with
 `unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
-lists 25,811 files, 948 project-owned files, 944 deeply inspected
+lists 26,520 files, 973 project-owned files, 969 deeply inspected
 project-owned files, and 0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 85 Ops, Script, and CI Guard Follow-up - 2026-06-25
+
+Scope: close evidence-backed lower-priority guard gaps already present
+in the Session 80 ledger without changing stable product behavior.
+
+### Issues Fixed
+
+- `F-CI-005`: every Telegram notification workflow now uses the
+  documented truthiness guard `env.TELEGRAM_TOKEN && env.TELEGRAM_TO`,
+  so empty env-backed secrets skip the notification action.
+- `F-CI-007`: all scheduled workflows now key concurrency on
+  `github.event_name` and use `cancel-in-progress: false`.
+- `F-CI-009`: `stale-cleanup.yml` exposes a manual `dry-run` input and
+  wires it to `actions/stale`.
+- `F-DOCKER-006`: production and local nginx landing aliases deny
+  `.git`, `.env`, `.docker`, and `.aws` paths with `404`.
+- `F-DOCKER-008`: local and production Alertmanager template gates now
+  check the same explicit placeholder set.
+- `F-NGINX-005`: production nginx now rejects unknown HTTPS Host
+  headers with a default 443 server returning `444`, and the app
+  server blocks use explicit `dataforge.example.com` placeholders that
+  operators must replace with their real domain.
+- `F-SCRIPT-004`: `scripts/send_telegram.py` supports file-backed and
+  prompt-backed token/chat-id inputs.
+- `F-OPSDOC-001`: `scripts/run_worker.py` has CLI tests for path
+  bootstrap, subprocess help/error behavior, `--once` mode, heartbeat
+  args, and shutdown signal registration.
+- `F-OPSDOC-002`: `docs/ARTIFACTS.md` documents artifact outputs and is
+  linked from `docs/INDEX.md`.
+- `F-OPSDOC-003`: worker healthcheck script has healthy/stale/error/TTL
+  tests.
+- `F-DRIFT-002`: production compose now has structural tests that app
+  and worker share the exact same image reference and build target.
+- File inventory classifier now treats `.sql.original` migration
+  snapshots as `database_migration`, keeping file-ledger follow-ups at
+  zero after regeneration.
+- `docs/ENV_VARIABLES.md` now documents `DATAFORGE_ENABLE_RELOAD` and
+  `DATAFORGE_WORKER_HEARTBEAT_TTL`, matching the current code/test
+  surface.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before finalizing Session 85 passed; run id `20260625T134626Z_quick`, 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_compose_alertmanager_template_gate.py backend/tests/test_cron_workflow_concurrency.py backend/tests/test_docker_atomic_image_pair.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_landing_alias_lockdown.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_run_worker_cli.py backend/tests/test_send_telegram_cli.py backend/tests/test_stale_cleanup_dry_run.py backend/tests/test_telegram_ci_secret_guards.py backend/tests/test_worker_healthcheck.py -q -o addopts=` | 0 | PASS; 54 tests passed. |
+| `python3 -m ruff check backend/tests/test_compose_alertmanager_template_gate.py backend/tests/test_cron_workflow_concurrency.py backend/tests/test_docker_atomic_image_pair.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_landing_alias_lockdown.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_run_worker_cli.py backend/tests/test_send_telegram_cli.py backend/tests/test_stale_cleanup_dry_run.py backend/tests/test_telegram_ci_secret_guards.py backend/tests/test_worker_healthcheck.py scripts/send_telegram.py artifacts/audit/gen_full_ledger.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/tests/test_compose_alertmanager_template_gate.py backend/tests/test_cron_workflow_concurrency.py backend/tests/test_docker_atomic_image_pair.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_landing_alias_lockdown.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_run_worker_cli.py backend/tests/test_send_telegram_cli.py backend/tests/test_stale_cleanup_dry_run.py backend/tests/test_telegram_ci_secret_guards.py backend/tests/test_worker_healthcheck.py scripts/send_telegram.py artifacts/audit/gen_full_ledger.py` | 0 | PASS; 13 files already formatted after formatting `backend/tests/test_telegram_ci_secret_guards.py` and `backend/tests/test_nginx_catch_all_host_lock.py`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated `artifacts/audit/FILE_INVENTORY.md` / file audit ledgers. |
+| `python3 - <<'PY' ... FILE_AUDIT_LEDGER counts ... PY` | 0 | PASS; `rows=26520`, `project_owned=973`, `deeply_inspected=969`, `followups=0`; `backend/migrations/008_postgres_storage_v8.sql.original` classified as `database_migration`. |
+| `python3 -c "import csv; from collections import Counter; rows=list(csv.DictReader(open('artifacts/audit/ISSUE_LEDGER.csv', newline='', encoding='utf-8'))); print({'rows':len(rows),'statuses':dict(Counter(r['status'] for r in rows)),'open_by_priority':dict(Counter(r['priority'] for r in rows if r['status'] in {'verified','deferred (blocked by staging environment)'}))})"` | 0 | PASS; 105 issue rows, statuses `fixed=61`, `verified=39`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=15`, `P2=25`. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv column-count check ... PY` | 0 | PASS; 105 rows, 14 expected columns, 0 malformed rows. |
+| `python3 scripts/verify_docs_match_code.py` | 1 | FAIL before env-doc cleanup; `DATAFORGE_ENABLE_RELOAD` and `DATAFORGE_WORKER_HEARTBEAT_TTL` were present in code/tests but missing from docs. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS after documenting both env vars; routes and environment variables match between code and docs. |
+| `DATAFORGE_IMAGE_TAG=v-test DATAFORGE_DB_PASSWORD=strong-password-xyz DATAFORGE_METRICS_TOKEN=metrics-token-xyz docker compose -f docker-compose.prod.yml config -q` | 0 | PASS; production Compose rendered with explicit image tag / required secrets. |
+| `DATAFORGE_DEV_UID=501 DATAFORGE_DEV_GID=502 DATAFORGE_DB_PASSWORD=strong-password-xyz GRAFANA_PASSWORD=strong-grafana-password ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.test/services/T000/B000/xxx docker compose -f docker-compose.yml -f docker-compose.override.local.yml config -q` | 1 | FAIL as expected for the wrong base file; `alertmanager` only exists when the local override is paired with `docker-compose.prod.yml`. |
+| `DATAFORGE_IMAGE_TAG=v-test DATAFORGE_DEV_UID=501 DATAFORGE_DEV_GID=502 DATAFORGE_DB_PASSWORD=strong-password-xyz DATAFORGE_METRICS_TOKEN=metrics-token-xyz GRAFANA_PASSWORD=strong-grafana-password ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.test/services/T000/B000/xxx docker compose -f docker-compose.prod.yml -f docker-compose.override.local.yml config -q` | 0 | PASS; local-production override rendered with explicit tag, UID/GID, and required secrets. |
+| `docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$TMPDIR/ssl:/etc/nginx/ssl:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; production nginx config syntax is valid with a temporary self-signed cert. |
+| `git diff --check` | 0 | PASS; no whitespace errors in the final diff. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final Session 85 quick gate passed; run id `20260625T141822Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+The project remains pre-production. Remaining verified issues include
+P1 nginx/monitoring/env/migration work plus P2 frontend, npm, monitoring,
+backup, and script hardening rows in `artifacts/audit/ISSUE_LEDGER.*`.
 
 ## Session 84 P1 CI Action-Pinning Follow-up - 2026-06-25
 

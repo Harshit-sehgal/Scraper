@@ -56,6 +56,7 @@ The Dockerfile installs Python packages from `pyproject.toml` (the single source
 
 - Rebuild the Docker image in CI/target infrastructure.
 - Start the production Compose stack with a real uncommitted `.env` for the target environment.
+- Replace `dataforge.example.com` in `nginx.conf` with the real production hostname before exposing nginx. Unknown Host headers are rejected by the default HTTPS server.
 - Verify `/health`, `/ready`, `/docs`, `/redoc`, `/openapi.json`, and `/metrics` through the target ingress.
 - Verify worker startup and job processing under concurrent and failure scenarios.
 - Verify Postgres persistence, backup, restore, and migration behavior.

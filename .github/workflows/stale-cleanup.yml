@@ -15,6 +15,12 @@ on:
     # Daily at 4 AM UTC
     - cron: "0 4 * * *"
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Preview the cleanup without labelling or closing anything"
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: write
@@ -59,3 +65,11 @@ jobs:
           # Only target issues/PRs without these labels
           exempt-all-milestones: true
           operations-per-run: 100
+
+          # Honour the manual `dry-run` input: when true the action labels
+          # and previews but never closes anything, so the operator can
+          # verify exempt-label coverage before letting the schedule run
+          # for real. F-CI-009: a mislabeled hot-fix release PR could be
+          # auto-closed if the operator can't preview which items will be
+          # touched.
+          dry-run: ${{ inputs.dry-run || false }}

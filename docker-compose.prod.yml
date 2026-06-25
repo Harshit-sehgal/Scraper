@@ -410,7 +410,11 @@ services:
             -e "s|__ALERTMANAGER_EMAIL_TO__|$${ALERTMANAGER_EMAIL_TO:-}|g" \
           < /etc/alertmanager/alertmanager.yml.template \
           > /tmp/alertmanager.yml
-        if grep -q '__ALERTMANAGER_SMTP_HOST__\|__ALERTMANAGER_SMTP_USER__\|__ALERTMANAGER_SMTP_PASS__\|__ALERTMANAGER_EMAIL_FROM__' /tmp/alertmanager.yml; then
+        # Grep gate must list every `__ALERTMANAGER_*__` placeholder that
+        # the sed chain above substitutes, so an unreplaced token always
+        # fails the gate. The list mirrors docker-compose.override.local.yml
+        # exactly (F-DOCKER-008).
+        if grep -q '__ALERTMANAGER_SLACK_WEBHOOK_URL__\|__ALERTMANAGER_SMTP_HOST__\|__ALERTMANAGER_SMTP_USER__\|__ALERTMANAGER_SMTP_PASS__\|__ALERTMANAGER_EMAIL_FROM__\|__ALERTMANAGER_EMAIL_TO__' /tmp/alertmanager.yml; then
           echo 'ERROR: alertmanager template substitution failed' >&2
           exit 1
         fi

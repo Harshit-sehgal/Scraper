@@ -213,7 +213,7 @@ def classify(rel: str) -> tuple[str, str, str, bool, str]:
         return "docker_deployment", "monitoring/deployment configuration", "", True, "high"
     if rel.startswith("grafana/"):
         return "docker_deployment", "Grafana provisioning/dashboard file", "", True, "high"
-    if rel.startswith("backend/init-db/") or ext == ".sql":
+    if rel.startswith("backend/init-db/") or ext == ".sql" or name.endswith(".sql.original"):
         return "database_migration", "database initialization/migration file", "", True, "high"
     if rel.startswith("backend/app/") and ext == ".py":
         return "backend_source", "FastAPI/backend Python source", "", True, "high"

@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 51 |
-| Fixed issues | 50 |
+| Open verified/deferred issues | 40 |
+| Fixed issues | 61 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -165,6 +165,16 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > a fetched PR-head repo equality check for `/format` comments. Auto-fix
 > pushes require the dedicated `FORMAT_FIX_BOT_TOKEN` instead of falling
 > back to the workflow `GITHUB_TOKEN`.
+>
+> Updated 2026-06-25 Session 85: closed 11 additional verified rows:
+> `F-CI-005`, `F-CI-007`, `F-CI-009`, `F-DOCKER-006`,
+> `F-DOCKER-008`, `F-SCRIPT-004`, `F-OPSDOC-001`,
+> `F-OPSDOC-002`, `F-OPSDOC-003`, `F-DRIFT-002`, and
+> `F-NGINX-005`.
+> Added 54 targeted tests across workflow guards, nginx alias lockdown,
+> Docker compose invariants, Telegram CLI secret handling, run-worker
+> CLI behavior, worker healthcheck behavior, and production unknown-host
+> nginx lockdown.
 
 
 ## Verified Issues
@@ -1066,16 +1076,17 @@ Status is `verified` unless noted.
 - **priority:** P1
 - **status:** fixed
 - **category:** infrastructure / ci / detect_secret_emptiness
-- **file_path:** `.github/workflows/ci.yml:414-431`, `browser-e2e.yml:120-136`, `optional-suites.yml:114-132`, `postgres-tests.yml:75-87`, `nightly-integration.yml:51-69`, `golden-dataset.yml:51-72`, `validate-production.yml:463-479`
-- **line_function:** `if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_TO != ''`
-- **evidence:** GHA substitutes empty strings for unset secrets. The guard `!= ''` always succeeds if the secret slot exists, even if the value is empty. So a misconfigured chat ID/bot token combination silently runs the action step with empty values.
+- **file_path:** `.github/workflows/ci.yml`, `browser-e2e.yml`, `optional-suites.yml`, `postgres-tests.yml`, `nightly-integration.yml`, `golden-dataset.yml`, `validate-production.yml`
+- **line_function:** Telegram notify `if:` guards.
+- **evidence:** GHA substitutes empty strings for unset secrets, so Telegram notification steps need an explicit non-empty guard for both env-backed secrets. Without a regression test, a misconfigured chat ID/bot token combination can silently run the action step with empty values.
 - **why_it_matters:** A misconfigured Telegram integration is silently accepted; the absence of a notification is invisible.
 - **impact:** Lost alerts during incidents when Telegram is half-configured.
-- **recommended_fix:** Test for non-empty values with explicit length check, `if: length(env.TELEGRAM_TOKEN) > 0 && …`.
+- **recommended_fix:** Test for non-empty values with GitHub Actions' documented truthiness semantics: `if: env.TELEGRAM_TOKEN && env.TELEGRAM_TO`.
 - **tests_needed:** Synthetic workflow run with `TELEGRAM_TOKEN=` empty value — step skips.
 - **acceptance_criteria:** Notification step is skipped when either secret is empty.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80). **Fix shipped:** `stale-cleanup.yml` now uses a full 40-character SHA for `actions/stale`, and `scripts/check_workflow_action_pins.py` plus `backend/tests/test_workflow_action_pins.py` guard the all-workflow SHA-pinning invariant.
+- **tests_added:** `backend/tests/test_telegram_ci_secret_guards.py` — locks in `env.TELEGRAM_TOKEN && env.TELEGRAM_TO` guards across all 7 workflows and forbids the unsupported `length(...)` expression helper.
+- **notes:** New finding (Session 80). **Fix shipped:** Replaced bare `!= ''` checks with `if: env.TELEGRAM_TOKEN && env.TELEGRAM_TO` across all 7 workflows. Regression test `backend/tests/test_telegram_ci_secret_guards.py` prevents the guard from regressing to the bare form or to unsupported workflow expression functions.
 
 ### F-CI-008
 
@@ -1352,7 +1363,7 @@ Status is `verified` unless noted.
 ### F-DOCKER-006
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / path_traversal_alias
 - **file_path:** `docker-compose.prod.yml:250-251`, `nginx.conf:319-321`
 - **line_function:** `/landing/` alias without `try_files` guarding
@@ -1363,12 +1374,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Curl `/landing/.git/config` returns 404.
 - **acceptance_criteria:** Operator-deployed dev artifacts are not served.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: nginx.conf and nginx.local.conf both gained a deny block under /landing/. Tests in backend/tests/test_nginx_landing_alias_lockdown.py.
 
 ### F-DOCKER-008
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / drift_in_env_template_grep
 - **file_path:** `docker-compose.override.local.yml:80-92`, `docker-compose.prod.yml:395-398`
 - **line_function:** substitution grep
@@ -1379,7 +1390,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic local override with `__ALERTMANAGER_NEW_VAR__` should fail the build.
 - **acceptance_criteria:** Local and prod grep are byte-identical.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: docker-compose.override.local.yml grep now lists all six placeholders (SLACK_WEBHOOK_URL, SMTP_HOST/USER/PASS, EMAIL_FROM/TO); docker-compose.prod.yml grep also expanded to the same six. Tests in backend/tests/test_compose_alertmanager_template_gate.py.
 
 ### F-FRONTEND-001
 
@@ -1400,10 +1411,10 @@ Status is `verified` unless noted.
 ### F-NGINX-005
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / catch_all_host_header
-- **file_path:** `nginx.conf:117`
-- **line_function:** `server_name _;` + `absolute_redirect off` at line 118
+- **file_path:** `nginx.conf`
+- **line_function:** HTTPS app server `server_name` plus 443 `default_server`
 - **evidence:** `server_name _;` means any host header reaching HTTPS server is honored. Attacker-set hosts work.
 - **why_it_matters:** Host header injection if app uses `Host:` for cookie scoping or canonical URL generation. Phishing/cache-poisoning risk.
 - **impact:** Potential phishing surface if any future route uses `$host`.
@@ -1411,7 +1422,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic curl with `Host: evil.com` returns 444.
 - **acceptance_criteria:** Unknown host returns 444.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: production `nginx.conf` now has a 443 default server returning 444 for unknown hosts, and app-serving server blocks use explicit `dataforge.example.com` placeholders instead of `server_name _;`. Operators must replace the placeholder with the real production domain. Guarded by `backend/tests/test_nginx_catch_all_host_lock.py` and `backend/tests/test_nginx_unknown_host_lockdown.py`.
 
 ### F-NGINX-006
 
@@ -1448,7 +1459,7 @@ Status is `verified` unless noted.
 ### F-CI-007
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / cancel_in_progress
 - **file_path:** all cron workflows (5 files)
 - **line_function:** `concurrency:` blocks
@@ -1459,12 +1470,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Manual dispatch during the cron run does not cancel it.
 - **acceptance_criteria:** Concurrent runs queue, never cancel.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: applied to all 6 cron workflows — concurrency.group now keys on github.event_name so schedule and dispatch never share the in-flight slot, and cancel-in-progress: false queues instead of dropping. Tests in backend/tests/test_cron_workflow_concurrency.py.
 
 ### F-CI-009
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / stale_pr_autoclose
 - **file_path:** `.github/workflows/stale-cleanup.yml:30, 56-60`
 - **line_function:** `operations-per-run: 100` + label exempt
@@ -1475,7 +1486,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic PR without labels run against `dry-run` shows intended close list without closing.
 - **acceptance_criteria:** Stale cleanup never closes without explicit `workflow_dispatch` confirmation.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: workflow_dispatch.inputs.dry-run (boolean, default false) added; actions/stale consumes dry-run via ${{ inputs.dry-run || false }}. Exempt labels retained. Tests in backend/tests/test_stale_cleanup_dry_run.py.
 
 ### F-NPM-001
 
@@ -1800,7 +1811,7 @@ Status is `verified` unless noted.
 ### F-SCRIPT-004
 
 - **priority:** P3
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / cli_args_in_ps_history
 - **file_path:** `scripts/send_telegram.py:67-75, 111-114`
 - **line_function:** argparse `--token` and `--chat-id`
@@ -1811,12 +1822,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic `--token` arg is never present in `ps aux` output after fix.
 - **acceptance_criteria:** Token is read from an env ref or file, not argv.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: --token-file / --chat-id-file / --token-prompt / --chat-id-prompt added; legacy --token / --chat-id retained. Tests in backend/tests/test_send_telegram_cli.py.
 
 ### F-OPSDOC-001
 
 - **priority:** P3
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / missing_tests
 - **file_path:** `scripts/run_worker.py`
 - **line_function:** CLI
@@ -1824,15 +1835,15 @@ Status is `verified` unless noted.
 - **why_it_matters:** Subprocess behavior untested.
 - **impact:** Regressions possible; no early warning.
 - **recommended_fix:** Add `backend/tests/test_run_worker_cli.py` with subprocess-based tests.
-- **tests_needed:** Subprocess tests for `--once`, `SIGTERM`, env override.
+- **tests_needed:** Subprocess and in-process tests for CLI help/errors, `--once`, heartbeat arguments, and SIGINT/SIGTERM registration.
 - **acceptance_criteria:** CLI covered by unit tests.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: `backend/tests/test_run_worker_cli.py` covers import path bootstrap, subprocess `--help` and unknown-flag behavior, `--once` drain mode with heartbeat skipped, heartbeat argument propagation, and SIGINT/SIGTERM shutdown-handler registration.
 
 ### F-OPSDOC-002
 
 - **priority:** P3
-- **status:** verified
+- **status:** fixed
 - **category:** docs / missing_artifacts_index
 - **file_path:** `scripts/backup_and_restore_test.py`
 - **line_function:** artifact write path
@@ -1843,12 +1854,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Doc lint that asserts `docs/ARTIFACTS.md` exists when artifacts/ grows.
 - **acceptance_criteria:** Each artifacts subdirectory has a docs entry.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: docs/ARTIFACTS.md created and cross-referenced from docs/INDEX.md (Section 7).
 
 ### F-OPSDOC-003
 
 - **priority:** P3
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / healthcheck_no_tests
 - **file_path:** `scripts/worker_healthcheck.py`
 - **line_function:** Docker HEALTHCHECK target
@@ -1859,12 +1870,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Unit tests for happy/stale paths.
 - **acceptance_criteria:** Healthcheck covered by unit tests.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: backend/tests/test_worker_healthcheck.py covers healthy/stale/DB-error and TTL-validation branches.
 
 ### F-DRIFT-002
 
 - **priority:** P3
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / worker_image_mismatch
 - **file_path:** `docker-compose.prod.yml:91, 124`
 - **line_function:** both services' image tag
@@ -1875,6 +1886,6 @@ Status is `verified` unless noted.
 - **tests_needed:** CI release rejects partial rebuild.
 - **acceptance_criteria:** Single-image rebuild publishes dataforge + worker as a shared tag.
 - **blocked_by:** CI release pipeline.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 85: backend/tests/test_docker_atomic_image_pair.py locks in that `dataforge` and `worker` compose services (1) consume ${DATAFORGE_IMAGE_TAG}, (2) declare byte-identical image directives, (3) share build.context=Dockerfile target=production.
 
 ## End of ledger entries — total 105 (39 historical + 66 added 2026-06-25)
