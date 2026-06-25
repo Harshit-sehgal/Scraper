@@ -75,6 +75,25 @@ legitimately fail the audit step. The backup drill still depends on
 Docker and a free host port; the preflight refusal only checks for
 TCP listeners, not for Docker-level port mapping conflicts.
 
+### Test Sweep — Session 88b Final
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/ --timeout=60` | 0 | 4170 passed, 94 skipped, 0 failed in 5m03s. |
+
+Three regression tests were tightened to clear the sweep:
+
+- `backend/tests/test_nginx_rate_limit.py` now accepts either the
+  legacy `zone=api` literal or the new F-NGINX-SEC-001 dynamic
+  `zone=$api_bucket`, preserving the F-NGINX-003 path-normalization
+  bypass invariant.
+- `backend/tests/test_postgres_migration_ddl_only.py` dropped a
+  now-unused named regex capture (`verb`) so pyflakes is clean.
+- `backend/tests/test_alerting_channel_smoke.py` parses
+  `scripts/smoke_prod_stack.sh` via `bash -n` (matching its
+  `#!/usr/bin/env bash` shebang) instead of `/bin/sh -n` so
+  dash-based distros don't trip the array-in-trap pattern.
+
 ## Session 88 Nginx + Script + CI Guard Follow-up - 2026-06-25
 
 Scope: close the verified `F-OPSDOC-001`, `F-NGINX-005`, `F-NGINX-SEC-001`,
