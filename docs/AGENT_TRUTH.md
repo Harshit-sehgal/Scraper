@@ -1,21 +1,69 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 87 CI Postgres-port follow-up. Quick validation is
-green (`20260625T144244Z_quick`, 13/13 passed) and security validation
-is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
-pip-audit, and the expected-failing production env template check).
-`artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-37 open verified/deferred lower-priority rows, 64 fixed rows, 3
-candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
-route inventory is 161 routes; route auth matrix has 150 API rows with
-`unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
-lists 26,520 files, 973 project-owned files, 969 deeply inspected
-project-owned files, and 0 file-ledger follow-up rows._
+Last verified: Session 88 nginx + script + CI guard follow-up. Quick
+validation is green (`20260625T161803Z_quick`, 12/12 passed) and security
+validation is green (`20260625T013939Z_security`, 9/9 passed, including
+Bandit, pip-audit, and the expected-failing production env template
+check). `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105
+issue IDs: 32 open verified/deferred lower-priority rows, 68 fixed
+rows, 3 candidate rows, 1 not-reproducible row, and 0 open P0 rows.
+Current route inventory is 161 routes; route auth matrix has 150 API
+rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
+inventory lists 26,520 files, 973 project-owned files, 969 deeply
+inspected project-owned files, and 0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 88 Nginx + Script + CI Guard Follow-up - 2026-06-25
+
+Scope: close the verified `F-OPSDOC-001`, `F-NGINX-005`, `F-NGINX-SEC-001`,
+and `F-SCRIPT-003` rows that remained after the Session 85 push, plus
+add the regression tests for the F-CI-005 telegram-notify guard fix.
+
+### Issues Fixed
+
+- `F-OPSDOC-001`: `scripts/run_worker.py` is now covered by
+  `backend/tests/test_run_worker_cli.py` (CLI surface, in-process
+  bootstrap, --once drain mode, heartbeat arguments, signal-handler
+  registration).
+- `F-NGINX-005`: production `nginx.conf` adds a 443
+  `default_server` block that returns 444 for unknown Host headers,
+  and the app-serving 443 and 80 server blocks now use an explicit
+  `dataforge.example.com` placeholder instead of `server_name _;`.
+  Guarded by `backend/tests/test_nginx_catch_all_host_lock.py`.
+- `F-NGINX-SEC-001`: `nginx.conf` and `nginx.local.conf` now define
+  `limit_req_zone ... zone=api_write:10m rate=10r/s`, a
+  `map $request_method $api_bucket` block classifies
+  POST/PUT/PATCH/DELETE into the write zone, and the `/api/` plus
+  `/dashboard/` locations apply
+  `limit_req zone=$api_bucket burst=20 nodelay`. Guarded by
+  `backend/tests/test_nginx_method_rate_limit.py`.
+- `F-SCRIPT-003`: `scripts/start.sh` now refuses a missing `.env`
+  by default with a clear remediation message, with an opt-in
+  (`DATAFORGE_ACCEPT_PLACEHOLDER_ENV=1`) for operators who
+  explicitly want the placeholder copy. Guarded by
+  `backend/tests/test_start_sh_env_gate.py`.
+- `F-CI-005`: every Telegram-notify guard across all 7 GitHub
+  Actions workflows now combines `!= ''` with
+  `length(env.<VAR>) > 0` so an empty-secret substitution cannot
+  silently trigger `appleboy/telegram-action` with no values.
+  Guarded by `backend/tests/test_telegram_ci_secret_guards.py`.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_run_worker_cli.py backend/tests/test_telegram_ci_secret_guards.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_keepalive_requests_pin.py backend/tests/test_workflow_postgres_port_uniqueness.py backend/tests/test_nginx_method_rate_limit.py backend/tests/test_start_sh_env_gate.py -q -o addopts=` | 0 | PASS; new + updated regression tests all green. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T161803Z_quick`, 12/12 checks passed. |
+
+### Remaining Constraints
+
+None of these tests prove runtime behavior under real load; the
+production posture remains gated by `validate-production.yml`
+nightly and `optional-suites.yml` weekly runs.
 
 ## Session 87 CI Postgres-Port Follow-up - 2026-06-25
 

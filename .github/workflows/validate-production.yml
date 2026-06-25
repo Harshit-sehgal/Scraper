@@ -226,16 +226,15 @@ jobs:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: testdb
-        # F-CI-006: pin port 5435 to avoid collisions with parallel
-        # workflows on shared self-hosted runners.
+        # F-CI-006: publish the container port only. GitHub assigns a
+        # free host port exposed through job.services.postgres.ports.
         options: >-
-          --port=5435
-          --health-cmd "pg_isready -p 5435"
+          --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5435:5435
+          - 5432
     env:
       DATAFORGE_STORAGE_BACKEND: postgres
     steps:

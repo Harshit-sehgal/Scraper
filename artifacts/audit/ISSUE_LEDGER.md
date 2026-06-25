@@ -1716,18 +1716,19 @@ Status is `verified` unless noted.
 ### F-NGINX-SEC-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / methodless_rate_limit
-- **file_path:** `nginx.local.conf:108-124`
-- **line_function:** `location /api/`
-- **evidence:** `/api/` proxy forwards all methods and paths to FastAPI without method-specific rate limiting.
-- **why_it_matters:** No pre-auth throttle; admin paths exposed at unlimited rate.
-- **impact:** Brute force / flood risk.
+- **file_path:** `nginx.conf`, `nginx.local.conf`
+- **line_function:** `/api/` location + `map $request_method $api_bucket`
+- **evidence:** Pre-fix `/api/` location block applied the identical read-bucket rate limit (`zone=api burst=20 nodelay`) to every HTTP method, leaving POST/PUT/PATCH/DELETE unthrottled at a stricter posture.
+- **why_it_matters:** Read traffic has natural polling cadence, so a generous rate is appropriate; write traffic trades off against the storage backend's write throughput and needs a harder ceiling.
+- **impact:** Brute force / flood risk on write endpoints.
 - **recommended_fix:** Add `limit_req` for write methods (`POST/PUT/DELETE`) at stricter burst than reads.
 - **tests_needed:** Synthetic burst of 1k POSTs to `/api/jobs` returns 503/429.
 - **acceptance_criteria:** Write methods are throttled at strict rate.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **tests_added:** `backend/tests/test_nginx_method_rate_limit.py`
+- **notes:** New finding (Session 80). **Fixed Session 88:** `nginx.conf` and `nginx.local.conf` both define `limit_req_zone ... zone=api_write:10m rate=10r/s`, a `map $request_method $api_bucket` block classifies POST/PUT/PATCH/DELETE into the write zone, and the `/api/` plus `/dashboard/` locations apply `limit_req zone=$api_bucket burst=20 nodelay`. Regression test `backend/tests/test_nginx_method_rate_limit.py` guards the dual-zone map+location form across both nginx configs.
 
 ### F-EXCEPTION-001
 
@@ -1796,10 +1797,10 @@ Status is `verified` unless noted.
 ### F-SCRIPT-003
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / start_sh / silent_copy
-- **file_path:** `scripts/start.sh:36-44`
-- **line_function:** env creation block
+- **file_path:** `scripts/start.sh`
+- **line_function:** .env presence + `DATAFORGE_ACCEPT_PLACEHOLDER_ENV` opt-in
 - **evidence:** If `.env` missing, `cp .env.example .env` silently runs, producing a placeholder-keyed .env that the server happily boots with disabled auth/DB.
 - **why_it_matters:** Operator sees "server started" with placeholder keys and learns the failure later.
 - **impact:** Footgun time-loss; possible credentials leak in transit logs.
@@ -1807,7 +1808,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic missing-`.env` start fails.
 - **acceptance_criteria:** `start.sh` exits non-zero when `.env` missing.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **tests_added:** `backend/tests/test_start_sh_env_gate.py`
+- **notes:** New finding (Session 80). **Fixed Session 88:** `scripts/start.sh` now exits non-zero with a remediation message when `.env` is missing. An opt-in escape hatch (`DATAFORGE_ACCEPT_PLACEHOLDER_ENV=1`) lets operators who explicitly want the placeholder file copy proceed. Regression test `backend/tests/test_start_sh_env_gate.py` exercises the refuse-by-default posture and the opt-in branch in isolated scratch trees.
 
 ### F-SCRIPT-005
 

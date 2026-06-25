@@ -33,13 +33,28 @@ if [ -z "$VENV_DIR" ]; then
 fi
 
 # ─── Check .env ────────────────────────────────────────────────────────────
+# F-SCRIPT-003: refuse to silently create a placeholder ``.env``. The
+# prior behaviour ran ``cp .env.example .env`` and exited 0, so an
+# operator who forgot to set ``GROQ_API_KEY`` (or any other secret)
+# would boot the server with a placeholder-keyed .env and only learn
+# the failure later. The fix refuses by default and lets a developer
+# opt in via ``DATAFORGE_ACCEPT_PLACEHOLDER_ENV=1`` when they
+# explicitly want the example file.
 if [ ! -f "$PROJECT_DIR/.env" ]; then
-    echo "⚠️  No .env file found. Copying from .env.example..."
+    echo "❌ No .env file found in $PROJECT_DIR." >&2
+    echo "   Create one with real production secrets before starting the server." >&2
+    echo "   If you want a placeholder .env for local experimentation only," >&2
+    echo "   rerun with: DATAFORGE_ACCEPT_PLACEHOLDER_ENV=1 $0" >&2
+    if [ "${DATAFORGE_ACCEPT_PLACEHOLDER_ENV:-0}" != "1" ]; then
+        exit 1
+    fi
     if [ -f "$PROJECT_DIR/.env.example" ]; then
         cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-        echo "   Created .env — edit it to add your GROQ_API_KEY"
+        echo "   Placeholder .env copied (DATAFORGE_ACCEPT_PLACEHOLDER_ENV=1)." >&2
+        echo "   Replace placeholder secrets with real values before any real use." >&2
     else
-        echo "   No .env.example found either. Create a .env file manually."
+        echo "   No .env.example found either. Create a .env file manually before running." >&2
+        exit 1
     fi
 fi
 
