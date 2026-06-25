@@ -31,6 +31,9 @@ services:
       target: production
     image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
     container_name: dataforge-scraper
+    # Match the caller's host UID/GID for bind mounts. ``make up`` exports
+    # these values; direct ``docker compose`` calls can set them explicitly.
+    user: "${DATAFORGE_DEV_UID:-1000}:${DATAFORGE_DEV_GID:-1000}"
     ports:
       - "${HOST:-127.0.0.1}:${PORT:-8000}:8000"
     env_file:
@@ -41,8 +44,8 @@ services:
       # Source code mounted for hot-reload
       - ./backend:/app/backend
       - ./frontend:/app/frontend
-      # Persistent data across restarts
-      - dataforge_data:/app/backend/data
+      # Runtime data lives in ./backend/data through the backend bind mount
+      # so container writes use the same UID/GID as the host checkout.
     depends_on: []
     restart: unless-stopped
     healthcheck:
@@ -64,10 +67,6 @@ services:
           cpus: "2"
     networks:
       - dataforge-net
-
-volumes:
-  dataforge_data:
-    name: dataforge_scraper_data
 
 networks:
   dataforge-net:

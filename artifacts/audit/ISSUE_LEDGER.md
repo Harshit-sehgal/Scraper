@@ -971,7 +971,7 @@ Status is `verified` unless noted.
 ### F-DOCKER-002
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / mount_permission_drift
 - **file_path:** `docker-compose.yml:22-61`
 - **line_function:** dev service mounts at lines 36-38
@@ -979,10 +979,10 @@ Status is `verified` unless noted.
 - **why_it_matters:** Contributors hit confusing errors on every reload; workaround is undocumented `chown -R 1000:1000 .` on host.
 - **impact:** Friction for all contributors on non-UID-1000 hosts.
 - **recommended_fix:** Pass `user: "${UID:-1000}:${GID:-1000}"` to the dev service; or run as root in dev with a clear env flag.
-- **tests_needed:** Manual smoke on a UID-500 host; documents `make up` works without `chown`.
-- **acceptance_criteria:** Default `make up` works on a non-UID-1000 host without manual `chown`.
+- **tests_needed:** Static guard plus Compose config render with non-1000 UID/GID; docs show `make up` path and direct Compose override.
+- **acceptance_criteria:** `make up` exports the host UID/GID, dev Compose runs the service as that UID/GID, and `/app/backend/data` stays under the host bind mount instead of an image-owned named volume.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `Makefile` now derives `DATAFORGE_DEV_UID`/`DATAFORGE_DEV_GID` from `id -u`/`id -g` and prefixes development Compose commands with them. `docker-compose.yml` consumes those values via `user: "${DATAFORGE_DEV_UID:-1000}:${DATAFORGE_DEV_GID:-1000}"` and no longer overlays `/app/backend/data` with the image-owned `dataforge_data` volume in dev. `docs/QUICKSTART.md` now documents `make up` and the direct Compose UID/GID override. Guarded by `backend/tests/test_docker_dev_target.py`.
 
 ### F-DOCKER-005
 

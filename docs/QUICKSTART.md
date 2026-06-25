@@ -110,14 +110,22 @@ curl http://localhost:8000/api/jobs/$JOB_ID/results \
 ### Development
 
 ```bash
-# Start with Docker Compose
-docker compose up -d
+# Start with Docker through the Makefile. This passes your host UID/GID
+# into Compose so files created under bind mounts stay editable.
+make up
 
 # View logs
-docker compose logs -f
+make logs
 
 # Stop
-docker compose down
+make down
+```
+
+If you run Compose directly instead of `make up`, pass the same UID/GID
+values explicitly:
+
+```bash
+DATAFORGE_DEV_UID="$(id -u)" DATAFORGE_DEV_GID="$(id -g)" docker compose up -d
 ```
 
 ### Production

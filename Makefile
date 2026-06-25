@@ -23,7 +23,11 @@
 
 .DEFAULT_GOAL := help
 
-DC := docker compose
+# Development Compose bind-mounts the host source tree. Export the caller's
+# UID/GID so files created by the container stay editable on non-UID-1000 hosts.
+DATAFORGE_DEV_UID ?= $(shell id -u 2>/dev/null || echo 1000)
+DATAFORGE_DEV_GID ?= $(shell id -g 2>/dev/null || echo 1000)
+DC := DATAFORGE_DEV_UID=$(DATAFORGE_DEV_UID) DATAFORGE_DEV_GID=$(DATAFORGE_DEV_GID) docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 

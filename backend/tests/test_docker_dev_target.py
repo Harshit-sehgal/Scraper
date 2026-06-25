@@ -16,10 +16,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[2]  # backend/tests/X.py → repo root
 DOCKERFILE = REPO_ROOT / "Dockerfile"
 DEV_COMPOSE = REPO_ROOT / "docker-compose.override.yml"
 BASE_COMPOSE = REPO_ROOT / "docker-compose.yml"
+MAKEFILE = REPO_ROOT / "Makefile"
 
 
 def _dockerfile_text() -> str:
@@ -39,9 +42,18 @@ def _base_compose_text() -> str:
     return BASE_COMPOSE.read_text(encoding="utf-8")
 
 
+def _base_compose() -> dict:
+    return yaml.safe_load(_base_compose_text())
+
+
 def _dev_override_text() -> str:
     assert DEV_COMPOSE.is_file(), f"missing {DEV_COMPOSE}"
     return DEV_COMPOSE.read_text(encoding="utf-8")
+
+
+def _makefile_text() -> str:
+    assert MAKEFILE.is_file(), f"missing {MAKEFILE}"
+    return MAKEFILE.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +103,32 @@ class TestDevReloadGating:
         text = _dev_override_text()
         assert "target: dev" in text, "docker-compose.override.yml no longer switches to dev target"
         assert "DATAFORGE_ENABLE_RELOAD" in text, "docker-compose.override.yml no longer opts in to uvicorn --reload"
+
+
+# ---------------------------------------------------------------------------
+# F-DOCKER-002 — dev bind mounts must use the host UID/GID
+# ---------------------------------------------------------------------------
+
+
+class TestDevBindMountOwnership:
+    """The dev service should not write root/image-owned files into host mounts."""
+
+    def test_base_compose_runs_service_with_host_uid_gid_placeholders(self) -> None:
+        service = _base_compose()["services"]["dataforge"]
+        assert service.get("user") == "${DATAFORGE_DEV_UID:-1000}:${DATAFORGE_DEV_GID:-1000}"
+
+    def test_makefile_passes_host_uid_gid_to_compose(self) -> None:
+        text = _makefile_text()
+        assert "DATAFORGE_DEV_UID ?= $(shell id -u" in text
+        assert "DATAFORGE_DEV_GID ?= $(shell id -g" in text
+        assert "DATAFORGE_DEV_UID=$(DATAFORGE_DEV_UID)" in text
+        assert "DATAFORGE_DEV_GID=$(DATAFORGE_DEV_GID)" in text
+
+    def test_dev_compose_does_not_overlay_backend_data_with_image_owned_volume(self) -> None:
+        compose = _base_compose()
+        volumes = compose["services"]["dataforge"].get("volumes", [])
+        assert "dataforge_data:/app/backend/data" not in volumes
+        assert "dataforge_data" not in compose.get("volumes", {})
 
 
 # ---------------------------------------------------------------------------
