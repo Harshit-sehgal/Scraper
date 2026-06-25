@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 40 |
-| Fixed issues | 61 |
+| Open verified/deferred issues | 39 |
+| Fixed issues | 62 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -175,6 +175,10 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > Docker compose invariants, Telegram CLI secret handling, run-worker
 > CLI behavior, worker healthcheck behavior, and production unknown-host
 > nginx lockdown.
+>
+> Updated 2026-06-25 Session 86: closed `F-NGINX-006` by pinning
+> `keepalive_requests 10000;` in the active production nginx `http`
+> context and adding `backend/tests/test_nginx_keepalive_requests.py`.
 
 
 ## Verified Issues
@@ -1427,18 +1431,18 @@ Status is `verified` unless noted.
 ### F-NGINX-006
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / keepalive_default
-- **file_path:** `nginx.conf:25-29`
-- **line_function:** global `worker_connections 1024`
+- **file_path:** `nginx.conf`
+- **line_function:** active `http` context keepalive settings
 - **evidence:** `worker_connections 1024` + `multi_accept on` globally. nginx defaults `keepalive_requests=1000` post-v1.19.7.
 - **why_it_matters:** Load tests may show non-linear latency scaling under concurrent keep-alive reuse.
 - **impact:** Hidden capacity cliff during load tests.
-- **recommended_fix:** Pin `keepalive_requests 10000;` on HTTPS server block.
+- **recommended_fix:** Pin `keepalive_requests 10000;` in the active nginx `http` context.
 - **tests_needed:** Synthetic `ab -c 200 -n 10000 …` shows consistent p95.
 - **acceptance_criteria:** No keep-alive cliff triggering under load.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 86: `nginx.conf` now pins `keepalive_requests 10000;` in the active `http` context, before server blocks, so all production listeners use the same request cap. Guarded by `backend/tests/test_nginx_keepalive_requests.py` and `backend/tests/test_nginx_keepalive_requests_pin.py`. Runtime load proof remains covered by the broader load-test/staging follow-up rows.
 
 ### F-CI-006
 

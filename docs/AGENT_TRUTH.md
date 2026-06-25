@@ -1,12 +1,12 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 85 ops/script/CI guard follow-up. Quick validation is
-green (`20260625T141822Z_quick`, 13/13 passed) and security validation
+Last verified: Session 86 nginx keepalive follow-up. Quick validation is
+green (`20260625T142552Z_quick`, 13/13 passed) and security validation
 is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
 pip-audit, and the expected-failing production env template check).
 `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-40 open verified/deferred lower-priority rows, 61 fixed rows, 3
+39 open verified/deferred lower-priority rows, 62 fixed rows, 3
 candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
 route inventory is 161 routes; route auth matrix has 150 API rows with
 `unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
@@ -16,6 +16,37 @@ project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 86 Nginx Keepalive Follow-up - 2026-06-25
+
+Scope: close one additional evidence-backed nginx production-capacity
+guard row found in the active worktree after Session 85 was pushed.
+
+### Issue Fixed
+
+- `F-NGINX-006`: production `nginx.conf` now pins
+  `keepalive_requests 10000;` in the active `http` context, before
+  server blocks, so the request cap does not drift with nginx image
+  defaults.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py -q -o addopts=` | 0 | PASS; 4 keepalive tests passed. |
+| `python3 -m ruff check backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py` | 0 | PASS; 2 files already formatted. |
+| `python3 -m pytest backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_unknown_host_lockdown.py -q -o addopts=` | 0 | PASS; 9 nginx hardening tests passed. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match between code and docs. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv column-count/status check ... PY` | 0 | PASS; 105 rows, 14 expected columns, 0 malformed rows; statuses `fixed=62`, `verified=38`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=15`, `P2=24`. |
+| `docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$TMPDIR/ssl:/etc/nginx/ssl:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; production nginx config syntax is valid with a temporary self-signed cert. |
+| `git diff --check` | 0 | PASS; no whitespace errors in the final diff. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T142552Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+Runtime load proof in the target environment remains tracked by the
+open load/staging follow-up rows in `artifacts/audit/ISSUE_LEDGER.*`.
 
 ## Session 85 Ops, Script, and CI Guard Follow-up - 2026-06-25
 
