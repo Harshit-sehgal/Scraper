@@ -1003,9 +1003,9 @@ Status is `verified` unless noted.
 ### F-DRIFT-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / readonly_bypass
-- **file_path:** `docker-compose.prod.yml:48-49, 73, 142`
+- **file_path:** `docker-compose.prod.yml:48-49, 73, 142` (dataforge), 119, 160 (worker)
 - **line_function:** both services `read_only: true` plus `volumes:` block
 - **evidence:** Both prod services have `read_only: true` (root fs locked) but `volumes: - dataforge_data:/app/backend/data` mounts on top **rw** by default — read-only protection is bypassed for that path. A compromised uvicorn can overwrite `semantic_state.json`, logs, etc.
 - **why_it_matters:** Read-only filesystem is a defense in depth against process compromise; the data volume is wide open, weakening it.
@@ -1014,7 +1014,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Run a compromised process and assert it cannot write `semantic_state.json` while still writing logs.
 - **acceptance_criteria:** Compromise from the API process cannot tamper with `semantic_state.json`.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Partial fix shipped:** regression test `backend/tests/test_read_only_root_fs.py` (6 tests) now asserts the existing `read_only: true` lockdown on both dataforge and worker services, the `/tmp` tmpfs scratch on each, the precise `/app/backend/data` named-volume mount, and the absence of any hidden `read_only: false` override. The deeper recommendation (splitting `/app/backend/data` into `:ro` subpaths for `semantic` and `:rw` subpaths for `logs`) is NOT applied because `backend/app/semantic_persistence.py::save_semantic_state` writes the semantic state during normal runtime (lines 78-99); making it `:ro` would break the live runtime. Splitting requires an app-level cache split between in-memory and persisted footprint, which is deferred to a separate follow-up.
 
 ### F-CI-003
 
