@@ -1,12 +1,12 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 86 nginx keepalive follow-up. Quick validation is
-green (`20260625T142552Z_quick`, 13/13 passed) and security validation
+Last verified: Session 87 CI Postgres-port follow-up. Quick validation is
+green (`20260625T144244Z_quick`, 13/13 passed) and security validation
 is green (`20260625T013939Z_security`, 9/9 passed, including Bandit,
 pip-audit, and the expected-failing production env template check).
 `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-39 open verified/deferred lower-priority rows, 62 fixed rows, 3
+37 open verified/deferred lower-priority rows, 64 fixed rows, 3
 candidate rows, 1 not-reproducible row, and 0 open P0 rows. Current
 route inventory is 161 routes; route auth matrix has 150 API rows with
 `unknown_auth=0` and `unknown_tenant=0`. The regenerated file inventory
@@ -16,6 +16,78 @@ project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 87 CI Postgres-Port Follow-up - 2026-06-25
+
+Scope: close the verified `F-CI-006` CI reliability row after an
+incomplete fixed-port workflow edit was found in the working tree.
+
+### Issue Fixed
+
+- `F-CI-006`: `optional-suites.yml`, `postgres-tests.yml`, and
+  `validate-production.yml` now publish Postgres service container port
+  `5432` without binding a fixed host port. The Postgres test steps
+  construct `DATAFORGE_DATABASE_URL` from
+  `${{ job.services.postgres.ports[5432] }}`, so concurrent scheduled or
+  manual runs on shared runners do not race for host port `5432`.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_postgres_workflow_service_ports.py -q -o addopts=` | 1 | RED before fix; caught fixed/custom host-port mappings and missing `job.services.postgres.ports[5432]` usage. |
+| `python3 -m pytest backend/tests/test_postgres_workflow_service_ports.py backend/tests/test_cron_workflow_concurrency.py backend/tests/test_workflow_action_pins.py backend/tests/test_telegram_ci_secret_guards.py -q -o addopts=` | 0 | PASS after fix; 18 workflow guard tests passed. |
+| `python3 -m ruff check backend/tests/test_postgres_workflow_service_ports.py backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py && python3 -m ruff format --check backend/tests/test_postgres_workflow_service_ports.py backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py` | 1 | `ruff check` passed; format check required formatting `backend/tests/test_postgres_workflow_service_ports.py`. |
+| `python3 -m ruff format backend/tests/test_postgres_workflow_service_ports.py && python3 -m ruff check backend/tests/test_postgres_workflow_service_ports.py backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py && python3 -m ruff format --check backend/tests/test_postgres_workflow_service_ports.py backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py` | 0 | PASS; 1 file reformatted, checks passed, 3 files formatted. |
+| `python3 -m pytest backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py backend/tests/test_nginx_landing_alias_lockdown.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py backend/tests/test_nginx_tls_posture.py backend/tests/test_postgres_workflow_service_ports.py backend/tests/test_cron_workflow_concurrency.py backend/tests/test_workflow_action_pins.py backend/tests/test_telegram_ci_secret_guards.py -q -o addopts=` | 0 | PASS; 40 nginx and workflow regression tests passed. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv check with stale priority assertion ... PY` | 1 | The CSV parsed cleanly but the ad-hoc assertion expected the wrong open-priority split; rerun below used the actual row-derived split. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv corrected status check ... PY` | 0 | PASS; 105 rows, 14 columns, 0 malformed rows; statuses `fixed=64`, `verified=36`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=14`, `P2=23`. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match between code and docs. |
+| `git diff --check` | 0 | PASS; no whitespace errors in the final diff. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T144244Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+This removes fixed host-port binding from the GitHub Actions service
+configuration. It does not prove a live parallel run on GitHub-hosted or
+self-hosted runners; that acceptance evidence still depends on CI
+runtime behavior.
+
+## Session 87 Nginx Reserved Admin Path Follow-up - 2026-06-25
+
+Scope: close one verified P1 nginx edge-hardening row while correcting
+stale ledger wording against current code.
+
+### Issue Fixed
+
+- `F-NGINX-001`: both production and local nginx configs now reserve
+  `/api/admin`, `/api/admin/`, `/api/system/admin`, and
+  `/api/system/admin/` with direct `return 404` blocks before generic
+  `/api/` proxying. Fresh code inspection showed the old ledger wording
+  was stale: production did not currently have an active admin deny
+  block either.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before editing passed; 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_nginx_admin_acl.py -q -o addopts=` | 1 | RED before fix; missing active `location = /api/admin` block in `nginx.conf`. |
+| `python3 -m pytest backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py backend/tests/test_nginx_landing_alias_lockdown.py -q -o addopts=` | 0 | PASS after fix/test refresh; 9 tests passed. |
+| `python3 -m ruff check backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py` | 0 | PASS; all checks passed. |
+| `python3 -m ruff format --check backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py` | 0 | PASS; 2 files already formatted after formatting `backend/tests/test_nginx_admin_acl.py`. |
+| `docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$TMPDIR/ssl:/etc/nginx/ssl:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; production nginx config syntax is valid with a temporary self-signed cert. |
+| `docker run --rm -v "$PWD/nginx.local.conf:/etc/nginx/nginx.conf:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; local nginx config syntax is valid. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv column-count/status check ... PY` | 0 | PASS; 105 rows, 14 expected columns, 0 malformed rows; statuses `fixed=63`, `verified=37`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=14`, `P2=24`. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variables match between code and docs. |
+| `python3 -m pytest backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_rate_limit.py backend/tests/test_nginx_landing_alias_lockdown.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_nginx_keepalive_requests.py backend/tests/test_nginx_keepalive_requests_pin.py backend/tests/test_nginx_tls_posture.py -q -o addopts=` | 0 | PASS; 22 nginx regression tests passed. |
+| `git diff --check` | 0 | PASS; no whitespace errors in the final diff. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; run id `20260625T143448Z_quick`, 13/13 checks passed. |
+
+### Remaining Constraints
+
+This reserves currently non-existent admin path prefixes at the edge; it
+does not replace centralized FastAPI RBAC for real product routes.
 
 ## Session 86 Nginx Keepalive Follow-up - 2026-06-25
 

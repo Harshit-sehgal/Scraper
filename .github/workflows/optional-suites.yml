@@ -30,16 +30,17 @@ jobs:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: testdb
+        # F-CI-006: publish the container port only. GitHub assigns a
+        # free host port exposed through job.services.postgres.ports.
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5432
     env:
       DATAFORGE_STORAGE_BACKEND: postgres
-      DATAFORGE_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Set up Python 3.12
@@ -54,6 +55,8 @@ jobs:
         run: |
           PYTHONPATH=backend \
           DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=postgres \
+          DATAFORGE_DATABASE_URL="postgresql://testuser:testpassword@localhost:${{ job.services.postgres.ports[5432] }}/testdb" \
           python3 -m pytest -q backend/tests --run-postgres -o addopts= \
           --tb=short --timeout=300 --reruns 3 --reruns-delay 10 2>&1 | tee /tmp/postgres_results.txt
           PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}' || echo "0")

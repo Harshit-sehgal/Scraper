@@ -10,8 +10,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 39 |
-| Fixed issues | 62 |
+| Open verified/deferred issues | 37 |
+| Fixed issues | 64 |
 | Not reproducible issues | 1 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
@@ -179,6 +179,19 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 > Updated 2026-06-25 Session 86: closed `F-NGINX-006` by pinning
 > `keepalive_requests 10000;` in the active production nginx `http`
 > context and adding `backend/tests/test_nginx_keepalive_requests.py`.
+>
+> Updated 2026-06-25 Session 87: closed `F-NGINX-001`. Fresh code
+> inspection showed both production and local nginx configs lacked
+> active reserved-path blocks for `/api/admin` and `/api/system/admin`;
+> both now return 404 for those prefixes before the generic `/api/`
+> proxy. Guarded by `backend/tests/test_nginx_admin_acl.py`.
+>
+> Updated 2026-06-25 Session 87 follow-up: closed `F-CI-006`. The three
+> Postgres workflow jobs now publish only container port `5432` and build
+> `DATAFORGE_DATABASE_URL` with
+> `${{ job.services.postgres.ports[5432] }}` so concurrent runs do not
+> bind the same host port. Guarded by
+> `backend/tests/test_postgres_workflow_service_ports.py`.
 
 
 ## Verified Issues
@@ -1127,18 +1140,18 @@ Status is `verified` unless noted.
 ### F-NGINX-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / missing_admin_acl
-- **file_path:** `nginx.local.conf:75-224`
-- **line_function:** `location /api/` proxy at lines 108-124
-- **evidence:** Production `nginx.conf` has `/api/admin` deny block; `nginx.local.conf` does not. CSP includes `connect-src 'self' ws: wss:` which is essentially no TLS pinning. `/api/` proxy passes everything to FastAPI without IP allow-list.
+- **file_path:** `nginx.conf`, `nginx.local.conf`
+- **line_function:** reserved admin path locations before generic `location /api/`
+- **evidence:** Fresh Session 87 inspection showed neither production nor local nginx config had active `/api/admin` or `/api/system/admin` reserved-path blocks; both configs only had the generic `/api/` proxy.
 - **why_it_matters:** In local TLS-bypass mode (used by `docker-compose.override.local.yml:118-121`), the entire nginx HTTP server is the *only* firewall between host network and the FastAPI app. Any future refactor that exposes a sensitive endpoint under `/api/` flows unconditionally through the proxy.
 - **impact:** Local-dev HTTP exposure of admin paths.
-- **recommended_fix:** Add a `/api/admin` deny block to `nginx.local.conf` matching the production file. Or add an IP allow-list `127.0.0.1` only.
-- **tests_needed:** Curl admin paths from a non-loopback NIC — returns 403.
+- **recommended_fix:** Add reserved `/api/admin` and `/api/system/admin` blocks to both nginx configs before the generic `/api/` proxy.
+- **tests_needed:** Static and runtime checks that admin prefixes do not proxy upstream.
 - **acceptance_criteria:** Local nginx refuses `/api/admin/*` and `/api/system/admin/*` paths.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 87: both `nginx.conf` and `nginx.local.conf` now return 404 for `/api/admin`, `/api/admin/`, `/api/system/admin`, and `/api/system/admin/` before the generic `/api/` proxy. Guarded by `backend/tests/test_nginx_admin_acl.py`; both configs also pass `nginx -t` in `nginx:1.27-alpine`.
 
 ### F-NGINX-002
 
@@ -1447,18 +1460,18 @@ Status is `verified` unless noted.
 ### F-CI-006
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / ci / postgres_port_collision
-- **file_path:** `.github/workflows/optional-suites.yml:24-26`, `validate-production.yml:222-224`, `postgres-tests.yml:22-24`
+- **file_path:** `.github/workflows/optional-suites.yml`, `.github/workflows/validate-production.yml`, `.github/workflows/postgres-tests.yml`
 - **line_function:** `services.postgres` config
-- **evidence:** Hardcoded `postgresql://testuser:testpassword@…:5432/`. Port collisions on shared self-hosted runners.
+- **evidence:** Pre-fix workflows bound Postgres services to fixed host ports (`5432:5432` or partial custom fixed ports), and test steps used fixed `localhost:5432` DSNs. Shared/self-hosted runners can collide when scheduled/manual Postgres jobs overlap.
 - **why_it_matters:** Reliability — not security — but ports collide on multi-job runners.
 - **impact:** Random CI run failures on shared infra.
-- **recommended_fix:** Use `POSTGRES_HOST_AUTH_METHOD: trust` and skip the mapped port, or set custom port with `options: "--port=5433"`.
+- **recommended_fix:** Use GitHub Actions random host-port mapping (`ports: - 5432`) and connect through `${{ job.services.postgres.ports[5432] }}` in the Postgres test step.
 - **tests_needed:** Two parallel jobs running the workflow on the same runner both pass.
 - **acceptance_criteria:** No port collision during parallel run.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed in Session 87 follow-up: `optional-suites.yml`, `postgres-tests.yml`, and `validate-production.yml` now publish only container port `5432`, keep the service health check on default `pg_isready`, and construct `DATAFORGE_DATABASE_URL` with the assigned host port from `job.services.postgres.ports[5432]`. Guarded by `backend/tests/test_postgres_workflow_service_ports.py`; workflow policy guards passed.
 
 ### F-CI-007
 

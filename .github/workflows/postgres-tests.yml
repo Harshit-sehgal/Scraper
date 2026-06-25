@@ -27,16 +27,17 @@ jobs:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: testdb
+        # F-CI-006: publish the container port only. GitHub assigns a
+        # free host port exposed through job.services.postgres.ports.
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5432
     env:
       DATAFORGE_STORAGE_BACKEND: postgres
-      DATAFORGE_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -67,7 +68,7 @@ jobs:
           PYTHONPATH=backend \
           DATAFORGE_DOTENV_PATH=/dev/null \
           DATAFORGE_STORAGE_BACKEND=postgres \
-          DATAFORGE_DATABASE_URL=postgresql://testuser:testpassword@localhost:5432/testdb \
+          DATAFORGE_DATABASE_URL="postgresql://testuser:testpassword@localhost:${{ job.services.postgres.ports[5432] }}/testdb" \
           python -m pytest -v backend/tests --run-postgres -o addopts= \
           --tb=short --reruns 3 --reruns-delay 10
 

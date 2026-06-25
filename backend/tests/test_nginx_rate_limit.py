@@ -25,29 +25,32 @@ NGINX_LOCAL_CONF = REPO_ROOT / "nginx.local.conf"
 
 
 def _active_server_block(text: str) -> str:
-    """Return the text of the uncommented server block A (HTTPS).
+    """Return the active app-serving HTTPS server block.
 
     nginx config comments are ``# ...`` at the start of any line. Server
-    block C is intentionally commented out in ``nginx.conf``; we want
-    to assert that the ACTIVE (currently active at runtime) ``/dashboard/``
-    block has a ``limit_req`` directive.
+    block C is intentionally commented out in ``nginx.conf``. The first
+    active server block may be the default 444 unknown-host sink, so we
+    select the active server block that owns ``/dashboard/``.
 
     The capture walks the chars from ``^\\s*server {`` and balances
     braces (since server blocks contain nested ``location {}`` blocks).
     """
     block_starts = [m.start() for m in re.finditer(r"^[ \t]*server\s*\{", text, re.MULTILINE)]
     assert block_starts, "nginx.conf has no active server block"
-    start = block_starts[0]
-    body_start = text.index("{", start)
-    depth = 0
-    for i in range(body_start, len(text)):
-        ch = text[i]
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[body_start + 1 : i]
+    for start in block_starts:
+        body_start = text.index("{", start)
+        depth = 0
+        for i in range(body_start, len(text)):
+            ch = text[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    body = text[body_start + 1 : i]
+                    if "location /dashboard/" in body:
+                        return body
+                    break
     msg = "nginx.conf: server block never balances"
     raise AssertionError(msg)
 

@@ -226,16 +226,18 @@ jobs:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: testdb
+        # F-CI-006: pin port 5435 to avoid collisions with parallel
+        # workflows on shared self-hosted runners.
         options: >-
-          --health-cmd pg_isready
+          --port=5435
+          --health-cmd "pg_isready -p 5435"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5435:5435
     env:
       DATAFORGE_STORAGE_BACKEND: postgres
-      DATAFORGE_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -253,7 +255,7 @@ jobs:
           PYTHONPATH=backend \
           DATAFORGE_DOTENV_PATH=/dev/null \
           DATAFORGE_STORAGE_BACKEND=postgres \
-          DATAFORGE_DATABASE_URL=postgresql://testuser:testpassword@localhost:5432/testdb \
+          DATAFORGE_DATABASE_URL="postgresql://testuser:testpassword@localhost:${{ job.services.postgres.ports[5432] }}/testdb" \
           python3 -m pytest -q backend/tests --run-postgres -o addopts= \
           --tb=short \
           --timeout=300 \
