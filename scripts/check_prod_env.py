@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 REQUIRED_VARS = [
+    "DATAFORGE_IMAGE_TAG",
     "DATAFORGE_API_KEY",
     "DATAFORGE_SESSION_SECRET",
     "DATAFORGE_CORS_ORIGINS",
@@ -282,6 +283,35 @@ def check_pg_driver(value: str) -> bool:
             "because the production image only ships the psycopg3 driver. "
             "Set DATAFORGE_PG_DRIVER=psycopg3 in .env.production.example "
             "and in both the dataforge and worker services of docker-compose.prod.yml.",
+        )
+        return False
+    return True
+
+
+def check_image_tag(value: str) -> bool:
+    """Validate DATAFORGE_IMAGE_TAG is set and not the mutable ``latest``.
+
+    F-DOCKER-005: the Dockerfile pins the runtime image by digest (lines
+    14-16), but the compose services consumed the env var with a
+    ``:-latest`` fallback, which lets a registry swap silently redeploy
+    on the next ``docker compose up``. Production must use an immutable
+    tag (CI-built SHA, release version, etc.).
+    """
+    tag = value.strip()
+    if not tag:
+        print("  [FAIL]  DATAFORGE_IMAGE_TAG is empty. Set to an immutable tag")
+        print("          (e.g. CI SHA like $(git rev-parse --short HEAD)) so production")
+        print("          deploys are reproducible and a registry swap cannot silently")
+        print("          re-pull a different image (F-DOCKER-005).")
+        return False
+    if _is_placeholder_secret(tag):
+        print(f"  [FAIL]  DATAFORGE_IMAGE_TAG={tag!r} is a placeholder. Set it to an immutable release version or CI commit SHA.")
+        return False
+    if tag.lower() == "latest":
+        print(
+            f"  [FAIL]  DATAFORGE_IMAGE_TAG={tag!r}. The mutable 'latest' tag defeats"
+            " the Dockerfile's pinned-digest model. Use an immutable tag (CI SHA or"
+            " release version)."
         )
         return False
     return True
@@ -574,6 +604,12 @@ def main() -> int:
 
     # ── Required vars ────────────────────────────────────────────────
     checks = [
+        (
+            "DATAFORGE_IMAGE_TAG",
+            True,
+            check_image_tag,
+            "Must be an immutable image tag such as a release version or CI commit SHA; never 'latest'",
+        ),
         ("DATAFORGE_API_KEY", True, check_api_key, 'Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
         ("DATAFORGE_CORS_ORIGINS", True, check_cors_origins, 'Must be a JSON array of origins, e.g. ["https://yourdomain.com"]'),
         ("DATAFORGE_DB_PASSWORD", True, check_db_password, "Must match POSTGRES_PASSWORD in docker-compose.prod.yml"),
@@ -658,6 +694,12 @@ def main() -> int:
             True,
             check_paypal_webhook_secret,
             "PayPal webhook signing secret for event verification",
+        ),
+        (
+            "DATAFORGE_IMAGE_TAG",
+            True,
+            check_image_tag,
+            'Immutable tag (CI SHA or release version). Never use "latest" (F-DOCKER-005).',
         ),
     ]
 

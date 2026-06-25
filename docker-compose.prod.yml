@@ -3,7 +3,7 @@
 # =============================================================================
 # Full production stack with nginx reverse proxy.
 #
-# Start:  docker compose -f docker-compose.prod.yml up -d
+# Start:  DATAFORGE_IMAGE_TAG=<immutable-tag> docker compose -f docker-compose.prod.yml up -d --pull never
 # Logs:   docker compose -f docker-compose.prod.yml logs -f
 # Stop:   docker compose -f docker-compose.prod.yml down
 # =============================================================================
@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
+    image: dataforge:${DATAFORGE_IMAGE_TAG:?DATAFORGE_IMAGE_TAG is required for production deploys (F-DOCKER-005)}
     container_name: dataforge-scraper
     # Not exposed directly to the internet — behind nginx
     expose:
@@ -97,7 +97,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
+    image: dataforge:${DATAFORGE_IMAGE_TAG:?DATAFORGE_IMAGE_TAG is required for production deploys (F-DOCKER-005)}
     container_name: dataforge-worker
     command: ["/app/scripts/start_worker.sh"]
     env_file:

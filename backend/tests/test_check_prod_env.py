@@ -603,6 +603,34 @@ class TestCheckProdEnvPgDriver:
         assert mod.check_var(env, "DATAFORGE_PG_DRIVER", required=True, validator=mod.check_pg_driver)
 
 
+class TestCheckProdEnvImageTag:
+    """Tests for immutable production image tag validation."""
+
+    def _import_module(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "check_prod_env",
+            _SCRIPT_PATH / "check_prod_env.py",
+        )
+        assert spec is not None
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_check_image_tag_accepts_release_or_sha(self) -> None:
+        mod = self._import_module()
+        assert mod.check_image_tag("v1.2.3")
+        assert mod.check_image_tag("679dd480")
+
+    def test_check_image_tag_rejects_empty_latest_and_placeholders(self) -> None:
+        mod = self._import_module()
+        assert not mod.check_image_tag("")
+        assert not mod.check_image_tag("latest")
+        assert not mod.check_image_tag("CHANGE_ME_RELEASE_VERSION_OR_GIT_SHA")
+
+
 class TestCheckQueueDriverCompatibility:
     """Tests for the queue/driver compatibility check in check_prod_env.py.
 

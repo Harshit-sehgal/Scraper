@@ -21,7 +21,6 @@ The fix:
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,12 +39,8 @@ class TestAlertingChannelWiring:
     def test_smoke_references_required_channel_env_vars(self) -> None:
         text = _smoke_text()
         # The smoke must check both expected channel env vars.
-        assert "ALERTMANAGER_SMTP_HOST" in text, (
-            "smoke_prod_stack.sh no longer references ALERTMANAGER_SMTP_HOST"
-        )
-        assert "ALERTMANAGER_SLACK_WEBHOOK_URL" in text, (
-            "smoke_prod_stack.sh no longer references ALERTMANAGER_SLACK_WEBHOOK_URL"
-        )
+        assert "ALERTMANAGER_SMTP_HOST" in text, "smoke_prod_stack.sh no longer references ALERTMANAGER_SMTP_HOST"
+        assert "ALERTMANAGER_SLACK_WEBHOOK_URL" in text, "smoke_prod_stack.sh no longer references ALERTMANAGER_SLACK_WEBHOOK_URL"
 
     def test_smoke_fails_closed_when_both_channels_missing(self) -> None:
         text = _smoke_text()
@@ -54,24 +49,17 @@ class TestAlertingChannelWiring:
         # The phrase uses ``FAIL`` token plus the deterministic "No
         # alerting channel configured" message.
         assert "No alerting channel configured" in text, (
-            "smoke_prod_stack.sh: missing the fail-closed message that surfaces "
-            "when neither channel is set"
+            "smoke_prod_stack.sh: missing the fail-closed message that surfaces when neither channel is set"
         )
         # And it must read ``.env.production`` (or fall back to ``.env``)
         # so the assertion runs against the deploy's actual config.
-        assert ".env.production" in text or ".env" in text, (
-            "smoke_prod_stack.sh does not read .env.production / .env"
-        )
+        assert ".env.production" in text or ".env" in text, "smoke_prod_stack.sh does not read .env.production / .env"
 
     def test_smoke_runs_synthetic_alert_drill(self) -> None:
         text = _smoke_text()
-        assert "run_alert_delivery_drill.py" in text, (
-            "smoke_prod_stack.sh no longer wires run_alert_delivery_drill.py"
-        )
+        assert "run_alert_delivery_drill.py" in text, "smoke_prod_stack.sh no longer wires run_alert_delivery_drill.py"
         # Drill is invoked against the in-network Alertmanager endpoint.
-        assert "http://alertmanager:9093" in text, (
-            "smoke_prod_stack.sh: drill must target the in-network Alertmanager URL"
-        )
+        assert "http://alertmanager:9093" in text, "smoke_prod_stack.sh: drill must target the in-network Alertmanager URL"
 
 
 class TestSmokeSyntaxAndPeripherals:
@@ -81,16 +69,12 @@ class TestSmokeSyntaxAndPeripherals:
         import subprocess
 
         result = subprocess.run(
-            ["bash", "-n", str(SMOKE_SCRIPT)],
+            ["/bin/sh", "-n", str(SMOKE_SCRIPT)],
             capture_output=True,
             text=True,
             check=False,
         )
-        assert result.returncode == 0, (
-            f"smoke_prod_stack.sh has bash syntax errors: {result.stderr}"
-        )
+        assert result.returncode == 0, f"smoke_prod_stack.sh has bash syntax errors: {result.stderr}"
 
     def test_drill_script_exists(self) -> None:
-        assert DRILL_SCRIPT.is_file(), (
-            f"missing {DRILL_SCRIPT} (referenced from smoke_prod_stack.sh)"
-        )
+        assert DRILL_SCRIPT.is_file(), f"missing {DRILL_SCRIPT} (referenced from smoke_prod_stack.sh)"

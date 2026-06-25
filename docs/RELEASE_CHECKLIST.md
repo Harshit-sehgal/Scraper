@@ -44,14 +44,14 @@ Use this checklist before every production release.
 
 2. **Build and push Docker image**
    ```bash
-   make docker-build
-   docker tag dataforge:latest registry.example.com/dataforge:v<VERSION>
+   DATAFORGE_IMAGE_TAG=v<VERSION> make build-prod
+   docker tag dataforge:v<VERSION> registry.example.com/dataforge:v<VERSION>
    docker push registry.example.com/dataforge:v<VERSION>
    ```
 
 3. **Deploy to staging**
    ```bash
-   docker compose -f docker-compose.prod.yml up -d
+   DATAFORGE_IMAGE_TAG=v<VERSION> docker compose -f docker-compose.prod.yml up -d --pull never
    ```
 
 4. **Run smoke tests**
@@ -66,9 +66,8 @@ Use this checklist before every production release.
 
 6. **Deploy to production** (after staging verification)
    ```bash
-   # Update production environment
-   docker compose -f docker-compose.prod.yml pull
-   docker compose -f docker-compose.prod.yml up -d
+   # Deploy the exact image tag verified in staging.
+   DATAFORGE_IMAGE_TAG=v<VERSION> docker compose -f docker-compose.prod.yml up -d --pull never
    ```
 
 ## Post-Release Verification
@@ -91,8 +90,7 @@ If issues are detected:
 
 2. **Restore previous version**
    ```bash
-   docker compose -f docker-compose.prod.yml pull  # previous version
-   docker compose -f docker-compose.prod.yml up -d
+   DATAFORGE_IMAGE_TAG=v<PREVIOUS_VERSION> docker compose -f docker-compose.prod.yml up -d --pull never
    ```
 
 3. **Rollback database if needed**

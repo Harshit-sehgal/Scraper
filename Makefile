@@ -49,7 +49,8 @@ build: ## Build Docker image (dev target)
 	$(DC) build
 
 build-prod: ## Build Docker image (production target)
-	DOCKER_BUILDKIT=1 docker build --target production -t dataforge:latest .
+	@test -n "$$DATAFORGE_IMAGE_TAG" || (echo "ERROR: DATAFORGE_IMAGE_TAG must be set for prod builds (F-DOCKER-005)."; exit 1)
+	DOCKER_BUILDKIT=1 docker build --target production -t dataforge:$$DATAFORGE_IMAGE_TAG .
 
 # ─── Development ────────────────────────────────────────────────────────────
 
@@ -207,7 +208,8 @@ api-docs-check: ## Diff-check stable API inventory without writing
 # ─── Production ─────────────────────────────────────────────────────────────
 
 prod: ## Start production stack
-	$(DCF) up -d
+	@test -n "$$DATAFORGE_IMAGE_TAG" || (echo "ERROR: DATAFORGE_IMAGE_TAG must be set for prod deploys (F-DOCKER-005)."; exit 1)
+	$(DCF) up -d --pull=never
 
 prod-down: ## Stop production stack
 	$(DCF) down

@@ -34,7 +34,7 @@ Current audit result: passed as part of local Compose startup with a temporary i
 6. Start and verify the stack:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+DATAFORGE_IMAGE_TAG=v<VERSION> docker compose -f docker-compose.prod.yml up -d --pull never
 docker compose -f docker-compose.prod.yml ps
 curl -i http://localhost/health
 curl -i http://localhost/ready

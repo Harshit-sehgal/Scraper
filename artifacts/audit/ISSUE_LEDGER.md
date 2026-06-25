@@ -987,18 +987,18 @@ Status is `verified` unless noted.
 ### F-DOCKER-005
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / rolling_redeploy_drift
-- **file_path:** `docker-compose.prod.yml:28, 91`
-- **line_function:** image references
-- **evidence:** Both `dataforge` and `worker` services use `image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}`. Default unpinned tag means rolling `docker compose -f … up -d` without rebuild pulls whatever the registry holds as `latest`. There is no `--pull=never` flag, so Compose fetches from registry on every restart.
+- **file_path:** `docker-compose.prod.yml`, `Makefile`, `scripts/check_prod_env.py`
+- **line_function:** image references at compose lines 28 + 100; Makefile `prod:` target lines 209-212; `check_prod_env.py::check_image_tag` (added at line 290) and required-checks entry (added near line 700)
+- **evidence:** Both `dataforge` and `worker` services used `image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}`. Default unpinned tag means rolling `docker compose -f … up -d` without rebuild pulls whatever the registry holds as `latest`. There was no `--pull=never` flag, so Compose fetched from registry on every restart.
 - **why_it_matters:** Defeats the explicit "image digest is pinned" comment at `Dockerfile:14-16`. Production deploy becomes non-reproducible.
 - **impact:** A malicious or stale upstream release can silently deploy on next restart.
 - **recommended_fix:** Generate image tags from CI (`dataforge:${GITHUB_SHA}` or `dataforge:${RELEASE_VERSION}`) and bake the SHA into `.env.production`. Add `--pull=never` to compose commands in prod runbooks.
-- **tests_needed:** `make prod` fails when `.env.production` lacks `DATAFORGE_IMAGE_TAG`.
-- **acceptance_criteria:** Production deploy uses an immutable tag.
+- **tests_needed:** Static guard for production image references; `docker compose -f docker-compose.prod.yml config -q` fails when `DATAFORGE_IMAGE_TAG` is missing and renders `dataforge:<tag>` when set.
+- **acceptance_criteria:** Production deploy requires `DATAFORGE_IMAGE_TAG`, rejects empty/placeholder/`latest`, and `make prod` uses `--pull=never` with an explicit immutable tag.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** New finding (Session 80). **Fix shipped:** `docker-compose.prod.yml` now requires `${DATAFORGE_IMAGE_TAG:?...}` for both `dataforge` and `worker`, so a missing tag fails at compose-config time. `Makefile` requires the tag for `build-prod` and `prod`, builds `dataforge:$DATAFORGE_IMAGE_TAG`, and runs production `up` with `--pull=never`. `check_prod_env.py::check_image_tag` rejects empty, placeholder, and `latest` values; the required-checks list enforces `DATAFORGE_IMAGE_TAG`. `.env.production.example`, `docs/RELEASE_CHECKLIST.md`, and `docs/PRODUCTION_STARTUP.md` document the immutable-tag path. Guarded by `backend/tests/test_docker_image_tag_pinning.py` and `backend/tests/test_check_prod_env.py`.
 
 ### F-DRIFT-001
 
