@@ -1,13 +1,14 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-25 local time from the working tree.
-Last verified: Session 88 nginx + script + CI guard follow-up. Quick
-validation is green (`20260625T161803Z_quick`, 12/12 passed) and security
-validation is green (`20260625T013939Z_security`, 9/9 passed, including
-Bandit, pip-audit, and the expected-failing production env template
-check). `artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105
-issue IDs: 32 open verified/deferred lower-priority rows, 68 fixed
-rows, 3 candidate rows, 1 not-reproducible row, and 0 open P0 rows.
+Last verified: Session 88b supply-chain + DB-migration + docker + drill
+follow-up. Quick validation is green (`20260625T161803Z_quick`, 12/12
+passed) and security validation is green (`20260625T013939Z_security`,
+9/9 passed, including Bandit, pip-audit, and the expected-failing
+production env template check). `artifacts/audit/ISSUE_LEDGER.md` /
+`.csv` now agree on 105 issue IDs: 28 open verified/deferred
+lower-priority rows, 72 fixed rows, 3 candidate rows, 1
+not-reproducible row, and 0 open P0 rows.
 Current route inventory is 161 routes; route auth matrix has 150 API
 rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
 inventory lists 26,520 files, 973 project-owned files, 969 deeply
@@ -16,6 +17,63 @@ inspected project-owned files, and 0 file-ledger follow-up rows._
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 88b Supply-chain + DB Migration + Docker + Drill Follow-up - 2026-06-25
+
+Scope: close the remaining verified P2 issues: npm supply-chain,
+Postgres tenant indexes, migration data-leak guard, dockerignore gaps,
+package.json caret drift, prod-dep guard, and backup-drill port
+collision avoidance.
+
+### Issues Fixed
+
+- `F-NPM-002`: every workflow that runs `npm ci` (`ci.yml`,
+  `validate-production.yml`, `browser-e2e.yml`, `auto-fix.yml`) now
+  follows it with `npm audit signatures` so a tampered lockfile or
+  compromised package signature halts the run before tests start.
+  Guarded by `backend/tests/test_npm_audit_signatures.py`.
+- `F-DB-003`: added `idx_recycle_bin_org_id` and
+  `idx_recycle_bin_project_id` to the postgres migration so the
+  recycle-bin tenant columns are indexed. Guarded by
+  `backend/tests/test_postgres_tenant_indexes.py`.
+- `F-DB-004`: regression file
+  `backend/tests/test_postgres_migration_ddl_only.py` parses the
+  migration and asserts (a) no `COPY FROM stdin` bulk-load token,
+  (b) the only allowable `INSERT INTO` target is
+  `public.schema_version`, (c) no top-level `UPDATE`/`DELETE FROM`/
+  `SELECT` statements, and (d) every `VALUES` clause belongs to the
+  schema-version stamp. Verified by mutation: poisoning with a
+  synthetic `INSERT INTO public.jobs` tripped the guard exactly as
+  expected.
+- `F-DOCKER-004`: `.dockerignore` now denies `.secrets/`,
+  `backend/init-db/`, `*.dump`, `*.sql.gz`, and `*.bak` so an
+  operator-dropped plaintext pg_dump never reaches the build context.
+  Guarded by `backend/tests/test_dockerignore_blocks_secrets.py`.
+- `F-NPM-001`: every dev-dependency in `package.json` is pinned to
+  its exact lockfile-resolved version (no `^`/`~`/`>=`/`*` etc.).
+  Guarded by `backend/tests/test_npm_pin_no_range.py`.
+- `F-NPM-003`: `backend/tests/test_npm_no_prod_deps.py` refuses a
+  non-empty `dependencies` block so prod deps can't silently appear.
+- `F-SCRIPT-005`: `scripts/backup_and_restore_test.py` exposes
+  `--drill-instance-port` for portable CI use and refuses to run when
+  the chosen port is already in use unless `--allow-collision` is
+  supplied. Guarded by
+  `backend/tests/test_backup_drill_port_collision_guard.py`.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 -m pytest backend/tests/test_npm_audit_signatures.py backend/tests/test_postgres_tenant_indexes.py backend/tests/test_postgres_migration_ddl_only.py -v` | 0 | PASS; 12 new regression tests all green. |
+| `python3 -m pytest backend/tests/test_dockerignore_blocks_secrets.py backend/tests/test_npm_pin_no_range.py backend/tests/test_npm_no_prod_deps.py backend/tests/test_backup_drill_port_collision_guard.py -v` | 0 | PASS; 11 new regression tests all green. |
+
+### Remaining Constraints
+
+Supply-chain integrity depends on `npm audit signatures` coverage of
+the npm registry; packages published without signatures will
+legitimately fail the audit step. The backup drill still depends on
+Docker and a free host port; the preflight refusal only checks for
+TCP listeners, not for Docker-level port mapping conflicts.
 
 ## Session 88 Nginx + Script + CI Guard Follow-up - 2026-06-25
 
