@@ -249,13 +249,18 @@ def test_workflow_mock_fixture_has_stable_start_form_and_extractable_results() -
     form = soup.select_one("form[data-workflow-start='true']")
     assert form is not None
     assert form.get("action") == "/suppliers/search"
-    assert not any(token in form.get("action", "").lower() for token in ("sid=", "session=", "token="))
+    action = str(form.get("action", ""))
+    assert not any(token in action.lower() for token in ("sid=", "session=", "token="))
     assert {field.get("name") for field in form.select("input[name], select[name]")} >= {"q", "region"}
 
     cards = soup.select(".result-card")
     assert len(cards) == 2
-    assert cards[0].select_one(".supplier-name").get_text(strip=True) == "Apex Components"
-    assert cards[1].select_one(".supplier-url")["href"] == "/suppliers/northstar-parts"
+    name_tag = cards[0].select_one(".supplier-name")
+    assert name_tag is not None
+    assert name_tag.get_text(strip=True) == "Apex Components"
+    url_tag = cards[1].select_one(".supplier-url")
+    assert url_tag is not None
+    assert url_tag["href"] == "/suppliers/northstar-parts"
 
 
 def test_network_json_fixture_pairs_shell_page_with_expected_payload() -> None:
@@ -268,7 +273,9 @@ def test_network_json_fixture_pairs_shell_page_with_expected_payload() -> None:
 
     root = soup.select_one("[data-json-source='network_catalog_payload.json']")
     assert root is not None
-    assert soup.select_one("[data-api]")["data-api"] == "/api/catalog?page=1"
+    api_tag = soup.select_one("[data-api]")
+    assert api_tag is not None
+    assert api_tag["data-api"] == "/api/catalog?page=1"
 
     records = payload["items"]
     assert payload["total"] == 3
