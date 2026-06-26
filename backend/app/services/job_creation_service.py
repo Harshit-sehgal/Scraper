@@ -235,6 +235,11 @@ class JobCreationService:
             _ctx = resolve_auth_context(request, allow_cookie=True)
             return user_id, _ctx.org_id, _ctx.project_id
         except Exception:
+            logger.warning(
+                "Failed to resolve org/project context for user %s; defaulting to empty",
+                user_id,
+                exc_info=True,
+            )
             return user_id, "", ""
 
     def _validate_urls(self, job_data: JobCreate) -> list[str]:

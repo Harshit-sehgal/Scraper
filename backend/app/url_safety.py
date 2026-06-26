@@ -222,7 +222,7 @@ def validate_public_http_url(url: str) -> None:
         _record_ssrf_reject("admin_denylisted")
         raise
     except Exception as e:
-        logger.debug("Admin denylist check failed (non-fatal): %s", e)
+        logger.warning("Admin denylist check failed (non-fatal): %s", e)
 
     # Design note: DNS-based SSRF protection is handled by the transport
     # layer which resolves DNS asynchronously via loop.getaddrinfo().

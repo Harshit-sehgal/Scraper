@@ -85,9 +85,9 @@ class SSRFDefense:
 
             return True, ip
 
-        except Exception:
-            logger.exception("URL validation error")
-            return False, "URL validation failed"
+        except Exception as e:
+            logger.exception("URL validation error for %s", url)
+            return False, f"URL validation failed: {e}"
 
 
 class DNSRebindingDefense:
@@ -122,8 +122,8 @@ class DNSRebindingDefense:
                                 current_ips,
                             )
                             return True
-                    except socket.gaierror:
-                        pass
+                    except socket.gaierror as e:
+                        logger.debug("DNS re-resolution failed for %s during rebinding check: %s", hostname, e)
 
             # Cache current resolution
             result = socket.getaddrinfo(hostname, None)

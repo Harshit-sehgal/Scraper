@@ -174,6 +174,7 @@ class QueueTask:
             try:
                 task.status = TaskStatus(raw_status)
             except ValueError:
+                logger.warning("Unknown task status %r for task %s; defaulting to PENDING", raw_status, d.get("id", "?"))
                 task.status = TaskStatus.PENDING
         # Normalize timestamps: convert datetime / date objects to ISO strings
         for _f in ("created_at", "started_at", "completed_at", "scheduled_at"):

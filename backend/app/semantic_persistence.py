@@ -52,7 +52,7 @@ def _release_lock(fd) -> None:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
     except OSError:
-        pass
+        logger.debug("Failed to release semantic state lock (fd=%s)", fd, exc_info=True)
 
 
 def load_semantic_state() -> None:
