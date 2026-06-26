@@ -1,5 +1,6 @@
 """Unit tests for browser_pool — BrowserPool lifecycle, metrics, and context management."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -57,6 +58,8 @@ class TestBrowserPoolInit:
         assert pool.active_contexts == 0
         assert pool.context_reuse_rate == 0.0
         assert pool.startup_latency_ms == 0.0
+        assert pool._isolated_contexts == {}
+        assert pool._active_acquires == 0
 
     def test_initially_recycle_event_set(self) -> None:
         pool = BrowserPool()
@@ -78,6 +81,9 @@ class TestGetMetrics:
         assert metrics["total_fetches"] == 0
         assert metrics["crash_count"] == 0
         assert metrics["connected"] is False
+        assert metrics["reusable_contexts"] == 0
+        assert metrics["isolated_contexts"] == 0
+        assert metrics["active_acquires"] == 0
 
     def test_reflects_activity(self) -> None:
         pool = BrowserPool()
@@ -671,3 +677,322 @@ class TestGetBrowserPool:
         p1 = get_browser_pool()
         p2 = get_browser_pool()
         assert p1 is p2
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Acquire / Release Isolated Contexts
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestAcquireContext:
+    @pytest.mark.asyncio
+    async def test_acquire_yields_context_and_id(self) -> None:
+        pool = BrowserPool()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
+        mock_browser.new_context.return_value = mock_context
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1280),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 720),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.BROWSER_MAX_CONTEXTS", 10),
+        ):
+            async with pool.acquire_context() as (ctx_id, ctx):
+                assert ctx_id.startswith("iso:")
+                assert ctx is mock_context
+                assert pool._active_acquires == 1
+                assert ctx_id in pool._isolated_contexts
+
+        # After exit the context should be released
+        assert pool._active_acquires == 0
+        assert len(pool._isolated_contexts) == 0
+
+    @pytest.mark.asyncio
+    async def test_acquire_releases_on_exception(self) -> None:
+        pool = BrowserPool()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
+        mock_browser.new_context.return_value = mock_context
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1280),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 720),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.BROWSER_MAX_CONTEXTS", 10),
+        ):
+            with pytest.raises(RuntimeError, match="simulated"):
+                async with pool.acquire_context() as (_ctx_id, _ctx):
+                    _err = RuntimeError("simulated")
+                    raise _err
+
+        # Even after exception, slot should be released
+        assert pool._active_acquires == 0
+        assert len(pool._isolated_contexts) == 0
+
+    @pytest.mark.asyncio
+    async def test_acquire_launches_browser_if_none(self) -> None:
+        pool = BrowserPool()
+        # No pre-existing browser
+
+        with (
+            patch("app.browser_pool.async_playwright") as mock_async_pw,
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.BROWSER_SECURITY_HARDENING", True),
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1280),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 720),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.BROWSER_MAX_CONTEXTS", 10),
+        ):
+            mock_context = _sync_mock_context()
+            mock_browser = _sync_browser_mock(is_connected=True)
+            mock_browser.new_context.return_value = mock_context
+            mock_pw = AsyncMock()
+            mock_pw.chromium.launch.return_value = mock_browser
+            mock_pw_manager = MagicMock()
+            mock_pw_manager.start = AsyncMock(return_value=mock_pw)
+            mock_async_pw.return_value = mock_pw_manager
+
+            async with pool.acquire_context() as (ctx_id, ctx):
+                assert ctx is mock_context
+                assert pool._browser is mock_browser
+
+    @pytest.mark.asyncio
+    async def test_acquire_custom_viewport_and_ua(self) -> None:
+        pool = BrowserPool()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
+        mock_browser.new_context.return_value = mock_context
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.settings.USER_AGENT", "DefaultUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.BROWSER_MAX_CONTEXTS", 10),
+        ):
+            async with pool.acquire_context(
+                viewport_width=800,
+                viewport_height=600,
+                user_agent="CustomBot/1.0",
+            ) as (_ctx_id, _ctx):
+                _, kwargs = mock_browser.new_context.call_args
+                assert kwargs["viewport"]["width"] == 800
+                assert kwargs["viewport"]["height"] == 600
+                assert kwargs["user_agent"] == "CustomBot/1.0"
+
+    @pytest.mark.asyncio
+    async def test_semaphore_released_on_create_failure(self) -> None:
+        """If _create_isolated_context raises, the semaphore slot is released."""
+        pool = BrowserPool()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_browser.new_context.side_effect = Error("context creation failed")
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1280),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 720),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.BROWSER_MAX_CONTEXTS", 10),
+        ):
+            with pytest.raises(Error, match="context creation failed"):
+                async with pool.acquire_context():
+                    pass
+
+        # Semaphore should be back to fully available
+        assert pool._concurrency_semaphore._value == 10
+
+
+class TestConcurrencyCap:
+    @pytest.mark.asyncio
+    async def test_semaphore_blocks_at_max(self) -> None:
+        """With max_contexts=2, the 3rd acquire blocks until a slot opens."""
+        pool = BrowserPool()
+        # Override semaphore (constructed with default settings before patch)
+        pool._concurrency_semaphore = asyncio.Semaphore(2)
+        mock_browser = _sync_browser_mock(is_connected=True)
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1280),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 720),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+        ):
+            acquired = []
+            release_events: list[asyncio.Event] = [asyncio.Event() for _ in range(3)]
+
+            async def holder(idx: int) -> None:
+                mock_ctx = _sync_mock_context()
+                mock_browser.new_context.return_value = mock_ctx
+                async with pool.acquire_context() as (ctx_id, _ctx):
+                    acquired.append(ctx_id)
+                    # Hold until told to release
+                    await release_events[idx].wait()
+
+            # Acquire 2 slots (cap = 2)
+            t0 = asyncio.create_task(holder(0))
+            t1 = asyncio.create_task(holder(1))
+            # Give them time to acquire
+            await asyncio.sleep(0.05)
+            assert pool._active_acquires == 2
+
+            # 3rd attempt should block
+            t2_started = asyncio.Event()
+
+            async def holder2() -> None:
+                t2_started.set()
+                mock_ctx = _sync_mock_context()
+                mock_browser.new_context.return_value = mock_ctx
+                async with pool.acquire_context() as (ctx_id, _ctx):
+                    acquired.append(ctx_id)
+                    await release_events[2].wait()
+
+            t2 = asyncio.create_task(holder2())
+            await asyncio.sleep(0.05)
+            # t2 should be waiting on the semaphore — active acquires still 2
+            assert pool._active_acquires == 2
+
+            # Release slot 0 — now t2 should acquire
+            release_events[0].set()
+            await asyncio.sleep(0.05)
+            assert pool._active_acquires == 2  # t2 got the slot
+
+            # Cleanup
+            release_events[1].set()
+            release_events[2].set()
+            await asyncio.gather(t0, t1, t2, return_exceptions=True)
+            assert pool._active_acquires == 0
+
+
+class TestReleaseContext:
+    @pytest.mark.asyncio
+    async def test_release_closes_context(self) -> None:
+        pool = BrowserPool()
+        mock_ctx = _sync_mock_context()
+        pool._isolated_contexts["iso:abc123"] = mock_ctx
+        pool._active_acquires = 1
+        pool.active_contexts = 1
+
+        await pool.release_context("iso:abc123")
+
+        mock_ctx.close.assert_awaited_once()
+        assert "iso:abc123" not in pool._isolated_contexts
+        assert pool._active_acquires == 0
+
+    @pytest.mark.asyncio
+    async def test_release_unknown_id_is_noop(self) -> None:
+        pool = BrowserPool()
+        await pool.release_context("iso:nonexistent")  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_release_handles_close_exception(self) -> None:
+        pool = BrowserPool()
+        mock_ctx = _sync_mock_context()
+        mock_ctx.close.side_effect = Error("close failed")
+        pool._isolated_contexts["iso:failing"] = mock_ctx
+        pool._active_acquires = 1
+
+        await pool.release_context("iso:failing")  # should not raise
+        assert pool._active_acquires == 0
+
+
+class TestCloseWithIsolatedContexts:
+    @pytest.mark.asyncio
+    async def test_close_cleans_up_isolated_contexts(self) -> None:
+        pool = BrowserPool()
+        mock_ctx = _sync_mock_context()
+        pool._isolated_contexts["iso:test"] = mock_ctx
+        pool._active_acquires = 1
+
+        await pool.close()
+
+        mock_ctx.close.assert_awaited_once()
+        assert pool._isolated_contexts == {}
+        assert pool._active_acquires == 0
+
+
+class TestGetMetricsWithIsolated:
+    def test_metrics_include_isolated_counts(self) -> None:
+        pool = BrowserPool()
+        pool._isolated_contexts["iso:1"] = MagicMock()
+        pool._isolated_contexts["iso:2"] = MagicMock()
+        pool._active_acquires = 2
+        pool._contexts["test:default"] = MagicMock()
+
+        metrics = pool.get_metrics()
+        assert metrics["isolated_contexts"] == 2
+        assert metrics["reusable_contexts"] == 1
+        assert metrics["active_acquires"] == 2
+
+    def test_metrics_default_zero(self) -> None:
+        pool = BrowserPool()
+        metrics = pool.get_metrics()
+        assert metrics["isolated_contexts"] == 0
+        assert metrics["reusable_contexts"] == 0
+        assert metrics["active_acquires"] == 0
+
+
+class TestEnsureBrowser:
+    @pytest.mark.asyncio
+    async def test_launches_browser_when_none(self) -> None:
+        pool = BrowserPool()
+
+        with (
+            patch("app.browser_pool.async_playwright") as mock_async_pw,
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.BROWSER_SECURITY_HARDENING", False),
+        ):
+            mock_browser = _sync_browser_mock(is_connected=True)
+            mock_pw = AsyncMock()
+            mock_pw.chromium.launch.return_value = mock_browser
+            mock_pw_manager = MagicMock()
+            mock_pw_manager.start = AsyncMock(return_value=mock_pw)
+            mock_async_pw.return_value = mock_pw_manager
+
+            await pool._ensure_browser()
+
+        assert pool._browser is mock_browser
+        assert pool._playwright is mock_pw
+
+    @pytest.mark.asyncio
+    async def test_relaunches_disconnected_browser(self) -> None:
+        pool = BrowserPool()
+        dead_browser = _sync_browser_mock(is_connected=False)
+        pool._browser = dead_browser
+        pool._playwright = AsyncMock()
+
+        with (
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.BROWSER_SECURITY_HARDENING", False),
+        ):
+            new_browser = _sync_browser_mock(is_connected=True)
+            pool._playwright.chromium.launch = AsyncMock(return_value=new_browser)
+
+            await pool._ensure_browser()
+
+        assert pool._browser is new_browser

@@ -50,6 +50,10 @@ async def run_workflow_in_browser(
 ) -> dict[str, Any]:
     """Execute a workflow in a headless Playwright browser.
 
+    Uses the shared ``BrowserPool`` to reuse the Chromium process across
+    requests while isolating each request's cookies/storage in a separate
+    browser context.
+
     Parameters
     ----------
     workflow:
@@ -70,6 +74,8 @@ async def run_workflow_in_browser(
     """
     try:
         from playwright.async_api import async_playwright
+
+        _ = async_playwright  # availability check; referenced to silence pyflakes
     except ImportError:
         return _browser_failure(
             workflow,
@@ -95,12 +101,14 @@ async def run_workflow_in_browser(
         last_url = actual_url
 
     try:
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 720},
-                ignore_https_errors=False,
-            )
+        from app.browser_pool import get_browser_pool
+
+        pool = get_browser_pool()
+
+        async with pool.acquire_context(
+            viewport_width=1280,
+            viewport_height=720,
+        ) as (_ctx_id, context):
             page = await context.new_page()
             page.set_default_timeout(MAX_NAVIGATION_TIMEOUT_MS)
 
@@ -142,6 +150,8 @@ async def run_workflow_in_browser(
                             "detail": str(exc)[:200],
                         }
                     )
+                finally:
+                    await page.close()
 
             except Exception as exc:
                 return _browser_failure(
@@ -152,9 +162,15 @@ async def run_workflow_in_browser(
                     timeline=timeline,
                     last_url=last_url,
                 )
-            finally:
-                await context.close()
-                await browser.close()
+    except ImportError:
+        return _browser_failure(
+            workflow,
+            failure_type="playwright_unavailable",
+            user_message="Playwright is not installed. Install with: pip install playwright && playwright install",
+            recommended_action="Install Playwright browser runtime.",
+            timeline=timeline,
+            last_url=last_url,
+        )
     except Exception as exc:
         return _browser_failure(
             workflow,

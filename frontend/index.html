@@ -39,15 +39,10 @@
           </div>
         </div>
         <div class="topbar-right">
-          <button
-            type="button"
-            class="icon-btn"
-            id="btn-notifications"
-            title="Notifications"
-            aria-label="Notifications"
-          >
-            <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
-          </button>
+          <div id="engine-status" class="engine-status" title="Engine status">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="engine-status-text">Offline</span>
+          </div>
           <button
             type="button"
             class="icon-btn"
@@ -2462,16 +2457,6 @@
                     <span class="settings-pref-label">Purge Stale Data</span>
                     <p class="settings-pref-desc">Permanently delete all data older than the retention policies.</p>
                   </div>
-                  <button
-                    type="button"
-                    class="btn ghost small"
-                    data-action="purge-stale-data"
-                    id="btn-purge-stale"
-                    disabled
-                  >
-                    <span class="material-symbols-outlined" style="font-size: 16px">delete_forever</span>
-                    Execute Purge
-                  </button>
                 </div>
               </section>
             </div>

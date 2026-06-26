@@ -34,21 +34,7 @@ from pathlib import Path
 
 from app.utils.json_file_store import JSONFileStore
 
-DEFAULT_WORKFLOW_RUNS_FILENAME = "workflow_runs.json"
 WORKFLOW_RUNS_ENV = "DATAFORGE_WORKFLOW_RUNS_FILE"
-
-
-def default_workflow_runs_path() -> Path:
-    """Resolve the on-disk path for the workflow-run store.
-
-    Reads ``DATAFORGE_WORKFLOW_RUNS_FILE`` on every call so tests
-    can override it after import and operators can repoint the
-    store without restarting running workers.
-    """
-    env_value = os.environ.get(WORKFLOW_RUNS_ENV, "").strip()
-    if env_value:
-        return Path(env_value)
-    return Path(__file__).resolve().parents[2] / "data" / DEFAULT_WORKFLOW_RUNS_FILENAME
 
 
 class WorkflowRunStore(JSONFileStore):
@@ -62,4 +48,7 @@ class WorkflowRunStore(JSONFileStore):
     """
 
     def _default_path(self) -> Path:
-        return default_workflow_runs_path()
+        env_value = os.environ.get(WORKFLOW_RUNS_ENV, "").strip()
+        if env_value:
+            return Path(env_value)
+        return Path(__file__).resolve().parents[2] / "data" / "workflow_runs.json"

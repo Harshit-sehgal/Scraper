@@ -38,6 +38,8 @@ class AlertDrillConfig:
     channel_assert_reachable: bool
     slack_bot_token: str
     slack_channel_id: str
+    slack_webhook_url: str
+    slack_webhook_enabled: bool
     extra_labels: dict[str, str]
 
 
@@ -50,6 +52,14 @@ class HttpResult:
 @dataclass(frozen=True)
 class SlackChannelCheckResult:
     reachable: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class SlackWebhookResult:
+    """Result of sending a test payload to a Slack incoming webhook."""
+    delivered: bool
+    status_code: int | None
     reason: str
 
 
@@ -69,6 +79,10 @@ class AlertDrillResult:
     slack_channel_check_required: bool
     slack_channel_reachable: bool
     slack_channel_check_reason: str
+    slack_webhook_attempted: bool
+    slack_webhook_delivered: bool
+    slack_webhook_status_code: int | None
+    slack_webhook_reason: str
     passed: bool
     failure_reason: str
 
@@ -201,6 +215,90 @@ def validate_slack_channel_reachable(
     return SlackChannelCheckResult(False, reason)
 
 
+def send_slack_webhook(
+    webhook_url: str,
+    alertname: str,
+    severity: str,
+    drill_id: str,
+    alertmanager_url: str,
+    *,
+    timeout_seconds: float = 10.0,
+) -> SlackWebhookResult:
+    """POST a test alert payload to a Slack incoming webhook URL.
+
+    The payload is a simple message block formatted as a Slack-compatible
+    JSON — matching the format Alertmanager's Slack receiver would
+    produce so the drill proves the webhook integration end-to-end.
+    """
+    url = webhook_url.strip()
+    if not url:
+        return SlackWebhookResult(False, None, "no_webhook_url")
+    if not url.startswith("https://hooks.slack.com/"):
+        return SlackWebhookResult(False, None, f"invalid_webhook_url_prefix:{display_url(url)}")
+
+    timestamp_iso = rfc3339(utc_now())
+    alertmanager_url_display = display_url(alertmanager_url)
+
+    slack_payload: dict[str, Any] = {
+        "text": f"DataForge Synthetic Alert: {alertname}",
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f":warning: {alertname}",
+                },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Severity:* {severity}"},
+                    {"type": "mrkdwn", "text": f"*Drill ID:* {drill_id}"},
+                    {"type": "mrkdwn", "text": f"*Alertmanager:* {alertmanager_url_display}"},
+                    {"type": "mrkdwn", "text": f"*Fired at:* {timestamp_iso}"},
+                ],
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        "This is a *synthetic alert drill* posted by"
+                        " `scripts/run_alert_delivery_drill.py` to verify the"
+                        " Alertmanager → Slack webhook integration is functional."
+                        " If you received this, the delivery path works."
+                    ),
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f":white_check_mark: Webhook URL: `{display_url(url)}`",
+                    }
+                ],
+            },
+        ],
+    }
+
+    try:
+        response = http_request(
+            "POST",
+            url,
+            payload=slack_payload,
+            timeout_seconds=timeout_seconds,
+            headers={"Content-Type": "application/json"},
+        )
+    except (OSError, urllib.error.URLError) as exc:
+        return SlackWebhookResult(False, None, f"webhook_request_failed:{type(exc).__name__}")
+
+    if response.status_code == 200:
+        return SlackWebhookResult(True, response.status_code, "ok")
+    return SlackWebhookResult(False, response.status_code, f"slack_webhook_http_{response.status_code}")
+
+
 def alert_matches(alert: dict[str, Any], config: AlertDrillConfig) -> bool:
     labels = alert.get("labels") or {}
     return labels.get("alertname") == config.alertname and labels.get("drill_id") == config.drill_id
@@ -238,13 +336,17 @@ def build_result(
     post_status_code: int,
     alert_visible: bool,
     slack_channel_check: SlackChannelCheckResult | None = None,
+    slack_webhook: SlackWebhookResult | None = None,
     generated_at: datetime | None = None,
 ) -> AlertDrillResult:
     notification_confirmed = bool(config.notification_evidence.strip())
     slack_check = slack_channel_check or SlackChannelCheckResult(False, "not_required")
+    slack_wh = slack_webhook or SlackWebhookResult(False, None, "not_attempted")
     failure_reason = ""
     if config.channel_assert_reachable and not slack_check.reachable:
         failure_reason = f"slack_channel_unreachable:{slack_check.reason}"
+    elif config.slack_webhook_enabled and not slack_wh.delivered:
+        failure_reason = f"slack_webhook_failed:{slack_wh.reason}"
     elif ready_status_code != 200:
         failure_reason = f"alertmanager_not_ready:{ready_status_code}"
     elif post_status_code not in {200, 202}:
@@ -269,6 +371,10 @@ def build_result(
         slack_channel_check_required=config.channel_assert_reachable,
         slack_channel_reachable=slack_check.reachable,
         slack_channel_check_reason=slack_check.reason,
+        slack_webhook_attempted=config.slack_webhook_enabled,
+        slack_webhook_delivered=slack_wh.delivered,
+        slack_webhook_status_code=slack_wh.status_code,
+        slack_webhook_reason=slack_wh.reason,
         passed=not failure_reason,
         failure_reason=failure_reason,
     )
@@ -291,6 +397,20 @@ def run_drill(config: AlertDrillConfig) -> AlertDrillResult:
                 slack_channel_check=slack_channel_check,
             )
 
+    # Slack webhook delivery: POST a test payload to the webhook URL if
+    # configured. This proves the Alertmanager → Slack integration
+    # end-to-end (the Alertmanager Slack receiver uses this same URL).
+    slack_webhook = SlackWebhookResult(False, None, "not_attempted")
+    if config.slack_webhook_enabled:
+        slack_webhook = send_slack_webhook(
+            config.slack_webhook_url,
+            config.alertname,
+            config.severity,
+            config.drill_id,
+            config.alertmanager_url,
+            timeout_seconds=config.timeout_seconds,
+        )
+
     ready = http_request("GET", endpoint(config.alertmanager_url, "/-/ready"), timeout_seconds=config.timeout_seconds)
     post = HttpResult(status_code=0, body="")
     alert_visible = False
@@ -310,6 +430,7 @@ def run_drill(config: AlertDrillConfig) -> AlertDrillResult:
         post_status_code=post.status_code,
         alert_visible=alert_visible,
         slack_channel_check=slack_channel_check,
+        slack_webhook=slack_webhook,
     )
 
 
@@ -328,6 +449,12 @@ def format_human(result: AlertDrillResult) -> str:
         lines.append(f"Notification evidence:    {result.notification_evidence}")
     if result.slack_channel_check_required:
         lines.append(f"Slack channel reachable:  {result.slack_channel_reachable} ({result.slack_channel_check_reason})")
+    if result.slack_webhook_attempted:
+        status = result.slack_webhook_status_code or "N/A"
+        lines.append(
+            f"Slack webhook delivered:  {result.slack_webhook_delivered}"
+            f" (HTTP {status}, {result.slack_webhook_reason})"
+        )
     lines.extend(
         [
             "",
@@ -372,6 +499,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--slack-channel-id",
         default=os.environ.get("ALERTMANAGER_SLACK_CHANNEL_ID", ""),
         help="Slack channel ID to validate; defaults to ALERTMANAGER_SLACK_CHANNEL_ID",
+    )
+    parser.add_argument(
+        "--slack-webhook",
+        default=os.environ.get("ALERTMANAGER_SLACK_WEBHOOK", ""),
+        help="Slack incoming webhook URL for test delivery; defaults to ALERTMANAGER_SLACK_WEBHOOK",
+    )
+    parser.add_argument(
+        "--slack-webhook-only",
+        action="store_true",
+        help="Only attempt the Slack webhook delivery (skip Alertmanager and poll checks)",
     )
     parser.add_argument("--json", action="store_true", help="Print only JSON to stdout")
     parser.add_argument("--json-file", type=Path, help="Write JSON result to this path")
@@ -436,6 +573,8 @@ def main(argv: list[str] | None = None) -> int:
         channel_assert_reachable=args.channel_assert_reachable,
         slack_bot_token=args.slack_bot_token,
         slack_channel_id=args.slack_channel_id,
+        slack_webhook_url=args.slack_webhook,
+        slack_webhook_enabled=bool(args.slack_webhook.strip()),
         extra_labels=labels,
     )
     result = run_drill(config)

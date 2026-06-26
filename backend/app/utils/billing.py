@@ -1,6 +1,6 @@
-"""Invoice generation and usage alerts for billing.
+"""Invoice generation for billing.
 
-Generates invoices and sends usage alerts for billing purposes.
+Generates invoices for billing purposes.
 """
 
 from __future__ import annotations
@@ -19,15 +19,6 @@ class InvoiceStatus(Enum):
     PAID = "paid"
     OVERDUE = "overdue"
     CANCELLED = "cancelled"
-
-
-class AlertType(Enum):
-    """Usage alert types."""
-
-    QUOTA_WARNING = "quota_warning"
-    QUOTA_EXCEEDED = "quota_exceeded"
-    UNUSUAL_ACTIVITY = "unusual_activity"
-    BILLING_ISSUE = "billing_issue"
 
 
 @dataclass
@@ -64,20 +55,6 @@ class Invoice:
         self.subtotal = sum(item.total for item in self.items)
         self.tax = self.subtotal * 0.1  # 10% tax
         self.total = self.subtotal + self.tax
-
-
-@dataclass
-class UsageAlert:
-    """Usage alert data."""
-
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str = ""
-    alert_type: AlertType = AlertType.QUOTA_WARNING
-    message: str = ""
-    threshold: float = 0.0
-    current_usage: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    acknowledged: bool = False
 
 
 class InvoiceGenerator:
@@ -150,105 +127,3 @@ class InvoiceGenerator:
 
         return self.generate_invoice(user_id, items)
 
-
-class UsageAlertManager:
-    """Manages usage alerts for users."""
-
-    def __init__(self):
-        self._alerts: dict[str, list[UsageAlert]] = {}
-        self._thresholds: dict[str, dict] = {}
-
-    def set_threshold(
-        self,
-        usage_type: str,
-        warning_threshold: float = 0.8,
-        critical_threshold: float = 1.0,
-    ) -> None:
-        """Set alert thresholds for a usage type."""
-        self._thresholds[usage_type] = {
-            "warning": warning_threshold,
-            "critical": critical_threshold,
-        }
-
-    def check_usage(
-        self,
-        user_id: str,
-        usage_type: str,
-        current_usage: float,
-        limit: float,
-    ) -> UsageAlert | None:
-        """Check if usage exceeds thresholds and create alert."""
-        if limit <= 0:
-            return None
-
-        usage_ratio = current_usage / limit
-        thresholds = self._thresholds.get(usage_type, {"warning": 0.8, "critical": 1.0})
-
-        alert_type = None
-        message = ""
-
-        if usage_ratio >= thresholds["critical"]:
-            alert_type = AlertType.QUOTA_EXCEEDED
-            message = f"Usage limit exceeded for {usage_type}: {current_usage}/{limit}"
-        elif usage_ratio >= thresholds["warning"]:
-            alert_type = AlertType.QUOTA_WARNING
-            message = f"Usage warning for {usage_type}: {current_usage}/{limit} ({usage_ratio:.0%})"
-
-        if alert_type:
-            return self.create_alert(user_id, alert_type, message, limit, current_usage)
-        return None
-
-    def create_alert(
-        self,
-        user_id: str,
-        alert_type: AlertType,
-        message: str,
-        threshold: float,
-        current_usage: float,
-    ) -> UsageAlert:
-        """Create a new usage alert."""
-        alert = UsageAlert(
-            user_id=user_id,
-            alert_type=alert_type,
-            message=message,
-            threshold=threshold,
-            current_usage=current_usage,
-        )
-
-        if user_id not in self._alerts:
-            self._alerts[user_id] = []
-        self._alerts[user_id].append(alert)
-
-        return alert
-
-    def get_alerts(self, user_id: str) -> list[UsageAlert]:
-        """Get all alerts for a user."""
-        return self._alerts.get(user_id, [])
-
-    def get_unacknowledged_alerts(self, user_id: str) -> list[UsageAlert]:
-        """Get unacknowledged alerts for a user."""
-        return [alert for alert in self._alerts.get(user_id, []) if not alert.acknowledged]
-
-    def acknowledge_alert(self, alert_id: str) -> bool:
-        """Acknowledge an alert."""
-        for alerts in self._alerts.values():
-            for alert in alerts:
-                if alert.id == alert_id:
-                    alert.acknowledged = True
-                    return True
-        return False
-
-
-# Global instances
-invoice_generator = InvoiceGenerator()
-usage_alert_manager = UsageAlertManager()
-
-
-def get_invoice_generator() -> InvoiceGenerator:
-    """Get the global invoice generator."""
-    return invoice_generator
-
-
-def get_usage_alert_manager() -> UsageAlertManager:
-    """Get the global usage alert manager."""
-    return usage_alert_manager

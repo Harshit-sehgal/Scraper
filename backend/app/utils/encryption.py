@@ -22,7 +22,6 @@ import base64
 import logging
 import os
 import secrets
-from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +58,6 @@ class EncryptionError(Exception):
 
 class DecryptionError(Exception):
     """Raised when decryption operation fails."""
-
-
-class EncryptedPayload(NamedTuple):
-    """Structured representation of an encrypted payload."""
-
-    ciphertext_b64: str
-    nonce_b64: str
-    tag_b64: str
-    key_version: str
 
 
 # ---------------------------------------------------------------------------

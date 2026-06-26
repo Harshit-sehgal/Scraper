@@ -51,10 +51,6 @@ class JobRunnerSettings(BaseSettings):
     """Worker queue backend: 'sqlite' (single-node) or 'postgres' (multi-node)."""
 
     # ─── Discovery / Search ────────────────────────────────────────────
-    DDG_MAX_RESULTS_MULTIPLIER: int = 3
-    """Multiply num_results to get raw DDG fetch size."""
-    DDG_ABSOLUTE_MAX: int = 80
-    """Hard cap on raw DDG results."""
     BLOCKED_DISCOVERY_DOMAINS: str = "quickfinds.org"
     """Comma-separated root domains excluded from discovery."""
     DISCOVERY_SOCIAL_DOMAINS: str = (
@@ -78,12 +74,6 @@ class JobRunnerSettings(BaseSettings):
     SOURCE_TRUST_SEARCH: float = 0.35
     """Default trust score for search engine results."""
 
-    # ─── Search Form Recovery ─────────────────────────────────────────
-    SEARCH_FORM_MIN_SCORE: int = 3
-    """Minimum score for a form to be classified as a search form."""
-    SEARCH_FORM_RECOVERY_TIMEOUT: float = 30.0
-    """Timeout in seconds for search form POST recovery."""
-
     # ─── Session URL Detection ─────────────────────────────────────────
     SESSION_PARAM_NAME_CONFIDENCE: float = 0.8
     SESSION_PARAM_VALUE_CONFIDENCE: float = 0.7
@@ -102,7 +92,6 @@ class JobRunnerSettings(BaseSettings):
     EMPTY_PAGE_SIGNAL_CONFIDENCE: float = 0.8
 
     # ─── Zero Result Classification ────────────────────────────────────
-    ZERO_RESULT_ANTIBOT_THRESHOLD: float = 0.8
     ZERO_RESULT_EMPTY_HTML_LEN: int = 100
     ZERO_RESULT_JS_SHELL_HTML_LEN: int = 1000
     ZERO_RESULT_AUTH_PATTERNS: list[str] = ["login", "sign in", "password"]

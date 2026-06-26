@@ -288,6 +288,27 @@ class RecoveryStrategist:
             "backoff_seconds": 0.0,
             "params": {"force_llm_discovery": True},
         },
+        FailureCategory.NO_RECORDS_EXTRACTED: {
+            "primary": RecoveryAction.FORCE_REDISCOVERY,
+            "escalation": [
+                RecoveryAction.LOWER_SCORE_THRESHOLD,
+                RecoveryAction.ESCALATE_TO_LLM,
+                RecoveryAction.SKIP_URL,
+            ],
+            "max_retries": 2,
+            "backoff_seconds": 0.0,
+            "params": {"bypass_memory": True},
+        },
+        FailureCategory.PARTIAL_EXTRACTION: {
+            "primary": RecoveryAction.LOWER_SCORE_THRESHOLD,
+            "escalation": [
+                RecoveryAction.FORCE_REDISCOVERY,
+                RecoveryAction.RETRY_WITH_FIELD_FOCUS,
+            ],
+            "max_retries": 1,
+            "backoff_seconds": 0.0,
+            "params": {"score_multiplier": 0.85},
+        },
         FailureCategory.HALLUCINATION: {
             "primary": RecoveryAction.LOWER_SCORE_THRESHOLD,
             "escalation": [
@@ -496,17 +517,235 @@ class RecoveryExecutor:
         return False
 
 
+# ── Built-in recovery handlers ──────────────────────────────────────────
+# Each handler receives (params, context, attempt_ctx) and mutates
+# ``attempt_ctx`` so the next scrape attempt picks up the change.
+# Handlers return True to signal "recovery action applied successfully"
+# (meaning the context mutation was applied, not that the scrape will
+# succeed — the caller still needs to retry).
+
+
+async def handle_increase_hydration_wait(
+    params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Increase hydration wait milliseconds for the next attempt."""
+    extra_ms = params.get("extra_delay_ms", 5000)
+    attempt_ctx.hydration_wait_ms = (attempt_ctx.hydration_wait_ms or 0) + int(extra_ms)
+    logger.info("Recovery: increased hydration_wait_ms to %d", attempt_ctx.hydration_wait_ms)
+    return True
+
+
+async def handle_retry_with_dns_flush(
+    params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Retry after a DNS cache flush delay."""
+    delay_ms = params.get("delay_ms", 3000)
+    await asyncio.sleep(delay_ms / 1000)
+    logger.info("Recovery: DNS flush wait of %dms complete", delay_ms)
+    return True
+
+
+async def handle_increase_timeout(
+    params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Increase the page/network timeout for the next attempt."""
+    timeout_ms = params.get("timeout_ms", 25000)
+    attempt_ctx.timeout_ms = int(timeout_ms)
+    logger.info("Recovery: increased timeout_ms to %d", attempt_ctx.timeout_ms)
+    return True
+
+
+async def handle_reduce_concurrency(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Reduce concurrency for the next attempt."""
+    attempt_ctx.reduce_concurrency = True
+    logger.info("Recovery: reduce_concurrency enabled")
+    return True
+
+
+async def handle_rotate_proxy(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Rotate the proxy for the next attempt."""
+    attempt_ctx.proxy_profile = "rotated"
+    logger.info("Recovery: proxy rotation requested")
+    return True
+
+
+async def handle_backoff_and_slow(
+    params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Backoff before retry with reduced speed."""
+    delay_ms = params.get("delay_ms", 5000)
+    await asyncio.sleep(delay_ms / 1000)
+    attempt_ctx.reduce_concurrency = True
+    slow_factor = params.get("slow_factor", 0.5)
+    logger.info("Recovery: backed off %dms, slow_factor=%.2f", delay_ms, slow_factor)
+    return True
+
+
+async def handle_abort_domain(
+    _params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Mark domain for cooldown instead of retrying."""
+    url = context.get("url", "")
+    attempt_ctx.abort_domain = True
+    logger.warning("Recovery: aborting domain for %s", url)
+    return True
+
+
+async def handle_force_rediscovery(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Force selector rediscovery, bypassing memory."""
+    attempt_ctx.bypass_selector_memory = True
+    attempt_ctx.force_llm_discovery = True
+    logger.info("Recovery: forced selector rediscovery")
+    return True
+
+
+async def handle_force_rediscovery_with_swap_detection(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Force rediscovery with swap detection enabled."""
+    attempt_ctx.bypass_selector_memory = True
+    attempt_ctx.force_llm_discovery = True
+    attempt_ctx.force_container_discovery = True
+    logger.info("Recovery: forced rediscovery with swap detection")
+    return True
+
+
+async def handle_lower_score_threshold(
+    params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Lower the minimum record score threshold for the next attempt."""
+    score_multiplier = params.get("score_multiplier", 0.8)
+    current = context.get("min_record_score", 50.0)
+    attempt_ctx.min_record_score_override = current * score_multiplier
+    logger.info(
+        "Recovery: lowered min_record_score to %.1f (x%.2f)",
+        attempt_ctx.min_record_score_override,
+        score_multiplier,
+    )
+    return True
+
+
+async def handle_retry_with_field_focus(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Retry with field-focused extraction."""
+    attempt_ctx.force_llm_discovery = True
+    logger.info("Recovery: retrying with field focus")
+    return True
+
+
+async def handle_escalate_to_llm(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Escalate to LLM-based discovery."""
+    attempt_ctx.force_llm_discovery = True
+    logger.info("Recovery: escalated to LLM discovery")
+    return True
+
+
+async def handle_use_httpx_fallback(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Fall back to HTTPX for the next attempt."""
+    attempt_ctx.prefer_httpx = True
+    logger.info("Recovery: switching to HTTPX fallback")
+    return True
+
+
+async def handle_skip_domain(
+    _params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Skip the entire domain."""
+    url = context.get("url", "")
+    attempt_ctx.skip_domain = url
+    logger.warning("Recovery: skipping domain for %s", url)
+    return True
+
+
+async def handle_skip_url(
+    _params: dict[str, Any],
+    _context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Skip this URL."""
+    attempt_ctx.skip_url = True
+    logger.warning("Recovery: skipping URL")
+    return True
+
+
+# ── Handler registry — maps RecoveryAction to its implementation ────
+
+_BUILTIN_HANDLERS: dict[RecoveryAction, Callable] = {
+    RecoveryAction.INCREASE_HYDRATION_WAIT: handle_increase_hydration_wait,
+    RecoveryAction.RETRY_WITH_DNS_FLUSH: handle_retry_with_dns_flush,
+    RecoveryAction.INCREASE_TIMEOUT: handle_increase_timeout,
+    RecoveryAction.REDUCE_CONCURRENCY: handle_reduce_concurrency,
+    RecoveryAction.ROTATE_PROXY: handle_rotate_proxy,
+    RecoveryAction.BACKOFF_AND_SLOW: handle_backoff_and_slow,
+    RecoveryAction.ABORT_DOMAIN: handle_abort_domain,
+    RecoveryAction.FORCE_REDISCOVERY: handle_force_rediscovery,
+    RecoveryAction.FORCE_REDISCOVERY_WITH_SWAP_DETECTION: handle_force_rediscovery_with_swap_detection,
+    RecoveryAction.LOWER_SCORE_THRESHOLD: handle_lower_score_threshold,
+    RecoveryAction.RETRY_WITH_FIELD_FOCUS: handle_retry_with_field_focus,
+    RecoveryAction.ESCALATE_TO_LLM: handle_escalate_to_llm,
+    RecoveryAction.USE_HTTPX_FALLBACK: handle_use_httpx_fallback,
+    RecoveryAction.SKIP_DOMAIN: handle_skip_domain,
+    RecoveryAction.SKIP_URL: handle_skip_url,
+}
+
+
 # Global singleton executor
 _executor: RecoveryExecutor | None = None
 _strategist: RecoveryStrategist | None = None
 
 
 def get_recovery_executor() -> RecoveryExecutor:
-    """Get the global recovery executor."""
+    """Get the global recovery executor with built-in handlers registered."""
     global _executor
     if _executor is None:
         _executor = RecoveryExecutor()
+        _register_builtin_handlers(_executor)
     return _executor
+
+
+def _register_builtin_handlers(executor: RecoveryExecutor) -> None:
+    """Register the built-in recovery action handlers on the executor."""
+    for action, handler in _BUILTIN_HANDLERS.items():
+        executor.register_handler(action, handler)
 
 
 def get_recovery_strategist() -> RecoveryStrategist:

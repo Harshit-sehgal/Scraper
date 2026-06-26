@@ -29,19 +29,6 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def default_path_for(env_var: str, filename: str) -> Path:
-    """Resolve an on-disk path from an env override.
-
-    Reads ``env_var`` on every call so tests can override it after
-    import and operators can repoint the store without restarting
-    running workers.
-    """
-    env_value = os.environ.get(env_var, "").strip()
-    if env_value:
-        return Path(env_value)
-    return Path(__file__).resolve().parents[2] / "data" / filename
-
-
 def _is_production_env() -> bool:
     try:
         from app.config import settings

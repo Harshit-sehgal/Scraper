@@ -2,6 +2,14 @@
 
 LAW: Browser instances are heavy. Contexts are light.
 Reuse browsers to minimize startup latency; rotate contexts to reduce fingerprint consistency.
+
+Two acquisition patterns:
+- ``get_context()`` — reusable, domain-keyed context (for scraping).
+- ``acquire_context()`` — async context manager that yields an isolated,
+  request-scoped context (for workflow replay, preview, etc.).  Each
+  acquire creates a fresh browser context with clean cookies/storage but
+  shares the underlying Chromium process.  Concurrent acquires are capped
+  by ``settings.BROWSER_MAX_CONTEXTS`` (default 10).
 """
 
 from __future__ import annotations
@@ -11,6 +19,8 @@ import contextlib
 import logging
 import threading
 import time
+import uuid
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from playwright.async_api import Browser, BrowserContext, Error, async_playwright
@@ -48,6 +58,13 @@ class BrowserPool:
         # need to update counters safely. asyncio.Lock cannot be used with
         # regular ``with`` — it requires ``async with``.
         self._counter_lock = threading.Lock()
+
+        # ── Per-request isolated contexts ────────────────────────────────
+        # Semaphore caps concurrent isolated context acquisitions.
+        self._concurrency_semaphore = asyncio.Semaphore(settings.BROWSER_MAX_CONTEXTS)
+        # Track isolated contexts separately so close() can clean them up.
+        self._isolated_contexts: dict[str, BrowserContext] = {}
+        self._active_acquires: int = 0
 
         # Metrics
         self.startup_latency_ms: float = 0.0
@@ -277,6 +294,149 @@ class BrowserPool:
 
             return context
 
+    # ── Per-request isolated context acquisition ────────────────────────
+
+    @asynccontextmanager
+    async def acquire_context(
+        self,
+        *,
+        viewport_width: int | None = None,
+        viewport_height: int | None = None,
+        user_agent: str | None = None,
+    ):
+        """Acquire an isolated browser context via async context manager.
+
+        Yields ``(context_id, context)``.  The context gets fresh
+        cookies/storage per request (isolation) but shares the pool's
+        Chromium process (reuse).  When the ``async with`` block exits
+        the context is closed and the semaphore slot is released.
+
+        The semaphore ensures at most ``BROWSER_MAX_CONTEXTS`` (default 10)
+        concurrent isolated acquisitions.  Callers that exceed the cap
+        will block until a slot opens up.
+        """
+        await self._concurrency_semaphore.acquire()
+        ctx_id = f"iso:{uuid.uuid4().hex[:12]}"
+        try:
+            ctx = await self._create_isolated_context(
+                ctx_id,
+                viewport_width=viewport_width,
+                viewport_height=viewport_height,
+                user_agent=user_agent,
+            )
+        except BaseException:
+            self._concurrency_semaphore.release()
+            raise
+        self._active_acquires += 1
+        self._last_activity = time.time()
+        try:
+            yield ctx_id, ctx
+        finally:
+            await self.release_context(ctx_id)
+
+    async def release_context(self, ctx_id: str) -> None:
+        """Close an isolated context and release its concurrency slot."""
+        ctx = self._isolated_contexts.pop(ctx_id, None)
+        if ctx:
+            with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
+                await ctx.close()
+        self._active_acquires = max(0, self._active_acquires - 1)
+        self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
+        self._concurrency_semaphore.release()
+
+    async def _create_isolated_context(
+        self,
+        ctx_id: str,
+        *,
+        viewport_width: int | None = None,
+        viewport_height: int | None = None,
+        user_agent: str | None = None,
+    ) -> BrowserContext:
+        """Ensure the browser is running and create a fresh isolated context."""
+        # Make sure the browser is up (reuse logic from get_context)
+        await self._ensure_browser()
+
+        opts: dict[str, Any] = {
+            "user_agent": user_agent or settings.USER_AGENT,
+            "viewport": {
+                "width": viewport_width or settings.BROWSER_VIEWPORT_WIDTH,
+                "height": viewport_height or settings.BROWSER_VIEWPORT_HEIGHT,
+            },
+            "is_mobile": False,
+            "has_touch": False,
+            "locale": settings.STEALTH_DEFAULT_LOCALE,
+            "timezone_id": settings.STEALTH_TIMEZONE_POOL.split(",")[0],
+        }
+
+        if settings.PROXY_ROTATION_ENABLED:
+            from app.proxy_manager import get_proxy_manager
+
+            proxy_mgr = get_proxy_manager()
+            if proxy_mgr.enabled:
+                proxy_config = proxy_mgr.get_proxy_for_playwright()
+                if proxy_config:
+                    opts["proxy"] = proxy_config
+                    logger.debug(
+                        "[BrowserPool] Isolated context %s with proxy: %s",
+                        ctx_id,
+                        mask_proxy_url(proxy_config["server"]),
+                    )
+
+        context = await self._browser.new_context(**opts)
+        self._isolated_contexts[ctx_id] = context
+        self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
+        logger.debug("[BrowserPool] Created isolated context %s (active=%d)", ctx_id, self._active_acquires)
+        return context
+
+    async def _ensure_browser(self) -> None:
+        """Make sure playwright + browser are initialised (shared infra)."""
+        async with self._lock:
+            if not self._playwright:
+                start = time.time()
+                self._playwright = await async_playwright().start()
+                self.startup_latency_ms = (time.time() - start) * 1000
+
+            if not self._browser or not self._browser.is_connected():
+                logger.info("[BrowserPool] Launching new Chromium instance (isolated path)")
+                browser_args: list[str] = []
+                if settings.BROWSER_SECURITY_HARDENING:
+                    browser_args.extend(
+                        [
+                            "--disable-dev-shm-usage",
+                            "--disable-extensions",
+                            "--disable-background-networking",
+                            "--disable-default-apps",
+                            "--disable-gpu",
+                            "--no-first-run",
+                        ],
+                    )
+                try:
+                    self._browser = await self._playwright.chromium.launch(
+                        headless=settings.PLAYWRIGHT_HEADLESS,
+                        args=browser_args or None,
+                    )
+                except (Error, OSError, RuntimeError):
+                    self.crash_count += 1
+                    logger.exception("[BrowserPool] Failed to launch browser (isolated path)")
+                    try:
+                        from app.metrics_collector import record_browser_launch
+
+                        record_browser_launch(success=False)
+                    except (ImportError, RuntimeError, ValueError):
+                        logger.debug("[BrowserPool] Failed to record browser launch failure metric")
+                    raise
+                try:
+                    from app.metrics_collector import record_browser_launch
+
+                    record_browser_launch(success=True)
+                except (ImportError, RuntimeError, ValueError):
+                    logger.debug("[BrowserPool] Failed to record browser launch success metric")
+
+                if not self._cleanup_task or self._cleanup_task.done():
+                    self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+
+    # ── Utility ────────────────────────────────────────────────────────
+
     def _get_random_ua(self) -> str:
         """Return a randomized browser user agent."""
         import random
@@ -304,6 +464,9 @@ class BrowserPool:
         return {
             "startup_latency_ms": round(self.startup_latency_ms, 2),
             "active_contexts": self.active_contexts,
+            "reusable_contexts": len(self._contexts),
+            "isolated_contexts": len(self._isolated_contexts),
+            "active_acquires": self._active_acquires,
             "context_reuse_rate": round(self.context_reuse_rate, 3),
             "total_fetches": self.total_fetches,
             "crash_count": self.crash_count,
@@ -313,6 +476,7 @@ class BrowserPool:
     async def close(self) -> None:
         """Gracefully close all contexts and the browser instance."""
         async with self._lock:
+            # Close pool-managed (reusable) contexts
             for ctx in list(self._contexts.values()):
                 try:
                     await ctx.close()
@@ -320,6 +484,15 @@ class BrowserPool:
                     logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
+
+            # Close isolated contexts
+            for ctx in list(self._isolated_contexts.values()):
+                try:
+                    await ctx.close()
+                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
+                    logger.debug("[BrowserPool] Failed to close isolated context during close(): %s", e)
+            self._isolated_contexts.clear()
+            self._active_acquires = 0
 
             # Cancel any lingering background tasks to avoid RuntimeWarnings
             # about unawaited coroutines (AsyncMock in tests, or leaked tasks

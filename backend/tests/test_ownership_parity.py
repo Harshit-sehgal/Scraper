@@ -85,14 +85,18 @@ def sqlite_state_path(tmp_path):
     """Temporary path for on-disk SQLite storage."""
     import os
 
-    old_path = os.environ.get("DATAFORGE_DB_PATH")
-    db_path = tmp_path / "test_ownership.db"
-    os.environ["DATAFORGE_DB_PATH"] = str(db_path)
-    yield db_path
-    if old_path:
-        os.environ["DATAFORGE_DB_PATH"] = old_path
+    from app.job_store import reset_job_store_for_tests
+
+    old_state_file = os.environ.get("DATAFORGE_STATE_FILE")
+    state_file = tmp_path / "test_ownership.json"
+    os.environ["DATAFORGE_STATE_FILE"] = str(state_file)
+    reset_job_store_for_tests()
+    yield state_file.with_suffix(".db")
+    if old_state_file:
+        os.environ["DATAFORGE_STATE_FILE"] = old_state_file
     else:
-        os.environ.pop("DATAFORGE_DB_PATH", None)
+        os.environ.pop("DATAFORGE_STATE_FILE", None)
+    reset_job_store_for_tests()
 
 
 class TestSqliteOwnershipRoundTrip:
@@ -206,7 +210,6 @@ class TestSqliteRecycleBinOwnership:
 
 
 @pytest.mark.postgres
-@pytest.mark.skip(reason="Postgres not available in this environment — run with DATAFORGE_DATABASE_URL set")
 class TestPostgresOwnershipParity:
     """Ownership fields survive Postgres save/load via the base repository.
 

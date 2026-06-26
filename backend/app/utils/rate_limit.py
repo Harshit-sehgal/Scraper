@@ -141,11 +141,3 @@ def mark_rate_limited(
         expired = [k for k, v in _RATE_LIMIT_STATE.items() if v < now]
         for k in expired:
             _RATE_LIMIT_STATE.pop(k, None)
-
-
-def reset_rate_limit_state(domain_or_type: str | None = None) -> None:
-    """Clear rate-limit cooldown state for a domain (or all domains)."""
-    if domain_or_type:
-        _RATE_LIMIT_STATE.pop(domain_or_type, None)
-    else:
-        _RATE_LIMIT_STATE.clear()

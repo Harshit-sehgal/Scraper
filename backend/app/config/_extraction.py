@@ -39,8 +39,6 @@ class ExtractionSettings(BaseSettings):
     # ─── URL Analyzer ─────────────────────────────────────────────────
     URL_ANALYZER_MAX_FIELDS: int = 30
     """Max fields returned by the URL analyzer."""
-    URL_ANALYZER_SNIPPET_MAX_CHARS: int = 30000
-    """Max characters of HTML sent to LLM for URL analysis."""
     URL_ANALYZER_TEMPERATURE: float = 0.5
     """Temperature for URL analysis LLM calls."""
     URL_ANALYZER_TIMEOUT: int = 120

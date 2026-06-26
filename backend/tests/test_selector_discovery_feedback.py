@@ -9,7 +9,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app import selector_discovery as sd_mod
 from app import selector_discovery_analysis as sda_module
 from app.selector_discovery_analysis import (
     _analyze_page_data_type,
@@ -55,8 +54,15 @@ class TestLLMErrorReturnsFailureMetadata:
         html = "<html><body><div>Hello World with enough text for selector discovery</div></body></html>"
         with (
             patch.object(sda_module, "_discover_selectors_from_dom", return_value=None),
-            patch.object(sd_mod, "clean_html_for_selectors", return_value="<div>Hello content for discovery</div>"),
-            patch.object(sd_mod, "llm_json", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
+            patch(
+                "app.selector_discovery.clean_html_for_selectors",
+                return_value="<div>Hello content for discovery</div>",
+            ),
+            patch(
+                "app.selector_discovery.llm_json",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("LLM timeout"),
+            ),
         ):
             result = await discover_selectors(html, [_schema_field()])
         assert result.get("failure_category") == "llm_error"
@@ -71,8 +77,11 @@ class TestLLMEmptyResultReturnsMetadata:
         html = "<html><body><div>Hello World with enough text for selector discovery</div></body></html>"
         with (
             patch.object(sda_module, "_discover_selectors_from_dom", return_value=None),
-            patch.object(sd_mod, "clean_html_for_selectors", return_value="<div>Hello content for discovery</div>"),
-            patch.object(sd_mod, "llm_json", new_callable=AsyncMock, return_value={"fields": {"title": ".title"}}),
+            patch(
+                "app.selector_discovery.clean_html_for_selectors",
+                return_value="<div>Hello content for discovery</div>",
+            ),
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value={"fields": {"title": ".title"}}),
         ):
             result = await discover_selectors(html, [_schema_field()])
         assert result.get("failure_category") == "llm_empty_result"
@@ -87,8 +96,8 @@ class TestDOMFallbackFailure:
         html = "<html><body><div>Single element, no repeating structure</div></body></html>"
         with (
             patch.object(sda_module, "_discover_selectors_from_dom", return_value=None),
-            patch.object(sd_mod, "clean_html_for_selectors", return_value="<div>Single element</div>"),
-            patch.object(sd_mod, "llm_json", new_callable=AsyncMock, return_value={}),
+            patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>Single element</div>"),
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value={}),
         ):
             result = await discover_selectors(html, [_schema_field()])
         assert result.get("failure_category") == "dom_no_repeating_structure"
@@ -100,7 +109,7 @@ class TestCleanedHTMLEmpty:
     @pytest.mark.asyncio
     async def test_cleaned_html_empty(self):
         html = "<html><body><script>var x=1;</script></body></html>"
-        with patch.object(sd_mod, "clean_html_for_selectors", return_value=""):
+        with patch("app.selector_discovery.clean_html_for_selectors", return_value=""):
             result = await discover_selectors(html, [_schema_field()])
         assert result.get("failure_category") == "no_dom_elements"
 
@@ -113,8 +122,8 @@ class TestSuccessPathPassesThrough:
         html = "<html><body><div class='item'>Data</div></body></html>"
         llm_result = {"item_container": ".item", "fields": {"title": ".item .title"}}
         with (
-            patch.object(sd_mod, "clean_html_for_selectors", return_value=html),
-            patch.object(sd_mod, "llm_json", new_callable=AsyncMock, return_value=llm_result),
+            patch("app.selector_discovery.clean_html_for_selectors", return_value=html),
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value=llm_result),
         ):
             result = await discover_selectors(html, [_schema_field()])
         assert result.get("item_container") == ".item"
@@ -125,8 +134,8 @@ class TestSuccessPathPassesThrough:
         html = "<html><body><div class='item'>Data</div></body></html>"
         dom_result = {"item_container": ".item", "fields": {}, "_discovery_method": "dom_fallback"}
         with (
-            patch.object(sd_mod, "clean_html_for_selectors", return_value=html),
-            patch.object(sd_mod, "llm_json", new_callable=AsyncMock, return_value={}),
+            patch("app.selector_discovery.clean_html_for_selectors", return_value=html),
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value={}),
             patch.object(sda_module, "_discover_selectors_from_dom", return_value=dom_result),
         ):
             result = await discover_selectors(html, [_schema_field()])

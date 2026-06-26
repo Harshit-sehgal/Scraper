@@ -428,7 +428,10 @@ class TestDiscoverSelectors:
     async def test_successful_extraction(self) -> None:
         mock_selectors = {"item_container": "div.item", "fields": {"name": "h2"}}
         with (
-            patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
+            patch(
+                "app.selector_discovery.clean_html_for_selectors",
+                return_value="<div>cleaned content for selector discovery</div>",
+            ),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value=mock_selectors),
         ):
             result = await discover_selectors(
@@ -440,26 +443,32 @@ class TestDiscoverSelectors:
     @pytest.mark.asyncio
     async def test_llm_returns_non_dict_falls_back_to_empty(self) -> None:
         with (
-            patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
+            patch(
+                "app.selector_discovery.clean_html_for_selectors",
+                return_value="<div>cleaned content for selector discovery</div>",
+            ),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value="not a dict"),
         ):
             result = await discover_selectors(
-                "<html>...</html>",
+                "<html><body><div>Enough text for selector discovery fallback behavior</div></body></html>",
                 [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)],
             )
-            assert result == {}
+            assert result.get("failure_category") == "dom_no_repeating_structure"
 
     @pytest.mark.asyncio
     async def test_llm_raises_exception_returns_empty(self) -> None:
         with (
-            patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
+            patch(
+                "app.selector_discovery.clean_html_for_selectors",
+                return_value="<div>cleaned content for selector discovery</div>",
+            ),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, side_effect=ValueError("API error")),
         ):
             result = await discover_selectors(
-                "<html>...</html>",
+                "<html><body><div>Enough text for selector discovery fallback behavior</div></body></html>",
                 [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)],
             )
-            assert result == {}
+            assert result.get("failure_category") == "llm_error"
 
 
 # ── Fixture-backed characterization locks (P1-ARCH-CHARTEST-001) ─────────
@@ -563,7 +572,10 @@ class TestSelectorDiscoveryFixtureBehavior:
         mock_selectors = {"item_container": "div.card", "fields": {"title": "h3"}}
         motifs = [{"field": "title", "selector": "h3", "confidence": 0.8}]
         with (
-            patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
+            patch(
+                "app.selector_discovery.clean_html_for_selectors",
+                return_value="<div>cleaned content for selector discovery</div>",
+            ),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value=mock_selectors),
         ):
             result = await discover_selectors(

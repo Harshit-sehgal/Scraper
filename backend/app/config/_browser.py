@@ -47,24 +47,14 @@ class BrowserSettings(BaseSettings):
         "text": ("string",),
         "href": ("url",),
     }
-    PAGE_LOADING_INDICATOR_TIMEOUT: int = 2000
-    """Ms to wait for each common loading indicator to disappear."""
     PAGE_SCROLL_DELAY: float = 0.5
     """Seconds to wait after auto-scrolling to trigger lazy loaders."""
     POST_SCROLL_RESET_DELAY: float = 0.2
     """Seconds to wait after resetting scroll position to top."""
-    MAX_SCROLL_ATTEMPTS: int = 3
-    """Maximum number of sequential scrolls for infinite-scroll pages."""
     PLAYWRIGHT_STEALTH: bool = True
     """Enable basic fingerprint randomization for reducing bot detection risk."""
     DOM_STABILIZATION_INTERVAL: int = 200
     """Ms between DOM change checks."""
-    DOM_STABILIZATION_MIN_STABLE_CHECKS: int = 5
-    """Consecutive stable checks required for quiescence."""
-    DOM_STABILIZATION_MIN_TOTAL_CHECKS: int = 25
-    """Minimum checks to perform before allowing early exit."""
-    DOM_STABILIZATION_MAX_CHECKS: int = 60
-    """Absolute limit on DOM stabilization checks."""
 
     # ─── Browser Stealth Pool ──────────────────────────────────────────
     STEALTH_UA_POOL: str = (

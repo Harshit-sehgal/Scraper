@@ -93,7 +93,7 @@ export function setEngineStatus(text, offline = false) {
   const textEl = document.getElementById("engine-status-text");
   if (!el || !textEl) return;
   textEl.textContent = text;
-  el.classList.toggle("offline", offline);
+  el.setAttribute("data-state", offline ? "offline" : "");
 }
 
 export function setEnginePolling(active) {

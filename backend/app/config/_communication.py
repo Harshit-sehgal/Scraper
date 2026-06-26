@@ -76,8 +76,6 @@ class CommunicationSettings(BaseSettings):
     """Comma-separated list of proxy URLs (http://ip:port or socks5://ip:port)."""
     PROXY_ROTATION_FAILURE_THRESHOLD: int = 5
     """Rotate proxy after this many consecutive failures."""
-    PROXY_TIMEOUT_SECONDS: int = 30
-    """Timeout for proxy connection attempts."""
 
     # ─── Anti-Bot Detection ────────────────────────────────────────────
     ANTIBOT_PLATFORM_MATCH_SCORE: float = 0.6

@@ -13,22 +13,6 @@ from pathlib import Path
 
 from app.utils.json_file_store import JSONFileStore
 
-DEFAULT_AUTH_PROFILES_FILENAME = "auth_profiles.json"
-AUTH_PROFILES_ENV = "DATAFORGE_AUTH_PROFILES_FILE"
-
-
-def default_auth_profiles_path() -> Path:
-    """Resolve the on-disk path for the auth-profile store.
-
-    Reads the env var on every call so tests can override it after
-    import and operators can repoint the store without restarting
-    running workers.
-    """
-    env_value = os.environ.get(AUTH_PROFILES_ENV, "").strip()
-    if env_value:
-        return Path(env_value)
-    return Path(__file__).resolve().parents[2] / "data" / DEFAULT_AUTH_PROFILES_FILENAME
-
 
 class AuthProfileStore(JSONFileStore):
     """File-backed AuthProfile registry.
@@ -41,4 +25,7 @@ class AuthProfileStore(JSONFileStore):
     """
 
     def _default_path(self) -> Path:
-        return default_auth_profiles_path()
+        env_value = os.environ.get("DATAFORGE_AUTH_PROFILES_FILE", "").strip()
+        if env_value:
+            return Path(env_value)
+        return Path(__file__).resolve().parents[2] / "data" / "auth_profiles.json"

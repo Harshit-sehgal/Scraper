@@ -590,9 +590,6 @@ class ScheduledJob(BaseModel):
 
     # Scheduling
     frequency: ScheduledJobFrequency = Field(default=ScheduledJobFrequency.DAILY)
-    cron_expression: str = Field("", description="Optional custom cron expression", max_length=100)
-    timezone: str = Field("UTC", max_length=50)
-    next_run_at: str | None = Field(default=None, description="ISO 8601 timestamp of next scheduled execution")
     last_run_at: str | None = None
 
     # Job template (snapshot of a JobCreate payload)

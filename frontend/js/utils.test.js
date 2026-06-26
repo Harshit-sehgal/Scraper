@@ -103,17 +103,17 @@ describe("setEngineStatus()", () => {
     expect(textEl.textContent).toBe("Running");
   });
 
-  it("toggles offline class", () => {
+  it("sets data-state to offline", () => {
     setEngineStatus("Offline", true);
     const el = document.getElementById("engine-status");
-    expect(el.classList.contains("offline")).toBe(true);
+    expect(el.getAttribute("data-state")).toBe("offline");
   });
 
-  it("removes offline class when online", () => {
+  it("clears data-state when online", () => {
     setEngineStatus("Offline", true);
     setEngineStatus("Online", false);
     const el = document.getElementById("engine-status");
-    expect(el.classList.contains("offline")).toBe(false);
+    expect(el.getAttribute("data-state")).toBe("");
   });
 });
 

@@ -1,8 +1,19 @@
+from __future__ import annotations  # noqa: I001
+
 from argparse import ArgumentTypeError
 from datetime import UTC, datetime
+from pathlib import Path
+import sys
 
 import pytest
 
+# The alert drill script lives at <repo_root>/scripts/ — add repo root
+# so ``scripts.run_alert_delivery_drill`` resolves.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+# must follow sys.path insertion above
 from scripts.run_alert_delivery_drill import (
     AlertDrillConfig,
     alert_matches,
@@ -34,6 +45,8 @@ def _config(
         channel_assert_reachable=False,
         slack_bot_token="",
         slack_channel_id="",
+        slack_webhook_url="",
+        slack_webhook_enabled=False,
         extra_labels={"environment": "test"},
     )
 

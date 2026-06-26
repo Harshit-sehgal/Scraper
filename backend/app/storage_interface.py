@@ -917,16 +917,12 @@ class SQLiteJobRepository(JobRepository):
         """
         from app.job_store import _DB_LOCK, _get_connection
 
-        from typing import Literal
-
-        terminal_statuses: tuple[Literal["completed", "failed", "canceled", "degraded", "empty_result"], ...] = (
-            "completed", "failed", "canceled", "degraded", "empty_result"
-        )
+        terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
         with _DB_LOCK:
             conn = _get_connection()
             try:
                 query = "SELECT * FROM jobs WHERE status IN (?, ?, ?, ?, ?)"
-                params = list(terminal_statuses)
+                params: list[object] = list(terminal_statuses)
                 if older_than:
                     query += " AND completed_at < ?"
                     params.append(older_than)

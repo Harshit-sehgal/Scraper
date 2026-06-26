@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════
-   DataForge — Workflows view + run history
+   DataForge — Workflows view + run history + preview
    ═══════════════════════════════════ */
 
-import { apiFetch } from "./api.js";
+import { apiFetch, endpoints } from "./api.js";
 import { showConfirm, toast } from "./utils.js";
 
 const RUN_STATUS_BADGE = {
@@ -11,6 +11,12 @@ const RUN_STATUS_BADGE = {
   succeeded: { label: "Succeeded", cls: "badge-success" },
   failed: { label: "Failed", cls: "badge-failed" },
   canceled: { label: "Canceled", cls: "badge-canceled" },
+};
+
+const PREVIEW_STATUS_BADGE = {
+  succeeded: { label: "Succeeded", cls: "badge-success" },
+  failed: { label: "Failed", cls: "badge-failed" },
+  partial: { label: "Partial", cls: "badge-running" },
 };
 
 let selectedWorkflowId = null;
@@ -181,6 +187,13 @@ function renderWorkflowDetail(wf, runs) {
   runBtn.setAttribute("data-id", wf.id);
   runBtn.textContent = "Run now";
   actions.appendChild(runBtn);
+  const previewBtn = document.createElement("button");
+  previewBtn.type = "button";
+  previewBtn.className = "btn secondary";
+  previewBtn.setAttribute("data-action", "preview-workflow");
+  previewBtn.setAttribute("data-id", wf.id);
+  previewBtn.textContent = "Preview";
+  actions.appendChild(previewBtn);
   const delBtn = document.createElement("button");
   delBtn.type = "button";
   delBtn.className = "btn ghost small";
@@ -297,6 +310,9 @@ export async function onWorkflowAction(action, id) {
       toast(`Failed to queue workflow: ${err.message || err}`, "error");
     }
   }
+  if (action === "preview-workflow" && id) {
+    await previewWorkflow(id);
+  }
   if (action === "delete-workflow" && id) {
     showConfirm("Delete Workflow?", "Delete this workflow? This cannot be undone.", async () => {
       try {
@@ -309,5 +325,109 @@ export async function onWorkflowAction(action, id) {
         toast(`Failed to delete workflow: ${err.message || err}`, "error");
       }
     });
+  }
+}
+
+// ── Preview ──────────────────────────────────────────────────────────────
+
+async function previewWorkflow(workflowId) {
+  let previewContainer = document.getElementById("workflow-preview-results");
+  if (!previewContainer) {
+    const pane = document.getElementById("workflows-detail-pane");
+    if (!pane) return;
+    previewContainer = document.createElement("div");
+    previewContainer.id = "workflow-preview-results";
+    previewContainer.className = "workflow-preview-section";
+    pane.appendChild(previewContainer);
+  }
+
+  // Show loading state
+  previewContainer.innerHTML = '<div class="loading">Previewing workflow…</div>';
+
+  try {
+    const url = endpoints.workflowPreview(workflowId);
+    const resp = await apiFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sample_limit: 5 }),
+    });
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => "");
+      throw new Error(`HTTP ${resp.status}: ${errBody || "preview failed"}`);
+    }
+    const result = await resp.json();
+    renderPreviewResults(previewContainer, result);
+  } catch (err) {
+    previewContainer.innerHTML = `<div class="error">Preview failed: ${escapeHtml(String(err.message || err))}</div>`;
+  }
+}
+
+function renderPreviewResults(container, result) {
+  container.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "workflow-preview-header";
+
+  const title = document.createElement("h4");
+  title.textContent = "Preview Results";
+
+  const statusMeta = PREVIEW_STATUS_BADGE[result.preview_status] || {
+    label: result.preview_status || "unknown",
+    cls: "badge-unknown",
+  };
+  const statusBadge = document.createElement("span");
+  statusBadge.className = `badge ${statusMeta.cls}`;
+  statusBadge.textContent = statusMeta.label;
+  header.appendChild(title);
+  header.appendChild(statusBadge);
+  container.appendChild(header);
+
+  if (result.preview_status === "succeeded" && result.records && result.records.length > 0) {
+    // Render extracted records in a compact table
+    const tbl = document.createElement("table");
+    tbl.className = "preview-table";
+
+    // Build columns from first record keys
+    const keys = Object.keys(result.records[0]);
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    for (const key of keys) {
+      const th = document.createElement("th");
+      th.textContent = key;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    tbl.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const record of result.records) {
+      const row = document.createElement("tr");
+      for (const key of keys) {
+        const td = document.createElement("td");
+        td.textContent = String(record[key] ?? "");
+        row.appendChild(td);
+      }
+      tbody.appendChild(row);
+    }
+    tbl.appendChild(tbody);
+    container.appendChild(tbl);
+
+    // Summary line
+    const summary = document.createElement("div");
+    summary.className = "subtle preview-summary";
+    summary.textContent = `${result.records.length} record(s) extracted`;
+    container.appendChild(summary);
+  } else if (result.preview_status === "succeeded" && (!result.records || result.records.length === 0)) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state-illustration";
+    empty.innerHTML = "<p>Preview completed but no records were extracted.</p>";
+    container.appendChild(empty);
+  } else {
+    // Failed / partial preview
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "error";
+    const msg = result.user_message || result.failure_type || result.error || "Preview failed with no details";
+    errorDiv.textContent = String(msg);
+    container.appendChild(errorDiv);
   }
 }
