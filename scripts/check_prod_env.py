@@ -90,31 +90,50 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_env_file(path: Path) -> dict[str, str]:
-    """Parse a .env file and return a dict of variable -> value."""
+    """Parse a .env file and return a dict of variable -> value.
+
+    F-SCRIPT-002: replaced the prior ``value.partition("#")[0].strip()``
+    splitter because that silently truncated any value containing a
+    literal ``#`` (e.g. ``DATAFORGE_API_KEY=abc#def`` was returned as
+    ``abc``). The new parser:
+
+      - treats lines starting with ``#`` as comments (after leading
+        whitespace);
+      - honours ``KEY=value#with#hashes`` as a single raw value (the
+        tail is part of the value, not a comment);
+      - strips a single layer of matching surrounding ``"..."`` or
+        ``'...'`` so downstream consumers (e.g. ``json.loads`` for
+        CORS_ORIGINS) still receive a raw array;
+      - ignores blank lines.
+
+    We deliberately keep the parser local rather than reusing
+    ``python-dotenv``: dotenv refuses files with unbalanced quotes
+    (e.g. when a JSON-array value contains inner ``"`` characters),
+    while the historical contract is tolerant of those as long as the
+    wrapper quotes line up.
+    """
     env: dict[str, str] = {}
     if not path.exists():
         print(f"  [WARN]  .env file not found: {path}")
         return env
+
+    def _strip_wrapping_quotes(value: str) -> str:
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            return value[1:-1]
+        return value
+
     with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
+        for raw_line in f:
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#"):
                 continue
-            if "=" not in line:
+            if "=" not in stripped:
                 continue
-            key, _, value = line.partition("=")
+            key, _, value = stripped.partition("=")
             key = key.strip()
-            value = value.strip()
-            if value.startswith('"'):
-                last_quote = value.rfind('"')
-                if last_quote > 0:
-                    value = value[1:last_quote]
-            elif value.startswith("'"):
-                last_quote = value.rfind("'")
-                if last_quote > 0:
-                    value = value[1:last_quote]
-            else:
-                value = value.partition("#")[0].strip()
+            if not key:
+                continue
+            value = _strip_wrapping_quotes(value.strip())
             env[key] = value
     return env
 

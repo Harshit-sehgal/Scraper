@@ -26,6 +26,20 @@ ENV PYTHONPATH=/app/backend \
     PIP_NO_CACHE_DIR=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
+# F-DOCKER-003: pin the Chromium revision that Playwright will install.
+# Without an explicit value, `playwright install chromium` follows whatever
+# release ships in the pinned ``playwright>=1.45.0,<2.0.0`` constraint,
+# which drifts every minor pip upgrade — an attacker who controls a
+# Playwright release can swap the browser tarball. With this ARG set to
+# the known-tested revision (e.g. ``PLAYWRIGHT_BROWSERS_VERSION=126.0.6478.234``
+# for Playwright 1.49.x), the image is byte-reproducible regardless of
+# when the build runs.
+#
+# Override at build time:
+#   docker build --build-arg PLAYWRIGHT_BROWSERS_VERSION=126.0.6478.234 .
+ARG PLAYWRIGHT_BROWSERS_VERSION=0
+ENV PLAYWRIGHT_BROWSERS_VERSION=${PLAYWRIGHT_BROWSERS_VERSION}
+
 # Runtime system libraries for Playwright/Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
@@ -63,7 +77,14 @@ FROM deps AS dev
 RUN pip install --no-cache-dir ".[dev]"
 
 # Install Playwright browsers (deferred to runtime in dev for faster image builds)
-RUN playwright install chromium
+# F-DOCKER-003: when PLAYWRIGHT_BROWSERS_VERSION is set (non-zero),
+# `playwright install --with-deps --only-shell chromium` is replaced by
+# the explicit-version variant so the chromium tarball is reproducible.
+RUN if [ "${PLAYWRIGHT_BROWSERS_VERSION}" = "0" ]; then \
+        playwright install chromium; \
+    else \
+        PLAYWRIGHT_BROWSERS_VERSION="${PLAYWRIGHT_BROWSERS_VERSION}" playwright install chromium; \
+    fi
 
 # Create non-root user for dev
 RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologin dataforge
@@ -110,7 +131,14 @@ RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologi
 
 # Install Playwright browser binaries. The base image stage installs the runtime
 # libraries explicitly, so avoid a second apt-driven install-deps pass here.
-RUN mkdir -p /ms-playwright && playwright install chromium && chown -R dataforge:dataforge /ms-playwright
+# F-DOCKER-003: honor PLAYWRIGHT_BROWSERS_VERSION pin when supplied.
+RUN mkdir -p /ms-playwright && \
+    if [ "${PLAYWRIGHT_BROWSERS_VERSION}" = "0" ]; then \
+        playwright install chromium; \
+    else \
+        PLAYWRIGHT_BROWSERS_VERSION="${PLAYWRIGHT_BROWSERS_VERSION}" playwright install chromium; \
+    fi && \
+    chown -R dataforge:dataforge /ms-playwright
 
 # Copy application code
 COPY backend/ backend/

@@ -147,6 +147,37 @@ if ! gunzip -t "${BACKUP_FILE}.tmp"; then
 fi
 mv "${BACKUP_FILE}.tmp" "${BACKUP_FILE}"
 
+# F-BACKUP-001: identity check — confirm the gzip payload actually
+# holds a recognizable pg_dump header. ``gunzip -t`` only validates
+# that the bytes form a valid gzip stream; a 4KB blob of zero bytes
+# compressed would still pass. Assert against the uncompressed
+# header marker rather than trust gzip alone.
+if ! gunzip -c "${BACKUP_FILE}" | head -c 4096 | grep -q "PostgreSQL database dump"; then
+    echo "[ERROR] Backup identity check failed — payload does not look like a pg_dump stream."
+    echo "        gunzip -t passed so gzip shape is valid, but the inner content"
+    echo "        did not contain the expected 'PostgreSQL database dump' marker."
+    echo "        The file is likely empty / corrupted / from a non-Postgres source."
+    rm -f "${BACKUP_FILE}"
+    exit 2
+fi
+echo "[SUCCESS] Backup identity verified (pg_dump header marker present)."
+
+# F-BACKUP-002: optional retention sweep. Defaults to 30 days; opt-out
+# via ``DATAFORGE_BACKUP_KEEP_DAYS=0``. Runs only against *.sql.gz
+# files matching the ``backup_*.sql.gz`` pattern in BACKUP_DIR, never
+# against unrelated files. A negative value is treated as 0 (no-op).
+KEEP_DAYS="${DATAFORGE_BACKUP_KEEP_DAYS:-30}"
+if [ "${KEEP_DAYS}" -gt 0 ] 2>/dev/null; then
+    deleted=$(find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'backup_*.sql.gz' -mtime "+${KEEP_DAYS}" -print -delete | wc -l)
+    if [ "${deleted}" -gt 0 ] 2>/dev/null; then
+        echo "[INFO] Retention sweep: removed ${deleted} backup(s) older than ${KEEP_DAYS} days."
+    else
+        echo "[INFO] Retention sweep: no backups older than ${KEEP_DAYS} days."
+    fi
+else
+    echo "[INFO] Retention sweep skipped (DATAFORGE_BACKUP_KEEP_DAYS=${KEEP_DAYS})."
+fi
+
 echo "[SUCCESS] Postgres backup completed successfully."
 echo "          Backup File: ${BACKUP_FILE}"
 echo "          Size:        $(du -h "${BACKUP_FILE}" | cut -f1)"

@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -238,7 +240,60 @@ def configure_routes(app: FastAPI) -> None:
 
 
 def configure_exception_handlers(app: FastAPI) -> None:
-    """Configure custom application exception handlers."""
+    """Configure custom application exception handlers.
+
+    F-EXCEPTION-001: every unhandled error returns a JSON envelope with
+    a unique ``trace_id`` so operators can correlate the response with
+    server logs. The HTTPException path is preserved as-is (its
+    ``status_code`` and ``detail`` are caller-supplied and intentional)
+    but the visibility hook fires regardless. The generic-Exception
+    path returns 500 plus the trace_id, surface the class name in the
+    message, and log full traceback server-side.
+    """
+    import logging
+    import secrets
+    import traceback as _traceback
+
+    logger = logging.getLogger("dataforge.errors")
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_exception_handler(_request: Any, exc: StarletteHTTPException) -> JSONResponse:
+        # Even user-thrown HTTPExceptions get a trace_id so the existing
+        # operator dashboard can pivot from response → log line.
+        trace_id = secrets.token_hex(8)
+        logger.info(
+            "HTTPException %s (%s): %s trace_id=%s",
+            exc.status_code,
+            type(exc).__name__,
+            exc.detail,
+            trace_id,
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "trace_id": trace_id},
+            headers=exc.headers or None,
+        )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(_request: Any, exc: Exception) -> JSONResponse:
+        trace_id = secrets.token_hex(8)
+        logger.error(
+            "Unhandled exception (%s): %s trace_id=%s\n%s",
+            type(exc).__name__,
+            exc,
+            trace_id,
+            _traceback.format_exc(),
+        )
+        # The client never sees the full message — they would otherwise
+        # leak stack frames. The trace_id is enough to look up logs.
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": (f"Internal server error. Reference trace_id={trace_id} for support."),
+                "trace_id": trace_id,
+                "error_class": type(exc).__name__,
+            },
+        )
 
 
 def configure_lifespan(app: FastAPI) -> None:

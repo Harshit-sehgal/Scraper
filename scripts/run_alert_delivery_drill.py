@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -277,6 +278,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--json", action="store_true", help="Print only JSON to stdout")
     parser.add_argument("--json-file", type=Path, help="Write JSON result to this path")
+    # F-SCRIPT-001: drill scripts that default to ``localhost`` and
+    # silently retarget a remote CI runner produce false-positive
+    # "drill passed" results. Operators must consciously confirm when
+    # the URL points off-host. The default behaviour is a hard refusal
+    # for non-localhost / non-127.0.0.1 targets unless
+    # ``--allow-remote-host`` is passed OR ``DATAFORGE_DRILL_ALLOW_REMOTE=1``.
+    parser.add_argument(
+        "--allow-remote-host",
+        action="store_true",
+        help="Opt-in override that lets the drill target a non-localhost"
+        " host. Required when running from a CI runner that talks to a"
+        " remote Alertmanager; suppressed in default operator runs.",
+    )
     return parser
 
 
@@ -289,6 +303,27 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--poll-interval must be > 0")
     if args.alert_duration_seconds <= 0:
         parser.error("--alert-duration-seconds must be > 0")
+
+    # F-SCRIPT-001 host-context confirmation. ``localhost`` and
+    # ``127.0.0.1`` are in-policy without a flag; everything else
+    # requires an explicit opt-out.
+    env_allow = os.environ.get("DATAFORGE_DRILL_ALLOW_REMOTE") == "1"
+    parsed_url = urllib.parse.urlparse(args.url)
+    host_is_local = parsed_url.hostname in (None, "localhost", "127.0.0.1", "::1")
+    if not host_is_local and not (args.allow_remote_host or env_allow):
+        msg = (
+            f"Refusing to run drill against non-localhost host "
+            f"{parsed_url.hostname!r}. Re-run with --allow-remote-host"
+            " (or set DATAFORGE_DRILL_ALLOW_REMOTE=1) to confirm the"
+            " URL is the intended target. F-SCRIPT-001 guards against"
+            " silent drills pointed at a developer's local stack from"
+            " a remote CI runner."
+        )
+        if args.json:
+            print(json.dumps({"status": "refused", "reason": msg}))
+        else:
+            print(f"[ERROR] {msg}")
+        return 4
 
     labels = dict(parse_label(raw) for raw in args.label)
     config = AlertDrillConfig(
