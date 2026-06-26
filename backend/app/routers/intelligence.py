@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 @router.get("/analyze-url", status_code=200)
 async def analyze_url_endpoint(
     url: str,
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))],
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
 ):
     """Analyze a URL and return its classification, risk, and recommendation.
 
