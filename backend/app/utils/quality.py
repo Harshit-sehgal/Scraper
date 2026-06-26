@@ -54,6 +54,29 @@ def _value_quality(field: SchemaField, value) -> float:
     if not text:
         return 0.0
 
+    # Placeholder / NA detection — these are not real field values.
+    # Returning 0.0 prevents "N/A" from scoring above the presence
+    # threshold and polluting the record score.
+    PLACEHOLDER_VALUES = {
+        "n/a",
+        "na",
+        "not available",
+        "not applicable",
+        "none",
+        "null",
+        "undefined",
+        "tbd",
+        "tba",
+        "-",
+        "--",
+        "---",
+        "n/a.",
+        "n.a.",
+        "n.a",
+    }
+    if text.lower().strip(".") in PLACEHOLDER_VALUES:
+        return 0.0
+
     # Probabilistic scoring: start with a baseline and add "evidence"
     score = settings.QUALITY_BASE_SCORE  # Base for non-empty text
 

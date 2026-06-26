@@ -6,62 +6,16 @@ tested by calling the handler directly with a mock ``_role`` to bypass
 FastAPI's ``Depends(require_role(...))`` guard.
 
 Endpoints not covered here:
-- ``POST /api/system/retention/enforce`` — side-effects on live data
 - ``GET /metrics`` — requires running Prometheus metrics collector
 - ``POST /api/url/analyze`` — requires network access + LLM
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from app.utils.rbac import UserRole
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-
-# ─── system_manifest ─────────────────────────────────────────────────
-
-
-class TestSystemManifest:
-    """``GET /api/system/manifest`` returns project metadata."""
-
-    @pytest.mark.asyncio
-    async def test_manifest_returns_project_name(self) -> None:
-        from app.routers.system import system_manifest
-
-        result = await system_manifest(_role=UserRole.ADMIN)
-        assert result["project"] == "DataForge Scraper"
-
-    @pytest.mark.asyncio
-    async def test_manifest_includes_env(self) -> None:
-        from app.routers.system import system_manifest
-
-        result = await system_manifest(_role=UserRole.ADMIN)
-        assert "env" in result
-
-    @pytest.mark.asyncio
-    async def test_manifest_includes_storage_backend(self) -> None:
-        from app.routers.system import system_manifest
-
-        result = await system_manifest(_role=UserRole.ADMIN)
-        assert "storage_backend" in result
-
-    @pytest.mark.asyncio
-    async def test_manifest_includes_aup_version(self) -> None:
-        from app.routers.system import system_manifest
-
-        result = await system_manifest(_role=UserRole.ADMIN)
-        assert "aup_version" in result
-
-    @pytest.mark.asyncio
-    async def test_manifest_includes_pg_driver(self) -> None:
-        from app.routers.system import system_manifest
-
-        result = await system_manifest(_role=UserRole.ADMIN)
-        assert "pg_driver" in result
 
 
 # ─── rate_limit_stats ────────────────────────────────────────────────
@@ -200,28 +154,3 @@ class TestAcquisitionMode:
         from app.routers.system import AcquisitionMode
 
         assert AcquisitionMode.DEEP_SCAN == "deep_scan"
-
-
-# ─── Retention config/health endpoints ───────────────────────────────
-
-
-class TestRetentionEndpoints:
-    """Retention config and health endpoints return structured data."""
-
-    @pytest.mark.asyncio
-    async def test_get_retention_config_returns_dict(self) -> None:
-        from app.routers.system import get_retention_config_endpoint
-
-        with patch("app.utils.data_retention.get_retention_config", return_value={"max_age_days": 90}):
-            result = await get_retention_config_endpoint(_role=UserRole.ADMIN)
-        assert "config" in result
-
-    @pytest.mark.asyncio
-    async def test_get_retention_health_returns_dict(self) -> None:
-        from app.routers.system import get_retention_health_endpoint
-
-        mock_monitor = MagicMock()
-        mock_monitor.get_health_check.return_value = {"status": "healthy", "last_run": "2026-01-01"}
-        with patch("app.utils.retention_monitoring.get_retention_monitor", return_value=mock_monitor):
-            result = await get_retention_health_endpoint(_role=UserRole.ADMIN)
-        assert "health" in result

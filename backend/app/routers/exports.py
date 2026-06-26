@@ -23,11 +23,12 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_rbac_event
@@ -47,30 +48,9 @@ logger = logging.getLogger(__name__)
 class BatchExportRequest(BaseModel):
     """Request body for batch export endpoint."""
 
-    job_ids: list[str] = Field(
-        ...,
-        min_length=1,
-        max_length=50,
-        description="Job IDs to include in the batch export",
-    )
-    format: str = Field(
-        "csv",
-        description="Export format: csv, json, or xlsx",
-    )
-
-    @field_validator("format")
-    @classmethod
-    def _validate_format(cls, value: str) -> str:
-        if value not in ("csv", "json", "xlsx"):
-            msg = "format must be one of: csv, json, xlsx"
-            raise ValueError(msg)
-        return value
-
-    flatten: bool = Field(
-        True,
-        description="When True, all results are combined into a single output. "
-        "When False, CSV uses separator rows and Excel uses one sheet per job.",
-    )
+    job_ids: list[str] = Field(..., min_length=1)
+    format: str = "csv"
+    flatten: bool = True
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -417,7 +397,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"'},
         )
 
-    # ─── Batch export ───────────────────────────────────────────────
+    # ─── Batch export ────────────────────────────────────────────
 
     @router.post("/api/exports/batch")
     async def batch_export(
@@ -429,127 +409,173 @@ def create_exports_router(jobs_store: dict[str, Any]):
         ],
     ):
         try:
-            result = await _batch_export_impl(body, auth)
-            _record_export_usage(auth[1], f"batch_{body.format}", body.job_ids, request)
+            result = await _batch_export_impl(body, auth, request)
+            _record_export_usage(auth[1], body.format, body.job_ids, request)
         except HTTPException:
-            _record_export_outcome(f"batch_{body.format}", False)
-            _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=False)
+            _record_export_outcome(body.format, False)
+            _log_export_access(auth[1], body.format, body.job_ids, request, success=False)
             raise
         except Exception:
-            _record_export_outcome(f"batch_{body.format}", False)
-            _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=False)
+            _record_export_outcome(body.format, False)
+            _log_export_access(auth[1], body.format, body.job_ids, request, success=False)
             raise
         else:
-            _record_export_outcome(f"batch_{body.format}", True)
-            _log_export_access(auth[1], f"batch_{body.format}", body.job_ids, request, success=True)
+            _record_export_outcome(body.format, True)
+            _log_export_access(auth[1], body.format, body.job_ids, request, success=True)
             return result
 
-    async def _batch_export_impl(body: BatchExportRequest, auth: tuple[UserRole, str, str, str]):
-        fmt = body.format.lower()
-        if fmt not in ("csv", "json", "xlsx"):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported format '{fmt}'. Supported: csv, json, xlsx",
-            )
-
-        # Resolve all jobs — fail fast on any missing ID.
+    async def _batch_export_impl(
+        body: BatchExportRequest,
+        auth: tuple[UserRole, str, str, str],
+        request: Request,
+    ):
+        # Validate all jobs exist and check access
         missing: list[str] = []
-        for _jid in body.job_ids:
-            await run_in_threadpool(_refresh_job_for_export, _jid)
-            job = jobs_store.get(_jid)
+        for jid in body.job_ids:
+            job = jobs_store.get(jid)
             if not job:
-                missing.append(_jid)
-            else:
-                _ensure_export_job_access(job, auth, "batch_export")
+                missing.append(jid)
+                continue
+            _ensure_export_job_access(job, auth, f"batch_export_{body.format}")
 
         if missing:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Jobs not found: {', '.join(missing)}",
-            )
+            raise HTTPException(status_code=404, detail=f"Jobs not found: {', '.join(missing)}")
 
-        # Resolve job metadata (id, name, on_disk, file_path).
+        fmt = body.format.lower()
+        if fmt not in {"csv", "json", "xlsx"}:
+            raise HTTPException(status_code=422, detail=f"Unsupported format: {fmt}")
+
+        # Build job metadata list for the service layer
         job_meta: list[tuple[str, str, bool, str | None]] = []
-        for _jid in body.job_ids:
-            job = jobs_store.get(_jid)
-            if not job:
-                job_meta.append((_jid, _jid, False, None))
-            else:
-                job_meta.append((_jid, job.name or _jid, bool(job.results_on_disk), job.results_file_path))
+        for jid in body.job_ids:
+            job = jobs_store[jid]
+            results_on_disk = getattr(job, "results_on_disk", False)
+            file_path = getattr(job, "results_file_path", None)
+            job_meta.append((jid, getattr(job, "name", jid), results_on_disk, file_path))
 
-        from app.utils.job_results_store import load_paginated_job_results_from_disk
+        # Build the page_loader that works for both in-memory and disk-backed jobs.
+        # Uses run_in_threadpool so the calling async handler doesn't block.
+        def _page_loader(
+            jid: str,
+            limit: int = export_service.PAGINATION_CHUNK_SIZE,
+            offset: int = 0,
+            file_path: str | None = None,
+        ) -> tuple[list[dict], int]:
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
 
-        def _get_inmemory_results(jid: str) -> list[dict]:
-            job = jobs_store.get(jid)
-            return list(job.results) if job and job.results else []
+            return load_paginated_job_results_from_disk(jid, limit=limit, offset=offset, file_path=file_path)
 
+        # Build helpers needed by the service layer for in-memory-only access
         def _get_inmemory_count(jid: str) -> int | None:
             job = jobs_store.get(jid)
-            return len(job.results) if job and job.results else 0
+            if job is None:
+                return None
+            results = getattr(job, "results", None)
+            return len(results) if results else 0
 
+        def _get_inmemory_sample(jid: str) -> list[dict]:
+            job = jobs_store.get(jid)
+            if job is None:
+                return []
+            results = getattr(job, "results", None)
+            return list(results)[:1] if results else []
+
+        def _get_inmemory_results(jid: str) -> list[dict] | None:
+            job = jobs_store.get(jid)
+            if job is None:
+                return None
+            return getattr(job, "results", None)
+
+        # Build manifest with proper page_loader for disk jobs
         manifest = await export_service.build_batch_manifest(
             job_meta,
-            load_paginated_job_results_from_disk,
+            _page_loader,
             _get_inmemory_count,
         )
-        fieldnames, has_any_data = await export_service.discover_fieldnames_union(
+
+        # Check if any jobs have data
+        has_data = any(e.get("status") == "included" for e in manifest)
+        if not has_data:
+            raise HTTPException(status_code=400, detail="No jobs with results found")
+
+        fieldnames, _ = await export_service.discover_fieldnames_union(
             job_meta,
-            load_paginated_job_results_from_disk,
-            _get_inmemory_results,
+            _page_loader,
+            _get_inmemory_sample,
         )
-        if not has_any_data:
-            raise HTTPException(status_code=400, detail="None of the specified jobs have results to export")
 
-        total_requested = len(manifest)
-        total_included = sum(1 for e in manifest if e["status"] == "included")
-        total_empty = sum(1 for e in manifest if e["status"] == "empty")
+        # Build pages generator (async iterator yielding (jid, jname, cleaned_page))
+        async def _pages() -> AsyncIterator[tuple[str, str, list[dict]]]:
+            for jid, jname, on_disk, fpath in job_meta:
+                if on_disk:
+                    offset = 0
+                    while True:
+                        page, total = await run_in_threadpool(
+                            _page_loader,
+                            jid,
+                            limit=export_service.PAGINATION_CHUNK_SIZE,
+                            offset=offset,
+                            file_path=fpath,
+                        )
+                        if not page:
+                            break
+                        yield (jid, jname, _strip_sys(page))
+                        offset += len(page)
+                        if offset >= total:
+                            break
+                else:
+                    results = _get_inmemory_results(jid)
+                    if results:
+                        yield (jid, jname, _strip_sys(results))
 
-        ts = export_service.batch_export_timestamp()
-        manifest_headers = {
-            "X-Export-Total-Jobs": str(total_requested),
-            "X-Export-Jobs-With-Data": str(total_included),
-            "X-Export-Empty-Jobs": str(total_empty),
-            "Content-Disposition": f'attachment; filename="batch_export_{ts}.{fmt}"',
-        }
+        def _strip_sys(records: list[dict]) -> list[dict]:
+            return [{k: v for k, v in r.items() if not k.startswith("_")} for r in records]
 
+        # Dispatch by format
         if fmt == "csv":
-            pages = export_service.iter_batch_pages(
-                job_meta,
-                load_paginated_job_results_from_disk,
-                _get_inmemory_results,
-            )
+            pages_it = _pages()
+            from app.services.exports import batch_csv_stream
+
             return StreamingResponse(
-                export_service.batch_csv_stream(pages, fieldnames, body.flatten),
+                batch_csv_stream(pages_it, fieldnames, body.flatten),
                 media_type="text/csv",
-                headers=manifest_headers,
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="batch_export_{export_service.batch_export_timestamp()}.csv"'
+                    )
+                },
             )
+
         if fmt == "json":
-            pages = export_service.iter_batch_pages(
-                job_meta,
-                load_paginated_job_results_from_disk,
-                _get_inmemory_results,
-            )
+            pages_it = _pages()
+            from app.services.exports import batch_json_stream
+
             return StreamingResponse(
-                export_service.batch_json_stream(pages, body.flatten, manifest),
+                batch_json_stream(pages_it, body.flatten, manifest),
                 media_type="application/json",
-                headers=manifest_headers,
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="batch_export_{export_service.batch_export_timestamp()}.json"'
+                    )
+                },
             )
-        # Export as xlsx
-        content_bytes = await run_in_threadpool(
-            export_service.batch_xlsx,
+
+        xlsx_bytes = export_service.batch_xlsx(
             job_meta,
             fieldnames,
             body.flatten,
-            manifest,
-            load_paginated_job_results_from_disk,
-            _get_inmemory_results,
+            manifest=manifest,
+            page_loader=_page_loader,
+            get_inmemory_results=_get_inmemory_results,
         )
-        from fastapi.responses import Response
-
-        return Response(
-            content=content_bytes,
+        return StreamingResponse(
+            iter([xlsx_bytes]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="batch_export_{ts}.xlsx"'},
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="batch_export_{export_service.batch_export_timestamp()}.xlsx"'
+                )
+            },
         )
 
     return router

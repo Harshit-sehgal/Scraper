@@ -85,15 +85,10 @@ def test_get_job_results_next_offset(client, seed_job_with_results) -> None:
 
 
 def test_backfill_metadata_endpoint(client, seed_job_with_results) -> None:
+    """backfill-metadata endpoint has been removed from the system router.
+    
+    Verify that the endpoint returns 404 for the removed route.
+    """
     job = seed_job_with_results
     r = client.post(f"/api/jobs/{job.id}/backfill-metadata")
-    assert r.status_code == 200
-    data = r.json()
-    assert "Metadata backfilled successfully" in data["message"]
-    assert data["updated"] is True
-
-    # Fetch the job and check updated source metadata
-    r_job = client.get(f"/api/jobs/{job.id}?include_results=true")
-    data_job = r_job.json()
-    assert data_job["results"][0]["source_type"] != "unknown"
-    assert "source_trust_score" in data_job["results"][0]
+    assert r.status_code == 404

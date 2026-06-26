@@ -73,8 +73,14 @@ class ExtractionSettings(BaseSettings):
     SCORE_TYPE_INTEGRITY_WEIGHT: float = 0.10
 
     # ─── Record Quality Scoring ────────────────────────────────────────
-    QUALITY_BASE_SCORE: float = 0.3
-    """Base quality score for non-empty text values."""
+    QUALITY_BASE_SCORE: float = 0.15
+    """Base quality score for non-empty text values.
+
+    Lowered from 0.3 (previous default) to reduce false positives —
+    "N/A", "Click here", and other placeholder text must not score
+    above the presence threshold just for being non-empty.  Meaningful
+    text with length bonuses pushes the score up to appropriate levels.
+    """
     QUALITY_TEXT_LEN_THRESHOLD_1: int = 4
     """Text longer than this gets a length bonus (+0.2)."""
     QUALITY_TEXT_LEN_THRESHOLD_2: int = 20
@@ -87,7 +93,7 @@ class ExtractionSettings(BaseSettings):
     """Penalty for long text in status fields (> 25 chars)."""
     QUALITY_STATUS_MISMATCH_PENALTY: float = 0.2
     """Penalty for status fields without known phrases and long text."""
-    QUALITY_PRESENT_FIELD_THRESHOLD: float = 0.2
+    QUALITY_PRESENT_FIELD_THRESHOLD: float = 0.25
     """Field quality above this counts as 'present'."""
     QUALITY_REQUIRED_MISSING_THRESHOLD: float = 0.3
     """Required field quality below this increments missing count."""

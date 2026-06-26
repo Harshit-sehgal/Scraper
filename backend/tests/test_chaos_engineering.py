@@ -16,7 +16,7 @@ from app.recovery_handlers import register_all_recovery_handlers
 from app.recovery_strategies import RecoveryAction, RecoveryExecutor
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_recovery_integration import scrape_url_with_recovery
-from app.selector_memory import get_selector_memory
+from app.selector_memory import SelectorMemory, get_selector_memory
 
 logger = logging.getLogger(__name__)
 
@@ -157,10 +157,12 @@ async def test_selector_decay_rediscovery() -> None:
     chaos = get_chaos_simulator()
     chaos.active_failures[FailureMode.SELECTOR_POISONING.value] = True
 
-    # Store a selector in memory first
+    # Store a selector in memory first (using composite key domain/path-prefix)
     selector_memory = get_selector_memory()
     url = "https://decaying-selectors.com/catalog"
-    selector_memory._memory["decaying-selectors.com"] = {
+    composite_key = SelectorMemory._extract_domain(url)
+    assert composite_key is not None, "URL must produce a valid composite key"
+    selector_memory._memory[composite_key] = {
         "selectors": {"css": ".old-selector"},
         "success_count": 10,
         "failure_count": 0,
@@ -169,7 +171,7 @@ async def test_selector_decay_rediscovery() -> None:
     }
 
     # Assert that it is in memory initially
-    assert "decaying-selectors.com" in selector_memory._memory
+    assert composite_key in selector_memory._memory
 
     original_execute = RecoveryExecutor.execute
     recovery_executed = []
@@ -201,7 +203,7 @@ async def test_selector_decay_rediscovery() -> None:
         assert classifications[0]["category"] == FailureCategory.SELECTOR_DECAY.value
 
         # Verify selector memory was forced to clean up for this domain
-        assert "decaying-selectors.com" not in selector_memory._memory
+        assert composite_key not in selector_memory._memory
         assert len(recovery_executed) > 0
 
 

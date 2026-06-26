@@ -65,7 +65,6 @@ REQUIRED_STABLE_PATHS = {
     "/health",
     "/ready",
     "/api/system/status",
-    "/api/system/manifest",
     "/api/system/audit-log",
     "/api/saas/aup/status",
     "/api/saas/plan",

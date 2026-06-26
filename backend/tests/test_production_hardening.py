@@ -176,32 +176,7 @@ def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatc
 
 
 def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
-    """Verify that backfill-metadata endpoint only saves the single job updated and doesn't call a global save."""
-    saved_jobs: list[Job] = []
-
-    # Mock _save_job to track what gets saved
-    async def mock_save_job(job) -> None:
-        saved_jobs.append(job)
-
-    # monkeypatch at the service import site where save_job is used
-    monkeypatch.setattr("app.services.job_mutation_service.save_job", mock_save_job)
-
-    # Track if persist_state gets called
-    persist_called = False
-
-    def mock_persist_state(**kwargs) -> None:
-        nonlocal persist_called
-        persist_called = True
-
-    monkeypatch.setattr("app.services.state.persist_state", mock_persist_state)
-
-    # Mock infer_source_metadata to return a mock inferred dict
-    monkeypatch.setattr(
-        "app.discovery.infer_source_metadata",
-        lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85},
-    )
-
-    # Seed a job with unknown source_type
+    """backfill-metadata endpoint has been removed. Verify the route returns 404."""
     job_id = "test_backfill_job"
     job = Job(
         id=job_id,
@@ -213,18 +188,8 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     )
     main_mod.jobs_store[job_id] = job
 
-    # Call backfill-metadata endpoint
     resp = client.post(f"/api/jobs/{job_id}/backfill-metadata")
-    assert resp.status_code == 200
-    assert resp.json()["updated"] is True
-
-    # Verify that the single job was saved
-    assert len(saved_jobs) == 1
-    assert saved_jobs[0].id == job_id
-    assert saved_jobs[0].results[0]["source_type"] == "inferred_type"
-
-    # Verify that a global save or persist_state was NOT triggered to prevent concurrency risk
-    assert not persist_called, "Global persist_state was called, bringing back concurrency risk!"
+    assert resp.status_code == 404
 
 
 def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:

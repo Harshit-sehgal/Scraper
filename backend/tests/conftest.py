@@ -552,6 +552,30 @@ def reset_usage_ledger_fixture():
 
 
 @pytest.fixture(autouse=True)
+def _reset_browser_pool_fixture():
+    """Reset the global BrowserPool singleton after each test.
+
+    BrowserPool uses ``asyncio.Lock`` internally, which is bound to the
+    event loop at construction time.  pytest-asyncio creates a fresh
+    event loop per test, so a pool created during test N is unusable
+    for test N+1 — its lock is bound to the now-closed loop.  This
+    fixture drops the singleton reference between tests so the next
+    test constructs a fresh pool on the current loop.
+
+    Does NOT attempt graceful close (async would fail on a dead loop).
+    The underlying Playwright process is reclaimed by the OS on pool
+    teardown or session exit.
+    """
+    yield
+    try:
+        from app.browser_pool import reset_global_browser_pool
+
+        reset_global_browser_pool()
+    except ImportError:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def _reset_identity_store_fixture():
     """Reset the SaaS identity store between tests.
 

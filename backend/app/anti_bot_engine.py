@@ -6,6 +6,7 @@ Responsible for:
 - Providing adaptive pacing and retry policies
 - Browser entropy stabilization
 - Proxy rotation coordination
+- Cookie persistence (SQLite-backed, survives restarts)
 """
 
 from __future__ import annotations
@@ -13,13 +14,51 @@ from __future__ import annotations
 import logging
 import random
 import re
+import sqlite3
 import time
+from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from app.config import settings
 from app.utils.log_redaction import mask_proxy_url
 
 logger = logging.getLogger(__name__)
+
+# ── Cookie persistence (SQLite) ──────────────────────────────────────
+_COOKIE_DB_LOCK = Lock()
+_COOKIE_DB_INITIALIZED: set[Path] = set()
+
+
+def _cookie_db_path() -> Path:
+    """Resolve the cookie database path from settings (or default)."""
+    if settings.STATE_FILE_PATH_DYNAMIC:
+        base = Path(settings.STATE_FILE_PATH_DYNAMIC).expanduser()
+    else:
+        base = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
+    return base.parent / "anti_bot_cookies.db"
+
+
+def _cookie_db_conn(db_path: Path | None = None) -> sqlite3.Connection:
+    """Open (or create) the cookie database with WAL mode."""
+    path = db_path or _cookie_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=15)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    if path not in _COOKIE_DB_INITIALIZED:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cookies (
+                domain  TEXT PRIMARY KEY,
+                cookie_string TEXT NOT NULL,
+                updated_at    REAL NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        _COOKIE_DB_INITIALIZED.add(path)
+    return conn
 
 # Primary detection patterns for common anti-bot platforms
 CHALLENGE_PATTERNS = {
@@ -81,10 +120,12 @@ class AntiBotEngine:
         self._block_history: dict[str, list[float]] = {}
         # Lazy import to avoid circular dependencies
         self._proxy_manager: Any = None
-        self._cookies: dict[str, str] = {}  # domain -> cookie_string
+        self._cookies: dict[str, str] = {}  # domain -> cookie_string (in-memory cache)
         self._last_cookie_update: dict[str, float] = {}
         # domain -> user agents used
         self._ua_history: dict[str, list[str]] = {}
+        # On startup, hydrate the in-memory cache from SQLite
+        self._load_cookies_from_db()
 
     @property
     def proxy_manager(self):
@@ -282,12 +323,56 @@ class AntiBotEngine:
         }
 
     def update_cookies(self, domain: str, cookie_string: str) -> None:
-        """Persist cookies for a domain to reuse on subsequent requests."""
+        """Persist cookies for a domain to reuse on subsequent requests.
+
+        Writes to both the in-memory cache and the SQLite backing store
+        so cookies survive container/process restarts.
+        """
         if not domain or not cookie_string:
             return
+        now = time.time()
         self._cookies[domain] = cookie_string
-        self._last_cookie_update[domain] = time.time()
+        self._last_cookie_update[domain] = now
+        # Persist to SQLite
+        try:
+            with _COOKIE_DB_LOCK:
+                conn = _cookie_db_conn()
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO cookies (domain, cookie_string, updated_at)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(domain) DO UPDATE SET
+                            cookie_string = excluded.cookie_string,
+                            updated_at     = excluded.updated_at
+                        """,
+                        (domain, cookie_string, now),
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+        except sqlite3.Error:
+            logger.warning("Failed to persist cookies for %s to SQLite", domain, exc_info=True)
         logger.debug("Cookies updated for domain %s (%d chars)", domain, len(cookie_string))
+
+    def _load_cookies_from_db(self) -> None:
+        """Hydrate the in-memory cookie cache from SQLite on startup."""
+        try:
+            with _COOKIE_DB_LOCK:
+                conn = _cookie_db_conn()
+                try:
+                    rows = conn.execute(
+                        "SELECT domain, cookie_string, updated_at FROM cookies"
+                    ).fetchall()
+                finally:
+                    conn.close()
+            for domain, cookie_string, updated_at in rows:
+                self._cookies[domain] = cookie_string
+                self._last_cookie_update[domain] = updated_at
+            if rows:
+                logger.info("Loaded %d persisted cookies from SQLite", len(rows))
+        except sqlite3.Error:
+            logger.warning("Failed to load cookies from SQLite, starting fresh", exc_info=True)
 
     def get_cookies(self, domain: str) -> str:
         """Get persisted cookies for a domain."""
@@ -301,7 +386,7 @@ class AntiBotEngine:
         age_hours = (time.time() - last_update) / 3600
         return age_hours > max_age_hours
 
-    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:
+    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:  # noqa: ARG002 — url kept for API contract
         """Determine the next step based on the block score and domain history."""
         policy: dict[str, Any] = {}
 

@@ -44,7 +44,6 @@ from app.services.job_creation_service import (
     JobCreationService,
 )
 from app.services.job_mutation_service import (
-    JobBackfillService,
     JobCancellerService,
     JobRecleanerService,
 )
@@ -176,22 +175,6 @@ def register_jobs_write_routes(
         role, user_id, org_id, project_id = _auth_tuple(auth)
         service = JobCancellerService(manager)
         return await service.cancel_job(job_id, role, user_id, org_id, project_id)
-
-    @router.post("/api/jobs/{job_id}/backfill-metadata")
-    async def backfill_job_metadata(
-        job_id: str,
-        auth: Annotated[
-            tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
-        ],
-    ):
-        """Explicitly backfill source metadata for manual-mode job results.
-
-        Delegates business logic to ``JobBackfillService``.
-        """
-        role, user_id, org_id, project_id = _auth_tuple(auth)
-        service = JobBackfillService(manager)
-        return await service.backfill_metadata(job_id, role, user_id, org_id, project_id)
 
     @router.post("/api/jobs/{job_id}/reclean")
     async def reclean_job(

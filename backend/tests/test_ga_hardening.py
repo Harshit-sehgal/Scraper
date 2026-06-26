@@ -1,8 +1,4 @@
 import asyncio
-import io
-import json
-import zipfile
-from typing import Any, cast
 
 import app.main as main_mod
 import pytest
@@ -139,100 +135,11 @@ async def test_browser_pool_hard_recycling(monkeypatch) -> None:
 
 
 def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
-    """Test Component 3: GET /api/system/diagnostics/export and PII sanitization."""
-    # Seed job store with PII data to verify sanitization
-    pii_job_id = "pii-job-999"
-    job = Job(
-        id=pii_job_id,
-        name="Sensitive Customer Scraping",
-        status=JobStatus.COMPLETED,
-        urls=["https://example.com"],
-        results=[
-            {"email": "harshit.sehgal@gmail.com", "phone": "+91 98765 43210", "auth_header": "Bearer secret_jwt_token_12345"},
-        ],
-    )
-    main_mod.jobs_store[pii_job_id] = job
-
-    # Setup selector memory mock
-    class FakeSelectorMemory:
-        _memory = {
-            "example.com": {
-                "selectors": {"title": "h1"},
-                "success_count": 10,
-                "failure_count": 1,
-                "first_seen": 1780000000.0,
-                "last_success": 1780000005.0,
-            },
-        }
-
-        def _compute_confidence(self, entry):
-            class FakeConfidence:
-                raw_confidence = 0.9
-                age_factor = 1.0
-                freshness_factor = 1.0
-                final_score = 0.9
-                reason = "Excellent"
-
-            return FakeConfidence()
-
-    monkeypatch.setattr("app.selector_memory.get_selector_memory", FakeSelectorMemory)
-
-    # Setup world state/observability telemetry mock
-    class FakeObservability:
-        telemetry = [
-            {
-                "type": "scrape",
-                "timestamp": 1780000000.0,
-                "details": {"url": "https://example.com/user/harshit.sehgal@gmail.com"},
-            },
-        ]
-
-    class FakeWorldState:
-        _observability = FakeObservability()
-
-    monkeypatch.setattr("app.semantic_world_state.get_world_state", FakeWorldState)
-
-    # Set config settings values (use ADMIN_API_KEY since endpoint requires ADMIN role)
-    monkeypatch.setattr(settings, "API_KEY", "super_secret_api_key_123")
+    """Diagnostics export endpoint has been removed. Verify the route returns 404."""
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "super_secret_admin_key_456")
-    monkeypatch.setattr(settings, "ALERT_WEBHOOK_URL", "http://alert.webhook/endpoint")
 
-    # Retrieve diagnostics zip
     r = client.get("/api/system/diagnostics/export", headers={"X-API-Key": "super_secret_admin_key_456"})
-    assert r.status_code == 200
-    assert r.headers["content-type"] == "application/zip"
-
-    # Parse Zip content in memory
-    zip_data = io.BytesIO(r.content)
-    with zipfile.ZipFile(zip_data) as zf:
-        file_list = zf.namelist()
-        assert "anonymized_state.json" in file_list
-        assert "active_settings.json" in file_list
-        assert "selector_decay_snapshots.json" in file_list
-        assert "telemetry_snapshots.json" in file_list
-
-        # Verify anonymized_state.json PII masking
-        anonymized_state = json.loads(zf.read("anonymized_state.json"))
-        job_data = anonymized_state["jobs"][pii_job_id]
-        record = cast("dict[str, Any]", job_data["results"][0])
-        assert record["email"] == "<redacted_email>"
-        assert record["phone"] == "<redacted_phone>"
-        assert "Bearer" not in record["auth_header"]
-
-        # Verify active_settings.json masking
-        active_settings: dict = json.loads(zf.read("active_settings.json"))
-        assert active_settings["API_KEY"] == "********"
-        assert active_settings["ALERT_WEBHOOK_URL"] == "********"
-
-        # Verify selector decay snapshot
-        selector_decay: dict = json.loads(zf.read("selector_decay_snapshots.json"))
-        assert "example.com" in selector_decay
-        assert selector_decay["example.com"]["confidence"]["final_score"] == 0.9
-
-        # Verify telemetry snapshot sanitization
-        telemetry: list = json.loads(zf.read("telemetry_snapshots.json"))
-        assert len(telemetry) == 1
-        assert "<redacted_email>" in telemetry[0]["details"]["url"]
+    assert r.status_code == 404
 
 
 @pytest.mark.asyncio

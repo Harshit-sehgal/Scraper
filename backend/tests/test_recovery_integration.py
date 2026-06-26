@@ -21,7 +21,7 @@ from app.recovery_strategies import (
     get_recovery_executor,
     get_recovery_strategist,
 )
-from app.selector_memory import get_selector_memory
+from app.selector_memory import SelectorMemory, get_selector_memory
 
 
 class TestRecoveryStrategist:
@@ -242,9 +242,12 @@ class TestSelectorMemoryCleanup:
         # Create a healthy selector
         domain = "healthy-domain.com"
         import time
+        from app.selector_memory import SelectorMemory
 
         now = time.time()
-        selector_memory._memory[domain] = {
+        # Use the composite key that matches a real URL with a path
+        composite_key = SelectorMemory._extract_domain(f"https://{domain}/page")
+        selector_memory._memory[composite_key] = {
             "selectors": {"css": ".product"},
             "success_count": 10,
             "failure_count": 1,
@@ -330,7 +333,8 @@ class TestRecoveryHandlers:
 
         # Create a cached selector
         domain = "test.com"
-        selector_memory._memory[domain] = {
+        composite_key = SelectorMemory._extract_domain(f"https://{domain}/page")
+        selector_memory._memory[composite_key] = {
             "selectors": {"css": ".item"},
             "success_count": 5,
             "failure_count": 0,
@@ -343,7 +347,7 @@ class TestRecoveryHandlers:
 
         assert result is True
         # Should have deleted the cached entry
-        assert domain not in selector_memory._memory
+        assert composite_key not in selector_memory._memory
 
     async def test_skip_url_handler(self) -> None:
         """Test skip URL handler."""

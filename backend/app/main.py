@@ -47,7 +47,6 @@ from app.routers.auth_profiles import router as auth_profiles_router
 # loaded at startup when ENABLE_EXPERIMENTAL_ROUTES is False.
 from app.routers.exports import create_exports_router
 from app.routers.health import router as health_router
-from app.routers.intelligence import router as intelligence_router
 from app.routers.jobs import create_jobs_router
 from app.routers.operator import router as operator_router
 from app.routers.scheduled_monitoring import router as scheduled_monitoring_router
@@ -211,7 +210,6 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(system_router)
     app.include_router(health_router)
     app.include_router(session_router)
-    app.include_router(intelligence_router)
     app.include_router(workflow_router)
     app.include_router(workflow_draft_router)
     app.include_router(auth_profiles_router)

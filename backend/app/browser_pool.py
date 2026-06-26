@@ -685,3 +685,16 @@ def get_browser_pool() -> BrowserPool:
             if _pool is None:
                 _pool = BrowserPool()
     return _pool
+
+
+def reset_global_browser_pool() -> None:
+    """Reset the global BrowserPool singleton.
+
+    Test-only helper.  Drops the singleton reference without attempting
+    graceful close (the pool's ``asyncio.Lock`` may already be bound to
+    a dead event loop when this is called from conftest teardown).
+    The underlying Playwright process is reclaimed by the OS on exit.
+    """
+    global _pool
+    with _pool_lock:
+        _pool = None

@@ -391,9 +391,51 @@ class SelectorMemory:
 
     @staticmethod
     def _extract_domain(url: str) -> str | None:
+        """Extract a domain+path-prefix key from *url*.
+
+        Using domain-only keys (e.g. ``example.com``) caused selector
+        cross-contamination: selectors learned on ``/products`` would be
+        incorrectly applied to ``/blog`` even though the HTML structures
+        differ.  The fix is to include the first meaningful path segment
+        so that ``example.com/products`` and ``example.com/blog`` map to
+        separate memory entries, while ``example.com/products/123`` and
+        ``example.com/products/456`` still share the same entry under
+        ``example.com/products``.
+
+        Path segments that look like slugs/IDs (all digits, or UUID/guid
+        patterns, or very long segments) are skipped so that
+        ``example.com/items/42`` keys to ``example.com/items`` rather
+        than ``example.com/items/42``.
+
+        Returns ``None`` if the URL has no parseable netloc.
+        """
         try:
             parsed = urlparse(url)
-            return parsed.netloc.lower() or None
+            netloc = parsed.netloc.lower() or None
+            if not netloc:
+                return None
+
+            path = parsed.path.rstrip("/")
+            # Collect up to one meaningful (non-slug/ID) segment
+            prefix_parts: list[str] = []
+            for segment in path.split("/"):
+                segment = segment.strip()
+                if not segment:
+                    continue
+                # Skip segments that look like slugs/IDs
+                if segment.isdigit():
+                    break  # pure numeric ID — treat as leaf, don't key on it
+                if len(segment) >= 32 and "-" in segment:
+                    # Likely a UUID or hash — skip
+                    break
+                prefix_parts.append(segment)
+                # Only take the first meaningful segment to avoid
+                # over-fragmenting the memory space
+                break
+
+            if prefix_parts:
+                return f"{netloc}/{prefix_parts[0]}"
+            return netloc
         except (ValueError, AttributeError):
             return None
 

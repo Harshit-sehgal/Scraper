@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-26 20:33:55 UTC
+**Generated:** 2026-06-26 22:38:31 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -30,7 +30,6 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/jobs/{job_id}/export/json` |
 | GET | `/api/jobs/{job_id}/results` |
 | POST | `/api/jobs` |
-| POST | `/api/jobs/{job_id}/backfill-metadata` |
 | POST | `/api/jobs/{job_id}/cancel` |
 | POST | `/api/jobs/{job_id}/reclean` |
 
@@ -79,16 +78,11 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | DELETE | `/api/operator/denylist` |
 | GET | `/api/operator/denylist` |
 | GET | `/api/system/audit-log` |
-| GET | `/api/system/diagnostics/export` |
-| GET | `/api/system/manifest` |
 | GET | `/api/system/rate-limit-stats` |
-| GET | `/api/system/retention/config` |
-| GET | `/api/system/retention/health` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
 | POST | `/api/operator/denylist` |
 | POST | `/api/system/csp-violations` |
-| POST | `/api/system/retention/enforce` |
 
 ## Session/Auth Routes
 
@@ -121,7 +115,6 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/billing/stub-return/{plan_tier}/{request_id}` |
 | GET | `/api/billing/subscriptions` |
 | GET | `/api/billing/subscriptions/{customer_id}` |
-| GET | `/api/intelligence/analyze-url` |
 | GET | `/api/saas/aup/status` |
 | GET | `/api/saas/email-verification/status` |
 | GET | `/api/saas/invitations/pending` |
@@ -171,4 +164,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 115
+**Total routes:** 108

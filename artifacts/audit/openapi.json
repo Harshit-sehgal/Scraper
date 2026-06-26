@@ -234,22 +234,18 @@
         "properties": {
           "flatten": {
             "default": true,
-            "description": "When True, all results are combined into a single output. When False, CSV uses separator rows and Excel uses one sheet per job.",
             "title": "Flatten",
             "type": "boolean"
           },
           "format": {
             "default": "csv",
-            "description": "Export format: csv, json, or xlsx",
             "title": "Format",
             "type": "string"
           },
           "job_ids": {
-            "description": "Job IDs to include in the batch export",
             "items": {
               "type": "string"
             },
-            "maxItems": 50,
             "minItems": 1,
             "title": "Job Ids",
             "type": "array"
@@ -2813,47 +2809,6 @@
         "summary": "Batch Export"
       }
     },
-    "/api/intelligence/analyze-url": {
-      "get": {
-        "description": "Analyze a URL and return its classification, risk, and recommendation.\n\nThis endpoint is pure \u2014 no HTTP requests are made to the URL.  It\ninspects the URL string only and returns a structured analysis result.\n\n**Query parameters:**\n    - *url*: The URL to analyze (required, must be `http` or `https`)\n\n**Returns:**\n    A ``UrlAnalysisResult`` JSON object with fields ``url``, ``classification``,\n    ``risk``, ``recommended_mode``, ``confidence``, ``reason``,\n    ``next_steps``, and ``signals``.",
-        "operationId": "analyze_url_endpoint_api_intelligence_analyze_url_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "url",
-            "required": true,
-            "schema": {
-              "title": "Url",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Analyze Url Endpoint",
-        "tags": [
-          "intelligence"
-        ]
-      }
-    },
     "/api/jobs": {
       "get": {
         "description": "List job summaries.\n\nSupports keyset pagination via ``limit`` and ``cursor`` (an\nISO-8601 ``created_at`` timestamp). The response shape is\nadditive: callers that ignore ``next_cursor`` see the same\ndata they always have. When more results are available the\nfield contains the ``created_at`` of the last returned item;\nwhen the result set is exhausted it is ``None``.",
@@ -3078,47 +3033,6 @@
           }
         },
         "summary": "Get Job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}/backfill-metadata": {
-      "post": {
-        "description": "Explicitly backfill source metadata for manual-mode job results.\n\nDelegates business logic to ``JobBackfillService``.",
-        "operationId": "backfill_job_metadata_api_jobs__job_id__backfill_metadata_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Backfill Job Metadata",
         "tags": [
           "jobs"
         ]
@@ -5788,46 +5702,6 @@
         ]
       }
     },
-    "/api/system/diagnostics/export": {
-      "get": {
-        "description": "Generates and exports an authenticated and sanitized system diagnostics ZIP bundle.",
-        "operationId": "export_system_diagnostics_api_system_diagnostics_export_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Export System Diagnostics",
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/api/system/manifest": {
-      "get": {
-        "description": "Live module/version manifest for the dashboard help section.\n\nReturns the project's metadata, runtime configuration, and the\ncurrently-active AUP version so the help panel can show\nversion-aware information without hardcoding values in JS.",
-        "operationId": "system_manifest_api_system_manifest_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "System Manifest",
-        "tags": [
-          "system"
-        ]
-      }
-    },
     "/api/system/rate-limit-stats": {
       "get": {
         "description": "Return current rate limiter configuration and active counter stats.\n\nExposes the rate limiter's internal state for operational debugging:\n- ``enabled`` \u2014 whether any tier (global or per-IP) is active\n- ``global_limit_per_window`` / ``global_window_seconds`` \u2014 aggregate cap\n- ``per_ip_enabled`` / ``per_ip_limit_per_window`` / ``per_ip_window_seconds`` \u2014 fair-share cap\n- ``active_keys`` \u2014 how many distinct counter keys are currently tracked\n- ``route_limits`` \u2014 per-route override limits (max + window per prefix)\n\nRequires operator or admin role.",
@@ -5843,102 +5717,6 @@
           }
         },
         "summary": "Rate Limit Stats",
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/api/system/retention/config": {
-      "get": {
-        "description": "Return the current data retention policy configuration.",
-        "operationId": "get_retention_config_endpoint_api_system_retention_config_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Retention Config Endpoint Api System Retention Config Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Get Retention Config Endpoint",
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/api/system/retention/enforce": {
-      "post": {
-        "description": "Enforce the data retention policy, purging data older than the configured TTL.\n\nBy default this runs as a dry-run (reports only). Pass ``?dry_run=false``\nto actually delete expired data.\n\nReturns:\n    - ``jobs_purged``: completed/terminal jobs deleted\n    - ``recycle_purged``: recycle-bin items deleted\n    - ``jobs_skipped``: completed jobs within retention window\n    - ``recycle_skipped``: recycle items within retention window\n    - ``idempotency_keys_purged``: stale idempotency keys deleted\n    - ``config``: current retention policy in days",
-        "operationId": "enforce_data_retention_api_system_retention_enforce_post",
-        "parameters": [
-          {
-            "description": "When true, report what would be deleted without deleting.",
-            "in": "query",
-            "name": "dry_run",
-            "required": false,
-            "schema": {
-              "default": true,
-              "description": "When true, report what would be deleted without deleting.",
-              "title": "Dry Run",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Enforce Data Retention Api System Retention Enforce Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Enforce Data Retention",
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/api/system/retention/health": {
-      "get": {
-        "description": "Return health status of data retention enforcement.",
-        "operationId": "get_retention_health_endpoint_api_system_retention_health_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Retention Health Endpoint Api System Retention Health Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Get Retention Health Endpoint",
         "tags": [
           "system"
         ]

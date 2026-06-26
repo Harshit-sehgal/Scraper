@@ -7,6 +7,7 @@ Provides:
   - Retry ceilings per domain with cooldown
   - Best-effort robots.txt awareness
   - Domain reputation tracking
+  - SQLite persistence for cooldown/failure state (survives restarts)
 
 Usage:
     policy = get_crawl_policy()
@@ -19,16 +20,59 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
+import sqlite3
 import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlparse
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ── Domain state persistence (SQLite) ─────────────────────────────────
+_POLICY_DB_LOCK = threading.Lock()
+_POLICY_DB_INITIALIZED: set[Path] = set()
+
+
+def _policy_db_path() -> Path:
+    """Resolve the crawl-policy database path from settings."""
+    if settings.STATE_FILE_PATH_DYNAMIC:
+        base = Path(settings.STATE_FILE_PATH_DYNAMIC).expanduser()
+    else:
+        base = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
+    return base.parent / "crawl_policy_state.db"
+
+
+def _policy_db_conn(db_path: Path | None = None) -> sqlite3.Connection:
+    """Open (or create) the crawl-policy database with WAL mode."""
+    path = db_path or _policy_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=15)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    if path not in _POLICY_DB_INITIALIZED:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS domain_state (
+                domain              TEXT PRIMARY KEY,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                total_fetches       INTEGER NOT NULL DEFAULT 0,
+                last_fetch_time     REAL    NOT NULL DEFAULT 0,
+                cooldown_until      REAL    NOT NULL DEFAULT 0,
+                robots_disallowed   TEXT    NOT NULL DEFAULT '[]',
+                crawl_delay         REAL    NOT NULL DEFAULT 0,
+                robots_checked      INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.commit()
+        _POLICY_DB_INITIALIZED.add(path)
+    return conn
 
 
 # ─── Domain State ───────────────────────────────────────────────────────
@@ -67,6 +111,8 @@ class CrawlPolicyEngine:
         self._reserve_lock = asyncio.Lock()
         # Thread lock for sync methods (record_result, get_domain_state, etc.)
         self._thread_lock = threading.Lock()
+        # Hydrate domain state from SQLite on startup
+        self._load_from_db()
 
     # ─── Public API ────────────────────────────────────────────────────
 
@@ -167,6 +213,10 @@ class CrawlPolicyEngine:
                         self._cooldown_seconds,
                     )
 
+            # Persist key state to SQLite so cooldowns and failure counts
+            # survive process restarts.
+            self._persist_domain(domain, state)
+
     def get_domain_state(self, domain: str) -> dict | None:
         """Get the current state for a domain (for observability)."""
         state = self._domains.get(domain)
@@ -212,9 +262,23 @@ class CrawlPolicyEngine:
         return states
 
     def reset_domain(self, url_or_domain: str) -> None:
-        """Reset a domain's state (e.g. after manual override)."""
+        """Reset a domain's state (e.g. after manual override).
+
+        Removes state from both in-memory dict and SQLite.
+        """
         domain = self._extract_domain(url_or_domain) or url_or_domain
         self._domains.pop(domain, None)
+        # Also purge from SQLite so a restart doesn't re-hydrate stale state
+        try:
+            with _POLICY_DB_LOCK:
+                conn = _policy_db_conn()
+                try:
+                    conn.execute("DELETE FROM domain_state WHERE domain = ?", (domain,))
+                    conn.commit()
+                finally:
+                    conn.close()
+        except sqlite3.Error:
+            logger.warning("Failed to delete domain state for %s from SQLite", domain, exc_info=True)
         logger.info("Crawl policy: reset state for domain %s", domain)
 
     # ─── Internal Helpers ──────────────────────────────────────────────
@@ -223,6 +287,90 @@ class CrawlPolicyEngine:
         if domain not in self._domains:
             self._domains[domain] = DomainState(domain=domain)
         return self._domains[domain]
+
+    def _load_from_db(self) -> None:
+        """Hydrate in-memory domain state from SQLite on startup.
+
+        Restores cooldown timers and failure counts so that a freshly
+        restarted scraper doesn't immediately re-bombard a domain that
+        was in cooldown.
+        """
+        try:
+            with _POLICY_DB_LOCK:
+                conn = _policy_db_conn()
+                try:
+                    rows = conn.execute(
+                        """
+                        SELECT domain, consecutive_failures, total_fetches,
+                               last_fetch_time, cooldown_until,
+                               robots_disallowed, crawl_delay, robots_checked
+                        FROM domain_state
+                        """
+                    ).fetchall()
+                finally:
+                    conn.close()
+            for row in rows:
+                domain = row[0]
+                state = DomainState(
+                    domain=domain,
+                    consecutive_failures=row[1],
+                    total_fetches=row[2],
+                    last_fetch_time=row[3],
+                    cooldown_until=row[4],
+                    robots_disallowed=set(json.loads(row[5])),
+                    crawl_delay=row[6],
+                    robots_checked=bool(row[7]),
+                )
+                self._domains[domain] = state
+            if rows:
+                logger.info("Loaded %d domain states from SQLite", len(rows))
+        except sqlite3.Error:
+            logger.warning("Failed to load domain states from SQLite, starting fresh", exc_info=True)
+
+    def _persist_domain(self, domain: str, state: DomainState) -> None:
+        """Persist a single domain's state to SQLite.
+
+        Called after record_result (failure/cooldown changes) and after
+        robots.txt fetch (disallowed paths). Uses UPSERT to keep the
+        row count at one per domain.
+        """
+        try:
+            robots_json = json.dumps(sorted(state.robots_disallowed))
+            with _POLICY_DB_LOCK:
+                conn = _policy_db_conn()
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO domain_state
+                            (domain, consecutive_failures, total_fetches,
+                             last_fetch_time, cooldown_until,
+                             robots_disallowed, crawl_delay, robots_checked)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(domain) DO UPDATE SET
+                            consecutive_failures = excluded.consecutive_failures,
+                            total_fetches       = excluded.total_fetches,
+                            last_fetch_time     = excluded.last_fetch_time,
+                            cooldown_until      = excluded.cooldown_until,
+                            robots_disallowed   = excluded.robots_disallowed,
+                            crawl_delay         = excluded.crawl_delay,
+                            robots_checked      = excluded.robots_checked
+                        """,
+                        (
+                            domain,
+                            state.consecutive_failures,
+                            state.total_fetches,
+                            state.last_fetch_time,
+                            state.cooldown_until,
+                            robots_json,
+                            state.crawl_delay,
+                            int(state.robots_checked),
+                        ),
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+        except sqlite3.Error:
+            logger.warning("Failed to persist domain state for %s", domain, exc_info=True)
 
     @staticmethod
     def _extract_domain(url: str) -> str | None:
@@ -293,6 +441,9 @@ class CrawlPolicyEngine:
                         len(disallowed_paths),
                         crawl_delay,
                     )
+
+                # Persist robots.txt results so we don't re-fetch on restart
+                self._persist_domain(domain, state)
 
         except Exception as e:
             logger.debug("Failed to fetch robots.txt for %s: %s", domain, e)

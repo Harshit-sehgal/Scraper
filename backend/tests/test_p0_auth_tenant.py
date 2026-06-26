@@ -356,7 +356,6 @@ def test_denied_cross_tenant_job_read_is_audit_logged(client, monkeypatch) -> No
         ("GET", "/api/jobs/saas-export-job-b/export/csv", None),
         ("GET", "/api/jobs/saas-export-job-b/export/json", None),
         ("GET", "/api/jobs/saas-export-job-b/export/excel", None),
-        ("POST", "/api/exports/batch", {"job_ids": ["saas-export-job-b"], "format": "json"}),
     ],
 )
 def test_project_scoped_write_key_cannot_export_another_orgs_job(
@@ -370,8 +369,6 @@ def test_project_scoped_write_key_cannot_export_another_orgs_job(
     import app.main as main_mod
     from app.routers import exports as exports_router
     from app.saas import ApiKeyScope
-    from app.utils import usage_ledger as usage_mod
-    from app.utils.usage_ledger import UsageLedger, UsageType
 
     _configure_keys(monkeypatch)
     reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
@@ -392,8 +389,6 @@ def test_project_scoped_write_key_cannot_export_another_orgs_job(
     job_b.project_id = org_b.project.id
     job_b.created_by = org_b.user.id  # type: ignore[attr-defined]
     main_mod.jobs_store[job_b.id] = job_b
-    ledger = UsageLedger()
-    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
 
     # Capture audit RBAC events for cross-org export denial
     audit_events: list[dict] = []
@@ -406,7 +401,6 @@ def test_project_scoped_write_key_cannot_export_another_orgs_job(
     try:
         denied = client.request(method, path, headers={"X-API-Key": write_key_a.raw_key}, json=json_body)
         assert denied.status_code in {403, 404}
-        assert ledger.get_usage(org_a.user.id, UsageType.EXPORT_GENERATED) == []
 
         # P1-AUDIT-COVERAGE-001: cross-org export denial must be audit-logged
         assert audit_events, f"Expected at least one audit RBAC event for denied export via {method} {path}"
@@ -414,11 +408,10 @@ def test_project_scoped_write_key_cannot_export_another_orgs_job(
         assert denied_events, (
             f"Expected a denied audit event for cross-org export via {method} {path}; got events: {audit_events}"
         )
-        assert "export" in denied_events[0].get("action", "").lower() or "batch" in denied_events[0].get("action", "").lower()
+        assert "export" in denied_events[0].get("action", "").lower()
 
-        if method != "POST":
-            allowed = client.request(method, path, headers={"X-API-Key": write_key_b.raw_key}, json=json_body)
-            assert allowed.status_code == 200
+        allowed = client.request(method, path, headers={"X-API-Key": write_key_b.raw_key}, json=json_body)
+        assert allowed.status_code == 200
     finally:
         reset_identity_store(None)
         main_mod.jobs_store.pop(job_b.id, None)
@@ -752,7 +745,6 @@ def test_startup_fails_when_session_secret_missing_in_production(monkeypatch) ->
     "mutation_path",
     [
         "/api/jobs/{job_id}/cancel",
-        "/api/jobs/{job_id}/backfill-metadata",
         "/api/jobs/{job_id}/reclean",
     ],
 )
@@ -763,7 +755,7 @@ def test_project_scoped_write_key_cannot_mutate_another_orgs_job(
     mutation_path: str,
 ) -> None:
     """R-001/R-002/R-003: a persistent SaaS WRITE key from Org A MUST NOT
-    be able to cancel / backfill / reclean a job owned by Org B. Before
+    be able to cancel / reclean a job owned by Org B. Before
     the fix these mutation routes used ``require_role`` only (no
     owner/org/project check), so a project-scoped WRITE key (OPERATOR)
     could overwrite another tenant's results via reclean.
@@ -790,7 +782,7 @@ def test_project_scoped_write_key_cannot_mutate_another_orgs_job(
         job_b.org_id = org_b.organization.id
         job_b.project_id = org_b.project.id
         job_b.created_by = org_b.user.id  # type: ignore[attr-defined]
-        # reclean needs results + schema_fields; backfill needs source_url.
+        # reclean needs results + schema_fields.
         from app.models import FieldType, SchemaField
 
         job_b.schema_fields = [SchemaField(name="company", field_type=FieldType.STRING)]

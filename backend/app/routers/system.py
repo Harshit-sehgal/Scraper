@@ -1,18 +1,14 @@
-"""System Router — endpoints for metrics, health, system status, diagnostics, and URL analysis."""
+"""System Router — endpoints for metrics, health, system status, and URL analysis."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import io
 import json
 import logging
-import re
 import secrets
 import threading
-import zipfile
 from enum import StrEnum
-from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -20,7 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from app.config import resolve_pg_driver, settings
+from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
 from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
@@ -65,47 +61,6 @@ async def storage_status(
     """Detailed storage backend status. Requires operator or admin."""
     repo = get_job_repository()
     return await run_in_threadpool(repo.get_storage_status)
-
-
-@router.get("/api/system/manifest")
-async def system_manifest(
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))],
-):
-    """Live module/version manifest for the dashboard help section.
-
-    Returns the project's metadata, runtime configuration, and the
-    currently-active AUP version so the help panel can show
-    version-aware information without hardcoding values in JS.
-    """
-    from app.saas import CURRENT_AUP_VERSION
-    from app.utils.encryption import _get_key_version
-
-    pyproject_path = Path(__file__).resolve().parents[3] / "pyproject.toml"
-    project_version = "unknown"
-    if pyproject_path.exists():
-        try:
-            import tomllib  # type: ignore[import-not-found]
-
-            with pyproject_path.open("rb") as f:
-                data = tomllib.load(f)
-            project_version = str(
-                data.get("project", {}).get("version") or data.get("tool", {}).get("poetry", {}).get("version") or "unknown",
-            )
-        except (OSError, KeyError, ValueError):
-            project_version = "unknown"
-
-    return {
-        "project": "DataForge Scraper",
-        "version": project_version,
-        "env": str(getattr(settings, "ENV", "development")),
-        "aup_version": CURRENT_AUP_VERSION,
-        "encryption_key_version": _get_key_version(),
-        "experimental_routes_enabled": bool(
-            getattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False),
-        ),
-        "storage_backend": str(getattr(settings, "STORAGE_BACKEND", "sqlite")),
-        "pg_driver": resolve_pg_driver(runtime_env=settings.ENV),
-    }
 
 
 @router.get("/api/system/status")
@@ -237,147 +192,6 @@ def _compute_job_counts() -> dict[str, Any]:
     return counts
 
 
-# ─── Diagnostics ZIP Export ─────────────────────────────────────────────
-
-
-@router.get("/api/system/diagnostics/export")
-async def export_system_diagnostics(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):  # noqa: B008, C901, PLR0912, PLR0915, RUF100
-    """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
-    # Regular expressions for PII sanitization
-    email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-    phone_regex = re.compile(r"\+?\b\d[\d\s()\-]{8,14}\d\b")
-    sensitive_keys = {
-        "authorization",
-        "auth",
-        "api_key",
-        "key",
-        "password",
-        "token",
-        "secret",
-        "signature",
-        "alert_webhook_url",
-        "credential",
-        "session",
-        "cookie",
-        "bearer",
-        "private",
-        "client_secret",
-        "api_secret",
-        "access_key",
-        "secret_key",
-    }
-
-    def sanitize_value(val, _depth=0, _max_depth=50):
-        if _depth >= _max_depth:
-            return val
-        if isinstance(val, str):
-            val = email_regex.sub("<redacted_email>", val)
-            return phone_regex.sub("<redacted_phone>", val)
-        if isinstance(val, dict):
-            return {
-                k: (
-                    "********"
-                    if any(s in k.lower() for s in sensitive_keys)
-                    else sanitize_value(v, _depth=_depth + 1, _max_depth=_max_depth)
-                )
-                for k, v in val.items()
-            }
-        if isinstance(val, list):
-            return [sanitize_value(item, _depth=_depth + 1, _max_depth=_max_depth) for item in val]
-        return val
-
-    # 1. anonymized_state.json
-    with _jobs_store_lock:
-        anonymized_jobs = {}
-        for j_id, job in jobs_store.items():
-            if hasattr(job, "model_dump"):
-                job_dict = job.model_dump()
-            elif hasattr(job, "dict"):
-                job_dict = job.dict()
-            else:
-                job_dict = dict(job)
-            anonymized_jobs[j_id] = sanitize_value(job_dict)
-
-        anonymized_recycle = {}
-        for j_id, job in recycle_bin_store.items():
-            if hasattr(job, "model_dump"):
-                job_dict = job.model_dump()
-            elif hasattr(job, "dict"):
-                job_dict = job.dict()
-            else:
-                job_dict = dict(job)
-            anonymized_recycle[j_id] = sanitize_value(job_dict)
-
-    anonymized_state = {"jobs": anonymized_jobs, "recycle_bin": anonymized_recycle}
-
-    # 2. active_settings.json
-    settings_dict = {}
-    if hasattr(settings, "model_dump"):
-        settings_dict = settings.model_dump()
-    elif hasattr(settings, "dict"):
-        settings_dict = settings.dict()
-    else:
-        settings_dict = dict(settings)
-
-    masked_settings = {}
-    for k, v in settings_dict.items():
-        if any(s in k.lower() for s in sensitive_keys):
-            masked_settings[k] = "********"
-        else:
-            masked_settings[k] = sanitize_value(v)
-
-    # 3. selector_decay_snapshots.json
-    selector_decay_snapshots = {}
-    try:
-        from app.selector_memory import get_selector_memory
-
-        memory = get_selector_memory()
-        if memory and hasattr(memory, "_memory"):
-            for domain, entry in memory._memory.items():
-                conf = memory._compute_confidence(entry)
-                selector_decay_snapshots[domain] = {
-                    "selectors": entry.get("selectors"),
-                    "success_count": entry.get("success_count", 0),
-                    "failure_count": entry.get("failure_count", 0),
-                    "first_seen": entry.get("first_seen"),
-                    "last_success": entry.get("last_success"),
-                    "confidence": {
-                        "raw_confidence": conf.raw_confidence,
-                        "age_factor": conf.age_factor,
-                        "freshness_factor": conf.freshness_factor,
-                        "final_score": conf.final_score,
-                        "reason": conf.reason,
-                    },
-                }
-    except (AttributeError, ImportError, RuntimeError) as e:
-        logger.exception("Failed to build selector decay snapshots for diagnostics")
-        selector_decay_snapshots = {"error": {"message": str(e)}}
-
-    # 4. telemetry_snapshots.json
-    telemetry_snapshots = []
-    try:
-        from app.semantic_world_state import get_world_state
-
-        ws = get_world_state()
-        if hasattr(ws, "_observability") and ws._observability:
-            telemetry_snapshots = sanitize_value(ws._observability.telemetry)
-    except (AttributeError, ImportError, RuntimeError) as e:
-        logger.exception("Failed to build telemetry snapshots for diagnostics")
-        telemetry_snapshots = [{"error": str(e)}]
-
-    # Create ZIP archive in memory
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("anonymized_state.json", json.dumps(anonymized_state, indent=2))
-        zip_file.writestr("active_settings.json", json.dumps(masked_settings, indent=2))
-        zip_file.writestr("selector_decay_snapshots.json", json.dumps(selector_decay_snapshots, indent=2))
-        zip_file.writestr("telemetry_snapshots.json", json.dumps(telemetry_snapshots, indent=2))
-
-    zip_buffer.seek(0)
-    headers = {"Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"}
-    return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
-
-
 # ─── Audit Log Endpoint ────────────────────────────────────────────────
 
 
@@ -474,84 +288,6 @@ async def csp_violations(request: Request):
         _sanitise(csp_report.get("document-uri")),
     )
     return JSONResponse(status_code=204, content=None)
-
-
-# ─── Data Retention ──────────────────────────────────────────────────────
-
-
-@router.post("/api/system/retention/enforce", status_code=200)
-async def enforce_data_retention(
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
-    dry_run: Annotated[
-        bool,
-        Query(
-            description="When true, report what would be deleted without deleting.",
-        ),
-    ] = True,
-) -> dict[str, Any]:
-    """Enforce the data retention policy, purging data older than the configured TTL.
-
-    By default this runs as a dry-run (reports only). Pass ``?dry_run=false``
-    to actually delete expired data.
-
-    Returns:
-        - ``jobs_purged``: completed/terminal jobs deleted
-        - ``recycle_purged``: recycle-bin items deleted
-        - ``jobs_skipped``: completed jobs within retention window
-        - ``recycle_skipped``: recycle items within retention window
-        - ``idempotency_keys_purged``: stale idempotency keys deleted
-        - ``config``: current retention policy in days
-    """
-    from app.globals import _jobs_store_lock, jobs_store, recycle_bin_store
-    from app.utils.data_retention import enforce_idempotency_retention, enforce_retention, get_retention_config
-
-    with _jobs_store_lock:
-        result: dict[str, Any] = dict(
-            enforce_retention(
-                jobs_store,
-                recycle_bin_store,
-                dry_run=dry_run,
-            )
-        )
-    result["idempotency_keys_purged"] = enforce_idempotency_retention(dry_run=dry_run)
-    result["config"] = get_retention_config()
-    result["dry_run"] = dry_run
-
-    # Persist the in-memory deletions to the database
-    if not dry_run and (result["jobs_purged"] > 0 or result["recycle_purged"] > 0):
-        try:
-            from app.job_store import save_state
-
-            with _jobs_store_lock:
-                save_state(jobs_store, recycle_bin_store, prune_missing=True)
-        except (ImportError, RuntimeError) as e:
-            logger.warning("Failed to persist retention deletions: %s", e)
-            result["persist_error"] = str(e)
-
-    return result
-
-
-@router.get("/api/system/retention/config", status_code=200)
-async def get_retention_config_endpoint(
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
-) -> dict[str, Any]:
-    """Return the current data retention policy configuration."""
-    from app.utils.data_retention import get_retention_config
-
-    return {"config": get_retention_config()}
-
-
-@router.get("/api/system/retention/health", status_code=200)
-async def get_retention_health_endpoint(
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
-) -> dict[str, Any]:
-    """Return health status of data retention enforcement."""
-    from app.utils.retention_monitoring import get_retention_monitor
-
-    monitor = get_retention_monitor()
-    health = monitor.get_health_check()
-
-    return {"health": health}
 
 
 # ─── Rate Limiter Stats ─────────────────────────────────────────────────
