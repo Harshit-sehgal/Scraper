@@ -89,6 +89,9 @@ jobs:
       - name: OpenAPI spec generation (contract artifact)
         run: python scripts/generate_openapi.py --no-docs-copy
 
+      - name: Docs lint (API.md vs live routes)
+        run: python scripts/docs_lint.py --include-experimental
+
       - name: Dependency vulnerability audit (pip-audit)
         run: pip-audit . --progress-spinner off --desc off --strict
 
@@ -289,9 +292,6 @@ jobs:
         run: |
           npx prettier --check 'frontend/**/*.{js,css,html,mjs}' \
             'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
-
-      - name: Docs lint
-        run: python scripts/docs_lint.py --include-experimental
 
       - name: Verify frontend assets exist
         run: |
