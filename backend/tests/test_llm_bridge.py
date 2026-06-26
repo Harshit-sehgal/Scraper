@@ -24,11 +24,13 @@ from app.llm_bridge import (
     _should_retry_http_error,
     get_llm_call_count,
     get_plugin_manager,
+    get_silent_failure_counts,
     llm_json,
     llm_json_fast,
     llm_text,
     reset_llm_call_count,
     reset_plugin_manager,
+    reset_silent_failure_counts,
 )
 
 
@@ -571,3 +573,25 @@ class TestGetPluginManager:
         reset_plugin_manager()
         second = get_plugin_manager()
         assert first is not second
+
+
+# ─── Silent-failure tracking ────────────────────────────────────────────
+
+
+class TestSilentFailureTracking:
+    """``get_silent_failure_counts`` / ``reset_silent_failure_counts``
+    must reflect how many times the cascade returned an empty sentinel."""
+
+    def test_initial_counts_are_zero(self) -> None:
+        reset_silent_failure_counts()
+        counts = get_silent_failure_counts()
+        assert counts == {"llm_json": 0, "llm_json_fast": 0, "llm_text": 0}
+
+    def test_reset_clears_counts(self) -> None:
+        # Artificially bump a counter
+        from app.llm_bridge import _silent_failure_counts
+
+        _silent_failure_counts["llm_json"] = 5
+        assert get_silent_failure_counts()["llm_json"] == 5
+        reset_silent_failure_counts()
+        assert get_silent_failure_counts()["llm_json"] == 0

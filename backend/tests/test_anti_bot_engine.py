@@ -113,3 +113,33 @@ class TestRetryPolicyJitter:
         # At least 5 distinct delays across 100 random samples is the
         # expected spread for ±25 % jitter.
         assert len(delays) >= 5
+
+
+# ─── Stealth HTTP headers ──────────────────────────────────────────────
+
+
+class TestStealthHeaders:
+    """The stealth profile's ``Accept`` header must not contain literal spaces
+    inside MIME types like ``text / html`` — that's a malformed header
+    value that real bot detectors flag (and which most browsers reject
+    outright). The fix removed the spurious spaces so we ship the real
+    ``text/html,application/xhtml+xml,...`` form."""
+
+    def test_accept_header_has_no_malformed_mime_types(self) -> None:
+        engine = AntiBotEngine()
+        profile = engine.get_stealth_profile("example.com")
+        accept = profile["extra_headers"]["Accept"]
+        # No MIME subtype should contain a space around the slash.
+        # Splitting on commas gives each Accept value; each entry must
+        # look like ``text/html`` not ``text / html``.
+        for entry in accept.split(","):
+            entry = entry.strip()
+            assert " / " not in entry, (
+                f"Malformed MIME type in Accept header: {entry!r} — spatial slips like 'text / html' are a bot signal."
+            )
+
+    def test_accept_header_includes_text_html(self) -> None:
+        engine = AntiBotEngine()
+        profile = engine.get_stealth_profile("example.com")
+        # Should always advertise text/html support
+        assert "text/html" in profile["extra_headers"]["Accept"]

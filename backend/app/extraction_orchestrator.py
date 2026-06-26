@@ -303,7 +303,31 @@ async def orchestrate_extraction(
         nonlocal page_closed
         page_closed = True
 
-    gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
+    # ── Self-tuning integration ──
+    # If the tuning controller has learned a domain-specific
+    # min_confidence_threshold, prefer it over the caller-supplied
+    # default. The controller adjusts this value based on extraction
+    # quality telemetry — high-quality domains raise it (to gate out
+    # noise faster) and low-quality domains lower it (to keep marginal
+    # results). This is the feedback loop that was previously missing:
+    # the controller's output was never wired into the orchestrator.
+    effective_min_score = min_record_score
+    try:
+        from app.self_tuning_extraction import get_self_tuning_controller
+
+        # Derive domain from URL for per-domain tuning.
+        _domain = url.split("//", 1)[-1].split("/", 1)[0] if "//" in url else url
+        controller = get_self_tuning_controller()
+        tuned = controller.get_parameters(_domain)
+        if tuned.adjustment_count > 0:
+            # The controller has observed this domain; use its learned
+            # threshold. Still respect a hard lower bound from the caller
+            # so an aggressive tune-down can't go below 0.1.
+            effective_min_score = max(tuned.min_confidence_threshold, 0.1)
+    except Exception:
+        logger.debug("Self-tuning controller unavailable; using default min_record_score", exc_info=True)
+
+    gate_threshold = max(effective_min_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
 
     # Use module-level helper - defined after this function
 
@@ -375,6 +399,28 @@ async def orchestrate_extraction(
         )
 
     def _arbitrate_and_return(dom_res: ExtractionResult, warnings: list[str] | None = None) -> ExtractionResult:  # noqa: ARG001, RUF100
+        # ── Record telemetry for the self-tuning controller ──
+        # This closes the feedback loop: the controller adjusts
+        # min_confidence_threshold and fetch parameters based on
+        # observed extraction quality. Without this, the controller's
+        # ``record_telemetry`` method is a dead letter.
+        try:
+            from app.self_tuning_extraction import get_self_tuning_controller
+
+            _t_domain = url.split("//", 1)[-1].split("/", 1)[0] if "//" in url else url
+            _avg_score = _average_record_score(dom_res.records) if dom_res.records else 0.0
+            get_self_tuning_controller().record_telemetry(
+                _t_domain,
+                {
+                    "avg_quality": _avg_score,
+                    "record_count": len(dom_res.records),
+                    "method": dom_res.method,
+                    "error": None if dom_res.records else "empty_extraction",
+                },
+            )
+        except Exception:
+            logger.debug("Self-tuning telemetry recording failed", exc_info=True)
+
         if not network_result:
             network_diagnostics.append("arbitration winner: dom (Reason: No network extraction result available)")
             dom_res.network_diagnostics = list(network_diagnostics)

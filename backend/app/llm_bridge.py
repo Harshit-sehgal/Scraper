@@ -74,6 +74,45 @@ def reset_token_usage() -> None:
         _token_usage.update({"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
 
 
+# ─── Silent-failure tracking ─────────────────────────────────────────
+# When every provider in the cascade fails, the public functions below
+# return ``{}`` / ``""`` as a backwards-compatible sentinel. That sentinel
+# is indistinguishable from a real "intentionally empty" response and
+# callers (cleaning / insight pipelines) can silently persist empty
+# structured data — a data-integrity hazard. We increment a process-wide
+# counter on every silent return and emit a single warning-level log so
+# operators can spot the pattern without scraping exception stacks.
+
+
+_silent_failure_counts: dict[str, int] = {"llm_json": 0, "llm_json_fast": 0, "llm_text": 0}
+_silent_failure_lock = threading.Lock()
+
+
+def get_silent_failure_counts() -> dict[str, int]:
+    """How many times each public function fell through to a silent-empty
+    return. Process-local — restart resets; surface in metrics to
+    detect cascade outages that compound across worker restarts."""
+    with _silent_failure_lock:
+        return dict(_silent_failure_counts)
+
+
+def reset_silent_failure_counts() -> None:
+    with _silent_failure_lock:
+        _silent_failure_counts.update({"llm_json": 0, "llm_json_fast": 0, "llm_text": 0})
+
+
+def _record_silent_failure(name: str, last_exception: BaseException | None) -> None:
+    with _silent_failure_lock:
+        _silent_failure_counts[name] = _silent_failure_counts.get(name, 0) + 1
+    logger.warning(
+        "%s returning empty result after every provider failed (last error: %s)"
+        " — caller may treat empty as a real value. "
+        "Inspect get_silent_failure_counts() or consider switching to raise_on_failure=True.",
+        name,
+        last_exception,
+    )
+
+
 def _record_token_usage(response_data: dict[str, Any]) -> None:
     """Extract and accumulate token usage from an API response."""
     usage = response_data.get("usage")
@@ -210,7 +249,14 @@ async def _call_openai_compatible_json(
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
         except _LLM_RETRY_ERRORS as error:
-            logger.exception("API call failed")
+            # WARN (not exception) on transient retry — full stack
+            # traces on every retry storm drown signal in logs.
+            logger.warning(
+                "API call failed (attempt %s/%s): %s",
+                attempt,
+                max_attempts,
+                error,
+            )
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -258,7 +304,14 @@ async def _call_openai_compatible_text(
                 _record_token_usage(data)
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except _LLM_RETRY_ERRORS as error:
-            logger.exception("API call failed")
+            # WARN (not exception) on transient retry — full stack
+            # traces on every retry storm drown signal in logs.
+            logger.warning(
+                "API call failed (attempt %s/%s): %s",
+                attempt,
+                max_attempts,
+                error,
+            )
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -316,6 +369,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         temperature = settings.LLM_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
+    last_err: BaseException | None = None
     groq_key = settings.GROQ_API_KEY
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -335,6 +389,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 if parsed is not None:
                     return parsed
             except _MODEL_FALLBACK_ERRORS as e:
+                last_err = e
                 logger.exception("LLM JSON call failed")
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
                 logger.exception("%s failed: %s", stage, model)
@@ -352,6 +407,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             if parsed is not None:
                 return parsed
         except _MODEL_FALLBACK_ERRORS as e:
+            last_err = e
             logger.exception("Pollinations JSON call failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
@@ -374,19 +430,39 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                     raise ValueError(msg)
                 return res.choices[0].message.content.strip()
 
-            content = await asyncio.to_thread(_run_g4f_json)
+            # g4f runs in a thread pool worker with no guaranteed timeout
+            # internalisation — the ``timeout`` param is a hint to g4f but
+            # not all backends honour it. Wrap in asyncio.wait_for so a
+            # hung provider releases the thread-pool worker after the
+            # configured timeout + a small grace margin for thread
+            # scheduling overhead.
+            _g4f_hard_timeout = (timeout or settings.LLM_TIMEOUT) + 5
+            try:
+                content = await asyncio.wait_for(
+                    asyncio.to_thread(_run_g4f_json),
+                    timeout=_g4f_hard_timeout,
+                )
+            except TimeoutError:
+                logger.warning(
+                    "g4f JSON call exceeded hard timeout (%ds); falling through",
+                    _g4f_hard_timeout,
+                )
+                content = None
             if content is None:
                 return {}
             parsed = _extract_json_payload(content)
             if parsed is not None:
                 return parsed
         except _MODEL_FALLBACK_ERRORS as e:
+            last_err = e
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
         except Exception as e:  # g4f may raise arbitrary exception types
+            last_err = e
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
+    _record_silent_failure("llm_json", last_err)
     return {}
 
 
@@ -402,6 +478,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         temperature = settings.LLM_FAST_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_FAST_TIMEOUT
+    last_err: BaseException | None = None
     groq_key = settings.GROQ_API_KEY
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -421,6 +498,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
                 if parsed is not None:
                     return parsed
             except _MODEL_FALLBACK_ERRORS as e:
+                last_err = e
                 logger.exception("Groq fast JSON call failed")
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
                 logger.exception("%s failed: %s", stage, model)
@@ -442,9 +520,11 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
             if parsed is not None:
                 return parsed
         except _MODEL_FALLBACK_ERRORS as e:
+            last_err = e
             logger.exception("Pollinations fast JSON call failed")
             _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
+    _record_silent_failure("llm_json_fast", last_err)
     return {}
 
 
@@ -459,6 +539,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         temperature = settings.LLM_TEXT_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
+    last_err: BaseException | None = None
     groq_key = settings.GROQ_API_KEY
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -477,7 +558,8 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if text:
                     return text
-            except _MODEL_FALLBACK_ERRORS:
+            except _MODEL_FALLBACK_ERRORS as e:
+                last_err = e
                 logger.exception("Groq text call failed")
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
                 logger.exception("%s failed: %s", stage, model)
@@ -492,7 +574,8 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
             text = await _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
             if text:
                 return text
-        except _MODEL_FALLBACK_ERRORS:
+        except _MODEL_FALLBACK_ERRORS as e:
+            last_err = e
             logger.exception("Pollinations text call failed")
 
         try:
@@ -514,16 +597,31 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                     raise ValueError(msg)
                 return (res.choices[0].message.content or "").strip()
 
-            result = await asyncio.to_thread(_run_g4f_text)
+            _g4f_hard_timeout = (timeout or settings.LLM_TIMEOUT) + 5
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(_run_g4f_text),
+                    timeout=_g4f_hard_timeout,
+                )
+            except TimeoutError:
+                logger.warning(
+                    "g4f text call exceeded hard timeout (%ds); falling through",
+                    _g4f_hard_timeout,
+                )
+                result = None
             if result is None:
                 return ""
             return result  # type: ignore[no-any-return]
-        except _MODEL_FALLBACK_ERRORS:
+        except _MODEL_FALLBACK_ERRORS as e:
+            last_err = e
             logger.exception("g4f text fallback failed")
-        except Exception:  # g4f may raise arbitrary exception types
+        except Exception as e:  # g4f may raise arbitrary exception types
+            last_err = e
             logger.exception("g4f text fallback failed")
+        _record_silent_failure("llm_text", last_err)
         return ""
 
+    _record_silent_failure("llm_text", last_err)
     return ""
 
 

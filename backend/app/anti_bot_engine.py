@@ -244,7 +244,7 @@ class AntiBotEngine:
         else:
             sec_ch_ua_platform = '"Linux"'
         extra_headers = {
-            "Accept": "text / html,application / xhtml+xml,application / xml;q=0.9,image / avif,image / webp,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": settings.STEALTH_ACCEPT_LANGUAGE,
             "Accept-Encoding": "gzip, deflate, br",
             "Sec-Fetch-Dest": "document",
@@ -258,9 +258,7 @@ class AntiBotEngine:
         }
         if not is_chromium:
             # Firefox-style headers
-            extra_headers["Accept"] = (
-                "text / html,application / xhtml+xml,application / xml;q=0.9,image / avif,image / webp,*/*;q=0.8"
-            )
+            extra_headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
             extra_headers["Sec-Fetch-Dest"] = "document"
             extra_headers["Sec-Fetch-Mode"] = "navigate"
             extra_headers["Sec-Fetch-Site"] = "none"
