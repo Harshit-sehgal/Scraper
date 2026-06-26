@@ -339,20 +339,44 @@ class JobRepository(ABC):
         return False
 
     def move_to_recycle_bin(self, job_id: str) -> bool:
-        """Move a job to the recycle bin. Returns True if the job was moved."""
-        raise NotImplementedError
+        """Move a job to the recycle bin. Returns True if the job was moved.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently dropping soft-delete operations.
+        """
+        msg = f"{self.__class__.__name__} must implement move_to_recycle_bin()"
+        raise NotImplementedError(msg)
 
     def restore_from_recycle_bin(self, job_id: str) -> bool:
-        """Restore a job from the recycle bin. Returns True if restored."""
-        raise NotImplementedError
+        """Restore a job from the recycle bin. Returns True if restored.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently dropping restore operations.
+        """
+        msg = f"{self.__class__.__name__} must implement restore_from_recycle_bin()"
+        raise NotImplementedError(msg)
 
     def hard_delete(self, job_id: str) -> bool:
-        """Permanently delete a job. Returns True if deleted."""
-        raise NotImplementedError
+        """Permanently delete a job. Returns True if deleted.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently dropping hard-delete operations.
+        """
+        msg = f"{self.__class__.__name__} must implement hard_delete()"
+        raise NotImplementedError(msg)
 
     def clear_terminal_jobs(self, older_than: str | None = None) -> int:
-        """Remove terminal-status jobs older than the given timestamp. Returns count removed."""
-        raise NotImplementedError
+        """Remove terminal-status jobs older than the given timestamp. Returns count removed.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently skipping cleanup.
+        """
+        msg = f"{self.__class__.__name__} must implement clear_terminal_jobs()"
+        raise NotImplementedError(msg)
 
     def cleanup_companion_data(self, job_id: str) -> None:
         """Remove companion-table rows (``job_results``, ``job_events``)
@@ -673,6 +697,25 @@ class SQLiteJobRepository(JobRepository):
 
         return _read_paginated(job_id, limit=limit, offset=offset)
 
+    def count_results(self, job_id: str) -> int:
+        """Count result rows for a job in the SQLite companion table.
+
+        Delegates to ``app.job_store.count_job_results`` which issues a
+        ``SELECT COUNT(*)`` against the ``job_results`` table.
+        """
+        from app.job_store import _DB_LOCK, _get_connection
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM job_results WHERE job_id = ?",
+                    (job_id,),
+                ).fetchone()
+                return row[0] if row else 0
+            finally:
+                conn.close()
+
     def lookup_idempotency_key(self, idem_key: str) -> str | None:
         """Lookup an idempotency key in SQLite."""
         from app.job_store import lookup_idempotency_key as _lookup
@@ -874,7 +917,11 @@ class SQLiteJobRepository(JobRepository):
         """
         from app.job_store import _DB_LOCK, _get_connection
 
-        terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
+        from typing import Literal
+
+        terminal_statuses: tuple[Literal["completed", "failed", "canceled", "degraded", "empty_result"], ...] = (
+            "completed", "failed", "canceled", "degraded", "empty_result"
+        )
         with _DB_LOCK:
             conn = _get_connection()
             try:
