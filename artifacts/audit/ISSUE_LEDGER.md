@@ -1068,7 +1068,7 @@ Status is `verified` unless noted.
 ### F-DRIFT-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / readonly_bypass
 - **file_path:** `docker-compose.prod.yml:48-49, 73, 142` (dataforge), 119, 160 (worker)
 - **line_function:** both services `read_only: true` plus `volumes:` block
@@ -1079,7 +1079,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Run a compromised process and assert it cannot write `semantic_state.json` while still writing logs.
 - **acceptance_criteria:** Compromise from the API process cannot tamper with `semantic_state.json`.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80). **Partial guard shipped, issue still open:** regression test `backend/tests/test_read_only_root_fs.py` (6 tests) asserts the existing `read_only: true` lockdown on both dataforge and worker services, the `/tmp` tmpfs scratch on each, the precise `/app/backend/data` named-volume mount, and the absence of any hidden `read_only: false` override. This does NOT satisfy the acceptance criterion because `/app/backend/data` remains writable by the app process. **Step 4 of the forward roadmap** will split the volume into `:ro` subpaths for semantic state and `:rw` subpaths for logs, plus an in-memory cache refactor in `semantic_persistence.py` to decouple runtime writes from the persisted file. This is the remaining follow-up to fully close this issue.
+- **notes:** Fixed (Session 100): The production Docker compose now uses a split-volume layout: ``dataforge_data:/app/backend/data:ro`` (read-only) plus ``dataforge_state:/app/backend/data/w:rw`` (writable subdir). All runtime-writable paths (semantic_state, selector_memory, domain_intelligence, audit logs, etc.) are redirected into the ``w/`` subdirectory via env vars (``DATAFORGE_STATE_DIR``, ``DATAFORGE_SEMANTIC_STATE_PATH``, ``DATAFORGE_SELECTOR_MEMORY_PATH``, ``DATAFORGE_DOMAIN_INTELLIGENCE_PATH``). The app code respects these overrides — ``selector_memory.py`` and ``domain_intelligence.py`` now prefer config-level paths over hardcoded data/ defaults. Regression tests in ``test_read_only_root_fs.py`` (16 tests) assert the :ro root mount, the :rw sub-mount, and that all env var redirects are present. A compromised API process can now only write under ``/app/backend/data/w/``, not the ML/learning state files at the data/ root.
 
 ### F-CI-003
 

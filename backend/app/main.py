@@ -31,6 +31,7 @@ from app.lifespan import (
     schedule_background_task,
 )
 from app.middlewares import (
+    access_log_middleware,
     api_key_middleware,
     body_size_middleware,
     csp_middleware,
@@ -117,6 +118,7 @@ def configure_middleware(app: FastAPI) -> None:
     app.middleware("http")(api_key_middleware)
     app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
     app.middleware("http")(latency_tracking_middleware)
+    app.middleware("http")(access_log_middleware)
 
 
 class SPAStaticFiles(StaticFiles):

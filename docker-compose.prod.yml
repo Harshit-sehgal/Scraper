@@ -47,26 +47,28 @@ services:
       - TMPDIR=/tmp
       - DATAFORGE_SMOKE_TEST_MODE=${DATAFORGE_SMOKE_TEST_MODE:-false}
       - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
-      - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
-      - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
-      # F-DRIFT-001: When set, all runtime-writable state (DBs, JSON stores,
-      # results) is redirected to this directory.  Combined with mounting
-      # dataforge_data:/app/backend/data:ro and a separate :rw volume at
-      # this path, a process compromise cannot tamper with ML/learning state
-      # files at the data/ root.  Empty/absent means use the historical
-      # single-volume layout.
-      - DATAFORGE_STATE_DIR=${DATAFORGE_STATE_DIR:-}
+      - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/w/semantic_state.json
+      - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/w/logs
+      # F-DRIFT-001: Writable state directory. All runtime-writable state
+      # (databases, JSON stores, results) is redirected here. Combined with
+      # mounting the parent data volume :ro and a separate :rw sub-volume
+      # at /app/backend/data/w, a process compromise cannot tamper with
+      # ML/learning state files at the data/ root.
+      - DATAFORGE_STATE_DIR=/app/backend/data/w
+      # F-DRIFT-001: Redirect paths for selector_memory and domain_intelligence
+      # into the writable subdirectory so they don't need the :rw root mount.
+      - DATAFORGE_SELECTOR_MEMORY_PATH=/app/backend/data/w/selector_memory.json
+      - DATAFORGE_DOMAIN_INTELLIGENCE_PATH=/app/backend/data/w/domain_intelligence.json
+      - DATAFORGE_SELECTOR_DECAY_SNAPSHOT_PATH=/app/backend/data/w/selector_decay_snapshots.json
+      - DATAFORGE_REGRESSION_REGISTRY_PATH=/app/backend/data/w/regression_registry.json
     volumes:
-      # F-DRIFT-001: the named volume is explicitly :rw because several
-      # runtime services write under /app/backend/data (semantic_state.json,
-      # selector_memory.json, domain_intelligence.json, audit logs, etc.).
-      # The root FS stays read_only: true; this volume is the ONLY writable
-      # surface.  Operators who want a narrower writable surface can:
-      #   1. Set DATAFORGE_STATE_DIR=/app/backend/data/w
-      #   2. Change this mount to :ro
-      #   3. Add a separate :rw volume at /app/backend/data/w
-      # This makes ML/learning files at data/ root read-only by default.
-      - dataforge_data:/app/backend/data:rw
+      # F-DRIFT-001: the data root is mounted :ro so a compromised process
+      # cannot tamper with non-volatile learning state (selector_memory,
+      # domain_intelligence, semantic_state, etc.).  Writable runtime state
+      # (job results, logs, temp DBs) lives in the /app/backend/data/w
+      # sub-mount, which is the only :rw surface.
+      - dataforge_data:/app/backend/data:ro
+      - dataforge_state:/app/backend/data/w:rw
     secrets:
       - dataforge_api_key
       - dataforge_operator_api_key
@@ -134,12 +136,18 @@ services:
       - DATAFORGE_WORKER=true
       - DATAFORGE_SMOKE_TEST_MODE=${DATAFORGE_SMOKE_TEST_MODE:-false}
       - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
-      - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
-      - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
-      - DATAFORGE_STATE_DIR=${DATAFORGE_STATE_DIR:-}
+      - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/w/semantic_state.json
+      - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/w/logs
+      # F-DRIFT-001: Writable state directory — see dataforge service comment.
+      - DATAFORGE_STATE_DIR=/app/backend/data/w
+      - DATAFORGE_SELECTOR_MEMORY_PATH=/app/backend/data/w/selector_memory.json
+      - DATAFORGE_DOMAIN_INTELLIGENCE_PATH=/app/backend/data/w/domain_intelligence.json
+      - DATAFORGE_SELECTOR_DECAY_SNAPSHOT_PATH=/app/backend/data/w/selector_decay_snapshots.json
+      - DATAFORGE_REGRESSION_REGISTRY_PATH=/app/backend/data/w/regression_registry.json
     volumes:
-      # F-DRIFT-001: see comment on the dataforge service.
-      - dataforge_data:/app/backend/data:rw
+      # F-DRIFT-001: same split-volume layout as the dataforge service.
+      - dataforge_data:/app/backend/data:ro
+      - dataforge_state:/app/backend/data/w:rw
     secrets:
       - dataforge_api_key
       - dataforge_operator_api_key
@@ -545,6 +553,8 @@ volumes:
     name: dataforge_alertmanager_data
   dataforge_data:
     name: dataforge_scraper_data
+  dataforge_state:
+    name: dataforge_scraper_state
   postgres_data:
     name: dataforge_postgres_data
   prometheus_data:

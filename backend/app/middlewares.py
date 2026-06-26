@@ -316,3 +316,47 @@ rate_limiter = RateLimiterMiddleware(
     per_ip=settings.RATE_LIMIT_PER_IP_ENABLED,
     per_ip_limit=settings.RATE_LIMIT_PER_IP,
 )
+
+
+# ─── Access Log ────────────────────────────────────────────────────────
+
+
+async def access_log_middleware(request: Request, call_next):
+    """Structured JSON access logging for every API request.
+
+    Emits one log line per request with method, path, status code,
+    latency, and client IP. Uses the standard ``logging`` module so
+    output goes to stdout (container-friendly). The log record is
+    structured as a JSON object for easy parsing by log aggregators
+    (ELK, Loki, CloudWatch Logs, etc.).
+
+    Only logs API requests (``/api/`` prefix) and health endpoints
+    to avoid noise from static assets and favicon hits.
+
+    Integration with ``metrics_collector``: the latency histogram is
+    already recorded by ``latency_tracking_middleware``; this middleware
+    adds the human-readable log line for incident response.
+    """
+    path = request.url.path
+    if not (path.startswith("/api/") or path in ("/health", "/ready")):
+        return await call_next(request)
+
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start) * 1000
+
+    access_logger.info(
+        "",
+        extra={
+            "access_log": True,
+            "method": request.method,
+            "path": path,
+            "status": response.status_code,
+            "latency_ms": round(duration_ms, 1),
+            "client_ip": _get_client_ip(request),
+        },
+    )
+    return response
+
+
+access_logger = logging.getLogger("dataforge.access")

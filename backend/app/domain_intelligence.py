@@ -55,7 +55,14 @@ class DomainIntelligenceRegistry:
 
     def __init__(self, storage_path: str | None = None) -> None:
         if storage_path is None:
-            storage_path = str(Path(__file__).resolve().parent.parent / "data" / "domain_intelligence.json")
+            # F-DRIFT-001: prefer the config-level DOMAIN_INTELLIGENCE_PATH
+            # (which honours DATAFORGE_STATE_DIR / DATAFORGE_DOMAIN_INTELLIGENCE_PATH
+            # env vars) over the hardcoded data/ fallback.
+            cfg_path = getattr(settings, "DOMAIN_INTELLIGENCE_PATH", "")
+            if cfg_path:
+                storage_path = str(Path(__file__).resolve().parent.parent / cfg_path)
+            else:
+                storage_path = str(Path(__file__).resolve().parent.parent / "data" / "domain_intelligence.json")
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._registry: dict[str, DomainIntelligence] = {}

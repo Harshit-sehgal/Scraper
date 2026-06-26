@@ -54,7 +54,14 @@ class SelectorMemory:
 
     def __init__(self, storage_path: str | None = None) -> None:
         if storage_path is None:
-            storage_path = str(Path(__file__).resolve().parent.parent / "data" / "selector_memory.json")
+            # F-DRIFT-001: prefer the config-level SELECTOR_MEMORY_PATH (which
+            # honours DATAFORGE_STATE_DIR / DATAFORGE_SELECTOR_MEMORY_PATH env
+            # vars) over the hardcoded data/ fallback.
+            cfg_path = getattr(settings, "SELECTOR_MEMORY_PATH", "")
+            if cfg_path:
+                storage_path = str(Path(__file__).resolve().parent.parent / cfg_path)
+            else:
+                storage_path = str(Path(__file__).resolve().parent.parent / "data" / "selector_memory.json")
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._memory: dict[str, dict] = {}
