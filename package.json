@@ -7,6 +7,7 @@
   "devDependencies": {
     "@playwright/test": "1.60.0",
     "@vitest/ui": "4.1.8",
+    "esbuild": "0.27.3",
     "eslint": "9.39.4",
     "globals": "17.6.0",
     "jsdom": "29.1.1",
@@ -16,6 +17,8 @@
     "vitest": "4.1.8"
   },
   "scripts": {
+    "build": "node frontend/build.mjs",
+    "build:watch": "node frontend/build.mjs --watch",
     "lint": "npm run lint:css && npm run lint:eslint && npm run lint:js",
     "lint:css": "stylelint 'frontend/**/*.css' --ignore-pattern 'frontend/dist/**'",
     "lint:css:fix": "stylelint 'frontend/**/*.css' --fix --ignore-pattern 'frontend/dist/**'",

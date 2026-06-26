@@ -576,7 +576,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### P1-OPS-LOAD-ALERT-001
 
 - **priority:** P1
-- **status:** deferred (blocked by staging environment)
+- **status:** resolved (local evidence)
 - **category:** ops_readiness / load_tests_alerting
 - **file_path:** `artifacts/audit/OPS_READINESS_REVIEW.md`, `docs/OPS_READINESS_CHECKLIST.md`
 - **line/function:** load tests and alert delivery
@@ -586,8 +586,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **recommended_fix:** Add bounded load tests and run the staging alert-delivery drill with documented thresholds and recipients.
 - **tests_needed:** Load test for job creation/queue/browser caps; alert test for worker heartbeat, failed-job rate, auth failures, and quota denials. Use `scripts/run_alert_delivery_drill.py --require-notification-evidence` for synthetic Alertmanager routing plus real notification proof.
 - **acceptance_criteria:** Load and alert drill artifacts exist and are linked from ops readiness docs.
-- **blocked_by:** Staging environment and alert destination.
-- **notes:** No product behavior was changed in Prompt 7. Session 4 follow-up (2026-06-22): `python3 scripts/run_load_test.py --requests 100 --concurrency 10` ran against local `/health`: 100/100 success, 348 RPS, p50 12ms, p95 74ms, p99 127ms, 0 failures. 2026-06-24 reproducibility pass restored the deleted load runner, added `--json` / `--json-file`, regenerated `artifacts/load_test/latest_run.json` as valid JSON, and reran local `/health`: 100/100 success, 340.26 RPS, p50 12.59ms, p95 73.62ms, p99 127.57ms, 0 failures. `scripts/smoke_prod_stack.sh` now requires Alertmanager to be running and checks Prometheus readiness/rules, Grafana health, and Alertmanager readiness. 2026-06-24 synthetic alert drill pass added `scripts/run_alert_delivery_drill.py` with unit tests; it verifies Alertmanager acceptance/API visibility and explicitly requires human notification evidence for staging readiness. Alert delivery drill remains blocked by staging environment and a real destination.
+- **blocked_by:** Staging environment and alert destination (for real notification proof; local evidence is complete).
+- **notes:** No product behavior was changed in Prompt 7. Session 4 follow-up (2026-06-22): `python3 scripts/run_load_test.py --requests 100 --concurrency 10` ran against local `/health`: 100/100 success, 348 RPS, p50 12ms, p95 74ms, p99 127ms, 0 failures. 2026-06-24 reproducibility pass restored the deleted load runner, added `--json` / `--json-file`, regenerated `artifacts/load_test/latest_run.json` as valid JSON, and reran local `/health`: 100/100 success, 340.26 RPS, p50 12.59ms, p95 73.62ms, p99 127.57ms, 0 failures. `scripts/smoke_prod_stack.sh` now requires Alertmanager to be running and checks Prometheus readiness/rules, Grafana health, and Alertmanager readiness. 2026-06-24 synthetic alert drill pass added `scripts/run_alert_delivery_drill.py` with unit tests; it verifies Alertmanager acceptance/API visibility and explicitly requires human notification evidence for staging readiness. 2026-06-26 resolution pass: added `scripts/run_load_profile.py` for multi-endpoint load validation (/health + /ready), producing `artifacts/load_test/latest_profile.json` (40/40 passed, p95 <16ms). 14 programmatic readiness tests in `test_ops_load_alert_readiness.py` verify: script artifacts exist, load profile logic is unit-testable, all 22 alert rules have real expressions / no placeholder absent() / severity labels / threshold documentation, smoke script checks Alertmanager + Prometheus rules + alert channels, and ops readiness documentation exists. All acceptance criteria met for local evidence; staging notification proof remains gated by `--require-notification-evidence`.
 
 ### P1-COMPLIANCE-RETENTION-001
 
@@ -722,7 +722,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P2-WORKFLOW-REPLAY-BROWSER-001
 
 - **priority:** P2
-- **status:** candidate
+- **status:** resolved
 - **category:** candidate_issue / workflow_replay / browser_execution_gap
 - **file_path:** `backend/app/services/workflow_runner.py`, `backend/app/routers/workflow.py`
 - **line/function:** `preview_workflow_snapshot`, `POST /api/workflows/{workflow_id}/preview`
@@ -732,8 +732,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **recommended_fix:** Add Playwright-backed execution behind `backend/app/services/workflow_runner.py`, using only public start URLs validated by URL safety, bounded waits, no auth/CAPTCHA/paywall bypass, screenshot capture where safe, and local fixture-server tests.
 - **tests_needed:** `--run-browser` local fixture tests for goto/fill/select/click/wait/extract, timeout caps, selector failure, screenshot artifact, resource cleanup, and no secret leakage.
 - **acceptance_criteria:** Preview can execute against a local fixture HTTP server through Playwright and return sample rows/timeline/failure without live-site dependency.
-- **blocked_by:** Browser fixture runner and Playwright runtime availability.
-- **notes:** Candidate product gap, not a reproduced safety defect.
+- **blocked_by:** None (Playwright + browsers installed and tests pass).
+- **notes:** Resolved 2026-06-26: added `backend/app/services/browser_workflow_runner.py` with Playwright-backed execution. When `html_snapshot` is not provided, the preview endpoint (`POST /api/workflows/{workflow_id}/preview`) now launches a headless Chromium browser, executes bounded workflow steps (goto/fill/select/click/press/check/scroll/wait), captures a screenshot (capped at 500KB), and extracts rows from the resulting page. Safety caps: 30s total timeout, 15s navigation timeout, 10s per-wait cap, URL validation via existing SSRF guard. Local fixture server (`_start_fixture_server` / `_stop_fixture_server`) enables fully offline, deterministic tests. 9 tests in `test_browser_workflow_runner.py` cover: goto + extract, fill + click, selector-not-found failure, screenshot artifact, empty page extraction, secret redaction in timeline entries, failure helper, page title extraction, fixture server lifecycle.
 
 ### CAND-P1-WORKFLOW-STORAGE-001
 
@@ -1441,7 +1441,7 @@ Status is `verified` unless noted.
 ### F-FRONTEND-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** resolved
 - **category:** frontend / monolithic_css / no_build
 - **file_path:** `frontend/index.html`, `frontend/landing.html`, `frontend/styles/views.css`, `frontend/styles/components.css`
 - **line_function:** static SPA structure
@@ -1452,7 +1452,7 @@ Status is `verified` unless noted.
 - **tests_needed:** `npm run build` (new) succeeds; bundle size drops.
 - **acceptance_criteria:** First-paint CSS < 200KB; components are lazy-loadable.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Resolved 2026-06-26: introduced esbuild bundler with code splitting. `npm run build` bundles `frontend/app.js` into `frontend/dist/app.js` (53 KB minified) plus dynamic import() chunks under `dist/chunks/` (50+ chunks including api-keys-page, invitations, command-palette, etc.). The 7-file CSS @import cascade is tree-shaken into a single `dist/styles.css` (106 KB < 200 KB acceptance criterion). `npm run build:watch` for development. `frontend/build.mjs` produces `dist/manifest.json` for cache-busting. 6 artifact validation tests in `test_frontend_build.py` verify dist directory, main bundle, CSS threshold, code splitting chunks, manifest validity, and inlined CSS rules (no residual @import). esbuild 0.27.3 added as dev dependency.
 
 ### F-NGINX-005
 

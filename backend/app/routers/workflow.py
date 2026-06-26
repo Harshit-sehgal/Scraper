@@ -641,26 +641,29 @@ async def preview_workflow(
     preview_req = req or WorkflowPreviewRequest()
     workflow_model = Workflow.model_validate(wf)
 
-    if not preview_req.html_snapshot:
-        return {
-            "workflow_id": workflow_id,
-            "preview_status": "failed",
-            "failure_type": "preview_input_required",
-            "user_message": "Preview requires a local HTML snapshot in this deterministic runner.",
-            "recommended_action": "Detect fields or provide an HTML snapshot, then preview again.",
-            "timeline": [],
-            "last_url": workflow_model.start_url,
-            "page_title": "",
-            "screenshot": None,
-            "sample_rows": [],
-            "warnings": ["Full browser preview is deferred behind the workflow runner boundary."],
-        }
+    result: dict[str, Any]
+    if preview_req.html_snapshot:
+        result = await preview_workflow_snapshot(
+            workflow_model,
+            html_snapshot=preview_req.html_snapshot,
+            sample_limit=preview_req.sample_limit,
+        )
+    else:
+        # CAND-P2-WORKFLOW-REPLAY-BROWSER-001: when no HTML snapshot is
+        # provided, attempt a browser-backed execution against the
+        # workflow start URL. This uses a headless Playwright chromium
+        # with safety caps (max 30 s total, 15 s navigation timeout,
+        # 500 KB screenshot cap, SSRF-validated URL only).
+        #
+        # If Playwright is not available or the browser cannot be
+        # launched, the browser runner itself returns a graceful
+        # failure dict with ``playwright_unavailable`` failure type.
+        from app.services.browser_workflow_runner import run_workflow_in_browser
 
-    result = await preview_workflow_snapshot(
-        workflow_model,
-        html_snapshot=preview_req.html_snapshot,
-        sample_limit=preview_req.sample_limit,
-    )
+        result = await run_workflow_in_browser(
+            workflow_model,
+            sample_limit=preview_req.sample_limit,
+        )
     if result.get("preview_status") == "succeeded":
         wf["last_success_at"] = _now_iso()
         wf["last_failure_reason"] = None
