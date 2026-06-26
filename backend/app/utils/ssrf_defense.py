@@ -85,9 +85,9 @@ class SSRFDefense:
 
             return True, ip
 
-        except Exception as e:
+        except Exception:
             logger.exception("URL validation error for %s", url)
-            return False, f"URL validation failed: {e}"
+            return False, "URL validation failed"
 
 
 class DNSRebindingDefense:
