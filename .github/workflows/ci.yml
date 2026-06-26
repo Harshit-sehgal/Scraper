@@ -181,6 +181,9 @@ jobs:
       - name: Bandit security scan
         run: python -m bandit -r backend -q
 
+      - name: Docs lint
+        run: python scripts/docs_lint.py --include-experimental
+
   # ── 3. Backend Tests (full pytest suite + coverage) ─────────────────────
   backend-tests:
     name: Backend Tests
@@ -289,9 +292,6 @@ jobs:
         run: |
           npx prettier --check 'frontend/**/*.{js,css,html,mjs}' \
             'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
-
-      - name: Docs lint
-        run: python scripts/docs_lint.py --include-experimental
 
       - name: Verify frontend assets exist
         run: |
