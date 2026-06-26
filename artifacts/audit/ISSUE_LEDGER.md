@@ -1375,7 +1375,7 @@ Status is `verified` unless noted.
 ### F-DOCKER-003
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / docker / browser_image_double_install
 - **file_path:** `Dockerfile:30-36, 66, 102-103`
 - **line_function:** base stage OS libs; dev stage `playwright install` line 66; prod stage line 103
@@ -1386,7 +1386,8 @@ Status is `verified` unless noted.
 - **tests_needed:** `docker build` image size delta before/after pinning.
 - **acceptance_criteria:** `make up` image is reproducible; CI cache hit rate > 90%.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_dockerfile_playwright_pin.py`
+- **notes:** Fixed Session 92: `Dockerfile` now exposes `ARG PLAYWRIGHT_BROWSERS_VERSION`, exports it into the image environment, and branches both dev/prod browser install paths through that value. Regression coverage asserts the ARG, ENV, and both install paths stay wired so image builds can be pinned deliberately instead of drifting on the default Playwright browser payload.
 
 ### F-DOCKER-004
 
@@ -1701,7 +1702,7 @@ Status is `verified` unless noted.
 ### F-BACKUP-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / backup / gzip_only
 - **file_path:** `scripts/backup_postgres.sh:142-148`
 - **line_function:** `chmod 600 ...; gunzip -t`
@@ -1712,12 +1713,13 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic empty-dump backup fails the integrity gate.
 - **acceptance_criteria:** Backup file passes identity + gzip integrity + row count.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_postgres_backup_integrity.py`
+- **notes:** Fixed Session 92: `scripts/backup_postgres.sh` now keeps the existing `gunzip -t` shape check and then verifies the uncompressed payload contains the `PostgreSQL database dump` marker. A failed identity check deletes the bad backup and exits non-zero. Regression coverage asserts the marker check exists and runs after gzip validation.
 
 ### F-BACKUP-002
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / backup / no_rotation
 - **file_path:** `scripts/backup_postgres.sh:17-19`
 - **line_function:** `BACKUP_DIR` assignment
@@ -1728,12 +1730,13 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic 31-day-old backup is deleted.
 - **acceptance_criteria:** Backups older than retention are removed.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_postgres_backup_integrity.py`
+- **notes:** Fixed Session 92: `scripts/backup_postgres.sh` now reads `DATAFORGE_BACKUP_KEEP_DAYS` with a default of 30 and runs a bounded `find ... -maxdepth 1 -name 'backup_*.sql.gz' -mtime +N -delete` retention sweep after a successful backup. Regression coverage locks the env knob and bounded filename glob in place.
 
 ### F-BACKUP-003
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / backup / restore_no_verify
 - **file_path:** `scripts/restore_postgres.sh:138-148`
 - **line_function:** `psql` pipe + `echo SUCCESS`
@@ -1744,7 +1747,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic partial restore fails the verification step.
 - **acceptance_criteria:** Restore verification rejects non-equivalent row counts.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_postgres_backup_integrity.py`
+- **notes:** Fixed Session 92: `scripts/restore_postgres.sh` now verifies post-restore row counts for the canonical schema tables and exits non-zero on invalid counts. `DATAFORGE_RESTORE_SKIP_VERIFY=1` remains an explicit emergency bypass. Regression coverage checks the verified-table list, row-count query, bypass knob, and shell syntax.
 
 ### F-NGINX-SEC-001
 
@@ -1766,7 +1770,7 @@ Status is `verified` unless noted.
 ### F-EXCEPTION-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** code_quality / error_handling / generic_500
 - **file_path:** `backend/app/routers/experimental.py`, `backend/app/routers/scraper.py`, `backend/app/services/job_mutation_service.py:399`
 - **line_function:** 20+ `raise HTTPException(status_code=500, ...)` sites
@@ -1777,12 +1781,13 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic 500 response includes `trace_id`.
 - **acceptance_criteria:** All 500 responses surface a correlation ID.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_exception_handlers_trace_id.py`
+- **notes:** Fixed Session 92: `configure_exception_handlers()` now registers handlers for `StarletteHTTPException` and generic `Exception`. HTTP errors preserve status/detail while adding a trace ID, and unhandled exceptions return a 500 JSON envelope with `detail`, `trace_id`, and `error_class` while logging traceback server-side. Regression coverage drives both paths through `TestClient`.
 
 ### F-RBAC-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** security / rbac / static_grep_blindspot
 - **file_path:** all routers
 - **line_function:** import of `require_principal`/`require_role`/etc.
@@ -1793,12 +1798,13 @@ Status is `verified` unless noted.
 - **tests_needed:** A synthetic uncovered route triggers the static test to fail.
 - **acceptance_criteria:** Route auth matrix + static-grep work in tandem.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_route_auth_matrix_generated.py`
+- **notes:** Fixed Session 92: added a generated route-auth guard that walks every FastAPI `APIRoute` from `create_app()` and fails if a non-public endpoint lacks a `require_*` dependency either in route dependencies or the endpoint signature. Public paths are explicitly allowlisted with comments. This catches future RBAC drift that a simple import grep would miss.
 
 ### F-SCRIPT-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / hardcoded_localhost
 - **file_path:** `scripts/run_alert_delivery_drill.py`, `scripts/run_load_test.py`, `scripts/backup_and_restore_test.py`, `scripts/manual_test.py:33`
 - **line_function:** default URL constants
@@ -1809,12 +1815,13 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic remote-host drill fails loudly.
 - **acceptance_criteria:** Drill refuses to run without explicit `--url-prefix` on non-localhost targets.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_drill_url_host_confirmation.py`
+- **notes:** Fixed Session 92: `scripts/run_alert_delivery_drill.py` now refuses non-localhost targets unless `--allow-remote-host` or `DATAFORGE_DRILL_ALLOW_REMOTE=1` is provided. The refusal exits non-zero with a clear operator message; localhost and loopback targets remain allowed. Regression coverage checks help text, default refusal, env bypass, and loopback behavior.
 
 ### F-SCRIPT-002
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** scripts / env_parser / partial_comment
 - **file_path:** `scripts/check_prod_env.py:82-110`
 - **line_function:** `load_env_file`
@@ -1825,7 +1832,8 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic hash-bearing values pass through unchanged.
 - **acceptance_criteria:** Env file parsing matches `dotenv`'s behavior.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **regression_test:** `backend/tests/test_check_prod_env_hash_values.py`
+- **notes:** Fixed Session 92: `scripts/check_prod_env.py` no longer truncates literal `#` characters in env values. The local parser still ignores full-line comments and strips one matching quote layer for compatibility, but `KEY=value#hash` round-trips as the complete value. Regression coverage pins simple, hash-bearing, quoted, and comment-only cases.
 
 ### F-SCRIPT-003
 

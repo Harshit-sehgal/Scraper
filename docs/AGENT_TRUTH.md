@@ -1,22 +1,72 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-26 local time from the working tree.
-Last verified: Session 91 SSRF metric cardinality follow-up. Quick
-validation is green (`20260625T204758Z_quick`, 13/13 passed) and
-security validation is green (`20260625T013939Z_security`,
-9/9 passed, including Bandit, pip-audit, and the expected-failing
-production env template check). `artifacts/audit/ISSUE_LEDGER.md` /
-`.csv` now agree on 105 issue IDs: 25 open verified/deferred
-lower-priority rows, 76 fixed rows, 3 candidate rows, 1
+Last verified: Session 92 audit-batch truth reconciliation. Quick
+validation is green (`20260626T045929Z_quick`, 13/13 passed) and
+security validation is green (`20260626T050145Z_security`, 9/9 passed,
+including Bandit, pip-audit, and the expected production env template
+placeholder check behavior). `artifacts/audit/ISSUE_LEDGER.md` /
+`.csv` now agree on 105 issue IDs: 17 open verified/deferred rows
+(`P1=11`, `P2=6`), 84 fixed rows, 3 candidate rows, 1
 not-reproducible row, and 0 open P0 rows.
 Current route inventory is 161 routes; route auth matrix has 150 API
 rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
-inventory lists 26,520 files, 973 project-owned files, 969 deeply
+inventory lists 27,196 files, 998 project-owned files, 994 deeply
 inspected project-owned files, and 0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 92 Audit-Batch Truth Reconciliation - 2026-06-26
+
+Scope: verify the already-pushed audit-batch commit `628383f7`, fix the
+truth/documentation drift it left behind, and refresh the file inventory.
+
+### Issues Fixed
+
+- `F-DOCKER-003`: Dockerfile Playwright browser install now supports an
+  explicit `PLAYWRIGHT_BROWSERS_VERSION` pin, guarded by
+  `backend/tests/test_dockerfile_playwright_pin.py`.
+- `F-BACKUP-001`, `F-BACKUP-002`, `F-BACKUP-003`: backup/restore scripts
+  now validate pg_dump identity, prune old backups via
+  `DATAFORGE_BACKUP_KEEP_DAYS`, and report post-restore table counts
+  unless `DATAFORGE_RESTORE_SKIP_VERIFY=1` is explicitly set.
+- `F-SCRIPT-001`: alert-delivery drill refuses non-localhost targets
+  unless `--allow-remote-host` or `DATAFORGE_DRILL_ALLOW_REMOTE=1` is
+  provided.
+- `F-SCRIPT-002`: production env parser no longer truncates literal `#`
+  characters inside values.
+- `F-EXCEPTION-001`: app-level HTTP and generic exception handlers now
+  return JSON envelopes with trace IDs, and generic exceptions log the
+  traceback server-side.
+- `F-RBAC-001`: generated route-auth matrix guard asserts future
+  non-public API routes carry centralized `require_*` dependencies.
+- Truth artifacts were reconciled after the audit batch:
+  `docs/ENV_VARIABLES.md` now documents the three new script env knobs,
+  `artifacts/audit/ISSUE_LEDGER.md` matches the CSV statuses, and
+  `artifacts/audit/FILE_INVENTORY.md` was regenerated.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS before documentation reconciliation on `628383f7`; run id `20260626T045551Z_quick`, 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_check_prod_env_hash_values.py backend/tests/test_dockerfile_playwright_pin.py backend/tests/test_drill_url_host_confirmation.py backend/tests/test_exception_handlers_trace_id.py backend/tests/test_postgres_backup_integrity.py backend/tests/test_route_auth_matrix_generated.py -q -o addopts=` | 0 | PASS; 26 audit-batch regression tests passed. |
+| `python3 scripts/verify_docs_match_code.py` | 1 | FAIL before env-doc fix; missing `DATAFORGE_BACKUP_KEEP_DAYS`, `DATAFORGE_DRILL_ALLOW_REMOTE`, and `DATAFORGE_RESTORE_SKIP_VERIFY` from docs. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS after documenting the three script env vars; routes and env docs match code. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv / ISSUE_LEDGER.md status agreement ... PY` | 0 | PASS; 105 rows, statuses `fixed=84`, `verified=16`, `deferred=1`, `candidate=3`, `not_reproducible=1`; open priorities `P1=11`, `P2=6`; Markdown/CSV status mismatches `0`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated file inventory: 27,196 total files, 998 project-owned, 994 deeply inspected, 0 follow-up rows. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after ledger/env-doc reconciliation; run id `20260626T045929Z_quick`, 13/13 checks passed. |
+| `python3 scripts/validate_local.py --security` | 0 | PASS on current tree; run id `20260626T050145Z_security`, 9/9 checks passed including Bandit and pip-audit. |
+
+### Remaining Constraints
+
+The project is still pre-production. The open verified/deferred issue
+rows are 11 P1 and 6 P2. The highest-confidence blockers remain staging
+alert-delivery proof, writable-volume narrowing, nginx header
+deduplication, monitoring/Alertmanager hardening, env-gate drift, and
+schema-version tracking.
 
 ## Session 91 SSRF Metric Cardinality Follow-up - 2026-06-26
 

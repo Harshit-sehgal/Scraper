@@ -84,6 +84,14 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_LOCATION_WORDS_FILE` | - | Path to a file containing extra location words (one per line) |
 | `DATAFORGE_DB_PASSWORD` | - | Postgres password (fallback used by backup/restore scripts when `DATAFORGE_DATABASE_URL` is unset) |
 
+## Operations Scripts
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_BACKUP_KEEP_DAYS` | `30` | Retention window for `scripts/backup_postgres.sh`; set to `0` to skip the post-backup retention sweep |
+| `DATAFORGE_RESTORE_SKIP_VERIFY` | `0` | Set to `1` to bypass `scripts/restore_postgres.sh` post-restore row-count verification during an emergency restore |
+| `DATAFORGE_DRILL_ALLOW_REMOTE` | `0` | Set to `1` to allow `scripts/run_alert_delivery_drill.py` to target a non-localhost Alertmanager URL without `--allow-remote-host` |
+
 ## Experimental Features
 
 | Variable | Default | Description |
@@ -126,6 +134,9 @@ These are acceptable direct environment reads outside the config module:
 | `backend/app/rate_limiter.py` | `DATAFORGE_REDIS_URL` | Redis connection URL for distributed rate-limiter storage |
 | `backend/app/utils/encryption.py` | `DATAFORGE_ENCRYPTION_SALT` | Encryption salt for auth-profile key derivation |
 | `scripts/check_prod_env.py` | `DATAFORGE_SKIP_DB_CHECK` | Validation script |
+| `scripts/backup_postgres.sh` | `DATAFORGE_BACKUP_KEEP_DAYS` | Postgres backup retention |
+| `scripts/restore_postgres.sh` | `DATAFORGE_RESTORE_SKIP_VERIFY` | Emergency restore verification bypass |
+| `scripts/run_alert_delivery_drill.py` | `DATAFORGE_DRILL_ALLOW_REMOTE` | Explicit remote-host drill opt-in |
 | `scripts/run_worker.py` | `DATAFORGE_JOB_ID` | Worker script |
 | `scripts/manual_test.py` | `DATAFORGE_API_BASE` | Manual testing |
 | `scripts/staging_smoke_test.py` | `STATE_FILE_PATH` | Smoke test |
