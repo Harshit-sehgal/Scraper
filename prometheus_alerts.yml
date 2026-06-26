@@ -197,31 +197,110 @@ groups:
           description: "Prometheus cannot scrape Alertmanager for more than 1 minute. Alerts may not deliver until the alertmanager container is restored."
 
       # 16. PostgreSQL Disk Utilization Alert — F-MON-004
+      # Uses pg_database_size_bytes exposed via the postgres-exporter
+      # extended queries in postgres-queries.yaml. The custom query
+      # dataforge_pg_table_sizes provides total_bytes per table; the
+      # alert fires when the dataforge database exceeds 20 GB.
       - alert: PostgresDiskUsageHigh
-        expr: pg_stat_database_tup_fetched{job="postgres"} > 0
-        for: 0s
+        expr: |
+          (
+            sum(dataforge_pg_table_sizes_total_bytes)
+            or on() vector(0)
+          ) > 21474836480
+        for: 10m
         labels:
-          severity: info
+          severity: warning
         annotations:
-          summary: "Postgres disk-usage alert placeholder — pg_size metrics unavailable"
-          description: "The ``postgres_exporter`` is active and exposing Postgres metrics for service {{ $labels.instance }}. To enable actual disk-usage alerting, deploy ``pg_stat_user_tables_size`` or ``pg_database_size_bytes`` via ``postgres_exporter`` extended queries. This placeholder confirms the exporter endpoint is reachable. When extended queries are configured, replace this rule with: ``(pg_database_size_bytes{datname=\"dataforge\"} / 1024 / 1024 / 1024) > 20`` (disk > 20 GB). F-MON-004."
+          summary: "Postgres database disk usage is high"
+          description: "The total size of the dataforge database tables exceeds 20 GB (currently {{ $value | humanize }} bytes). Check table growth, vacuum health, and whether old job results or audit logs need pruning. F-MON-004."
 
       # 17. Container OOM Alert — F-MON-004
+      # Uses cadvisor metrics to detect when a container's memory usage
+      # exceeds 95% of its configured limit. The cadvisor service is
+      # deployed via docker-compose.prod.yml and scraped by Prometheus.
       - alert: ContainerOOMKillPending
-        expr: absent(cadvisor_version_info)
-        for: 1m
+        expr: |
+          (
+            container_memory_working_set_bytes / container_spec_memory_limit_bytes > 0.95
+          )
+          and
+          (
+            container_spec_memory_limit_bytes > 0
+          )
+        for: 2m
         labels:
-          severity: info
+          severity: critical
         annotations:
-          summary: "Container OOM alert placeholder — cadvisor not deployed"
-          description: "The ``cadvisor`` metrics exporter is not currently deployed. To enable container memory pressure / OOM alerts, add a cadvisor service to ``docker-compose.prod.yml`` (image: gcr.io/cadvisor/cadvisor) and wire a scrape job in ``prometheus.yml``. Then replace this rule with: ``container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.95`` (memory > 95 % of the container limit). F-MON-004."
+          summary: "Container memory usage exceeds 95% of limit — OOM kill imminent"
+          description: "Container {{ $labels.name }} (image {{ $labels.image }}) is using {{ $value | humanizePercentage }} of its memory limit. An OOM kill is likely within minutes. Increase the memory limit in docker-compose.prod.yml or investigate the memory leak. F-MON-004."
 
       # 18. SSL/TLS Certificate Expiry Alert — F-MON-004
+      # Uses probe_ssl_earliest_cert_expiry from the blackbox TLS
+      # probe (tls_connect module). Fires when the certificate
+      # expires in less than 30 days (2,592,000 seconds).
       - alert: TLSCertificateExpiring
-        expr: absent(probe_ssl_earliest_cert_expiry)
-        for: 1m
+        expr: |
+          (
+            probe_ssl_earliest_cert_expiry - time() < 2592000
+          )
+        for: 1h
         labels:
-          severity: info
+          severity: warning
         annotations:
-          summary: "TLS certificate expiry alert placeholder — TLS probe not configured"
-          description: "Blackbox exporter is deployed but the TLS expiry probe module is not active. To enable, add a ``tls_connect`` module in the blackbox-exporter config and wire a scrape job targeting ``https://<your-domain>``. Then replace this rule with: ``probe_ssl_earliest_cert_expiry - time() < 2592000`` (cert expires in < 30 days). F-MON-004."
+          summary: "TLS certificate expires in less than 30 days"
+          description: "The TLS certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}. Renew the certificate via certbot or your CA before it expires. F-MON-004."
+
+      # 19. Node Exporter Health — F-MON-004
+      # Fires when the node-exporter scrape fails, meaning host-level
+      # metrics (CPU, memory, disk, network) are no longer being
+      # collected. This is an infra observability gap.
+      - alert: NodeExporterDown
+        expr: up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node exporter is down — host metrics unavailable"
+          description: "Prometheus cannot scrape the node-exporter for more than 2 minutes. Host-level metrics (CPU, memory, disk, network) are unavailable. Check the node-exporter container health. F-MON-004."
+
+      # 20. cAdvisor Health — F-MON-004
+      # Fires when the cadvisor scrape fails, meaning container-level
+      # metrics are no longer being collected. OOM alerts depend on this.
+      - alert: CadvisorDown
+        expr: up{job="cadvisor"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cAdvisor is down — container metrics unavailable"
+          description: "Prometheus cannot scrape cAdvisor for more than 2 minutes. Container-level metrics (memory, CPU, I/O per container) are unavailable, so OOM kill prediction is degraded. Check the cadvisor container health. F-MON-004."
+
+      # 21. Host Filesystem Space Filling Up — F-MON-004
+      # Uses node-exporter filesystem metrics. Fires when any mounted
+      # filesystem is more than 85% full. This catches disk exhaustion
+      # before it takes down Postgres, Prometheus, or backups.
+      - alert: NodeFilesystemSpaceFillingUp
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|nsfs|overlay"}
+            /
+            node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|nsfs|overlay"}
+          ) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host filesystem is more than 85% full"
+          description: "Filesystem {{ $labels.mountpoint }} ({{ $labels.fstype }}) on {{ $labels.instance }} has only {{ $value | humanizePercentage }} space remaining. Investigate large files, old logs, or stale backups. F-MON-004."
+
+      # 22. Public HTTPS Availability — F-MON-004
+      # Uses the blackbox TLS probe to detect if the public HTTPS
+      # endpoint is unreachable or the TLS handshake fails.
+      - alert: PublicHTTPSProbeFailing
+        expr: probe_success{job="blackbox-tls"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Public HTTPS endpoint probe is failing"
+          description: "The TLS probe to {{ $labels.instance }} has failed for more than 2 minutes. The endpoint may be down, the certificate may be invalid, or the TLS handshake may be broken. F-MON-004."

@@ -33,6 +33,7 @@ from app.url_safety import validate_public_http_url
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 from app.utils.workflow_run_store import WorkflowRunStore
+from app.workflow_repository import WorkflowRepository, get_workflow_repository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -40,13 +41,54 @@ draft_router = APIRouter(prefix="/api/workflow-drafts", tags=["workflow-drafts"]
 
 # File-backed workflow store shared across uvicorn/gunicorn workers.
 # Reads always re-read disk; writes use flock-serialised atomic rename.
-_workflows = JSONFileStore(Path(__file__).resolve().parents[2] / "data" / "workflows.json")
+#
+# CAND-P1-WORKFLOW-STORAGE-001: the workflow definition store is now
+# resolved via get_workflow_repository(), which selects the backend
+# (json / sqlite / postgres) based on DATAFORGE_WORKFLOW_BACKEND.
+# _workflow_drafts remains a JSONFileStore because drafts have no DDL
+# table — the candidate issue targets workflow definitions and runs
+# specifically.
 _workflow_drafts = JSONFileStore(
     Path(__file__).resolve().parents[2] / "data" / "workflow_drafts.json",
 )
 # Run history is its own keyed store so we can paginate and filter
 # independent of the workflow definitions.
 _workflow_runs = WorkflowRunStore()
+
+
+def _get_workflow_repo() -> WorkflowRepository:
+    """Return the singleton workflow repository (lazily resolved)."""
+    return get_workflow_repository()
+
+
+def _clear_all_workflows() -> int:
+    """Clear all workflow definitions from the active store.
+
+    Used by test teardown to reset state between test cases.
+    For the JSON backend this delegates to the file store's clear_all.
+    For SQL backends this issues a DELETE FROM workflows.
+    Returns the number of records removed.
+    """
+    repo = _get_workflow_repo()
+    from app.workflow_repository import JsonWorkflowRepository
+
+    if isinstance(repo, JsonWorkflowRepository):
+        return repo._store.clear_all()
+    # SQL backend: iterate and delete
+    count = repo.count_workflows()
+    from app.job_store import _DB_LOCK
+
+    try:
+        with _DB_LOCK:
+            conn = repo._db_connection()  # type: ignore[attr-defined]
+            try:
+                conn.execute("DELETE FROM workflows")
+                conn.commit()
+            finally:
+                conn.close()
+    except (AttributeError, RuntimeError):
+        pass
+    return count
 
 
 class WorkflowDraftFromUrlAnalysisRequest(BaseModel):
@@ -114,7 +156,7 @@ def _write_back(record: dict[str, Any]) -> None:
     if not record_id:
         missing_id_message = "workflow dict missing 'id' before write-back"
         raise RuntimeError(missing_id_message)
-    _workflows.upsert(record_id, record)
+    _get_workflow_repo().upsert(record_id, record)
 
 
 def _can_access_workflow(item: dict[str, Any], auth: tuple[UserRole, str, str, str]) -> bool:
@@ -131,7 +173,7 @@ def _can_access_workflow(item: dict[str, Any], auth: tuple[UserRole, str, str, s
 
 
 def _get_visible_workflow(workflow_id: str, auth: tuple[UserRole, str, str, str]) -> dict[str, Any]:
-    item = _workflows.get(workflow_id)
+    item = _get_workflow_repo().get(workflow_id)
     if item is None or not _can_access_workflow(item, auth):
         raise HTTPException(status_code=404, detail="Workflow not found")
     return item
@@ -273,7 +315,7 @@ async def create_workflow_from_manual_mapping(
         project_id=project_id,
         status=WorkflowStatus.DRAFT,
     )
-    _workflows.upsert(wf.id, _workflow_to_dict(wf))
+    _get_workflow_repo().upsert(wf.id, _workflow_to_dict(wf))
     draft["workflow_id"] = wf.id
     draft["updated_at"] = _now_iso()
     _write_back_draft(draft)
@@ -322,7 +364,7 @@ async def create_workflow(
         project_id=project_id,
         status=WorkflowStatus.ACTIVE,
     )
-    _workflows.upsert(wf.id, _workflow_to_dict(wf))
+    _get_workflow_repo().upsert(wf.id, _workflow_to_dict(wf))
     logger.info("Workflow created: %s (%s)", wf.name, wf.id)
     log_job_event(
         actor=user_id,
@@ -348,12 +390,8 @@ async def list_workflows(
 
     Supports filtering by status and domain. Results are paginated.
     """
-    items = [item for item in _workflows.values() if _can_access_workflow(item, auth)]
-
-    if status:
-        items = [w for w in items if w.get("status") == status]
-    if domain:
-        items = [w for w in items if domain.lower() in (w.get("domain") or "").lower()]
+    repo = _get_workflow_repo()
+    items = [item for item in repo.list_workflows(status=status, domain=domain, limit=500) if _can_access_workflow(item, auth)]
 
     total = len(items)
     items = items[offset : offset + limit]
@@ -442,7 +480,7 @@ async def delete_workflow(
 ):
     """Delete a workflow permanently."""
     _get_visible_workflow(workflow_id, auth)
-    if _workflows.delete(workflow_id):
+    if _get_workflow_repo().delete(workflow_id):
         logger.info("Workflow deleted: %s", workflow_id)
         log_job_event(
             actor=auth[1],

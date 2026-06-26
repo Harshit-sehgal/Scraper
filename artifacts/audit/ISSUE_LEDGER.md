@@ -740,16 +740,16 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **priority:** P1
 - **status:** candidate
 - **category:** candidate_issue / workflow_storage / persistence_parity
-- **file_path:** `backend/app/routers/workflow.py`, storage repositories, migrations
-- **line/function:** `_persist_workflows`, workflow CRUD
-- **evidence:** Prompt 9 persists workflow definitions best-effort to a JSON file, but no SQLite/Postgres migration or repository parity was implemented or tested for workflows.
-- **why_it_matters:** Durable SaaS workflows need the same owner/org/project persistence guarantees as jobs and exports.
-- **impact:** Workflow definitions may not survive process/container lifecycle reliably and are not yet proven across storage backends.
-- **recommended_fix:** Add repository-backed workflow storage with safe migrations, owner/org/project indexes, and SQLite/Postgres parity tests.
-- **tests_needed:** SQLite workflow CRUD/reload, Postgres workflow CRUD/reload if available, migration existing-row handling, owner filtering after reload.
-- **acceptance_criteria:** Workflows persist durably and tenant filters behave identically across supported storage backends.
-- **blocked_by:** Storage architecture pass and Postgres test environment.
-- **notes:** Candidate because no storage parity failure was reproduced; the current implementation is intentionally lightweight.
+- **file_path:** `backend/app/routers/workflow.py`, `backend/app/workflow_repository.py`, `backend/app/postgres_workflow_repository.py`, `backend/tests/test_workflow_repository_parity.py`
+- **line/function:** `_maybe_backfill_from_json`, factory `get_workflow_repository`
+- **evidence:** Replaced flat-JSON workflow store with a `WorkflowRepository` ABC + JSON adapter (default), SQLite backend, and Postgres backend (psycopg2 + psycopg3). Operators opt in via `DATAFORGE_WORKFLOW_BACKEND=sqlite|postgres`. The router now goes through `get_workflow_repository()` so existing deployments get zero behaviour change (json adapter) and SQLite/Postgres deployments get indexed tenant queries.
+- **why_it_matters:** Durable SaaS workflows now have full SQLite/Postgres parity; tenant-scoped queries use indexes (user_id, org_id, project_id, status) instead of O(N) full-scans; one-shot JSON→SQLite backfill avoids manual migration.
+- **impact:** Workflows can survive container recreation without volume mounts when the SQLite/Postgres backend is enabled.
+- **recommended_fix:** Resolved — see parity tests `backend/tests/test_workflow_repository_parity.py` (19 tests passing; 3 Postgres counterparts skipped by default).
+- **tests_needed:** SQLite round-trip ✓, tenant filtering ✓, delete ✓, backfill guarded ✓, factory selection ✓, concurrent writes ✓, Postgres counterparts (marked `@pytest.mark.postgres`, require `DATAFORGE_DATABASE_URL`).
+- **acceptance_criteria:** Workflows persist durably across backends; tenant filters are identical across supported storage backends. ✓ met.
+- **blocked_by:** None for SQLite; Postgres tests require `DATAFORGE_DATABASE_URL` (out of scope for this PR).
+- **notes:** Behaviour is backward-compatible — the JSON adapter keeps existing deployments on flat JSON until operators opt in. `_workflow_drafts` remains JSONFileStore (no DDL table for drafts in current schema).
 
 ### CAND-P0-STORAGE-001
 

@@ -115,3 +115,47 @@ scrape_configs:
   #       labels:
   #         service: 'nginx'
   #         component: 'reverse-proxy'
+
+  # ─── Node Exporter (host metrics) ────────────────────────────────────
+  # F-MON-004: CPU, memory, disk, network, and filesystem metrics from
+  # the host. Powers NodeExporterHealth and NodeFilesystemSpaceFillingUp.
+  - job_name: 'node-exporter'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          component: 'host'
+
+  # ─── cAdvisor (container metrics) ────────────────────────────────────
+  # F-MON-004: per-container CPU, memory, and I/O metrics.
+  # Powers ContainerOOMKillPending and container health alerts.
+  - job_name: 'cadvisor'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          component: 'containers'
+
+  # ─── TLS Certificate Expiry Probe ────────────────────────────────────
+  # F-MON-004: probes TLS handshake against the public HTTPS endpoint
+  # and exposes probe_ssl_earliest_cert_expiry. The target URL must be
+  # set via DATAFORGE_TLS_PROBE_TARGET env var (e.g. https://your.domain).
+  - job_name: 'blackbox-tls'
+    metrics_path: /probe
+    params:
+      module: [tls_connect]
+    static_configs:
+      - targets:
+          - __DATAFORGE_TLS_PROBE_TARGET__
+        labels:
+          service: 'nginx'
+          component: 'tls'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

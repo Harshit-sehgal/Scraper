@@ -442,7 +442,7 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
         name="org-b-write",
         scope=ApiKeyScope.WRITE,
     )
-    workflow_router._workflows.clear_all()
+    workflow_router._clear_all_workflows()
 
     # Capture audit job events for workflow operations
     audit_events: list[dict] = []
@@ -487,7 +487,7 @@ def test_project_scoped_key_cannot_access_another_orgs_workflow(client, monkeypa
         assert owner_get.status_code == 200
     finally:
         reset_identity_store(None)
-        workflow_router._workflows.clear_all()
+        workflow_router._clear_all_workflows()
 
 
 def test_project_scoped_key_cannot_access_another_orgs_workflow_draft(client, monkeypatch, tmp_path) -> None:

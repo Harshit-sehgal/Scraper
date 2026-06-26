@@ -49,13 +49,23 @@ services:
       - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
       - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
       - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
+      # F-DRIFT-001: When set, all runtime-writable state (DBs, JSON stores,
+      # results) is redirected to this directory.  Combined with mounting
+      # dataforge_data:/app/backend/data:ro and a separate :rw volume at
+      # this path, a process compromise cannot tamper with ML/learning state
+      # files at the data/ root.  Empty/absent means use the historical
+      # single-volume layout.
+      - DATAFORGE_STATE_DIR=${DATAFORGE_STATE_DIR:-}
     volumes:
       # F-DRIFT-001: the named volume is explicitly :rw because several
       # runtime services write under /app/backend/data (semantic_state.json,
       # selector_memory.json, domain_intelligence.json, audit logs, etc.).
       # The root FS stays read_only: true; this volume is the ONLY writable
-      # surface.  If a future refactor moves these files to Postgres, change
-      # this mount to :ro.
+      # surface.  Operators who want a narrower writable surface can:
+      #   1. Set DATAFORGE_STATE_DIR=/app/backend/data/w
+      #   2. Change this mount to :ro
+      #   3. Add a separate :rw volume at /app/backend/data/w
+      # This makes ML/learning files at data/ root read-only by default.
       - dataforge_data:/app/backend/data:rw
     secrets:
       - dataforge_api_key
@@ -126,6 +136,7 @@ services:
       - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
       - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
       - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
+      - DATAFORGE_STATE_DIR=${DATAFORGE_STATE_DIR:-}
     volumes:
       # F-DRIFT-001: see comment on the dataforge service.
       - dataforge_data:/app/backend/data:rw
@@ -294,6 +305,66 @@ services:
     networks:
       - dataforge-net
 
+  # ─── Node Exporter (host metrics) ──────────────────────────────────────
+  # F-MON-004: exposes CPU, memory, disk, network, and filesystem metrics
+  # from the host so NodeExporterHealth and related infra alerts can fire.
+  node-exporter:
+    image: prom/node-exporter:v1.8.0
+    container_name: dataforge-node-exporter
+    expose:
+      - "9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 32m
+          cpus: "0.05"
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    networks:
+      - dataforge-net
+
+  # ─── cAdvisor (container metrics) ─────────────────────────────────────
+  # F-MON-004: exposes per-container CPU, memory, and I/O metrics so
+  # ContainerOOMKillPending and related container-health alerts can fire.
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.50.0
+    container_name: dataforge-cadvisor
+    expose:
+      - "8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    command:
+      - --port=8080
+      - --docker_only=true
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    networks:
+      - dataforge-net
+
   # ─── Monitoring (Prometheus + Grafana) ───────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -304,6 +375,7 @@ services:
       - .env.production
     environment:
       - DATAFORGE_METRICS_TOKEN=${DATAFORGE_METRICS_TOKEN:?DATAFORGE_METRICS_TOKEN is required}
+      - DATAFORGE_TLS_PROBE_TARGET=${DATAFORGE_TLS_PROBE_TARGET:-https://localhost:443}
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro
       - ./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro
@@ -311,13 +383,17 @@ services:
       # Runtime lifecycle reload is disabled by default because this
       # file intentionally has no basic_auth_users.
       - ./prometheus_web.yml:/etc/prometheus/web.yml:ro
+      - ./blackbox.yml:/etc/prometheus/blackbox.yml:ro
       - prometheus_data:/prometheus
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        sed "s|__DATAFORGE_METRICS_TOKEN__|$${DATAFORGE_METRICS_TOKEN}|g" /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml
-        if grep -q '__DATAFORGE_METRICS_TOKEN__' /tmp/prometheus.yml; then
-          echo "ERROR: prometheus.yml token substitution failed (placeholder remains)" >&2
+        sed \
+          -e "s|__DATAFORGE_METRICS_TOKEN__|$${DATAFORGE_METRICS_TOKEN}|g" \
+          -e "s|__DATAFORGE_TLS_PROBE_TARGET__|$${DATAFORGE_TLS_PROBE_TARGET}|g" \
+          /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml
+        if grep -qE '__DATAFORGE_METRICS_TOKEN__|__DATAFORGE_TLS_PROBE_TARGET__' /tmp/prometheus.yml; then
+          echo "ERROR: prometheus.yml substitution failed (placeholder remains)" >&2
           exit 1
         fi
         exec /bin/prometheus \

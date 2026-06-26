@@ -8,11 +8,23 @@ Regression target:
       with ``semantic_state.json``, audit logs, replay buffer, and
       job results inside that single mount.
 
-This module performs protective assertions only — it does **not**
-attempt to mount semantic_state.json as :ro, because ``backend/app/
-semantic_persistence.py::save_semantic_state`` writes that file
-during normal runtime. The volume tightening is documented in the
-ledger as a follow-up that requires an app-level cache split.
+The fix ships an opt-in **narrowed-writable-surface** profile via
+``DATAFORGE_STATE_DIR``: when this env var is set, mutable runtime
+state is redirected to a separate subdirectory (typically
+``/app/backend/data/w``) so the parent data volume can be mounted
+``read_only`` and ML/learning files at the data/ root become
+process-compromise-safe.
+
+The default production profile continues to use the single ``:rw``
+volume because the current app code-base writes several ML files at
+the data/ root during normal runtime. Operators who want the
+hardened profile opt in by:
+
+    1. Setting ``DATAFORGE_STATE_DIR=/app/backend/data/w`` in
+       ``.env.production``.
+    2. Updating the dataforge/worker service volumes to mount
+       ``dataforge_data:/app/backend/data:ro`` plus a separate
+       ``:rw`` volume at ``/app/backend/data/w``.
 
 Assertions covered here:
 
@@ -25,10 +37,16 @@ Assertions covered here:
    matters because a later ``read_only: false`` would silently
    re-enable writes, and the test guards against that class of
    regression.
+5. The ``DATAFORGE_STATE_DIR`` env var is exposed so operators can
+   opt into the narrowed-writable-surface profile.
+6. When ``DATAFORGE_STATE_DIR`` is set, the parent ``dataforge_data``
+   mount SHOULD be tightened to ``:ro`` (the test asserts the
+   configurable nature of the volume pattern, not its default).
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -164,3 +182,85 @@ class TestDataVolumeIsBounded:
                 " overrides the earlier `true` and undoes the lockdown"
                 " (F-DRIFT-001)"
             )
+
+
+class TestStateDirKnob:
+    """F-DRIFT-001: the narrowed-writable-surface profile is reachable.
+
+    The full :ro + :rw sub-mount split requires app-level changes that
+    are out of scope for this pass.  The shipping fix exposes the
+    ``DATAFORGE_STATE_DIR`` knob so operators can wire the narrower
+    profile without a code change, and exposes a matching config
+    setting (``STATE_DIR`` / ``DATA_DIR``) so the app honours it.
+    """
+
+    def test_dataforge_state_dir_env_exposed_in_compose(self) -> None:
+        for service_name in ("dataforge", "worker"):
+            text = _service_text(service_name)
+            assert "DATAFORGE_STATE_DIR" in text, (
+                f"F-DRIFT-001: {service_name} service must expose the"
+                " DATAFORGE_STATE_DIR env var so operators can opt into"
+                " the narrowed-writable-surface profile."
+            )
+
+    def test_state_dir_default_is_empty_in_compose(self) -> None:
+        """The default production profile keeps the single :rw volume
+        because the app still writes ML files at the data/ root. The
+        env var must default to empty (interpreted as 'use default
+        layout') so existing deployments don't break.
+        """
+        text = _service_text("dataforge")
+        assert "DATAFORGE_STATE_DIR=${DATAFORGE_STATE_DIR:-}" in text, (
+            "F-DRIFT-001: DATAFORGE_STATE_DIR must default to empty in"
+            " docker-compose.prod.yml so existing single-volume"
+            " deployments keep working."
+        )
+
+    def test_state_dir_config_knob_present(self) -> None:
+        """The config layer must own a STATE_DIR setting so a future
+        refactor can switch from per-file hardcoded paths to a single
+        configurable base directory. This is the capability that
+        lets a follow-up PR move files into the writable sub-mount
+        without a Compose rewrite."""
+        # Test that the config module re-exports STATE_DIR
+        from app.config import settings
+
+        assert hasattr(settings, "STATE_DIR"), (
+            "F-DRIFT-001: settings.STATE_DIR must exist so operators can wire a narrowed-writable-surface profile end-to-end."
+        )
+        # The DATA_DIR property is the runtime accessor.
+        assert hasattr(settings, "DATA_DIR"), (
+            "F-DRIFT-001: settings.DATA_DIR property must exist to resolve the writable base dir with env-var fallback."
+        )
+
+    def test_state_dir_resolves_to_data_by_default(self) -> None:
+        """When DATAFORGE_STATE_DIR is unset, the property must fall
+        back to "data" — the historical layout — so non-hardened
+        profiles behave unchanged.
+        """
+        from app.config import settings
+
+        # Make sure the env var is unset for this assertion.
+        saved = os.environ.pop("DATAFORGE_STATE_DIR", None)
+        try:
+            assert settings.DATA_DIR == "data", (
+                f"F-DRIFT-001: settings.DATA_DIR must default to 'data'"
+                f" when DATAFORGE_STATE_DIR is unset, got {settings.DATA_DIR!r}"
+            )
+        finally:
+            if saved is not None:
+                os.environ["DATAFORGE_STATE_DIR"] = saved
+
+    def test_state_dir_honours_env_override(self) -> None:
+        """When DATAFORGE_STATE_DIR is set in the runtime env, the
+        property must reflect that path so app code can resolve the
+        writable subdirectory."""
+        from app.config import settings
+
+        os.environ["DATAFORGE_STATE_DIR"] = "/app/backend/data/w"
+        try:
+            assert settings.DATA_DIR == "/app/backend/data/w", (
+                f"F-DRIFT-001: settings.DATA_DIR must honour runtime override of DATAFORGE_STATE_DIR, got {settings.DATA_DIR!r}"
+            )
+        finally:
+            os.environ.pop("DATAFORGE_STATE_DIR", None)

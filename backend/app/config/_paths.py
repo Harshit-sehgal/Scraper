@@ -1,5 +1,7 @@
 """Paths, observability, research, and federation configuration."""
 
+import os
+
 from pydantic_settings import BaseSettings
 
 
@@ -7,6 +9,16 @@ class PathSettings(BaseSettings):
     """File paths, observability, research, and federation settings."""
 
     # ─── Paths ─────────────────────────────────────────────────────────
+    # F-DRIFT-001: STATE_DIR is the base directory for all mutable runtime
+    # state. In the hardened Docker production profile, this is set to
+    # /app/backend/data/w (a :rw sub-mount) so the parent /app/backend/data
+    # is mounted :ro, preventing a compromised process from tampering with
+    # ML/learning state files (semantic_state.json, selector_memory.json,
+    # domain_intelligence.json, etc.) that live outside the writable
+    # subdirectory.  In dev and non-hardened environments the default is
+    # "" (empty), which means individual path defaults are used unchanged.
+    STATE_DIR: str = ""
+
     SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
@@ -53,7 +65,7 @@ class PathSettings(BaseSettings):
     # ─── Domain Health Alerts ──────────────────────────────────────────
     DOMAIN_HEALTH_ALERT_COOLDOWN: int = 60
 
-    # ─── Gossip Propagation ────────────────────────────────────────────
+    # ─── Gossip Propagation ─────────────────────────────────────────────
     GOSSIP_PROPAGATION_INTERVAL: int = 60
 
     # ─── Federation / Sharding ─────────────────────────────────────────
@@ -66,9 +78,34 @@ class PathSettings(BaseSettings):
     ENABLE_EXPERIMENTAL_ROUTES: bool = False
     """Enable experimental / research-only API routes."""
 
-    # ─── Rate Limiter Background Pruning ────────────────────────
+    # ─── Rate Limiter Background Pruning ────────────────────────────────
     RATE_LIMIT_PRUNE_INTERVAL: int = 3600
     """Seconds between background prunes of the ``rate_limits`` table.
     Default 3600 (1 hour). Set to 0 to disable the background cron;
     the middleware's request-time pruning (every 300s) still runs.
     """
+
+    # ─── Workflow Storage ───────────────────────────────────────────────
+    WORKFLOW_BACKEND: str = "json"
+    """CAND-P1-WORKFLOW-STORAGE-001: workflow storage backend.
+    'json' (default) uses the existing JSONFileStore; 'sqlite' and
+    'postgres' use the workflows table from storage_migrations.py.
+    Can be overridden at runtime via DATAFORGE_WORKFLOW_BACKEND."""
+
+    @property
+    def DATA_DIR(self) -> str:
+        """Resolve the base data directory for mutable runtime state.
+
+        F-DRIFT-001: In the hardened Docker production profile, the
+        operator sets ``DATAFORGE_STATE_DIR=/app/backend/data/w`` so that
+        mutable runtime state (databases, JSON stores, results) lands in
+        the ``:rw`` sub-mount while the rest of ``/app/backend/data`` is
+        read-only.  When empty (the default), the original ``data/``
+        layout is used for backward compatibility.
+
+        This property also checks the raw ``DATAFORGE_STATE_DIR`` env var
+        so that it can be set without going through Pydantic validation
+        (useful in Docker Compose where env vars are set at container
+        start).
+        """
+        return os.environ.get("DATAFORGE_STATE_DIR") or self.STATE_DIR or "data"

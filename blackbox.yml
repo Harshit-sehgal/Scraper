@@ -9,3 +9,14 @@ modules:
       method: GET
       no_follow_redirects: false
       preferred_ip_protocol: ip4
+
+  # F-MON-004: TLS certificate expiry probe.
+  # Probes the TLS handshake and exposes probe_ssl_earliest_cert_expiry
+  # so the TLSCertificateExpiring alert can fire. Targets are defined
+  # in prometheus.yml under the blackbox-tls scrape job.
+  tls_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+      preferred_ip_protocol: ip4

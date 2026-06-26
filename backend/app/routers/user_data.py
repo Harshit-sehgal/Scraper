@@ -111,15 +111,29 @@ async def delete_my_data(
 
     # 3. Delete workflows owned by the user (single flocked batch via delete_many).
     try:
-        from app.routers.workflow import _workflows as workflow_store
+        from app.routers.workflow import _get_workflow_repo
+        from app.workflow_repository import JsonWorkflowRepository
 
-        workflow_ids_to_delete: list[str] = [
-            str(wf.get("id", "")) for wf in workflow_store.values() if str(wf.get("user_id", "")) == user_id and wf.get("id")
-        ]
-        if workflow_ids_to_delete:
-            summary["workflows_deleted"] = workflow_store.delete_many(workflow_ids_to_delete)
+        repo = _get_workflow_repo()
+
+        if isinstance(repo, JsonWorkflowRepository):
+            # JSON store supports batch delete_many for efficiency.
+            workflow_store = repo._store
+            workflow_ids_to_delete: list[str] = [
+                str(wf.get("id", "")) for wf in workflow_store.values() if str(wf.get("user_id", "")) == user_id and wf.get("id")
+            ]
+            if workflow_ids_to_delete:
+                summary["workflows_deleted"] = workflow_store.delete_many(workflow_ids_to_delete)
+            else:
+                summary["workflows_deleted"] = 0
         else:
-            summary["workflows_deleted"] = 0
+            # SQL-backed repos: iterate and delete individually.
+            user_wfs = repo.list_workflows(user_id=user_id, limit=500)
+            deleted = 0
+            for wf in user_wfs:
+                if repo.delete(str(wf.get("id", ""))):
+                    deleted += 1
+            summary["workflows_deleted"] = deleted
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete workflows for user %s: %s", user_id, e)
 
