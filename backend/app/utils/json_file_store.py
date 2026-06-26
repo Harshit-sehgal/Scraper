@@ -14,17 +14,17 @@ clobber each other.
 
 from __future__ import annotations
 
-import contextlib
 import errno
 import fcntl
 import json
 import logging
 import os
-import tempfile
 import threading
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from app.utils.common_datetime import utc_now_iso
+from app.utils.common_persistence import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +50,7 @@ def _is_production_env() -> bool:
     return (getattr(settings, "ENV", "") or "").strip().lower() == "production"
 
 
-def _utc_now_iso() -> str:
-    """Return the current UTC timestamp formatted as ISO-8601.
-
-    Module-level so subclasses and unit tests can import the same
-    formatter without re-implementing timezone serialization.
-    """
-    return datetime.now(UTC).isoformat()
+_utc_now_iso = utc_now_iso
 
 
 class JSONFileStore:
@@ -145,21 +139,12 @@ class JSONFileStore:
         try:
             snapshot = self._read_json()
             mutate(snapshot)
-            fd, tmp_path = tempfile.mkstemp(
-                prefix=".json_store.",
-                suffix=".tmp",
-                dir=str(self.path.parent),
+            atomic_json_write(
+                snapshot,
+                self.path,
+                sort_keys=True,
+                default=str,
             )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    json.dump(snapshot, f, indent=2, sort_keys=True, default=str)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_path, self.path)
-            except Exception:
-                with contextlib.suppress(FileNotFoundError):
-                    Path(tmp_path).unlink()
-                raise
             return snapshot
         finally:
             os.close(lock_fd)

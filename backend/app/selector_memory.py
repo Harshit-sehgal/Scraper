@@ -15,10 +15,8 @@ Confidence Scoring:
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
-import os
 import threading
 import time
 from dataclasses import dataclass
@@ -27,6 +25,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.config import settings
+from app.utils.common_persistence import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
@@ -73,25 +72,10 @@ class SelectorMemory:
                 self._memory = {}
 
     def _save(self) -> None:
-        import tempfile
-
-        fd: int | None = None
-        tmp_path: str | None = None
         try:
-            fd, tmp_path = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")
-            with os.fdopen(fd, "w") as f:
-                fd = None  # ownership transferred to fdopen context manager
-                json.dump(self._memory, f, indent=2)
-            os.replace(tmp_path, self.path)
-            tmp_path = None  # ownership transferred via rename
+            atomic_json_write(self._memory, self.path)
         except (OSError, TypeError):
             logger.exception("Failed to save selector memory")
-            with contextlib.suppress(OSError):
-                if fd is not None:
-                    os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):
-                with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)
 
     def _compute_confidence(self, entry: dict[str, Any]) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.

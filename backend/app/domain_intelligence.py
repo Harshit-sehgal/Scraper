@@ -6,16 +6,15 @@ anti-bot signals. The system records these signals to adjust strategy choices.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from app.config import settings
+from app.utils.common_persistence import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
@@ -72,25 +71,13 @@ class DomainIntelligenceRegistry:
                 logger.exception("Failed to load domain intelligence")
 
     def _save(self) -> None:
-        import tempfile
-
-        fd: int | None = None
-        tmp_path: str | None = None
         try:
-            fd, tmp_path = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")
-            with os.fdopen(fd, "w") as f:
-                fd = None  # ownership transferred to fdopen context manager
-                json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
-            os.replace(tmp_path, self.path)
-            tmp_path = None  # ownership transferred via rename
+            atomic_json_write(
+                {d: i.to_dict() for d, i in self._registry.items()},
+                self.path,
+            )
         except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
             logger.exception("Failed to save domain intelligence")
-            with contextlib.suppress(OSError):
-                if fd is not None:
-                    os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):
-                with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)
 
     def get_intelligence(self, url: str) -> DomainIntelligence:
         """Get or create intelligence for a domain."""

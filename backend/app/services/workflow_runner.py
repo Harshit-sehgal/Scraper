@@ -8,19 +8,18 @@ added behind this interface without changing API handlers.
 
 from __future__ import annotations
 
-import datetime
 from typing import Any
 
 from bs4 import BeautifulSoup
 
 from app.models import SchemaField, Workflow, WorkflowStep, WorkflowStepType
+from app.utils.common_datetime import utc_now_iso
 
 SENSITIVE_NAME_PARTS = ("password", "pass", "token", "secret", "session", "cookie", "auth")
 MAX_WAIT_MS = 10_000
 
 
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 def _is_sensitive_name(value: str) -> bool:

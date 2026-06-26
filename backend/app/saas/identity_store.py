@@ -42,6 +42,7 @@ from app.saas.models import (
     User,
     UserStatus,
 )
+from app.utils.common_datetime import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,7 @@ _DB_ERRORS: tuple[type[BaseException], ...] = (
 )
 
 
-def _now_iso() -> str:
-    """Return current UTC time as ISO-8601 string."""
-    return datetime.now(UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 def _row_to_user(row: sqlite3.Row | dict) -> User:

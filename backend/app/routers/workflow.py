@@ -6,7 +6,6 @@ saved workflows that replay a sequence of browser steps.
 
 from __future__ import annotations
 
-import datetime
 import logging
 import uuid
 from pathlib import Path
@@ -30,6 +29,7 @@ from app.services.workflow_runner import (
 )
 from app.url_analyzer import analyze_url as analyze_guided_url
 from app.url_safety import validate_public_http_url
+from app.utils.common_datetime import utc_now_iso
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 from app.utils.workflow_run_store import WorkflowRunStore
@@ -82,8 +82,7 @@ class WorkflowPreviewRequest(BaseModel):
     sample_limit: int = Field(default=5, ge=1, le=25)
 
 
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 def _workflow_to_dict(wf: Workflow) -> dict[str, Any]:

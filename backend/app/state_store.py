@@ -10,7 +10,6 @@ Storage safety features:
 
 import atexit
 import concurrent.futures
-import datetime
 import json
 import logging
 import shutil
@@ -19,6 +18,7 @@ from threading import Lock
 from typing import Any
 
 from app.models import Job
+from app.utils.common_datetime import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,7 @@ _BACKUP_SUFFIX = ".bak"
 _SAVE_RETRIES = 3
 
 
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 def get_state_file_path() -> Path:

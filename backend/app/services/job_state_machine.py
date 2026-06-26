@@ -23,11 +23,11 @@ Valid states (from app.models.JobStatus):
 
 from __future__ import annotations
 
-import datetime
 import logging
 from typing import Any
 
 from app.models import JobStatus
+from app.utils.common_datetime import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +60,7 @@ _VALID_TRANSITIONS: dict[JobStatus, set[JobStatus]] = {
 }
 
 
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 # ── Public API ─────────────────────────────────────────────────────────

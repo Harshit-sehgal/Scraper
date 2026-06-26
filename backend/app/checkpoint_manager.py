@@ -1,9 +1,9 @@
-import contextlib
 import json
 import logging
-import os
 import time
 from pathlib import Path
+
+from app.utils.common_persistence import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
@@ -38,27 +38,12 @@ class CheckpointManager:
             msg = f"Resolved checkpoint path {filepath} is outside base directory"
             raise ValueError(msg)
 
-        fd: int | None = None
-        tmp_path: str | None = None
         try:
-            import tempfile
-
-            fd, tmp_path = tempfile.mkstemp(dir=self.base_dir, suffix=".tmp")
-            with os.fdopen(fd, "w") as f:
-                fd = None  # ownership transferred to fdopen context manager
-                json.dump(state_dict, f, indent=2)
-            os.replace(tmp_path, filepath)
-            tmp_path = None  # ownership transferred via rename
+            atomic_json_write(state_dict, filepath)
             logger.info("Created checkpoint: %s", filename)
             return str(filepath)
         except Exception:
             logger.exception("Failed to create checkpoint")
-            with contextlib.suppress(OSError):
-                if fd is not None:
-                    os.close(fd)
-            if tmp_path is not None and os.path.exists(tmp_path):
-                with contextlib.suppress(OSError):
-                    os.unlink(tmp_path)
             raise
 
     def load_checkpoint(self, filepath: str) -> None:

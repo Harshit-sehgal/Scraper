@@ -15,7 +15,6 @@ endpoint; in dev/test we honour a shared HMAC secret in X-Billing-Webhook-Secret
 
 from __future__ import annotations
 
-import contextlib
 import errno
 import fcntl
 import hashlib
@@ -23,7 +22,6 @@ import hmac
 import json
 import logging
 import os
-import tempfile
 import threading
 from pathlib import Path
 from typing import Annotated, Any
@@ -33,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.billing.models import PlanTierId, SubscriptionStatus
 from app.billing.service import resolve_tier_from_plan_id
 from app.config import settings
+from app.utils.common_persistence import atomic_json_write
 from app.utils.rbac import UserRole, require_role
 
 logger = logging.getLogger(__name__)
@@ -147,21 +146,11 @@ class _SubscriptionStore:
         try:
             snapshot = self._read_json()
             mutate(snapshot)
-            fd, tmp_path = tempfile.mkstemp(
-                prefix=".billing_subscriptions.",
-                suffix=".tmp",
-                dir=str(self.path.parent),
+            atomic_json_write(
+                snapshot,
+                self.path,
+                sort_keys=True,
             )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    json.dump(snapshot, f, indent=2, sort_keys=True)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_path, self.path)
-            except Exception:
-                with contextlib.suppress(FileNotFoundError):
-                    Path(tmp_path).unlink()
-                raise
             return snapshot
         finally:
             os.close(lock_fd)

@@ -10,7 +10,6 @@ live in the workflow/job runner.
 
 from __future__ import annotations
 
-import datetime
 import json
 import logging
 from typing import Annotated, Any
@@ -22,6 +21,7 @@ from app.config import settings
 from app.models import AuthProfile, AuthProfileStatus
 from app.url_safety import validate_public_domain
 from app.utils.auth_profile_store import AuthProfileStore
+from app.utils.common_datetime import utc_now_iso
 from app.utils.encryption import decrypt as encryption_decrypt
 from app.utils.encryption import encrypt as encryption_encrypt
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
@@ -33,8 +33,7 @@ router = APIRouter(prefix="/api/auth-profiles", tags=["auth-profiles"])
 _auth_profiles = AuthProfileStore()
 
 
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 def _can_access_profile(item: dict[str, Any], auth: tuple[UserRole, str, str, str]) -> bool:

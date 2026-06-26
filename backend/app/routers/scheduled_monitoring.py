@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.audit_logger import log_rbac_event
 from app.models import ScheduledJob, ScheduledJobFrequency
 from app.utils.aup import require_aup_accepted
+from app.utils.common_datetime import utc_now_iso
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 
@@ -40,8 +41,7 @@ _scheduled_jobs = JSONFileStore(
 )
 
 
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat()
+_now_iso = utc_now_iso
 
 
 def _write_back(record: dict[str, Any]) -> None:
