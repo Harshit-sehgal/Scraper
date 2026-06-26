@@ -131,7 +131,7 @@ def should_escalate(
     - Session expired → escalate from STANDARD to AGGRESSIVE
     - Recovery failed → escalate from AGGRESSIVE to DEEP_SCAN
     - Empty response state → escalate to try different rendering
-    - Anti-bot blocked → escalate to try stealth
+    - Anti-bot blocked → escalate to try alternative fetch strategies
 
     A plain empty_response boolean only triggers escalation from STANDARD,
     since AGGRESSIVE / DEEP_SCAN already have empty-response detection enabled.

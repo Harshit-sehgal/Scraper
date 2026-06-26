@@ -5,7 +5,7 @@ live here — not scattered across modules. Import via:
 
     from app.config import settings
 
-To override, set the corresponding env var (e.g. PLAYWRIGHT_TIMEOUT=45000).
+To override, set the corresponding env var (e.g. DATAFORGE_PLAYWRIGHT_TIMEOUT=45000).
 
 Settings are split by domain into mixin classes under ``app/config/``
 and combined into a single ``Settings`` class via multi-inheritance.

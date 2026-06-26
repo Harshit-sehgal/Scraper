@@ -172,6 +172,7 @@ class AcquisitionLineage(BaseModel):
             AcquisitionState.EMPTY_RESPONSE,
             AcquisitionState.ANTI_BOT_BLOCKED,
             AcquisitionState.CROSS_DOMAIN,
+            AcquisitionState.DOMAIN_COOLDOWN,
         )
 
         # Map AcquisitionState to the legacy redirect_type values

@@ -27,9 +27,6 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_PARALLEL: int = 2
 # Seconds a domain stays in cooldown after hitting the failure limit.
 _DEFAULT_COOLDOWN_SECONDS: int = 60
-# Consecutive failures before a domain enters cooldown.
-_COOLDOWN_FAILURE_LIMIT: int = 3
-
 # Weighted failure severity system.
 # Strong failures (anti-bot, rate-limit, blocked) add 1.0 pressure.
 # Medium failures (empty shell, session expired, browser crash) add 0.5 pressure.
@@ -137,6 +134,9 @@ class DomainRuntimePolicy:
         entry.recent_failures = 0
         # Reduce failure pressure on success (decay, not full reset)
         entry.failure_pressure = max(0.0, entry.failure_pressure - 0.5)
+        # Reset recent rate-limit / anti-bot counters on success
+        entry.recent_rate_limits = 0
+        entry.recent_antibot_blocks = 0
         entry.total_attempts += 1
         # If pressure is now below threshold, clear cooldown
         if entry.failure_pressure < _COOLDOWN_PRESSURE_THRESHOLD:
@@ -159,9 +159,10 @@ class DomainRuntimePolicy:
         entry.total_attempts += 1
         entry.total_failures += 1
 
-        if "rate_limit" in failure_type.lower() or "429" in failure_type:
+        lower_failure_type = failure_type.lower()
+        if "rate_limit" in lower_failure_type or "429" in lower_failure_type:
             entry.recent_rate_limits += 1
-        if "anti_bot" in failure_type.lower() or "block" in failure_type.lower():
+        if "anti_bot" in lower_failure_type or "block" in lower_failure_type:
             entry.recent_antibot_blocks += 1
 
         weight = self._get_failure_weight(failure_type)
@@ -203,7 +204,7 @@ class DomainRuntimePolicy:
     def can_fetch(self, url: str) -> bool:
         """Return True if the domain is not in cooldown."""
         entry = self.get_or_create(url)
-        return not entry.cooldown_until > time.monotonic()
+        return time.monotonic() >= entry.cooldown_until
 
     def remaining_cooldown(self, url: str) -> float:
         """Seconds remaining in cooldown (0 if not cooling)."""
