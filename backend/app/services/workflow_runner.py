@@ -319,10 +319,3 @@ async def preview_workflow_snapshot(
         "screenshot": None,
         "record_count": len(sample_rows),
     }
-
-
-async def run_workflow_snapshot(workflow: Workflow, *, html_snapshot: str) -> dict[str, Any]:
-    """Run a workflow against an HTML snapshot and return preview-style rows."""
-    result = await preview_workflow_snapshot(workflow, html_snapshot=html_snapshot, sample_limit=100)
-    result["run_status"] = "succeeded" if result.get("preview_status") == "succeeded" else "failed"
-    return result

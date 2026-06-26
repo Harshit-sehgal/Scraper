@@ -72,8 +72,12 @@ class ProxyManager:
             self.rotate(domain=domain)
             self._failure_counts[proxy] = 0
 
-    def record_success(self, proxy: str | None = None) -> None:
-        """Record a success for the given proxy (or current)."""
+    def record_success(self, proxy: str | None = None, domain: str | None = None) -> None:
+        """Record a success for the given proxy (or current).
+
+        ``domain`` is accepted for API symmetry with ``record_failure`` but
+        does not currently affect success tracking.
+        """
         if not self.enabled:
             return
 

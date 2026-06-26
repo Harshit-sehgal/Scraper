@@ -213,6 +213,18 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    # F-DOCKER-CAPABILITIES-001: drop capabilities Postgres does not need
+    # (the daemon requires several caps including DAC_OVERRIDE and
+    # SETUID, but NET_RAW, SYS_PTRACE, SYS_ADMIN, SYS_MODULE,
+    # SYS_RESOURCE, and NET_ADMIN are unnecessary for a database
+    # container).
+    cap_drop:
+      - NET_RAW
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - SYS_MODULE
+      - SYS_RESOURCE
+      - NET_ADMIN
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dataforge"]
@@ -301,6 +313,13 @@ services:
       dataforge:
         condition: service_healthy
     restart: unless-stopped
+    # F-NGINX-HEALTHCHECK-001: pin to HTTPS responding, not just process alive.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     logging: *default-logging
     deploy:
       resources:
@@ -309,6 +328,8 @@ services:
           cpus: "0.25"
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     init: true
     networks:
       - dataforge-net
@@ -339,6 +360,12 @@ services:
           cpus: "0.05"
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - SYS_MODULE
+      - SYS_RESOURCE
     init: true
     networks:
       - dataforge-net
@@ -369,6 +396,12 @@ services:
           cpus: "0.25"
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - SYS_MODULE
+      - SYS_RESOURCE
     init: true
     networks:
       - dataforge-net
@@ -412,12 +445,29 @@ services:
           --web.console.templates=/etc/prometheus/consoles \
           --web.config.file=/etc/prometheus/web.yml
     restart: unless-stopped
+    # F-PROM-HEALTHCHECK-001: poll the metrics endpoint using the same
+    # bearer token path as scrape jobs to ensure the token-substitution
+    # step in the entrypoint succeeded.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "--header=Authorization: Bearer", "http://127.0.0.1:9090/-/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging: *default-logging
     deploy:
       resources:
         limits:
           memory: 256m
           cpus: "0.25"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - SYS_MODULE
+      - SYS_RESOURCE
     init: true
     networks:
       - dataforge-net
@@ -440,6 +490,12 @@ services:
           cpus: "0.1"
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - SYS_MODULE
+      - SYS_RESOURCE
     init: true
     networks:
       - dataforge-net
@@ -471,12 +527,26 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging: *default-logging
     deploy:
       resources:
         limits:
           memory: 256m
           cpus: "0.25"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - SYS_MODULE
+      - SYS_RESOURCE
     init: true
     networks:
       - dataforge-net

@@ -594,7 +594,7 @@ async def fetch_page_content(
             # Scroll handling — use recovery scroll_attempts if provided
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 _scroll_attempts = 0
-                max_scrolls = scroll_attempts if scroll_attempts is not None else getattr(settings, "MAX_SCROLL_ATTEMPTS", 3)
+                max_scrolls = scroll_attempts if scroll_attempts is not None else 3
                 last_height = await page.evaluate("document.body.scrollHeight")
                 while _scroll_attempts < max_scrolls:
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")

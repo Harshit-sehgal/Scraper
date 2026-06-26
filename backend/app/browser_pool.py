@@ -254,22 +254,72 @@ class BrowserPool:
                 stealth_js = f"""
                 Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
                 window.chrome = {{ runtime: {{}} }};
-                Object.defineProperty(navigator, 'plugins', {{get: () => [1, 2, 3, 4, 5]}});
+                // Realistic navigator.plugins mock — returns a PluginArray-like
+                // object so that .length and [i].name checks pass.
+                (function() {{
+                    const pluginData = [
+                        {{name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
+                        {{name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
+                        {{name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
+                        {{name: 'Microsoft EDGE PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
+                        {{name: 'WebKit built-in PDF', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
+                    ];
+                    const pluginArray = [];
+                    pluginData.forEach(function(p) {{
+                        const plugin = {{
+                            name: p.name,
+                            filename: p.filename,
+                            description: p.description,
+                            length: 1,
+                            0: {{type: 'application/pdf', suffixes: 'pdf', description: p.description}}
+                        }};
+                        pluginArray.push(plugin);
+                    }});
+                    Object.defineProperty(pluginArray, 'length', {{get: () => pluginArray.length}});
+                    Object.defineProperty(navigator, 'plugins', {{get: () => pluginArray}});
+                }})();
                 Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs_js}}});
                 """
                 await context.add_init_script(stealth_js)
 
                 if is_stealth:
-                    # Advanced fingerprint randomization
+                    import random
+
+                    # Randomize WebGL fingerprint from a pool of
+                    # common GPU identities instead of a single
+                    # deterministic pair that every request shares.
+                    _webgl_vendors = [
+                        ("Intel Open Source Technology Center", "Intel(R) HD Graphics 630"),
+                        ("Intel Open Source Technology Center", "Mesa DRI Intel(R) UHD Graphics 630"),
+                        ("NVIDIA Corporation", "GeForce GTX 1060/PCIe/SSE2"),
+                        ("NVIDIA Corporation", "GeForce GTX 1650/PCIe/SSE2"),
+                        ("NVIDIA Corporation", "GeForce RTX 3060/PCIe/SSE2"),
+                        ("AMD", "Radeon RX 580 Series"),
+                        ("AMD", "Radeon(TM) RX 470 Graphics"),
+                        ("Intel Open Source Technology Center", "Mesa Intel(R) UHD Graphics 770"),
+                    ]
+                    _gl_vendor, _gl_renderer = random.choice(_webgl_vendors)  # nosec B311
+                    # Escape single quotes for JS string injection
+                    _gl_vendor_js = _gl_vendor.replace("'", "\\'")
+                    _gl_renderer_js = _gl_renderer.replace("'", "\\'")
                     hw_concurrency = settings.STEALTH_HARDWARE_CONCURRENCY
                     advanced_stealth = f"""
-                    // WebGL spoofing
+                    // WebGL spoofing — randomized per context
                     const getParameter = WebGLRenderingContext.prototype.getParameter;
                     WebGLRenderingContext.prototype.getParameter = function(parameter) {{
-                        if (parameter === 37445) return 'Intel Open Source Technology Center';
-                        if (parameter === 37446) return 'Mesa DRI Intel(R) Ivybridge Mobile ';
+                        if (parameter === 37445) return '{_gl_vendor_js}';
+                        if (parameter === 37446) return '{_gl_renderer_js}';
                         return getParameter.apply(this, arguments);
                     }};
+                    // Also spoof WebGL2 if present
+                    if (typeof WebGL2RenderingContext !== 'undefined') {{
+                        const getParam2 = WebGL2RenderingContext.prototype.getParameter;
+                        WebGL2RenderingContext.prototype.getParameter = function(parameter) {{
+                            if (parameter === 37445) return '{_gl_vendor_js}';
+                            if (parameter === 37446) return '{_gl_renderer_js}';
+                            return getParam2.apply(this, arguments);
+                        }};
+                    }}
 
                     // Hardware concurrency randomization
                     Object.defineProperty(navigator, 'hardwareConcurrency', {{

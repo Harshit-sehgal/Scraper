@@ -405,7 +405,20 @@ def _extract_field_by_pattern(
         elif ftype == FieldType.EMAIL:
             patterns = [r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"]
         elif ftype == FieldType.PHONE:
-            patterns = [r"[\d\s\-()+]{7,20}"]
+            # Precise phone pattern: must start with +, (, or have a
+            # country/area code grouping. Must contain at least 7 digits.
+            # Anchored to avoid matching dates/SKUs that look numeric.
+            patterns = [
+                # International: +CC (AA) NNN-NNNN
+                r"\+\d{1,3}[\s\-]?\(?\d{1,4}\)?[\s\-.]?\d{2,4}[\s\-.]?\d{2,4}(?:[\s\-.]?\d{2,4})?",
+                # Area code in parens: (NNN) NNN-NNNN
+                r"\(\d{3}\)\s*\d{3}[\s\-.]?\d{4}",
+                # Dashed US-style: NNN-NNN-NNNN (must look like phone via
+                # non-year grouping — 3 digits, not 4-digit year)
+                r"\b\d{3}[\s\-.]\d{3}[\s\-.]\d{4}\b",
+                # UK/India spaced: NNNN NNNNNN or NNNNN NNNNNN
+                r"\b\d{4,5}[\s\-]\d{2,4}[\s\-]\d{3,4}\b",
+            ]
         elif ftype == FieldType.URL:
             patterns = [r"https?://[^\s]+"]
         elif ftype == FieldType.DATE:

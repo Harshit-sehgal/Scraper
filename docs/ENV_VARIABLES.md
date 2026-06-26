@@ -9,14 +9,12 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATAFORGE_ENV` | `development` | Environment: `development`, `staging`, `production` |
-| `DATAFORGE_DEBUG` | `false` | Enable debug mode |
 | `DATAFORGE_ENABLE_RELOAD` | `false` | Enable uvicorn `--reload` / debug logging in the dev container target; leave unset for production/default compose runs |
 | `DATAFORGE_DOTENV_PATH` | `.env` | Path to dotenv file |
 | `DATAFORGE_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `postgres` |
 | `DATAFORGE_DATABASE_URL` | - | PostgreSQL connection URL (required for postgres backend) |
-| `DATAFORGE_STATE_FILE` | `data/state.json` | Path to state file |
-| `DATAFORGE_DB_CONNECT_TIMEOUT` | `10` | Postgres connect timeout in seconds (used by `verify_postgres_connectivity` and pool init). The test suite sets this to `1` for fast-fail negative paths. |
-| `DATAFORGE_JOB_STORE_PATH` | - | Override SQLite job-store database path |
+| `DATAFORGE_STATE_FILE` | *unset* | Legacy alias for `DATAFORGE_STATE_FILE_PATH`. Read by `STATE_FILE_PATH_DYNAMIC` when the path override is not configured. |
+| `DATAFORGE_STATE_FILE_PATH` | `""` | Override path for `jobs_state.json` (empty = `./backend/data/jobs_state.json`) |
 | `DATAFORGE_SEMANTIC_STATE_PATH` | `data/semantic_state.json` | Path to semantic state file |
 
 ## Production Ingress
@@ -99,15 +97,6 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES` | `false` | Enable experimental API routes |
 | `DATAFORGE_SMOKE_TEST_MODE` | `false` | Enable smoke test mode |
 
-## Data Retention
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATAFORGE_RETENTION_DAYS_COMPLETED` | `30` | Days to retain completed jobs before automatic cleanup |
-| `DATAFORGE_RETENTION_DAYS_IDEMPOTENCY` | `7` | Days to retain idempotency keys for deduplication |
-| `DATAFORGE_RETENTION_DAYS_RECYCLE` | `30` | Days to retain soft-deleted jobs in recycle bin before permanent purge |
-| `DATAFORGE_RETENTION_INTERVAL` | `43200` | Background retention sweep interval in seconds (default 12h) |
-
 ## LLM Integration
 
 | Variable | Default | Description |
@@ -131,15 +120,20 @@ These are acceptable direct environment reads outside the config module:
 | `backend/app/__init__.py` | `DATAFORGE_DOTENV_PATH` | Dotenv loading boundary |
 | `backend/app/utils/env.py` | Generic helper | Environment utility |
 | `backend/app/billing/checkout.py` | `DATAFORGE_PUBLIC_BASE_URL` | Public base URL for constructing checkout approval URLs |
+| `backend/app/postgres_repository.py` | `DATAFORGE_DB_CONNECT_TIMEOUT` | Postgres connect timeout (default `10`); test suite uses `1` for fast-fail |
 | `backend/app/rate_limiter.py` | `DATAFORGE_REDIS_URL` | Redis connection URL for distributed rate-limiter storage |
 | `backend/app/utils/encryption.py` | `DATAFORGE_ENCRYPTION_SALT` | Encryption salt for auth-profile key derivation |
+| `backend/app/utils/data_retention.py` | `DATAFORGE_RETENTION_DAYS_COMPLETED` | Days to retain completed jobs (default `30`) |
+| `backend/app/utils/data_retention.py` | `DATAFORGE_RETENTION_DAYS_RECYCLE` | Days to retain recycle-bin jobs (default `30`) |
+| `backend/app/utils/data_retention.py` | `DATAFORGE_RETENTION_DAYS_IDEMPOTENCY` | Days to retain idempotency keys (default `7`) |
+| `backend/app/lifespan.py` | `DATAFORGE_RETENTION_INTERVAL` | Retention sweep interval in seconds (default `43200` = 12h) |
+| `backend/app/admin_denylist.py` | `DATAFORGE_JOB_STORE_PATH` | Override SQLite job-store database path |
 | `scripts/check_prod_env.py` | `DATAFORGE_SKIP_DB_CHECK` | Validation script |
 | `scripts/backup_postgres.sh` | `DATAFORGE_BACKUP_KEEP_DAYS` | Postgres backup retention |
 | `scripts/restore_postgres.sh` | `DATAFORGE_RESTORE_SKIP_VERIFY` | Emergency restore verification bypass |
 | `scripts/run_alert_delivery_drill.py` | `DATAFORGE_DRILL_ALLOW_REMOTE` | Explicit remote-host drill opt-in |
 | `scripts/run_worker.py` | `DATAFORGE_JOB_ID` | Worker script |
 | `scripts/manual_test.py` | `DATAFORGE_API_BASE` | Manual testing |
-| `scripts/staging_smoke_test.py` | `STATE_FILE_PATH` | Smoke test |
 
 ## Production Validation
 

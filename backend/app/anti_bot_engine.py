@@ -342,15 +342,16 @@ class AntiBotEngine:
         # Keep last 10 attempts
         self._block_history[domain] = self._block_history[domain][-settings.ANTIBOT_BLOCK_HISTORY_SIZE :]
 
-        # If score indicates hard block, record proxy failure
+        # If score indicates hard block, record proxy failure for the domain
+        # so domain-aware rotation can skip this proxy for this domain.
         if score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD and self.proxy_manager.enabled:
-            self.proxy_manager.record_failure()
+            self.proxy_manager.record_failure(domain=domain)
             logger.info("Hard block detected on %s, recorded proxy failure", domain)
 
-    def record_success(self, domain: str) -> None:  # noqa: ARG002, RUF100
+    def record_success(self, domain: str) -> None:
         """Record successful fetch from domain."""
         if self.proxy_manager.enabled:
-            self.proxy_manager.record_success()
+            self.proxy_manager.record_success(domain=domain)
 
     def rotate_proxy(self) -> str | None:
         """Explicitly rotate to next proxy and return it."""
