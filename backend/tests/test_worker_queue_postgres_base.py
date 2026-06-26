@@ -17,10 +17,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.worker_queue import Priority, QueueTask
 from app.worker_queue_postgres_base import PostgresWorkerQueueBase
-
 
 # ─── Stub implementation ───────────────────────────────────────────────
 
@@ -47,34 +45,30 @@ class _StubQueue(PostgresWorkerQueueBase):
         self._mock_conn.cursor.return_value = self._mock_cursor
 
         # Instrumentation
-        self.executed: list[tuple[str, tuple | None]] = []
+        self.executed: list[tuple[str, Any]] = []
+        self._execute_impl: MagicMock = MagicMock(side_effect=self._record_execute)
+        self._fetch_all_impl: MagicMock = MagicMock(return_value=[])
+        self._fetch_one_impl: MagicMock = MagicMock(return_value=None)
 
     @contextmanager
     def _conn(self):
         yield self._mock_conn
 
-    def _execute_impl(self, conn, sql: str, params=None):
+    def _record_execute(self, conn: Any, sql: str, params: Any = None) -> MagicMock:
         self.executed.append((sql, params))
         return self._mock_cursor
 
-    def _fetch_all_impl(self, conn, sql: str, params=None) -> list[dict]:
-        return []
-
-    def _fetch_one_impl(self, conn, sql: str, params=None) -> dict | None:
-        return None
-
-    def _execute(self, conn, sql: str, params=None):
+    def _execute(self, conn: Any, sql: str, params: Any = None) -> Any:
         return self._execute_impl(conn, sql, params)
 
-    def _fetch_one(self, conn, sql: str, params=None) -> dict | None:
+    def _fetch_one(self, conn: Any, sql: str, params: Any = None) -> dict[str, Any] | None:
         return self._fetch_one_impl(conn, sql, params)
 
-    def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:
+    def _fetch_all(self, conn: Any, sql: str, params: Any = None) -> list[dict[str, Any]]:
         return self._fetch_all_impl(conn, sql, params)
 
     def _ensure_schema(self) -> None:
         """Skip real schema creation in tests."""
-        pass
 
 
 def _make_task_row(task_id: str = "t1", task_type: str = "test_type", **overrides) -> dict[str, Any]:
@@ -523,43 +517,41 @@ class TestWorkerStartStop:
     @pytest.mark.asyncio
     async def test_start_sets_running(self) -> None:
         q = _StubQueue()
-        q._recover_stuck_tasks = MagicMock()
-
-        await q.start()
-        assert q._running is True
-        await q.stop(drain=False)
+        with patch.object(q, "_recover_stuck_tasks"):
+            await q.start()
+            assert q._running is True
+            await q.stop(drain=False)
 
     @pytest.mark.asyncio
     async def test_double_start_is_noop(self) -> None:
         q = _StubQueue()
-        q._recover_stuck_tasks = MagicMock()
-
-        await q.start()
-        assert q._running is True
-        # Second start should be a no-op
-        await q.start()
-        await q.stop(drain=False)
+        with patch.object(q, "_recover_stuck_tasks"):
+            await q.start()
+            assert q._running is True
+            # Second start should be a no-op
+            await q.start()
+            await q.stop(drain=False)
 
     @pytest.mark.asyncio
     async def test_stop_drains_in_flight(self) -> None:
         q = _StubQueue()
-        q._recover_stuck_tasks = MagicMock()
-        await q.start()
+        with patch.object(q, "_recover_stuck_tasks"):
+            await q.start()
 
-        # Add a quick-completing task to in_flight
-        done_task = asyncio.create_task(asyncio.sleep(0))
-        await done_task  # complete it
-        q._in_flight["t1"] = done_task
+            # Add a quick-completing task to in_flight
+            done_task = asyncio.create_task(asyncio.sleep(0))
+            await done_task  # complete it
+            q._in_flight["t1"] = done_task
 
-        await q.stop(drain=True)
+            await q.stop(drain=True)
         assert q._running is False
 
     @pytest.mark.asyncio
     async def test_stop_without_drain(self) -> None:
         q = _StubQueue()
-        q._recover_stuck_tasks = MagicMock()
-        await q.start()
-        await q.stop(drain=False)
+        with patch.object(q, "_recover_stuck_tasks"):
+            await q.start()
+            await q.stop(drain=False)
         assert q._running is False
 
 
@@ -577,8 +569,8 @@ class TestExecuteTask:
         async def mock_fail(task_id, error, **kwargs):
             pass
 
-        q.fail = mock_fail
-        await q._execute_task(task)
+        with patch.object(q, "fail", new=mock_fail):
+            await q._execute_task(task)
 
     @pytest.mark.asyncio
     async def test_handler_success_completes(self) -> None:
@@ -593,8 +585,8 @@ class TestExecuteTask:
         async def mock_complete(task_id, result=None):
             pass
 
-        q.complete = mock_complete
-        await q._execute_task(task)
+        with patch.object(q, "complete", new=mock_complete):
+            await q._execute_task(task)
 
     @pytest.mark.asyncio
     async def test_handler_returns_false_fails(self) -> None:
@@ -609,8 +601,8 @@ class TestExecuteTask:
         async def mock_fail(task_id, error, **kwargs):
             pass
 
-        q.fail = mock_fail
-        await q._execute_task(task)
+        with patch.object(q, "fail", new=mock_fail):
+            await q._execute_task(task)
 
     @pytest.mark.asyncio
     async def test_handler_timeout_fails(self) -> None:

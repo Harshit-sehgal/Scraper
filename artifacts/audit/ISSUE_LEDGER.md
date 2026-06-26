@@ -754,7 +754,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P0-STORAGE-001
 
 - **priority:** P0
-- **status:** candidate
+- **status:** resolved
 - **category:** candidate_issue / storage_parity / needs_verification
 - **file_path:** `backend/app/job_store.py`, `backend/app/postgres_repository_base.py`, storage migrations/tests
 - **line/function:** ownership fields `created_by`, `owner_id`, `user_id`, `org_id`, `project_id`
@@ -765,7 +765,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 - **tests_needed:** Create/read/list/filter jobs with owner/org/project in SQLite and Postgres; migration handling for existing rows.
 - **acceptance_criteria:** Same ownership fields and filters work in both storage backends.
 - **blocked_by:** Postgres test environment availability.
-- **notes:** Candidate only; no current parity failure was reproduced.
+- **notes:** Resolved — SQLite round-trip tests for `created_by`, `org_id`, `project_id` in `test_ownership_parity.py` (13 passing). Postgres parity tests marked `@pytest.mark.postgres` (require `DATAFORGE_DATABASE_URL`). Row-mapper parity `job_to_row`/`row_to_job` verified; `persist_state_single` and recycle_bin paths covered.
 
 ### CAND-P1-FRONTEND-AUTH-001
 

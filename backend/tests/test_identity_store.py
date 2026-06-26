@@ -10,7 +10,6 @@ import hashlib
 import time
 
 import pytest
-
 from app.saas.identity_store import (
     SQLiteIdentityStore,
     _row_to_api_key,
@@ -69,9 +68,17 @@ class TestRowConverters:
     """Round-trip conversion of dict rows to Pydantic models."""
 
     def test_row_to_user(self) -> None:
-        row = {"id": "u1", "email": "a@b.com", "display_name": "A", "status": "active",
-               "password_hash": "h", "created_at": "2026-01-01", "email_verified_at": None,
-               "aup_accepted_at": None, "aup_version_accepted": None}
+        row = {
+            "id": "u1",
+            "email": "a@b.com",
+            "display_name": "A",
+            "status": "active",
+            "password_hash": "h",
+            "created_at": "2026-01-01",
+            "email_verified_at": None,
+            "aup_accepted_at": None,
+            "aup_version_accepted": None,
+        }
         u = _row_to_user(row)
         assert u.id == "u1"
         assert u.email == "a@b.com"
@@ -93,9 +100,18 @@ class TestRowConverters:
         assert p.name == "Proj"
 
     def test_row_to_api_key(self) -> None:
-        row = {"id": "k1", "project_id": "p1", "user_id": "u1", "name": "key1",
-               "key_hash": "hash", "key_prefix": "pfx", "scope": "write",
-               "created_at": "2026-01-01", "last_used_at": None, "revoked_at": None}
+        row = {
+            "id": "k1",
+            "project_id": "p1",
+            "user_id": "u1",
+            "name": "key1",
+            "key_hash": "hash",
+            "key_prefix": "pfx",
+            "scope": "write",
+            "created_at": "2026-01-01",
+            "last_used_at": None,
+            "revoked_at": None,
+        }
         k = _row_to_api_key(row)
         assert k.is_active()
 
@@ -339,9 +355,7 @@ class TestApiKeys:
 
     def test_get_api_key(self, store: SQLiteIdentityStore, project: Project, user: User) -> None:
         key_hash = hashlib.sha256(b"test-key").hexdigest()
-        key = store.create_api_key(
-            ApiKey(project_id=project.id, user_id=user.id, name="K1", key_hash=key_hash)
-        )
+        key = store.create_api_key(ApiKey(project_id=project.id, user_id=user.id, name="K1", key_hash=key_hash))
         found = store.get_api_key(key.id)
         assert found is not None
         assert found.key_hash == key_hash

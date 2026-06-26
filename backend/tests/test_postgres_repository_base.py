@@ -13,10 +13,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.models import Job, JobStatus
 from app.postgres_repository_base import PostgresRepositoryBase
-
 
 # ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -60,30 +58,27 @@ class _StubRepo(PostgresRepositoryBase):
         self._mock_conn.cursor.return_value = self._mock_cursor
 
         # Recorded SQL/params for assertions
-        self.executed: list[tuple[str, tuple | None]] = []
+        self.executed: list[tuple[str, Any]] = []
+        self._fetch_all_impl: MagicMock = MagicMock(return_value=[])
+        self._fetch_one_impl: MagicMock = MagicMock(return_value=None)
+        self._execute_impl: MagicMock = MagicMock(side_effect=self._record_execute)
 
     @contextmanager
     def _conn(self):
         yield self._mock_conn
 
-    def _fetch_all_impl(self, conn, sql: str, params=None) -> list[dict]:
-        return []
-
-    def _fetch_one_impl(self, conn, sql: str, params=None) -> dict | None:
-        return None
-
-    def _execute_impl(self, conn, sql: str, params=None):
+    def _record_execute(self, conn: Any, sql: str, params: Any = None) -> MagicMock:
         self.executed.append((sql, params))
         return self._mock_cursor
 
     # Override abstract methods to delegate to our impls
-    def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:
+    def _fetch_all(self, conn: Any, sql: str, params: Any = None) -> list[dict[str, Any]]:
         return self._fetch_all_impl(conn, sql, params)
 
-    def _fetch_one(self, conn, sql: str, params=None) -> dict | None:
+    def _fetch_one(self, conn: Any, sql: str, params: Any = None) -> dict[str, Any] | None:
         return self._fetch_one_impl(conn, sql, params)
 
-    def _execute(self, conn, sql: str, params=None):
+    def _execute(self, conn: Any, sql: str, params: Any = None) -> Any:
         return self._execute_impl(conn, sql, params)
 
 
@@ -174,7 +169,8 @@ class TestDriverFunctions:
         mock_ex = MagicMock()
         _set_driver_functions(mock_fa, mock_fo, mock_ex)
 
-        from app.postgres_repository_base import _fetch_all, _fetch_one, execute as mod_execute
+        from app.postgres_repository_base import _fetch_all, _fetch_one
+        from app.postgres_repository_base import execute as mod_execute
 
         conn = MagicMock()
         _fetch_all(conn, "SELECT 1", None)
@@ -209,7 +205,7 @@ class TestRegisterDbErrorClass:
         import app.postgres_repository_base as mod
         from app.postgres_repository_base import register_db_error_class
 
-        register_db_error_class(str)  # str is not a BaseException subclass
+        register_db_error_class(str)  # type: ignore[arg-type]  # intentional invalid class
         assert str not in mod._DB_OPS_ERRORS
 
 
@@ -448,10 +444,12 @@ class TestCountJobsByStatus:
 
     def test_groups_by_status(self) -> None:
         repo = _StubRepo()
-        repo._fetch_all_impl = MagicMock(return_value=[
-            {"status": "completed", "cnt": 5},
-            {"status": "failed", "cnt": 2},
-        ])
+        repo._fetch_all_impl = MagicMock(
+            return_value=[
+                {"status": "completed", "cnt": 5},
+                {"status": "failed", "cnt": 2},
+            ]
+        )
 
         result = repo.count_jobs_by_status()
         assert result == {"completed": 5, "failed": 2}
@@ -623,10 +621,12 @@ class TestReadResults:
 
     def test_parses_json_payloads(self) -> None:
         repo = _StubRepo()
-        repo._fetch_all_impl = MagicMock(return_value=[
-            {"payload": json.dumps({"title": "r1"})},
-            {"payload": json.dumps({"title": "r2"})},
-        ])
+        repo._fetch_all_impl = MagicMock(
+            return_value=[
+                {"payload": json.dumps({"title": "r1"})},
+                {"payload": json.dumps({"title": "r2"})},
+            ]
+        )
 
         results = repo.read_results("j1")
         assert len(results) == 2
@@ -634,9 +634,11 @@ class TestReadResults:
 
     def test_unparseable_payload_returns_fallback(self) -> None:
         repo = _StubRepo()
-        repo._fetch_all_impl = MagicMock(return_value=[
-            {"payload": "not-json"},
-        ])
+        repo._fetch_all_impl = MagicMock(
+            return_value=[
+                {"payload": "not-json"},
+            ]
+        )
 
         results = repo.read_results("j1")
         assert len(results) == 1
@@ -680,9 +682,11 @@ class TestReadEvents:
 
     def test_reads_events(self) -> None:
         repo = _StubRepo()
-        repo._fetch_all_impl = MagicMock(return_value=[
-            {"timestamp": "2026-01-01", "level": "info", "message": "ok"},
-        ])
+        repo._fetch_all_impl = MagicMock(
+            return_value=[
+                {"timestamp": "2026-01-01", "level": "info", "message": "ok"},
+            ]
+        )
 
         events = repo.read_events("j1")
         assert len(events) == 1
@@ -837,12 +841,14 @@ class TestWorkerHeartbeat:
 
         recent = datetime.datetime.now(datetime.UTC).isoformat()
         repo = _StubRepo()
-        repo._fetch_one_impl = MagicMock(return_value={
-            "last_heartbeat": recent,
-            "hostname": "host1",
-            "pid": 1234,
-            "started_at": recent,
-        })
+        repo._fetch_one_impl = MagicMock(
+            return_value={
+                "last_heartbeat": recent,
+                "hostname": "host1",
+                "pid": 1234,
+                "started_at": recent,
+            }
+        )
 
         health = repo.get_worker_health("w1")
         assert health["alive"] is True
@@ -857,12 +863,14 @@ class TestWorkerHeartbeat:
 
     def test_get_health_stale_heartbeat(self) -> None:
         repo = _StubRepo()
-        repo._fetch_one_impl = MagicMock(return_value={
-            "last_heartbeat": "2020-01-01T00:00:00+00:00",
-            "hostname": "host1",
-            "pid": 1234,
-            "started_at": "2020-01-01T00:00:00+00:00",
-        })
+        repo._fetch_one_impl = MagicMock(
+            return_value={
+                "last_heartbeat": "2020-01-01T00:00:00+00:00",
+                "hostname": "host1",
+                "pid": 1234,
+                "started_at": "2020-01-01T00:00:00+00:00",
+            }
+        )
 
         health = repo.get_worker_health("w1", ttl_seconds=60)
         assert health["alive"] is False
@@ -872,9 +880,11 @@ class TestWorkerHeartbeat:
 
         recent = datetime.datetime.now(datetime.UTC).isoformat()
         repo = _StubRepo()
-        repo._fetch_all_impl = MagicMock(return_value=[
-            {"worker_id": "w1", "last_heartbeat": recent, "hostname": "h1", "pid": 1},
-        ])
+        repo._fetch_all_impl = MagicMock(
+            return_value=[
+                {"worker_id": "w1", "last_heartbeat": recent, "hostname": "h1", "pid": 1},
+            ]
+        )
 
         results = repo.get_all_worker_healths()
         assert len(results) == 1
@@ -886,16 +896,17 @@ class TestHealthCheck:
 
     def test_returns_dict_with_ok_key(self) -> None:
         repo = _StubRepo()
-        with patch("app.storage_health.check_postgres_health", return_value={"ok": True, "backend": "postgres", "schema_version": 8}):
+        with patch(
+            "app.storage_health.check_postgres_health", return_value={"ok": True, "backend": "postgres", "schema_version": 8}
+        ):
             result = repo.health_check()
 
         assert "ok" in result
 
     def test_db_error_returns_error_dict(self) -> None:
         repo = _StubRepo()
-        repo._ensure = MagicMock(side_effect=RuntimeError("no db"))
-
-        result = repo.health_check()
+        with patch.object(repo, "_ensure", side_effect=RuntimeError("no db")):
+            result = repo.health_check()
         assert result["ok"] is False
 
 
@@ -904,9 +915,8 @@ class TestGetStorageStatus:
 
     def test_error_path_returns_minus_one_counts(self) -> None:
         repo = _StubRepo()
-        repo._ensure = MagicMock(side_effect=RuntimeError("no db"))
-
-        result = repo.get_storage_status()
+        with patch.object(repo, "_ensure", side_effect=RuntimeError("no db")):
+            result = repo.get_storage_status()
         assert result["job_count"] == -1
         assert result["recycle_bin_count"] == -1
         assert result["wal_mode"] == "unknown"

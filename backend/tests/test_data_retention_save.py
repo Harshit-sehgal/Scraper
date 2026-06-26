@@ -9,8 +9,6 @@ from __future__ import annotations
 import datetime
 from unittest.mock import patch
 
-import pytest
-
 from app.models import Job, JobStatus
 
 
@@ -42,8 +40,8 @@ class TestRetentionRoundTrip:
     def test_completed_job_within_retention_window_is_skipped(self) -> None:
         from app.utils.data_retention import enforce_retention
 
-        jobs_store = {"job-1": _fake_job("1", completed_at=_days_ago(10))}
-        recycle_bin_store = {}
+        jobs_store: dict[str, Job] = {"job-1": _fake_job("1", completed_at=_days_ago(10))}
+        recycle_bin_store: dict[str, Job] = {}
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=True)
         assert result["jobs_purged"] == 0
         assert result["jobs_skipped"] == 1
@@ -52,8 +50,8 @@ class TestRetentionRoundTrip:
     def test_expired_completed_job_is_purged(self) -> None:
         from app.utils.data_retention import enforce_retention
 
-        jobs_store = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
-        recycle_bin_store = {}
+        jobs_store: dict[str, Job] = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
+        recycle_bin_store: dict[str, Job] = {}
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
         assert result["jobs_purged"] == 1
         assert "job-old" not in jobs_store
@@ -65,7 +63,7 @@ class TestRetentionRoundTrip:
             "active": _fake_job("active", status=JobStatus.RUNNING),
             "pending": _fake_job("pending", status=JobStatus.PENDING),
         }
-        recycle_bin_store = {}
+        recycle_bin_store: dict[str, Job] = {}
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
         assert result["jobs_purged"] == 0
         assert "active" in jobs_store
@@ -75,7 +73,7 @@ class TestRetentionRoundTrip:
         from app.utils.data_retention import enforce_retention
 
         jobs_store = {"failed-old": _fake_job("failed-old", status=JobStatus.FAILED, completed_at=_days_ago(100))}
-        recycle_bin_store = {}
+        recycle_bin_store: dict[str, Job] = {}
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
         assert result["jobs_purged"] == 1
         assert "failed-old" not in jobs_store
@@ -83,7 +81,7 @@ class TestRetentionRoundTrip:
     def test_recycle_bin_items_expire(self) -> None:
         from app.utils.data_retention import enforce_retention
 
-        jobs_store = {}
+        jobs_store: dict[str, Job] = {}
         recycle_bin_store = {"rec-old": _fake_job("rec-old", completed_at=_days_ago(40))}
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
         assert result["recycle_purged"] == 1
@@ -92,8 +90,8 @@ class TestRetentionRoundTrip:
     def test_dry_run_does_not_delete(self) -> None:
         from app.utils.data_retention import enforce_retention
 
-        jobs_store = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
-        recycle_bin_store = {}
+        jobs_store: dict[str, Job] = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
+        recycle_bin_store: dict[str, Job] = {}
         result = enforce_retention(jobs_store, recycle_bin_store, dry_run=True)
         assert result["jobs_purged"] == 1
         assert "job-old" in jobs_store  # still exists
@@ -107,8 +105,8 @@ class TestRetentionRoundTrip:
         """
         from app.utils.data_retention import enforce_retention
 
-        jobs_store = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
-        recycle_bin_store = {}
+        jobs_store: dict[str, Job] = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
+        recycle_bin_store: dict[str, Job] = {}
 
         with patch("app.job_store.save_state") as mock_save:
             result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
