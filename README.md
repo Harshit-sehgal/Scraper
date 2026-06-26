@@ -49,12 +49,12 @@ Status: pre-production candidate.
 | **Dependabot** (auto-merge safe updates) | [![Dependabot](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml) |
 | **Postgres Integration** | [![Postgres](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml) |
 | **Browser E2E** (Playwright) | [![Browser E2E](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml) |
-| **Local Validation** | Passes with `make validate` |
+| **Local Validation** | `make validate` runs `python3 scripts/validate_local.py --full`; use `make validate-quick` for the bounded quick gate |
 
 > Note: Per-job status badges use GitHub's per-job query parameter (`?job=...`).
 > Replace `Harshit-sehgal/Scraper` in badge URLs with the actual repo owner/name if forked.
 
-For the latest detailed status, run `make validate` or check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml).
+For the latest detailed status, run `make validate` for the full local gate, `make validate-quick` for the bounded quick gate, or check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml).
 
 ## API and Dashboard Notes
 
@@ -111,6 +111,7 @@ Makefile shortcuts:
 
 ```bash
 make validate
+make validate-quick
 make validate-full
 make validate-backend
 make validate-frontend

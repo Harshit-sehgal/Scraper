@@ -10,9 +10,9 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 25 |
-| Fixed issues | 76 |
-| Not reproducible issues | 1 |
+| Open verified/deferred issues | 4 |
+| Fixed issues | 95 |
+| Not reproducible issues | 3 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
 | Open verified P0 issue rows | 0 |
@@ -1198,7 +1198,7 @@ Status is `verified` unless noted.
 ### F-NGINX-004
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / nginx / duplicated_security_headers
 - **file_path:** `nginx.conf:138-306`
 - **line_function:** 10+ `add_header` blocks per `location`
@@ -1209,7 +1209,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Smoke test: every endpoint (not under SSL) returns CSP.
 - **acceptance_criteria:** Single source for security headers; per-location overrides only when intentional.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 94: `nginx/security_headers.conf` is mounted read-only into nginx and included at the HTTPS server plus cache-header locations. Direct repeated security-header `add_header` values were removed from active `nginx.conf`; regression tests assert the snippet is the only source and nginx syntax passes with the snippet mounted.
 
 ### F-MON-002
 
@@ -1231,7 +1231,7 @@ Status is `verified` unless noted.
 ### F-MON-003
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / single_instance_amber
 - **file_path:** `prometheus.yml:36-38`, `docker-compose.prod.yml:403`
 - **line_function:** `alertmanagers.targets` and alertmanager `--cluster.listen-address=`
@@ -1242,12 +1242,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic alertmanager kill → on-call pages within 60s.
 - **acceptance_criteria:** Either failover works or explicit down-alert fires.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 94: Prometheus now scrapes `alertmanager:9093` and `prometheus_alerts.yml` adds the critical `DataForgeAlertmanagerDown` alert. This keeps the single-instance trade-off explicit with a down alert rather than pretending HA exists. Promtool validates the updated 16-rule file.
 
 ### F-MON-007
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / alert_fatigue_duplicate
 - **file_path:** `alertmanager.yml:78-87`
 - **line_function:** `critical` route `continue: true`
@@ -1255,15 +1255,15 @@ Status is `verified` unless noted.
 - **why_it_matters:** Alert fatigue. Operators start ignoring `critical` because there are too many duplicate messages.
 - **impact:** Real incidents lost in the noise.
 - **recommended_fix:** Drop `continue: true`; ensure `critical` receiver owns all delivery paths. Use `mute_time_intervals` correctly.
-- **tests_needed:** Synthetic critical alert delivers exactly 1 email + 1 Slack.
+- **tests_needed:** `backend/tests/test_p1_config_monitoring_foundation.py`
 - **acceptance_criteria:** No duplicate notifications in alertmanager routes.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 93: removed `continue: true` from the critical Alertmanager sub-route so critical alerts deliver through the critical receiver only instead of duplicating into default email. Regression test parses `alertmanager.yml` and rejects critical routes that continue to default.
 
 ### F-DOC-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** docs / readme / validate_gate_mislabeled
 - **file_path:** `README.md`, `Makefile`
 - **line_function:** `README.md:52`, `Makefile:169-170`
@@ -1271,15 +1271,15 @@ Status is `verified` unless noted.
 - **why_it_matters:** Operators expect `make validate` to be the quick local-gate; they get the slow, full-local check. Documentation drift hides the actual default gate.
 - **impact:** Confusing contributor interpretation; possible time wasted on full runs.
 - **recommended_fix:** Either: (a) make `make validate` run `--quick`, or (b) update README to say "Passes with `make validate` (runs `--full`)". Pick one and document.
-- **tests_needed:** Manual: `make -n validate` shows the actual `--full` execution.
+- **tests_needed:** `backend/tests/test_p1_config_monitoring_foundation.py`
 - **acceptance_criteria:** README, Makefile, and AGENTS.md all agree on which mode `make validate` runs.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 93: README now explicitly states that `make validate` runs `python3 scripts/validate_local.py --full`, and lists `make validate-quick` as the bounded quick gate. Regression test asserts README and Makefile validate semantics stay aligned.
 
 ### F-MON-009
 
 - **priority:** P1
-- **status:** verified
+- **status:** not_reproducible
 - **category:** infrastructure / monitoring / alert_query_against_unrelated_metric
 - **file_path:** `prometheus_alerts.yml:124`, `metrics_collector.py:267-281`
 - **line_function:** `RepoQueryLatencyDegraded` alert (line 124) vs Python list[float] ring buffer (line 267-281)
@@ -1287,10 +1287,10 @@ Status is `verified` unless noted.
 - **why_it_matters:** This alert will **never fire** in current setup. Operators expect it to catch Postgres latency regressions.
 - **impact:** Silent regression-monitoring gap during incident response.
 - **recommended_fix:** Either expose `dataforge_repo_query_latency_seconds_bucket` as a real Histogram (use `histogram_quantile(0.95, …)`) or switch the alert expression to a derived gauge.
-- **tests_needed:** Force slow query; assert `DataForge...Instance...alert-test` evaluation returns firing.
+- **tests_needed:** `backend/tests/test_p1_config_monitoring_foundation.py`
 - **acceptance_criteria:** Alert can fire on real latency regression.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Session 93 current-state check: the claimed missing quantile metric is not reproducible. `/metrics` exports `dataforge_repo_query_latency_seconds` with `quantile="0.95"` from the repository latency ring buffer, and `prometheus_alerts.yml` queries that same labelled gauge. Regression test records latency samples and asserts both the exported metric and alert expression exist.
 
 ### F-NAMING-001
 
@@ -1311,7 +1311,7 @@ Status is `verified` unless noted.
 ### F-ENV-002
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** docs / env_example / drift
 - **file_path:** `.env.example`, `.env.production.example`
 - **line_function:** `.env.example:96-99, 134-138` vs `.env.production.example`
@@ -1319,15 +1319,15 @@ Status is `verified` unless noted.
 - **why_it_matters:** Operators porting dev templates to production miss notification config entirely; no comment notes the omission.
 - **impact:** Production deploys have inconsistent notification behavior vs dev.
 - **recommended_fix:** Add a `# Notifications (optional)` block to `.env.production.example` matching the dev env structure.
-- **tests_needed:** `diff` after the change shows only env-var-key equality, not value drift.
+- **tests_needed:** `backend/tests/test_p1_config_monitoring_foundation.py`
 - **acceptance_criteria:** Both files document all notification env vars.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 93: `.env.example` and `.env.production.example` now both document `DATAFORGE_TELEGRAM_ENABLED`, `DATAFORGE_TELEGRAM_BOT_TOKEN`, and `DATAFORGE_TELEGRAM_CHAT_ID` under notification blocks. Regression test compares notification env keys across the two templates.
 
 ### F-ENV-003
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** security / env / check_prod_env_missing
 - **file_path:** `scripts/check_prod_env.py:24-33`, `docker-compose.prod.yml:321`
 - **line_function:** `REQUIRED_VARS` list
@@ -1335,15 +1335,15 @@ Status is `verified` unless noted.
 - **why_it_matters:** Single-user Grafana admin with no rotation slips through the gate.
 - **impact:** Misconfigured Grafana admin user; permission misassignment post-deploy.
 - **recommended_fix:** Add `GRAFANA_USER` + `GRAFANA_PASSWORD` to `REQUIRED_VARS` with placeholder/weak-secret check (the existing `--weak-password` style).
-- **tests_needed:** Synthetic run with `GRAFANA_USER=ops` triggers gate failure.
+- **tests_needed:** `backend/tests/test_p1_config_monitoring_foundation.py`
 - **acceptance_criteria:** `scripts/check_prod_env.py` fails deploy when user/password drift detected.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 93: `scripts/check_prod_env.py` now lists `GRAFANA_USER` and `GRAFANA_PASSWORD` in `REQUIRED_VARS` and validates `GRAFANA_USER=admin` explicitly, rejecting `GRAFANA_USER=ops` before deploy. Regression test covers required-var membership and the admin-only validator.
 
 ### F-ENV-005
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** config / env / llm_fallback_silent
 - **file_path:** `.env.example:30-35`, `scripts/check_prod_env.py`
 - **line_function:** GROQ API key configuration
@@ -1351,26 +1351,26 @@ Status is `verified` unless noted.
 - **why_it_matters:** Operators don't know whether their deployment is fully functional until they hit an LLM-call path.
 - **impact:** Silent degraded paths; customers see partial data without operator awareness.
 - **recommended_fix:** Extend `scripts/check_prod_env.py` to assert `DATAFORGE_GROQ_API_KEY` (or LLM) is set when AI structuring is enabled.
-- **tests_needed:** Empty `DATAFORGE_GROQ_API_KEY` with `LLM=true` triggers gate failure.
+- **tests_needed:** `backend/tests/test_p1_config_monitoring_foundation.py`
 - **acceptance_criteria:** Deploy fails when LLM-required deploy lacks LLM credentials.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 93: production env checks now fail closed when `DATAFORGE_GROQ_API_KEY` / `GROQ_API_KEY` is absent or placeholder while public LLM fallbacks are disabled; public fallbacks are rejected by the production checker. `.env.production.example` now documents `DATAFORGE_GROQ_API_KEY` as required for AI structuring. Regression test covers missing, prefixed, and legacy-key cases.
 
 ### F-DB-002
 
 - **priority:** P1
-- **status:** verified
+- **status:** not_reproducible
 - **category:** infrastructure / db_migrations / no_schema_version_tracking
 - **file_path:** `backend/init-db/init.sql:13-21`
 - **line_function:** init.sql header + comments
-- **evidence:** Tables are created by `app.postgres_repository._ensure_schema()` at runtime, not by versioned DDL files. There is no `schema_version` table to track applied migrations.
+- **evidence:** Current checkout has `POSTGRES_SCHEMA_VERSION = 8`, `run_postgres_migrations()` creates and updates `schema_version`, `backend/migrations/008_postgres_storage_v8.sql` exports `public.schema_version`, and storage health reports the schema version.
 - **why_it_matters:** Multiple app versions running against the same database could race on schema apply. Operators cannot rebuild the schema by replaying files (see F-DB-001).
 - **impact:** Schema drift during rolling deploys.
 - **recommended_fix:** Export `_ensure_schema()` DDL into versioned files. Add a `schema_version` table the app reads on boot to determine whether migrations should run.
 - **tests_needed:** Boot against an empty DB applies migrations in order; boot against a migrated DB skips migrations.
 - **acceptance_criteria:** Schema version is queryable from outside the app process.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Session 94 current-state check: the original claim is stale. Postgres schema version tracking is present in `backend/app/storage_migrations.py`, exported in `backend/migrations/008_postgres_storage_v8.sql`, and guarded by `backend/tests/test_infra_monitoring_foundation.py::test_postgres_schema_version_tracking_is_current_checkout_reality`.
 
 ### F-DOCKER-003
 
@@ -1592,19 +1592,19 @@ Status is `verified` unless noted.
 - **category:** infrastructure / monitoring / missing_alerts
 - **file_path:** `prometheus_alerts.yml`
 - **line_function:** file-level coverage
-- **evidence:** 14 alert rules cover app signals. None for PG disk, container OOM, TLS cert expiry, `AlertmanagerDown`, `node-exporter`, `blackbox-exporter HTTPS`.
+- **evidence:** 16 alert rules now cover app signals plus Alertmanager down and metrics-scrape/root-cause separation. Still missing PG disk, container OOM, TLS certificate expiry, node-exporter, cadvisor, and public HTTPS blackbox coverage.
 - **why_it_matters:** Operator blind spots in incident response.
 - **impact:** Real outages missed because no alert fires.
 - **recommended_fix:** Add scrape jobs for `node_exporter`, `cadvisor`, `blackbox_exporter`; add corresponding rules.
 - **tests_needed:** Each new alert fires under synthetic condition.
 - **acceptance_criteria:** Comprehensive alerting on infra signals.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Session 94 partial: added `blackbox-exporter` for internal DataForge readiness and `DataForgeAlertmanagerDown`; this also fixed F-MON-003 and F-MON-010. Broader infra coverage remains open here until PG disk, container OOM, TLS expiry, node-exporter, cadvisor, and public HTTPS probes are added and tested.
 
 ### F-MON-005
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / self_scrape_pollution
 - **file_path:** `prometheus.yml:27-34, 53-54`
 - **line_function:** `alert_relabel_configs` vs self-scrape
@@ -1615,12 +1615,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic scrape with `instance_label_inconsistency` test passes.
 - **acceptance_criteria:** Self-metrics labels are uniquely tagged.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 94: Prometheus self-scrape now relabels `instance` to `prometheus-self`, so self-series no longer inherit the ambiguous target label `prometheus:9090`. Regression test asserts the relabel remains present.
 
 ### F-MON-006
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / lifecycle_auth_missing
 - **file_path:** `prometheus_web.yml:18`, `docker-compose.prod.yml:303`
 - **line_function:** `--web.enable-lifecycle` + empty `basic_auth_users`
@@ -1631,12 +1631,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic `curl -X POST /-/reload` succeeds.
 - **acceptance_criteria:** Reload works without container restart.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 94: `--web.enable-lifecycle` was removed while `prometheus_web.yml` intentionally has empty `basic_auth_users`; lifecycle reload is no longer exposed in a broken unauthorized state. Regression test enforces disabled lifecycle whenever auth users are absent.
 
 ### F-MON-008
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / slack_channel_silent_miss
 - **file_path:** `alertmanager.yml:132, 145, 156`
 - **line_function:** `channel: '#alerts-critical'` etc.
@@ -1647,12 +1647,12 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic channel-typo deploy fails the gate.
 - **acceptance_criteria:** Slack channel reachability is asserted on every prod deploy.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 94: `scripts/run_alert_delivery_drill.py` adds `--channel-assert-reachable`, calling Slack `conversations.info` with `SLACK_BOT_TOKEN` and `ALERTMANAGER_SLACK_CHANNEL_ID`. `scripts/smoke_prod_stack.sh` enables the check when credentials are present and fails closed when Slack delivery is configured without channel-validation credentials. Env templates document both knobs.
 
 ### F-MON-010
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / api_down_rootcause_ambiguity
 - **file_path:** `prometheus.yml:60-61`
 - **line_function:** `DataForgeAPIInstanceDown` alert
@@ -1663,7 +1663,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Synthetic 401 state fires `MetricsTokenInvalid`, not `DataForgeAPIInstanceDown`.
 - **acceptance_criteria:** Pages are labelled with the correct root cause.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80).
+- **notes:** Fixed Session 94: `blackbox-exporter` now probes `http://dataforge:8000/ready`; `DataForgeAPIInstanceDown` keys on readiness probe failure, while `DataForgeMetricsScrapeFailed` fires when the `/metrics` scrape is down but readiness succeeds. This separates token/routing mistakes from API downtime. Promtool validates the updated rules.
 
 ### F-DB-003
 

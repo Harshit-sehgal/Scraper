@@ -45,7 +45,4 @@ class TestPackageJsonHasNoProductionDeps:
         """A static SPA ``import`` from a non-dev namespace would imply a prod dep."""
         manifest = json.loads(_read(PACKAGE_JSON))
         deps = set((manifest.get("dependencies") or {}).keys())
-        assert not deps, (
-            "F-NPM-003: production dependencies present; runtime"
-            " imports are out of scope of this static-build repo."
-        )
+        assert not deps, "F-NPM-003: production dependencies present; runtime imports are out of scope of this static-build repo."

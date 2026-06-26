@@ -60,8 +60,7 @@ class TestDockerignoreExcludesSecretsDumps:
         assert not missing, (
             "F-DOCKER-004: .dockerignore is missing required"
             " patterns that keep plaintext dumps and seed scripts"
-            " out of the build context:\n  - " + "\n  - ".join(missing)
-            + "\nA future contributor who drops a `.secrets/dump.sql`"
+            " out of the build context:\n  - " + "\n  - ".join(missing) + "\nA future contributor who drops a `.secrets/dump.sql`"
             " would ship it into the image."
         )
 
@@ -87,7 +86,7 @@ class TestDockerignoreExcludesSecretsDumps:
                 dump_path.unlink(missing_ok=True)
                 return
             rel = ".secrets/synthetic_dump.sql"
-            res = subprocess.run(  # noqa: S603
+            res = subprocess.run(
                 [git_bin, "check-ignore", "-v", rel],
                 cwd=REPO_ROOT,
                 capture_output=True,

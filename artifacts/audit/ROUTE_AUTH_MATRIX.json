@@ -191,7 +191,7 @@
       "route_dependency": "none",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no",
-      "test_coverage": "unknown"
+      "test_coverage": "yes"
     },
     {
       "method": "GET",

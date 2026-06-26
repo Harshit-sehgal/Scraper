@@ -49,8 +49,7 @@ class TestBackupDrillRefusesPortCollisions:
     def test_help_lists_drill_instance_port(self) -> None:
         out = _run_help()
         assert "--drill-instance-port" in out, (
-            "F-SCRIPT-005: backup drill is missing"
-            " ``--drill-instance-port`` so CI can't pick a free host port."
+            "F-SCRIPT-005: backup drill is missing ``--drill-instance-port`` so CI can't pick a free host port."
         )
 
     def test_help_lists_allow_collision(self) -> None:

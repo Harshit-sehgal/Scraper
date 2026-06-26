@@ -63,11 +63,12 @@ class TestPostgresMigrationIsDDLOnly:
             table = m.group(1).strip()
             if table == "public.schema_version":
                 continue
-            raise AssertionError(
+            msg = (
                 f"F-DB-004: migration file carries an INSERT into"
                 f" ``{table}``. Only DDL plus the schema_version"
                 f" stamp may reach the committed .sql file."
             )
+            raise AssertionError(msg)
 
     def test_no_dml_statements(self) -> None:
         """Top-level UPDATE/SELECT/DELETE FROM outside the schema-version stamp."""
@@ -83,10 +84,7 @@ class TestPostgresMigrationIsDDLOnly:
             # file is the schema_version INSERT's DO NOTHING and is
             # never a top-level UPDATE/SELECT/DELETE FROM).
             bad.append(f"line {line_no}: {line}")
-        assert not bad, (
-            "F-DB-004: migration file carries DML outside the schema"
-            " stamp:\n  " + "\n  ".join(bad)
-        )
+        assert not bad, "F-DB-004: migration file carries DML outside the schema stamp:\n  " + "\n  ".join(bad)
 
     def test_values_clauses_outside_schema_version(self) -> None:
         """Every VALUES clause must belong to the schema_version stamp."""
@@ -95,11 +93,9 @@ class TestPostgresMigrationIsDDLOnly:
             # Find the statement boundary (prior ';' or start of file).
             boundary = text.rfind(";", 0, m.start())
             start = boundary + 1 if boundary != -1 else 0
-            statement = text[start:m.end() + 200]
+            statement = text[start : m.end() + 200]
             if "public.schema_version" in statement:
                 continue
             raise AssertionError(
-                "F-DB-004: migration VALUES clause outside the"
-                " schema_version stamp:\n  "
-                + statement.splitlines()[0].strip()
+                "F-DB-004: migration VALUES clause outside the schema_version stamp:\n  " + statement.splitlines()[0].strip()
             )

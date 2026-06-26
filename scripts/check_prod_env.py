@@ -32,6 +32,8 @@ REQUIRED_VARS = [
     "DATAFORGE_WORKER_QUEUE",
     "DATAFORGE_METRICS_TOKEN",
     "DATAFORGE_ENV",
+    "GRAFANA_USER",
+    "GRAFANA_PASSWORD",
 ]
 
 FILE_BACKED_SECRET_VARS = (
@@ -141,7 +143,7 @@ def load_env_file(path: Path) -> dict[str, str]:
 def load_effective_env(path: Path) -> dict[str, str]:
     """Load env-file values and overlay process environment variables."""
     env = load_env_file(path)
-    env.update({key: value for key, value in os.environ.items() if key.startswith(("DATAFORGE_", "GRAFANA_"))})
+    env.update({key: value for key, value in os.environ.items() if key.startswith(("DATAFORGE_", "GRAFANA_", "GROQ_"))})
     _load_file_backed_secrets(env, path.parent)
     return env
 
@@ -348,6 +350,60 @@ def check_grafana_password(value: str) -> bool:
     if len(value) < 8:
         print(f"  [FAIL]  GRAFANA_PASSWORD is too short ({len(value)} chars). Must be at least 8 characters.")
         return False
+    return True
+
+
+def check_grafana_user(value: str) -> bool:
+    """Validate the production Grafana admin username.
+
+    The production Compose file wires a single Grafana administrator
+    through ``GF_SECURITY_ADMIN_USER``. Keep the supported username
+    explicit in the startup gate so an accidental ``GRAFANA_USER=ops``
+    drift is caught before deployment instead of creating an unexpected
+    one-off local admin account.
+    """
+    normalized = value.strip()
+    if normalized != "admin":
+        print(
+            f"  [FAIL]  GRAFANA_USER={normalized!r}. Production supports the "
+            "single default Grafana admin account only; keep GRAFANA_USER=admin "
+            "and rotate GRAFANA_PASSWORD instead.",
+        )
+        return False
+    return True
+
+
+def check_llm_provider_credentials(env: dict[str, str]) -> bool:
+    """Validate production has explicit LLM credentials for AI paths."""
+    fallbacks_enabled = env.get("DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if fallbacks_enabled:
+        print(
+            "  [FAIL]  DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=true is not accepted "
+            "by the production checker. Configure an authenticated LLM provider "
+            "instead so prompts are not sent to unauthenticated public fallbacks.",
+        )
+        return False
+
+    prefixed = env.get("DATAFORGE_GROQ_API_KEY", "").strip()
+    legacy = env.get("GROQ_API_KEY", "").strip()
+    value = prefixed or legacy
+    if not value:
+        print(
+            "  [FAIL]  DATAFORGE_GROQ_API_KEY / GROQ_API_KEY is not set. "
+            "AI structuring and schema suggestion paths require an explicit "
+            "LLM provider key in production.",
+        )
+        return False
+    if _is_placeholder_secret(value) or len(value) < 16:
+        source = "DATAFORGE_GROQ_API_KEY" if prefixed else "GROQ_API_KEY"
+        print(f"  [FAIL]  {source}={_mask_value(source, value)} is missing or a placeholder.")
+        return False
+    print("  [OK]    LLM provider credentials configured")
     return True
 
 
@@ -679,6 +735,12 @@ def main() -> int:
             "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)",
         ),
         (
+            "GRAFANA_USER",
+            True,
+            check_grafana_user,
+            "Production supports the single default Grafana admin username: admin",
+        ),
+        (
             "PAYPAL_CLIENT_ID",
             True,
             check_paypal_client_id,
@@ -746,6 +808,9 @@ def main() -> int:
             all_pass = False
 
     if not check_distinct_api_keys(env):
+        all_pass = False
+
+    if not check_llm_provider_credentials(env):
         all_pass = False
 
     # ── Postgres Connectivity (if storage backend is postgres) ───────────

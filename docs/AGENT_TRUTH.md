@@ -1,22 +1,149 @@
 # Agent Truth - DataForge Scraper
 
 _Truth source current as of 2026-06-26 local time from the working tree.
-Last verified: Session 92 audit-batch truth reconciliation. Quick
-validation is green (`20260626T045929Z_quick`, 13/13 passed) and
-security validation is green (`20260626T050145Z_security`, 9/9 passed,
-including Bandit, pip-audit, and the expected production env template
-placeholder check behavior). `artifacts/audit/ISSUE_LEDGER.md` /
-`.csv` now agree on 105 issue IDs: 17 open verified/deferred rows
-(`P1=11`, `P2=6`), 84 fixed rows, 3 candidate rows, 1
-not-reproducible row, and 0 open P0 rows.
+Last verified: Session 94 infra monitoring/nginx hardening pass.
+Full validation is green (`20260626T054628Z_full`, 24/24 passed),
+including backend full tests, ruff, pyflakes, mypy, Bandit, pip-audit,
+the expected production env template placeholder check, npm ci,
+frontend tests, JS formatting, and CSS lint. This session also ran green
+quick (`20260626T053702Z_quick`) and security
+(`20260626T053732Z_security`) gates before the final full pass.
+`artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
+4 open verified/deferred rows (`P1=2`, `P2=2`), 95 fixed rows, 3
+candidate rows, 3 not-reproducible rows, and 0 open P0 rows.
 Current route inventory is 161 routes; route auth matrix has 150 API
 rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
-inventory lists 27,196 files, 998 project-owned files, 994 deeply
+inventory lists 27,354 files, 1,002 project-owned files, 998 deeply
 inspected project-owned files, and 0 file-ledger follow-up rows._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 94 Infra Monitoring / Nginx Foundation Pass - 2026-06-26
+
+Scope: close locally provable infrastructure monitoring and nginx
+foundation rows without claiming staging, HA, host-level observability,
+or production alert-delivery proof.
+
+### Issues Fixed / Reconciled
+
+- `F-NGINX-004`: active nginx security header values now live in
+  `nginx/security_headers.conf`, mounted read-only into the production
+  nginx container. `nginx.conf` includes that snippet at the HTTPS
+  server level and in cache-header locations, removing the repeated
+  per-location header blocks.
+- `F-MON-003`: Prometheus now scrapes `alertmanager:9093`, and
+  `prometheus_alerts.yml` has a critical `DataForgeAlertmanagerDown`
+  alert. This is explicit down-alert coverage, not HA failover.
+- `F-MON-005`: Prometheus self-scrape relabels `instance` to
+  `prometheus-self`, avoiding ambiguous self-series labels.
+- `F-MON-006`: Prometheus lifecycle reload is disabled while
+  `prometheus_web.yml` has no `basic_auth_users`; the config no longer
+  exposes a reload endpoint that only returns 401.
+- `F-MON-008`: `scripts/run_alert_delivery_drill.py` adds
+  `--channel-assert-reachable`, backed by Slack `conversations.info`.
+  The production smoke enables it when Slack validation credentials are
+  present and fails closed when Slack delivery is configured without
+  `SLACK_BOT_TOKEN` / `ALERTMANAGER_SLACK_CHANNEL_ID`.
+- `F-MON-010`: `blackbox-exporter` probes internal `/ready`.
+  `DataForgeAPIInstanceDown` now keys on readiness probe failure, while
+  `DataForgeMetricsScrapeFailed` isolates metrics-token/routing failure
+  when `/metrics` is down but readiness succeeds.
+- `F-DB-002`: moved to `not_reproducible`; current code already has
+  `POSTGRES_SCHEMA_VERSION`, `schema_version` creation/update, exported
+  Postgres migration SQL, and storage health schema-version reporting.
+- `F-MON-004`: partially reduced but still open. This session added
+  internal blackbox readiness and AlertmanagerDown, but the row still
+  tracks missing PG disk, container OOM, TLS expiry, node-exporter,
+  cadvisor, and public HTTPS blackbox coverage.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before Session 94 edits passed; run id `20260626T053702Z_quick`. |
+| `python3 -m pytest backend/tests/test_infra_monitoring_foundation.py -q -o addopts=` | 1 | RED before fix; 8 failures proved missing nginx header snippet, missing Alertmanager scrape/down alert, missing self-scrape relabel, lifecycle mismatch, missing blackbox readiness/token-root-cause split, and missing Slack channel-reachability gate. |
+| `python3 -m pytest backend/tests/test_infra_monitoring_foundation.py -q -o addopts=` | 0 | PASS after fixes; 9/9 tests passed. |
+| `python3 -m pytest backend/tests/test_infra_monitoring_foundation.py backend/tests/test_p1_config_monitoring_foundation.py backend/tests/test_alerting_channel_smoke.py backend/tests/test_read_only_root_fs.py backend/tests/test_nginx_tls_posture.py backend/tests/test_nginx_unknown_host_lockdown.py backend/tests/test_nginx_catch_all_host_lock.py backend/tests/test_nginx_keepalive_requests_pin.py -q -o addopts=` | 0 | PASS; 37 adjacent infra/config/nginx tests passed. |
+| `DATAFORGE_IMAGE_TAG=v-test DATAFORGE_DB_PASSWORD=strong-password-xyz DATAFORGE_METRICS_TOKEN=metrics-token-xyz docker compose -f docker-compose.prod.yml config -q` | 0 | PASS; production Compose renders with the new blackbox service and nginx header snippet mount. |
+| `docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$PWD/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro" -v "$TMPDIR/ssl:/etc/nginx/ssl:ro" nginx:1.27-alpine nginx -t` | 0 | PASS; production nginx config syntax is valid with the shared security-header snippet mounted. |
+| `docker run --rm --entrypoint=promtool -v "$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro" -v "$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" prom/prometheus:v2.53.0 check config /etc/prometheus/prometheus.yml` | 0 | PASS; Prometheus config is valid and `prometheus_alerts.yml` has 16 valid rules. |
+| `python3 -m pytest backend/tests/test_alert_delivery_drill.py backend/tests/test_run_worker_cli.py backend/tests/test_dockerignore_blocks_secrets.py backend/tests/test_npm_no_prod_deps.py backend/tests/test_npm_pin_no_range.py backend/tests/test_postgres_migration_ddl_only.py -q -o addopts=` | 0 | PASS; 23 tests covering follow-up fixes and formatter-touched guard files passed. |
+| `python3 -m ruff check backend scripts && python3 -m ruff format --check backend scripts` | 0 | PASS; 628 Python files checked/formatted. |
+| `python3 -m mypy backend` | 0 | PASS; 596 source/test files type-checked. |
+| `python3 scripts/verify_docs_match_code.py && git diff --check` | 0 | PASS; route/env docs match code and no whitespace errors. |
+| `python3 scripts/generate_route_inventory.py && python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; route inventory regenerated at 161 routes; auth matrix regenerated at 150 API rows with `unknown_auth=0`, `unknown_tenant=0`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated file inventory: 27,354 total files, 1,002 project-owned, 998 deeply inspected, 0 follow-up rows. |
+| `python3 scripts/validate_local.py --full` | 1 | Initial full rerun failed; backend alert-drill tests needed new config fields, and full ruff/mypy surfaced style/type issues. Those were fixed before final validation. |
+| `python3 scripts/validate_local.py --full` | 0 | Final full validation passed; run id `20260626T054628Z_full`, 24/24 checks passed. |
+
+### Remaining Constraints
+
+Open verified/deferred rows are now `P1-OPS-LOAD-ALERT-001`,
+`F-DRIFT-001`, `F-FRONTEND-001`, and `F-MON-004`. The project remains
+pre-production until staging load/alert proof, writable-volume
+narrowing, host-level monitoring alerts, TLS expiry coverage, and the
+frontend build/CSS foundation are addressed and proven.
+
+## Session 93 P1 Config/Docs/Monitoring Foundation Pass - 2026-06-26
+
+Scope: close locally provable P1 rows in configuration, documentation,
+and monitoring without touching staging-blocked operational proof.
+
+### Issues Fixed / Reconciled
+
+- `F-DOC-001`: README now states that `make validate` runs
+  `python3 scripts/validate_local.py --full`, and documents
+  `make validate-quick` as the bounded quick gate.
+- `F-ENV-002`: `.env.example` and `.env.production.example` now both
+  document `DATAFORGE_TELEGRAM_ENABLED`,
+  `DATAFORGE_TELEGRAM_BOT_TOKEN`, and
+  `DATAFORGE_TELEGRAM_CHAT_ID`.
+- `F-ENV-003`: `scripts/check_prod_env.py` now lists
+  `GRAFANA_USER` / `GRAFANA_PASSWORD` in `REQUIRED_VARS` and rejects
+  `GRAFANA_USER=ops`, keeping the production Grafana admin account
+  explicitly `admin`.
+- `F-ENV-005`: production env checks now fail closed if
+  `DATAFORGE_GROQ_API_KEY` / `GROQ_API_KEY` is absent or placeholder
+  while public LLM fallbacks are disabled. Public LLM fallbacks are
+  rejected by the production checker.
+- `F-MON-007`: the critical Alertmanager route no longer has
+  `continue: true`, preventing critical alerts from duplicating into
+  the default email receiver.
+- `F-MON-009`: moved to `not_reproducible` based on current checkout
+  evidence. `/metrics` already exports
+  `dataforge_repo_query_latency_seconds{quantile="0.95"}`, and
+  `prometheus_alerts.yml` queries the same labelled gauge. The new
+  regression test locks that contract.
+- `artifacts/audit/ISSUE_LEDGER.csv` now parses as 105 rows with
+  `malformed_extra_fields=0`; seven pre-existing comma-split note rows
+  were repaired while updating the six target issue rows.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits passed; run id `20260626T051011Z_quick`, 13/13 checks passed. |
+| `python3 -m pytest backend/tests/test_p1_config_monitoring_foundation.py -q -o addopts=` | 1 | RED before fix; 5 failures covered README validate wording, missing notification env docs, missing Grafana user check, missing LLM provider gate, and Alertmanager `continue: true`; 1 test harness fixture error was corrected before final validation. |
+| `python3 -m pytest backend/tests/test_p1_config_monitoring_foundation.py -q -o addopts=` | 0 | PASS after fixes; 6/6 tests passed. |
+| `python3 -m pytest backend/tests/test_check_prod_env.py backend/tests/test_check_prod_env_hash_values.py backend/tests/test_alerting_channel_smoke.py backend/tests/test_metrics_observability.py backend/tests/test_p1_config_monitoring_foundation.py -q -o addopts=` | 0 | PASS; 105 adjacent config, alerting, metrics, and P1 regression tests passed. |
+| `python3 scripts/verify_docs_match_code.py && git diff --check` | 0 | PASS; route/env docs match code and no whitespace errors. |
+| `DATAFORGE_SKIP_DB_CHECK=true python3 scripts/check_prod_env.py --env-file .env.production.example` | 1 | Expected template failure; placeholders still fail closed, and the output now also flags placeholder `DATAFORGE_GROQ_API_KEY`. |
+| `python3 -m ruff format backend/tests/test_p1_config_monitoring_foundation.py scripts/check_prod_env.py && python3 -m ruff check backend/tests/test_p1_config_monitoring_foundation.py scripts/check_prod_env.py && python3 -m ruff format --check backend/tests/test_p1_config_monitoring_foundation.py scripts/check_prod_env.py` | 0 | PASS; changed Python files formatted and linted. |
+| `python3 - <<'PY' ... ISSUE_LEDGER.csv / ISSUE_LEDGER.md agreement ... PY` | 0 | PASS; 105 rows, statuses `fixed=89`, `verified=10`, `deferred=1`, `candidate=3`, `not_reproducible=2`; open priorities `P1=5`, `P2=6`; Markdown/CSV mismatches `0`; malformed extra CSV fields `0`. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated file inventory: 27,233 total files, 999 project-owned, 995 deeply inspected, 0 follow-up rows. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after all edits; run id `20260626T052032Z_quick`, 13/13 checks passed. |
+| `python3 scripts/validate_local.py --security` | 0 | PASS after all edits; run id `20260626T052103Z_security`, 9/9 checks passed including Bandit and pip-audit. |
+
+### Remaining Constraints
+
+The remaining open verified/deferred P1 rows are
+`P1-OPS-LOAD-ALERT-001`, `F-DRIFT-001`, `F-NGINX-004`, `F-MON-003`,
+and `F-DB-002`. The project remains pre-production until staging alert
+delivery/load proof, writable-volume narrowing, nginx header
+deduplication, Alertmanager availability, and schema-version tracking
+are handled and validated.
 
 ## Session 92 Audit-Batch Truth Reconciliation - 2026-06-26
 

@@ -31,6 +31,9 @@ def _config(
         alert_duration_seconds=300,
         notification_evidence=notification_evidence,
         require_notification_evidence=require_notification_evidence,
+        channel_assert_reachable=False,
+        slack_bot_token="",
+        slack_channel_id="",
         extra_labels={"environment": "test"},
     )
 

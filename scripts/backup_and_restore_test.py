@@ -293,24 +293,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Backup/Restore drill — spins a disposable Postgres,"
-            " seeds it, backs up, restores, and verifies row counts."
+            "Backup/Restore drill — spins a disposable Postgres, seeds it, backs up, restores, and verifies row counts."
         ),
     )
     parser.add_argument(
         "--drill-instance-port",
         type=int,
         default=DEFAULT_PG_PORT,
-        help="Host port to bind the disposable Postgres to"
-        f" (default: {DEFAULT_PG_PORT}).",
+        help=f"Host port to bind the disposable Postgres to (default: {DEFAULT_PG_PORT}).",
     )
     parser.add_argument(
         "--allow-collision",
         action="store_true",
-        help=(
-            "Opt-in override that lets the drill shadow a Postgres"
-            " already listening on ``--drill-instance-port``."
-        ),
+        help=("Opt-in override that lets the drill shadow a Postgres already listening on ``--drill-instance-port``."),
     )
     return parser.parse_args(argv)
 

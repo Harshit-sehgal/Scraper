@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import importlib.util as importlib_util
 import signal
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
@@ -30,9 +32,9 @@ def _import_script() -> ModuleType:
     if module_name in sys.modules:
         return importlib.reload(sys.modules[module_name])
 
-    spec = importlib.util.spec_from_file_location(module_name, SCRIPT_PATH)
+    spec = importlib_util.spec_from_file_location(module_name, SCRIPT_PATH)
     assert spec is not None, f"could not load spec for {SCRIPT_PATH}"
-    module = importlib.util.module_from_spec(spec)
+    module = importlib_util.module_from_spec(spec)
     sys.modules[module_name] = module
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -102,7 +104,7 @@ def _patch_worker_queue(monkeypatch, queue: _FakeQueue) -> None:
 
 def _patch_heartbeat(monkeypatch, heartbeat_cls: type) -> None:
     heartbeat_module = ModuleType("app.worker_heartbeat")
-    heartbeat_module.HeartbeatManager = heartbeat_cls
+    heartbeat_module.HeartbeatManager = heartbeat_cls  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "app.worker_heartbeat", heartbeat_module)
 
 
@@ -210,9 +212,9 @@ class TestRunWorkerContinuousMode:
 
         class _FakeLoop:
             def __init__(self) -> None:
-                self.handlers: dict[signal.Signals, object] = {}
+                self.handlers: dict[signal.Signals, Callable[[], None]] = {}
 
-            def add_signal_handler(self, sig: signal.Signals, callback: object) -> None:
+            def add_signal_handler(self, sig: signal.Signals, callback: Callable[[], None]) -> None:
                 self.handlers[sig] = callback
 
         fake_loop = _FakeLoop()

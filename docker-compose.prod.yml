@@ -267,6 +267,7 @@ services:
       - "${HOST:-0.0.0.0}:${HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
       - ./frontend:/usr/share/nginx/html/frontend:ro
       - ${DATAFORGE_NGINX_SSL_DIR:-./.secrets/nginx}:/etc/nginx/ssl:ro
       - ${DATAFORGE_CERTBOT_WEBROOT:-./.secrets/certbot/www}:/var/www/certbot:ro
@@ -299,11 +300,9 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro
       - ./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro
-      # web.yml carries the lifecycle-reload basic-auth users. The
-      # list is empty by default so ``/-/reload`` is rejected
-      # outright — add a ``basic_auth_users:`` block here and pass
-      # the matching credentials to enable runtime config reloads
-      # without exposing an unauthenticated restart endpoint.
+      # web.yml is still mounted for future TLS/basic-auth settings.
+      # Runtime lifecycle reload is disabled by default because this
+      # file intentionally has no basic_auth_users.
       - ./prometheus_web.yml:/etc/prometheus/web.yml:ro
       - prometheus_data:/prometheus
     entrypoint: ["/bin/sh", "-c"]
@@ -320,8 +319,7 @@ services:
           --storage.tsdb.retention.time=30d \
           --web.console.libraries=/etc/prometheus/console_libraries \
           --web.console.templates=/etc/prometheus/consoles \
-          --web.config.file=/etc/prometheus/web.yml \
-          --web.enable-lifecycle
+          --web.config.file=/etc/prometheus/web.yml
     restart: unless-stopped
     logging: *default-logging
     deploy:
@@ -329,6 +327,28 @@ services:
         limits:
           memory: 256m
           cpus: "0.25"
+    init: true
+    networks:
+      - dataforge-net
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: dataforge-blackbox-exporter
+    expose:
+      - "9115"
+    volumes:
+      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.1"
+    security_opt:
+      - no-new-privileges:true
     init: true
     networks:
       - dataforge-net

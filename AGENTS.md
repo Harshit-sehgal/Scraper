@@ -185,16 +185,21 @@ are proven in the current checkout and target environment.
 | 77 | Close `P1-ARCH-STORAGE-001`: fresh `--run-postgres` storage suites exposed and fixed Postgres soft-delete restore parity; storage boundary docs now match mapper/migration/health split; 77 optional Postgres storage tests pass | ✅ Done |
 | 78 | Restore reproducible load-test tooling: `scripts/run_load_test.py` is back with JSON artifact support and unit tests; corrupt `artifacts/load_test/latest_run.json` replaced with valid output; production smoke now checks Alertmanager readiness instead of only Prometheus/Grafana | ✅ Done |
 | 79 | Add synthetic alert drill tooling: `scripts/run_alert_delivery_drill.py` posts/verifies Alertmanager v2 alerts and requires explicit notification evidence for staging readiness gates; unit tests added | ✅ Done |
+| 80 | Fix P1 config/docs/monitoring foundation drift: README validate semantics, Telegram env docs, Grafana user prod gate, LLM provider prod gate, Alertmanager critical duplicate route, repo-latency alert reconciliation | ✅ Done |
+| 81 | Fix infra monitoring/nginx foundation drift: shared nginx security-header snippet, Alertmanager scrape/down alert, Prometheus self-scrape relabel, disabled unauthenticated lifecycle reload, Slack channel reachability gate, blackbox readiness/root-cause split, full validation green | ✅ Done |
 
 ## Active Risks
 
 - `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
 
-## Open Verified Issues (1 remaining, P1)
+## Open Verified Issues (4 remaining: P1=2, P2=2)
 
 | ID | Category | Summary |
 |----|----------|---------|
 | P1-OPS-LOAD-ALERT-001 | Ops | Local load runner/artifacts and synthetic Alertmanager drill tooling are reproducible; real alert delivery proof blocked by staging/on-call destination |
+| F-DRIFT-001 | Docker / filesystem | Production app and worker still mount `dataforge_data:/app/backend/data` writable; narrowing requires an app-level split between writable runtime data and immutable semantic state |
+| F-FRONTEND-001 | Frontend | Vanilla/static frontend still has monolithic CSS and no build/code-splitting pipeline |
+| F-MON-004 | Monitoring | Alert rules improved, but PG disk, container OOM, TLS expiry, node-exporter, cadvisor, and public HTTPS blackbox coverage remain open |
 
 ## Recently Resolved Risks
 

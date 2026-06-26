@@ -66,8 +66,7 @@ class TestPackageJsonPinnedToLockfile:
         assert not bad, (
             "F-NPM-001: package.json contains range-pinned dependencies."
             " Pinning everything to exact versions matches the lockfile"
-            " and stops `npm install` (vs `npm ci`) from drifting:\n  - "
-            + "\n  - ".join(bad)
+            " and stops `npm install` (vs `npm ci`) from drifting:\n  - " + "\n  - ".join(bad)
         )
 
     def test_pinned_versions_match_lockfile(self) -> None:
@@ -87,16 +86,13 @@ class TestPackageJsonPinnedToLockfile:
                 key = f"node_modules/{name}"
                 lock_entry = lock_pkgs.get(key)
                 if lock_entry is None:
-                    if spec.startswith("file:") or spec.startswith("link:"):
+                    if spec.startswith(("file:", "link:")):
                         continue
                     mismatches.append(f"{group_name}.{name}={spec!r}: not found in lockfile")
                     continue
                 resolved = lock_entry.get("version")
                 if resolved != spec:
-                    mismatches.append(
-                        f"{group_name}.{name}: package.json says {spec!r},"
-                        f" lockfile says {resolved!r}"
-                    )
+                    mismatches.append(f"{group_name}.{name}: package.json says {spec!r}, lockfile says {resolved!r}")
 
         assert not mismatches, (
             "F-NPM-001: package.json pins disagree with package-lock.json:\n  - "

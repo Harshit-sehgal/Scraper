@@ -463,14 +463,36 @@ fi
 # `--notification-evidence` to a follow-up run-in-prod call; we
 # deliberately do NOT enable `--require-notification-evidence` in this
 # smoke so that CI can run the gate without a real mailbox.
-DRILL_OUTPUT=$("${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml exec -T dataforge python3 /app/scripts/run_alert_delivery_drill.py \
+DRILL_EXEC_ARGS=(-T)
+DRILL_SCRIPT_ARGS=(
     --url http://alertmanager:9093 \
     --alertname "dataforge.smoke.delivery.drill" \
     --severity info \
     --drill-id "smoke-$(date +%s)" \
     --timeout 5 \
     --poll-interval 1 \
-    --json 2>&1 || true)
+    --json
+)
+SLACK_BOT_TOKEN_VALUE="${SLACK_BOT_TOKEN:-}"
+SLACK_CHANNEL_ID_VALUE="${ALERTMANAGER_SLACK_CHANNEL_ID:-}"
+if [ -n "${ENV_FILE:-}" ]; then
+    if [ -z "$SLACK_BOT_TOKEN_VALUE" ]; then
+        SLACK_BOT_TOKEN_VALUE=$(grep -E '^[[:space:]]*SLACK_BOT_TOKEN[[:space:]]*=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '[:space:]' || true)
+    fi
+    if [ -z "$SLACK_CHANNEL_ID_VALUE" ]; then
+        SLACK_CHANNEL_ID_VALUE=$(grep -E '^[[:space:]]*ALERTMANAGER_SLACK_CHANNEL_ID[[:space:]]*=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '[:space:]' || true)
+    fi
+fi
+if [ -n "${SLACK_URL:-}" ] && { [ -z "$SLACK_BOT_TOKEN_VALUE" ] || [ -z "$SLACK_CHANNEL_ID_VALUE" ]; }; then
+    echo -e "  $FAIL  Slack alerting is configured, but SLACK_BOT_TOKEN or ALERTMANAGER_SLACK_CHANNEL_ID is missing; cannot verify channel reachability."
+    ALL_PASS=false
+fi
+if [ -n "$SLACK_BOT_TOKEN_VALUE" ] && [ -n "$SLACK_CHANNEL_ID_VALUE" ]; then
+    DRILL_EXEC_ARGS+=(-e "SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN_VALUE" -e "ALERTMANAGER_SLACK_CHANNEL_ID=$SLACK_CHANNEL_ID_VALUE")
+    DRILL_SCRIPT_ARGS+=(--channel-assert-reachable)
+    echo -e "  $INFO  Slack channel reachability assertion enabled for alert drill"
+fi
+DRILL_OUTPUT=$("${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml exec "${DRILL_EXEC_ARGS[@]}" dataforge python3 /app/scripts/run_alert_delivery_drill.py "${DRILL_SCRIPT_ARGS[@]}" 2>&1 || true)
 if echo "$DRILL_OUTPUT" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert d.get('ready_status_code') == 200 and d.get('post_status_code') in (200, 202)" 2>/dev/null; then
     echo -e "  $PASS  Alertmanager delivery drill accepted (ready=200 POST=accepted)"
 else

@@ -10,13 +10,23 @@ groups:
     rules:
       # 1. API Server Liveness Alert
       - alert: DataForgeAPIInstanceDown
-        expr: up{job="dataforge"} == 0
+        expr: probe_success{job="blackbox-dataforge-ready"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
           summary: "DataForge API instance is down"
-          description: "Instance {{ $labels.instance }} has been offline for more than 1 minute."
+          description: "The unauthenticated readiness probe {{ $labels.instance }} has failed for more than 1 minute."
+
+      # 1b. Metrics Scrape Failure Alert
+      - alert: DataForgeMetricsScrapeFailed
+        expr: up{job="dataforge"} == 0 and on() probe_success{job="blackbox-dataforge-ready"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DataForge metrics scrape failed while readiness probe succeeds"
+          description: "Prometheus cannot scrape /metrics, but /ready is healthy. Check DATAFORGE_METRICS_TOKEN and internal metrics routing before treating this as API downtime."
 
       # 2. Queue Backlog Alert
       - alert: QueueBacklogHigh
@@ -170,3 +180,13 @@ groups:
         annotations:
           summary: "High rate limit block rate"
           description: "Rate limiter is blocking {{ $value | humanize }} requests/sec across both global and per-IP tiers for more than 5 minutes (threshold > 0.5 req/s). This may indicate aggressive crawling, a misconfigured RATE_LIMIT_GLOBAL setting, or a traffic spike."
+
+      # 15. Alertmanager Down
+      - alert: DataForgeAlertmanagerDown
+        expr: up{job="alertmanager"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DataForge Alertmanager is down"
+          description: "Prometheus cannot scrape Alertmanager for more than 1 minute. Alerts may not deliver until the alertmanager container is restored."

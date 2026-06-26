@@ -35,6 +35,9 @@ class AlertDrillConfig:
     alert_duration_seconds: int
     notification_evidence: str
     require_notification_evidence: bool
+    channel_assert_reachable: bool
+    slack_bot_token: str
+    slack_channel_id: str
     extra_labels: dict[str, str]
 
 
@@ -42,6 +45,12 @@ class AlertDrillConfig:
 class HttpResult:
     status_code: int
     body: str
+
+
+@dataclass(frozen=True)
+class SlackChannelCheckResult:
+    reachable: bool
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -57,6 +66,9 @@ class AlertDrillResult:
     notification_delivery_confirmed: bool
     notification_evidence: str
     require_notification_evidence: bool
+    slack_channel_check_required: bool
+    slack_channel_reachable: bool
+    slack_channel_check_reason: str
     passed: bool
     failure_reason: str
 
@@ -128,14 +140,23 @@ def build_alert_payload(config: AlertDrillConfig, *, starts_at: datetime | None 
     ]
 
 
-def http_request(method: str, url: str, *, payload: Any | None = None, timeout_seconds: float = 10.0) -> HttpResult:
+def http_request(
+    method: str,
+    url: str,
+    *,
+    payload: Any | None = None,
+    timeout_seconds: float = 10.0,
+    headers: dict[str, str] | None = None,
+) -> HttpResult:
     data = None
-    headers = {"Accept": "application/json"}
+    request_headers = {"Accept": "application/json"}
+    if headers:
+        request_headers.update(headers)
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
+        request_headers["Content-Type"] = "application/json"
 
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    request = urllib.request.Request(url, data=data, headers=request_headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             body = response.read(1_000_000).decode("utf-8", errors="replace")
@@ -143,6 +164,41 @@ def http_request(method: str, url: str, *, payload: Any | None = None, timeout_s
     except urllib.error.HTTPError as exc:
         body = exc.read(1_000_000).decode("utf-8", errors="replace")
         return HttpResult(status_code=exc.code, body=body)
+
+
+def validate_slack_channel_reachable(
+    slack_bot_token: str,
+    slack_channel_id: str,
+    *,
+    timeout_seconds: float = 10.0,
+) -> SlackChannelCheckResult:
+    """Verify a Slack channel ID is visible to the configured bot token."""
+    token = slack_bot_token.strip()
+    channel_id = slack_channel_id.strip()
+    if not token or not channel_id:
+        return SlackChannelCheckResult(False, "missing_slack_channel_credentials")
+
+    url = "https://slack.com/api/conversations.info?" + urllib.parse.urlencode({"channel": channel_id})
+    try:
+        response = http_request(
+            "GET",
+            url,
+            timeout_seconds=timeout_seconds,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    except (OSError, urllib.error.URLError) as exc:
+        return SlackChannelCheckResult(False, f"slack_request_failed:{type(exc).__name__}")
+
+    if response.status_code != 200:
+        return SlackChannelCheckResult(False, f"slack_http_{response.status_code}")
+    try:
+        payload = json.loads(response.body or "{}")
+    except json.JSONDecodeError:
+        return SlackChannelCheckResult(False, "slack_invalid_json")
+    if payload.get("ok") is True and (payload.get("channel") or {}).get("id") == channel_id:
+        return SlackChannelCheckResult(True, "ok")
+    reason = str(payload.get("error") or "slack_channel_not_reachable")
+    return SlackChannelCheckResult(False, reason)
 
 
 def alert_matches(alert: dict[str, Any], config: AlertDrillConfig) -> bool:
@@ -181,11 +237,15 @@ def build_result(
     ready_status_code: int,
     post_status_code: int,
     alert_visible: bool,
+    slack_channel_check: SlackChannelCheckResult | None = None,
     generated_at: datetime | None = None,
 ) -> AlertDrillResult:
     notification_confirmed = bool(config.notification_evidence.strip())
+    slack_check = slack_channel_check or SlackChannelCheckResult(False, "not_required")
     failure_reason = ""
-    if ready_status_code != 200:
+    if config.channel_assert_reachable and not slack_check.reachable:
+        failure_reason = f"slack_channel_unreachable:{slack_check.reason}"
+    elif ready_status_code != 200:
         failure_reason = f"alertmanager_not_ready:{ready_status_code}"
     elif post_status_code not in {200, 202}:
         failure_reason = f"alert_post_failed:{post_status_code}"
@@ -206,12 +266,31 @@ def build_result(
         notification_delivery_confirmed=notification_confirmed,
         notification_evidence=config.notification_evidence,
         require_notification_evidence=config.require_notification_evidence,
+        slack_channel_check_required=config.channel_assert_reachable,
+        slack_channel_reachable=slack_check.reachable,
+        slack_channel_check_reason=slack_check.reason,
         passed=not failure_reason,
         failure_reason=failure_reason,
     )
 
 
 def run_drill(config: AlertDrillConfig) -> AlertDrillResult:
+    slack_channel_check = SlackChannelCheckResult(False, "not_required")
+    if config.channel_assert_reachable:
+        slack_channel_check = validate_slack_channel_reachable(
+            config.slack_bot_token,
+            config.slack_channel_id,
+            timeout_seconds=config.timeout_seconds,
+        )
+        if not slack_channel_check.reachable:
+            return build_result(
+                config,
+                ready_status_code=0,
+                post_status_code=0,
+                alert_visible=False,
+                slack_channel_check=slack_channel_check,
+            )
+
     ready = http_request("GET", endpoint(config.alertmanager_url, "/-/ready"), timeout_seconds=config.timeout_seconds)
     post = HttpResult(status_code=0, body="")
     alert_visible = False
@@ -230,6 +309,7 @@ def run_drill(config: AlertDrillConfig) -> AlertDrillResult:
         ready_status_code=ready.status_code,
         post_status_code=post.status_code,
         alert_visible=alert_visible,
+        slack_channel_check=slack_channel_check,
     )
 
 
@@ -246,6 +326,8 @@ def format_human(result: AlertDrillResult) -> str:
     ]
     if result.notification_evidence:
         lines.append(f"Notification evidence:    {result.notification_evidence}")
+    if result.slack_channel_check_required:
+        lines.append(f"Slack channel reachable:  {result.slack_channel_reachable} ({result.slack_channel_check_reason})")
     lines.extend(
         [
             "",
@@ -275,6 +357,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-notification-evidence",
         action="store_true",
         help="Fail unless --notification-evidence is supplied; use for staging readiness gates",
+    )
+    parser.add_argument(
+        "--channel-assert-reachable",
+        action="store_true",
+        help="Call Slack conversations.info and fail if the configured channel is not reachable by the bot token",
+    )
+    parser.add_argument(
+        "--slack-bot-token",
+        default=os.environ.get("SLACK_BOT_TOKEN", ""),
+        help="Slack bot token with conversations:read scope; defaults to SLACK_BOT_TOKEN",
+    )
+    parser.add_argument(
+        "--slack-channel-id",
+        default=os.environ.get("ALERTMANAGER_SLACK_CHANNEL_ID", ""),
+        help="Slack channel ID to validate; defaults to ALERTMANAGER_SLACK_CHANNEL_ID",
     )
     parser.add_argument("--json", action="store_true", help="Print only JSON to stdout")
     parser.add_argument("--json-file", type=Path, help="Write JSON result to this path")
@@ -336,6 +433,9 @@ def main(argv: list[str] | None = None) -> int:
         alert_duration_seconds=args.alert_duration_seconds,
         notification_evidence=args.notification_evidence,
         require_notification_evidence=args.require_notification_evidence,
+        channel_assert_reachable=args.channel_assert_reachable,
+        slack_bot_token=args.slack_bot_token,
+        slack_channel_id=args.slack_channel_id,
         extra_labels=labels,
     )
     result = run_drill(config)

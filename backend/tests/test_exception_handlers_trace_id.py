@@ -40,12 +40,12 @@ class TestFastAPITraceIdExceptionHandlers:
 
     def test_handlers_wired_on_app(self) -> None:
         # Import inside the test so we don't pull FastAPI at collection time.
-        import app.main as M
+        import app.main as main_module
         from fastapi import FastAPI
         from starlette.exceptions import HTTPException as StarletteHTTPException
 
         app = FastAPI()
-        M.configure_exception_handlers(app)
+        main_module.configure_exception_handlers(app)
         # FastAPI stores installed handlers in ``app.exception_handlers``
         # (a dict keyed by exception class). Both must be present.
         handlers = app.exception_handlers  # type: ignore[attr-defined]
@@ -61,7 +61,7 @@ class TestFastAPITraceIdExceptionHandlers:
         )
 
     def test_http_exception_response_has_trace_id(self) -> None:
-        import app.main as M
+        import app.main as main_module
         from fastapi import FastAPI, HTTPException
         from fastapi.testclient import TestClient
 
@@ -71,7 +71,7 @@ class TestFastAPITraceIdExceptionHandlers:
         def _break() -> None:
             raise HTTPException(status_code=418, detail="drill says no")
 
-        M.configure_exception_handlers(app)
+        main_module.configure_exception_handlers(app)
         client = TestClient(app, raise_server_exceptions=False)
         res = client.get("/break-with-http")
         assert res.status_code == 418
@@ -88,7 +88,7 @@ class TestFastAPITraceIdExceptionHandlers:
         )
 
     def test_unhandled_exception_returns_structured_500(self) -> None:
-        import app.main as M
+        import app.main as main_module
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -96,9 +96,10 @@ class TestFastAPITraceIdExceptionHandlers:
 
         @app.get("/break-with-generic")
         def _break() -> None:
-            raise ValueError("synthetic test failure")
+            msg = "synthetic test failure"
+            raise ValueError(msg)
 
-        M.configure_exception_handlers(app)
+        main_module.configure_exception_handlers(app)
         client = TestClient(app, raise_server_exceptions=False)
         res = client.get("/break-with-generic")
         assert res.status_code == 500, (

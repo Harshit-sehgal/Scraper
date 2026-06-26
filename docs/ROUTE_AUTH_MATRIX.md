@@ -27,7 +27,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/intelligence/analyze-url` | protected | authenticated-user | none | yes | no | unknown | stable | protected by global /api middleware; no route-level role dependency |
+| `GET` | `/api/intelligence/analyze-url` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/cleanup/terminal` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |

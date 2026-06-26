@@ -52,6 +52,9 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['prometheus:9090']
+    relabel_configs:
+      - target_label: instance
+        replacement: prometheus-self
 
   # ─── DataForge Application Metrics ──────────────────────────────────
   - job_name: 'dataforge'
@@ -64,6 +67,35 @@ scrape_configs:
         labels:
           service: 'scraper'
           component: 'api'
+
+  # ─── DataForge Readiness Probe (no metrics token required) ───────────
+  # Distinguishes "API is down" from "Prometheus metrics token is wrong".
+  - job_name: 'blackbox-dataforge-ready'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://dataforge:8000/ready
+        labels:
+          service: 'scraper'
+          component: 'api-readiness'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ─── Alertmanager Health ────────────────────────────────────────────
+  - job_name: 'alertmanager'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['alertmanager:9093']
+        labels:
+          service: 'alertmanager'
+          component: 'alerting'
 
   # ─── PostgreSQL Exporter ────────────────────────────────────────────
   - job_name: 'postgres'
