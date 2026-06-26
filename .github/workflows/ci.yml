@@ -286,8 +286,9 @@ jobs:
         run: npm run lint:css
 
       - name: JS/CSS/JSON format check (Prettier)
-        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' \
-          'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
+        run: |
+          npx prettier --check 'frontend/**/*.{js,css,html,mjs}' \
+            'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
 
       - name: Docs lint
         run: python scripts/docs_lint.py --include-experimental
