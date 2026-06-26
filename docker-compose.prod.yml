@@ -50,7 +50,13 @@ services:
       - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
       - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
     volumes:
-      - dataforge_data:/app/backend/data
+      # F-DRIFT-001: the named volume is explicitly :rw because several
+      # runtime services write under /app/backend/data (semantic_state.json,
+      # selector_memory.json, domain_intelligence.json, audit logs, etc.).
+      # The root FS stays read_only: true; this volume is the ONLY writable
+      # surface.  If a future refactor moves these files to Postgres, change
+      # this mount to :ro.
+      - dataforge_data:/app/backend/data:rw
     secrets:
       - dataforge_api_key
       - dataforge_operator_api_key
@@ -121,7 +127,8 @@ services:
       - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
       - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
     volumes:
-      - dataforge_data:/app/backend/data
+      # F-DRIFT-001: see comment on the dataforge service.
+      - dataforge_data:/app/backend/data:rw
     secrets:
       - dataforge_api_key
       - dataforge_operator_api_key

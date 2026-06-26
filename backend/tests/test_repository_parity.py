@@ -170,6 +170,27 @@ class TestGetJobContract:
         assert loaded is not None
         assert loaded.created_by == "owner-fingerprint"
 
+    def test_get_job_preserves_tenant_fields_sqlite(self, sqlite_repo) -> None:
+        """Tenant isolation depends on org_id/project_id surviving a round-trip.
+
+        Prompt 4 (CAND-P0-STORAGE-001) flagged that ownership parity was not
+        verified end-to-end with --run-postgres. Without these fields
+        surviving, list_job_summaries() filters silently widen and one
+        tenant can see another's jobs.
+        """
+        job = _make_job(5)
+        job.org_id = "org-test-42"
+        job.project_id = "proj-test-7"
+        job.created_by = "user-test-99"
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+
+        loaded = sqlite_repo.get_job(job.id)
+
+        assert loaded is not None
+        assert loaded.org_id == "org-test-42"
+        assert loaded.project_id == "proj-test-7"
+        assert loaded.created_by == "user-test-99"
+
     def test_get_job_returns_none_for_unknown_id_sqlite(self, sqlite_repo) -> None:
         assert sqlite_repo.get_job("does-not-exist") is None
 
@@ -373,6 +394,24 @@ class TestPostgresParity:
 
         assert loaded is not None
         assert loaded.created_by == "owner-fingerprint"
+
+    def test_get_job_preserves_tenant_fields_postgres(self, postgres_repo) -> None:
+        """Same tenant-field parity as the SQLite variant — guarantees cross-backend
+        isolation contract. Without this, list_job_summaries filters by org_id
+        silently return more rows than they should.
+        """
+        job = _make_job(106)
+        job.org_id = "org-pg-42"
+        job.project_id = "proj-pg-7"
+        job.created_by = "user-pg-99"
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+
+        loaded = postgres_repo.get_job(job.id)
+
+        assert loaded is not None
+        assert loaded.org_id == "org-pg-42"
+        assert loaded.project_id == "proj-pg-7"
+        assert loaded.created_by == "user-pg-99"
 
     def test_list_summaries_returns_all_persisted_jobs_postgres(self, postgres_repo) -> None:
         jobs = {f"parity-{idx}": _make_job(idx) for idx in range(101, 104)}

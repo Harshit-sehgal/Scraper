@@ -7,7 +7,6 @@ All tool-calls must be traceable and governed by the Substrate Policy Engine.
 import asyncio
 import json
 import logging
-import re
 import threading
 from collections.abc import Callable
 from typing import Any
@@ -89,6 +88,43 @@ def _record_token_usage(response_data: dict[str, Any]) -> None:
 # ─── Legacy LLM Utility Support ──────────────────────────────────────
 
 
+def _first_balanced_json_fragment(text: str, open_char: str, close_char: str) -> str | None:
+    r"""Return the largest balanced ``open_char...close_char`` substring in ``text``.
+
+    Non-greedy regex like ``r"\{[\s\S]*?\}"`` silently truncates nested
+    JSON — e.g. ``{"a": {"b": 1}, "c": 2}`` matches only ``{"a": {"b": 1}``
+    which then fails ``json.loads``. This scans string-aware braces so
+    embedded braces inside string literals are skipped.
+    """
+    start = text.find(open_char)
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == open_char:
+            depth += 1
+            continue
+        if ch == close_char:
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def _extract_json_payload(text: str | None):
     raw = (text or "").strip()
     if not raw:
@@ -107,24 +143,28 @@ def _extract_json_payload(text: str | None):
         except json.JSONDecodeError:
             logger.debug("_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate))
 
-    match = re.search(r"\{[\s\S]*?\}", raw)
-    if match:
+    # Brace-balanced scan — preserves nested objects so we don't silently
+    # truncate {"a": {"b": 1}, "c": 2} → {"a": {"b": 1} (which the old
+    # non-greedy regex did).
+    balanced = _first_balanced_json_fragment(raw, "{", "}")
+    if balanced:
         try:
-            return json.loads(match.group(0))
+            return json.loads(balanced)
         except json.JSONDecodeError:
             logger.debug(
-                "_extract_json_payload: object JSON parse failed for match of len %d",
-                len(match.group(0)),
+                "_extract_json_payload: balanced object parse failed (len=%d)",
+                len(balanced),
             )
 
-    match = re.search(r"\[[\s\S]*?\]", raw)
-    if match:
+    # Falls through to bracket form for top-level arrays.
+    balanced = _first_balanced_json_fragment(raw, "[", "]")
+    if balanced:
         try:
-            return json.loads(match.group(0))
+            return json.loads(balanced)
         except json.JSONDecodeError:
             logger.debug(
-                "_extract_json_payload: array JSON parse failed for match of len %d",
-                len(match.group(0)),
+                "_extract_json_payload: balanced array parse failed (len=%d)",
+                len(balanced),
             )
 
     return None

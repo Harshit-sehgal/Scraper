@@ -175,8 +175,20 @@ class AntiBotEngine:
             if "akamai" in server:
                 return "akamai"
             cookies = headers_lower.get("set-cookie", "")
-            if any(p in cookies for p in ["_abck", "_px", "datadome", "incap_ses"]):
-                return "captcha"
+            # Disambiguate anti-bot cookies by their associated platform
+            # so observability labels reflect the actual blocker. Previously
+            # every bot-cookie name collapsed to "captcha", which masked
+            # Akamai / PerimeterX / DataDome / Incapsula specificity from
+            # the dataforge_anti_bot_classifications_total{classification=*}
+            # metric.
+            if "_abck" in cookies:
+                return "akamai"
+            if "_px" in cookies:
+                return "perimeterx"
+            if "datadome" in cookies:
+                return "datadome"
+            if "incap_ses" in cookies:
+                return "incapsula"
 
         return "ok"
 
@@ -291,9 +303,9 @@ class AntiBotEngine:
         age_hours = (time.time() - last_update) / 3600
         return age_hours > max_age_hours
 
-    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:  # noqa: ARG002, RUF100
+    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:
         """Determine the next step based on the block score and domain history."""
-        policy = {}
+        policy: dict[str, Any] = {}
 
         if last_score < 0.3:
             policy = {"action": "continue", "delay": 0}
@@ -308,6 +320,15 @@ class AntiBotEngine:
 
         else:
             policy = {"action": "continue", "delay": 0}
+
+        # Add jitter to the delay so concurrent scrapers hitting the same
+        # domain don't retry in lockstep (which amplifies the burst
+        # pattern that bot detectors key off of). Capped at ±25 % so the
+        # operator-configured base delay still dominates the policy.
+        base_delay = int(policy.get("delay", 0) or 0)
+        if base_delay > 0:
+            jitter = random.uniform(-0.25, 0.25)
+            policy["delay"] = max(0, round(base_delay * (1.0 + jitter)))
 
         # Include current proxy info if available
         if self.proxy_manager.enabled:

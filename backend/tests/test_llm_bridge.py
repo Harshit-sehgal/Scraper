@@ -75,6 +75,30 @@ class TestExtractJsonPayload:
         result = _extract_json_payload(text)
         assert result == {"level1": {"level2": [1, 2, 3]}}
 
+    def test_nested_json_embedded_in_text(self) -> None:
+        """Old non-greedy regex would match ``{"a": {"b": 1`` and fail."""
+        text = 'Sure, here is the answer: {"outer": {"inner": 42, "list": [1, 2]}, "end": "ok"}'
+        result = _extract_json_payload(text)
+        assert result == {"outer": {"inner": 42, "list": [1, 2]}, "end": "ok"}
+
+    def test_nested_array_embedded_in_text(self) -> None:
+        """Old regex would match ``[[1, [2,`` for a nested array."""
+        text = "Here: [[1, [2, 3]], [4, 5]] done."
+        result = _extract_json_payload(text)
+        assert result == [[1, [2, 3]], [4, 5]]
+
+    def test_brace_inside_string_literal_skipped(self) -> None:
+        """String literal braces must not trick the scanner into early
+        termination — the scanner is string-aware."""
+        text = '{"key": "a value with } curly } inside"}'
+        result = _extract_json_payload(text)
+        assert result == {"key": "a value with } curly } inside"}
+
+    def test_escaped_quotes_inside_string_skipped(self) -> None:
+        text = '{"key": "escaped \\" quote here"}'
+        result = _extract_json_payload(text)
+        assert result == {"key": 'escaped " quote here'}
+
 
 # ─── _should_retry_http_error ──────────────────────────────────────────
 

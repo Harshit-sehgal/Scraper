@@ -129,8 +129,13 @@ groups:
           description: "Content-Security-Policy report-only violations are occurring at {{ $value | humanize }} violations/sec. Once the report-only period shows zero violations for a full release cycle, the CSP can be tightened to enforce mode."
 
       # 11. Repo Query Latency Degradation Alert — NEW
+      # F-MON-009: the metric is exposed as a gauge with a ``quantile``
+      # label by the app metrics collector (ring buffer median). The
+      # ``or on() vector(0)`` clause handles the case where no queries
+      # have been recorded yet (empty ring buffer → no series → alert
+      # would be absent without the or-clause).
       - alert: RepoQueryLatencyDegraded
-        expr: dataforge_repo_query_latency_seconds{quantile="0.95"} > 0.5
+        expr: dataforge_repo_query_latency_seconds{quantile="0.95"} > 0.5 or on() vector(0)
         for: 10m
         labels:
           severity: warning
@@ -190,3 +195,33 @@ groups:
         annotations:
           summary: "DataForge Alertmanager is down"
           description: "Prometheus cannot scrape Alertmanager for more than 1 minute. Alerts may not deliver until the alertmanager container is restored."
+
+      # 16. PostgreSQL Disk Utilization Alert — F-MON-004
+      - alert: PostgresDiskUsageHigh
+        expr: pg_stat_database_tup_fetched{job="postgres"} > 0
+        for: 0s
+        labels:
+          severity: info
+        annotations:
+          summary: "Postgres disk-usage alert placeholder — pg_size metrics unavailable"
+          description: "The ``postgres_exporter`` is active and exposing Postgres metrics for service {{ $labels.instance }}. To enable actual disk-usage alerting, deploy ``pg_stat_user_tables_size`` or ``pg_database_size_bytes`` via ``postgres_exporter`` extended queries. This placeholder confirms the exporter endpoint is reachable. When extended queries are configured, replace this rule with: ``(pg_database_size_bytes{datname=\"dataforge\"} / 1024 / 1024 / 1024) > 20`` (disk > 20 GB). F-MON-004."
+
+      # 17. Container OOM Alert — F-MON-004
+      - alert: ContainerOOMKillPending
+        expr: absent(cadvisor_version_info)
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "Container OOM alert placeholder — cadvisor not deployed"
+          description: "The ``cadvisor`` metrics exporter is not currently deployed. To enable container memory pressure / OOM alerts, add a cadvisor service to ``docker-compose.prod.yml`` (image: gcr.io/cadvisor/cadvisor) and wire a scrape job in ``prometheus.yml``. Then replace this rule with: ``container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.95`` (memory > 95 % of the container limit). F-MON-004."
+
+      # 18. SSL/TLS Certificate Expiry Alert — F-MON-004
+      - alert: TLSCertificateExpiring
+        expr: absent(probe_ssl_earliest_cert_expiry)
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "TLS certificate expiry alert placeholder — TLS probe not configured"
+          description: "Blackbox exporter is deployed but the TLS expiry probe module is not active. To enable, add a ``tls_connect`` module in the blackbox-exporter config and wire a scrape job targeting ``https://<your-domain>``. Then replace this rule with: ``probe_ssl_earliest_cert_expiry - time() < 2592000`` (cert expires in < 30 days). F-MON-004."

@@ -113,6 +113,23 @@ class TestTmpfsScratchAvailable:
 class TestDataVolumeIsBounded:
     """The dataforge_data named volume must be the only :rw surface."""
 
+    def test_data_volume_explicit_rw(self) -> None:
+        """F-DRIFT-001: the data volume mount must declare :rw explicitly.
+
+        Without the explicit ``:rw`` tag, the mount mode is implicit and
+        harder to audit.  Making it explicit means a future contributor who
+        adds a new volume mount can't accidentally widen the writable
+        surface without seeing the contrast.
+        """
+        for service_name in ("dataforge", "worker"):
+            text = _service_text(service_name)
+            assert "dataforge_data:/app/backend/data:rw" in text, (
+                f"F-DRIFT-001: {service_name} service must declare the"
+                " data volume mount as ``:rw`` explicitly — implicit"
+                " write access on a ``read_only: true`` root FS is an"
+                " audit blindspot."
+            )
+
     def test_data_volume_is_mounted_at_data_root(self) -> None:
         compose = _compose_data()
         service = compose["services"]["dataforge"]

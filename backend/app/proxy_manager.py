@@ -83,7 +83,16 @@ class ProxyManager:
 
         self._success_counts[proxy] += 1
         self._consecutive_failures = 0
-        self._failure_counts[proxy] = 0
+        # Decay the failure counter rather than wiping it. The previous
+        # behavior (set to 0 on a single success) let a proxy burn 9 of
+        # its failure budget, succeed once, and immediately re-enter the
+        # pool with no memory of recent trouble — which meant
+        # PROXY_ROTATION_FAILURE_THRESHOLD could be reset by a single
+        # lucky success and the proxy would be chosen again on the next
+        # domain.
+        prior_failures = self._failure_counts.get(proxy, 0)
+        if prior_failures > 0:
+            self._failure_counts[proxy] = max(0, prior_failures - 1)
 
     def rotate(self, domain: str | None = None) -> str | None:
         """Explicitly rotate to the next proxy.

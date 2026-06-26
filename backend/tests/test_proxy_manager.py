@@ -76,10 +76,26 @@ class TestRecordFailure:
         manager.record_failure()  # This should trigger rotation
         assert manager.current_proxy != initial, "Proxy should have rotated after hitting failure threshold"
 
-    def test_resets_failure_after_success(self, manager: ProxyManager) -> None:
-        manager.record_failure()
-        manager.record_success()
-        assert manager._failure_counts["http://proxy1:8080"] == 0
+    def test_decays_failure_after_success(self, manager: ProxyManager) -> None:
+        """Success should decay (not fully erase) failure history.
+
+        Previously, a single success would reset the failure counter to
+        0, which let a intermittently-bad proxy hide behind one lucky
+        success and never reach the rotation threshold. Now, success
+        decrements the failure counter by 1 instead of resetting it, so
+        a proxy must sustain successes to recover.
+        """
+        proxy = "http://proxy1:8080"
+        # Set 2 failures manually (below threshold of 3 so no rotation yet)
+        manager._failure_counts[proxy] = 2
+
+        # One success → decay to 1, not reset to 0
+        manager.record_success(proxy)
+        assert manager._failure_counts[proxy] == 1
+
+        # Another success → decay to 0
+        manager.record_success(proxy)
+        assert manager._failure_counts[proxy] == 0
 
 
 class TestRecordSuccess:

@@ -12,6 +12,7 @@ Layers:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -658,7 +659,25 @@ async def orchestrate_extraction(
             if solidified_motifs:
                 logger.info("[Orchestrator] Using %d learned motifs for discovery guidance", len(solidified_motifs))
 
-        discovered_selectors = await discover_selectors(html, schema_fields, solidified_motifs=solidified_motifs)
+        # Bound the LLM discovery call: without this, a hung provider would
+        # stall the entire extraction cascade (this used to be the only
+        # ``await`` in the orchestrator and would silently block until the
+        # httpx/g4f timeout fired). The fallback path is Layer 4
+        # (Container Discovery), so a timeout here always degrades rather
+        # than fails the job.
+        llm_discovery_timeout_s = getattr(settings, "LLM_DISCOVERY_TIMEOUT_S", 45.0)
+        try:
+            discovered_selectors = await asyncio.wait_for(
+                discover_selectors(html, schema_fields, solidified_motifs=solidified_motifs),
+                timeout=llm_discovery_timeout_s,
+            )
+        except TimeoutError:
+            logger.warning(
+                "[Orchestrator] LLM discovery timed out after %.1fs for %s; falling through to container discovery",
+                llm_discovery_timeout_s,
+                url,
+            )
+            discovered_selectors = None
 
     if discovered_selectors and discovered_selectors.get("item_container"):
         # Phase 81: Semantic Alignment Pass + Multi-Pass Extraction
