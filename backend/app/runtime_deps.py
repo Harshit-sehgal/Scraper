@@ -86,3 +86,64 @@ def set_deps(
     global schedule_task_fn, run_job_coro_fn
     schedule_task_fn = schedule if schedule is not None else _default_schedule_task
     run_job_coro_fn = run_job if run_job is not None else _default_run_job
+
+
+# ── Runtime dependency checks ────────────────────────────────────────────
+
+# Required packages — the application will not start if any are missing.
+REQUIRED_PACKAGES: list[tuple[str, str]] = [
+    ("pydantic", "pydantic"),
+    ("fastapi", "fastapi"),
+    ("uvicorn", "uvicorn"),
+    ("httpx", "httpx"),
+    ("bs4", "beautifulsoup4"),
+]
+
+# Optional packages — the application logs a warning if missing but continues.
+OPTIONAL_PACKAGES: list[tuple[str, str]] = [
+    ("playwright", "playwright"),
+    ("aiosqlite", "aiosqlite"),
+    ("psycopg2", "psycopg2-binary"),
+    ("psycopg", "psycopg[binary,pool]"),
+]
+
+
+def check_runtime_deps(fail_on_missing: bool = True) -> dict[str, list[str]]:
+    """Verify that required and optional Python packages are importable.
+
+    Returns a dict with keys ``"missing_required"`` and ``"missing_optional"``,
+    each containing a list of pip package names that could not be imported.
+
+    Args:
+        fail_on_missing: If True (default), raise ``RuntimeError`` when any
+            required package is missing. Set False for a soft check (e.g. in
+            health endpoints).
+    """
+    missing_required: list[str] = []
+    missing_optional: list[str] = []
+
+    for module_name, pip_name in REQUIRED_PACKAGES:
+        try:
+            __import__(module_name)
+        except ImportError:
+            missing_required.append(pip_name)
+
+    for module_name, pip_name in OPTIONAL_PACKAGES:
+        try:
+            __import__(module_name)
+        except ImportError:
+            missing_optional.append(pip_name)
+
+    if missing_optional:
+        logger.warning(
+            "Optional packages not installed: %s. Some features may be unavailable.",
+            ", ".join(missing_optional),
+        )
+
+    if missing_required and fail_on_missing:
+        msg = f"Missing required packages: {', '.join(missing_required)}. Install them with: pip install " + " ".join(
+            missing_required
+        )
+        raise RuntimeError(msg)
+
+    return {"missing_required": missing_required, "missing_optional": missing_optional}

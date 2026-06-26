@@ -203,19 +203,39 @@ async def discover_selectors(
         schema_fields: Target schema fields to extract
         solidified_motifs: Optional learned structural patterns for adaptive hints
 
+    Returns:
+        Dict with ``item_container`` and ``fields`` keys on success.
+        On failure, includes ``failure_reason`` (human-readable) and
+        ``failure_category`` (one of: ``no_dom_elements``, ``llm_error``,
+        ``llm_empty_result``, ``dom_no_repeating_structure``) so callers
+        can adapt recovery strategy.
     """
     # Lazy imports to respect test patching at app.selector_discovery.*
     from app.selector_discovery import clean_html_for_selectors as _clean_html
     from app.selector_discovery import llm_json as _llm_json
+
+    # Gate: refuse empty or trivial HTML
+    if not html or len(html.strip()) < 50:
+        return {
+            "failure_reason": "HTML input is empty or too short to analyse",
+            "failure_category": "no_dom_elements",
+        }
 
     # 1. Analyze page structure
     page_analysis = _analyze_page_data_type(html, schema_fields)
 
     # 2. Map schema to CSS selectors via LLM
     html_snippet = _clean_html(html)
+    if not html_snippet or len(html_snippet.strip()) < 20:
+        return {
+            "failure_reason": "Cleaned HTML snippet is empty or too short after noise removal",
+            "failure_category": "no_dom_elements",
+        }
+
     prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis, solidified_motifs)
 
-    selectors = {}
+    selectors: dict[str, Any] = {}
+    llm_error: str | None = None
     try:
         selectors = await _llm_json(
             messages=[
@@ -227,7 +247,8 @@ async def discover_selectors(
             ],
             timeout=settings.LLM_SELECTOR_TIMEOUT,
         )
-    except (KeyError, ValueError, RuntimeError):
+    except (KeyError, ValueError, RuntimeError) as exc:
+        llm_error = str(exc)
         logger.exception("[SelectorDiscovery] LLM extraction failed")
 
     if not isinstance(selectors, dict):
@@ -237,13 +258,28 @@ async def discover_selectors(
     if container_sel and str(container_sel).strip():
         return selectors
 
+    # LLM returned no usable container — try DOM fallback
     logger.info("[SelectorDiscovery] LLM returned no item_container, falling back to DOM discovery")
     dom_selectors = _discover_selectors_from_dom(html, schema_fields)
     if dom_selectors and dom_selectors.get("item_container"):
         logger.info("[SelectorDiscovery] DOM discovery found container: %s", dom_selectors["item_container"])
         return dom_selectors
 
-    return selectors or {}
+    # Both LLM and DOM discovery failed — return structured failure metadata
+    if llm_error:
+        failure_category = "llm_error"
+        failure_reason = f"LLM extraction raised an error and DOM fallback found no repeating structure: {llm_error}"
+    elif selectors:
+        failure_category = "llm_empty_result"
+        failure_reason = "LLM returned a result but without a valid item_container selector"
+    else:
+        failure_category = "dom_no_repeating_structure"
+        failure_reason = "Both LLM and DOM fallback failed to identify a repeating data container in the page"
+
+    return {
+        "failure_reason": failure_reason,
+        "failure_category": failure_category,
+    }
 
 
 def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) -> dict | None:
