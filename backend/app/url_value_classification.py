@@ -10,8 +10,11 @@ content_quality.py; search form detection in search_form_recovery.py.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ─── Value Classification ───────────────────────────────────────────
 
@@ -62,6 +65,7 @@ def _classify_value(value: str) -> str:
                         matched_type = output_type
                         break
                 except re.error:
+                    logger.debug("Invalid regex pattern in VALUE_PATTERNS[%s]: %s", pname, pattern)
                     continue
             if matched_type:
                 break

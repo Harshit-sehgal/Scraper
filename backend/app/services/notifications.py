@@ -21,10 +21,13 @@ class TelegramNotifier:
             self._client = httpx.AsyncClient(timeout=30.0)
         return self._client
 
-    async def send_message(self, text: str) -> None:
-        """Send a simple text message to the connected chat."""
+    async def send_message(self, text: str) -> bool:
+        """Send a simple text message to the connected chat.
+
+        Returns True on success, False on failure.
+        """
         if not self.enabled or not self.token or not self.chat_id:
-            return
+            return False
 
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         payload = {"chat_id": self.chat_id, "text": text, "parse_mode": "Markdown"}
@@ -33,8 +36,10 @@ class TelegramNotifier:
             client = self._get_client()
             response = await client.post(url, json=payload)
             response.raise_for_status()
+            return True
         except Exception:
             logger.exception("Failed to send Telegram notification")
+            return False
 
     async def close(self) -> None:
         """Close the underlying HTTP client to release sockets."""
