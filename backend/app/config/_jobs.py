@@ -13,8 +13,6 @@ class JobRunnerSettings(BaseSettings):
     """Max total wall-clock seconds for one job."""
     AI_STRUCTURING_TIMEOUT_SECONDS: int = 240
     """Max seconds for the global AI structuring pass."""
-    INSIGHT_TIMEOUT_SECONDS: int = 25
-    """Max seconds for AI insight generation."""
     MAX_DISCOVERY_URLS: int = 20
     """Max URLs discovered per auto-discovery."""
     MAX_JOB_HISTORY: int = 300

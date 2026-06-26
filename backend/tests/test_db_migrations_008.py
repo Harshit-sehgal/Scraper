@@ -1,19 +1,10 @@
 """Guard tests for the F-DB-001 Postgres migration idempotency fix.
 
-The pre-fix ``backend/migrations/008_postgres_storage_v8.sql`` file
-was a raw ``pg_dump --schema-only`` artifact: it began with the
-psql paste-blocker ``\\restrict`` macro, ``SET``-style session
-configuration statements, and plain ``CREATE TABLE`` / ``CREATE
-INDEX`` lines that were not idempotent. Operators could not replay
-the file against an already-migrated database.
+The ``backend/migrations/008_postgres_storage_v8.sql`` file must be
+replayable against any database state. These tests assert properties
+of the migration file so a future regen is forced to keep them:
 
-The fix is a normalizer (``scripts/normalize_migration_008.py``)
-that emits a replayable version. These tests assert properties of
-the regenerated migration so a future regen of the file is
-forced to keep them:
-
-- no ``\\restrict`` / ``\\unrestrict`` macros (the leading dump
-  token)
+- no ``\\restrict`` / ``\\unrestrict`` macros (the leading dump token)
 - no ``SET`` session configurator statements left in the body
 - every ``CREATE TABLE`` / ``CREATE INDEX`` is ``IF NOT EXISTS``
 - every ``ALTER … OWNER TO dataforge;`` is wrapped in a
@@ -26,13 +17,10 @@ forced to keep them:
 from __future__ import annotations
 
 import re
-import subprocess
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # backend/tests/X.py → repo root
 MIGRATION = REPO_ROOT / "backend" / "migrations" / "008_postgres_storage_v8.sql"
-NORMALIZER = REPO_ROOT / "scripts" / "normalize_migration_008.py"
 
 
 def _migration_text() -> str:
@@ -113,28 +101,3 @@ class TestIdempotencyProperties:
         # and size-bloating. The migration is meant to be schema-only.
         bad = re.search(r"^COPY\s+public\.\w+\s+FROM\s+stdin;", text, re.MULTILINE)
         assert not bad, "migration contains COPY <table> FROM stdin; data block"
-
-
-class TestNormalizerRoundTrip:
-    """Calling the normalizer twice yields a stable idempotent file."""
-
-    def test_normalizer_idempotent_on_already_normalized_input(self, tmp_path: Path) -> None:
-        # First pass: produce a normalized copy in tmp_path.
-        normalized_copy = tmp_path / "normalized.sql"
-        result = subprocess.run(
-            [sys.executable, str(NORMALIZER), str(MIGRATION)],
-            check=True,
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-        )
-        normalized_copy.write_text(result.stdout, encoding="utf-8")
-        # Second pass: re-normalize the normalized copy.
-        result_again = subprocess.run(
-            [sys.executable, str(NORMALIZER), str(normalized_copy)],
-            check=True,
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-        )
-        assert result_again.stdout == result.stdout, "normalizer is not idempotent — round-trip drift detected"

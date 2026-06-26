@@ -738,8 +738,8 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 ### CAND-P1-WORKFLOW-STORAGE-001
 
 - **priority:** P1
-- **status:** candidate
-- **category:** candidate_issue / workflow_storage / persistence_parity
+- **status:** resolved
+- **category:** workflow_storage / persistence_parity
 - **file_path:** `backend/app/routers/workflow.py`, `backend/app/workflow_repository.py`, `backend/app/postgres_workflow_repository.py`, `backend/tests/test_workflow_repository_parity.py`
 - **line/function:** `_maybe_backfill_from_json`, factory `get_workflow_repository`
 - **evidence:** Replaced flat-JSON workflow store with a `WorkflowRepository` ABC + JSON adapter (default), SQLite backend, and Postgres backend (psycopg2 + psycopg3). Operators opt in via `DATAFORGE_WORKFLOW_BACKEND=sqlite|postgres`. The router now goes through `get_workflow_repository()` so existing deployments get zero behaviour change (json adapter) and SQLite/Postgres deployments get indexed tenant queries.
@@ -1079,7 +1079,7 @@ Status is `verified` unless noted.
 - **tests_needed:** Run a compromised process and assert it cannot write `semantic_state.json` while still writing logs.
 - **acceptance_criteria:** Compromise from the API process cannot tamper with `semantic_state.json`.
 - **blocked_by:** None.
-- **notes:** New finding (Session 80). **Partial guard shipped, issue still open:** regression test `backend/tests/test_read_only_root_fs.py` (6 tests) asserts the existing `read_only: true` lockdown on both dataforge and worker services, the `/tmp` tmpfs scratch on each, the precise `/app/backend/data` named-volume mount, and the absence of any hidden `read_only: false` override. This does NOT satisfy the acceptance criterion because `/app/backend/data` remains writable by the app process. The deeper recommendation (splitting `/app/backend/data` into `:ro` subpaths for `semantic` and `:rw` subpaths for `logs`) is NOT applied because `backend/app/semantic_persistence.py::save_semantic_state` writes the semantic state during normal runtime (lines 78-99); making it `:ro` would break the live runtime. Splitting requires an app-level cache split between in-memory and persisted footprint, which remains a follow-up.
+- **notes:** New finding (Session 80). **Partial guard shipped, issue still open:** regression test `backend/tests/test_read_only_root_fs.py` (6 tests) asserts the existing `read_only: true` lockdown on both dataforge and worker services, the `/tmp` tmpfs scratch on each, the precise `/app/backend/data` named-volume mount, and the absence of any hidden `read_only: false` override. This does NOT satisfy the acceptance criterion because `/app/backend/data` remains writable by the app process. **Step 4 of the forward roadmap** will split the volume into `:ro` subpaths for semantic state and `:rw` subpaths for logs, plus an in-memory cache refactor in `semantic_persistence.py` to decouple runtime writes from the persisted file. This is the remaining follow-up to fully close this issue.
 
 ### F-CI-003
 
@@ -1588,18 +1588,18 @@ Status is `verified` unless noted.
 ### F-MON-004
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** infrastructure / monitoring / missing_alerts
 - **file_path:** `prometheus_alerts.yml`
 - **line_function:** file-level coverage
-- **evidence:** 16 alert rules now cover app signals plus Alertmanager down and metrics-scrape/root-cause separation. Still missing PG disk, container OOM, TLS certificate expiry, node-exporter, cadvisor, and public HTTPS blackbox coverage.
+- **evidence:** 22 alert rules now cover app signals, Alertmanager down, metrics-scrape/root-cause separation, PG disk usage, container OOM kill, TLS certificate expiry, node-exporter, cAdvisor, and public HTTPS blackbox coverage. All gaps from the original finding are addressed.
 - **why_it_matters:** Operator blind spots in incident response.
 - **impact:** Real outages missed because no alert fires.
-- **recommended_fix:** Add scrape jobs for `node_exporter`, `cadvisor`, `blackbox_exporter`; add corresponding rules.
-- **tests_needed:** Each new alert fires under synthetic condition.
-- **acceptance_criteria:** Comprehensive alerting on infra signals.
+- **recommended_fix:** Added — see PostgresDiskUsageHigh, ContainerOOMKillPending, TLSCertificateExpiring, NodeExporterDown, CadvisorDown, PublicHTTPSProbeFailing in prometheus_alerts.yml and corresponding scrape jobs in docker-compose.prod.yml.
+- **tests_needed:** Each new alert fires under synthetic condition — covered by test_ops_load_alert_readiness.py.
+- **acceptance_criteria:** Comprehensive alerting on infra signals. ✓ met.
 - **blocked_by:** None.
-- **notes:** Session 94 partial: added `blackbox-exporter` for internal DataForge readiness and `DataForgeAlertmanagerDown`; this also fixed F-MON-003 and F-MON-010. Broader infra coverage remains open here until PG disk, container OOM, TLS expiry, node-exporter, cadvisor, and public HTTPS probes are added and tested.
+- **notes:** Session 94 partial: added blackbox-exporter + DataForgeAlertmanagerDown. Session 99 completed: added node-exporter, cAdvisor, blackbox_exporter public HTTPS probes, plus 6 new alert rules (PostgresDiskUsageHigh, ContainerOOMKillPending, TLSCertificateExpiring, NodeExporterDown, CadvisorDown, PublicHTTPSProbeFailing). All 22 rules now have real metric expressions and threshold documentation.
 
 ### F-MON-005
 

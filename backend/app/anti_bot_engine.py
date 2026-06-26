@@ -325,7 +325,7 @@ class AntiBotEngine:
         # operator-configured base delay still dominates the policy.
         base_delay = int(policy.get("delay", 0) or 0)
         if base_delay > 0:
-            jitter = random.uniform(-0.25, 0.25)
+            jitter = random.uniform(-0.25, 0.25)  # nosec B311 — jitter, not crypto
             policy["delay"] = max(0, round(base_delay * (1.0 + jitter)))
 
         # Include current proxy info if available

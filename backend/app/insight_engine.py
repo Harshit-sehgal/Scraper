@@ -27,7 +27,7 @@ async def generate_data_insight(results: list[dict]) -> str:
         {"role": "system", "content": "You are a data analyst. Provide concise, valuable insights."},
         {"role": "user", "content": prompt},
     ]
-    response = await _llm_text(messages, temperature=settings.INSIGHT_TEMPERATURE, timeout=settings.INSIGHT_TIMEOUT)
+    response = await _llm_text(messages, temperature=settings.INSIGHT_TEMPERATURE, timeout=settings.INSIGHT_TIMEOUT_SECONDS)
     return response or "Analysis generation encountered an upstream model error."
 
 

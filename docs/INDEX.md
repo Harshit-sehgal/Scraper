@@ -38,6 +38,7 @@ for length).
 | [`WORKFLOW_REPLAY.md`](WORKFLOW_REPLAY.md) | Replay-buffer semantics |
 | [`URL_INTELLIGENCE.md`](URL_INTELLIGENCE.md) | URL safety, SSRF, pagination detection |
 | [`MODULE_CLASSIFICATION.md`](MODULE_CLASSIFICATION.md) | Stable vs experimental research classification |
+| [`ARCHITECTURE_DECISIONS.md`](ARCHITECTURE_DECISIONS.md) | Architecture Decision Records (ADRs) |
 
 ## 3. API surface
 
@@ -88,6 +89,7 @@ regenerated from code by `scripts/generate_route_inventory.py` and
 | [`DATA_QUALITY.md`](DATA_QUALITY.md) | Cleaning, validation, dedup, scoring |
 | [`EXTRACTION_DEPTH.md`](EXTRACTION_DEPTH.md) | Pagination, infinite scroll, schema fields |
 | [`EXTRACTION_QUALITY.md`](EXTRACTION_QUALITY.md) | Quality metrics and benchmarking |
+| [`COMPLIANCE_RETENTION.md`](COMPLIANCE_RETENTION.md) | Data retention and deletion compliance |
 
 ## 7. Validation, testing, quality
 
@@ -135,6 +137,8 @@ regenerated from code by `scripts/generate_route_inventory.py` and
 | [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md) | DR plan |
 | [`RESILIENCE_PATTERNS.md`](RESILIENCE_PATTERNS.md) | Resilience design patterns |
 | [`MIGRATION_AND_ROLLBACK_POLICY.md`](MIGRATION_AND_ROLLBACK_POLICY.md) | Schema and code migration policy |
+| [`OPERATIONAL_RUNBOOK.md`](OPERATIONAL_RUNBOOK.md) | Extended operational runbook (L16-L18) |
+| [`OPERATIONAL_L16_L18.md`](OPERATIONAL_L16_L18.md) | Additional L16-L18 operational documentation |
 | [`FAILURE_EXPLANATIONS.md`](FAILURE_EXPLANATIONS.md) | User-facing failure narratives |
 
 ## 11. Benchmarks, roadmap, refs

@@ -57,15 +57,16 @@ test-results/
 # Local/editor metadata
 .DS_Store
 .commandcode/
+*.swp
+*.bak
+.idea/
+.vscode/
 
 # Secrets directory (production credentials)
 .secrets/
 
 # AI agent auxiliary directories
 .agents/
-.codex/
-.antigravitycli/
-.kilo/
 .claude/
 
 # Generated validation artifacts (large, reproducible)

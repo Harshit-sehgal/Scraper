@@ -32,7 +32,7 @@ class CommunicationSettings(BaseSettings):
     """Fast-path timeout for throughput-sensitive LLM calls."""
     LLM_SELECTOR_TIMEOUT: int = 30
     """Timeout for selector discovery LLM calls."""
-    INSIGHT_TIMEOUT: int = 25
+    INSIGHT_TIMEOUT_SECONDS: int = 25
     """Timeout for insight generation calls."""
     LLM_TEMPERATURE: float = 0.1
     """Default LLM temperature for JSON calls."""
