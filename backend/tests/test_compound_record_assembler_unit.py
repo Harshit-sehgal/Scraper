@@ -1,5 +1,7 @@
 """Unit tests for app.compound_record_assembler — segment detection and record assembly."""
 
+from typing import Any
+
 from app.compound_record_assembler import (
     CompoundRecord,
     Segment,
@@ -165,27 +167,27 @@ class TestExtractSharedFields:
         assert shared["price"] == "$500.00"
 
     def test_largest_price_selected(self):
-        segments = []
+        segments: list[dict[str, Any]] = []
         shared = _extract_shared_fields(segments, "$100 economy $500 business $250 premium")
         assert shared["price"] == "$500"
 
     def test_rating(self):
-        segments = []
+        segments: list[dict[str, Any]] = []
         shared = _extract_shared_fields(segments, "Hotel rating: 4.5/5")
         assert shared["rating"] == "4.5"
 
     def test_status_available(self):
-        segments = []
+        segments: list[dict[str, Any]] = []
         shared = _extract_shared_fields(segments, "Room is available for booking")
         assert shared["status"].lower() == "available"
 
     def test_status_sold_out(self):
-        segments = []
+        segments: list[dict[str, Any]] = []
         shared = _extract_shared_fields(segments, "This item is sold out")
         assert "sold" in shared["status"].lower()
 
     def test_no_shared_fields(self):
-        segments = []
+        segments: list[dict[str, Any]] = []
         shared = _extract_shared_fields(segments, "plain text with no structured data")
         assert isinstance(shared, dict)
 

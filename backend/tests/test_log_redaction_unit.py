@@ -1,5 +1,7 @@
 """Unit tests for app.utils.log_redaction — PII / credential redaction utilities."""
 
+from typing import Any
+
 from app.utils.log_redaction import (
     mask_proxy_url,
     redact_pii,
@@ -104,40 +106,40 @@ class TestRedactPii:
 
 class TestSanitizeLogValue:
     def test_string_with_email(self):
-        result = sanitize_log_value("user@example.com logged in")
+        result = str(sanitize_log_value("user@example.com logged in"))
         assert "<redacted_email>" in result
 
     def test_dict_sensitive_keys_redacted(self):
-        data = {"authorization": "Bearer token123", "name": "test"}
-        result = sanitize_log_value(data)
+        data: dict[str, str] = {"authorization": "Bearer token123", "name": "test"}
+        result: Any = sanitize_log_value(data)
         assert "authorization" not in result
         assert "********" in result
         assert "name" in result
 
     def test_dict_api_key_redacted(self):
-        data = {"api_key": "sk-12345", "url": "https://example.com"}
-        result = sanitize_log_value(data)
+        data: dict[str, str] = {"api_key": "sk-12345", "url": "https://example.com"}
+        result: Any = sanitize_log_value(data)
         has_redacted = any("********" in str(k) for k in result)
         assert has_redacted
 
     def test_dict_password_redacted(self):
-        data = {"password": "secret123"}
-        result = sanitize_log_value(data)
+        data: dict[str, str] = {"password": "secret123"}
+        result: Any = sanitize_log_value(data)
         assert "password" not in result
 
     def test_list_items_sanitized(self):
         data = ["user@example.com", "normal text"]
-        result = sanitize_log_value(data)
+        result: Any = sanitize_log_value(data)
         assert "<redacted_email>" in result[0]
         assert result[1] == "normal text"
 
     def test_nested_dict_sanitized(self):
-        data = {"outer": {"token": "abc123", "email": "user@test.com"}}
-        result = sanitize_log_value(data)
+        data: dict[str, Any] = {"outer": {"token": "abc123", "email": "user@test.com"}}
+        result: Any = sanitize_log_value(data)
         assert "token" not in result["outer"]
 
     def test_depth_limit(self):
-        deeply_nested = "leaf"
+        deeply_nested: Any = "leaf"
         for _ in range(60):
             deeply_nested = {"key": deeply_nested}
         result = sanitize_log_value(deeply_nested)
