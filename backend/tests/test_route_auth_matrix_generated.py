@@ -88,10 +88,6 @@ UNPROTECTED_PATH_PREFIXES: tuple[str, ...] = (
     # API key.  Pinning ``require_*`` on them would break the gateway.
     "/api/billing/webhook",
     "/api/billing/stub-return/",
-    "/api/intelligence/analyze-url",
-    # legitimate *public* analyzer — operators
-    # expose it for unauthenticated URL triage;
-    # needs explicit sign-off if changed.
 )
 
 

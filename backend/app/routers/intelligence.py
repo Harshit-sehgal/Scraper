@@ -7,10 +7,13 @@ recommended extraction mode.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.url_analyzer import analyze_url as _analyze_url
 from app.url_safety import validate_public_http_url
+from app.utils.rbac import UserRole, require_role
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 
@@ -21,7 +24,10 @@ router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 
 
 @router.get("/analyze-url", status_code=200)
-async def analyze_url_endpoint(url: str):
+async def analyze_url_endpoint(
+    url: str,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Analyze a URL and return its classification, risk, and recommendation.
 
     This endpoint is pure — no HTTP requests are made to the URL.  It
@@ -35,9 +41,9 @@ async def analyze_url_endpoint(url: str):
         ``risk``, ``recommended_mode``, ``confidence``, ``reason``,
         ``next_steps``, and ``signals``.
     """
-    result = _analyze_url(url)
     if not url or not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="Invalid or non-HTTP URL.")
+    result = _analyze_url(url)
     try:
         validate_public_http_url(url)
     except ValueError as e:
