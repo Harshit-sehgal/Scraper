@@ -3,6 +3,7 @@ import ipaddress
 import logging
 import socket
 from collections.abc import Callable
+from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
@@ -81,21 +82,26 @@ def is_safe_ip(ip_str: str) -> bool:
         return False
 
 
-def _is_smoke_allowed_internal_host(hostname: str | None) -> bool:
-    if not hostname or not settings.SMOKE_TEST_MODE:
-        return False
-
-    host = hostname.strip("[]").lower()
+@lru_cache(maxsize=1)
+def _get_allowed_internal_hosts() -> set[str]:
+    """Parse and cache the allowed internal hosts set from settings."""
+    hosts = set()
     for raw_entry in settings.ALLOWED_INTERNAL_HOSTS.split(","):
         entry = raw_entry.strip().lower()
         if not entry:
             continue
-        if entry.strip("[]") == host:
-            return True
+        hosts.add(entry.strip("[]"))
         parsed = urlparse(f"http://{entry}")
-        if parsed.hostname and parsed.hostname.strip("[]").lower() == host:
-            return True
-    return False
+        if parsed.hostname:
+            hosts.add(parsed.hostname.strip("[]").lower())
+    return hosts
+
+
+def _is_smoke_allowed_internal_host(hostname: str | None) -> bool:
+    if not hostname or not settings.SMOKE_TEST_MODE:
+        return False
+    host = hostname.strip("[]").lower()
+    return host in _get_allowed_internal_hosts()
 
 
 def _normalize_ip_literal(hostname: str) -> str | None:
@@ -720,16 +726,24 @@ def verify_ssrf_self_check() -> dict[str, Any]:
 
         # Final wiring assertion: get_safe_async_client() must use the
         # public-API wrapper as the OUTER transport.
-        import inspect
-
         from app.url_safety import get_safe_async_client as _factory
 
-        src = inspect.getsource(_factory)
-        if "_UrlValidatingAsyncTransport" not in src or "SafeAsyncHTTPTransport" not in src:
+        client = _factory()
+        transport = client._transport
+        if not isinstance(transport, _UrlValidatingAsyncTransport):
             diag["ok"] = False
             diag["reason"] = (
-                "get_safe_async_client is no longer stacking the public-API "
-                "transport wrapper on top of the private-injection transport."
+                "get_safe_async_client is not using the public-API "
+                "transport wrapper as the outer transport."
+            )
+            return diag
+        
+        inner = transport._inner
+        if not isinstance(inner, SafeAsyncHTTPTransport):
+            diag["ok"] = False
+            diag["reason"] = (
+                "get_safe_async_client is not using the private-injection "
+                "transport as the inner transport."
             )
             return diag
 

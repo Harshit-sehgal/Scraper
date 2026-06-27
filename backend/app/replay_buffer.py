@@ -10,6 +10,7 @@ The ReplayBuffer complements the in-memory EventJournal by providing:
 Phase 66: Long-Horizon Scaling — streaming replay from persistent storage.
 """
 
+import bisect
 import json
 import logging
 import threading
@@ -31,26 +32,44 @@ _CHECKPOINT_INTERVAL = 500
 class _CheckpointIndex:
     """In-memory index of checkpoints for O(log N) seek."""
 
-    __slots__ = ("entries",)
+    __slots__ = ("entries", "_indices")
 
     def __init__(self) -> None:
         # entries: list of (global_idx, segment_path, segment_offset,
         # snapshot_dict)
         self.entries: list[tuple[int, str, int, dict]] = []
+        self._indices: list[int] = []
 
     def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict[str, Any]) -> None:
         self.entries.append((global_idx, segment_path, offset, snapshot))
+        self._indices.append(global_idx)
 
     def find_nearest(self, target_idx: int) -> tuple[int, str, int, dict] | None:
         """Find the nearest checkpoint at or before target_idx."""
-        best = None
-        for entry in self.entries:
-            if entry[0] <= target_idx and (best is None or entry[0] > best[0]):
-                best = entry
-        return best
+        if not self._indices:
+            return None
+        
+        pos = bisect.bisect_right(self._indices, target_idx)
+        
+        if pos == 0:
+            return None
+        
+        return self.entries[pos - 1]
 
     def clear(self) -> None:
         self.entries.clear()
+        self._indices.clear()
+
+    def remove_segment(self, segment_name: str) -> None:
+        """Remove all checkpoints for a given segment."""
+        new_entries = []
+        new_indices = []
+        for i, entry in enumerate(self.entries):
+            if entry[1] != segment_name:
+                new_entries.append(entry)
+                new_indices.append(self._indices[i])
+        self.entries = new_entries
+        self._indices = new_indices
 
     def to_dict_list(self) -> list[dict]:
         return [{"idx": idx, "segment": seg, "offset": off} for idx, seg, off, _ in self.entries]
@@ -75,12 +94,12 @@ class ReplayBuffer:
         self._base_dir = Path(base_dir)
         self._base_dir.mkdir(parents=True, exist_ok=True)
         self._max_segments = max_segments
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # Reentrant lock for nested calls
 
         # Current segment tracking
         self._current_segment_idx = 0
         self._current_segment_count = 0
-        self._current_segment_file: Path | None = None  # Lazy-opened
+        self._current_segment_file: Any = None  # TextIO
         self._next_global_idx = 0
 
         # Checkpoint index
@@ -122,8 +141,12 @@ class ReplayBuffer:
             # Write to current segment
             filepath = self._ensure_segment()
             line = json.dumps(entry, separators=(",", ":"))
-            with open(filepath, "a") as f:
-                f.write(line + "\n")
+            
+            # Capture offset BEFORE writing so the checkpoint points to the start of this entry
+            segment_offset = self._current_segment_file.tell()
+            
+            self._current_segment_file.write(line + "\n")
+            self._current_segment_file.flush()
 
             self._current_segment_count += 1
             self._total_entries += 1
@@ -139,7 +162,6 @@ class ReplayBuffer:
                 "phase_transition",
             }
             if is_structural or (self._current_segment_count % _CHECKPOINT_INTERVAL == 0):
-                segment_offset = self._get_file_offset(filepath)
                 snapshot = dict(entry)  # Use entry as checkpoint snapshot
                 self._checkpoints.add(idx, filepath.name, segment_offset, snapshot)
                 self._total_checkpoints += 1
@@ -155,15 +177,15 @@ class ReplayBuffer:
         if self._current_segment_file is None:
             seg_name = f"segment_{self._current_segment_idx:06d}.jsonl"
             filepath = self._base_dir / seg_name
-            self._current_segment_file = filepath
+            self._current_segment_file = open(filepath, "a", encoding="utf-8")
             self._segments.append(seg_name)
-            # Touch file
-            filepath.touch(exist_ok=True)
             return filepath
-        return self._current_segment_file
+        return Path(self._current_segment_file.name)
 
     def _rotate_segment(self) -> None:
         """Rotate to a new segment file."""
+        if self._current_segment_file is not None:
+            self._current_segment_file.close()
         self._current_segment_idx += 1
         self._current_segment_count = 0
         self._current_segment_file = None
@@ -177,8 +199,7 @@ class ReplayBuffer:
                 oldest_path.unlink()
             self._segments.remove(oldest)
             # Prune checkpoints in evicted segments
-            evicted_seg = oldest
-            self._checkpoints.entries = [cp for cp in self._checkpoints.entries if cp[1] != evicted_seg]
+            self._checkpoints.remove_segment(oldest)
 
     def _get_file_offset(self, filepath: Path) -> int:
         """Get the current byte offset at end of file."""
@@ -199,45 +220,30 @@ class ReplayBuffer:
             Delta entries in sequential order.
 
         """
-        # 1. Find nearest checkpoint <= start_idx
-        checkpoint = self._checkpoints.find_nearest(start_idx)
-        if checkpoint is None:
-            # No checkpoints — start from beginning of first segment
-            segment_name = self._segments[0] if self._segments else None
-            segment_offset = 0
-        else:
-            _checkpoint_idx, segment_name, segment_offset, _ = checkpoint
+        with self._lock:
+            # 1. Find nearest checkpoint <= start_idx
+            checkpoint = self._checkpoints.find_nearest(start_idx)
+            if checkpoint is None:
+                # No checkpoints — start from beginning of first segment
+                segment_name = self._segments[0] if self._segments else None
+                segment_offset = 0
+            else:
+                _checkpoint_idx, segment_name, segment_offset, _ = checkpoint
 
-        if segment_name is None:
-            return
+            if segment_name is None:
+                return
 
-        # 2. Seek to checkpoint offset in the segment
-        segment_path = self._base_dir / segment_name
-        if not segment_path.exists():
-            return
+            # Copy segment list to avoid race conditions during file I/O
+            segments_to_process = [segment_name] + self._get_subsequent_segments(segment_name)
 
-        # 3. Stream forward from checkpoint, skipping entries < start_idx
-        with open(segment_path) as f:
-            f.seek(segment_offset)
-            for line in f:
-                line = line.strip()  # noqa: PLW2901, RUF100
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("idx", 0) < start_idx:
-                    continue
-                yield entry
-
-        # 4. Continue through subsequent segments
-        next_segments = self._get_subsequent_segments(segment_name)
-        for seg_name in next_segments:
+        # 2. Stream forward from checkpoint, skipping entries < start_idx
+        for i, seg_name in enumerate(segments_to_process):
             seg_path = self._base_dir / seg_name
             if not seg_path.exists():
                 continue
             with open(seg_path) as f:
+                if i == 0:
+                    f.seek(segment_offset)
                 for line in f:
                     line = line.strip()  # noqa: PLW2901, RUF100
                     if not line:
@@ -245,6 +251,8 @@ class ReplayBuffer:
                     try:
                         entry = json.loads(line)
                     except json.JSONDecodeError:
+                        continue
+                    if i == 0 and entry.get("idx", 0) < start_idx:
                         continue
                     yield entry
 
@@ -260,13 +268,17 @@ class ReplayBuffer:
             Reconstructed state dict, or None if cannot reconstruct.
 
         """
-        checkpoint = self._checkpoints.find_nearest(target_idx)
-        if checkpoint is None:
-            return None
+        with self._lock:
+            checkpoint = self._checkpoints.find_nearest(target_idx)
+            if checkpoint is None:
+                return None
 
-        cp_idx, seg_name, offset, snapshot = checkpoint
-        if cp_idx > target_idx:
-            return None
+            cp_idx, seg_name, offset, snapshot = checkpoint
+            if cp_idx > target_idx:
+                return None
+
+            # Copy segment list to avoid race conditions during file I/O
+            segments_to_process = [seg_name] + self._get_subsequent_segments(seg_name)
 
         # Clone the checkpoint snapshot as starting state, unpacking delta
         # encoding
@@ -276,28 +288,30 @@ class ReplayBuffer:
             state[k] = change.get("to", change) if isinstance(change, dict) else change
 
         # Replay deltas from checkpoint to target
-        seg_path = self._base_dir / seg_name
-        if not seg_path.exists():
-            return None
+        for i, current_seg_name in enumerate(segments_to_process):
+            seg_path = self._base_dir / current_seg_name
+            if not seg_path.exists():
+                return None
 
-        with open(seg_path) as f:
-            f.seek(offset)
-            for line in f:
-                line = line.strip()  # noqa: PLW2901, RUF100
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                idx = entry.get("idx", -1)
-                if idx <= cp_idx:
-                    continue
-                if idx > target_idx:
-                    break
-                # Apply delta to state
-                for k, change in entry.get("delta", {}).items():
-                    state[k] = change.get("to", change)
+            with open(seg_path) as f:
+                if i == 0:
+                    f.seek(offset)
+                for line in f:
+                    line = line.strip()  # noqa: PLW2901, RUF100
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    idx = entry.get("idx", -1)
+                    if i == 0 and idx <= cp_idx:
+                        continue
+                    if idx > target_idx:
+                        break
+                    # Apply delta to state
+                    for k, change in entry.get("delta", {}).items():
+                        state[k] = change.get("to", change)
 
         return state
 
@@ -341,6 +355,8 @@ class ReplayBuffer:
     def clear(self) -> None:
         """Clear all stored data and reset state."""
         with self._lock:
+            if self._current_segment_file is not None:
+                self._current_segment_file.close()
             for seg_name in self._segments:
                 seg_path = self._base_dir / seg_name
                 if seg_path.exists():
@@ -356,7 +372,9 @@ class ReplayBuffer:
 
     def close(self) -> None:
         """Close the buffer, ensuring all data is flushed."""
-        self._current_segment_file = None
+        if self._current_segment_file is not None:
+            self._current_segment_file.close()
+            self._current_segment_file = None
 
     # ─── Internal Helpers ──────────────────────────────────────────
 
@@ -407,7 +425,7 @@ class ReplayBuffer:
             self._current_segment_count = total_lines
 
         if self._segments:
-            self._current_segment_file = self._base_dir / self._segments[-1]
+            self._current_segment_file = open(self._base_dir / self._segments[-1], "a", encoding="utf-8")
 
     def _get_subsequent_segments(self, current_seg: str) -> list[str]:
         """Return segments that come after current_seg in sorted order."""

@@ -59,6 +59,18 @@ logger = logging.getLogger(__name__)
 
 DENYLIST_TABLE = "domain_denylist"
 
+_CREATE_TABLE_SQL = f"""
+    CREATE TABLE IF NOT EXISTS {DENYLIST_TABLE} (
+        domain TEXT PRIMARY KEY,
+        reason TEXT NOT NULL DEFAULT '',
+        added_by TEXT NOT NULL DEFAULT '',
+        added_at TEXT NOT NULL DEFAULT (datetime('now')),
+        path_prefix TEXT NOT NULL DEFAULT ''
+    )
+"""
+
+_DELETE_ALL_SQL = f"DELETE FROM {DENYLIST_TABLE}"
+
 DEFAULT_DB_PATH = "dataforge_denylist.sqlite"
 # In-process cache TTL — denylist reads are on the hot path of every
 # scrape, but writes are rare (admin-only). A 5-second TTL keeps the
@@ -115,17 +127,7 @@ class DomainDenylist:
 
     def _ensure_schema(self) -> None:
         with self._lock, self._connect() as conn:
-            conn.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {DENYLIST_TABLE} (
-                    domain TEXT PRIMARY KEY,
-                    reason TEXT NOT NULL DEFAULT '',
-                    added_by TEXT NOT NULL DEFAULT '',
-                    added_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    path_prefix TEXT NOT NULL DEFAULT ''
-                )
-                """,
-            )
+            conn.execute(_CREATE_TABLE_SQL)
 
     # ── Cache ────────────────────────────────────────────────────────
 
@@ -258,8 +260,7 @@ class DomainDenylist:
     def clear(self) -> None:
         """Remove every entry (test helper)."""
         with self._lock, self._connect() as conn:
-            query = "DELETE FROM domain_denylist"
-            conn.execute(query)
+            conn.execute(_DELETE_ALL_SQL)
         self._invalidate_cache()
 
     def close(self) -> None:

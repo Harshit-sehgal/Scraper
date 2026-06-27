@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.config import settings
+
 
 def assess_acquisition_quality(
     *,
@@ -21,11 +23,15 @@ def assess_acquisition_quality(
     AcquisitionLineage object) to keep this module free of top-level
     research-module imports.
     """
-    if data_evidence_score < 0.3:
+    data_threshold = getattr(settings, "ACQUISITION_QUALITY_DATA_EVIDENCE_THRESHOLD", 0.3)
+    anti_bot_threshold = getattr(settings, "ACQUISITION_QUALITY_ANTI_BOT_THRESHOLD", 0.2)
+    text_length_threshold = getattr(settings, "ACQUISITION_QUALITY_VISIBLE_TEXT_THRESHOLD", 50)
+    
+    if data_evidence_score < data_threshold:
         return "block"
-    if anti_bot_score < 0.2:
+    if anti_bot_score < anti_bot_threshold:
         return "block"
-    if visible_text_length < 50:
+    if visible_text_length < text_length_threshold:
         return "review"
     return "pass"
 
