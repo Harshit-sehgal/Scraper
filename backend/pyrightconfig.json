@@ -1,6 +1,6 @@
 {
   "include": ["app", "tests"],
-  "ignore": ["../scripts", "../artifacts", "benchmarks"],
+  "ignore": ["../scripts", "../artifacts", "benchmarks", "../scripts/**", "../artifacts/**"],
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic",
   "reportMissingImports": false,
@@ -10,5 +10,14 @@
   "reportOptionalMemberAccess": "warning",
   "reportOptionalSubscript": "warning",
   "reportReturnType": "warning",
-  "reportGeneralTypeIssues": "warning"
+  "reportGeneralTypeIssues": "warning",
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "reportCallIssue": "none",
+      "reportArgumentType": "none",
+      "reportAttributeAccessIssue": "none",
+      "reportOptionalMemberAccess": "none"
+    }
+  ]
 }

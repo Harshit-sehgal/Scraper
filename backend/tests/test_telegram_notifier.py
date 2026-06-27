@@ -168,7 +168,7 @@ class TestHighLevelHelpers:
         response = MagicMock(status_code=200, text="{}")
 
         def fake_post(url, json=None, timeout=None):
-            captured["text"] = json["text"]
+            captured["text"] = (json or {})["text"]
             return response
 
         with patch("app.utils.telegram_notifier.requests.post", side_effect=fake_post):
@@ -186,7 +186,7 @@ class TestHighLevelHelpers:
         response = MagicMock(status_code=200, text="{}")
 
         def fake_post(url, json=None, timeout=None):
-            captured["text"] = json["text"]
+            captured["text"] = (json or {})["text"]
             return response
 
         with patch("app.utils.telegram_notifier.requests.post", side_effect=fake_post):
@@ -212,7 +212,7 @@ class TestHighLevelHelpers:
         response = MagicMock(status_code=200, text="{}")
 
         def fake_post(url, json=None, timeout=None):
-            captured["text"] = json["text"]
+            captured["text"] = (json or {})["text"]
             return response
 
         with patch("app.utils.telegram_notifier.requests.post", side_effect=fake_post):
