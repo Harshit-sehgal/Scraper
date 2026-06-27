@@ -491,6 +491,7 @@ class TestPasswordResetAPI:
 
     def test_password_reset_allowed_without_dev_auth(self, client, monkeypatch):
         from app import main
+
         # Force ALLOW_INSECURE_DEV_AUTH to False (mimics production mode)
         monkeypatch.setattr(main.settings, "ALLOW_INSECURE_DEV_AUTH", False)
 

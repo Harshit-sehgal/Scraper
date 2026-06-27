@@ -21,6 +21,7 @@ Public API:
 
 The module is import-safe even when Django-style logging is not yet configured.
 """
+
 from __future__ import annotations
 
 import json
@@ -199,7 +200,7 @@ _configured_lock = False  # cheap idempotency guard
 def configure_logging(
     level: str | None = None,
     fmt: str | None = None,
-    stream = None,
+    stream=None,
 ) -> None:
     """Configure root logging based on settings / explicit args.
 

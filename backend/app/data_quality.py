@@ -68,7 +68,7 @@ def _clean_url(value: str) -> str:
         return urllib.parse.urlunparse(
             (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment),
         )
-    except Exception:
+    except (ValueError, UnicodeDecodeError):
         return url
 
 
@@ -280,7 +280,7 @@ def clean_record(record: dict, schema_fields: list[SchemaField]) -> dict:
         cleaner = CLEANERS.get(field.field_type, _clean_text)
         try:
             cleaned[key] = cleaner(value)
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
             cleaned[key] = value
 
     return cleaned

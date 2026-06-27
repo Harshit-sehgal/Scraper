@@ -22,6 +22,7 @@ This module exposes:
 The limit is *inclusive* — payloads exactly at the cap are allowed,
 payloads above the cap are rejected.
 """
+
 from __future__ import annotations
 
 import logging
@@ -48,10 +49,7 @@ class HTMLSizeExceeded(ValueError):
         self.observed = observed
         self.limit = limit
         self.url = url
-        msg = (
-            f"HTML payload of {observed:,} bytes exceeds the "
-            f"{limit:,}-byte limit"
-        )
+        msg = f"HTML payload of {observed:,} bytes exceeds the {limit:,}-byte limit"
         if url:
             msg += f" (url={url})"
         super().__init__(msg)
@@ -141,6 +139,6 @@ def truncate_html(html: str, *, cap: int) -> str:
     sentinel = "\n<!-- truncated by DATAFORGE_MAX_HTML_BYTES -->"
     # Reserve room for the sentinel; if cap < len(sentinel), just clip.
     if cap <= len(sentinel):
-        return html[:max(0, cap - 0)]  # cap smaller than sentinel; just cut
+        return html[: max(0, cap - 0)]  # cap smaller than sentinel; just cut
     keep = cap - len(sentinel)
     return html[:keep] + sentinel

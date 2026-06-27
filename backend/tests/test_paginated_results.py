@@ -82,5 +82,3 @@ def test_get_job_results_next_offset(client, seed_job_with_results) -> None:
     assert r3.status_code == 200
     data3 = r3.json()
     assert data3["next_offset"] is None
-
-

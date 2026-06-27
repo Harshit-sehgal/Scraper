@@ -63,9 +63,7 @@ class TestDomainStatePersistence:
             engine2 = CrawlPolicyEngine()
             state = engine2.get_domain_state("blocked.example.org")
             assert state is not None
-            assert state["cooldown"] > 0, (
-                "Domain in cooldown must still be cooling down after restart"
-            )
+            assert state["cooldown"] > 0, "Domain in cooldown must still be cooling down after restart"
 
     def test_success_clears_failures_in_db(self, tmp_path: Path) -> None:
         """A successful fetch resets failure count to 0, persisted."""

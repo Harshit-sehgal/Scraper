@@ -79,7 +79,7 @@ def _record_browser_minutes(
     except ValueError:
         logger.warning("Browser-minute quota exceeded for job %s URL %s", metadata["job_id"], url)
         return False
-    except Exception as exc:
+    except (AttributeError, TypeError, RuntimeError) as exc:
         logger.debug("Browser-minute metering skipped: %s", exc)
         return True
 

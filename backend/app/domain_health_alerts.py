@@ -380,7 +380,7 @@ class DomainHealthMonitor:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:
+        except (ValueError, UnicodeDecodeError):
             return None
 
 

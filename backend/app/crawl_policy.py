@@ -213,7 +213,7 @@ class CrawlPolicyEngine:
                     # to recover.
                     cycle = state.consecutive_failures - self._max_retries + 1
                     cooldown = min(
-                        self._cooldown_seconds * (self._cooldown_multiplier ** cycle),
+                        self._cooldown_seconds * (self._cooldown_multiplier**cycle),
                         self._max_cooldown_seconds,
                     )
                     state.cooldown_until = time.time() + cooldown

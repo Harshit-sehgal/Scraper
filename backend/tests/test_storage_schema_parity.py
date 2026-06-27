@@ -17,6 +17,7 @@ the schema definition surface only.  Integration tests that exercise the
 actual DB engine live in the ``test_postgres_*.py`` modules and require
 ``--run-postgres``.
 """
+
 from __future__ import annotations
 
 import re
@@ -103,8 +104,7 @@ def test_postgres_columns_match_sqlite_for_overlap_set():
 
     extra = postgres_cols - sqlite_cols - _POSTGRES_PREPENDED_COLUMNS
     assert not extra, (
-        f"Postgres has columns SQLite does not: {sorted(extra)}. "
-        f"These would be silently dropped on SQLite round-trip."
+        f"Postgres has columns SQLite does not: {sorted(extra)}. These would be silently dropped on SQLite round-trip."
     )
 
 
@@ -144,9 +144,7 @@ def test_create_jobs_sql_contains_updated_at_column():
 
     sql = build_create_jobs_sql()
     # Column definitions look like: "updated_at TEXT DEFAULT ''",
-    assert re.search(r"\bupdated_at\s+TEXT\b", sql), (
-        f"'updated_at' column missing from Postgres CREATE TABLE: {sql!r}"
-    )
+    assert re.search(r"\bupdated_at\s+TEXT\b", sql), f"'updated_at' column missing from Postgres CREATE TABLE: {sql!r}"
 
 
 def test_create_recycle_bin_sql_contains_updated_at_column():
@@ -176,10 +174,7 @@ def test_create_jobs_sql_symmetric_for_recycle_bin():
         "CREATE TABLE IF NOT EXISTS recycle_bin",
         "CREATE TABLE IF NOT EXISTS t",
     )
-    assert jobs_body == recycle_body, (
-        "jobs and recycle_bin schemas diverge:\n"
-        f"JOBS:\n{jobs_sql}\nRECYCLE:\n{recycle_sql}"
-    )
+    assert jobs_body == recycle_body, f"jobs and recycle_bin schemas diverge:\nJOBS:\n{jobs_sql}\nRECYCLE:\n{recycle_sql}"
 
 
 # Columns Postgres adds by prepending them in build_create_jobs_sql.

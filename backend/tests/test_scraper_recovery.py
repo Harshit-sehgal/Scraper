@@ -79,9 +79,7 @@ class TestRecoveryStrategist:
         classification = _make_classification(FailureCategory.ANTI_BOT_BLOCK, confidence=0.9)
         domain_info = {"anti_bot_risk": 0.9, "failure_rate": 0.8}
 
-        plan = strategist.generate_recovery_plan(
-            classification, attempt_number=1, domain_info=domain_info
-        )
+        plan = strategist.generate_recovery_plan(classification, attempt_number=1, domain_info=domain_info)
         assert plan.primary_action == RecoveryAction.ROTATE_PROXY
 
 

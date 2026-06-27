@@ -388,7 +388,11 @@ async def discover_fieldnames_union(
     for jid, _jname, on_disk, fpath in job_meta:
         if on_disk and page_loader is not None:
             first_page, _ = await _call_async(
-                page_loader, jid, limit=PAGINATION_CHUNK_SIZE, offset=0, file_path=fpath,
+                page_loader,
+                jid,
+                limit=PAGINATION_CHUNK_SIZE,
+                offset=0,
+                file_path=fpath,
             )
             if first_page:
                 has_any_data = True
@@ -413,7 +417,11 @@ async def discover_fieldnames_union(
         offset = PAGINATION_CHUNK_SIZE
         while True:
             page, total = await _call_async(
-                page_loader, jid, limit=PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
+                page_loader,
+                jid,
+                limit=PAGINATION_CHUNK_SIZE,
+                offset=offset,
+                file_path=fpath,
             )
             if not page:
                 break
@@ -440,7 +448,11 @@ async def iter_batch_pages(
             offset = 0
             while True:
                 page, total = await _call_async(
-                    page_loader, jid, limit=PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
+                    page_loader,
+                    jid,
+                    limit=PAGINATION_CHUNK_SIZE,
+                    offset=offset,
+                    file_path=fpath,
                 )
                 if not page:
                     break

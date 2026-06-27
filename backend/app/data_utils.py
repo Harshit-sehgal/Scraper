@@ -316,7 +316,7 @@ def process_raw_records(
             semantic_results = run_pipeline(results, [f.name for f in schema_fields])
             if semantic_results:
                 results = semantic_results
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError, OSError, TypeError) as e:
             # Log but don't fail extraction if semantic pipeline is unavailable
             import logging
 

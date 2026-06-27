@@ -45,7 +45,7 @@ def requires_invariants(mutation_fn: Callable):
         if ws is not None:
             try:
                 snapshot = ws.to_dict()
-            except Exception as snapshot_err:
+            except (ValueError, TypeError, AttributeError, RuntimeError) as snapshot_err:
                 snapshot = None
                 logger.warning("Could not take snapshot before %s — rollback unavailable", mutation_fn.__name__)
                 with suppress(Exception):

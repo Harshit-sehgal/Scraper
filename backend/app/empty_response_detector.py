@@ -158,8 +158,7 @@ def detect_empty_response(html: str, status_code: int = 200, url: str | None = N
             empty_type="",
             confidence=0.0,
             message=(
-                f"HTML payload of {exc.observed:,} bytes exceeds the "
-                f"{exc.limit:,}-byte limit; empty-response detection skipped"
+                f"HTML payload of {exc.observed:,} bytes exceeds the {exc.limit:,}-byte limit; empty-response detection skipped"
             ),
             text_length=0,
             data_signals=0,

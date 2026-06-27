@@ -21,17 +21,14 @@ class TestExtractDomainPathKeying:
         assert key_products == "example.com/products"
         assert key_blog == "example.com/blog"
         assert key_products != key_blog, (
-            f"Same-domain different paths must have different keys, "
-            f"got {key_products!r} and {key_blog!r}"
+            f"Same-domain different paths must have different keys, got {key_products!r} and {key_blog!r}"
         )
 
     def test_same_page_type_different_items_share_key(self) -> None:
         """Different items on ``/products/`` must share the same key."""
         key1 = SelectorMemory._extract_domain("https://example.com/products/42")
         key2 = SelectorMemory._extract_domain("https://example.com/products/99")
-        assert key1 == key2 == "example.com/products", (
-            f"Product items must share key, got {key1!r} and {key2!r}"
-        )
+        assert key1 == key2 == "example.com/products", f"Product items must share key, got {key1!r} and {key2!r}"
 
     def test_numeric_id_skipped(self) -> None:
         """Path segments that are pure digits must be treated as leaf IDs
@@ -41,9 +38,7 @@ class TestExtractDomainPathKeying:
 
     def test_uuid_like_segment_skipped(self) -> None:
         """UUID- or hash-like segments (>=32 chars with hyphens) must be skipped."""
-        key = SelectorMemory._extract_domain(
-            "https://example.com/orders/550e8400-e29b-41d4-a716-446655440000"
-        )
+        key = SelectorMemory._extract_domain("https://example.com/orders/550e8400-e29b-41d4-a716-446655440000")
         assert key == "example.com/orders", f"Expected example.com/orders, got {key!r}"
 
     def test_homepage_no_path(self) -> None:
@@ -72,9 +67,7 @@ class TestExtractDomainPathKeying:
 
     def test_deep_path_only_first_meaningful(self) -> None:
         """Only the first meaningful segment is used."""
-        key = SelectorMemory._extract_domain(
-            "https://example.com/api/v2/items/123/details"
-        )
+        key = SelectorMemory._extract_domain("https://example.com/api/v2/items/123/details")
         assert key == "example.com/api", f"Expected example.com/api, got {key!r}"
 
     def test_invalid_url_returns_none(self) -> None:
@@ -115,8 +108,7 @@ class TestSelectorMemoryBackwardCompat:
         # "example.com".
         result = mem.get_selectors("https://example.com/products")
         assert result is None, (
-            "Old domain-only key 'example.com' must not match "
-            "composite key 'example.com/products' — data needs to be re-learned"
+            "Old domain-only key 'example.com' must not match composite key 'example.com/products' — data needs to be re-learned"
         )
 
         # But the raw domain-only key lookup still works from _memory dict
@@ -134,9 +126,7 @@ class TestSelectorMemoryBackwardCompat:
             {"fields": {"title": "h1.product-title"}},
         )
         result = mem.get_selectors("https://example.com/products/item-42")
-        assert result is not None, (
-            "Selector learned on /products must be retrievable for /products/item-42"
-        )
+        assert result is not None, "Selector learned on /products must be retrievable for /products/item-42"
         assert result["fields"]["title"] == "h1.product-title"
 
     def test_has_memory_for_composite_key(self, tmp_path) -> None:

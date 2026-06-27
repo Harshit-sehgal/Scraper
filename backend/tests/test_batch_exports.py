@@ -257,10 +257,12 @@ class TestDiscoverFieldnamesUnion:
 class TestBatchCsvStream:
     @pytest.mark.asyncio
     async def test_flattened_includes_source_job(self) -> None:
-        pages = _async_pages([
-            ("job-1", "Job One", [{"name": "Alice", "price": "100"}]),
-            ("job-2", "Job Two", [{"name": "Bob", "price": "200"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Job One", [{"name": "Alice", "price": "100"}]),
+                ("job-2", "Job Two", [{"name": "Bob", "price": "200"}]),
+            ]
+        )
         fieldnames = ["name", "price"]
         stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
         result = await _async_collect(stream)
@@ -273,10 +275,12 @@ class TestBatchCsvStream:
     @pytest.mark.asyncio
     async def test_non_flattened_has_separator(self) -> None:
         """Separators appear *between* jobs; the first job starts right after the header."""
-        pages = _async_pages([
-            ("job-1", "Job One", [{"name": "Alice", "price": "100"}]),
-            ("job-2", "Job Two", [{"name": "Bob", "price": "200"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Job One", [{"name": "Alice", "price": "100"}]),
+                ("job-2", "Job Two", [{"name": "Bob", "price": "200"}]),
+            ]
+        )
         fieldnames = ["name", "price"]
         stream = export_service.batch_csv_stream(pages, fieldnames, flatten=False)
         result = await _async_collect(stream)
@@ -297,10 +301,12 @@ class TestBatchCsvStream:
 
     @pytest.mark.asyncio
     async def test_empty_pages_skipped(self) -> None:
-        pages = _async_pages([
-            ("job-1", "Job One", []),
-            ("job-2", "Job Two", [{"name": "Alice"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Job One", []),
+                ("job-2", "Job Two", [{"name": "Alice"}]),
+            ]
+        )
         fieldnames = ["name"]
         stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
         result = await _async_collect(stream)
@@ -310,9 +316,11 @@ class TestBatchCsvStream:
 
     @pytest.mark.asyncio
     async def test_all_empty_pages_returns_header(self) -> None:
-        pages = _async_pages([
-            ("job-1", "Job One", []),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Job One", []),
+            ]
+        )
         fieldnames = ["name"]
         stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
         result = await _async_collect(stream)
@@ -323,9 +331,11 @@ class TestBatchCsvStream:
 
     @pytest.mark.asyncio
     async def test_single_job(self) -> None:
-        pages = _async_pages([
-            ("job-1", "Single Job", [{"x": "1", "y": "2"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Single Job", [{"x": "1", "y": "2"}]),
+            ]
+        )
         stream = export_service.batch_csv_stream(pages, ["x", "y"], flatten=False)
         result = await _async_collect(stream)
         text = result.decode("utf-8")
@@ -337,9 +347,11 @@ class TestBatchCsvStream:
     @pytest.mark.asyncio
     async def test_csv_injection_protection(self) -> None:
         """Values starting with dangerous prefixes should be escaped."""
-        pages = _async_pages([
-            ("job-1", "Injection", [{"name": "=SUM(A1:A10)", "desc": "+CMD"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Injection", [{"name": "=SUM(A1:A10)", "desc": "+CMD"}]),
+            ]
+        )
         fieldnames = ["name", "desc"]
         stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
         result = await _async_collect(stream)
@@ -357,10 +369,12 @@ class TestBatchCsvStream:
 class TestBatchJsonStream:
     @pytest.mark.asyncio
     async def test_flattened_output_parses(self) -> None:
-        pages = _async_pages([
-            ("job-1", "Job One", [{"name": "Alice"}]),
-            ("job-2", "Job Two", [{"name": "Bob"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Job One", [{"name": "Alice"}]),
+                ("job-2", "Job Two", [{"name": "Bob"}]),
+            ]
+        )
         stream = export_service.batch_json_stream(pages, flatten=True)
         result = await _async_collect(stream)
         data = json.loads(result)
@@ -372,9 +386,11 @@ class TestBatchJsonStream:
 
     @pytest.mark.asyncio
     async def test_non_flattened_has_manifest_and_exports(self) -> None:
-        pages = _async_pages([
-            ("job-1", "Job One", [{"name": "Alice"}]),
-        ])
+        pages = _async_pages(
+            [
+                ("job-1", "Job One", [{"name": "Alice"}]),
+            ]
+        )
         manifest = [{"job_id": "job-1", "job_name": "Job One", "status": "included", "record_count": 1}]
         stream = export_service.batch_json_stream(pages, flatten=False, manifest=manifest)
         result = await _async_collect(stream)

@@ -56,9 +56,7 @@ def test_native_handlers_are_allow_listed():
     pm = SubstratePluginManager()
     for handler_name in ("role_merger", "manifold_compressor"):
         handler = pm._handlers[handler_name]
-        assert is_handler_module_allowed(handler), (
-            f"native handler {handler_name!r} should be on the allow-list"
-        )
+        assert is_handler_module_allowed(handler), f"native handler {handler_name!r} should be on the allow-list"
 
 
 def test_non_allow_listed_handler_is_refused():

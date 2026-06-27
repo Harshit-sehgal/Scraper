@@ -726,19 +726,13 @@ def verify_ssrf_self_check() -> dict[str, Any]:
         outer_transport = client._transport
         if not isinstance(outer_transport, _UrlValidatingAsyncTransport):
             diag["ok"] = False
-            diag["reason"] = (
-                "get_safe_async_client is not using the public-API "
-                "transport wrapper as the outer transport."
-            )
+            diag["reason"] = "get_safe_async_client is not using the public-API transport wrapper as the outer transport."
             return diag
 
         inner = outer_transport._inner
         if not isinstance(inner, SafeAsyncHTTPTransport):
             diag["ok"] = False
-            diag["reason"] = (
-                "get_safe_async_client is not using the private-injection "
-                "transport as the inner transport."
-            )
+            diag["reason"] = "get_safe_async_client is not using the private-injection transport as the inner transport."
             return diag
 
         return diag

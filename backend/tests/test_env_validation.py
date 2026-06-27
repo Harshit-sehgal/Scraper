@@ -3,6 +3,7 @@
 Verifies that env_validation surfaces misconfigurations without blocking
 startup (the validator is a best-effort advisor, not a hardening gate).
 """
+
 from __future__ import annotations
 
 import logging
@@ -43,9 +44,7 @@ def test_dev_mode_does_not_warn_missing_secrets(_reset_env, caplog):
         summary = validate_startup_config()
     assert summary["missing_secrets"] == 0
     # dev mode should not warn about missing GROQ_API_KEY
-    assert not any(
-        "DATAFORGE_GROQ_API_KEY" in record.message for record in caplog.records
-    )
+    assert not any("DATAFORGE_GROQ_API_KEY" in record.message for record in caplog.records)
 
 
 def test_production_warns_missing_secrets(_reset_env, caplog):
@@ -54,9 +53,7 @@ def test_production_warns_missing_secrets(_reset_env, caplog):
     with caplog.at_level(logging.WARNING, logger="app.utils.env_validation"):
         summary = validate_startup_config()
     assert summary["missing_secrets"] >= 1
-    assert any(
-        "DATAFORGE_GROQ_API_KEY" in record.message for record in caplog.records
-    )
+    assert any("DATAFORGE_GROQ_API_KEY" in record.message for record in caplog.records)
 
 
 def test_production_silent_when_secrets_present(_reset_env, caplog):

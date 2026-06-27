@@ -22,6 +22,7 @@ at app startup.  The function:
 
 Tests live in ``tests/test_env_validation.py``.
 """
+
 from __future__ import annotations
 
 import logging

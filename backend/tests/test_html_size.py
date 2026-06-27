@@ -3,6 +3,7 @@
 Verifies that enforce_html_size honors the cap, raises when oversized
 without must_truncate, and truncates cleanly when must_truncate=True.
 """
+
 from __future__ import annotations
 
 import pytest

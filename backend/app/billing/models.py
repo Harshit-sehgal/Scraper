@@ -43,4 +43,3 @@ class CustomerInfo(BaseModel):
     subscription_id: str = Field(default="", max_length=128)
     is_trialing: bool = False
     trial_end: str | None = Field(default=None, max_length=64)
-

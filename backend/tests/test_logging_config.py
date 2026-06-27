@@ -7,6 +7,7 @@ Verifies:
 - ``extra`` dict fields become top-level JSON keys (used by access log middleware)
 - Idempotent configuration — repeated calls do not stack handlers
 """
+
 from __future__ import annotations
 
 import io
@@ -199,9 +200,7 @@ def test_configure_logging_idempotent(reset_logging_state, monkeypatch):
     initial_handler_count = len(logging.getLogger().handlers)
     configure_logging(stream=stream2)
     after_handler_count = len(logging.getLogger().handlers)
-    assert initial_handler_count == after_handler_count, (
-        "Reconfiguring logging must not stack handlers"
-    )
+    assert initial_handler_count == after_handler_count, "Reconfiguring logging must not stack handlers"
 
 
 def test_configure_logging_redacts_in_output(reset_logging_state, monkeypatch):

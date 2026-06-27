@@ -58,6 +58,7 @@ class SlackChannelCheckResult:
 @dataclass(frozen=True)
 class SlackWebhookResult:
     """Result of sending a test payload to a Slack incoming webhook."""
+
     delivered: bool
     status_code: int | None
     reason: str
@@ -451,10 +452,7 @@ def format_human(result: AlertDrillResult) -> str:
         lines.append(f"Slack channel reachable:  {result.slack_channel_reachable} ({result.slack_channel_check_reason})")
     if result.slack_webhook_attempted:
         status = result.slack_webhook_status_code or "N/A"
-        lines.append(
-            f"Slack webhook delivered:  {result.slack_webhook_delivered}"
-            f" (HTTP {status}, {result.slack_webhook_reason})"
-        )
+        lines.append(f"Slack webhook delivered:  {result.slack_webhook_delivered} (HTTP {status}, {result.slack_webhook_reason})")
     lines.extend(
         [
             "",

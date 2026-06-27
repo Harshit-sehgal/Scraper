@@ -60,6 +60,7 @@ def _cookie_db_conn(db_path: Path | None = None) -> sqlite3.Connection:
         _COOKIE_DB_INITIALIZED.add(path)
     return conn
 
+
 # Primary detection patterns for common anti-bot platforms
 CHALLENGE_PATTERNS = {
     "cloudflare": [
@@ -375,9 +376,7 @@ class AntiBotEngine:
             with _COOKIE_DB_LOCK:
                 conn = _cookie_db_conn()
                 try:
-                    rows = conn.execute(
-                        "SELECT domain, cookie_string, updated_at FROM cookies"
-                    ).fetchall()
+                    rows = conn.execute("SELECT domain, cookie_string, updated_at FROM cookies").fetchall()
                 finally:
                     conn.close()
             for domain, cookie_string, updated_at in rows:

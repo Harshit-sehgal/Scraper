@@ -126,4 +126,3 @@ class InvoiceGenerator:
                 items.append(item)
 
         return self.generate_invoice(user_id, items)
-
