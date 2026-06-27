@@ -178,58 +178,60 @@ class SelectorMemory:
             "low_confidence_selectors": [],
         }
 
-        now = time.time()
         domains_to_delete: list[str] = []
+        needs_persist = False
 
-        for domain, entry in self._memory.items():
-            stats["domains_checked"] = int(stats["domains_checked"]) + 1
+        with self._lock:
+            for domain, entry in list(self._memory.items()):
+                stats["domains_checked"] = int(stats["domains_checked"]) + 1
 
-            # Evict entries that haven't been used in MAX_AGE_BEFORE_EVICTION seconds
-            last_success = entry.get("last_success", 0) or 0
-            last_failure = entry.get("last_failure", 0) or 0
-            last_activity = max(last_success, last_failure)
-            if last_activity > 0 and (now - last_activity) > SELECTOR_MAX_AGE_BEFORE_EVICTION:
-                logger.info(
-                    "Evicting stale selector for %s (last activity %.1f days ago)",
-                    domain,
-                    (now - last_activity) / 86400,
-                )
-                stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
-                stats["deleted_domains"].append(domain)
-                stats["low_confidence_selectors"].append(
-                    {
-                        "domain": domain,
-                        "score": 0.0,
-                        "reason": f"stale (last activity {(now - last_activity)/86400:.1f}d ago)",
-                    },
-                )
-                domains_to_delete.append(domain)
-                continue
+                # Evict entries that haven't been used in MAX_AGE_BEFORE_EVICTION seconds
+                last_success = entry.get("last_success", 0) or 0
+                last_failure = entry.get("last_failure", 0) or 0
+                last_activity = max(last_success, last_failure)
+                if last_activity > 0 and (now - last_activity) > SELECTOR_MAX_AGE_BEFORE_EVICTION:
+                    logger.info(
+                        "Evicting stale selector for %s (last activity %.1f days ago)",
+                        domain,
+                        (now - last_activity) / 86400,
+                    )
+                    stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
+                    stats["deleted_domains"].append(domain)
+                    stats["low_confidence_selectors"].append(
+                        {
+                            "domain": domain,
+                            "score": 0.0,
+                            "reason": f"stale (last activity {(now - last_activity) / 86400:.1f}d ago)",
+                        },
+                    )
+                    domains_to_delete.append(domain)
+                    continue
 
-            confidence = self._compute_confidence(entry)
+                confidence = self._compute_confidence(entry)
 
-            if confidence.final_score < threshold:
-                logger.info(
-                    "Deleting low-confidence selector for %s (score=%.2f, %s)",
-                    domain,
-                    confidence.final_score,
-                    confidence.reason,
-                )
-                stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
-                stats["deleted_domains"].append(domain)
-                stats["low_confidence_selectors"].append(
-                    {"domain": domain, "score": confidence.final_score, "reason": confidence.reason},
-                )
-                domains_to_delete.append(domain)
+                if confidence.final_score < threshold:
+                    logger.info(
+                        "Deleting low-confidence selector for %s (score=%.2f, %s)",
+                        domain,
+                        confidence.final_score,
+                        confidence.reason,
+                    )
+                    stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
+                    stats["deleted_domains"].append(domain)
+                    stats["low_confidence_selectors"].append(
+                        {"domain": domain, "score": confidence.final_score, "reason": confidence.reason},
+                    )
+                    domains_to_delete.append(domain)
 
-        # Delete low-confidence entries
-        for domain in domains_to_delete:
-            del self._memory[domain]
+            # Delete low-confidence entries inside the lock
+            for domain in domains_to_delete:
+                del self._memory[domain]
+                needs_persist = True
 
-        if domains_to_delete:
+            self._last_cleanup = now
+
+        if needs_persist:
             self._save()
-
-        self._last_cleanup = now
 
         if int(stats["selectors_deleted"]) > 0:
             logger.info(
@@ -246,7 +248,8 @@ class SelectorMemory:
         if not domain:
             return None
 
-        entry = self._memory.get(domain)
+        with self._lock:
+            entry = self._memory.get(domain)
         if not entry:
             return None
 
@@ -264,7 +267,8 @@ class SelectorMemory:
         if not domain:
             return None
 
-        entry = self._memory.get(domain)
+        with self._lock:
+            entry = self._memory.get(domain)
         if not entry:
             return None
 
@@ -321,7 +325,7 @@ class SelectorMemory:
             entry["success_count"] += 1
             entry["last_success"] = now
             self._memory[domain] = entry
-        self._save()
+            self._save()
 
     def record_failure(self, url: str) -> None:
         """Record a failure of remembered selectors for a domain."""
@@ -337,12 +341,15 @@ class SelectorMemory:
             entry["failure_count"] = entry.get("failure_count", 0) + 1
             entry["last_failure"] = time.time()
             self._memory[domain] = entry
-        self._save()
+            self._save()
 
     def has_memory_for(self, url: str) -> bool:
         """Public predicate: True if a memory entry exists for the URL's domain."""
         domain = self._extract_domain(url)
-        return bool(domain and domain in self._memory)
+        if not domain:
+            return False
+        with self._lock:
+            return domain in self._memory
 
     def invalidate_domain(self, url: str) -> bool:
         """Forget any cached selectors for the URL's domain.
@@ -355,11 +362,14 @@ class SelectorMemory:
         ``_save`` access from recovery handlers and other kernel code.
         """
         domain = self._extract_domain(url)
-        if not domain or domain not in self._memory:
+        if not domain:
             return False
-        logger.info("Invalidating selector memory for domain %s", domain)
-        del self._memory[domain]
-        self._save()
+        with self._lock:
+            if domain not in self._memory:
+                return False
+            logger.info("Invalidating selector memory for domain %s", domain)
+            del self._memory[domain]
+            self._save()
         return True
 
     def get_memory_stats(self) -> dict[str, Any]:
@@ -369,44 +379,45 @@ class SelectorMemory:
             dict with memory stats (total domains, avg confidence, etc.)
 
         """
-        if not self._memory:
-            return {
-                "total_domains": 0,
+        with self._lock:
+            if not self._memory:
+                return {
+                    "total_domains": 0,
+                    "avg_confidence": 0.0,
+                    "total_selectors": 0,
+                    "high_confidence": 0,
+                    "medium_confidence": 0,
+                    "low_confidence": 0,
+                    "by_confidence": {},
+                }
+
+            stats: dict[str, Any] = {
+                "total_domains": len(self._memory),
                 "avg_confidence": 0.0,
-                "total_selectors": 0,
-                "high_confidence": 0,
-                "medium_confidence": 0,
-                "low_confidence": 0,
+                "total_selectors": len(self._memory),
+                "high_confidence": 0,  # >= 0.75
+                "medium_confidence": 0,  # 0.5 - 0.74
+                "low_confidence": 0,  # < 0.5
                 "by_confidence": {},
             }
 
-        stats: dict[str, Any] = {
-            "total_domains": len(self._memory),
-            "avg_confidence": 0.0,
-            "total_selectors": len(self._memory),
-            "high_confidence": 0,  # >= 0.75
-            "medium_confidence": 0,  # 0.5 - 0.74
-            "low_confidence": 0,  # < 0.5
-            "by_confidence": {},
-        }
+            total_score = 0.0
+            for entry in self._memory.values():
+                confidence = self._compute_confidence(entry)
+                total_score += confidence.final_score
 
-        total_score = 0.0
-        for entry in self._memory.values():
-            confidence = self._compute_confidence(entry)
-            total_score += confidence.final_score
+                score_bucket = f"{confidence.final_score:.2f}"
+                bucket = stats["by_confidence"]
+                bucket[score_bucket] = bucket.get(score_bucket, 0) + 1
 
-            score_bucket = f"{confidence.final_score:.2f}"
-            bucket = stats["by_confidence"]
-            bucket[score_bucket] = bucket.get(score_bucket, 0) + 1
+                if confidence.final_score >= 0.75:
+                    stats["high_confidence"] = int(stats["high_confidence"]) + 1
+                elif confidence.final_score >= 0.5:
+                    stats["medium_confidence"] = int(stats["medium_confidence"]) + 1
+                else:
+                    stats["low_confidence"] = int(stats["low_confidence"]) + 1
 
-            if confidence.final_score >= 0.75:
-                stats["high_confidence"] = int(stats["high_confidence"]) + 1
-            elif confidence.final_score >= 0.5:
-                stats["medium_confidence"] = int(stats["medium_confidence"]) + 1
-            else:
-                stats["low_confidence"] = int(stats["low_confidence"]) + 1
-
-        stats["avg_confidence"] = total_score / len(self._memory) if self._memory else 0.0
+            stats["avg_confidence"] = total_score / len(self._memory) if self._memory else 0.0
 
         return stats
 
@@ -467,10 +478,14 @@ class SelectorMemory:
 
 # Global singleton
 _memory: SelectorMemory | None = None
+_singleton_lock = threading.Lock()
 
 
 def get_selector_memory() -> SelectorMemory:
+    """Return the global SelectorMemory singleton (thread-safe)."""
     global _memory
     if _memory is None:
-        _memory = SelectorMemory()
+        with _singleton_lock:
+            if _memory is None:
+                _memory = SelectorMemory()
     return _memory
