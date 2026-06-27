@@ -173,6 +173,10 @@ class DomainDenylist:
         if not all(c.isalnum() or c in ".-" for c in domain):
             msg = f"invalid domain: {domain!r}"
             raise ValueError(msg)
+        path_prefix = path_prefix.strip()
+        if path_prefix and not path_prefix.startswith("/"):
+            msg = "path_prefix must start with '/'"
+            raise ValueError(msg)
         with self._lock, self._connect() as conn:
             query = """
                 INSERT INTO domain_denylist (domain, reason, added_by, path_prefix)

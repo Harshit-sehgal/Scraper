@@ -425,7 +425,10 @@ class ReplayBuffer:
                         self._total_checkpoints += 1
 
             # Update current segment to the latest
-            self._current_segment_idx = int(seg_path.stem.split("_")[1]) if "_" in seg_path.stem else 0
+            try:
+                self._current_segment_idx = int(seg_path.stem.split("_")[1])
+            except (ValueError, IndexError):
+                logger.warning("Malformed segment filename %r; skipping index parse", seg_path.name)
             self._current_segment_count = total_lines
 
         if self._segments:

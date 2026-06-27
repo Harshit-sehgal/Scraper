@@ -4,6 +4,7 @@ True ownership boundary: NO external code should mutate learned_exclusions direc
 All tension changes go through this state object, which validates invariants.
 """
 
+import ast
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -173,8 +174,6 @@ class InstabilityState:
                 if len(k) > self.MAX_KEY_LENGTH:
                     logger.warning("Skipping overly long key (%d chars)", len(k))
                     continue
-
-                import ast
 
                 try:
                     k = ast.literal_eval(k)  # nosec  # noqa: PLW2901, RUF100

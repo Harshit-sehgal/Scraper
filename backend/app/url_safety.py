@@ -121,10 +121,6 @@ def _normalize_ip_literal(hostname: str) -> str | None:
     # to inet_aton (which silently accepts some weird inputs).
     if not candidate or any(c.isspace() or ord(c) < 32 for c in candidate):
         return None
-    # Single-decimal form (e.g. "2130706433") is sometimes accepted by
-    # inet_aton but is not a valid hostname; reject it explicitly.
-    if "." not in candidate:
-        return None
     try:
         packed = socket.inet_aton(candidate)
     except OSError:

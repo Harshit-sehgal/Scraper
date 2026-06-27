@@ -230,6 +230,7 @@ class AcquisitionLineage(BaseModel):
         Infers the correct AcquisitionState by combining redirect_type
         with search recovery context.
         """
+        redirect_info = redirect_info or {}
         redirect_type = redirect_info.get("redirect_type", "none")
         redirected = redirect_info.get("redirected", False)
         message = redirect_info.get("message", "")
