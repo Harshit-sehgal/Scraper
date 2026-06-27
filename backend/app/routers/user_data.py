@@ -66,10 +66,13 @@ async def delete_my_data(
     }
 
     # 1. Delete jobs owned by the user
+    # Pre-initialise so step 2 always has a valid reference even if
+    # step 1 fails early.
+    job_ids_to_delete: list[str] = []
+    job_result_paths: dict[str, str | None] = {}
     try:
         from app.globals import jobs_store
 
-        job_ids_to_delete: list[str] = []
         if hasattr(jobs_store, "get_all_jobs"):
             all_jobs = jobs_store.get_all_jobs()
         elif hasattr(jobs_store, "list_jobs"):
@@ -81,14 +84,17 @@ async def delete_my_data(
             for job_id, job in all_jobs.items():
                 if isinstance(job, dict):
                     owner = str(job.get("created_by") or job.get("created_by_fingerprint") or job.get("user_id", ""))
+                    rfp = job.get("result_file_path")
                 else:
                     owner = str(
                         getattr(job, "created_by", "")
                         or getattr(job, "created_by_fingerprint", "")
                         or getattr(job, "user_id", ""),
                     )
+                    rfp = getattr(job, "result_file_path", None)
                 if owner == user_id:
                     job_ids_to_delete.append(job_id)
+                    job_result_paths[job_id] = rfp
             for jid in job_ids_to_delete:
                 if hasattr(jobs_store, "delete_job"):
                     jobs_store.delete_job(jid)
@@ -105,7 +111,7 @@ async def delete_my_data(
         from app.utils.job_results_store import delete_job_results_from_disk
 
         for jid in job_ids_to_delete:
-            delete_job_results_from_disk(jid)
+            delete_job_results_from_disk(jid, file_path=job_result_paths.get(jid))
     except (OSError, ValueError, TypeError) as e:
         logger.debug("Failed to delete job results from disk: %s", e)
 
