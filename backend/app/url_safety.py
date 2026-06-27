@@ -3,7 +3,6 @@ import ipaddress
 import logging
 import socket
 from collections.abc import Callable
-from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
@@ -82,9 +81,8 @@ def is_safe_ip(ip_str: str) -> bool:
         return False
 
 
-@lru_cache(maxsize=1)
 def _get_allowed_internal_hosts() -> set[str]:
-    """Parse and cache the allowed internal hosts set from settings."""
+    """Parse the allowed internal hosts set from settings."""
     hosts = set()
     for raw_entry in settings.ALLOWED_INTERNAL_HOSTS.split(","):
         entry = raw_entry.strip().lower()
