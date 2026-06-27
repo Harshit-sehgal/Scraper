@@ -96,6 +96,11 @@ def save_semantic_state() -> None:
         with os.fdopen(fd, "w") as f:
             fd = None  # ownership transferred to fdopen context manager
             json.dump(full_state, f, indent=2)
+            # Crash-safety: fsync the data to disk BEFORE os.replace so
+            # a power failure between write and rename cannot leave the
+            # previous valid state replaced with a zero-byte file.
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp_path, path)
         tmp_path = None  # ownership transferred via rename
         logger.info("Saved unified semantic state to %s", path)

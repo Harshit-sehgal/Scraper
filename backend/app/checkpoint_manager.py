@@ -47,6 +47,11 @@ class CheckpointManager:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump(state_dict, f, indent=2)
+                # Crash-safety: fsync BEFORE os.replace so a power
+                # failure between write and rename cannot replace a
+                # valid checkpoint with a truncated one.
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, filepath)
             tmp_path = None  # ownership transferred via rename
             logger.info("Created checkpoint: %s", filename)

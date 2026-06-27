@@ -3,6 +3,7 @@
 import gzip
 import json
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,11 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
         with gzip.open(temp_path, "wt", encoding="utf-8") as f:
             for record in results:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            # Crash-safety: fsync the data to disk BEFORE os.replace
+            # so a power failure between write and rename cannot
+            # replace valid results with a truncated gzip file.
+            f.flush()
+            os.fsync(f.fileno())
         temp_path.replace(path)
     except Exception:
         logger.exception("Failed to write job results to disk for %s", job_id)
