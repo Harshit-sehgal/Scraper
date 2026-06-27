@@ -81,10 +81,7 @@ class LLMCascadeExhausted(RuntimeError):
         self.public_name = public_name
         self.last_exception = last_exception
         self.attempt_count = attempt_count
-        msg = (
-            f"{public_name}: all providers failed (attempts={attempt_count}, "
-            f"last_error={last_exception!r})"
-        )
+        msg = f"{public_name}: all providers failed (attempts={attempt_count}, last_error={last_exception!r})"
         super().__init__(msg)
 
 
@@ -137,6 +134,46 @@ def _record_silent_failure(name: str, last_exception: BaseException | None) -> N
         name,
         last_exception,
     )
+    # Notify the cascade breaker; if the threshold is reached, the
+    # breaker opens and short-circuits subsequent public-LLM calls
+    # until the open window elapses.  Import here to avoid a hard
+    # dependency at module import time.
+    try:
+        from app.config import settings as _settings
+        from app.utils.llm_circuit_breaker import get_llm_cascade_breaker
+
+        get_llm_cascade_breaker().record_failure(
+            error=last_exception or RuntimeError("silent cascade exhaustion"),
+            enabled=_settings.LLM_CIRCUIT_ENABLED,
+        )
+    except (ImportError, AttributeError, RuntimeError, TypeError, ValueError, OSError):
+        # The breaker's optional dependencies must never crash the
+        # production LLM call — fall back to no-op tracking.
+        logger.debug("Failed to record failure with cascade breaker", exc_info=True)
+
+
+def _record_cascade_success() -> None:
+    """Notify the breaker that a public LLM call succeeded."""
+    try:
+        from app.config import settings as _settings
+        from app.utils.llm_circuit_breaker import get_llm_cascade_breaker
+
+        get_llm_cascade_breaker().record_success(enabled=_settings.LLM_CIRCUIT_ENABLED)
+    except (ImportError, AttributeError, RuntimeError, TypeError, ValueError, OSError):
+        logger.debug("Failed to record success with cascade breaker", exc_info=True)
+
+
+def _check_cascade_breaker() -> None:
+    """Short-circuit cascade if the breaker is OPEN."""
+    try:
+        from app.config import settings as _settings
+        from app.utils.llm_circuit_breaker import LLMCircuitOpen, get_llm_cascade_breaker
+
+        get_llm_cascade_breaker().check(enabled=_settings.LLM_CIRCUIT_ENABLED)
+    except LLMCircuitOpen:
+        raise
+    except (ImportError, AttributeError, RuntimeError, TypeError, ValueError, OSError):
+        logger.debug("Failed to check cascade breaker", exc_info=True)
 
 
 def _record_token_usage(response_data: dict[str, Any]) -> None:
@@ -384,6 +421,21 @@ def _public_llm_fallbacks_enabled() -> bool:
     return bool(settings.LLM_ENABLE_PUBLIC_FALLBACKS)
 
 
+# Re-export the cascade circuit breaker exception so callers can
+# ``from app.llm_bridge import LLMCircuitOpen`` without depending on
+# the utility module path.
+try:
+    from app.utils.llm_circuit_breaker import LLMCircuitOpen  # type: ignore[assignment]
+except ImportError:
+    # Circuit breaker module optional — define a placeholder for
+    # environments where the utility is not installed.
+    class LLMCircuitOpen(RuntimeError):  # type: ignore[no-redef]
+        """Placeholder when llm_circuit_breaker is not available."""
+
+        def __init__(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+            super().__init__("LLM cascade circuit breaker is open (placeholder)")
+
+
 def _handle_silent_failure(
     name: str,
     last_err: BaseException | None,
@@ -413,6 +465,12 @@ async def llm_json(
     *,
     raise_on_failure: bool | None = None,
 ):
+    # Cascade breaker check — short-circuits when the breaker is open,
+    # so a misbehaving provider does not burn a full timeout on every
+    # call.  Raising here means callers with ``raise_on_failure=True``
+    # observe :class:`LLMCircuitOpen` instead of waiting 45s+ for the
+    # cascade to time out individually.
+    _check_cascade_breaker()
     try:
         from app.metrics_collector import record_llm_call
 
@@ -441,12 +499,12 @@ async def llm_json(
                     timeout=timeout,
                 )
                 if parsed is not None:
+                    _record_cascade_success()
                     return parsed
             except _MODEL_FALLBACK_ERRORS as e:
                 last_err = e
-                logger.exception("LLM JSON call failed")
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
-                logger.exception("%s failed: %s", stage, model)
+                logger.exception("%s failed (model=%s)", stage, model)
                 _record_llm_degradation(subsystem="groq", cause=f"{stage} ({model}) failed: {e}")
 
     if _public_llm_fallbacks_enabled():
@@ -502,18 +560,23 @@ async def llm_json(
                     _g4f_hard_timeout,
                 )
                 content = None
-            if content is None:
-                return {}
-            parsed = _extract_json_payload(content)
-            if parsed is not None:
-                return parsed
+            if content is not None:
+                parsed = _extract_json_payload(content)
+                if parsed is not None:
+                    _record_cascade_success()
+                    return parsed
+                # JSON extraction failed — fall through to next provider
         except _MODEL_FALLBACK_ERRORS as e:
             last_err = e
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
         except Exception as e:  # g4f may raise arbitrary exception types
             last_err = e
-            logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
+            logger.exception(
+                "g4f JSON fallback failed (prompt_len=%d, unexpected type=%s)",
+                len(messages),
+                type(e).__name__,
+            )
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
     if raise_on_failure is None:
@@ -532,6 +595,7 @@ async def llm_json_fast(
     raise_on_failure: bool | None = None,
 ):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
+    _check_cascade_breaker()
     try:
         from app.metrics_collector import record_llm_call
 
@@ -560,12 +624,12 @@ async def llm_json_fast(
                     timeout=timeout,
                 )
                 if parsed is not None:
+                    _record_cascade_success()
                     return parsed
             except _MODEL_FALLBACK_ERRORS as e:
                 last_err = e
-                logger.exception("Groq fast JSON call failed")
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
-                logger.exception("%s failed: %s", stage, model)
+                logger.exception("%s failed (model=%s)", stage, model)
                 _record_llm_degradation(subsystem="groq_fast", cause=f"{stage} ({model}) failed: {e}")
 
     if _public_llm_fallbacks_enabled():
@@ -599,6 +663,7 @@ async def llm_text(
     *,
     raise_on_failure: bool | None = None,
 ) -> str:
+    _check_cascade_breaker()
     try:
         from app.metrics_collector import record_llm_call
 
@@ -627,12 +692,12 @@ async def llm_text(
                     timeout=timeout,
                 )
                 if text:
+                    _record_cascade_success()
                     return text
             except _MODEL_FALLBACK_ERRORS as e:
                 last_err = e
-                logger.exception("Groq text call failed")
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
-                logger.exception("%s failed: %s", stage, model)
+                logger.exception("%s failed (model=%s)", stage, model)
 
     if _public_llm_fallbacks_enabled():
         try:
@@ -679,19 +744,21 @@ async def llm_text(
                     _g4f_hard_timeout,
                 )
                 result = None
-            if result is None:
-                return ""
-            return result  # type: ignore[no-any-return]
+            if result is not None:
+                _record_cascade_success()
+                return result  # type: ignore[no-any-return]
         except _MODEL_FALLBACK_ERRORS as e:
             last_err = e
             logger.exception("g4f text fallback failed")
         except Exception as e:  # g4f may raise arbitrary exception types
             last_err = e
-            logger.exception("g4f text fallback failed")
-        _record_silent_failure("llm_text", last_err)
-        return ""
+            logger.exception("g4f text fallback failed (unexpected type=%s)", type(e).__name__)
 
-    _record_silent_failure("llm_text", last_err)
+    if raise_on_failure is None:
+        from app.utils.llm_bridge_settings import llm_raise_on_failure_default
+
+        raise_on_failure = llm_raise_on_failure_default()
+    _handle_silent_failure("llm_text", last_err, raise_on_failure=raise_on_failure)
     return ""
 
 
@@ -845,8 +912,7 @@ class SubstratePluginManager:
             # door" for handlers that the policy engine would have rejected.
             if not is_handler_module_allowed(handler):
                 logger.warning(
-                    "TOOL DISPATCH: Handler [%s] module %r is not in the sandbox "
-                    "module allow-list — refusing to execute.",
+                    "TOOL DISPATCH: Handler [%s] module %r is not in the sandbox module allow-list — refusing to execute.",
                     handler_name,
                     getattr(handler, "__module__", None),
                 )
