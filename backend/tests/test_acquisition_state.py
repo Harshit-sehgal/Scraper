@@ -229,6 +229,17 @@ class TestAcquisitionLineage:
         )
         assert lineage.state == AcquisitionState.HOMEPAGE_REDIRECT
 
+    def test_from_redirect_info_none_input(self) -> None:
+        """Passing None for redirect_info should default to DIRECT state."""
+        lineage = AcquisitionLineage.from_redirect_info(
+            None,
+            original_url="https://example.com/data",
+            final_url="https://example.com/data",
+            fetch_method="playwright_full",
+        )
+        assert lineage.state == AcquisitionState.DIRECT
+        assert lineage.final_url == "https://example.com/data"
+
 
 class TestBuildRedirectInfo:
     """Tests for the build_redirect_info helper function."""

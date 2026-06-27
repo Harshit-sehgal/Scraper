@@ -228,18 +228,19 @@ def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch) -> None:
     validate_public_http_url("http://link-local-host.example.com")
 
 
-def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch) -> None:
-    """validate_public_http_url no longer does DNS resolution (M2 fix).
+def test_validate_decimal_and_hex_ip_literals_rejected() -> None:
+    """Non-canonical IPv4 literals (decimal, hex) are normalized and rejected.
 
-    Decimal/hex IPs that resolve to loopback via DNS now pass through
-    validate_public_http_url. The transport layer catches them instead.
+    validate_public_http_url uses socket.inet_aton to normalize these forms
+    before checking against the safe-IP predicate, closing an SSRF bypass.
     """
-    monkeypatch.setattr(settings, "ENV", "production")
+    # Single-decimal form (e.g. 2130706433 -> 127.0.0.1)
+    with pytest.raises(ValueError, match="restricted IP"):
+        validate_public_http_url("http://2130706433/")
 
-    # These pass validate_public_http_url because DNS resolution is removed.
-    # The transport layer would reject the resolved IPs at connect time.
-    validate_public_http_url("http://2130706433/")
-    validate_public_http_url("http://0x7f000001/")
+    # Hex form (e.g. 0x7f000001 -> 127.0.0.1)
+    with pytest.raises(ValueError, match="restricted IP"):
+        validate_public_http_url("http://0x7f000001/")
 
 
 def test_validate_redirect_to_private_ranges(monkeypatch) -> None:
