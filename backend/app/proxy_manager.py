@@ -22,11 +22,18 @@ logger = logging.getLogger(__name__)
 class ProxyManager:
     """Manages proxy rotation for anti-bot resilience."""
 
+    # If a proxy accumulates this many total failures (not reset by
+    # rotation or success decay), it is evicted permanently from the
+    # pool.  Prevents dead proxies from being retried indefinitely after
+    # domain-blocked lists are cleared.
+    _EVICTION_TOTAL_FAILURES = 15
+
     def __init__(self) -> None:
         self._proxy_list: list[str] = []
         self._current_index: int = 0
         self._failure_counts: dict[str, int] = defaultdict(int)
         self._success_counts: dict[str, int] = defaultdict(int)
+        self._total_failure_counts: dict[str, int] = defaultdict(int)  # cumulative, never reset
         self._enabled: bool = settings.PROXY_ROTATION_ENABLED
         self._consecutive_failures: int = 0  # Track across all proxies
         self._proxy_blocked_domains: dict[str, set[str]] = defaultdict(set)  # proxy -> domains blocked on
@@ -51,7 +58,12 @@ class ProxyManager:
         return self._proxy_list[self._current_index % len(self._proxy_list)]
 
     def record_failure(self, proxy: str | None = None, domain: str | None = None) -> None:
-        """Record a failure for the given proxy (or current)."""
+        """Record a failure for the given proxy (or current).
+
+        If a proxy's cumulative failure count exceeds the eviction
+        threshold, it is permanently removed from the pool so that
+        dead proxies are not retried indefinitely.
+        """
         if not self.enabled:
             return
 
@@ -60,11 +72,18 @@ class ProxyManager:
             return
 
         self._failure_counts[proxy] += 1
+        self._total_failure_counts[proxy] += 1
         self._consecutive_failures += 1
 
         # Track domain-specific proxy blocking
         if domain:
             self._proxy_blocked_domains[proxy].add(domain)
+
+        # ── Dead proxy eviction ────────────────────────────────────
+        cumulative = self._total_failure_counts[proxy]
+        if cumulative >= self._EVICTION_TOTAL_FAILURES:
+            self._evict_proxy(proxy)
+            return
 
         # Rotate if threshold exceeded
         if self._failure_counts[proxy] >= settings.PROXY_ROTATION_FAILURE_THRESHOLD:
@@ -97,6 +116,38 @@ class ProxyManager:
         prior_failures = self._failure_counts.get(proxy, 0)
         if prior_failures > 0:
             self._failure_counts[proxy] = max(0, prior_failures - 1)
+
+    def _evict_proxy(self, proxy: str) -> None:
+        """Permanently remove a dead proxy from the pool.
+
+        Called when a proxy's cumulative failure count exceeds
+        ``_EVICTION_TOTAL_FAILURES``.  Cleans up all associated tracking
+        state (failure counts, success counts, domain blocks) and removes
+        the proxy from rotation.
+        """
+        if proxy not in self._proxy_list:
+            return
+
+        logger.warning(
+            "Evicting dead proxy %s (cumulative failures: %d, remaining pool: %d)",
+            mask_proxy_url(proxy),
+            self._total_failure_counts.get(proxy, 0),
+            len(self._proxy_list) - 1,
+        )
+
+        self._proxy_list.remove(proxy)
+        self._failure_counts.pop(proxy, None)
+        self._success_counts.pop(proxy, None)
+        self._total_failure_counts.pop(proxy, None)
+        self._proxy_blocked_domains.pop(proxy, None)
+
+        # Clamp the index so subsequent rotations don't IndexError
+        if self._proxy_list:
+            self._current_index = self._current_index % len(self._proxy_list)
+        else:
+            self._current_index = 0
+            self._enabled = False
+            logger.warning("All proxies evicted — proxy rotation disabled")
 
     def rotate(self, domain: str | None = None) -> str | None:
         """Explicitly rotate to the next proxy.

@@ -700,6 +700,18 @@ async def scrape_url(
             record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
         else:
             record_anti_bot_classification("ok")
+
+        # ── Anti-Bot Feedback Loop ─────────────────────────────────
+        # Feed detection scores back into the engine so adaptive behaviors
+        # (stealth escalation, cookie TTL, proxy rotation, retry policy)
+        # activate on observed blocks.  Without this, record_block() and
+        # record_success() are dead code and the anti-bot engine is purely
+        # read-only.
+        from app.anti_bot_engine import get_anti_bot_engine
+
+        ab_engine = get_anti_bot_engine()
+        if anti_bot >= settings.ANTIBOT_HARD_BLOCK_THRESHOLD:
+            ab_engine.record_block(intel.domain, anti_bot)
     except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError):
         pass
 
@@ -754,6 +766,17 @@ async def scrape_url(
         time_ms=fetch_ms,
         quality=avg_score,
     )
+
+    # ── Anti-Bot Success Feedback ──────────────────────────────────
+    # Record a successful fetch against this domain so the anti-bot engine's
+    # adaptive feedback loop stays balanced (prevents over-escalation after
+    # transient blocks).
+    try:
+        from app.anti_bot_engine import get_anti_bot_engine
+
+        get_anti_bot_engine().record_success(intel.domain)
+    except (ImportError, AttributeError):
+        pass
 
     # ── Step 5: Motif Feedback ────────────────────────────────────
     new_motifs = run_all_adaptive_hooks(

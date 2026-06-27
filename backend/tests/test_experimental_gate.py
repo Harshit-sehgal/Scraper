@@ -89,10 +89,23 @@ def test_init_graph_scheduler_noop_when_disabled(gate_off, caplog) -> None:
     assert "Graph update scheduler initialized" not in caplog.text
 
 
-def test_init_recovery_framework_noop_when_disabled(gate_off, caplog) -> None:
-    with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
+def test_init_recovery_framework_always_active(gate_off, caplog) -> None:
+    """Recovery handler registration must NOT be gated behind ENABLE_EXPERIMENTAL_ROUTES.
+
+    Recovery handlers call into real system components (proxy_manager,
+    selector_memory, domain_runtime_policy) and need to be active in
+    production, so they are initialized regardless of the experimental
+    flag.
+    """
+    from unittest.mock import patch
+
+    with (
+        patch("app.recovery_handlers.register_all_recovery_handlers") as mock_reg,
+        caplog.at_level(logging.DEBUG, logger="app.experimental_startup"),
+    ):
         init_recovery_framework()
-    assert "Recovery handlers registered" not in caplog.text
+    mock_reg.assert_called_once()
+    assert "Recovery handlers registered" in caplog.text
 
 
 def test_init_domain_health_monitor_noop_when_disabled(gate_off, caplog) -> None:

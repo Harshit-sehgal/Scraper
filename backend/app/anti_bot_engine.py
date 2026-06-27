@@ -66,15 +66,22 @@ CHALLENGE_PATTERNS = {
         "cf-browser-verification",
         "cf-challenge",
         "cf-turnstile",
+        "cf-turnstile-v2",
         "challenge-platform",
         "checking your browser",
         "attention required",
+        "__cfruid",
+        "cf_clearance",
+        "cdn-cgi/challenge-platform",
+        "_cf_chl_opt",
+        "_cf_chl_tk",
+        "cloudflare-challenge",
     ],
-    "akamai": ["akamai-ghost", "ak_bmsc", "bm_sz", "_abck"],
-    "datadome": ["dd-captcha", "datadome", "dd="],
-    "perimeterx": ["perimeterx", "px-captcha", "_px"],
-    "incapsula": ["incapsula", "visid_incap", "incap_ses", "imperva"],
-    "captcha": ["g-recaptcha", "h-captcha", "recaptcha", "hcaptcha"],
+    "akamai": ["akamai-ghost", "ak_bmsc", "bm_sz", "_abck", "bm_mi"],
+    "datadome": ["dd-captcha", "datadome", "dd=", "x-datadome"],
+    "perimeterx": ["perimeterx", "px-captcha", "_px", "px_"],
+    "incapsula": ["incapsula", "visid_incap", "incap_ses", "imperva", "_incap"],
+    "captcha": ["g-recaptcha", "h-captcha", "recaptcha", "hcaptcha", "turnstile"],
     "generic_block": [
         "access denied",
         "blocked",
@@ -86,9 +93,12 @@ CHALLENGE_PATTERNS = {
         "human verify",
         "bot detection",
         "robot",
+        "automated access",
+        "unusual traffic",
+        "automated queries",
     ],
-    "js_required": ["enable javascript", "javascript is required", "browser is not supported"],
-    "rate_limit": ["too many requests", "429", "rate limit"],
+    "js_required": ["enable javascript", "javascript is required", "browser is not supported", "javascript must be enabled"],
+    "rate_limit": ["too many requests", "429", "rate limit", "try again later", "slow down"],
 }
 
 # Probability weights for detection signals
@@ -96,10 +106,13 @@ SIGNAL_WEIGHTS = {
     "challenge-platform": 0.95,
     "cf-browser-verification": 0.95,
     "cf-turnstile": 0.95,
+    "cf-turnstile-v2": 0.95,
+    "cdn-cgi/challenge-platform": 0.95,
     "g-recaptcha": 0.9,
     "h-captcha": 0.9,
     "datadome": 0.95,
     "perimeterx": 0.95,
+    "px-captcha": 0.95,
     "incapsula": 0.9,
     "imperva": 0.9,
     "access denied": 0.8,
@@ -107,6 +120,7 @@ SIGNAL_WEIGHTS = {
     "please verify": 0.7,
     "security check": 0.7,
     "sorry, you have been blocked": 0.95,
+    "unusual traffic": 0.8,
     "enable javascript": 0.6,
     "javascript is required": 0.6,
     "too many requests": 0.85,
@@ -378,15 +392,48 @@ class AntiBotEngine:
         """Get persisted cookies for a domain."""
         return self._cookies.get(domain, "")
 
-    def should_refresh_cookies(self, domain: str, max_age_hours: int = settings.ANTIBOT_COOKIE_MAX_AGE_HOURS) -> bool:
-        """Check if stored cookies for a domain should be refreshed."""
+    def should_refresh_cookies(
+        self,
+        domain: str,
+        max_age_hours: int | None = None,
+    ) -> bool:
+        """Check if stored cookies for a domain should be refreshed.
+
+        Uses domain-specific TTL when available (computed from block
+        history — domains with frequent blocks get shorter cookie TTL)
+        falling back to ``settings.ANTIBOT_COOKIE_MAX_AGE_HOURS``.
+        """
+        if max_age_hours is None:
+            max_age_hours = self._domain_specific_cookie_ttl(domain)
         last_update = self._last_cookie_update.get(domain, 0)
         if last_update == 0:
             return True
         age_hours = (time.time() - last_update) / 3600
         return age_hours > max_age_hours
 
-    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:  # noqa: ARG002 — url kept for API contract
+    def _domain_specific_cookie_ttl(self, domain: str, default: int | None = None) -> int:
+        """Compute a domain-specific cookie TTL based on block history.
+
+        Domains with frequent hard blocks get shorter cookie validity
+        so we refresh more aggressively.  Stable domains keep the default.
+        """
+        base = default or int(getattr(settings, "ANTIBOT_COOKIE_MAX_AGE_HOURS", 24))
+        history = self._block_history.get(domain, [])
+        if not history:
+            return base
+        # If any recent block was a hard block (score > 0.8), halve the TTL
+        recent = history[-5:]
+        hard_blocks = sum(1 for s in recent if s > 0.8)
+        if hard_blocks >= 2:
+            return max(base // 4, 1)  # aggressive: 25% of default, min 1h
+        if hard_blocks >= 1:
+            return max(base // 2, 2)  # moderate: 50% of default, min 2h
+        soft_blocks = sum(1 for s in recent if 0.4 < s <= 0.8)
+        if soft_blocks >= 3:
+            return max(base * 3 // 4, 4)  # mild: 75% of default
+        return base
+
+    def get_retry_policy(self, url: str, last_score: float) -> dict[str, Any]:
         """Determine the next step based on the block score and domain history."""
         policy: dict[str, Any] = {}
 

@@ -215,6 +215,33 @@ class BrowserPool:
             except (ImportError, RuntimeError, ValueError):
                 logger.debug("[BrowserPool] Failed to record browser context creation metric")
 
+            # ── Inject Persisted Cookies ────────────────────────────
+            # httpx-based fetches get persisted cookies injected via
+            # html_utils.py.  Playwright contexts must receive them
+            # separately so cached Cloudflare/Akamai clearance cookies
+            # survive across container restarts.
+            try:
+                from app.anti_bot_engine import get_anti_bot_engine
+
+                cookie_string = get_anti_bot_engine().get_cookies(domain)
+                if cookie_string:
+                    parsed_cookies = _parse_cookie_string_for_playwright(
+                        cookie_string, domain
+                    )
+                    if parsed_cookies:
+                        await context.add_cookies(parsed_cookies)
+                        logger.debug(
+                            "[BrowserPool] Injected %d persisted cookies for %s",
+                            len(parsed_cookies),
+                            domain,
+                        )
+            except (ImportError, AttributeError, TypeError, RuntimeError, OSError):
+                logger.debug(
+                    "[BrowserPool] Failed to inject persisted cookies for %s",
+                    domain,
+                    exc_info=True,
+                )
+
             # Register page tracking
             def register_page_tracking(ctx) -> None:
                 def on_page(page) -> None:
@@ -364,7 +391,17 @@ class BrowserPool:
         The semaphore ensures at most ``BROWSER_MAX_CONTEXTS`` (default 10)
         concurrent isolated acquisitions.  Callers that exceed the cap
         will block until a slot opens up.
+
+        If a hard recycle is in progress, the caller will wait for it to
+        complete before acquiring — preventing isolated contexts from being
+        created on a dying browser process.
         """
+        # Wait for any in-progress recycle to complete before acquiring
+        # a new isolated context.  Without this guard, a context could be
+        # created on a browser process that's about to be torn down, leading
+        # to orphaned contexts and potential crashes.
+        await self._recycle_event.wait()
+
         await self._concurrency_semaphore.acquire()
         ctx_id = f"iso:{uuid.uuid4().hex[:12]}"
         try:
@@ -432,6 +469,9 @@ class BrowserPool:
                         mask_proxy_url(proxy_config["server"]),
                     )
 
+        if self._browser is None:
+            msg = "_ensure_browser must have been called before _create_isolated_context"
+            raise RuntimeError(msg)
         context = await self._browser.new_context(**opts)
         self._isolated_contexts[ctx_id] = context
         self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
@@ -621,6 +661,7 @@ class BrowserPool:
             self._recycle_event.set()
 
     async def _hard_recycle(self) -> None:
+        # Close pooled contexts
         for ctx in list(self._contexts.values()):
             try:
                 await ctx.close()
@@ -628,6 +669,25 @@ class BrowserPool:
                 logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
+
+        # Close isolated contexts (e.g. workflow replays, previews). These
+        # were previously leaked during _hard_recycle, leaving orphaned
+        # contexts on a dying browser process.
+        for ctx_id, ctx in list(self._isolated_contexts.items()):
+            try:
+                await ctx.close()
+            except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
+                logger.debug(
+                    "[BrowserPool] Failed to close isolated context %s during hard recycle: %s",
+                    ctx_id,
+                    e,
+                )
+            finally:
+                # Release the semaphore slot for each closed context so the
+                # next browser launch starts with a full budget.
+                self._concurrency_semaphore.release()
+        self._isolated_contexts.clear()
+        self._active_acquires = 0
 
         if self._browser:
             try:
@@ -698,3 +758,56 @@ def reset_global_browser_pool() -> None:
     global _pool
     with _pool_lock:
         _pool = None
+
+
+# ── Cookie Parsing ──────────────────────────────────────────────────────
+
+
+def _parse_cookie_string_for_playwright(
+    cookie_string: str,
+    domain: str,
+) -> list[dict[str, Any]]:
+    """Parse a raw ``Set-Cookie``-style header into Playwright cookie dicts.
+
+    Handles the format stored by ``AntiBotEngine`` (exampleInput format:
+    ``"key1=val1; key2=val2"``).  Each cookie is mapped to Playwright's
+    ``add_cookies()`` schema:
+      - name, value, domain, path
+      - secure: True if the domain starts with ``https://``
+      - sameSite: ``"Lax"`` (sensible default)
+      - httpOnly / expires are omitted (not parseable from flat strings)
+
+    Robust against malformed input — bad entries are skipped rather than
+    causing the whole injection to fail.
+    """
+    if not cookie_string or not cookie_string.strip():
+        return []
+
+    cookies: list[dict[str, Any]] = []
+    # Strip leading "Cookie:" prefix if present (some storage formats
+    # include it, some don't)
+    raw = cookie_string.strip()
+    if raw.lower().startswith("cookie:"):
+        raw = raw.split(":", 1)[1].strip()
+
+    for pair in raw.split(";"):
+        pair = pair.strip()
+        if not pair or "=" not in pair:
+            continue
+        name, _, value = pair.partition("=")
+        name = name.strip()
+        value = value.strip()
+        if not name:
+            continue
+        cookies.append(
+            {
+                "name": name,
+                "value": value,
+                "domain": domain,
+                "path": "/",
+                "secure": domain.startswith("localhost") is False,
+                "sameSite": "Lax",
+            }
+        )
+
+    return cookies

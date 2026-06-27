@@ -66,10 +66,12 @@ def init_graph_scheduler() -> None:
 
 
 def init_recovery_framework() -> None:
-    """Register all recovery handlers for extraction failure scenarios."""
-    if not experimental_subsystems_enabled():
-        logger.debug("init_recovery_framework: skipped (experimental subsystems disabled)")
-        return
+    """Register all recovery handlers for extraction failure scenarios.
+
+    Recovery handlers call into real system components (proxy_manager,
+    selector_memory, domain_runtime_policy) and should always be active.
+    Only gated behind the experimental flag during initial development.
+    """
     try:
         from app.recovery_handlers import register_all_recovery_handlers
 
