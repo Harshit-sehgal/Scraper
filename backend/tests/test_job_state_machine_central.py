@@ -44,7 +44,7 @@ def test_transition_to_valid_changes_status() -> None:
 
 
 def test_transition_to_invalid_raises_value_error() -> None:
-    job = _mock_job(JobStatus.COMPLETED)
+    job = _mock_job(JobStatus.FAILED)
     with pytest.raises(ValueError, match="H7: Invalid state transition"):
         transition_to(job, JobStatus.RUNNING)
 
@@ -81,6 +81,14 @@ def test_transition_to_honors_explicit_completed_at() -> None:
     ts = "2026-06-01T12:00:00"
     transition_to(job, JobStatus.COMPLETED, completed_at=ts)
     assert job.completed_at == ts
+
+
+def test_transition_to_completed_auto_sets_completed_at() -> None:
+    """COMPLETED is a completing status (auto-sets completed_at) even though
+    it is not terminal (reclean allows COMPLETED → RUNNING)."""
+    job = _mock_job(JobStatus.RUNNING)
+    transition_to(job, JobStatus.COMPLETED)
+    assert job.completed_at is not None
 
 
 def test_transition_to_non_terminal_does_not_set_completed_at() -> None:
@@ -162,7 +170,10 @@ def test_state_machine_is_central_source() -> None:
     assert can_transition(job, JobStatus.RUNNING)
     job.status = JobStatus.RUNNING
     assert can_transition(job, JobStatus.COMPLETED)
+    # COMPLETED → RUNNING is allowed (reclean); FAILED → RUNNING is not
     job.status = JobStatus.COMPLETED
+    assert can_transition(job, JobStatus.RUNNING)  # reclean path
+    job.status = JobStatus.FAILED
     assert not can_transition(job, JobStatus.RUNNING)
 
 
@@ -176,6 +187,7 @@ def test_all_valid_transitions_defined() -> None:
         (JobStatus.RUNNING, JobStatus.FAILED),
         (JobStatus.PENDING, JobStatus.FAILED),
         (JobStatus.RUNNING, JobStatus.CANCELED),
+        (JobStatus.COMPLETED, JobStatus.RUNNING),  # reclean
     ]
     for src, dst in valid_paths:
         job = _mock_job(src)
@@ -184,8 +196,8 @@ def test_all_valid_transitions_defined() -> None:
 
 def test_invalid_transitions_blocked() -> None:
     invalid_paths = [
-        (JobStatus.COMPLETED, JobStatus.RUNNING),
         (JobStatus.FAILED, JobStatus.RUNNING),
+        (JobStatus.CANCELED, JobStatus.RUNNING),
         (JobStatus.COMPLETED, JobStatus.FAILED),
     ]
     for src, dst in invalid_paths:
@@ -203,7 +215,14 @@ def test_terminal_states_identified() -> None:
 
 def test_valid_transitions_from_terminal_returns_empty() -> None:
     for status in _TERMINAL_STATUSES:
-        assert valid_transitions_from(status) == frozenset()
+        assert valid_transitions_from(status) == frozenset(), f"{status} should have no valid transitions"
+
+
+def test_completed_is_not_terminal_due_to_reclean() -> None:
+    """COMPLETED → RUNNING is allowed (reclean), so COMPLETED is not terminal."""
+    assert not is_terminal(JobStatus.COMPLETED)
+    assert can_transition(_mock_job(JobStatus.COMPLETED), JobStatus.RUNNING)
+    assert valid_transitions_from(JobStatus.COMPLETED) == frozenset({JobStatus.RUNNING})
 
 
 def test_valid_transitions_from_pending() -> None:

@@ -10,6 +10,7 @@ The ReplayBuffer complements the in-memory EventJournal by providing:
 Phase 66: Long-Horizon Scaling — streaming replay from persistent storage.
 """
 
+import atexit
 import bisect
 import json
 import logging
@@ -17,7 +18,7 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,14 @@ class ReplayBuffer:
         self._total_entries = 0
         self._total_checkpoints = 0
         self._load_existing_segments()
+        # Ensure the open file handle is closed when the interpreter exits.
+        atexit.register(self.close)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
 
     # ─── Writing ────────────────────────────────────────────────────
 
@@ -438,6 +447,10 @@ class ReplayBuffer:
             self._current_segment_count = total_lines
 
         if self._segments:
+            # Defensive close: if a previous segment file was left open
+            # (caller error, restart path), close it before opening the
+            # latest segment so we don't leak a file descriptor.
+            self.close()
             self._current_segment_file = open(self._base_dir / self._segments[-1], "a", encoding="utf-8")  # noqa: SIM115
 
     def _get_subsequent_segments(self, current_seg: str) -> list[str]:

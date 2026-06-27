@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
-from app.globals import jobs_store, recycle_bin_store
+from app.globals import _jobs_store_lock, jobs_store, recycle_bin_store
 from app.storage_interface import get_job_repository
 
 logger = logging.getLogger(__name__)
@@ -94,14 +94,17 @@ async def ready():
             return {"status": "ready"}
 
         backend = getattr(repo, "backend", "sqlite")
+        with _jobs_store_lock:
+            job_count = health_info.get("job_count", len(jobs_store))
+            recycle_bin_count = health_info.get("recycle_bin_count", len(recycle_bin_store))
         return {
             "status": "ready",
             "backend": backend,
             "storage": "ok",
             "migrations": "ok",
             "schema_version": health_info.get("schema_version", 0),
-            "job_count": health_info.get("job_count", len(jobs_store)),
-            "recycle_bin_count": health_info.get("recycle_bin_count", len(recycle_bin_store)),
+            "job_count": job_count,
+            "recycle_bin_count": recycle_bin_count,
         }
     except Exception as e:
         duration = time.time() - start_time

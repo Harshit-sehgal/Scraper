@@ -335,8 +335,13 @@ class JobRepository(ABC):
         Required for cross-process cancellation: the worker polls this method
         during long-running operations to detect cancellations requested by
         the API process. Returns True if the cancellation flag is set.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently ignoring cancellation requests.
         """
-        return False
+        msg = f"{self.__class__.__name__} must implement is_cancel_requested()"
+        raise NotImplementedError(msg)
 
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin. Returns True if the job was moved.
@@ -387,11 +392,24 @@ class JobRepository(ABC):
     # ─── World state persistence ────────────────────────────────────────
 
     def load_world_state(self) -> dict | None:
-        """Load semantic world state from the persistent store."""
-        return None
+        """Load semantic world state from the persistent store.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently returning ``None`` (which would indicate "no state exists").
+        """
+        msg = f"{self.__class__.__name__} must implement load_world_state()"
+        raise NotImplementedError(msg)
 
     def save_world_state(self, payload: dict[str, Any]) -> None:
-        """Save semantic world state to the persistent store."""
+        """Save semantic world state to the persistent store.
+
+        Subclasses MUST override this — the base implementation raises
+        ``NotImplementedError`` so missing backends fail loudly rather than
+        silently discarding the world state payload.
+        """
+        msg = f"{self.__class__.__name__} must implement save_world_state()"
+        raise NotImplementedError(msg)
 
 
 class SQLiteJobRepository(JobRepository):

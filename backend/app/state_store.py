@@ -13,6 +13,7 @@ import concurrent.futures
 import datetime
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from threading import Lock
@@ -146,6 +147,12 @@ def _write_state_to_disk(path: Path, payload: dict[str, Any]) -> None:
                     shutil.copy2(path, backup_path)
 
                 temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+                # fsync the temp file so the data hits disk before rename
+                fd = os.open(str(temp_path), os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
                 temp_path.replace(path)
                 # Success — clean up old backups
                 old_backup = path.with_suffix(path.suffix + ".bak.old")
@@ -183,6 +190,9 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
     except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
         logger.exception("Failed to serialize semantic world state")
 
+    # Capture the snapshot /before/ submitting to the executor so the
+    # background thread sees a consistent view — the store dicts may
+    # change between ``.submit()`` and the actual write.
     payload = {
         "saved_at": _now_iso(),
         "jobs": [job.model_dump() for job in jobs_store.values()],

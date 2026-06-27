@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import sqlite3
 import time
 import uuid
@@ -105,8 +106,8 @@ def _server_session_is_active(sid: str, role: str, user_id: str, *, now: int) ->
     if row is None:
         return False
     return (
-        str(row["role"]) == role
-        and str(row["user_id"] or "") == (user_id or "")
+        secrets.compare_digest(str(row["role"]).encode("utf-8"), role.encode("utf-8"))
+        and secrets.compare_digest(str(row["user_id"] or "").encode("utf-8"), (user_id or "").encode("utf-8"))
         and row["revoked_at"] is None
         and int(row["expires_at"]) >= now
     )

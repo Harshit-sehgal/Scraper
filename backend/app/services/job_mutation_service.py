@@ -19,6 +19,7 @@ from typing import Any
 from app.config import settings
 from app.models import JobStatus
 from app.routers.jobs_state import JobStoreManager, save_job
+from app.services.job_state_machine import can_transition, transition_to
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.utils.rbac import UserRole, can_access_scoped_resource
@@ -203,7 +204,7 @@ class JobRecleanerService:
         reclean_warnings: list[str] = []
 
         previous_status = job.status
-        job.status = JobStatus.RUNNING
+        transition_to(job, JobStatus.RUNNING)
 
         ai_report = {
             "applied": False,
@@ -264,8 +265,7 @@ class JobRecleanerService:
             job.results = normalize_job_results(filtered_results, job.schema_fields)
             job.total_records = total
             job.filtered_records = filtered_count
-            job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
-            job.status = JobStatus.COMPLETED
+            transition_to(job, JobStatus.COMPLETED)
 
             scraped_at = datetime.datetime.now(datetime.UTC).isoformat()
             for row in job.results:
@@ -334,7 +334,12 @@ class JobRecleanerService:
                 job_id,
                 previous_status.value if hasattr(previous_status, "value") else previous_status,
             )
-            job.status = previous_status
+            # Restore previous status if it's a valid rollback, otherwise
+            # fall back to FAILED to avoid leaving the job in a bad state.
+            if previous_status and can_transition(job, previous_status):
+                transition_to(job, previous_status)
+            else:
+                transition_to(job, JobStatus.FAILED, error=f"Reclean failed: {e}")
             reclean_warnings.append(f"Reclean failed: {e}")
             try:
                 await save_job(job)

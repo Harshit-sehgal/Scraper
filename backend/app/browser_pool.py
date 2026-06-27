@@ -419,6 +419,9 @@ class BrowserPool:
         except BaseException:
             self._concurrency_semaphore.release()
             raise
+        # Safe within the single asyncio event loop: no two coroutines
+        # execute this increment concurrently (asyncio is cooperative
+        # and there is no ``await`` between read and write).
         self._active_acquires += 1
         self._last_activity = time.time()
         try:
@@ -432,6 +435,10 @@ class BrowserPool:
         if ctx:
             with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
                 await ctx.close()
+        # Same reasoning as the increment in acquire_isolated_context:
+        # single event loop, cooperative scheduling, no await between
+        # read and write.  ``max(0, ...)`` is a defensive guard against
+        # any future edge case that might cause a double-decrement.
         self._active_acquires = max(0, self._active_acquires - 1)
         self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
         self._concurrency_semaphore.release()

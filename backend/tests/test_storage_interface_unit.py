@@ -10,7 +10,7 @@ Postgres connections, using a minimal concrete stub so we can verify:
 - prune_idempotency_keys() returns 0 by default
 - health_check() returns the expected shape
 - is_cancel_requested() returns False by default
-- load_world_state()/save_world_state() defaults are safe no-ops
+- load_world_state()/save_world_state() defaults raise NotImplementedError
 """
 
 from __future__ import annotations
@@ -132,7 +132,8 @@ class TestDefaultMethodBehaviour:
 
     def test_is_cancel_requested_defaults_false(self) -> None:
         repo = _StubRepo()
-        assert repo.is_cancel_requested("any-id") is False
+        with pytest.raises(NotImplementedError, match="must implement is_cancel_requested"):
+            repo.is_cancel_requested("any-id")
 
     def test_move_to_recycle_bin_raises(self) -> None:
         repo = _StubRepo()
@@ -161,12 +162,16 @@ class TestDefaultMethodBehaviour:
 
     def test_load_world_state_returns_none(self) -> None:
         repo = _StubRepo()
-        assert repo.load_world_state() is None
+        with pytest.raises(NotImplementedError, match="must implement load_world_state"):
+            repo.load_world_state()
 
     def test_save_world_state_is_noop(self) -> None:
         repo = _StubRepo()
-        # Should not raise — default is a no-op
-        repo.save_world_state({"key": "value"})
+        # The base class raises ``NotImplementedError`` to force subclasses
+        # to implement world-state persistence; the stub has not overridden
+        # it, so a deliberate call raises.
+        with pytest.raises(NotImplementedError, match="must implement save_world_state"):
+            repo.save_world_state({"key": "value"})
 
 
 # ─── Repository resolver factory ───────────────────────────────────────

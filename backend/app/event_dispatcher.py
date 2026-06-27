@@ -5,6 +5,7 @@ Synchronous / Asynchronous propagation of semantic signals.
 """
 
 import logging
+import threading
 import time
 from collections.abc import Callable
 
@@ -17,20 +18,26 @@ class EventDispatcher:
     """Central hub for semantic event propagation.
 
     Engines subscribe to specific event types to react to topological changes.
+    Thread-safe: ``subscribe``/``unsubscribe``/``dispatch`` are guarded by
+    an internal lock so background threads can register handlers while the
+    main event loop dispatches events.
     """
 
     def __init__(self) -> None:
         self.subscribers: dict[SemanticEventType, list[Callable]] = {t: [] for t in SemanticEventType}
+        self._lock = threading.Lock()
 
     def subscribe(self, event_type: SemanticEventType, callback: Callable) -> None:
         """Register a callback for a specific event type."""
-        self.subscribers[event_type].append(callback)
+        with self._lock:
+            self.subscribers[event_type].append(callback)
 
     def unsubscribe(self, event_type: SemanticEventType, callback: Callable) -> None:
         """Remove a callback for a specific event type."""
-        subs = self.subscribers.get(event_type, [])
-        if callback in subs:
-            subs.remove(callback)
+        with self._lock:
+            subs = self.subscribers.get(event_type, [])
+            if callback in subs:
+                subs.remove(callback)
 
     def dispatch(self, event: SemanticEvent) -> None:
         """Propagate an event to all interested subscribers."""
@@ -42,7 +49,11 @@ class EventDispatcher:
             event.instability_delta,
         )
 
-        for callback in self.subscribers.get(event.event_type, []):
+        # Snapshot subscribers under lock to avoid iteration-during-mutation
+        with self._lock:
+            callbacks = list(self.subscribers.get(event.event_type, []))
+
+        for callback in callbacks:
             try:
                 callback(event)
             except Exception as e:

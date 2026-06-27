@@ -52,7 +52,9 @@ _VALID_TRANSITIONS: dict[JobStatus, set[JobStatus]] = {
         JobStatus.CANCELED,
         JobStatus.FAILED,  # exception or recovery
     },
-    JobStatus.COMPLETED: set(),  # terminal
+    JobStatus.COMPLETED: {
+        JobStatus.RUNNING,  # reclean: admin re-execute a completed job
+    },  # otherwise terminal
     JobStatus.DEGRADED: set(),  # terminal
     JobStatus.EMPTY_RESULT: set(),  # terminal
     JobStatus.CANCELED: set(),  # terminal
@@ -121,7 +123,7 @@ def transition_to(
         job.cancel_requested = True
     if completed_at is not None:
         job.completed_at = completed_at
-    elif new_status in _TERMINAL_STATUSES:
+    elif new_status in _COMPLETING_STATUSES:
         job.completed_at = _now_iso()
 
     logger.info(
@@ -181,6 +183,18 @@ def mark_recovered_failed(job: Any) -> None:
 
 _TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
     {
+        JobStatus.DEGRADED,
+        JobStatus.EMPTY_RESULT,
+        JobStatus.CANCELED,
+        JobStatus.FAILED,
+    }
+)
+
+# Statuses that auto-set completed_at when transitioned to.
+# COMPLETED is included here (sets the timestamp) even though it is not
+# terminal (COMPLETED → RUNNING is allowed for reclean).
+_COMPLETING_STATUSES: frozenset[JobStatus] = frozenset(
+    {
         JobStatus.COMPLETED,
         JobStatus.DEGRADED,
         JobStatus.EMPTY_RESULT,
@@ -191,7 +205,11 @@ _TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
 
 
 def is_terminal(status: JobStatus) -> bool:
-    """Check if a status is terminal (no further transitions allowed)."""
+    """Check if a status is terminal (no further transitions allowed).
+
+    COMPLETED is *not* terminal because the reclean feature allows
+    COMPLETED → RUNNING.  All other ending statuses are terminal.
+    """
     return status in _TERMINAL_STATUSES
 
 

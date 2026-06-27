@@ -29,8 +29,9 @@ class GeocodeCache:
         self.db_path = db_path
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
-        self.hits = 0
-        self.misses = 0
+        self._hits = 0
+        self._misses = 0
+        self._lock = threading.Lock()
 
     def _init_db(self) -> None:
         """Initialize geocode cache SQLite tables."""
@@ -73,7 +74,8 @@ class GeocodeCache:
             timestamp = row[0]
             elapsed_days = (time.time() - timestamp) / 86400.0
             if elapsed_days < NEGATIVE_CACHE_TTL_DAYS:
-                self.hits += 1
+                with self._lock:
+                    self._hits += 1
                 logger.info("[Geocode Cache] Negative cache HIT for query '%s' (suppressed)", query)
                 return (0.0, 0.0, "EXCLUDED_NEGATIVE_CACHE")
             # Expired negative cache entry
@@ -88,11 +90,13 @@ class GeocodeCache:
             row = cursor.fetchone()
 
         if row:
-            self.hits += 1
+            with self._lock:
+                self._hits += 1
             logger.info("[Geocode Cache] Cache HIT for query '%s' -> (%.4f, %.4f)", query, row[0], row[1])
             return (row[0], row[1], row[2])
 
-        self.misses += 1
+        with self._lock:
+            self._misses += 1
         return None
 
     def set(self, query: str, lat: float, lon: float, resolved_address: str | None = None) -> None:
@@ -114,10 +118,21 @@ class GeocodeCache:
             conn.commit()
         logger.info("[Geocode Cache] Cached negative failure for query '%s'", query)
 
+    @property
+    def hits(self) -> int:
+        with self._lock:
+            return self._hits
+
+    @property
+    def misses(self) -> int:
+        with self._lock:
+            return self._misses
+
     def get_hit_rate(self) -> float:
         """Compute the cache hit rate metric."""
-        total = self.hits + self.misses
-        return self.hits / total if total > 0 else 0.0
+        with self._lock:
+            total = self._hits + self._misses
+        return self._hits / total if total > 0 else 0.0
 
 
 # Global geocode cache singleton instances
