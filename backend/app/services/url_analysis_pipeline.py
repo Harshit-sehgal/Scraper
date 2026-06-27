@@ -478,7 +478,7 @@ class URLAnalysisPipeline:
         has_containers = bool(ctx.content_quality.get("has_data_containers"))
         not_empty_score = 0.5 if not ctx.empty_check.is_empty else 0.0
         data_score = (1.0 if has_containers else 0.0) + not_empty_score - ctx.anti_bot_score * 0.3
-        acquisition_lineage.data_evidence_score = round(data_score, 3) / 1.5
+        acquisition_lineage.data_evidence_score = max(0.0, min(1.0, round(data_score, 3) / 1.5))
         acquisition_lineage.anti_bot_score = round(ctx.anti_bot_score, 3)
         acquisition_lineage.containers_detected = ctx.content_quality.get("data_container_count", 0)
         acquisition_lineage.forms_detected = 1 if (ctx.search_form or {}).get("detected") else 0

@@ -164,7 +164,10 @@ class InstabilityState:
                     parts = k.split("|")
                     if len(parts) == EXPECTED_KEY_PARTS:
                         sk = tuple(sorted(parts))
-                        target[sk] = max(0.0, min(1.0, v))
+                        try:
+                            target[sk] = max(0.0, min(1.0, float(v)))
+                        except (TypeError, ValueError):
+                            logger.debug("Skipping invalid exclusion value for key %r: %r", sk, v)
                     continue
 
                 if len(k) > self.MAX_KEY_LENGTH:
@@ -180,7 +183,10 @@ class InstabilityState:
                     continue
             if isinstance(k, (list, tuple)) and len(k) == EXPECTED_KEY_PARTS:
                 sk = tuple(sorted(k))
-                target[sk] = max(0.0, min(1.0, v))
+                try:
+                    target[sk] = max(0.0, min(1.0, float(v)))
+                except (TypeError, ValueError):
+                    logger.debug("Skipping invalid exclusion value for key %r: %r", sk, v)
 
     def clear(self) -> None:
         target = self._staging if self._staging is not None else self._exclusions
@@ -194,9 +200,13 @@ class InstabilityState:
             parts = key_str.split("|")
             if len(parts) == EXPECTED_KEY_PARTS:
                 key = tuple(parts)
+                try:
+                    remote_val = float(r_val)
+                except (TypeError, ValueError):
+                    continue
                 l_val = self.get_exclusion_by_key(key)
                 # CRDT-lite: pick the strongest exclusion signal
-                if r_val > l_val:
-                    self.set_exclusion(key, r_val)
+                if remote_val > l_val:
+                    self.set_exclusion(key, remote_val)
 
         self._record("merge", {"remote_exclusions": len(remote_excl)})
