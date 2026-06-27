@@ -143,20 +143,6 @@ class RoleEmbeddingEngine:
         """Topological exclusion: delegates to WorldState geometry."""
         return self.ws.get_derived_exclusion(role_a, role_b)  # type: ignore[no-any-return]
 
-    def get_role_similarity(self, role_a: str, role_b: str) -> float:
-        """Geometric similarity between two roles in the manifold."""
-        va = self.manifold.get(role_a)
-        vb = self.manifold.get(role_b)
-        if not va or not vb:
-            return 0.0
-
-        sim = sum(a * b for a, b in zip(va, vb, strict=False))
-
-        # Calibration (Phase 34): scale by dimensionality
-        dim = self.dimension
-        neutral = dim * 0.25
-        return max(0.0, min(1.0, (sim - neutral) / (dim * 0.1)))
-
     @property
     def dimension(self) -> int:
         return self.ws.manifold_dimension  # type: ignore[no-any-return]
@@ -263,28 +249,6 @@ class RoleEmbeddingEngine:
 
         self.ws.set_manifold_vector(role, role_vec)
         self.learning_count += 1
-
-    def apply_motif_gravity(self, role_name: str, primary_type: SemanticType, stability: float) -> None:
-        """Accumulate gravity force from stable motifs."""
-        if stability < 0.1:
-            return
-
-        if not self.ws.has_manifold_role(role_name):
-            from app.semantic_allocation_engine import _infer_role_type
-
-            self.ws.set_manifold_vector(role_name, self._get_type_vector(_infer_role_type(role_name)))
-
-        role_vec = self.ws.get_manifold_vector(role_name)
-        type_vec = self._get_type_vector(primary_type)
-
-        # Gravity Strength: proportional to motif stability
-        gravity = 0.05 * stability * (1.0 - self.get_certainty())
-
-        # Accumulate force vector
-        dim = self.dimension
-        force = self.force_buffer.setdefault(role_name, [0.0] * dim)
-        for i in range(dim):
-            force[i] += (type_vec[i] - role_vec[i]) * gravity
 
     def relax_manifold(self) -> None:
         """Geometric relaxation of the Role Manifold with Semantic Sharding (Phase 35)."""
@@ -432,13 +396,6 @@ class RoleEmbeddingEngine:
                         # Strength 1.0 = full attractor pull
                         force = diff * strength * 0.1 * base_rate
                         role_vec[k] = max(0.0, min(1.0, role_vec[k] + force))
-
-    def learn_contradiction(self, role_a: str, role_b: str, token_type: str) -> None:  # noqa: ARG002, RUF100
-        from app.instability_api import InstabilityAPI
-
-        inst_api = InstabilityAPI(ws=self.ws)
-        current = inst_api.get_learned_exclusion(role_a, role_b)
-        inst_api.set_exclusion(role_a, role_b, min(1.0, current + 0.15))
 
     def get_certainty(self) -> float:
         if not self.manifold:

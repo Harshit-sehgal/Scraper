@@ -154,12 +154,14 @@ class ManifoldState:
             displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vector, strict=False)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
+        else:
+            displacement = 0.0
 
         manifold[role] = list(vector)
         self._set_struct("role_manifold", manifold)
         self._record(
             "set_manifold_vector",
-            {"role": role, "vector": vector, "displacement": displacement if "displacement" in locals() else 0.0},
+            {"role": role, "vector": vector, "displacement": displacement},
         )
 
     def apply_force_to_manifold(self, role: str, deltas: list[Any], clamp: bool = True) -> None:

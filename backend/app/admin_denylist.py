@@ -69,7 +69,7 @@ _CREATE_TABLE_SQL = f"""
     )
 """
 
-_DELETE_ALL_SQL = f"DELETE FROM {DENYLIST_TABLE}"
+_DELETE_ALL_SQL = f"DELETE FROM {DENYLIST_TABLE}"  # nosec B608 — table name is a module constant, not user input
 
 DEFAULT_DB_PATH = "dataforge_denylist.sqlite"
 # In-process cache TTL — denylist reads are on the hot path of every

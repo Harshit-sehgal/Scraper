@@ -59,9 +59,10 @@ def to_semantic_type(value: object) -> SemanticType:
     """Unified conversion: accepts str, SemanticType, or anything with .value."""
     if isinstance(value, SemanticType):
         return value
-    if hasattr(value, "value"):
+    raw_value = getattr(value, "value", None)
+    if raw_value is not None:
         try:
-            return SemanticType(value.value)
+            return SemanticType(raw_value)
         except (ValueError, TypeError):
             pass
     return candidate_type_to_semantic(str(value))
@@ -71,8 +72,9 @@ def sem_type_str(value: object) -> str:
     """Unified string representation of a type (str or SemanticType or .value)."""
     if isinstance(value, SemanticType):
         return value.value
-    if hasattr(value, "value"):
-        return str(value.value)
+    raw_value = getattr(value, "value", None)
+    if raw_value is not None:
+        return str(raw_value)
     return str(value)
 
 

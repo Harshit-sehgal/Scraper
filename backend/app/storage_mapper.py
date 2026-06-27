@@ -79,12 +79,10 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "created_at": job.created_at or "",
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
-        "acquisition_mode": (
-            job.acquisition_mode.value if hasattr(job.acquisition_mode, "value") else str(job.acquisition_mode or "standard")
-        ),
+        "acquisition_mode": getattr(job.acquisition_mode, "value", None) or str(job.acquisition_mode or "standard"),
         "location": job.location or "",
         "preferred_domain": job.preferred_domain or "",
-        "source_policy": job.source_policy.value if hasattr(job.source_policy, "value") else str(job.source_policy),
+        "source_policy": getattr(job.source_policy, "value", None) or str(job.source_policy),
         "max_per_domain": job.max_per_domain or 4,
         "origin_location": job.origin_location or "",
         "max_distance_km": job.max_distance_km,

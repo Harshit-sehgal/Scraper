@@ -10,15 +10,11 @@ Provides a deterministic pipeline for improving extracted data quality:
 from __future__ import annotations
 
 import json
-import logging
 import re
 import urllib.parse
 from typing import Any
 
 from app.models import FieldType, SchemaField
-
-logger = logging.getLogger(__name__)
-
 
 # ---------------------------------------------------------------------------
 # Cleaning rules

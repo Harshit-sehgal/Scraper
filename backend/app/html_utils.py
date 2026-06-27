@@ -509,13 +509,12 @@ async def fetch_page_content(
         # Phase 1: Try networkidle with quick timeout for faster failure
         # detection
         try:
-            wait_until: Literal["domcontentloaded", "networkidle"]
-            if skip_networkidle:
-                wait_until = "domcontentloaded"
-            elif strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
-                wait_until = "networkidle"
-            else:
-                wait_until = "domcontentloaded"
+            # Bind unconditionally so the except branch can safely reference
+            # ``wait_until`` even if ``page.goto`` (line 521) raises before
+            # mutually exclusive branches below would have assigned it.
+            wait_until: Literal["domcontentloaded", "networkidle"] = (
+                "domcontentloaded" if skip_networkidle or strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT else "networkidle"
+            )
             # Use recovery timeout if provided, otherwise use a short initial
             # timeout (15s) for networkidle
             initial_timeout = timeout_ms if timeout_ms is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
@@ -618,10 +617,10 @@ async def fetch_page_content(
                 if detect_anti_bot(partial_html) > 0.5:
                     logger.warning(
                         "[Scraper] Anti-bot detected during initial %s for %s — aborting early",
-                        wait_until,
+                        e,
                         url,
                     )
-                    msg = f"Anti-bot challenge detected during {wait_until}: {e}"
+                    msg = f"Anti-bot challenge detected: {e}"
                     raise ValueError(msg)
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
@@ -865,7 +864,11 @@ def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
         tag.attrs = {k: v for k, v in tag.attrs.items() if k in attrs_to_keep}
 
     cleaned = soup.prettify()
-    return cleaned[:max_chars]
+    if isinstance(cleaned, bytes):
+        text: str = cleaned.decode("utf-8", errors="replace")
+    else:
+        text = cleaned
+    return text[:max_chars]
 
 
 def _valid_email(text: str) -> str | None:
