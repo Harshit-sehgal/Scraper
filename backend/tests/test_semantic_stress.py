@@ -101,8 +101,6 @@ def test_massive_topology_scaling(ws) -> None:
             # Use 'price' and 'cost' to trigger ROLE_EXCLUSIVITY regions
             ws.capture_pre_allocation_field([token], ["price", "cost"])
 
-    time.time() - start_time
-
     start_time = time.time()
     ws.redistribute_instability()
     prop_duration = time.time() - start_time

@@ -75,7 +75,6 @@ def test_mega_horizon_simulation(ws) -> None:
     roles = ["price", "date", "org", "loc", "person"]
     types = [SemanticType.PRICE, SemanticType.DATE, SemanticType.ORGANIZATION, SemanticType.LOCATION, SemanticType.TEXT]
 
-    start_time = time.time()
     for i in range(5000):
         # 1. Random semantic event
         role = random.choice(roles)
@@ -107,8 +106,6 @@ def test_mega_horizon_simulation(ws) -> None:
         # 4. Record diagnostics
         if i % 10 == 0:
             analyzer.record(ws)
-
-    time.time() - start_time
 
     analysis = analyzer.analyze()
 
@@ -188,8 +185,6 @@ def test_topology_scaling_benchmark(ws) -> None:
             )
             # Creating complex coupling by using overlapping roles
             ws.capture_pre_allocation_field([token], [roles[i % 5], roles[(i + 1) % 5]])
-
-    time.time() - start_time
 
     # 2. Run propagation
     start_time = time.time()

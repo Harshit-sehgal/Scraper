@@ -7,7 +7,6 @@ causal graph growth, and topology fragmentation.
 """
 
 import random
-import time
 
 from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import SemanticWorldState
@@ -29,7 +28,6 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
     roles = [f"role_{i}" for i in range(20)]
     types = list(SemanticType)
 
-    start_time = time.time()
     checkpoint_interval = cycles // 20
 
     history_diversity = []
@@ -80,10 +78,8 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
             history_diversity.append(diversity)
 
         if i % checkpoint_interval == 0 and i > 0:
-            time.time() - start_time
             ws._observability.get_governance_report(ws.capture_governance_snapshot())
 
-    time.time() - start_time
     ws._observability.get_governance_report(ws.capture_governance_snapshot())
 
     # 6. Evolutionary Stability Invariants

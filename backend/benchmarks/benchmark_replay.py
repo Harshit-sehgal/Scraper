@@ -7,7 +7,6 @@ the time to perfectly reconstruct the state via deterministic replay.
 """
 
 import random
-import time
 
 from app.semantic_world_state import SemanticWorldState
 
@@ -44,10 +43,8 @@ def benchmark_replay(transaction_count: int = 10000) -> bool:
     original_checksum = ws.get_manifold_checksum()
     ws.clear()
 
-    start_replay = time.time()
     for tx in journal:
         ws.replay_transaction(tx)
-    time.time() - start_replay
 
     # 3. Verification
     final_checksum = ws.get_manifold_checksum()

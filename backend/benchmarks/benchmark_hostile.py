@@ -175,11 +175,8 @@ async def run_benchmarks() -> None:
     telemetry = get_scrape_telemetry()
 
     for name, url, expected in tests:
-        start = time.time()
-
         try:
             results = await scrape_url(url, fields, min_record_score=0.2)
-            time.time() - start
 
             # Check telemetry for this URL
             recent = telemetry.get_recent(1)

@@ -36,7 +36,7 @@ os.environ.setdefault("PYTHONPATH", "backend")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT))
 
-from app.models import FieldType, SchemaField, WorkflowPaginationConfig
+from app.models import WorkflowPaginationConfig
 from app.pagination_executor import PaginationConfig
 
 # ─── Mock Playwright page ───────────────────────────────────────────────
@@ -144,7 +144,6 @@ def test_run_infinite_scroll_extraction_drives_pagination_loop() -> None:
     extract_stub = _ExtractStub()
     extract_stub.records_per_call = [[{"title": "row-1"}], [], [], []]
 
-    [SchemaField(name="title", field_type=FieldType.STRING)]
     config = PaginationConfig(strategy="infinite_scroll", max_pages=3, delay_between_pages=0)
 
     result = _run(
@@ -180,7 +179,6 @@ def test_run_load_more_extraction_clicks_button_until_gone() -> None:
         [],
     ]
 
-    [SchemaField(name="name", field_type=FieldType.STRING)]
     config = PaginationConfig(strategy="load_more", max_pages=4, delay_between_pages=0)
 
     result = _run(
@@ -208,7 +206,6 @@ def test_run_load_more_stops_cleanly_when_button_is_absent() -> None:
 
     page = _MockPage(button_present=False)
     extract_stub = _ExtractStub()
-    [SchemaField(name="name", field_type=FieldType.STRING)]
     config = PaginationConfig(strategy="load_more", max_pages=3, delay_between_pages=0)
 
     result = _run(

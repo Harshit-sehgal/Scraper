@@ -8,7 +8,6 @@ to detect emergent causality drift and attractor collapse.
 """
 
 import random
-import time
 
 import pytest
 from app.failure_injector import set_injection_probability
@@ -52,7 +51,6 @@ def test_long_horizon_stability(ws) -> None:
     roles = ["price", "date", "location", "org", "rating"]
     types = [SemanticType.PRICE, SemanticType.DATE, SemanticType.LOCATION, SemanticType.ORGANIZATION, SemanticType.RATING]
 
-    start_time = time.time()
     for i in range(500):
         role = random.choice(roles)
         ttype = random.choice(types)
@@ -61,8 +59,6 @@ def test_long_horizon_stability(ws) -> None:
         # Every 50 events, perform cognitive decay
         if i % 50 == 0:
             ws.apply_memory_decay()
-
-    time.time() - start_time
 
     # Sanity checks
     assert ws.metrics.global_energy >= 0.0
