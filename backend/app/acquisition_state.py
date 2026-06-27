@@ -217,7 +217,7 @@ class AcquisitionLineage(BaseModel):
     @classmethod
     def from_redirect_info(
         cls,
-        redirect_info: dict[str, Any],
+        redirect_info: dict[str, Any] | None,
         original_url: str,
         final_url: str,
         fetch_method: str = "",
