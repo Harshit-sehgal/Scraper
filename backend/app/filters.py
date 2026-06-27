@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Geocoding & Distance (Nominatim; no paid API key required)
 # ──────────────────────────────────────────────
 
-_geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=cast(object, settings.GEOCODER_TIMEOUT))
+_geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=settings.GEOCODER_TIMEOUT)  # type: ignore[reportArgumentType]
 _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", "pincode")
 
 

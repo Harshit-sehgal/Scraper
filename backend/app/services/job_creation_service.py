@@ -175,14 +175,10 @@ class JobCreationService:
 
                 status = await get_pipeline_status()
                 if not status.get("available", False):
-                    from app.exceptions import JobCreationError
-
                     raise JobCreationError(
                         status_code=400, detail="M2: Semantic mode is not available. Use 'fast' or 'browser' mode instead."
                     )
             except (ImportError, RuntimeError):
-                from app.exceptions import JobCreationError
-
                 raise JobCreationError(status_code=503, detail="M2: Semantic pipeline unavailable; try again later.")
 
         # Step 3: Handle idempotency
