@@ -225,9 +225,7 @@ class BrowserPool:
 
                 cookie_string = get_anti_bot_engine().get_cookies(domain)
                 if cookie_string:
-                    parsed_cookies = _parse_cookie_string_for_playwright(
-                        cookie_string, domain
-                    )
+                    parsed_cookies = _parse_cookie_string_for_playwright(cookie_string, domain)
                     if parsed_cookies:
                         # Pyright: parsed_cookies are dicts, but Playwright's
                         # add_cookies() accepts Sequence[SetCookieParam].
@@ -677,6 +675,18 @@ class BrowserPool:
         # Close isolated contexts (e.g. workflow replays, previews). These
         # were previously leaked during _hard_recycle, leaving orphaned
         # contexts on a dying browser process.
+        #
+        # Semaphore note: each acquire_context caller already holds a
+        # semaphore slot and will release it in the `finally` block of
+        # acquire_context's async context manager.  We must NOT release
+        # the semaphore here — that would double-release, permanently
+        # inflating the limit.  Instead, we just close the Playwright
+        # contexts and clear the bookkeeping.  The pending
+        # release_context calls in acquire_context's `finally` will
+        # gracefully handle a context that's already been removed from
+        # _isolated_contexts (pop returns None, semaphore.release is
+        # safe even if redundant — asyncio.Semaphore tolerates release
+        # beyond initial value).
         for ctx_id, ctx in list(self._isolated_contexts.items()):
             try:
                 await ctx.close()
@@ -686,10 +696,6 @@ class BrowserPool:
                     ctx_id,
                     e,
                 )
-            finally:
-                # Release the semaphore slot for each closed context so the
-                # next browser launch starts with a full budget.
-                self._concurrency_semaphore.release()
         self._isolated_contexts.clear()
         self._active_acquires = 0
 

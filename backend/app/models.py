@@ -172,9 +172,9 @@ class ScraperDiagnosticsRequest(BaseModel):
 class JobCreate(BaseModel):
     """Request body to create a new scraping job."""
 
-    name: str = Field(..., description="Human-readable job name")
+    name: str = Field(..., max_length=255, description="Human-readable job name")
     mode: ScrapeMode = Field(ScrapeMode.MANUAL, description="Manual or Auto discovery mode")
-    intent: str = Field("", description="Natural language extraction intent")
+    intent: str = Field("", max_length=4096, description="Natural language extraction intent")
     # Manual mode
     urls: list[str] = Field(default_factory=list, max_length=100, description="List of URLs to scrape (manual mode)")
     # Auto mode

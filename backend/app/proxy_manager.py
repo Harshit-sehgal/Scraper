@@ -10,6 +10,7 @@ Responsible for:
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from typing import Any
 
@@ -20,7 +21,12 @@ logger = logging.getLogger(__name__)
 
 
 class ProxyManager:
-    """Manages proxy rotation for anti-bot resilience."""
+    """Manages proxy rotation for anti-bot resilience.
+
+    Thread safety: all mutating methods are guarded by ``_lock`` so
+    concurrent callers from the anti-bot engine, browser pool, and
+    request handlers can safely mutate the shared state.
+    """
 
     # If a proxy accumulates this many total failures (not reset by
     # rotation or success decay), it is evicted permanently from the
@@ -29,6 +35,7 @@ class ProxyManager:
     _EVICTION_TOTAL_FAILURES = 15
 
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self._proxy_list: list[str] = []
         self._current_index: int = 0
         self._failure_counts: dict[str, int] = defaultdict(int)
@@ -52,10 +59,11 @@ class ProxyManager:
 
     @property
     def current_proxy(self) -> str | None:
-        """Get the current proxy without rotating."""
-        if not self.enabled:
-            return None
-        return self._proxy_list[self._current_index % len(self._proxy_list)]
+        """Get the current proxy without rotating (thread-safe read)."""
+        with self._lock:
+            if not self._enabled or not self._proxy_list:
+                return None
+            return self._proxy_list[self._current_index % len(self._proxy_list)]
 
     def record_failure(self, proxy: str | None = None, domain: str | None = None) -> None:
         """Record a failure for the given proxy (or current).
@@ -67,29 +75,30 @@ class ProxyManager:
         if not self.enabled:
             return
 
-        proxy = proxy or self.current_proxy
-        if not proxy:
-            return
+        with self._lock:
+            proxy = proxy or self._proxy_list[self._current_index % len(self._proxy_list)] if self._proxy_list else None
+            if not proxy:
+                return
 
-        self._failure_counts[proxy] += 1
-        self._total_failure_counts[proxy] += 1
-        self._consecutive_failures += 1
+            self._failure_counts[proxy] += 1
+            self._total_failure_counts[proxy] += 1
+            self._consecutive_failures += 1
 
-        # Track domain-specific proxy blocking
-        if domain:
-            self._proxy_blocked_domains[proxy].add(domain)
+            # Track domain-specific proxy blocking
+            if domain:
+                self._proxy_blocked_domains[proxy].add(domain)
 
-        # ── Dead proxy eviction ────────────────────────────────────
-        cumulative = self._total_failure_counts[proxy]
-        if cumulative >= self._EVICTION_TOTAL_FAILURES:
-            self._evict_proxy(proxy)
-            return
+            # ── Dead proxy eviction ────────────────────────────────────
+            cumulative = self._total_failure_counts[proxy]
+            if cumulative >= self._EVICTION_TOTAL_FAILURES:
+                self._evict_proxy(proxy)
+                return
 
-        # Rotate if threshold exceeded
-        if self._failure_counts[proxy] >= settings.PROXY_ROTATION_FAILURE_THRESHOLD:
-            logger.warning("Proxy %s reached %d failures, rotating", mask_proxy_url(proxy), self._failure_counts[proxy])
-            self.rotate(domain=domain)
-            self._failure_counts[proxy] = 0
+            # Rotate if threshold exceeded
+            if self._failure_counts[proxy] >= settings.PROXY_ROTATION_FAILURE_THRESHOLD:
+                logger.warning("Proxy %s reached %d failures, rotating", mask_proxy_url(proxy), self._failure_counts[proxy])
+                self._rotate_locked(domain=domain)
+                self._failure_counts[proxy] = 0
 
     def record_success(self, proxy: str | None = None, domain: str | None = None) -> None:
         """Record a success for the given proxy (or current).
@@ -100,22 +109,23 @@ class ProxyManager:
         if not self.enabled:
             return
 
-        proxy = proxy or self.current_proxy
-        if not proxy:
-            return
+        with self._lock:
+            proxy = proxy or self._proxy_list[self._current_index % len(self._proxy_list)] if self._proxy_list else None
+            if not proxy:
+                return
 
-        self._success_counts[proxy] += 1
-        self._consecutive_failures = 0
-        # Decay the failure counter rather than wiping it. The previous
-        # behavior (set to 0 on a single success) let a proxy burn 9 of
-        # its failure budget, succeed once, and immediately re-enter the
-        # pool with no memory of recent trouble — which meant
-        # PROXY_ROTATION_FAILURE_THRESHOLD could be reset by a single
-        # lucky success and the proxy would be chosen again on the next
-        # domain.
-        prior_failures = self._failure_counts.get(proxy, 0)
-        if prior_failures > 0:
-            self._failure_counts[proxy] = max(0, prior_failures - 1)
+            self._success_counts[proxy] += 1
+            self._consecutive_failures = 0
+            # Decay the failure counter rather than wiping it. The previous
+            # behavior (set to 0 on a single success) let a proxy burn 9 of
+            # its failure budget, succeed once, and immediately re-enter the
+            # pool with no memory of recent trouble — which meant
+            # PROXY_ROTATION_FAILURE_THRESHOLD could be reset by a single
+            # lucky success and the proxy would be chosen again on the next
+            # domain.
+            prior_failures = self._failure_counts.get(proxy, 0)
+            if prior_failures > 0:
+                self._failure_counts[proxy] = max(0, prior_failures - 1)
 
     def _evict_proxy(self, proxy: str) -> None:
         """Permanently remove a dead proxy from the pool.
@@ -124,6 +134,8 @@ class ProxyManager:
         ``_EVICTION_TOTAL_FAILURES``.  Cleans up all associated tracking
         state (failure counts, success counts, domain blocks) and removes
         the proxy from rotation.
+
+        Must be called while holding ``self._lock``.
         """
         if proxy not in self._proxy_list:
             return
@@ -149,17 +161,17 @@ class ProxyManager:
             self._enabled = False
             logger.warning("All proxies evicted — proxy rotation disabled")
 
-    def rotate(self, domain: str | None = None) -> str | None:
-        """Explicitly rotate to the next proxy.
+    def _rotate_locked(self, domain: str | None = None) -> str | None:
+        """Internal rotate — caller already holds ``self._lock``.
 
         If domain is provided, marks the current proxy as blocked for that domain
         and skips proxies that have been blocked for it.
         """
-        if not self.enabled:
+        if not self._enabled or not self._proxy_list:
             return None
 
         # Record which proxy is blocked for which domain
-        current = self.current_proxy
+        current = self._proxy_list[self._current_index % len(self._proxy_list)]
         if domain and current:
             self._proxy_blocked_domains[current].add(domain)
             logger.debug("Proxy %s blocked for domain %s", mask_proxy_url(current), domain)
@@ -187,37 +199,48 @@ class ProxyManager:
         logger.debug("Rotated to proxy: %s", mask_proxy_url(new_proxy))
         return new_proxy
 
+    def rotate(self, domain: str | None = None) -> str | None:
+        """Explicitly rotate to the next proxy (thread-safe).
+
+        If domain is provided, marks the current proxy as blocked for that domain
+        and skips proxies that have been blocked for it.
+        """
+        with self._lock:
+            return self._rotate_locked(domain=domain)
+
     def reset_consecutive_failures(self) -> None:
         """Reset consecutive failure counter on successful request."""
-        self._consecutive_failures = 0
+        with self._lock:
+            self._consecutive_failures = 0
 
     def get_best_proxy(self, domain: str | None = None) -> str | None:
-        """Get the best proxy for a domain based on health stats.
+        """Get the best proxy for a domain based on health stats (thread-safe).
 
         Selects the proxy with the highest success rate that isn't
         blocked for the given domain.
         """
-        if not self.enabled:
-            return None
+        with self._lock:
+            if not self._enabled or not self._proxy_list:
+                return None
 
-        candidates = []
-        for proxy in self._proxy_list:
-            # Skip proxies blocked for this domain
-            if domain and proxy in self._proxy_blocked_domains and domain in self._proxy_blocked_domains[proxy]:
-                continue
+            candidates = []
+            for proxy in self._proxy_list:
+                # Skip proxies blocked for this domain
+                if domain and proxy in self._proxy_blocked_domains and domain in self._proxy_blocked_domains[proxy]:
+                    continue
 
-            success = self._success_counts.get(proxy, 0)
-            failure = self._failure_counts.get(proxy, 0)
-            total = success + failure
-            rate = (success / total) if total > 0 else 0.5
-            candidates.append((rate, proxy))
+                success = self._success_counts.get(proxy, 0)
+                failure = self._failure_counts.get(proxy, 0)
+                total = success + failure
+                rate = (success / total) if total > 0 else 0.5
+                candidates.append((rate, proxy))
 
-        if not candidates:
-            return self.current_proxy
+            if not candidates:
+                return self._proxy_list[self._current_index % len(self._proxy_list)]
 
-        # Return proxy with highest success rate
-        candidates.sort(key=lambda x: -x[0])
-        return candidates[0][1]
+            # Return proxy with highest success rate
+            candidates.sort(key=lambda x: -x[0])
+            return candidates[0][1]
 
     def get_proxy_for_playwright(self) -> dict | None:
         """Return proxy config dict for Playwright context creation.
@@ -230,23 +253,24 @@ class ProxyManager:
         return {"server": self.current_proxy}
 
     def get_health_stats(self) -> dict[str, Any]:
-        """Return health statistics for all proxies."""
-        stats = {}
-        for proxy in self._proxy_list:
-            success = self._success_counts.get(proxy, 0)
-            failure = self._failure_counts.get(proxy, 0)
-            total = success + failure
-            success_rate = (success / total * 100) if total > 0 else 0
+        """Return health statistics for all proxies (thread-safe read)."""
+        with self._lock:
+            stats = {}
+            for proxy in self._proxy_list:
+                success = self._success_counts.get(proxy, 0)
+                failure = self._failure_counts.get(proxy, 0)
+                total = success + failure
+                success_rate = (success / total * 100) if total > 0 else 0
 
-            stats[proxy] = {
-                "successes": success,
-                "failures": failure,
-                "total_attempts": total,
-                "success_rate": success_rate,
-                "health": "healthy" if success_rate >= 70 else "degraded" if success_rate >= 30 else "unhealthy",
-            }
+                stats[proxy] = {
+                    "successes": success,
+                    "failures": failure,
+                    "total_attempts": total,
+                    "success_rate": success_rate,
+                    "health": "healthy" if success_rate >= 70 else "degraded" if success_rate >= 30 else "unhealthy",
+                }
 
-        return stats
+            return stats
 
 
 # Global singleton

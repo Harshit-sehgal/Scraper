@@ -296,13 +296,6 @@ async def orchestrate_extraction(
     memory = get_selector_memory()
     force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
 
-    # C4: Track page invalidation
-    page_closed = False
-
-    def _on_page_close():
-        nonlocal page_closed
-        page_closed = True
-
     # ── Self-tuning integration ──
     # If the tuning controller has learned a domain-specific
     # min_confidence_threshold, prefer it over the caller-supplied
@@ -324,7 +317,7 @@ async def orchestrate_extraction(
             # threshold. Still respect a hard lower bound from the caller
             # so an aggressive tune-down can't go below 0.1.
             effective_min_score = max(tuned.min_confidence_threshold, 0.1)
-    except Exception:
+    except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError):
         logger.debug("Self-tuning controller unavailable; using default min_record_score", exc_info=True)
 
     gate_threshold = max(effective_min_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
@@ -418,7 +411,7 @@ async def orchestrate_extraction(
                     "error": None if dom_res.records else "empty_extraction",
                 },
             )
-        except Exception:
+        except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError):
             logger.debug("Self-tuning telemetry recording failed", exc_info=True)
 
         if not network_result:
@@ -575,9 +568,7 @@ async def orchestrate_extraction(
             avg_score = _average_record_score(provided_results)
             if avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
-                provided_results = _detect_and_align_field_swaps_for_layer(
-                    provided_results, schema_fields, provenance_builder
-                )
+                provided_results = _detect_and_align_field_swaps_for_layer(provided_results, schema_fields, provenance_builder)
                 memory.record_success(url, provided_selectors)
                 _record_field_provenance(
                     provenance_builder,
@@ -662,9 +653,7 @@ async def orchestrate_extraction(
                     warnings.append("Memory extraction returned low-confidence records on session-bound URL")
             elif avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
-                raw_results = _detect_and_align_field_swaps_for_layer(
-                    raw_results, schema_fields, provenance_builder
-                )
+                raw_results = _detect_and_align_field_swaps_for_layer(raw_results, schema_fields, provenance_builder)
                 memory.record_success(url, remembered_selectors)
                 _record_field_provenance(
                     provenance_builder,
@@ -1006,10 +995,7 @@ def _detect_and_align_field_swaps_for_layer(
     for record in results:
         new_record = dict(record)
         # Single-pass rotation: extract values, then re-assign to rotated targets.
-        extracted: dict[str, Any] = {
-            wrong_field: new_record.get(right_field)
-            for wrong_field, right_field in swapped.items()
-        }
+        extracted: dict[str, Any] = {wrong_field: new_record.get(right_field) for wrong_field, right_field in swapped.items()}
         # The source of each ``right_field``'s correct value is the
         # preceding wrong_field in the cycle.  For simple {A:B, B:A}, A
         # belongs in B and B belongs in A.

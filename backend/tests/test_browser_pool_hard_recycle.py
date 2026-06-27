@@ -51,8 +51,9 @@ class TestHardRecycleClearsIsolatedContexts:
 
         assert pool._active_acquires == 0
 
-    def test_semaphore_released_per_isolated_context(self) -> None:
-        """Each isolated context must have its semaphore slot released."""
+    def test_semaphore_not_released_for_isolated_contexts(self) -> None:
+        """Hard recycle must NOT release semaphore — acquire_context callers
+        still hold their slots and will release via release_context."""
         pool = BrowserPool()
         pool._isolated_contexts["iso:1"] = AsyncMock()
         pool._isolated_contexts["iso:2"] = AsyncMock()
@@ -64,8 +65,8 @@ class TestHardRecycleClearsIsolatedContexts:
 
         asyncio.run(pool._hard_recycle())
 
-        # 3 calls to .release() — one per isolated context
-        assert mock_sem.release.call_count == 3
+        # 0 calls to .release() — semaphore slots are owned by acquire_context callers
+        assert mock_sem.release.call_count == 0
 
     def test_active_fetches_reset(self) -> None:
         """After hard recycle, _active_fetches must be 0."""
