@@ -154,7 +154,8 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                 ws_path = _get_db_path().parent / "world_state.json"
                 if ws_path.exists():
                     world_state_data = json.loads(ws_path.read_text())
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug("Could not load world_state.json: %s", exc)
                 pass
 
             return jobs_store, recycle_bin_store, world_state_data

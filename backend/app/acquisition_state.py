@@ -70,26 +70,26 @@ class AcquisitionLineage(BaseModel):
     """
 
     # The URL as originally provided by the user
-    original_url: str
+    original_url: str = Field(max_length=2048)
 
     # The URL after all redirects and recovery attempts
-    final_url: str
+    final_url: str = Field(max_length=2048)
 
     # Current acquisition state
     state: AcquisitionState = AcquisitionState.DIRECT
 
     # Human-readable explanation of what happened
-    message: str = ""
+    message: str = Field(default="", max_length=1024)
 
     # How the page was fetched (playwright_full, httpx_basic,
     # search_form_post, etc.)
-    fetch_method: str = ""
+    fetch_method: str = Field(default="", max_length=64)
 
     # If recovery was attempted, what method was used
-    recovery_method: str | None = None
+    recovery_method: str | None = Field(default=None, max_length=64)
 
     # The fresh URL obtained after recovery (if any)
-    recovered_url: str | None = None
+    recovered_url: str | None = Field(default=None, max_length=2048)
 
     # Whether the original URL had session-bound parameters
     session_bound: bool = False
@@ -98,7 +98,7 @@ class AcquisitionLineage(BaseModel):
     ephemeral_params: list[str] = Field(default_factory=list)
 
     # User-friendly message with actionable guidance
-    user_message: str = ""
+    user_message: str = Field(default="", max_length=1024)
 
     # Evidence-based acquisition quality signals
     data_evidence_score: float = 0.0
@@ -107,7 +107,7 @@ class AcquisitionLineage(BaseModel):
     containers_detected: int = 0
     anti_bot_score: float = 0.0
     visible_text_length: int = 0
-    recommended_next_action: str = ""
+    recommended_next_action: str = Field(default="", max_length=1024)
 
     def get_user_message(self) -> str:
         """Generate a user-friendly message with actionable guidance.

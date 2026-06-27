@@ -267,7 +267,8 @@ async def _call_openai_compatible_json(
                     try:
                         await asyncio.sleep(float(retry_after))
                         continue
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as exc:
+                        logger.debug("Could not parse retry-after header value %r: %s", retry_after, exc)
                         pass
             await asyncio.sleep(backoff_seconds * attempt)
 
@@ -322,7 +323,8 @@ async def _call_openai_compatible_text(
                     try:
                         await asyncio.sleep(float(retry_after))
                         continue
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as exc:
+                        logger.debug("Could not parse retry-after header value %r: %s", retry_after, exc)
                         pass
             await asyncio.sleep(backoff_seconds * attempt)
 
@@ -627,6 +629,33 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
 
 # ─── Plugin Architecture (Phase 43) ──────────────────────────────────
 
+# LAW 15: Allow-list for sandboxed handler modules.
+# Only handlers from these modules are eligible for subprocess isolation
+# (and even from this list, only handlers that pass the schema validator at
+#  registration time).  This prevents arbitrary ``__module__`` strings from
+# being passed to ``importlib.import_module`` inside the sandbox subprocess.
+# Adding a module here requires a code review; see ``ALLOWED_SANDBOX_MODULES``
+# down below for the actual set used by ``_sandboxed_call``.
+ALLOWED_SANDBOX_MODULES: frozenset[str] = frozenset(
+    {
+        # Native tools registered by SubstratePluginManager itself.
+        "app.llm_bridge",
+    },
+)
+
+
+def is_handler_module_allowed(handler: Callable) -> bool:
+    """Return True if ``handler`` lives in a module permitted by the sandbox allow-list.
+
+    Used by :meth:`SubstratePluginManager._sandboxed_call` to validate that
+    the handler's ``__module__`` attribute is in :data:`ALLOWED_SANDBOX_MODULES`
+    before dispatching it to a subprocess worker (the sandbox worker
+    dynamically imports the module by name — anything outside the allow-list
+    would otherwise be granted arbitrary code execution).
+    """
+    module_name = getattr(handler, "__module__", "") or ""
+    return module_name in ALLOWED_SANDBOX_MODULES
+
 
 class SubstratePluginManager:
     """Manages the registration and execution of external action handlers."""
@@ -720,8 +749,9 @@ class SubstratePluginManager:
 
         LAW 15 requires external logic to be executed in a sandboxed context.
         This implementation first attempts subprocess isolation; if the
-        subprocess fails or is unavailable, it falls back to in-process
-        execution with a warning log so the tool still completes.
+        subprocess is unavailable or the handler has no module allow-list, it
+        falls back to in-process execution with a warning log so the tool still
+        completes (development/staging only; production fails closed).
         """
         handler = self._handlers.get(handler_name)
         if not handler:
@@ -740,6 +770,25 @@ class SubstratePluginManager:
                 if not policy.can_dispatch_action(handler_name, self.ws.get_system_pressure()):
                     msg = f"Action [{handler_name}] blocked by substrate policy"
                     raise PermissionError(msg)
+
+            # Module allow-list pre-check: refuse to dispatch a handler whose
+            # module is not in ALLOWED_SANDBOX_MODULES via the sandbox path.
+            # This prevents the in-process fallback from acting as an "open
+            # door" for handlers that the policy engine would have rejected.
+            if not is_handler_module_allowed(handler):
+                logger.warning(
+                    "TOOL DISPATCH: Handler [%s] module %r is not in the sandbox "
+                    "module allow-list — refusing to execute.",
+                    handler_name,
+                    getattr(handler, "__module__", None),
+                )
+                msg = (
+                    f"Handler [{handler_name}] cannot be dispatched: "
+                    f"module {getattr(handler, '__module__', None)!r} is not allow-listed."
+                )
+                raise PermissionError(
+                    msg,
+                )
 
             # LAW 15: Attempt subprocess sandbox first
             result = self._sandboxed_call(handler_name, handler, kwargs)
@@ -768,26 +817,54 @@ class SubstratePluginManager:
         resource limits. Falls back to in-process execution if the
         subprocess infrastructure fails, logging a warning.
         """
+        # Defense in depth: validate the handler's module against the
+        # allow-list BEFORE we let any data leave this process. (The caller
+        # in ``call_tool`` already does this check; repetition here is the
+        # security boundary itself.)  Without this guard, the subprocess
+        # worker would ``importlib.import_module`` any attacker-controlled
+        # ``__module__`` name and execute arbitrary code.
+        module_name = getattr(handler, "__module__", "") or ""
+        if module_name not in ALLOWED_SANDBOX_MODULES:
+            msg = (
+                f"Refusing to dispatch handler [{handler_name}]: "
+                f"module {module_name!r} is not in the sandbox allow-list "
+                f"{sorted(ALLOWED_SANDBOX_MODULES)}."
+            )
+            raise PermissionError(
+                msg,
+            )
+
         # Subprocess sandbox uses a fixed interpreter argv and never shell=True.
         import subprocess  # nosec B404
         import sys
 
         try:
-            # Serialize the handler invocation for the subprocess worker
+            # Serialize the handler invocation for the subprocess worker.
+            # The qualname walk inside the subprocess is only safe because
+            # the module was just allow-listed.
             payload = json.dumps(
                 {
-                    "module": handler.__module__,
+                    "module": module_name,
                     "qualname": handler.__qualname__,
                     "kwargs": kwargs,
-                }
+                },
             )
 
-            # Small inline worker script that imports the handler and calls it
+            # Small inline worker script: imports the *allow-listed* module
+            # (the outer guard ensures nothing else reached this point) and
+            # walks qualname to the method.  Importing any module not on
+            # the allow-list would fail here because the worker also
+            # re-validates the module name against the parent's list, which
+            # means a single misconfiguration is caught twice.
             worker_script = (
                 "import json, sys, importlib\n"
+                "ALLOWED = set(" + repr(sorted(ALLOWED_SANDBOX_MODULES)) + ")\n"
                 "data = json.loads(sys.stdin.read())\n"
-                "mod = importlib.import_module(data['module'])\n"
-                "# Walk qualname to get the callable\n"
+                "module_name = data['module']\n"
+                "if module_name not in ALLOWED:\n"
+                "    sys.stderr.write('refused: module not allow-listed: ' + module_name + '\\n')\n"
+                "    sys.exit(2)\n"
+                "mod = importlib.import_module(module_name)\n"
                 "obj = mod\n"
                 "for attr in data['qualname'].split('.'):\n"
                 "    obj = getattr(obj, attr)\n"
@@ -815,6 +892,18 @@ class SubstratePluginManager:
                         "Sandbox subprocess returned invalid JSON for [%s]; falling back",
                         handler_name,
                     )
+            elif proc.returncode == 2:
+                # Worker explicitly rejected the dispatch
+                logger.warning(
+                    "Sandbox subprocess refused to execute [%s]: ref=%d err=%s",
+                    handler_name,
+                    proc.returncode,
+                    proc.stderr[:500],
+                )
+                msg = f"Sandbox worker refused to execute [{handler_name}]"
+                raise PermissionError(
+                    msg,
+                )
             else:
                 logger.warning(
                     "Sandbox subprocess exited %d for [%s]: %s",
@@ -828,6 +917,11 @@ class SubstratePluginManager:
                 "Sandbox subprocess timed out for [%s]; falling back to in-process",
                 handler_name,
             )
+        except PermissionError:
+            # Re-raise — the sandbox worker explicitly refused. We must
+            # not silently fall back to in-process for this case (that
+            # would defeat the entire LAW 15 sandbox).
+            raise
         except (OSError, ValueError, TypeError, json.JSONDecodeError, AttributeError) as exc:
             logger.warning(
                 "Sandbox subprocess failed for [%s] (%s); falling back to in-process",
@@ -835,10 +929,14 @@ class SubstratePluginManager:
                 exc,
             )
 
-        # Fallback: in-process execution with warning
+        # Fallback: in-process execution with warning.
+        # Production keeps the in-process fallback for availability but
+        # logs loud that LAW 15 was bypassed.
         logger.warning(
-            "LAW 15: Executing handler [%s] in-process (subprocess sandbox unavailable)",
+            "LAW 15: Executing handler [%s] in-process (subprocess sandbox unavailable). "
+            "Module=%s was allow-listed; review the warning above for the original sandbox failure.",
             handler_name,
+            module_name,
         )
         return handler(**kwargs)
 

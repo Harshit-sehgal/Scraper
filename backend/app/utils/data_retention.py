@@ -37,8 +37,11 @@ def _get_days(key: str, default: int) -> int:
         val = getattr(settings, key, None)
         if val is not None:
             return max(1, int(val))
-    except (ImportError, AttributeError, ValueError, TypeError):
-        pass
+    except (ImportError, AttributeError, ValueError, TypeError) as exc:
+        # Settings lookup is best-effort; fall through to env var. Log at
+        # debug because in some environments the config import is intentionally
+        # disabled (test rigs, cold-start), and a warning there would be noise.
+        logger.debug("Settings lookup for %s failed (%s); falling through to env var", key, exc)
     try:
         return max(1, int(os.environ.get(key, str(default))))
     except (ValueError, TypeError):

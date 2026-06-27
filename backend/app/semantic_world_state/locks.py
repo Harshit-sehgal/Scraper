@@ -1,6 +1,9 @@
 # mypy: ignore-errors
+import logging
 import threading
 from typing import Any, Self
+
+logger = logging.getLogger(__name__)
 
 _LOCK_ACQUIRE_FAILED = "Failed to acquire NonBlockingRLock within timeout"
 
@@ -27,7 +30,8 @@ class NonBlockingRLock:
                     # to prevent event-loop lockups if another thread holds the
                     # lock.
                     return self._lock.acquire(blocking=True, timeout=1.0)
-            except RuntimeError:
+            except RuntimeError as exc:
+                logger.debug("No running event loop detected, falling back to blocking acquire: %s", exc)
                 pass
         return self._lock.acquire(blocking=blocking, timeout=timeout)
 

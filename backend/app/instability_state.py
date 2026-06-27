@@ -175,7 +175,8 @@ class InstabilityState:
 
                 try:
                     k = ast.literal_eval(k)  # nosec  # noqa: PLW2901, RUF100
-                except (ValueError, SyntaxError):
+                except (ValueError, SyntaxError) as exc:
+                    logger.debug("Skipping non-literal-eval key %r: %s", k, exc)
                     continue
             if isinstance(k, (list, tuple)) and len(k) == EXPECTED_KEY_PARTS:
                 sk = tuple(sorted(k))

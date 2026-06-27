@@ -11,6 +11,14 @@ the configured extraction schema is applied to the final page state.
 Pagination strategies (infinite scroll, load more, next button) are
 handled via ``app.pagination_executor.async_paginate``.
 
+**SSRF safety**: Every URL passed to ``page.goto()`` is pre-validated
+via :func:`app.url_safety.validate_public_http_url`. This prevents
+attacker-controlled ``start_url`` / step ``value`` fields from
+navigating Chromium to internal addresses, metadata endpoints, or
+non-HTTP schemes. The bypass is the single biggest gap in our SSRF
+defense (httpx is wrapped by ``SafeAsyncNetworkBackend`` but Chromium
+uses its own networking stack and was previously unguarded).
+
 **Status**: Tested but not yet integrated into the production scraper
 pipeline.  To activate, import and call from the job runner.  Until
 then, this module lives alongside the research shell but is not
@@ -27,6 +35,7 @@ import logging
 from typing import Any
 
 from app.models import Workflow, WorkflowStepType
+from app.url_safety import validate_public_http_url
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +43,38 @@ logger = logging.getLogger(__name__)
 MAX_STEP_TIMEOUT_MS = 15_000
 # Extra time after clicking/loading for JS rendering
 PAGE_SETTLE_SECONDS = 1.5
+
+
+def _safe_goto_url(target: str, *, source: str) -> str:
+    """Validate a URL before it reaches ``page.goto()`` (F-PLAYWRIGHT-SSRF).
+
+    Returns the validated-and-normalised URL string.  Raises
+    :class:`ValueError` when the URL fails the SSRF check so callers can
+    decide to skip a step or surface a 400 to the user.
+    """
+    if not target:
+        msg = f"{source}: URL is empty"
+        raise ValueError(msg)
+    try:
+        validate_public_http_url(target)  # raises ValueError on failure
+        # The validator returns None on success — return the original URL
+        # (or a normalised version if available in future versions).
+        return target
+    except ValueError as exc:
+        msg = f"{source}: URL failed security check: {exc}"
+        logger.warning("Refusing to navigate Playwright page.goto() — %s", msg)
+        raise ValueError(msg) from exc
+
+
+async def _safe_goto(page: Any, url: str, *, source: str, timeout: int = MAX_STEP_TIMEOUT_MS) -> None:
+    """``page.goto()`` with SSRF validation upstream.
+
+    Subclasses may override ``_safe_goto`` to add additional checks
+    (e.g., per-tenant allow-lists).  The default implementation is
+    sufficient for the SSRF threat model.
+    """
+    safe_url = _safe_goto_url(url, source=source)
+    await page.goto(safe_url, wait_until="domcontentloaded", timeout=timeout)
 
 
 async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
@@ -55,7 +96,11 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
 
         try:
             if step.step_type in (WorkflowStepType.GOTO, WorkflowStepType.OPEN):
-                await page.goto(step.value or workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
+                await _safe_goto(
+                    page,
+                    step.value or workflow.start_url,
+                    source=f"workflow {workflow.id!r} step {step.order} (GOTO)",
+                )
                 try:
                     await page.wait_for_load_state("networkidle", timeout=5000)
                 except (RuntimeError, OSError, ValueError):
@@ -301,7 +346,11 @@ async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
 
         # Navigate to start URL
         try:
-            await page.goto(workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
+            await _safe_goto(
+                page,
+                workflow.start_url,
+                source=f"workflow {workflow.id!r} start_url",
+            )
             try:
                 await page.wait_for_load_state("networkidle", timeout=5000)
             except (RuntimeError, OSError, TimeoutError):
@@ -381,7 +430,11 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
         page = await context.new_page()
 
         # Navigate to start URL
-        await page.goto(workflow.start_url, wait_until="domcontentloaded", timeout=MAX_STEP_TIMEOUT_MS)
+        await _safe_goto(
+            page,
+            workflow.start_url,
+            source=f"workflow {workflow.id!r} start_url (fallback path)",
+        )
         with contextlib.suppress(Exception):
             await page.wait_for_load_state("networkidle", timeout=5000)
         await asyncio.sleep(PAGE_SETTLE_SECONDS)

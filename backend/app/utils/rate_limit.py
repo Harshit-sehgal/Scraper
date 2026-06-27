@@ -6,8 +6,11 @@ of burning retries on transient rate-limit blocks.
 """
 
 import datetime
+import logging
 import re
 import time
+
+logger = logging.getLogger(__name__)
 
 # ── Rate-limit indicator patterns ──────────────────────────────────────
 
@@ -78,7 +81,8 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
 
     try:
         return float(raw)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        logger.debug("Retry-After header not numeric, trying HTTP-date: %s", exc)
         pass
 
     # Try parsing as HTTP-date
@@ -88,7 +92,8 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
         retry_dt = parsedate_to_datetime(raw)
         delta = (retry_dt - datetime.datetime.now(datetime.UTC)).total_seconds()
         return max(0.0, delta)
-    except Exception:  # nosec B110  # noqa: RUF100, S110
+    except Exception as exc:  # nosec B110  # noqa: RUF100, S110
+        logger.debug("Retry-After header unparseable as HTTP-date: %s", exc)
         pass
 
     return None

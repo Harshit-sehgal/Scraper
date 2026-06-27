@@ -45,7 +45,8 @@ def _try_register_driver_errors() -> None:
             err_cls = getattr(mod, "Error", None) or getattr(mod, "DatabaseError", None)
             if err_cls and issubclass(err_cls, BaseException):
                 register_wf_db_error_class(err_cls)
-        except ImportError:
+        except ImportError as exc:
+            logger.debug("Postgres driver %s not available: %s", mod_name, exc)
             pass
 
 

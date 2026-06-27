@@ -48,14 +48,16 @@ try:
     from psycopg2 import Error as _Psycopg2Error
 
     _DB_FALLBACK_ERRORS = (*_DB_FALLBACK_ERRORS, _Psycopg2Error)
-except ImportError:
+except ImportError as exc:
+    logger.debug("Optional psycopg2 driver not available: %s", exc)
     pass
 
 try:
     from psycopg import Error as _Psycopg3Error
 
     _DB_FALLBACK_ERRORS = (*_DB_FALLBACK_ERRORS, _Psycopg3Error)
-except ImportError:
+except ImportError as exc:
+    logger.debug("Optional psycopg (v3) driver not available: %s", exc)
     pass
 
 
@@ -795,7 +797,8 @@ class RateLimiterMiddleware:
             response.headers["X-RateLimit-Limit"] = str(counter.max_requests)
             response.headers["X-RateLimit-Remaining"] = str(counter.remaining())
             response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError) as exc:
+            logger.debug("Could not attach rate-limit headers: %s", exc)
             pass
 
     # ── Main middleware dispatch ───────────────────────────────────────

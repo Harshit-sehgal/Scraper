@@ -11,11 +11,14 @@ Owns:
 - field_activation_count: int — total field activations
 """
 
+import logging
 import math
 from collections.abc import Callable
 from typing import Any
 
 from app.transaction_context import active_transaction
+
+logger = logging.getLogger(__name__)
 
 
 class HistoryState:
@@ -168,7 +171,8 @@ class HistoryState:
         for m in new_motifs:
             try:
                 m_sorted = tuple(sorted(m))
-            except TypeError:
+            except TypeError as exc:
+                logger.debug("Skipping unhashable motif: %s", exc)
                 continue
             if m_sorted in existing:
                 continue

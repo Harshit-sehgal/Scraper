@@ -51,19 +51,21 @@ class UserStatus(StrEnum):
 class User(BaseModel):
     """A single human (or service principal) that can sign in and own resources."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    email: str
-    display_name: str = ""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    email: str = Field(max_length=320)
+    display_name: str = Field(default="", max_length=255)
     status: UserStatus = UserStatus.ACTIVE
-    password_hash: str = Field(default="", description="PBKDF2-SHA256 hash, never the raw password")
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
-    email_verified_at: str | None = None
+    password_hash: str = Field(default="", max_length=256, description="PBKDF2-SHA256 hash, never the raw password")
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), max_length=64)
+    email_verified_at: str | None = Field(default=None, max_length=64)
     aup_accepted_at: str | None = Field(
         default=None,
+        max_length=64,
         description="ISO timestamp at which the user accepted the Acceptable Use Policy. None = not yet accepted.",
     )
     aup_version_accepted: str | None = Field(
         default=None,
+        max_length=64,
         description="AUP version accepted by this user. None = not yet accepted.",
     )
 
@@ -85,10 +87,10 @@ class User(BaseModel):
 class Organization(BaseModel):
     """A tenant. Owns projects and memberships."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    created_by_user_id: str
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    name: str = Field(max_length=255)
+    created_by_user_id: str = Field(max_length=64)
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), max_length=64)
 
     @field_validator("name")
     @classmethod
@@ -116,12 +118,12 @@ class MembershipRole(StrEnum):
 class Membership(BaseModel):
     """The relationship between a user and an organization."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    org_id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    user_id: str = Field(max_length=64)
+    org_id: str = Field(max_length=64)
     role: MembershipRole = MembershipRole.MEMBER
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
-    removed_at: str | None = None
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), max_length=64)
+    removed_at: str | None = Field(default=None, max_length=64)
 
     def is_active(self) -> bool:
         return self.removed_at is None
@@ -130,11 +132,11 @@ class Membership(BaseModel):
 class Project(BaseModel):
     """A project belongs to an organization. Jobs will be project-scoped."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    org_id: str
-    name: str
-    created_by_user_id: str
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    org_id: str = Field(max_length=64)
+    name: str = Field(max_length=255)
+    created_by_user_id: str = Field(max_length=64)
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), max_length=64)
 
     @field_validator("name")
     @classmethod
@@ -164,16 +166,16 @@ class ApiKey(BaseModel):
     against ``key_hash`` using constant-time comparison.
     """
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    project_id: str
-    user_id: str = Field(default="", description="User who created/owns the key")
-    name: str
-    key_hash: str
-    key_prefix: str = ""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    project_id: str = Field(max_length=64)
+    user_id: str = Field(default="", max_length=64, description="User who created/owns the key")
+    name: str = Field(max_length=255)
+    key_hash: str = Field(max_length=128)
+    key_prefix: str = Field(default="", max_length=128)
     scope: ApiKeyScope = ApiKeyScope.WRITE
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
-    last_used_at: str | None = None
-    revoked_at: str | None = None
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), max_length=64)
+    last_used_at: str | None = Field(default=None, max_length=64)
+    revoked_at: str | None = Field(default=None, max_length=64)
 
     def is_active(self) -> bool:
         return self.revoked_at is None
@@ -182,7 +184,7 @@ class ApiKey(BaseModel):
 class SelectedContext(BaseModel):
     """The currently-selected organization and project for a user."""
 
-    user_id: str
-    org_id: str
-    project_id: str
-    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    user_id: str = Field(max_length=64)
+    org_id: str = Field(max_length=64)
+    project_id: str = Field(max_length=64)
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), max_length=64)

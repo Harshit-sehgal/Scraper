@@ -457,7 +457,8 @@ def decrypt(encrypted_payload: str, user_id: str | None = None) -> str:
                 result = _aes_gcm_decrypt(ciphertext, tag, nonce, fallback_key)
                 logger.info("Decrypted payload with fallback key version %s (stored: %s)", version, stored_key_version)
                 return result.decode("utf-8")
-            except (KeyError, ValueError, DecryptionError):
+            except (KeyError, ValueError, DecryptionError) as exc:
+                logger.debug("Decryption attempt with fallback key version %s failed: %s", version, exc)
                 continue
 
     msg = f"Decryption failed — no available key for version {stored_key_version} and no fallback key succeeded"

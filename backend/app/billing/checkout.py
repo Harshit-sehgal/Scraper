@@ -112,8 +112,8 @@ class CheckoutRequest(BaseModel):
 class CheckoutResponse(BaseModel):
     """Response from POST /api/billing/checkout."""
 
-    approval_url: str
-    token: str
+    approval_url: str = Field(max_length=2048)
+    token: str = Field(max_length=512)
     plan_tier: _PLAN_TIER_LITERAL
 
 

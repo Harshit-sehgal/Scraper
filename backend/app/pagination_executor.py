@@ -7,6 +7,13 @@ records, and runtime.
 Sync functions validate configuration and enforce limits.
 Async functions accept a Playwright page object and perform
 real browser interactions for infinite scroll, load more, etc.
+
+**SSRF safety**: When navigating Playwright to a constructed URL
+(from a user-supplied ``url_pattern``), the URL is first validated
+through :func:`app.url_safety.validate_public_http_url` before
+reaching the browser. This closes a previously unguarded SSRF path —
+Chromium's networking stack is independent from ``httpx`` and so the
+``get_safe_async_client()`` SSRF transport does not protect it.
 """
 
 from __future__ import annotations
@@ -18,7 +25,29 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.url_safety import validate_public_http_url
+
 logger = logging.getLogger(__name__)
+
+
+def _safe_pagination_url(url: str, *, source: str = "pagination url_pattern") -> str:
+    """Validate a constructed pagination URL before it reaches ``page.goto()``.
+
+    Returns the URL string (unchanged — the validator returns None on success).
+    Raises :class:`ValueError` on SSRF failure so callers can fail-fast the
+    entire pagination run rather than quietly navigating Chromium to a
+    forbidden target.
+    """
+    if not url:
+        msg = f"{source}: pagination produced an empty URL"
+        raise ValueError(msg)
+    try:
+        validate_public_http_url(url)  # raises on failure
+        return url
+    except ValueError as exc:
+        msg = f"{source}: URL failed security check: {exc}"
+        logger.warning("Refusing pagination navigation — %s", msg)
+        raise ValueError(msg) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -569,7 +598,11 @@ async def _async_paginate_url_pattern(
             page_url = config.url_pattern.format(page=page_num)
             logger.debug("URL pattern page URL: %s", page_url)
 
-            await page.goto(page_url, wait_until="domcontentloaded", timeout=15000)
+            # F-PLAYWRIGHT-SSRF: validate the URL *before* Chromium navigates.
+            # The url_pattern is user-controlled; without this check a
+            # crafted template can route requests at internal addresses.
+            safe_url = _safe_pagination_url(page_url)
+            await page.goto(safe_url, wait_until="domcontentloaded", timeout=15000)
 
             # Short wait for JS rendering
             try:

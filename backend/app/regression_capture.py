@@ -360,7 +360,8 @@ class RegressionCapture:
             try:
                 fpath.unlink()
                 pruned += 1
-            except OSError:
+            except OSError as exc:
+                logger.debug("Could not delete stale fixture %s: %s", fpath, exc)
                 pass
 
         if pruned > 0:

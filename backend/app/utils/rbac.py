@@ -212,7 +212,8 @@ def _auth_was_attempted(request: Request) -> bool:
     try:
         if request.cookies.get("dataforge_session"):
             return True
-    except (AttributeError, TypeError):
+    except (AttributeError, TypeError) as exc:
+        logger.debug("Could not access request cookies: %s", exc)
         pass
     return False
 

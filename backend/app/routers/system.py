@@ -36,7 +36,7 @@ class AcquisitionMode(StrEnum):
 
 
 class URLPreviewRequest(BaseModel):
-    url: str = Field(..., description="The URL to analyze for data extraction")
+    url: str = Field(..., max_length=2048, description="The URL to analyze for data extraction")
     fetch_preview: bool = Field(
         default=False,
         description="When false, return URL-only guidance without fetching the target page.",
@@ -149,7 +149,8 @@ async def system_status(
         worker_healths = await run_in_threadpool(repo.get_all_worker_healths, 60)
         if worker_healths:
             response["workers"] = worker_healths
-    except (AttributeError, ImportError, RuntimeError):
+    except (AttributeError, ImportError, RuntimeError) as exc:
+        logger.warning("Failed to fetch worker health status: %s", exc)
         pass
 
     # Queue status
@@ -163,7 +164,8 @@ async def system_status(
             "dead_letter": q_status.get("dead_letter", 0),
             "max_concurrency": q_status.get("max_concurrency", 0),
         }
-    except (AttributeError, ImportError, RuntimeError):
+    except (AttributeError, ImportError, RuntimeError) as exc:
+        logger.warning("Failed to fetch queue status: %s", exc)
         pass
 
     if settings.ENV.lower() != "production":
@@ -273,7 +275,8 @@ async def csp_violations(request: Request):
         from app.metrics_collector import record_csp_violation
 
         record_csp_violation(directive_label)
-    except (ImportError, AttributeError, TypeError, ValueError):
+    except (ImportError, AttributeError, TypeError, ValueError) as exc:
+        logger.debug("metrics_collector not available, skipping CSP violation metric: %s", exc)
         pass
 
     # Sanitise log values: truncate and remove newlines to prevent log injection

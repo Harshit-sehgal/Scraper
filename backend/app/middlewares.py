@@ -92,7 +92,8 @@ async def body_size_middleware(request: Request, call_next):
                     status_code=413,
                     content={"detail": "Request body too large (max 5MB)"},
                 )
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as exc:
+            logger.debug("Ignoring invalid Content-Length header: %s", exc)
             pass
 
     chunks: list[bytes] = []

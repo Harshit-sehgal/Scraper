@@ -712,7 +712,8 @@ async def scrape_url(
         ab_engine = get_anti_bot_engine()
         if anti_bot >= settings.ANTIBOT_HARD_BLOCK_THRESHOLD:
             ab_engine.record_block(intel.domain, anti_bot)
-    except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError):
+    except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError) as exc:
+        logger.warning("Could not record anti-bot block: %s", exc)
         pass
 
     soup_for_density = BeautifulSoup(html, "html.parser")
@@ -775,7 +776,8 @@ async def scrape_url(
         from app.anti_bot_engine import get_anti_bot_engine
 
         get_anti_bot_engine().record_success(intel.domain)
-    except (ImportError, AttributeError):
+    except (ImportError, AttributeError) as exc:
+        logger.warning("Could not record anti-bot success feedback: %s", exc)
         pass
 
     # ── Step 5: Motif Feedback ────────────────────────────────────

@@ -16,6 +16,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.utils.html_size import HTMLSizeExceeded, enforce_html_size
 
 
 @dataclass

@@ -250,9 +250,8 @@ class ReplayBuffer:
                         continue
                     try:
                         entry = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if i == 0 and entry.get("idx", 0) < start_idx:
+                    except json.JSONDecodeError as exc:
+                        logger.debug("Skipping malformed entry in segment %d: %s", i, exc)
                         continue
                     yield entry
 
@@ -273,7 +272,7 @@ class ReplayBuffer:
             if checkpoint is None:
                 return None
 
-            cp_idx, seg_name, offset, snapshot = checkpoint
+            cp_idx, seg_name, offset, _snapshot = checkpoint
             if cp_idx > target_idx:
                 return None
 
@@ -299,9 +298,9 @@ class ReplayBuffer:
                         continue
                     try:
                         entry = json.loads(line)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as exc:
+                        logger.debug("Skipping malformed entry during replay reconstruct: %s", exc)
                         continue
-                    idx = entry.get("idx", -1)
                     if i == 0 and idx < cp_idx:
                         continue
                     if idx > target_idx:
@@ -396,9 +395,9 @@ class ReplayBuffer:
                         continue
                     try:
                         entry = json.loads(line)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as exc:
+                        logger.debug("Skipping malformed entry during rebuild: %s", exc)
                         continue
-                    idx = entry.get("idx", 0)
                     if idx >= self._next_global_idx:
                         self._next_global_idx = idx + 1
                     self._total_entries += 1

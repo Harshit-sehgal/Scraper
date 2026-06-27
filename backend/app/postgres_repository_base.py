@@ -60,6 +60,7 @@ _JOB_COLUMNS: frozenset[str] = frozenset(
         "created_at",
         "started_at",
         "completed_at",
+        "updated_at",
         "total_records",
         "filtered_records",
         "error",

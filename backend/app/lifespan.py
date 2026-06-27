@@ -268,7 +268,8 @@ def schedule_background_task(coro):
     def _handle_task_result(t: asyncio.Task) -> None:
         try:
             t.result()
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
+            logger.debug("Background task cancelled: %s", exc)
             pass
         except _SHUTDOWN_EXCEPTIONS:
             logger.exception("Background task failed")

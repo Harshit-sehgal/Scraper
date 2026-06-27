@@ -383,7 +383,8 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
             if script.string:
                 data = json.loads(script.string)
                 jsonld_data.append(data)
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.debug("Skipping unparseable JSON-LD script: %s", exc)
             pass
     if jsonld_data:
         hydration["jsonld"] = jsonld_data[:10]
@@ -400,7 +401,8 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                 hydration["nextjs_page_props"] = _truncate_large_values(page_props)
             if "initialState" in data:
                 hydration["nextjs_initial_state"] = _truncate_large_values(data["initialState"])
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.debug("Skipping unparseable __NEXT_DATA__: %s", exc)
             pass
 
     # Window __INITIAL_STATE__
@@ -430,7 +432,8 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                         try:
                             data = json.loads(text[start:end])
                             hydration[var_name] = _truncate_large_values(data)
-                        except (json.JSONDecodeError, TypeError):
+                        except (json.JSONDecodeError, TypeError) as exc:
+                            logger.debug("Skipping unparseable initial state JSON: %s", exc)
                             pass
 
     # Apollo / Relay state
@@ -444,7 +447,8 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                 try:
                     data = json.loads(match.group(1))
                     hydration["apollo_state"] = _truncate_large_values(data)
-                except (json.JSONDecodeError, TypeError):
+                except (json.JSONDecodeError, TypeError) as exc:
+                    logger.debug("Skipping unparseable Apollo state JSON: %s", exc)
                     pass
 
     return hydration

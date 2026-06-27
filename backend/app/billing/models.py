@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PlanTierId(StrEnum):
@@ -35,12 +35,12 @@ class SubscriptionStatus(StrEnum):
 class CustomerInfo(BaseModel):
     """Customer information returned by the billing provider."""
 
-    customer_id: str
-    email: str
-    name: str = ""
+    customer_id: str = Field(max_length=128)
+    email: str = Field(max_length=320)
+    name: str = Field(default="", max_length=255)
     plan_tier: PlanTierId = PlanTierId.FREE
     subscription_status: SubscriptionStatus = SubscriptionStatus.ACTIVE
-    subscription_id: str = ""
+    subscription_id: str = Field(default="", max_length=128)
     is_trialing: bool = False
-    trial_end: str | None = None
+    trial_end: str | None = Field(default=None, max_length=64)
 

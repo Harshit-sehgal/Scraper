@@ -207,7 +207,8 @@ class JobCreationService:
             from app.metrics_collector import record_job_created
 
             record_job_created()
-        except ImportError:
+        except ImportError as exc:
+            logger.debug("Optional metrics collector not available: %s", exc)
             pass
 
         # Step 7: Record idempotency key

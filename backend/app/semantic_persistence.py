@@ -51,8 +51,11 @@ def _release_lock(fd) -> None:
     try:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
-    except OSError:
-        pass
+    except OSError as exc:
+        # Lock release / fd close failures are non-fatal — the fd is likely
+        # already invalid (process Exit, NFS reclaim).  Log at debug so
+        # operators can still see it without noise.
+        logger.debug("Lock release/close failed (fd likely stale): %s", exc)
 
 
 def load_semantic_state() -> None:

@@ -26,7 +26,7 @@ def assess_acquisition_quality(
     data_threshold = getattr(settings, "ACQUISITION_QUALITY_DATA_EVIDENCE_THRESHOLD", 0.3)
     anti_bot_threshold = getattr(settings, "ACQUISITION_QUALITY_ANTI_BOT_THRESHOLD", 0.2)
     text_length_threshold = getattr(settings, "ACQUISITION_QUALITY_VISIBLE_TEXT_THRESHOLD", 50)
-    
+
     if data_evidence_score < data_threshold:
         return "block"
     if anti_bot_score < anti_bot_threshold:

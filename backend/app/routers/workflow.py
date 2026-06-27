@@ -86,7 +86,8 @@ def _clear_all_workflows() -> int:
                 conn.commit()
             finally:
                 conn.close()
-    except (AttributeError, RuntimeError):
+    except (AttributeError, RuntimeError) as exc:
+        logger.warning("Failed to delete workflows table: %s", exc)
         pass
     return count
 
@@ -546,7 +547,8 @@ async def run_workflow(
         from app.metrics_collector import record_workflow_run
 
         record_workflow_run()
-    except ImportError:
+    except ImportError as exc:
+        logger.debug("metrics_collector not available, skipping workflow run metric: %s", exc)
         pass
 
     return {
@@ -675,6 +677,7 @@ async def preview_workflow(
         from app.metrics_collector import record_workflow_preview
 
         record_workflow_preview()
-    except ImportError:
+    except ImportError as exc:
+        logger.debug("metrics_collector not available, skipping workflow run metric: %s", exc)
         pass
     return result

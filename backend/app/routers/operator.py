@@ -44,11 +44,11 @@ class DenylistRemoveRequest(BaseModel):
 class DenylistEntryResponse(BaseModel):
     """One denylist row, as returned by the admin endpoints."""
 
-    domain: str
-    reason: str
-    added_by: str
-    added_at: str
-    path_prefix: str = ""
+    domain: str = Field(max_length=512)
+    reason: str = Field(max_length=1024)
+    added_by: str = Field(max_length=128)
+    added_at: str = Field(max_length=64)
+    path_prefix: str = Field(default="", max_length=512)
 
 
 def _to_response(entry: DenylistEntry) -> DenylistEntryResponse:

@@ -17,10 +17,13 @@ This layer:
 Core principle: WHAT values are, not WHERE they came from.
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
 
 from app.semantic_ir import SemanticToken, SemanticType
+
+logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # INTERMEDIATE REPRESENTATION (IR)
@@ -63,7 +66,8 @@ def to_semantic_type(value: object) -> SemanticType:
     if raw_value is not None:
         try:
             return SemanticType(raw_value)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as exc:
+            logger.debug("Cannot convert value %r to SemanticType directly, falling back to string mapping: %s", raw_value, exc)
             pass
     return candidate_type_to_semantic(str(value))
 

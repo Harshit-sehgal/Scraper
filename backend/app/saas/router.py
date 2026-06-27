@@ -58,11 +58,11 @@ class AupAcceptRequest(BaseModel):
 class AupStatusResponse(BaseModel):
     """Response body for AUP status / acceptance."""
 
-    user_id: str
-    aup_accepted_at: str | None
-    aup_version_accepted: str | None
+    user_id: str = Field(max_length=64)
+    aup_accepted_at: str | None = Field(default=None, max_length=64)
+    aup_version_accepted: str | None = Field(default=None, max_length=64)
     requires_acceptance: bool
-    current_aup_version: str
+    current_aup_version: str = Field(max_length=64)
 
 
 AupAcceptResponse = AupStatusResponse
@@ -161,21 +161,21 @@ async def get_aup_status(
 class SignupRequest(BaseModel):
     """Request body for self-service user signup."""
 
-    email: str = Field(..., description="User email (becomes login)")
-    password: str = Field(..., min_length=8, description="Minimum 8 characters")
-    display_name: str = Field("", description="Optional human-readable name")
-    org_name: str | None = Field(None, description="Optional organization name")
-    project_name: str | None = Field(None, description="Optional project name")
+    email: str = Field(..., max_length=320, description="User email (becomes login)")
+    password: str = Field(..., min_length=8, max_length=128, description="Minimum 8 characters")
+    display_name: str = Field("", max_length=255, description="Optional human-readable name")
+    org_name: str | None = Field(None, max_length=255, description="Optional organization name")
+    project_name: str | None = Field(None, max_length=255, description="Optional project name")
 
 
 class SignupResponse(BaseModel):
     """Response after successful signup."""
 
-    user_id: str
-    email: str
-    organization_id: str
-    project_id: str
-    message: str = "Account created successfully. Please accept the AUP."
+    user_id: str = Field(max_length=64)
+    email: str = Field(max_length=320)
+    organization_id: str = Field(max_length=64)
+    project_id: str = Field(max_length=64)
+    message: str = Field(default="Account created successfully. Please accept the AUP.", max_length=1024)
 
 
 @router.post("/signup", status_code=201)
@@ -233,12 +233,12 @@ async def signup(body: SignupRequest, request: Request) -> SignupResponse:
 class UserProfileResponse(BaseModel):
     """Public view of a user's profile."""
 
-    user_id: str
-    email: str
-    display_name: str
-    status: str
-    aup_accepted_at: str | None
-    aup_version_accepted: str | None
+    user_id: str = Field(max_length=64)
+    email: str = Field(max_length=320)
+    display_name: str = Field(max_length=255)
+    status: str = Field(max_length=32)
+    aup_accepted_at: str | None = Field(default=None, max_length=64)
+    aup_version_accepted: str | None = Field(default=None, max_length=64)
 
 
 @router.get("/me", response_model=UserProfileResponse)
@@ -291,10 +291,10 @@ class OrgCreateRequest(BaseModel):
 class OrgResponse(BaseModel):
     """Organization details."""
 
-    id: str
-    name: str
-    created_by_user_id: str
-    created_at: str
+    id: str = Field(max_length=64)
+    name: str = Field(max_length=255)
+    created_by_user_id: str = Field(max_length=64)
+    created_at: str = Field(max_length=64)
 
 
 class OrgListResponse(BaseModel):
@@ -453,7 +453,7 @@ async def delete_organization(
 class ProjectCreateRequest(BaseModel):
     """Request to create a new project within an organization."""
 
-    org_id: str = Field(..., description="Parent organization ID")
+    org_id: str = Field(..., max_length=64, description="Parent organization ID")
     name: str = Field(..., min_length=1, max_length=120, description="Project name")
 
     @field_validator("name")
@@ -472,11 +472,11 @@ class ProjectCreateRequest(BaseModel):
 class ProjectResponse(BaseModel):
     """Project details."""
 
-    id: str
-    org_id: str
-    name: str
-    created_by_user_id: str
-    created_at: str
+    id: str = Field(max_length=64)
+    org_id: str = Field(max_length=64)
+    name: str = Field(max_length=255)
+    created_by_user_id: str = Field(max_length=64)
+    created_at: str = Field(max_length=64)
 
 
 class ProjectListResponse(BaseModel):
@@ -640,19 +640,19 @@ async def delete_project(
 class MemberInviteRequest(BaseModel):
     """Request to invite a user to an organization."""
 
-    org_id: str = Field(..., description="Organization ID")
-    email: str = Field(..., description="Email of the user to invite")
-    role: str = Field("member", description="Role to assign (owner/admin/member/viewer)")
+    org_id: str = Field(..., max_length=64, description="Organization ID")
+    email: str = Field(..., max_length=320, description="Email of the user to invite")
+    role: str = Field("member", max_length=32, description="Role to assign (owner/admin/member/viewer)")
 
 
 class MembershipResponse(BaseModel):
     """Membership details."""
 
-    membership_id: str
-    user_id: str
-    org_id: str
-    role: str
-    created_at: str
+    membership_id: str = Field(max_length=64)
+    user_id: str = Field(max_length=64)
+    org_id: str = Field(max_length=64)
+    role: str = Field(max_length=32)
+    created_at: str = Field(max_length=64)
 
 
 @router.get("/orgs/{org_id}/members", response_model=list[MembershipResponse])
@@ -757,29 +757,29 @@ async def remove_member(
 class EmailVerificationSendResponse(BaseModel):
     """Response for requesting email verification."""
 
-    message: str = "Verification email sent. Check your inbox."
-    user_id: str
+    message: str = Field(default="Verification email sent. Check your inbox.", max_length=1024)
+    user_id: str = Field(max_length=64)
 
 
 class EmailVerifyRequest(BaseModel):
     """Request body for verifying an email address."""
 
-    token: str = Field(..., description="Verification token (from email link)")
+    token: str = Field(..., max_length=512, description="Verification token (from email link)")
 
 
 class EmailVerifyResponse(BaseModel):
     """Response after successful email verification."""
 
     verified: bool
-    message: str
+    message: str = Field(max_length=1024)
 
 
 class EmailVerificationStatusResponse(BaseModel):
     """Email verification status for the authenticated user."""
 
-    email: str
+    email: str = Field(max_length=320)
     email_verified: bool
-    email_verified_at: str | None
+    email_verified_at: str | None = Field(default=None, max_length=64)
 
 
 @router.post("/email-verification/send", status_code=200)
@@ -908,26 +908,26 @@ async def email_verification_status(
 class PasswordResetRequest(BaseModel):
     """Request body to initiate a password reset."""
 
-    email: str = Field(..., description="Email address for the account to reset")
+    email: str = Field(..., max_length=320, description="Email address for the account to reset")
 
 
 class PasswordResetResponse(BaseModel):
     """Response after a password reset request."""
 
-    message: str = "If that email exists, a reset link has been sent."
+    message: str = Field(default="If that email exists, a reset link has been sent.", max_length=1024)
 
 
 class PasswordResetConfirmRequest(BaseModel):
     """Request body to confirm a password reset with a new password."""
 
-    token: str = Field(..., description="Reset token (from email link)")
-    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+    token: str = Field(..., max_length=512, description="Reset token (from email link)")
+    new_password: str = Field(..., min_length=8, max_length=128, description="New password (min 8 characters)")
 
 
 class PasswordResetConfirmResponse(BaseModel):
     """Response after a successful password reset."""
 
-    message: str = "Password has been reset successfully."
+    message: str = Field(default="Password has been reset successfully.", max_length=1024)
 
 
 # Rate-limit state for password reset endpoints (in-memory, per-IP).
@@ -1145,21 +1145,21 @@ async def confirm_password_reset(
 class InvitationCreateRequest(BaseModel):
     """Request to invite a user to an organization."""
 
-    email: str = Field(..., description="Email address to invite")
-    role: str = Field("member", description="Role to assign (member/admin/viewer)")
+    email: str = Field(..., max_length=320, description="Email address to invite")
+    role: str = Field("member", max_length=32, description="Role to assign (member/admin/viewer)")
 
 
 class InvitationResponse(BaseModel):
     """Invitation details."""
 
-    id: str
-    org_id: str
-    invited_email: str
-    invited_by_user_id: str
-    role: str
-    status: str
-    created_at: str
-    expires_at: str
+    id: str = Field(max_length=64)
+    org_id: str = Field(max_length=64)
+    invited_email: str = Field(max_length=320)
+    invited_by_user_id: str = Field(max_length=64)
+    role: str = Field(max_length=32)
+    status: str = Field(max_length=32)
+    created_at: str = Field(max_length=64)
+    expires_at: str = Field(max_length=64)
 
 
 class InvitationListResponse(BaseModel):
@@ -1178,20 +1178,20 @@ class InvitationRespondRequest(BaseModel):
 class InvitationRespondResponse(BaseModel):
     """Response after responding to an invitation."""
 
-    id: str
-    status: str
-    message: str
+    id: str = Field(max_length=64)
+    status: str = Field(max_length=32)
+    message: str = Field(max_length=1024)
 
 
 class PendingInvitationResponse(BaseModel):
     """Pending invitation details (returned to the invited user)."""
 
-    id: str
-    org_id: str
-    invited_email: str
-    role: str
-    created_at: str
-    expires_at: str
+    id: str = Field(max_length=64)
+    org_id: str = Field(max_length=64)
+    invited_email: str = Field(max_length=320)
+    role: str = Field(max_length=32)
+    created_at: str = Field(max_length=64)
+    expires_at: str = Field(max_length=64)
 
 
 @router.post("/orgs/{org_id}/invitations", status_code=201, response_model=InvitationResponse)
@@ -1428,7 +1428,7 @@ _SCOPE_RANK: dict[str, int] = {
 class PlanInfoResponse(BaseModel):
     """Current plan information for the user."""
 
-    tier: str = "free"
+    tier: str = Field(default="free", max_length=32)
     max_jobs: int = 10
     max_scrapes: int = 1000
     max_teammates: int = 2
@@ -1447,6 +1447,7 @@ class ApiKeyCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120, description="Key name")
     scope: Literal["read", "write", "admin"] = Field(
         "read",
+        max_length=32,
         description="Key scope: read, write, or admin",
     )
 
@@ -1454,14 +1455,14 @@ class ApiKeyCreateRequest(BaseModel):
 class ApiKeyResponse(BaseModel):
     """API key metadata (raw key only shown once at creation)."""
 
-    id: str
-    project_id: str
-    name: str
-    scope: str
-    key_prefix: str
-    created_at: str
-    last_used_at: str | None
-    revoked_at: str | None
+    id: str = Field(max_length=64)
+    project_id: str = Field(max_length=64)
+    name: str = Field(max_length=255)
+    scope: str = Field(max_length=32)
+    key_prefix: str = Field(max_length=128)
+    created_at: str = Field(max_length=64)
+    last_used_at: str | None = Field(default=None, max_length=64)
+    revoked_at: str | None = Field(default=None, max_length=64)
 
 
 class ApiKeyListResponse(BaseModel):
@@ -1474,13 +1475,13 @@ class ApiKeyListResponse(BaseModel):
 class ApiKeyCreateResponse(BaseModel):
     """Response after creating an API key — raw key shown only here."""
 
-    id: str
-    project_id: str
-    name: str
-    scope: str
-    raw_key: str  # ⚠️ Shown once — never stored in plain text
-    key_prefix: str
-    created_at: str
+    id: str = Field(max_length=64)
+    project_id: str = Field(max_length=64)
+    name: str = Field(max_length=255)
+    scope: str = Field(max_length=32)
+    raw_key: str = Field(max_length=256)  # ⚠️ Shown once — never stored in plain text
+    key_prefix: str = Field(max_length=128)
+    created_at: str = Field(max_length=64)
 
 
 @router.post("/projects/{project_id}/keys", status_code=201, response_model=ApiKeyCreateResponse)

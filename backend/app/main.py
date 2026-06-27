@@ -19,6 +19,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import runtime_deps
+
+# Configure root logging FIRST so all subsequent getLogger() calls inherit
+# the JSON formatter and stdout handler we want in containerised output.
+from app.logging_config import configure_logging as _configure_logging
+
+_configure_logging()
+
 from app.billing.checkout import router as billing_checkout_router
 from app.billing.webhooks import router as billing_webhook_router
 from app.config import settings

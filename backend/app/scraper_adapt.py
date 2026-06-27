@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.crawl_frontier import get_crawl_frontier
+from app.utils.html_size import enforce_html_size
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ async def _run_crawl_frontier_link_discovery(
     try:
         from urllib.parse import urljoin, urlparse
 
+        html = enforce_html_size(html, url=url, must_truncate=True)
         soup = BeautifulSoup(html, "html.parser")
         discovered_links = []
         for a_tag in soup.find_all("a", href=True):

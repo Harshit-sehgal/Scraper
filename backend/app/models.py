@@ -86,7 +86,7 @@ class SchemaField(BaseModel):
 
     name: str = Field(..., description="Field name, e.g. 'company_name'", max_length=64)
     field_type: FieldType = Field(..., description="Data type for this field")
-    description: str = Field("", description="Optional hint for the LLM about what this field is")
+    description: str = Field("", description="Optional hint for the LLM about what this field is", max_length=1024)
     required: bool = Field(True, description="Whether this field is required")
 
     @field_validator("name")
@@ -105,19 +105,19 @@ class SchemaField(BaseModel):
 class FilterRule(BaseModel):
     """A single filter rule to apply to scraped data."""
 
-    field_name: str = Field(..., description="Which schema field to filter on")
+    field_name: str = Field(..., description="Which schema field to filter on", max_length=64)
     operator: FilterOperator = Field(..., description="Filter operator")
-    value: str = Field("", description="Value to compare against")
-    origin_address: str | None = Field(None, description="Origin address for distance calculation")
-    distance_unit: str | None = Field("km", description="km or miles")
+    value: str = Field("", description="Value to compare against", max_length=2048)
+    origin_address: str | None = Field(None, description="Origin address for distance calculation", max_length=512)
+    distance_unit: str | None = Field("km", description="km or miles", max_length=10)
 
 
 class DiscoveryRequest(BaseModel):
     """Request body for auto-discovery mode."""
 
-    topic: str = Field(..., description="What topic / data to search for")
-    location: str = Field("", description="Geographic focus, e.g. 'New York, USA'")
-    domain: str = Field("", description="Preferred domain to search, e.g. 'example.com'")
+    topic: str = Field(..., description="What topic / data to search for", max_length=512)
+    location: str = Field("", description="Geographic focus, e.g. 'New York, USA'", max_length=256)
+    domain: str = Field("", description="Preferred domain to search, e.g. 'example.com'", max_length=253)
     num_results: int = Field(8, ge=1, le=50, description="How many URLs to discover")
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum URLs allowed per domain in discovery")
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Source inclusion policy for discovery")
@@ -125,14 +125,14 @@ class DiscoveryRequest(BaseModel):
         default_factory=list,
         description="Optional schema field names to improve search relevance",
     )
-    origin_location: str = Field("", description="Center point for radius-aware optimization")
+    origin_location: str = Field("", description="Center point for radius-aware optimization", max_length=256)
     max_distance_km: float | None = Field(None, ge=0, description="Optional discovery radius in kilometers")
 
 
 class SchemaSuggestionRequest(BaseModel):
     """Request body to infer topic and schema fields from plain language."""
 
-    intent: str = Field(..., description="Natural language description of what data to scrape")
+    intent: str = Field(..., description="Natural language description of what data to scrape", max_length=4096)
     max_fields: int = Field(8, ge=1, le=20, description="Maximum number of fields to generate")
 
 
@@ -178,9 +178,9 @@ class JobCreate(BaseModel):
     # Manual mode
     urls: list[str] = Field(default_factory=list, max_length=100, description="List of URLs to scrape (manual mode)")
     # Auto mode
-    topic: str = Field("", description="Topic for auto-discovery")
-    location: str = Field("", description="Location focus for auto-discovery")
-    preferred_domain: str = Field("", description="Preferred domain for auto-discovery")
+    topic: str = Field("", description="Topic for auto-discovery", max_length=512)
+    location: str = Field("", description="Location focus for auto-discovery", max_length=256)
+    preferred_domain: str = Field("", description="Preferred domain for auto-discovery", max_length=253)
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Controls which source types are included")
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum discovered URLs per domain")
     origin_location: str = Field("", description="Center location for distance optimization")
@@ -192,12 +192,12 @@ class JobCreate(BaseModel):
     pagination: bool = Field(False, description="Whether to follow pagination links")
     max_pages: int = Field(10, ge=1, le=100, description="Max pages to follow per URL")
     deduplicate: bool = Field(True, description="Remove duplicate records")
-    deduplicate_field: str = Field("", description="Field to use for deduplication")
+    deduplicate_field: str = Field("", description="Field to use for deduplication", max_length=64)
     # Selectors map from URL analysis (item_container + field selectors)
     selectors_map: dict[str, Any] = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
-    auth_profile_id: str | None = Field(default=None, description="Optional auth profile ID to use for authenticated scraping")
+    auth_profile_id: str | None = Field(default=None, description="Optional auth profile ID to use for authenticated scraping", max_length=128)
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -272,49 +272,49 @@ class JobStatus(StrEnum):
 class LogEntry(BaseModel):
     """A single log entry for a job."""
 
-    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    message: str
-    level: str = "info"
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    message: str = Field(max_length=8192)
+    level: str = Field("info", max_length=16)
 
 
 class Job(BaseModel):
     """A scraping job with its current state."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    name: str = Field(max_length=255)
     mode: ScrapeMode = ScrapeMode.MANUAL
-    intent: str = ""
+    intent: str = Field("", max_length=4096)
     urls: list[str] = Field(default_factory=list)
-    topic: str = ""
-    location: str = ""
-    preferred_domain: str = ""
+    topic: str = Field("", max_length=512)
+    location: str = Field("", max_length=256)
+    preferred_domain: str = Field("", max_length=253)
     source_policy: SourcePolicy = SourcePolicy.ALL_SOURCES
     max_per_domain: int = 4
-    origin_location: str = ""
+    origin_location: str = Field("", max_length=256)
     max_distance_km: float | None = None
     schema_fields: list[SchemaField] = Field(default_factory=list)
     filters: list[FilterRule] = Field(default_factory=list)
     pagination: bool = False
     max_pages: int = 10
     deduplicate: bool = True
-    deduplicate_field: str = ""
+    deduplicate_field: str = Field("", max_length=64)
     min_record_score: float = 0.35
     # Selectors map from URL analysis (pre-discovered CSS selectors)
     selectors_map: dict[str, Any] = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
-    created_by: str = Field(default="", description="Owner identity (user ID or API key fingerprint) for data isolation")
-    org_id: str = Field(default="", description="Tenant org id; populated for persistent API keys (P0-SAAS-001)")
-    project_id: str = Field(default="", description="Project id; populated for persistent API keys (P0-SAAS-001)")
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    started_at: str | None = None
-    completed_at: str | None = None
+    created_by: str = Field(default="", description="Owner identity (user ID or API key fingerprint) for data isolation", max_length=128)
+    org_id: str = Field(default="", description="Tenant org id; populated for persistent API keys (P0-SAAS-001)", max_length=128)
+    project_id: str = Field(default="", description="Project id; populated for persistent API keys (P0-SAAS-001)", max_length=128)
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    started_at: str | None = Field(None, max_length=64)
+    completed_at: str | None = Field(None, max_length=64)
     total_records: int = 0
     filtered_records: int = 0
-    error: str | None = None
+    error: str | None = Field(None, max_length=8192)
     results: list[dict] = Field(default_factory=list)
-    analysis: str | None = None
+    analysis: str | None = Field(None, max_length=16384)
     discovered_urls: list[dict] = Field(default_factory=list)
     quality_report: dict[str, Any] = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
@@ -323,9 +323,9 @@ class Job(BaseModel):
     progress_current: int = 0
     progress_total: int = 0
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
-    results_file_path: str | None = Field(default=None, description="Path to the compressed results file")
+    results_file_path: str | None = Field(default=None, description="Path to the compressed results file", max_length=1024)
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
-    acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan")
+    acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan", max_length=16)
 
 
 # ─── Workflow System ──────────────────────────────────────────────────────
@@ -400,7 +400,7 @@ class WorkflowPaginationConfig(BaseModel):
         description="Pagination strategy: next_button, page_number, url_pattern, infinite_scroll, load_more",
     )
     max_pages: int = Field(10, ge=1, le=100, description="Maximum pages to follow")
-    stop_condition: str = Field("none", description="Stop condition: none, no_more_records, duplicate_threshold, custom")
+    stop_condition: str = Field("none", description="Stop condition: none, no_more_records, duplicate_threshold, custom", max_length=64)
     selector: str = Field("", description="Selector for next button or page links", max_length=500)
 
 
@@ -408,14 +408,14 @@ class Workflow(BaseModel):
     """A saved scraping workflow that can be replayed."""
 
     # Identity
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
     name: str = Field(..., description="Human-readable workflow name", max_length=255)
     description: str = Field("", description="Optional workflow description", max_length=1000)
 
     # Ownership
-    user_id: str = Field(default="", description="Creator user ID")
-    org_id: str = Field(default="", description="Organization ID for multi-tenant isolation")
-    project_id: str = Field(default="", description="Project ID for grouping")
+    user_id: str = Field(default="", description="Creator user ID", max_length=128)
+    org_id: str = Field(default="", description="Organization ID for multi-tenant isolation", max_length=128)
+    project_id: str = Field(default="", description="Project ID for grouping", max_length=128)
 
     # Target
     mode: str = Field(default="workflow_replay", description="Workflow execution mode", max_length=64)
@@ -438,12 +438,12 @@ class Workflow(BaseModel):
     version: int = Field(1, ge=1, description="Workflow version for change tracking")
 
     # Timestamps
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    last_run_at: str | None = Field(default=None, description="When this workflow was last executed")
-    last_success_at: str | None = Field(default=None, description="When this workflow last completed successfully")
-    last_failure_reason: str | None = Field(default=None, description="Last workflow failure reason")
-    last_run_job_id: str | None = Field(default=None, description="ID of the last job created from this workflow")
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    last_run_at: str | None = Field(default=None, description="When this workflow was last executed", max_length=64)
+    last_success_at: str | None = Field(default=None, description="When this workflow last completed successfully", max_length=64)
+    last_failure_reason: str | None = Field(default=None, description="Last workflow failure reason", max_length=4096)
+    last_run_job_id: str | None = Field(default=None, description="ID of the last job created from this workflow", max_length=64)
 
     # Statistics
     total_runs: int = Field(0, ge=0, description="Total number of times this workflow has been run")
@@ -524,7 +524,7 @@ class AuthProfile(BaseModel):
     """
 
     # Identity
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
     name: str = Field(..., description="Human-readable profile name", max_length=255)
     description: str = Field("", max_length=1000)
 
@@ -580,17 +580,17 @@ class ScheduledJob(BaseModel):
     """
 
     # Identity
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
     name: str = Field(..., description="Human-readable schedule name", max_length=255)
 
     # Ownership
-    user_id: str = Field(default="", description="Owner user ID")
-    org_id: str = Field(default="", description="Organization ID")
-    project_id: str = Field(default="", description="Project ID")
+    user_id: str = Field(default="", description="Owner user ID", max_length=128)
+    org_id: str = Field(default="", description="Organization ID", max_length=128)
+    project_id: str = Field(default="", description="Project ID", max_length=128)
 
     # Scheduling
     frequency: ScheduledJobFrequency = Field(default=ScheduledJobFrequency.DAILY)
-    last_run_at: str | None = None
+    last_run_at: str | None = Field(None, max_length=64)
 
     # Job template (snapshot of a JobCreate payload)
     job_name: str = Field(..., description="Name pattern for generated jobs", max_length=255)
@@ -607,8 +607,8 @@ class ScheduledJob(BaseModel):
 
     # Status
     enabled: bool = True
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
 
     # Statistics
     total_executions: int = Field(0, ge=0)

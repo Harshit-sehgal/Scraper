@@ -122,7 +122,8 @@ class DNSRebindingDefense:
                                 current_ips,
                             )
                             return True
-                    except socket.gaierror:
+                    except socket.gaierror as exc:
+                        logger.warning("DNS resolution failed during rebinding check for %s: %s", hostname, exc)
                         pass
 
             # Cache current resolution

@@ -237,7 +237,8 @@ async def scrape_url_with_recovery(
                     from app.metrics_collector import record_anti_bot_classification
 
                     record_anti_bot_classification("anti_bot_block")
-                except (ImportError, AttributeError, TypeError, ValueError):
+                except (ImportError, AttributeError, TypeError, ValueError) as exc:
+                    logger.debug("Could not record anti-bot classification: %s", exc)
                     pass
             else:
                 state = AcquisitionState.DIRECT

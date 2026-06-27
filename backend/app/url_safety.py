@@ -727,16 +727,16 @@ def verify_ssrf_self_check() -> dict[str, Any]:
         from app.url_safety import get_safe_async_client as _factory
 
         client = _factory()
-        transport = client._transport
-        if not isinstance(transport, _UrlValidatingAsyncTransport):
+        outer_transport = client._transport
+        if not isinstance(outer_transport, _UrlValidatingAsyncTransport):
             diag["ok"] = False
             diag["reason"] = (
                 "get_safe_async_client is not using the public-API "
                 "transport wrapper as the outer transport."
             )
             return diag
-        
-        inner = transport._inner
+
+        inner = outer_transport._inner
         if not isinstance(inner, SafeAsyncHTTPTransport):
             diag["ok"] = False
             diag["reason"] = (

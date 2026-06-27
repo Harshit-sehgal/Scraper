@@ -111,6 +111,7 @@ def _env(*, experimental: bool) -> dict:
 
 def _live_routes(*, experimental: bool):
     code = (
+        "import logging; logging.disable(logging.CRITICAL);"
         "import sys, json;"
         "sys.path.insert(0, 'scripts');"
         "from fastapi_route_iter import iter_app_routes;"
@@ -134,7 +135,11 @@ def _live_routes(*, experimental: bool):
         print("Failed to import app.main:", file=sys.stderr)
         print(proc.stderr, file=sys.stderr)
         sys.exit(2)
-    return [tuple(x) for x in json.loads(proc.stdout)]
+    # Parse only the last non-empty line of stdout (imports may emit warnings)
+    out_lines = [ln for ln in proc.stdout.strip().split("\n") if ln.strip()]
+    if not out_lines:
+        return []
+    return [tuple(x) for x in json.loads(out_lines[-1])]
 
 
 _PREFIX_TO_SECTION = [
