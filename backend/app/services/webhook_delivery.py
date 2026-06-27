@@ -15,8 +15,11 @@ secret and comparing (preferably using ``hmac.compare_digest``).
 
 Security
 --------
-- Only ``https://`` and ``http://`` URLs are allowed (validated at
-  model level).
+- ``validate_public_http_url`` is called on the webhook URL before any
+  HTTP request is made — private IPs, loopback, link-local, and
+  disallowed schemes are rejected.
+- ``get_safe_async_client`` pins DNS resolution to prevent TOCTOU
+  rebinding attacks.
 - The POST has a 10-second connect/read timeout to avoid blocking the
   event loop.
 - Payload size is bounded by the job result structure.
@@ -76,6 +79,23 @@ async def deliver_webhook(job: Any) -> bool:
     if not webhook_url:
         return False
 
+    # SSRF defense: reject private IPs, loopback, link-local, and
+    # disallowed schemes *before* opening any connection.
+    try:
+        from app.url_safety import validate_public_http_url
+
+        validate_public_http_url(webhook_url)
+    except ValueError as exc:
+        logger.warning(
+            "Webhook URL blocked by SSRF guard for job %s: %s",
+            getattr(job, "id", ""),
+            exc,
+        )
+        from app.metrics_collector import record_ssrf_reject
+
+        record_ssrf_reject(f"webhook {exc}")
+        return False
+
     payload = _build_payload(job)
     payload_bytes = json.dumps(payload, default=str).encode("utf-8")
 
@@ -89,12 +109,13 @@ async def deliver_webhook(job: Any) -> bool:
     if webhook_secret:
         headers["X-DataForge-Signature"] = f"sha256={_sign_payload(payload_bytes, webhook_secret)}"
 
-    import httpx
+    from app.url_safety import get_safe_async_client
+    import httpx  # for exception types only — the client is SSRF-guarded
 
     backoff = _INITIAL_BACKOFF_SECONDS
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            async with httpx.AsyncClient(timeout=_WEBHOOK_TIMEOUT_SECONDS) as client:
+            async with get_safe_async_client(timeout=_WEBHOOK_TIMEOUT_SECONDS) as client:
                 resp = await client.post(webhook_url, content=payload_bytes, headers=headers)
                 if resp.status_code < 400:
                     job.webhook_delivered = True

@@ -1,14 +1,11 @@
-"""Tests for app.services.webhook_delivery — HMAC signing, retry, and payload shape."""
+"""Tests for app.services.webhook_delivery — HMAC signing, retry, payload shape, and SSRF blocking."""
 
 from __future__ import annotations
 
-import datetime
 import hashlib
 import hmac
-import json
 
 import pytest
-
 from app.services.webhook_delivery import (
     MAX_RETRIES,
     _build_payload,
@@ -77,11 +74,34 @@ class TestDeliverWebhook:
         assert await deliver_webhook(job) is False
 
     @pytest.mark.asyncio
+    async def test_ssrf_blocked_url_returns_false(self) -> None:
+        """Private IP URLs are rejected by validate_public_http_url before any HTTP call."""
+        # 169.254.169.254 is the AWS metadata endpoint — a classic SSRF target.
+        job = _FakeJob(webhook_url="http://169.254.169.254/latest/meta-data/")
+        success = await deliver_webhook(job)
+        assert success is False
+        assert job.webhook_delivered is False
+
+    @pytest.mark.asyncio
+    async def test_ssrf_loopback_rejected(self) -> None:
+        """Loopback addresses should be blocked."""
+        job = _FakeJob(webhook_url="http://127.0.0.1:8080/callback")
+        success = await deliver_webhook(job)
+        assert success is False
+        assert job.webhook_delivered is False
+
+    @pytest.mark.asyncio
+    async def test_ssrf_localhost_hostname_rejected(self) -> None:
+        """'localhost' hostname should also be blocked."""
+        job = _FakeJob(webhook_url="http://localhost:6379/")
+        success = await deliver_webhook(job)
+        assert success is False
+
+    @pytest.mark.asyncio
     async def test_successful_delivery_updates_state(self) -> None:
-        """Mocked successful POST — verify state updates and correctness."""
+        """Mocked successful POST via get_safe_async_client."""
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        # Build a mock context manager that returns a mock HTTP client
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_client = MagicMock()
@@ -91,7 +111,11 @@ class TestDeliverWebhook:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
         mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("httpx.AsyncClient", return_value=mock_ctx):
+        # Patch the SSRF-safe client factory inside webhook_delivery
+        with patch(
+            "app.url_safety.get_safe_async_client",
+            return_value=mock_ctx,
+        ):
             job = _FakeJob(webhook_url="https://example.com/hook", webhook_secret="abc")
             success = await deliver_webhook(job)
 
@@ -118,6 +142,8 @@ class TestDeliverWebhook:
         """A 500 response on every attempt should exhaust retries and return False."""
         from unittest.mock import AsyncMock, MagicMock, patch
 
+        import asyncio
+
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_client = MagicMock()
@@ -127,12 +153,10 @@ class TestDeliverWebhook:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
         mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("httpx.AsyncClient", return_value=mock_ctx):
-            # The deliver_webhook code imports asyncio lazily inside the
-            # function body, so patch the built-in sleep via asyncio.sleep
-            # directly (a real approach for retry-backoff tests).
-            import asyncio
-
+        with patch(
+            "app.url_safety.get_safe_async_client",
+            return_value=mock_ctx,
+        ):
             original_sleep = asyncio.sleep
             asyncio.sleep = AsyncMock()  # type: ignore[assignment]
             try:
@@ -158,7 +182,10 @@ class TestDeliverWebhook:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
         mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("httpx.AsyncClient", return_value=mock_ctx):
+        with patch(
+            "app.url_safety.get_safe_async_client",
+            return_value=mock_ctx,
+        ):
             job = _FakeJob(webhook_url="https://example.com/hook", webhook_secret=None)
             await deliver_webhook(job)
 

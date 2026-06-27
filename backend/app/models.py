@@ -306,6 +306,15 @@ class JobCreate(BaseModel):
             if not stripped.startswith(("https://", "http://")):
                 msg = "webhook_url must start with https:// or http://"
                 raise ValueError(msg)
+            # SSRF defense: reject private IPs, loopback, link-local
+            # at model level so bad URLs never reach webhook_delivery.
+            try:
+                from app.url_safety import validate_public_http_url
+
+                validate_public_http_url(stripped)
+            except ValueError as exc:
+                msg = f"webhook_url failed security check: {exc}"
+                raise ValueError(msg) from exc
             self.webhook_url = stripped
 
         # ── fetch_strategy validation ──────────────────────────────────
@@ -469,6 +478,14 @@ class JobWebhookUpdate(BaseModel):
             if not stripped.startswith(("https://", "http://")):
                 msg = "webhook_url must start with https:// or http://"
                 raise ValueError(msg)
+            # SSRF defense at model level
+            try:
+                from app.url_safety import validate_public_http_url
+
+                validate_public_http_url(stripped)
+            except ValueError as exc:
+                msg = f"webhook_url failed security check: {exc}"
+                raise ValueError(msg) from exc
             self.webhook_url = stripped
         return self
 
