@@ -1,5 +1,5 @@
 {
-  "route_count": 150,
+  "route_count": 143,
   "routes": [
     {
       "method": "GET",
@@ -184,18 +184,6 @@
     {
       "method": "GET",
       "middleware_protected": "yes",
-      "notes": "protected by global /api middleware; no route-level role dependency",
-      "path": "/api/intelligence/analyze-url",
-      "public_protected_unknown": "protected",
-      "required_role": "authenticated-user",
-      "route_dependency": "none",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "GET",
-      "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator/user",
       "path": "/api/jobs",
       "public_protected_unknown": "protected",
@@ -248,18 +236,6 @@
       "path": "/api/jobs/{job_id}",
       "public_protected_unknown": "protected",
       "required_role": "authenticated-user",
-      "route_dependency": "require_principal",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "yes",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "POST",
-      "middleware_protected": "yes",
-      "notes": "route dependency accepts admin/operator",
-      "path": "/api/jobs/{job_id}/backfill-metadata",
-      "public_protected_unknown": "protected",
-      "required_role": "operator-or-admin",
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
@@ -1385,18 +1361,6 @@
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "require_role/admin-only dependency",
-      "path": "/api/system/diagnostics/export",
-      "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
       "path": "/api/system/domain-policy",
       "public_protected_unknown": "protected",
       "required_role": "admin",
@@ -1426,18 +1390,6 @@
       "required_role": "admin",
       "route_dependency": "require_role, verify_experimental_enabled",
       "stable_or_experimental": "experimental",
-      "tenant_scoped": "no",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "route dependency accepts admin/operator/user",
-      "path": "/api/system/manifest",
-      "public_protected_unknown": "protected",
-      "required_role": "authenticated-user",
-      "route_dependency": "require_role",
-      "stable_or_experimental": "stable",
       "tenant_scoped": "no",
       "test_coverage": "yes"
     },
@@ -1522,42 +1474,6 @@
       "required_role": "admin",
       "route_dependency": "require_role, verify_experimental_enabled",
       "stable_or_experimental": "experimental",
-      "tenant_scoped": "no",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/retention/config",
-      "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "POST",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/retention/enforce",
-      "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no",
-      "test_coverage": "yes"
-    },
-    {
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/retention/health",
-      "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
-      "stable_or_experimental": "stable",
       "tenant_scoped": "no",
       "test_coverage": "yes"
     },

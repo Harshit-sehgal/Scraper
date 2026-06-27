@@ -1,5 +1,5 @@
 {
-  "route_count": 161,
+  "route_count": 154,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -258,22 +258,6 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "",
-      "category": "stable API routes",
-      "handler_function": "analyze_url_endpoint",
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "protected by global /api middleware; no route-level role dependency",
-      "path": "/api/intelligence/analyze-url",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
-      "router_module": "app.routers.intelligence",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no"
-    },
-    {
       "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "list_jobs",
@@ -350,22 +334,6 @@
       "required_role_if_known": "authenticated-user",
       "response_model_if_known": "",
       "router_module": "app.routers.jobs_read",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "yes"
-    },
-    {
-      "auth_dependency_if_known": "require_principal",
-      "category": "stable API routes",
-      "handler_function": "backfill_job_metadata",
-      "method": "POST",
-      "middleware_protected": "yes",
-      "notes": "route dependency accepts admin/operator",
-      "path": "/api/jobs/{job_id}/backfill-metadata",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
-      "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
     },
@@ -1858,22 +1826,6 @@
       "tenant_scoped": "no"
     },
     {
-      "auth_dependency_if_known": "require_role",
-      "category": "stable API routes",
-      "handler_function": "export_system_diagnostics",
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/diagnostics/export",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "admin",
-      "response_model_if_known": "",
-      "router_module": "app.routers.system",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no"
-    },
-    {
       "auth_dependency_if_known": "require_role, verify_experimental_enabled",
       "category": "experimental API routes",
       "handler_function": "system_domain_policy",
@@ -1919,22 +1871,6 @@
       "response_model_if_known": "",
       "router_module": "app.routers.experimental",
       "stable_or_experimental": "experimental",
-      "tenant_scoped": "no"
-    },
-    {
-      "auth_dependency_if_known": "require_role",
-      "category": "stable API routes",
-      "handler_function": "system_manifest",
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "route dependency accepts admin/operator/user",
-      "path": "/api/system/manifest",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
-      "router_module": "app.routers.system",
-      "stable_or_experimental": "stable",
       "tenant_scoped": "no"
     },
     {
@@ -2047,54 +1983,6 @@
       "response_model_if_known": "",
       "router_module": "app.routers.experimental",
       "stable_or_experimental": "experimental",
-      "tenant_scoped": "no"
-    },
-    {
-      "auth_dependency_if_known": "require_role",
-      "category": "stable API routes",
-      "handler_function": "get_retention_config_endpoint",
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/retention/config",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "admin",
-      "response_model_if_known": "dict",
-      "router_module": "app.routers.system",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no"
-    },
-    {
-      "auth_dependency_if_known": "require_role",
-      "category": "stable API routes",
-      "handler_function": "enforce_data_retention",
-      "method": "POST",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/retention/enforce",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "admin",
-      "response_model_if_known": "dict",
-      "router_module": "app.routers.system",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "no"
-    },
-    {
-      "auth_dependency_if_known": "require_role",
-      "category": "stable API routes",
-      "handler_function": "get_retention_health_endpoint",
-      "method": "GET",
-      "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
-      "path": "/api/system/retention/health",
-      "public_or_protected": "protected",
-      "request_model_if_known": "",
-      "required_role_if_known": "admin",
-      "response_model_if_known": "dict",
-      "router_module": "app.routers.system",
-      "stable_or_experimental": "stable",
       "tenant_scoped": "no"
     },
     {

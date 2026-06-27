@@ -10,7 +10,7 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 4 |
+| Open verified/deferred issues | 10 |
 | Fixed issues | 95 |
 | Not reproducible issues | 3 |
 | Candidate issues | 3 |
@@ -1949,4 +1949,110 @@ Status is `verified` unless noted.
 - **blocked_by:** CI release pipeline.
 - **notes:** Fixed in Session 85: backend/tests/test_docker_atomic_image_pair.py locks in that `dataforge` and `worker` compose services (1) consume ${DATAFORGE_IMAGE_TAG}, (2) declare byte-identical image directives, (3) share build.context=Dockerfile target=production.
 
-## End of ledger entries — total 105 (39 historical + 66 added 2026-06-25)
+## Session 95 — New findings added 2026-06-27 (Codebase Quality and Security Audit)
+
+This section adds 6 new verified issues found during the codebase audit on 2026-06-27.
+
+| Priority | Count |
+|---|---|
+| P1 | 3 |
+| P2 | 3 |
+| **Total** | **6** |
+
+### P1-AUTH-PASSWORD-RESET-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** security_auth_exemption
+- **file_path:** `backend/app/middlewares.py`
+- **line_function:** `api_key_middleware lines 127-180`
+- **evidence:** In the test/production environment when `DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false`, a POST request to `/api/saas/password-reset/request` or `/api/saas/password-reset/reset` without credentials returns HTTP 403 Forbidden.
+- **why_it_matters:** Users requesting a password reset are unauthenticated and do not have an API key or session cookie.
+- **impact:** The password reset flow is completely broken and unusable for public users in staging and production.
+- **recommended_fix:** Add password-reset endpoints to the exempt list in `api_key_middleware` in `backend/app/middlewares.py`.
+- **tests_needed:** Verify unauthenticated requests to password reset endpoints do not trigger 403 when dev auth is disabled.
+- **acceptance_criteria:** Password reset endpoints return 200/400 instead of 403 when requested without credentials in production mode.
+- **blocked_by:** None.
+- **notes:** Discovered in codebase-wide quality and security audit.
+
+### P1-SEC-TENANT-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** tenant_isolation / billing_subscriptions
+- **file_path:** `backend/app/billing/webhooks.py:590-611`
+- **line_function:** `list_subscriptions / get_subscription`
+- **evidence:** Endpoints `GET /api/billing/subscriptions` and `GET /api/billing/subscriptions/{customer_id}` use `require_role([UserRole.ADMIN, UserRole.OPERATOR])` without checking the tenant's `org_id` or `project_id`.
+- **why_it_matters:** Any client with a project-scoped operator API key can view all subscriptions or details of any customer in the system.
+- **impact:** Leaks customer billing records across tenants, violating Rule 8 (Enforce tenant/user/project isolation).
+- **recommended_fix:** Use `require_principal` and restrict reads to matching `customer_id` with `org_id` or `user_id`.
+- **tests_needed:** Verify project-scoped operator keys from tenant A cannot read subscriptions of tenant B.
+- **acceptance_criteria:** Billing subscription queries enforce org matching.
+- **blocked_by:** None.
+- **notes:** Discovered in codebase-wide quality and security audit.
+
+### P1-ARCH-QUOTA-001
+
+- **priority:** P1
+- **status:** verified
+- **category:** plan_enforcement / quota_isolation
+- **file_path:** `backend/app/utils/usage_ledger.py` and `backend/app/plan_enforcer.py`
+- **line_function:** `_quota_key / get_quota`
+- **evidence:** `UsageLedger` and `PlanEnforcer` enforce limits by `user_id` (the key fingerprint) instead of `org_id` or `project_id`.
+- **why_it_matters:** A tenant organization can bypass monthly plan limits by generating multiple API keys since each key gets its own separate quota ledger.
+- **impact:** Plan-limit bypass vulnerability.
+- **recommended_fix:** Aggregate and enforce quotas at the `org_id` or `project_id` level.
+- **tests_needed:** Verify multiple keys generated under the same organization count against a single shared quota limit.
+- **acceptance_criteria:** Quota isolation is aggregated per-org or per-project.
+- **blocked_by:** None.
+- **notes:** Discovered in codebase-wide quality and security audit.
+
+### P2-SAAS-TENANT-BYPASS-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** tenant_isolation_saas
+- **file_path:** `backend/app/saas/router.py`
+- **line_function:** `delete_organization / delete_project / get_project`
+- **evidence:** SaaS org/project endpoints check only organization membership or creator match on `user_id` without matching `project_id`/`org_id` scope constraints of the key.
+- **why_it_matters:** A project-scoped API key can bypass its project scope and view or delete another project in the same organization.
+- **impact:** Cross-project resource exposure or deletion via scoped operator keys.
+- **recommended_fix:** Call `can_access_scoped_resource` to enforce project-level scope.
+- **tests_needed:** Verify a key scoped to Project A is denied when trying to access Project B.
+- **acceptance_criteria:** All scoped SaaS routes enforce matching project_id.
+- **blocked_by:** None.
+- **notes:** Discovered in codebase-wide quality and security audit.
+
+### P2-SEC-GUARDIAN-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** security_controls / query_guard
+- **file_path:** `backend/app/utils/cross_tenant_guard.py`
+- **line_function:** `guard_cross_tenant`
+- **evidence:** `guard_cross_tenant` is defined but only called inside its unit tests, and never used in production runtime repository code.
+- **why_it_matters:** The cross-tenant security guard is completely orphaned, providing zero active query-level leak protection.
+- **impact:** Security guardian provides zero runtime protection against cross-tenant leaks.
+- **recommended_fix:** Wire `guard_cross_tenant` into repository list/query operations.
+- **tests_needed:** Verify `guard_cross_tenant` is executed at runtime during data access.
+- **acceptance_criteria:** Repository list operations process results through the cross-tenant guardian.
+- **blocked_by:** None.
+- **notes:** Discovered in codebase-wide quality and security audit.
+
+### P2-DEV-LOGGING-JSON-ERROR-001
+
+- **priority:** P2
+- **status:** verified
+- **category:** developer_tooling
+- **file_path:** `scripts/generate_route_inventory.py`
+- **line_function:** `_raw_method_paths line 307`
+- **evidence:** Subprocess runs fastapi application, polluting stdout with rate-limiter and startup log statements in JSON format which breaks the JSON route parser.
+- **why_it_matters:** The inventory and auth matrix generation scripts fail without manual environment overrides.
+- **impact:** Breaks route inventory and auth matrix regeneration developer workflows.
+- **recommended_fix:** Force `DATAFORGE_LOG_LEVEL=ERROR` inside the environment dictionary passed to the subprocess.
+- **tests_needed:** Run `scripts/generate_route_auth_matrix.py` successfully.
+- **acceptance_criteria:** Generation scripts execute successfully without manual environment variables.
+- **blocked_by:** None.
+- **notes:** Discovered in codebase-wide quality and security audit.
+
+## End of ledger entries — total 111 (39 historical + 66 added 2026-06-25 + 6 added 2026-06-27)
