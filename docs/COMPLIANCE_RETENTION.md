@@ -14,7 +14,7 @@ Configured via `app.utils.data_retention.get_retention_config()`:
 
 ## Enforcement
 
-- Admin endpoint: `POST /api/system/retention/enforce` (dry-run supported)
+- Automated enforcement runs in the background sweep (`scripts/run_retention.py` / `app/lifespan.py` interval).  Dry-run sweep surfaces counts via `app.utils.data_retention.get_retention_ops()`.
 - Implementation: `app.utils.data_retention.enforce_retention`
 - Tests: `backend/tests/test_retention.py`
 
@@ -32,7 +32,7 @@ Configured via `app.utils.data_retention.get_retention_config()`:
 ## Operator Checklist
 
 1. Set retention env vars for your environment before launch.
-2. Run a dry-run retention enforce in staging and verify counts.
+2. Confirm the background retention sweep interval (`DATAFORGE_RETENTION_INTERVAL`) is appropriate for your retention windows.
 3. Document customer-facing retention in your SaaS terms.
 
 See also: `docs/SAFETY_AND_ACCEPTABLE_USE.md`, `artifacts/audit/COMPLIANCE_BASELINE.md`.

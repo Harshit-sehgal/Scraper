@@ -179,7 +179,7 @@ class TestGetJobRepository:
         # Ensure clean state
         reset_repository()
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
-        monkeypatch.setenv("DATAFORGE_STATE_FILE_PATH_DYNAMIC", str(tmp_path / "test.db"))
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "test.db"))
 
         repo = get_job_repository()
         try:
@@ -208,7 +208,7 @@ class TestGetJobRepository:
 
         reset_repository()
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
-        monkeypatch.setenv("DATAFORGE_STATE_FILE_PATH_DYNAMIC", str(tmp_path / "test2.db"))
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "test2.db"))
 
         repo1 = get_job_repository()
         repo2 = get_job_repository()
@@ -222,11 +222,11 @@ class TestGetJobRepository:
 
         reset_repository()
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
-        monkeypatch.setenv("DATAFORGE_STATE_FILE_PATH_DYNAMIC", str(tmp_path / "test3.db"))
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "test3.db"))
 
         repo1 = get_job_repository()
         reset_repository()
-        monkeypatch.setenv("DATAFORGE_STATE_FILE_PATH_DYNAMIC", str(tmp_path / "test4.db"))
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "test4.db"))
         repo2 = get_job_repository()
         # After reset, a new instance is created
         assert repo1 is not repo2

@@ -536,6 +536,14 @@ def record_browser_context_failed() -> None:
     increment_product_counter("browser_context_failed_total")
 
 
+def record_cross_tenant_guard_alert(*, context: str = "unknown") -> None:
+    """Record a cross-tenant contamination event detected by the guardian.
+
+    Fires a CRITICAL log + counter; surface in Prometheus alerting.
+    """
+    increment_product_counter("cross_tenant_guard_alerts_total")
+
+
 def get_auth_profile_ops() -> dict[str, int]:
     with _auth_profile_ops_lock:
         return dict(_auth_profile_ops)

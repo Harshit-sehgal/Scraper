@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-27 11:05:15 UTC
+**Generated:** 2026-06-27 12:54:04 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -131,6 +131,12 @@ For the diff between stable and experimental, see
 | GET | `/api/session/me` |
 | POST | `/api/session` |
 
+## Export Routes
+
+| Method | Path |
+| --- | --- |
+| POST | `/api/exports/batch` |
+
 ## Other
 
 | Method | Path |
@@ -197,4 +203,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 142
+**Total routes:** 143

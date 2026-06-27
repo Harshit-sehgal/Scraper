@@ -43,14 +43,18 @@ returns:
 With `fetch_preview=true`, the older field-discovery path still runs and
 adds guided URL intelligence under `url_intelligence`.
 
-Legacy compatibility endpoint:
+Legacy compatibility endpoint (deprecated — removed in current codebase):
 
 ```text
 GET /api/intelligence/analyze-url?url=...
 ```
 
-This route now returns the same guided response shape after URL safety
-validation.
+> **Note:** The legacy endpoint above was removed during the
+> recentization pass; `POST /api/url/analyze` is now the single
+> guided-intelligence entry point and returns the same response shape
+> after URL safety validation. The `fetch_preview` flag toggles
+> between the no-fetch guided response and the legacy field-discovery
+> path.
 
 ## Classifications
 

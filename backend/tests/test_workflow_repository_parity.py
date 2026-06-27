@@ -134,7 +134,7 @@ class TestSQLiteWorkflowRepository:
         workflows table before running to get isolation.
         """
         db_path = tmp_path / "test_jobs_state.db"
-        monkeypatch.setenv("DATAFORGE_STATE_FILE_PATH_DYNAMIC", str(db_path.with_suffix(".json")))
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(db_path.with_suffix(".json")))
         # Clear the cached migration set so the new DB gets migrated.
         import app.job_store
 

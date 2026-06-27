@@ -4,7 +4,7 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 150
+**API route rows:** 143
 **Unknown auth rows:** 0
 **Unknown tenant-scope rows:** 0
 
@@ -27,13 +27,11 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/intelligence/analyze-url` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/cleanup/terminal` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `DELETE` | `/api/jobs/{job_id}` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/jobs/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/jobs/{job_id}/backfill-metadata` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/jobs/{job_id}/cancel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/events` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/jobs/{job_id}/export/csv` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
@@ -127,11 +125,9 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/system/audit-log` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/system/crystalline` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `POST` | `/api/system/csp-violations` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
-| `GET` | `/api/system/diagnostics/export` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/system/domain-policy` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/export/knowledge` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/history/topology` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
-| `GET` | `/api/system/manifest` | protected | authenticated-user | require_role | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/system/merge/knowledge` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/observability` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/rate-limit-stats` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
@@ -139,9 +135,6 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/system/replay/chain` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/replay/events` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/replay/status` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
-| `GET` | `/api/system/retention/config` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
-| `POST` | `/api/system/retention/enforce` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
-| `GET` | `/api/system/retention/health` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `POST` | `/api/system/scheduler/step` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/search` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/status` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |

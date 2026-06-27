@@ -26,7 +26,6 @@ This route list was generated from the FastAPI app during the audit. Production 
 | POST | `/api/jobs` | Operator or admin |
 | POST | `/api/jobs/{job_id}/cancel` | Operator or admin |
 | POST | `/api/jobs/{job_id}/reclean` | Operator or admin |
-| POST | `/api/jobs/{job_id}/backfill-metadata` | Operator or admin |
 | DELETE | `/api/jobs/{job_id}` | Admin |
 | DELETE | `/api/jobs/cleanup/terminal` | Admin |
 | GET | `/api/jobs/{job_id}/export/csv` | Operator or admin |
@@ -49,7 +48,6 @@ This route list was generated from the FastAPI app during the audit. Production 
 | POST | `/api/discover` | Operator or admin |
 | POST | `/api/schema/suggest` | Operator or admin |
 | POST | `/api/url/analyze` | Operator or admin |
-| GET | `/api/intelligence/analyze-url` | Authenticated user |
 
 ## Scraper/Telemetry Routes
 
@@ -83,13 +81,8 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | DELETE | `/api/operator/denylist` | Admin |
 | GET | `/api/system/status` | Operator or admin |
 | GET | `/api/system/storage/status` | Operator or admin |
-| GET | `/api/system/manifest` | User (any authenticated role) |
 | GET | `/api/system/audit-log` | Admin |
-| GET | `/api/system/diagnostics/export` | Admin |
 | GET | `/api/system/rate-limit-stats` | Operator or admin |
-| GET | `/api/system/retention/config` | Operator or admin |
-| GET | `/api/system/retention/health` | Operator or admin |
-| POST | `/api/system/retention/enforce` | Admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
 
 ## Session/Auth Routes

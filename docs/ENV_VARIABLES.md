@@ -355,6 +355,32 @@ These are acceptable direct environment reads outside the config module:
 | `DATAFORGE_METRICS_HISTOGRAM_BUCKETS` | `0.01,0.05,...` | Comma-separated bucket boundaries for duration histograms |
 | `DATAFORGE_EMAIL_BLOCKED_DOMAINS` | `example.com,test.com,localhost` | Comma-separated email domains to reject |
 
+## Access Logging
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_ACCESS_LOG_ENABLED` | `true` | Master switch for the structured HTTP access-log middleware. Set to `0`/`false`/`no`/`off` to disable the per-request log line (method, path, status, latency, client IP, user-agent, request id). Read directly by `app/access_log.py`. |
+
+## Logging
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_LOG_FORMAT` | `json` | Logging output format: `json` (structured lines for log aggregators like Loki/ELK/CloudWatch) or `text` (human-readable plain text). Invalid values fall back to `json`. Read directly by `app/logging_config.py`. |
+| `DATAFORGE_LOG_LEVEL` | `INFO` | Application-wide log level. Recognised values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; invalid values fall back to `INFO`. Read directly by `app/logging_config.py`. |
+
+## LLM Bridge
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_LLM_CIRCUIT_ENABLED` | `true` | Master switch for the LLM cascade circuit breaker. Disable (set to `false`) when running unit tests that intentionally exhaust cascades for failure-path validation. Configured in `app/config/_communication.py`. |
+| `DATAFORGE_LLM_RAISE_ON_FAILURE` | `false` | When `true`/`1`/`yes`/`on`, the LLM bridge public functions raise `LLMCascadeExhausted` on cascade exhaustion instead of silently returning empty results. Defaults to silent (legacy). Read directly by `app/utils/llm_bridge_settings.py`. |
+
+## HTML Size Cap
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATAFORGE_MAX_HTML_BYTES` | `10485760` (10 MB) | Hard upper bound on HTML payload size accepted before parsing. Payloads exceeding this raise `HTMLSizeExceeded` (or are truncated if `must_truncate=True`). Negative or non-numeric values fall back to 10 MB. Read directly by `app/utils/html_size.py`. |
+
 ## Paths & State
 
 | Variable | Default | Description |

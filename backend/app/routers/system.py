@@ -646,6 +646,40 @@ def _render_basic_metrics_text() -> str:
         _basic_metric_line("dataforge_rate_limit_per_ip_hits_total", get_rate_limit_per_ip_hits()),
     )
 
+    # LLM cascade breaker state — alerts on operators' dashboards.
+    try:
+        from app.llm_bridge import get_silent_failure_counts
+        from app.utils.llm_circuit_breaker import get_llm_cascade_breaker
+
+        breaker_snap = get_llm_cascade_breaker().snapshot()
+        breaker_state_value = {
+            "closed": 0,
+            "half_open": 1,
+            "open": 2,
+        }.get(str(breaker_snap.get("state", "closed")), 0)
+        lines.append(
+            _basic_metric_line(
+                "llm_cascade_state",
+                breaker_state_value,
+            ),
+        )
+        lines.append(
+            _basic_metric_line(
+                "llm_cascade_consecutive_failures_total",
+                int(breaker_snap.get("consecutive_failures", 0) or 0),  # type: ignore[call-overload]
+            ),
+        )
+        for name, count in get_silent_failure_counts().items():
+            lines.append(
+                _basic_metric_line(
+                    "llm_silent_failure_total",
+                    count,
+                    {"function": name},
+                ),
+            )
+    except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
+        logger.debug("Metrics fallback: LLM cascade metrics collection failed")
+
     return "\n".join(lines) + "\n"
 
 
