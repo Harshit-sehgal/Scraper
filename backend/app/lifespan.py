@@ -92,6 +92,13 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
             "to enable authentication.",
         )
 
+    # Runtime dependency check — fail fast if required packages are missing.
+    # In production this raises RuntimeError; in dev/test we log warnings only
+    # so that incomplete environments can still start (e.g. for partial testing).
+    from app.runtime_deps import check_runtime_deps
+
+    check_runtime_deps(fail_on_missing=(settings.ENV.lower() == "production"))
+
     # Initialize experimental subsystems (research-only).
     # The functions in `experimental_startup` self-gate on
     # `settings.ENABLE_EXPERIMENTAL_ROUTES`, but we still skip the
