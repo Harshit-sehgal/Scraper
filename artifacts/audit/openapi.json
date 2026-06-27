@@ -855,6 +855,7 @@
           "intent": {
             "default": "",
             "description": "Natural language extraction intent",
+            "maxLength": 4096,
             "title": "Intent",
             "type": "string"
           },
@@ -908,6 +909,7 @@
           },
           "name": {
             "description": "Human-readable job name",
+            "maxLength": 255,
             "title": "Name",
             "type": "string"
           },
