@@ -7,11 +7,10 @@ import asyncio
 import logging
 import re
 import threading
-from typing import Any, cast
+from typing import Any
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
-from geopy.location import Location
 
 from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField
@@ -41,7 +40,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
     backoff = 1.0  # Base delay in seconds
     for attempt in range(max_retries):
         try:
-            location = cast(Location | None, await asyncio.to_thread(_geocoder.geocode, address))
+            location = await asyncio.to_thread(_geocoder.geocode, address)
             if location:
                 coords = (location.latitude, location.longitude)
                 cache.set(address, location.latitude, location.longitude, location.address)

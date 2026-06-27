@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-26T05:55:33+00:00 from `27354` files in the current checkout._
+_Generated: 2026-06-27T10:11:02+00:00 from `31068` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,52 +12,56 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 27354 |
-| Project-owned files | 1002 |
-| Project-owned files deeply inspected | 998 |
-| Skipped generated/vendor/binary/cache/log/archive files | 26356 |
-| Files needing follow-up | 0 |
+| Total files inventoried | 31068 |
+| Project-owned files | 1055 |
+| Project-owned files deeply inspected | 1045 |
+| Skipped generated/vendor/binary/cache/log/archive files | 30023 |
+| Files needing follow-up | 7 |
 
 ## By Classification
 
 | Classification | Total | Project-owned | Deep-inspected | Skipped |
 | --- | ---: | ---: | ---: | ---: |
-| backend_source | 254 | 254 | 254 | 0 |
-| frontend_source | 97 | 97 | 97 | 0 |
-| test | 429 | 429 | 428 | 1 |
+| backend_source | 259 | 259 | 259 | 0 |
+| frontend_source | 96 | 96 | 96 | 0 |
+| test | 468 | 468 | 468 | 0 |
 | script | 49 | 49 | 49 | 0 |
-| config | 55 | 55 | 52 | 3 |
-| documentation | 102 | 102 | 102 | 0 |
+| config | 57 | 57 | 54 | 3 |
+| documentation | 103 | 103 | 103 | 0 |
 | docker_deployment | 13 | 13 | 13 | 0 |
 | database_migration | 3 | 3 | 3 | 0 |
 | asset | 0 | 0 | 0 | 0 |
-| generated | 92 | 0 | 0 | 92 |
-| vendor | 15988 | 0 | 0 | 15988 |
-| cache | 6058 | 0 | 0 | 6058 |
-| binary | 38 | 0 | 0 | 38 |
+| generated | 221 | 0 | 0 | 221 |
+| vendor | 17477 | 0 | 0 | 17477 |
+| cache | 5661 | 0 | 0 | 5661 |
+| binary | 752 | 0 | 0 | 752 |
 | archive | 1 | 0 | 0 | 1 |
-| log | 4175 | 0 | 0 | 4175 |
-| unknown | 0 | 0 | 0 | 0 |
+| log | 5901 | 0 | 0 | 5901 |
+| unknown | 7 | 7 | 0 | 7 |
 
 ## Top-Level Counts
 
 | Top-level path | Files |
 | --- | ---: |
-| `.venv/` | 9847 |
-| `node_modules/` | 6140 |
-| `artifacts/` | 4236 |
-| `.git/` | 2156 |
-| `backend/` | 1705 |
-| `.mypy_cache/` | 1461 |
-| `.ruff_cache/` | 1438 |
-| `frontend/` | 115 |
+| `.venv/` | 11325 |
+| `node_modules/` | 6151 |
+| `artifacts/` | 5963 |
+| `.git/` | 3105 |
+| `backend/` | 1856 |
+| `.mypy_cache/` | 1469 |
+| `MagicMock/` | 681 |
+| `frontend/` | 244 |
 | `docs/` | 91 |
-| `scripts/` | 84 |
+| `scripts/` | 75 |
+| `.ruff_cache/` | 19 |
 | `playwright-report/` | 18 |
 | `.github/` | 11 |
+| `.aider.tags.cache.v4/` | 5 |
 | `.pytest_cache/` | 5 |
 | `grafana/` | 3 |
 | `.claude/` | 2 |
+| `.aider.chat.history.md/` | 1 |
+| `.aider.input.history/` | 1 |
 | `.dockerignore/` | 1 |
 | `.env/` | 1 |
 | `.env.example/` | 1 |
@@ -79,6 +83,7 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `THIRD_PARTY_NOTICES.md/` | 1 |
 | `alertmanager.yml/` | 1 |
 | `architecture_validator.py/` | 1 |
+| `auth/` | 1 |
 | `blackbox.yml/` | 1 |
 | `dataforge_denylist.sqlite/` | 1 |
 | `docker-compose.override.local.yml/` | 1 |
@@ -95,28 +100,29 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `prometheus_alerts.yml/` | 1 |
 | `prometheus_web.yml/` | 1 |
 | `pyproject.toml/` | 1 |
+| `setup/` | 1 |
 | `uv.lock/` | 1 |
 | `.vscode/` | 1 |
 | `__pycache__/` | 1 |
 | `nginx/` | 1 |
-| `test-results/` | 1 |
 
 ## Extension Counts (top 30)
 
 | Extension | Files |
 | --- | ---: |
-| `.py` | 6884 |
-| `(none)` | 4692 |
-| `.md` | 4471 |
-| `.js` | 2744 |
-| `.json` | 2135 |
+| `.py` | 6928 |
+| `.md` | 6130 |
+| `(none)` | 4224 |
+| `.js` | 2807 |
+| `.pyc` | 2524 |
+| `.json` | 2217 |
 | `.pyi` | 1217 |
-| `.pyc` | 981 |
-| `.ts` | 888 |
+| `.ts` | 889 |
+| `.db` | 746 |
 | `.cjs` | 534 |
-| `.mjs` | 454 |
+| `.mjs` | 455 |
+| `.map` | 397 |
 | `.so` | 385 |
-| `.map` | 333 |
 | `.txt` | 187 |
 | `.h` | 169 |
 | `.typed` | 111 |
@@ -133,8 +139,7 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `.mts` | 37 |
 | `.log` | 34 |
 | `.csv` | 33 |
-| `.db` | 32 |
-| `.sh` | 32 |
+| `.sh` | 33 |
 
 ## Skip Policy
 

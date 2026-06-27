@@ -15,7 +15,6 @@ import pytest
 
 # ─── _extract_json_payload ─────────────────────────────────────────────
 from app.llm_bridge import (
-    ALLOWED_SANDBOX_MODULES,
     SubstratePluginManager,
     _call_openai_compatible_json,
     _call_openai_compatible_text,
