@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-27 10:06:40 UTC
+**Generated:** 2026-06-27 10:39:49 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
