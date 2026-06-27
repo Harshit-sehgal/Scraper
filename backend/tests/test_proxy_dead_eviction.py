@@ -9,8 +9,6 @@ exceed _EVICTION_TOTAL_FAILURES, and that evicted proxies:
 
 from __future__ import annotations
 
-import pytest
-
 from app.proxy_manager import ProxyManager
 
 
@@ -45,9 +43,7 @@ class TestProxyDeadEviction:
             # the real rotation-after-threshold behavior
             mgr.record_failure(proxy)
 
-        assert proxy not in mgr._proxy_list, (
-            f"Proxy {proxy} should be evicted after {eviction_threshold} cumulative failures"
-        )
+        assert proxy not in mgr._proxy_list, f"Proxy {proxy} should be evicted after {eviction_threshold} cumulative failures"
 
     def test_evicted_proxy_state_cleaned(self) -> None:
         """All tracking state must be cleaned up on eviction."""

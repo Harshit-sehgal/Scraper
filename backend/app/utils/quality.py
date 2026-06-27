@@ -74,12 +74,10 @@ def _value_quality(field: SchemaField, value) -> float:
         "n.a.",
         "n.a",
         "n / a",
-        "n\/a",
         "n\\a",
         "...",
         "....",
         "……",
-        "...",
         "select",
         "choose",
         "please select",
@@ -97,10 +95,8 @@ def _value_quality(field: SchemaField, value) -> float:
 
     # Very short text (1-2 chars) that isn't a code or rating is
     # suspicious. A single letter or two is rarely meaningful data.
-    if field.field_type not in (FieldType.CODE, FieldType.RATING):
-        if len(text) == 1 and text.isalpha():
-            return 0.0  # "A", "x", etc. are not field values
-
+    if field.field_type not in (FieldType.CODE, FieldType.RATING) and len(text) == 1 and text.isalpha():
+        return 0.0  # "A", "x", etc. are not field values
 
     # Probabilistic scoring: start with a baseline and add "evidence"
     score = settings.QUALITY_BASE_SCORE  # Base for non-empty text

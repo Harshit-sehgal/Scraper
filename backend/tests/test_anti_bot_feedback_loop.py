@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from app.config import settings
 from app.anti_bot_engine import AntiBotEngine
+from app.config import settings
 
 
 class TestAntiBotFeedbackLoop:

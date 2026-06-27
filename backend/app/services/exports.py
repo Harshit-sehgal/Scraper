@@ -43,10 +43,10 @@ Batch
 from __future__ import annotations
 
 import csv
-import datetime
 import io
 import json
-from collections.abc import AsyncIterator, Callable, Iterable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 from openpyxl import Workbook
@@ -69,6 +69,17 @@ DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 # In-memory cap for batch exports from a single in-memory job, to
 # bound peak memory when callers have huge in-memory result lists.
 INMEMORY_BATCH_CAP = 10000
+
+
+def batch_export_timestamp() -> str:
+    """Generate a filesystem-safe timestamp string for batch export filenames.
+
+    Returns a string like ``20260627T020340`` suitable for use in
+    ``Content-Disposition`` attachment filenames.
+    """
+    from datetime import datetime
+
+    return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -689,4 +700,3 @@ async def _call_async(func: Callable[..., Any], *args: Any, **kwargs: Any) -> An
     if hasattr(result, "__await__"):
         return await result
     return result
-    return res

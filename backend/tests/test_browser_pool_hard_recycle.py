@@ -11,9 +11,7 @@ Also tests that acquire_context waits for in-progress recycle.
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from app.browser_pool import BrowserPool
 
