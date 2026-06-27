@@ -280,12 +280,9 @@ class ReplayBuffer:
             # Copy segment list to avoid race conditions during file I/O
             segments_to_process = [seg_name, *self._get_subsequent_segments(seg_name)]
 
-        # Clone the checkpoint snapshot as starting state, unpacking delta
-        # encoding
-        checkpoint_delta = snapshot.get("delta", {})
+        # Start with an empty state and apply all deltas from the checkpoint
+        # index (inclusive) to the target index.
         state = {}
-        for k, change in checkpoint_delta.items():
-            state[k] = change.get("to", change) if isinstance(change, dict) else change
 
         # Replay deltas from checkpoint to target
         for i, current_seg_name in enumerate(segments_to_process):
@@ -305,7 +302,7 @@ class ReplayBuffer:
                     except json.JSONDecodeError:
                         continue
                     idx = entry.get("idx", -1)
-                    if i == 0 and idx <= cp_idx:
+                    if i == 0 and idx < cp_idx:
                         continue
                     if idx > target_idx:
                         break
