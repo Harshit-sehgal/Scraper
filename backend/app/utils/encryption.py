@@ -510,9 +510,9 @@ def is_encrypted(value: str) -> bool:
     """
     if not value or not isinstance(value, str):
         return False
-    try:
-        import json
+    import json
 
+    try:
         payload_bytes = base64.b64decode(value)
         payload = json.loads(payload_bytes.decode("utf-8"))
         return all(k in payload for k in ("v", "c", "n", "t"))

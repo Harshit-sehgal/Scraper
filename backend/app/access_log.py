@@ -152,8 +152,8 @@ class StructuredAccessLogMiddleware(BaseHTTPMiddleware):
                 from app.metrics_collector import record_request_latency
 
                 record_request_latency(elapsed)
-            except Exception:
+            except (ImportError, AttributeError, RuntimeError):
                 logger.debug("Failed to record request latency metric", exc_info=True)
-        except Exception:
+        except (ValueError, TypeError, RuntimeError, ImportError):
             # Never let logging failure turn a successful request into a 5xx.
             logger.debug("Access log emission failed (non-blocking)", exc_info=True)

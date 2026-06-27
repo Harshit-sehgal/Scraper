@@ -178,7 +178,7 @@
       "tenant_scoped": "no"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal, require_role",
       "category": "stable API routes",
       "handler_function": "list_subscriptions",
       "method": "GET",
@@ -194,7 +194,7 @@
       "tenant_scoped": "no"
     },
     {
-      "auth_dependency_if_known": "require_role",
+      "auth_dependency_if_known": "require_principal, require_role",
       "category": "stable API routes",
       "handler_function": "get_subscription",
       "method": "GET",

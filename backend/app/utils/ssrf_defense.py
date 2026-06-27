@@ -46,7 +46,7 @@ class SSRFDefense:
                 return None
 
             resolved_ips: list[str] = []
-            for family, socktype, proto, canonname, sockaddr in result:
+            for _family, _socktype, _proto, _canonname, sockaddr in result:
                 ip = str(sockaddr[0])
 
                 if cls.is_blocked_ip(ip):

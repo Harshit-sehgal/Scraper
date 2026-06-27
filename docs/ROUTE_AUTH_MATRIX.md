@@ -22,8 +22,8 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/auth-profiles/{profile_id}/validate` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/billing/checkout` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/billing/stub-return/{plan_tier}/{request_id}` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency |
-| `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |

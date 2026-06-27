@@ -1,14 +1,13 @@
-[bandit]
-# Excluded from bandit scanning:
-#  - backend/tests: pytest tests legitimately use HTTP smoke calls and
-#    subprocess; the strict posture is enforced on backend/app instead.
-#  - backend/benchmarks: live benchmark scripts bypass some checks by design.
-exclude = backend/tests,backend/benchmarks
-# B101 (assert_used): the root pyproject.toml already skips this for the
-# whole project, but bandit does not auto-detect [tool.bandit] from a
-# parent pyproject.toml. We mirror the skip here so per-folder ``bandit -r
-# app/`` matches the CI posture. New asserts must still be paired with
-# runtime guards (try/except or ``if x is None:``) for ``python -O`` parity.
-skips = [
-    "B101",
-]
+---
+# Bandit configuration (YAML format).
+#
+# This file is discovered automatically by ``bandit`` when run from the
+# backend/ directory.  The root ``pyproject.toml`` also carries a
+# ``[tool.bandit]`` section, but bandit does not auto-detect that block
+# when invoked from a sub-directory.
+#
+# B101 (assert_used) is skipped: the root pyproject already skips it for
+# the whole project.  New asserts must still be paired with runtime
+# guards (try/except or ``if x is None:``) so they survive ``python -O``.
+
+skips: ["B101"]

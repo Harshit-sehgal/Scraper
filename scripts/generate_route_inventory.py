@@ -212,9 +212,16 @@ def _collect_current_app_rows(
     stable_paths: set[tuple[str, str]],
     experimental_paths: set[tuple[str, str]],
 ) -> list[dict[str, str]]:
-    from app.main import create_app
+    import sys
 
-    app = create_app()
+    real_stdout = sys.stdout
+    sys.stdout = sys.stderr
+    try:
+        from app.main import create_app
+
+        app = create_app()
+    finally:
+        sys.stdout = real_stdout
 
     rows: list[dict[str, str]] = []
     for route in iter_app_routes(app):
@@ -286,12 +293,15 @@ def _raw_method_paths(*, experimental: bool) -> list[tuple[str, str]]:
         "import sys, json;"
         "sys.path.insert(0, 'scripts');"
         "from fastapi_route_iter import iter_app_routes;"
+        "real_stdout = sys.stdout;"
+        "sys.stdout = sys.stderr;"
         "from app.main import create_app;"
         "app=create_app();"
         "out=[];"
         "[out.append([m.upper(), r.path]) for r in iter_app_routes(app) "
         "if hasattr(r, 'methods') for m in (r.methods or []) "
         "if m.upper() not in {'HEAD','OPTIONS'}];"
+        "sys.stdout = real_stdout;"
         "print(json.dumps(sorted(out)))"
     )
     proc = subprocess.run(

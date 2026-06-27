@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from bs4 import BeautifulSoup
+from soupsieve import SelectorSyntaxError
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def _assess_content_quality(html: str, profile) -> dict[str, Any]:
             if soup.select(sel):
                 landing_signals.append("hero_banner")
                 break
-        except Exception:  # noqa: RUF100, S112
+        except SelectorSyntaxError:  # noqa: RUF100, S112
             continue  # nosec B112
 
     # Search forms (generic — any form with text / search input)
@@ -139,7 +140,7 @@ def _assess_content_quality(html: str, profile) -> dict[str, Any]:
                 matching = soup.select(css_sel)
                 content_count = sum(1 for m in matching if len(m.get_text(strip=True)) > 20)
                 data_container_count = max(data_container_count, content_count)
-            except Exception:  # noqa: RUF100, S112
+            except SelectorSyntaxError:  # noqa: RUF100, S112
                 continue  # nosec B112
 
         # Also scan for repeating direct children of common containers

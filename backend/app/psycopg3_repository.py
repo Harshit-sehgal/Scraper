@@ -23,6 +23,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Exception tuple for DB rollback — when psycopg is imported successfully
+# in Psycopg3Repository.__init__, ``psycopg.Error`` is included; otherwise
+# the tuple omits it.  The ``__init__`` import ensures the module is
+# available before any connection is opened.
+try:
+    import psycopg as _psycopg
+
+    _DB_ROLLBACK_ERRORS: tuple[type[BaseException], ...] = (_psycopg.Error, OSError, TypeError, ValueError)
+except ImportError:  # pragma: no cover
+    _DB_ROLLBACK_ERRORS = (OSError, TypeError, ValueError)
+
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)
 # ───────────────────────────────────────────────────────────────────────
@@ -143,7 +154,15 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
 
     @contextmanager
     def _conn(self) -> Iterator:
-        """Acquire a connection from the psycopg 3 pool (context manager)."""
+        """Acquire a connection from the psycopg 3 pool (context manager).
+
+        Any exception inside the ``with`` block triggers a rollback so
+        the connection returns to the pool clean, then is re-raised so
+        the calling code still sees the original error.  Narrowing this
+        catch would silently skip rollback for unrelated error types,
+        which is exactly what the asserted-against test
+        ``test_conn_context_rolls_back_on_exception`` guards against.
+        """
         pool = _get_pool()
         with pool.connection() as conn:
             try:

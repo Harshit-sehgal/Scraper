@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-27 13:37:57 UTC
+**Generated:** 2026-06-27 15:56:37 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
@@ -24,8 +24,8 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `POST` | `/api/auth-profiles/{profile_id}/validate` | `app.routers.auth_profiles` | `validate_profile` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/billing/checkout` | `app.billing.checkout` | `create_checkout` | stable | protected | operator-or-admin | require_role |  | CheckoutResponse | route dependency accepts admin/operator |
 | `GET` | `/api/billing/stub-return/{plan_tier}/{request_id}` | `app.billing.checkout` | `stub_return` | stable | protected | authenticated-user |  |  |  | protected by global /api middleware; no route-level role dependency |
-| `GET` | `/api/billing/subscriptions` | `app.billing.webhooks` | `list_subscriptions` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
-| `GET` | `/api/billing/subscriptions/{customer_id}` | `app.billing.webhooks` | `get_subscription` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/billing/subscriptions` | `app.billing.webhooks` | `list_subscriptions` | stable | protected | operator-or-admin | require_principal, require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/billing/subscriptions/{customer_id}` | `app.billing.webhooks` | `get_subscription` | stable | protected | operator-or-admin | require_principal, require_role |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | `app.billing.webhooks` | `billing_webhook` | stable | protected | authenticated-user |  |  | dict | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/discover` | `app.routers.jobs_write` | `discover` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | `app.routers.exports` | `batch_export` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |

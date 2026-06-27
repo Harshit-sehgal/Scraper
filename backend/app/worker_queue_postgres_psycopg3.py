@@ -26,6 +26,11 @@ from app.worker_queue_postgres_base import (
     _ensure_schema_via,
 )
 
+try:
+    import psycopg
+except ImportError:  # pragma: no cover — psycopg3 absent in dev-only installs
+    psycopg = None  # type: ignore[assignment]
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -101,7 +106,12 @@ def _close_pool() -> None:
 
 @contextmanager
 def _conn() -> Iterator:
-    """Acquire a connection from the psycopg 3 pool (context manager)."""
+    """Acquire a connection from the psycopg 3 pool (context manager).
+
+    Any exception inside the ``with`` block must trigger a rollback so
+    the connection returns to the pool in a clean transaction state.
+    The exception is then re-raised to surface to the caller.
+    """
     pool = _get_pool()
     with pool.connection() as conn:
         try:
@@ -159,7 +169,12 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
 
     @contextmanager
     def _conn(self) -> Iterator:
-        """Acquire a connection from the psycopg 3 pool (context manager)."""
+        """Acquire a connection from the psycopg 3 pool (context manager).
+
+        Co-operates with the class-level rollback policy: any exception
+        inside the ``with`` block rolls back the open transaction so
+        the connection returns clean to the pool, then is re-raised.
+        """
         pool = _get_pool()
         with pool.connection() as conn:
             try:

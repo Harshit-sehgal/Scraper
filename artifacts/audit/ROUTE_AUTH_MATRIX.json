@@ -128,7 +128,7 @@
       "path": "/api/billing/subscriptions",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role",
+      "route_dependency": "require_principal, require_role",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no",
       "test_coverage": "yes"
@@ -140,7 +140,7 @@
       "path": "/api/billing/subscriptions/{customer_id}",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
-      "route_dependency": "require_role",
+      "route_dependency": "require_principal, require_role",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no",
       "test_coverage": "yes"

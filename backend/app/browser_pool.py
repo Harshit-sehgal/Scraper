@@ -771,16 +771,22 @@ def reset_global_browser_pool() -> None:
     Cancels the periodic cleanup task if it exists and is still pending,
     preventing ``Task was destroyed but it is pending!`` warnings when
     pytest-asyncio tears down the event loop between tests.
+
+    Safely handles the case where the event loop is already closed
+    by catching ``RuntimeError`` from ``task.cancel()``, which can
+    happen when pytest-asyncio has already torn down the loop.
     """
     global _pool
     with _pool_lock:
         if _pool is not None:
             cleanup_task = _pool._cleanup_task
             if cleanup_task is not None and not cleanup_task.done():
-                cleanup_task.cancel()
+                with contextlib.suppress(RuntimeError):
+                    cleanup_task.cancel()
             # Cancel background tasks to avoid unawaited-coroutine warnings
             for task in list(_pool._background_tasks):
-                task.cancel()
+                with contextlib.suppress(RuntimeError):
+                    task.cancel()
             _pool._background_tasks.clear()
         _pool = None
 

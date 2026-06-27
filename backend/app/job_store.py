@@ -665,9 +665,11 @@ def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
             parsed = parse_datetime(last_heartbeat)
             # parse_datetime may return None on unparseable input; the except
             # branch below already handles that. Narrow for the arithmetic op.
-            assert parsed is not None  # noqa: S101
-            delta = datetime.datetime.now(datetime.UTC) - parsed
-            alive = delta.total_seconds() < ttl_seconds
+            if parsed is None:
+                alive = False
+            else:
+                delta = datetime.datetime.now(datetime.UTC) - parsed
+                alive = delta.total_seconds() < ttl_seconds
         except (ValueError, TypeError):
             alive = False
     return {
@@ -703,9 +705,11 @@ def get_all_worker_healths(ttl_seconds: int = 60) -> list[dict]:
         if last_hb:
             try:
                 parsed = parse_datetime(last_hb)
-                assert parsed is not None  # noqa: S101 — guarded by try/except below
-                delta = datetime.datetime.now(datetime.UTC) - parsed
-                alive = delta.total_seconds() < ttl_seconds
+                if parsed is None:
+                    alive = False
+                else:
+                    delta = datetime.datetime.now(datetime.UTC) - parsed
+                    alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False
         results.append(

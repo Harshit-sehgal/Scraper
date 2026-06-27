@@ -285,7 +285,8 @@ async def detect_changes(
             if last_t is None or prev_t is None:
                 # Missing/unparseable timestamps: leave frequency_met None
                 # so the caller can distinguish "unknown" from "definitively unmet".
-                raise ValueError("unparseable ran_at")
+                _unparseable = "unparseable ran_at"
+                raise ValueError(_unparseable)
             gap_seconds = (last_t - prev_t).total_seconds()
             expected = _EXPECTED_GAP_SECONDS.get(str(job.get("frequency") or "").lower())
             if expected is not None:

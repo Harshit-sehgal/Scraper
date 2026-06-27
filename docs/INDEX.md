@@ -149,6 +149,7 @@ regenerated from code by `scripts/generate_route_inventory.py` and
 | [`BENCHMARK_PLAN.md`](BENCHMARK_PLAN.md) | Benchmark methodology |
 | [`HANDOFF.md`](HANDOFF.md) | Handoff notes |
 | [`LIMITATIONS.md`](LIMITATIONS.md) | Known limitations |
+| [`SCRAPER_IMPROVEMENT_ROADMAP.md`](SCRAPER_IMPROVEMENT_ROADMAP.md) | 65-wave plan to take scraper quality from 41→88 (6 sectors, 95+ actions) |
 
 ---
 
