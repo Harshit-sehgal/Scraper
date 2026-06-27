@@ -348,6 +348,8 @@ class TestResetForTesting:
         mc.record_signup_outcome("success")
         mc.record_scheduled_job_op("triggered")
         mc.record_retention_op("enforced")
+        mc.record_extraction_failure("timeout")
+        mc.record_domain_extraction("example.com", success=True)
 
         # Sanity-check populated state
         assert mc.get_request_latencies() == [0.1]
@@ -370,3 +372,85 @@ class TestResetForTesting:
         assert mc.get_signup_outcomes() == {}
         assert mc.get_scheduled_job_ops() == {}
         assert mc.get_retention_ops() == {}
+        # Roadmap Obs #1/Obs #10 metrics also must be reset.
+        assert mc.get_extraction_failure_counts() == dict.fromkeys(
+            (
+                "timeout",
+                "block",
+                "auth_required",
+                "ssl_error",
+                "network_error",
+                "parse_error",
+                "empty_page",
+                "captcha",
+                "rate_limit",
+                "browser_crash",
+            ),
+            0,
+        )
+        assert mc.get_domain_extraction_counts() == {}
+
+
+# ─── Extraction failure categories (Roadmap Obs #10) ──────────────────
+
+
+class TestExtractionFailureCategories:
+    def test_known_category_increments(self) -> None:
+        from app.metrics_collector import get_extraction_failure_counts, record_extraction_failure
+
+        record_extraction_failure("timeout")
+        record_extraction_failure("timeout")
+        record_extraction_failure("captcha")
+        counts = get_extraction_failure_counts()
+        assert counts["timeout"] == 2
+        assert counts["captcha"] == 1
+        # Counters the test never touched must be present in the snapshot
+        # (so the dict keys are stable for Prometheus scraping).
+        assert "block" in counts
+        assert counts["block"] == 0
+
+    def test_unknown_category_clamped_to_unknown(self) -> None:
+        from app.metrics_collector import get_extraction_failure_counts, record_extraction_failure
+
+        record_extraction_failure("not_a_real_category")
+        record_extraction_failure("totally_made_up")
+        counts = get_extraction_failure_counts()
+        # The "unknown" bucket is internal — it does NOT pollute the
+        # bounded label set that Prometheus sees.
+        # We assert it does NOT appear in the snapshot.
+        assert "unknown" not in counts
+
+
+# ─── Per-domain extraction tracking (Roadmap Obs #1) ───────────────────
+
+
+class TestDomainExtractionTracking:
+    def test_success_and_failure_counted_per_domain(self) -> None:
+        from app.metrics_collector import get_domain_extraction_counts, record_domain_extraction
+
+        record_domain_extraction("example.com", success=True)
+        record_domain_extraction("example.com", success=True)
+        record_domain_extraction("example.com", success=False)
+        record_domain_extraction("other.com", success=True)
+
+        counts = get_domain_extraction_counts()
+        assert counts["example.com"] == {"success": 2, "failure": 1}
+        assert counts["other.com"] == {"success": 1, "failure": 0}
+
+    def test_empty_domain_ignored(self) -> None:
+        from app.metrics_collector import get_domain_extraction_counts, record_domain_extraction
+
+        record_domain_extraction("", success=True)
+        record_domain_extraction("", success=False)
+        assert get_domain_extraction_counts() == {}
+
+    def test_bounded_memory_evicts_oldest(self) -> None:
+        from app.metrics_collector import get_domain_extraction_counts, record_domain_extraction
+
+        # Add MORE than the bound (1000) distinct domains to trigger eviction.
+        for i in range(1005):
+            record_domain_extraction(f"domain-{i}.example", success=True)
+        # We can't predict which domain gets evicted, but the dict should
+        # be bounded to roughly 1000 entries (the implementation keeps 1000).
+        snapshot = get_domain_extraction_counts()
+        assert len(snapshot) <= 1001

@@ -284,6 +284,8 @@ class TestRealWorkerHandler:
             selectors_map=None,
             search_params=None,
             usage_context=None,
+            headers=None,
+            cookies=None,
         ):
             sample_records = [
                 {

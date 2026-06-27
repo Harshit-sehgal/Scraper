@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
@@ -325,6 +326,30 @@ rate_limiter = RateLimiterMiddleware(
 )
 
 
+# ─── Request ID Propagation ─────────────────────────────────────────────
+
+
+async def request_id_middleware(request: Request, call_next):
+    """Propagate or generate a per-request correlation ID.
+
+    If the inbound request carries an ``X-Request-ID`` header, its value is
+    normalised and reused (allows upstream services like nginx or an API
+    gateway to set the ID).  Otherwise a random UUID4 is generated.
+
+    The ID is stored on ``request.state.request_id`` and attached as an
+    ``X-Request-ID`` response header so callers can correlate logs with
+    HTTP responses.  Downstream code (workers, storage, webhooks) can
+    access the ID via ``getattr(request.state, "request_id", "")``.
+    """
+    request_id = request.headers.get("X-Request-ID", "").strip()
+    if not request_id:
+        request_id = uuid.uuid4().hex
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers.setdefault("X-Request-ID", request_id)
+    return response
+
+
 # ─── Access Log ────────────────────────────────────────────────────────
 
 
@@ -361,6 +386,7 @@ async def access_log_middleware(request: Request, call_next):
             "status": response.status_code,
             "latency_ms": round(duration_ms, 1),
             "client_ip": _get_client_ip(request),
+            "request_id": getattr(request.state, "request_id", ""),
         },
     )
     return response

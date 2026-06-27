@@ -74,7 +74,7 @@ def guard_cross_tenant(rows: list[dict[str, Any]], *, context: str = "") -> set[
         try:
             from app.metrics_collector import record_cross_tenant_guard_alert
 
-            record_cross_tenant_guard_alert(context=context or "unknown")
+            record_cross_tenant_guard_alert()
         except Exception as exc:
             logger.debug("Failed to record cross-tenant guard metric: %s", exc)
 

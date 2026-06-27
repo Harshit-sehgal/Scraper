@@ -44,6 +44,7 @@ from app.middlewares import (
     csp_middleware,
     latency_tracking_middleware,
     rate_limiter,
+    request_id_middleware,
     security_headers_middleware,
 )
 from app.routers.auth_profiles import router as auth_profiles_router
@@ -60,6 +61,7 @@ from app.routers.scheduled_monitoring import router as scheduled_monitoring_rout
 from app.routers.scraper import router as scraper_router
 from app.routers.session import router as session_router
 from app.routers.system import router as system_router
+from app.routers.user_data import compliance_router as gdpr_compliance_router
 from app.routers.user_data import router as user_data_router
 from app.routers.workflow import draft_router as workflow_draft_router
 from app.routers.workflow import router as workflow_router
@@ -124,6 +126,9 @@ def configure_middleware(app: FastAPI) -> None:
     app.middleware("http")(api_key_middleware)
     app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
     app.middleware("http")(latency_tracking_middleware)
+    # request_id_middleware must run before access_log_middleware so that
+    # the request ID is available in request.state for the access log.
+    app.middleware("http")(request_id_middleware)
     app.middleware("http")(access_log_middleware)
 
 
@@ -222,6 +227,7 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(auth_profiles_router)
     app.include_router(scheduled_monitoring_router)
     app.include_router(user_data_router)
+    app.include_router(gdpr_compliance_router)
     app.include_router(billing_webhook_router)
     app.include_router(billing_checkout_router)
 

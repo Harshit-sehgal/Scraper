@@ -136,6 +136,29 @@ _PRODUCT_COUNTER_NAMES = (
     "browser_context_created_total",
     "browser_context_failed_total",
 )
+
+# ── Extraction failure categories ────────────────────────────────────
+# Roadmap Obs #10: classify extraction failures by category for alerting
+# and dashboard breakdown. Categories match failure_classification.py.
+_EXTRACTION_FAILURE_CATEGORIES = (
+    "timeout",
+    "block",
+    "auth_required",
+    "ssl_error",
+    "network_error",
+    "parse_error",
+    "empty_page",
+    "captcha",
+    "rate_limit",
+    "browser_crash",
+)
+_extraction_failure_counts: dict[str, int] = {}
+_extraction_failure_counts_lock = threading.Lock()
+
+# ── Per-domain extraction tracking ──────────────────────────────────
+# Roadmap Obs #1: per-domain success/failure counters and latency.
+_domain_extraction_counts: dict[str, dict[str, int]] = {}
+_domain_extraction_counts_lock = threading.Lock()
 _retention_ops_lock = threading.Lock()
 
 # Rate limit hit counters: incremented by the rate limiter middleware when
@@ -536,7 +559,136 @@ def record_browser_context_failed() -> None:
     increment_product_counter("browser_context_failed_total")
 
 
-def record_cross_tenant_guard_alert(*, context: str = "unknown") -> None:
+# ── Extraction specific metrics (Roadmap Obs #1, #3, #10) ────────────────
+
+
+def record_extraction_attempted(
+    *,
+    domain: str = "",
+    strategy: str = "",
+    cascade_layer: str = "",
+) -> None:
+    """Record one extraction attempt with domain/strategy/cascade metadata.
+
+    Per-domain and per-strategy tracking is done via separate counters to
+    keep label cardinality bounded while still enabling dashboards to filter
+    by the key dimensions.
+    """
+    if domain:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(domain, {})
+            entry["attempted"] = entry.get("attempted", 0) + 1
+    if strategy:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(f"strategy:{strategy}", {})
+            entry["attempted"] = entry.get("attempted", 0) + 1
+    if cascade_layer:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(f"layer:{cascade_layer}", {})
+            entry["attempted"] = entry.get("attempted", 0) + 1
+
+
+def record_extraction_succeeded(
+    *,
+    domain: str = "",
+    strategy: str = "",
+    cascade_layer: str = "",
+) -> None:
+    """Record a successful extraction with domain/strategy/cascade metadata."""
+    if domain:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(domain, {})
+            entry["succeeded"] = entry.get("succeeded", 0) + 1
+    if strategy:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(f"strategy:{strategy}", {})
+            entry["succeeded"] = entry.get("succeeded", 0) + 1
+    if cascade_layer:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(f"layer:{cascade_layer}", {})
+            entry["succeeded"] = entry.get("succeeded", 0) + 1
+
+
+def record_extraction_failed(
+    *,
+    category: str = "",
+    domain: str = "",
+    strategy: str = "",
+) -> None:
+    """Record an extraction failure with an optional category tag.
+
+    Categories match the failure_classification.py taxonomy:
+    timeout, block, auth_required, ssl_error, network_error,
+    parse_error, empty_page, captcha, rate_limit, browser_crash.
+    """
+    if category:
+        with _extraction_failure_counts_lock:
+            _extraction_failure_counts[category] = _extraction_failure_counts.get(category, 0) + 1
+    if domain:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(domain, {})
+            entry["failed"] = entry.get("failed", 0) + 1
+    if strategy:
+        with _domain_extraction_counts_lock:
+            entry = _domain_extraction_counts.setdefault(f"strategy:{strategy}", {})
+            entry["failed"] = entry.get("failed", 0) + 1
+
+
+def get_extraction_failure_counts() -> dict[str, int]:
+    """Return a snapshot of extraction failure counts by category.
+
+    Includes every category in :data:`_EXTRACTION_FAILURE_CATEGORIES`
+    with a count of 0 if no failures were recorded — this keeps the
+    Prometheus label set stable for charting.
+    """
+    with _extraction_failure_counts_lock:
+        return {k: _extraction_failure_counts.get(k, 0) for k in _EXTRACTION_FAILURE_CATEGORIES}
+
+
+def get_domain_extraction_counts() -> dict[str, dict[str, int]]:
+    """Return per-domain extraction outcome counts (success/failure)."""
+    with _domain_extraction_counts_lock:
+        return {k: dict(v) for k, v in _domain_extraction_counts.items()}
+
+
+def record_extraction_failure(category: str) -> None:
+    """Record an extraction failure classified into a category.
+
+    Roadmap Obs #10: aggregated per-category failure counts enable
+    dashboards (top failing categories) and alerting when a category
+    spikes (e.g., timeout spike indicates network issues).
+    Unknown categories are clamped to ``"unknown"``.
+    """
+    if category not in _EXTRACTION_FAILURE_CATEGORIES:
+        category = "unknown"
+    with _extraction_failure_counts_lock:
+        _extraction_failure_counts[category] = _extraction_failure_counts.get(category, 0) + 1
+
+
+def record_domain_extraction(domain: str, *, success: bool) -> None:
+    """Record an extraction attempt for a domain.
+
+    Roadmap Obs #1: per-domain success/failure counts power the
+    "per-domain success rate" rolling-24h dashboard. Bounded to 1K
+    domains to avoid unbounded memory growth.
+    """
+    if not domain:
+        return
+    with _domain_extraction_counts_lock:
+        entry = _domain_extraction_counts.setdefault(domain, {"success": 0, "failure": 0})
+        if success:
+            entry["success"] += 1
+        else:
+            entry["failure"] += 1
+        # Bound memory: evict oldest if too many domains tracked.
+        if len(_domain_extraction_counts) > 1000:
+            arbitrary_domain = next(iter(_domain_extraction_counts))
+            # Skip if we'd evict the just-updated domain — keep it.
+            if arbitrary_domain != domain:
+                _domain_extraction_counts.pop(arbitrary_domain, None)
+
+
+def record_cross_tenant_guard_alert() -> None:
     """Record a cross-tenant contamination event detected by the guardian.
 
     Fires a CRITICAL log + counter; surface in Prometheus alerting.
@@ -643,3 +795,7 @@ def reset_for_testing() -> None:
         _retention_ops.clear()
     with _product_totals_lock:
         _product_totals.clear()
+    with _extraction_failure_counts_lock:
+        _extraction_failure_counts.clear()
+    with _domain_extraction_counts_lock:
+        _domain_extraction_counts.clear()
