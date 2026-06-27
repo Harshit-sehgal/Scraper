@@ -796,6 +796,7 @@ class SQLiteJobRepository(JobRepository):
 
     def save_world_state(self, payload: dict[str, Any]) -> None:
         """Save semantic world state to the SQLite world_state.json file atomically."""
+        import contextlib
         import json
         import os
         import tempfile
@@ -807,15 +808,20 @@ class SQLiteJobRepository(JobRepository):
         # writes.
         tmp_dir = ws_path.parent
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".json.tmp",
-            dir=str(tmp_dir),
-            delete=False,
-        ) as f:
-            f.write(json.dumps(payload, ensure_ascii=False, indent=2))
-            tmp_path = f.name
-        os.replace(tmp_path, str(ws_path))
+        fd, tmp_path = tempfile.mkstemp(prefix="world_state_", suffix=".json.tmp", dir=str(tmp_dir))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False, indent=2))
+                f.flush()
+                # fsync the temp file so the data hits disk before
+                # the atomic rename — matches state_store's pattern.
+                os.fsync(f.fileno())
+            os.replace(tmp_path, str(ws_path))
+        except (RuntimeError, OSError, ValueError, TypeError):
+            # Best-effort cleanup of the temp file if rename never ran.
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
+            raise
 
     def load_world_state(self) -> dict | None:
         """Load semantic world state from the SQLite world_state.json file."""

@@ -6,7 +6,6 @@ and discovered URL assignment.
 
 from __future__ import annotations
 
-import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -33,9 +32,10 @@ async def run_discovery_phase(
     """
     from app.discovery import discover_urls
     from app.models import JobStatus
+    from app.services.job_state_machine import transition_to
 
     reset_llm_call_count()
-    job.status = JobStatus.DISCOVERING
+    transition_to(job, JobStatus.DISCOVERING)
     job.progress_total = int(job.max_pages or 10) + 2
     job.progress_current = 1
     _log(job, f"Starting auto-discovery for topic: {job.topic}", persist_fn=persist_fn)
@@ -77,9 +77,7 @@ async def run_discovery_phase(
             job.cancel_requested = True
             _log(job, "Job canceled during discovery", level="warning", persist_fn=persist_fn)
             return False
-        job.status = JobStatus.FAILED
-        job.error = "Could not discover any URLs for this topic"
-        job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
+        transition_to(job, JobStatus.FAILED, error="Could not discover any URLs for this topic")
         _log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_fn)
         return False
 

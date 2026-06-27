@@ -3,6 +3,7 @@
 import ipaddress
 import logging
 import socket
+import threading
 from typing import ClassVar
 from urllib.parse import urlparse
 
@@ -97,6 +98,7 @@ class DNSRebindingDefense:
         """Initialize with cache TTL."""
         self.ttl_cache_seconds = ttl_cache_seconds
         self._dns_cache: dict[str, tuple[float, list[str]]] = {}
+        self._lock = threading.Lock()
 
     def check_dns_rebinding(self, hostname: str) -> bool:
         """Check if hostname shows signs of DNS rebinding."""
@@ -106,8 +108,10 @@ class DNSRebindingDefense:
             current_time = time.time()
 
             # Get cached result if fresh
-            if hostname in self._dns_cache:
-                cache_time, cached_ips = self._dns_cache[hostname]
+            with self._lock:
+                cached = self._dns_cache.get(hostname)
+            if cached is not None:
+                cache_time, cached_ips = cached
                 if current_time - cache_time < self.ttl_cache_seconds:
                     # Compare with current resolution
                     try:
@@ -128,7 +132,8 @@ class DNSRebindingDefense:
             # Cache current resolution
             result = socket.getaddrinfo(hostname, None)
             ips = [str(addr[4][0]) for addr in result]
-            self._dns_cache[hostname] = (current_time, ips)
+            with self._lock:
+                self._dns_cache[hostname] = (current_time, ips)
 
             return False
 

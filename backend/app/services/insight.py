@@ -38,8 +38,13 @@ async def run_insight_phase(
         return
 
     from app.models import JobStatus
+    from app.services.job_state_machine import transition_to
 
-    job.status = JobStatus.RUNNING
+    # The job is already RUNNING at this point (set by job_runner after the
+    # scrape-loop). Reapplying the same status via transition_to() is a
+    # documented idempotent no-op — we keep it to ensure all status
+    # assignments go through the state machine, not direct attribute writes.
+    transition_to(job, JobStatus.RUNNING)
     _log(job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_fn)
     logger.info("Generating AI insights over %d records...", len(job.results))
     try:

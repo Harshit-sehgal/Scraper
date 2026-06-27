@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from app.config import settings
-from app.globals import jobs_store, recycle_bin_store
+from app.globals import _jobs_store_lock, jobs_store, recycle_bin_store
 from app.services.job_runner import run_job
 from app.state_store import get_state_file_path
 from app.storage_interface import get_job_repository
@@ -230,12 +230,15 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
             ssrf_check.get("has_sync_backend"),
         )
 
-    # Durable job store & semantic field state — single DB read on startup
+    # Durable job store & semantic field state — single DB read on startup.
+    # Acquire the store lock so the bulk clear+update is atomic with
+    # respect to any concurrent router-driven mutation.
     loaded_jobs, loaded_recycle, world_state_data = job_repo.load_all()
-    jobs_store.clear()
-    jobs_store.update(loaded_jobs)
-    recycle_bin_store.clear()
-    recycle_bin_store.update(loaded_recycle)
+    with _jobs_store_lock:
+        jobs_store.clear()
+        jobs_store.update(loaded_jobs)
+        recycle_bin_store.clear()
+        recycle_bin_store.update(loaded_recycle)
 
     # Restore semantic world state
     from app.experimental_startup import restore_semantic_world_state
@@ -346,7 +349,8 @@ def schedule_background_task(coro):
 
 def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     """Persist a single job to the configured backend."""
-    job = jobs_store.get(job_id)
+    with _jobs_store_lock:
+        job = jobs_store.get(job_id)
     if job:
         try:
             get_job_repository().save_single(job)
@@ -463,7 +467,8 @@ async def _process_due_scheduled_jobs() -> None:
                 org_id=str(scheduled.get("org_id") or ""),
                 project_id=str(scheduled.get("project_id") or ""),
             )
-            jobs_store[job.id] = job
+            with _jobs_store_lock:
+                jobs_store[job.id] = job
             await save_job(job)
 
             # Execute the job
@@ -595,4 +600,7 @@ async def _rate_limit_prune_loop() -> None:
 def persist_state_wrapper() -> None:
     """Persist all jobs and recycle bin to the configured backend."""
     repo = get_job_repository()
-    repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
+    # Snapshot the dicts under the lock so a concurrent mutation cannot
+    # observe a torn/empty dict during save_all().
+    with _jobs_store_lock:
+        repo.save_all(jobs=dict(jobs_store), recycle_bin=dict(recycle_bin_store))
