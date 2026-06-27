@@ -129,6 +129,7 @@ def steps_from_manual_mapping(
     """Convert user-corrected field mapping into bounded workflow steps."""
     steps: list[WorkflowStep] = [
         WorkflowStep(
+            selector="",
             step_type=WorkflowStepType.GOTO,
             value=start_url,
             description="Open stable workflow start URL",
@@ -176,6 +177,7 @@ def steps_from_manual_mapping(
         )
     steps.append(
         WorkflowStep(
+            selector="",
             step_type=WorkflowStepType.WAIT_FOR_TIMEOUT_LIMITED,
             value="1000",
             description="Bounded wait after submit",

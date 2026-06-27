@@ -197,7 +197,9 @@ class JobCreate(BaseModel):
     selectors_map: dict[str, Any] = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
-    auth_profile_id: str | None = Field(default=None, description="Optional auth profile ID to use for authenticated scraping", max_length=128)
+    auth_profile_id: str | None = Field(
+        default=None, description="Optional auth profile ID to use for authenticated scraping", max_length=128
+    )
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -304,7 +306,9 @@ class Job(BaseModel):
     search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
-    created_by: str = Field(default="", description="Owner identity (user ID or API key fingerprint) for data isolation", max_length=128)
+    created_by: str = Field(
+        default="", description="Owner identity (user ID or API key fingerprint) for data isolation", max_length=128
+    )
     org_id: str = Field(default="", description="Tenant org id; populated for persistent API keys (P0-SAAS-001)", max_length=128)
     project_id: str = Field(default="", description="Project id; populated for persistent API keys (P0-SAAS-001)", max_length=128)
     created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
@@ -325,7 +329,9 @@ class Job(BaseModel):
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
     results_file_path: str | None = Field(default=None, description="Path to the compressed results file", max_length=1024)
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
-    acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan", max_length=16)
+    acquisition_mode: str = Field(
+        default="standard", description="Acquisition mode: standard, aggressive, or deep_scan", max_length=16
+    )
 
 
 # ─── Workflow System ──────────────────────────────────────────────────────
@@ -400,7 +406,9 @@ class WorkflowPaginationConfig(BaseModel):
         description="Pagination strategy: next_button, page_number, url_pattern, infinite_scroll, load_more",
     )
     max_pages: int = Field(10, ge=1, le=100, description="Maximum pages to follow")
-    stop_condition: str = Field("none", description="Stop condition: none, no_more_records, duplicate_threshold, custom", max_length=64)
+    stop_condition: str = Field(
+        "none", description="Stop condition: none, no_more_records, duplicate_threshold, custom", max_length=64
+    )
     selector: str = Field("", description="Selector for next button or page links", max_length=500)
 
 
@@ -428,10 +436,7 @@ class Workflow(BaseModel):
     steps: list[WorkflowStep] = Field(default_factory=list, description="Ordered list of workflow steps")
     extraction_schema: list[SchemaField] = Field(default_factory=list, description="Fields to extract after replay")
     auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
-    pagination_config: WorkflowPaginationConfig = Field(
-        default_factory=WorkflowPaginationConfig,
-        description="Pagination settings",
-    )
+    pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)  # type: ignore[arg-type]
 
     # Status
     status: WorkflowStatus = Field(default=WorkflowStatus.DRAFT, description="Current workflow status")
@@ -472,7 +477,7 @@ class WorkflowCreate(BaseModel):
     steps: list[WorkflowStep] = Field(default_factory=list)
     extraction_schema: list[SchemaField] = Field(default_factory=list)
     auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
-    pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)
+    pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)  # type: ignore[arg-type]
 
     @model_validator(mode="after")
     def validate_create(self):

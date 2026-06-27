@@ -88,7 +88,6 @@ def _clear_all_workflows() -> int:
                 conn.close()
     except (AttributeError, RuntimeError) as exc:
         logger.warning("Failed to delete workflows table: %s", exc)
-        pass
     return count
 
 
@@ -302,7 +301,7 @@ async def create_workflow_from_manual_mapping(
         fields=req.fields,
         submit_action=req.submit_action,
     )
-    wf = Workflow(
+    wf = Workflow(  # type: ignore[call-arg]
         name=req.name.strip() or "Workflow Replay Draft",
         description=req.description,
         mode="workflow_replay",
@@ -349,7 +348,7 @@ async def create_workflow(
                 validate_public_http_url(_url.strip())
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-    wf = Workflow(
+    wf = Workflow(  # type: ignore[call-arg]
         name=req.name.strip(),
         description=req.description.strip() if req.description else "",
         mode=req.mode,
@@ -549,7 +548,6 @@ async def run_workflow(
         record_workflow_run()
     except ImportError as exc:
         logger.debug("metrics_collector not available, skipping workflow run metric: %s", exc)
-        pass
 
     return {
         "workflow_id": workflow_id,
@@ -679,5 +677,4 @@ async def preview_workflow(
         record_workflow_preview()
     except ImportError as exc:
         logger.debug("metrics_collector not available, skipping workflow run metric: %s", exc)
-        pass
     return result
