@@ -164,7 +164,7 @@ class ScraperDiagnosticsRequest(BaseModel):
     that caused PydanticUserError in OpenAPI generation.
     """
 
-    url: str = Field(..., description="The URL to run diagnostics on")
+    url: str = Field(..., max_length=2048, description="The URL to run diagnostics on")
     fields: list[SchemaField] = Field(..., description="Schema fields to attempt extraction for", max_length=50)
     min_score: float = Field(0.3, ge=0.0, le=1.0, description="Minimum quality score for records to be included")
 
@@ -595,7 +595,7 @@ class ScheduledJob(BaseModel):
     # Job template (snapshot of a JobCreate payload)
     job_name: str = Field(..., description="Name pattern for generated jobs", max_length=255)
     mode: ScrapeMode = Field(ScrapeMode.MANUAL)
-    urls: list[str] = Field(default_factory=list)
+    urls: list[str] = Field(default_factory=list, max_length=100, description="Target URLs for manual-mode jobs")
     topic: str = Field("", max_length=255)
     location: str = Field("", max_length=255)
     schema_fields: list[SchemaField] = Field(default_factory=list)

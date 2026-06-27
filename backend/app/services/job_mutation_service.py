@@ -1,4 +1,4 @@
-"""Job mutation services — encapsulate business logic for cancel, backfill, and reclean operations.
+"""Job mutation services — encapsulate business logic for cancel and reclean operations.
 
 Extracted from ``app.routers.jobs_write.register_jobs_write_routes`` to
 separate HTTP concerns (request parsing, response formatting) from domain
@@ -130,62 +130,6 @@ class JobCancellerService:
             "cancel_queued_task": cancel_task_success,
             "message": "Cancellation requested",
         }
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# JobBackfillService
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-class JobBackfillService:
-    """Encapsulates the business logic for backfilling source metadata on job results."""
-
-    def __init__(self, manager: JobStoreManager) -> None:
-        self._manager = manager
-
-    async def backfill_metadata(
-        self,
-        job_id: str,
-        role: UserRole,
-        user_id: str,
-        org_id: str,
-        project_id: str,
-    ) -> dict[str, Any]:
-        """Backfill source metadata for manual-mode job results.
-
-        Iterates over results and infers ``source_type`` and
-        ``source_trust_score`` for rows where ``source_type`` is
-        ``"unknown"``.
-        """
-        from fastapi.concurrency import run_in_threadpool as _run_sync
-
-        from app.discovery import infer_source_metadata
-        from app.utils.job_results_store import load_job_results_from_disk, save_job_results_to_disk
-
-        job = await _run_sync(self._manager.get_job, job_id)
-        _ensure_job_write_access(job, role, user_id, org_id, project_id, "backfill_metadata")
-
-        results_list = list(job.results)
-        if job.results_on_disk:
-            results_list = await _run_sync(load_job_results_from_disk, job.id, job.results_file_path)
-
-        updated = False
-        for row in results_list:
-            source_url = str(row.get("source_url") or "")
-            source_type = str(row.get("source_type") or "unknown").strip().lower()
-            if source_type == "unknown" and source_url:
-                inferred = infer_source_metadata(url=source_url)
-                row["source_type"] = str(inferred.get("source_type") or "unknown")
-                row["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
-                updated = True
-
-        if updated:
-            job.results = results_list
-            if job.results_on_disk:
-                await _run_sync(save_job_results_to_disk, job.id, results_list)
-            await save_job(job)
-
-        return {"message": "Metadata backfilled successfully", "updated": updated}
 
 
 # ═════════════════════════════════════════════════════════════════════════════

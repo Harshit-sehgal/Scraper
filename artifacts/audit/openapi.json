@@ -229,34 +229,6 @@
         "title": "AupStatusResponse",
         "type": "object"
       },
-      "BatchExportRequest": {
-        "description": "Request body for batch export endpoint.",
-        "properties": {
-          "flatten": {
-            "default": true,
-            "title": "Flatten",
-            "type": "boolean"
-          },
-          "format": {
-            "default": "csv",
-            "title": "Format",
-            "type": "string"
-          },
-          "job_ids": {
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Job Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "job_ids"
-        ],
-        "title": "BatchExportRequest",
-        "type": "object"
-      },
       "CheckoutRequest": {
         "description": "Request body for POST /api/billing/checkout.",
         "properties": {
@@ -1408,6 +1380,7 @@
           },
           "url": {
             "description": "The URL to run diagnostics on",
+            "maxLength": 2048,
             "title": "Url",
             "type": "string"
           }
@@ -2773,42 +2746,6 @@
         "tags": [
           "jobs"
         ]
-      }
-    },
-    "/api/exports/batch": {
-      "post": {
-        "operationId": "batch_export_api_exports_batch_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BatchExportRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Batch Export"
       }
     },
     "/api/jobs": {

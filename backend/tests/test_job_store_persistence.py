@@ -291,7 +291,7 @@ def test_restart_recovery_survives_second_load(isolated_db) -> None:
 
 
 # ---------------------------------------------------------------------------
-# test_sqlite_ownership_field_parity  (TODO-SAFE-006)
+# test_sqlite_ownership_field_parity
 # ---------------------------------------------------------------------------
 
 

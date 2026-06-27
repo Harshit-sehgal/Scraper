@@ -9,6 +9,7 @@ Provides a deterministic pipeline for improving extracted data quality:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import urllib.parse
@@ -272,7 +273,6 @@ def clean_record(record: dict, schema_fields: list[SchemaField]) -> dict:
 def validate_record(record: dict, schema_fields: list[SchemaField]) -> tuple[bool, dict[str, str]]:
     """Validate a record against the schema. Returns (is_valid, errors)."""
     errors: dict[str, str] = {}
-    {f.name: f for f in schema_fields}
 
     for field in schema_fields:
         value = record.get(field.name)
@@ -312,7 +312,6 @@ def deduplicate_records(records: list[dict]) -> tuple[list[dict], int]:
     """Remove exact duplicate records. Returns (unique_records, removed_count)."""
     seen: set[str] = set()
     unique: list[dict] = []
-    import json
 
     for record in records:
         fp = json.dumps(record, sort_keys=True, default=str)

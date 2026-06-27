@@ -1,8 +1,8 @@
 """Unit tests for ``app.services.job_mutation_service``.
 
-Tests each service class (JobCancellerService, JobBackfillService,
-JobRecleanerService) in isolation using mock stores and monkeypatched
-dependencies so no real HTTP, AI, or disk I/O is needed.
+Tests each service class (JobCancellerService, JobRecleanerService)
+in isolation using mock stores and monkeypatched dependencies so no
+real HTTP, AI, or disk I/O is needed.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from app.models import Job, JobStatus
 from app.routers.jobs_state import JobStoreManager
-from app.services.job_mutation_service import JobBackfillService, JobCancellerService, JobRecleanerService
+from app.services.job_mutation_service import JobCancellerService, JobRecleanerService
 from app.utils.rbac import UserRole
 from fastapi import HTTPException
 
@@ -104,52 +104,6 @@ class TestJobCancellerService:
 
             result = anyio.run(service.cancel_job, "j1", UserRole.ADMIN, "admin-u", "", "")
         assert result["cancel_requested"] is True
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# JobBackfillService
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-class TestJobBackfillService:
-    def test_backfill_updates_unknown_source_type(self, anyio_backend) -> None:
-        job = _make_job("j1", JobStatus.COMPLETED)
-        job.results = [{"source_url": "https://example.com/page", "source_type": "unknown", "source_trust_score": 0.0}]
-        manager = _make_manager({"j1": job})
-        service = JobBackfillService(manager)
-        with (
-            patch("app.services.job_mutation_service.save_job") as mock_save,
-            patch(
-                "app.discovery.infer_source_metadata", return_value={"source_type": "organic_search", "source_trust_score": 0.85}
-            ),
-        ):
-            import anyio
-
-            result = anyio.run(service.backfill_metadata, "j1", UserRole.ADMIN, "u1", "o1", "p1")
-        assert result["updated"] is True
-        assert job.results[0]["source_type"] == "organic_search"
-        mock_save.assert_awaited_once_with(job)
-
-    def test_backfill_skips_known_source_type(self, anyio_backend) -> None:
-        job = _make_job("j1", JobStatus.COMPLETED)
-        job.results = [{"source_url": "https://example.com/page", "source_type": "organic_search", "source_trust_score": 0.8}]
-        manager = _make_manager({"j1": job})
-        service = JobBackfillService(manager)
-        with patch("app.services.job_mutation_service.save_job") as mock_save:
-            import anyio
-
-            result = anyio.run(service.backfill_metadata, "j1", UserRole.ADMIN, "u1", "o1", "p1")
-        assert result["updated"] is False
-        mock_save.assert_not_called()
-
-    def test_backfill_denied_for_other_org(self, anyio_backend) -> None:
-        job = _make_job("j1", JobStatus.COMPLETED, org_id="org-a")
-        manager = _make_manager({"j1": job})
-        service = JobBackfillService(manager)
-        with pytest.raises(HTTPException):
-            import anyio
-
-            anyio.run(service.backfill_metadata, "j1", UserRole.USER, "u1", "org-b", "p1")
 
 
 # ═════════════════════════════════════════════════════════════════════════════

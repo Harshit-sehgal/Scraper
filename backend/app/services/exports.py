@@ -1,16 +1,16 @@
 """Pure export formatting service.
 
-This module owns the byte/stream production for CSV, JSON, Excel, and
-batch exports. It is intentionally free of FastAPI / middleware /
-auth dependencies so it can be unit-tested in isolation and so the
-HTTP layer in ``app.routers.exports`` stays a thin adapter.
+This module owns the byte/stream production for CSV, JSON, and Excel
+exports. It is intentionally free of FastAPI / middleware / auth
+dependencies so it can be unit-tested in isolation and so the HTTP layer
+in ``app.routers.exports`` stays a thin adapter.
 
 Public surface
 --------------
 
 CSV
 ~~~
-- :func:`build_csv_response` -- in-memory CSV for a single job
+- :func:`build_csv_bytes` -- in-memory CSV for a single job
 - :func:`stream_csv_from_disk` -- async iterator streaming CSV from
   paginated disk reads
 - :func:`flat_row` -- flatten a single result row for CSV writing
@@ -20,7 +20,7 @@ CSV
 
 JSON
 ~~~~
-- :func:`build_json_response` -- in-memory JSON for a single job
+- :func:`build_json_bytes` -- in-memory JSON for a single job
 - :func:`stream_json_from_disk` -- async iterator streaming JSON from
   paginated disk reads
 
@@ -28,16 +28,6 @@ Excel
 ~~~~~
 - :func:`build_excel_bytes` -- XLSX bytes for a single job (in-memory
   results or paginated disk reads)
-- :func:`batch_xlsx` -- XLSX bytes for a multi-job batch export with
-  optional flatten mode and a Summary sheet
-
-Batch
-~~~~~
-- :func:`build_batch_manifest` -- build the per-job manifest entry list
-- :func:`discover_fieldnames_union` -- union of fieldnames across jobs
-- :func:`make_unique_sheet_name` -- 31-char-capped, collision-safe
-- :func:`batch_csv_stream` -- async iterator for batch CSV
-- :func:`batch_json_stream` -- async iterator for batch JSON
 """
 
 from __future__ import annotations
@@ -46,7 +36,6 @@ import csv
 import io
 import json
 from collections.abc import AsyncIterator, Callable, Iterator
-from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 from openpyxl import Workbook
@@ -55,9 +44,6 @@ if TYPE_CHECKING:
     from app.models import Job
 
 
-SOURCE_JOB_FIELD = "_source_job"
-"""Field name injected into each result row to identify the source job."""
-
 PAGINATION_CHUNK_SIZE = 500
 """Default page size for paginated disk reads."""
 
@@ -65,21 +51,6 @@ PAGINATION_CHUNK_SIZE = 500
 # these strings get a leading single quote prepended on export so
 # Excel / Sheets / LibreOffice treat them as plain text.
 DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
-
-# In-memory cap for batch exports from a single in-memory job, to
-# bound peak memory when callers have huge in-memory result lists.
-INMEMORY_BATCH_CAP = 10000
-
-
-def batch_export_timestamp() -> str:
-    """Generate a filesystem-safe timestamp string for batch export filenames.
-
-    Returns a string like ``20260627T020340`` suitable for use in
-    ``Content-Disposition`` attachment filenames.
-    """
-    from datetime import datetime
-
-    return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -331,8 +302,23 @@ def build_excel_bytes(
 
 
 # ════════════════════════════════════════════════════════════════════
-# Sheet-name collision
+# Batch export (multi-job)
 # ════════════════════════════════════════════════════════════════════
+
+
+SOURCE_JOB_FIELD = "_source_job"
+"""Field name injected into each result row to identify the source job."""
+
+# In-memory cap for batch exports from a single in-memory job, to
+# bound peak memory when callers have huge in-memory result lists.
+INMEMORY_BATCH_CAP = 10000
+
+
+def batch_export_timestamp() -> str:
+    """Generate a filesystem-safe timestamp string for batch export filenames."""
+    from datetime import UTC, datetime
+
+    return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
 
 
 def make_unique_sheet_name(base: str, used: set[str], *, max_len: int = 31) -> str:
@@ -346,10 +332,6 @@ def make_unique_sheet_name(base: str, used: set[str], *, max_len: int = 31) -> s
     sheet_name = (base or "Sheet")[:max_len] or "Sheet"
     suffix = 2
     while sheet_name in used or sheet_name == "Sheet":
-        # Match the legacy logic: when this is the very first
-        # collision and the original base was not "Sheet", use a
-        # (2) suffix; otherwise use a numeric suffix and shrink the
-        # base so the suffix fits in 31 chars.
         if suffix == 2 and sheet_name != "Sheet":
             candidate = f"{sheet_name[: max_len - 4]} (2)"
         else:
@@ -363,23 +345,12 @@ def make_unique_sheet_name(base: str, used: set[str], *, max_len: int = 31) -> s
     return sheet_name
 
 
-# ════════════════════════════════════════════════════════════════════
-# Batch manifest + fieldname union
-# ════════════════════════════════════════════════════════════════════
-
-
 async def build_batch_manifest(
     job_meta: list[tuple[str, str, bool, str | None]],
     page_loader: Callable[..., tuple[list[dict], int]] | None,
     get_inmemory_count: Callable[[str], int | None],
 ) -> list[dict[str, Any]]:
-    """Build a per-job manifest list for a batch export.
-
-    Each entry contains ``job_id``, ``job_name``, ``status``
-    (``included`` / ``empty``), ``record_count``, and an optional
-    ``truncated`` / ``original_count`` for in-memory jobs above
-    :data:`INMEMORY_BATCH_CAP`.
-    """
+    """Build a per-job manifest list for a batch export."""
     manifest: list[dict[str, Any]] = []
     for jid, jname, on_disk, fpath in job_meta:
         entry: dict[str, Any] = {"job_id": jid, "job_name": jname, "status": "pending", "record_count": 0}
@@ -414,15 +385,10 @@ async def discover_fieldnames_union(
     seen: set[str] = set()
     has_any_data = False
 
-    # First pass: from the first page / sample of each job.
     for jid, _jname, on_disk, fpath in job_meta:
         if on_disk and page_loader is not None:
             first_page, _ = await _call_async(
-                page_loader,
-                jid,
-                limit=PAGINATION_CHUNK_SIZE,
-                offset=0,
-                file_path=fpath,
+                page_loader, jid, limit=PAGINATION_CHUNK_SIZE, offset=0, file_path=fpath,
             )
             if first_page:
                 has_any_data = True
@@ -441,18 +407,13 @@ async def discover_fieldnames_union(
                             seen.add(k)
                             fieldnames.append(k)
 
-    # Second pass: subsequent pages of disk jobs.
     for jid, _jname, on_disk, fpath in job_meta:
         if not (on_disk and page_loader is not None):
             continue
         offset = PAGINATION_CHUNK_SIZE
         while True:
             page, total = await _call_async(
-                page_loader,
-                jid,
-                limit=PAGINATION_CHUNK_SIZE,
-                offset=offset,
-                file_path=fpath,
+                page_loader, jid, limit=PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
             )
             if not page:
                 break
@@ -473,23 +434,13 @@ async def iter_batch_pages(
     page_loader: Callable[..., tuple[list[dict], int]] | None,
     get_inmemory_results: Callable[[str], list[dict] | None],
 ) -> AsyncIterator[tuple[str, str, list[dict]]]:
-    """Yield ``(job_id, job_name, cleaned_page)`` tuples for a batch export.
-
-    For disk-backed jobs, yields each paginated page until the job
-    is exhausted. For in-memory jobs, yields a single (capped) page
-    containing up to :data:`INMEMORY_BATCH_CAP` rows. Jobs with no
-    data are silently skipped.
-    """
+    """Yield ``(job_id, job_name, cleaned_page)`` tuples for a batch export."""
     for jid, jname, on_disk, fpath in job_meta:
         if on_disk and page_loader is not None:
             offset = 0
             while True:
                 page, total = await _call_async(
-                    page_loader,
-                    jid,
-                    limit=PAGINATION_CHUNK_SIZE,
-                    offset=offset,
-                    file_path=fpath,
+                    page_loader, jid, limit=PAGINATION_CHUNK_SIZE, offset=offset, file_path=fpath,
                 )
                 if not page:
                     break
@@ -503,22 +454,12 @@ async def iter_batch_pages(
                 yield (jid, jname, strip_system_fields(list(results)[:INMEMORY_BATCH_CAP]))
 
 
-# ════════════════════════════════════════════════════════════════════
-# Batch format helpers
-# ════════════════════════════════════════════════════════════════════
-
-
 async def batch_csv_stream(
     pages: AsyncIterator[tuple[str, str, list[dict]]],
     fieldnames: list[str],
     flatten: bool,
 ) -> AsyncIterator[bytes]:
-    """Yield CSV bytes for a multi-job batch export.
-
-    When *flatten* is True a single ``_source_job`` column is added;
-    when False, a ``--- <job_name> ---`` separator row is inserted
-    between jobs.
-    """
+    """Yield CSV bytes for a multi-job batch export."""
     output = io.StringIO()
     if flatten:
         all_fieldnames = [*list(fieldnames), SOURCE_JOB_FIELD]
@@ -598,15 +539,9 @@ def batch_xlsx(
     page_loader: Callable[..., tuple[list[dict], int]] | None = None,
     get_inmemory_results: Callable[[str], list[dict] | None] | None = None,
 ) -> bytes:
-    """Build XLSX bytes for a multi-job batch export.
-
-    *page_loader* and *get_inmemory_results* mirror the contract
-    used elsewhere; the legacy router used an inline generator
-    helper, this service version takes two callables for testability.
-    """
+    """Build XLSX bytes for a multi-job batch export."""
     wb = Workbook(write_only=True)
 
-    # Summary sheet (E2) with per-job status.
     ws_summary = wb.create_sheet(title="Summary")
     ws_summary.append(["Job ID", "Job Name", "Status", "Record Count", "Truncated"])
     for entry in manifest or []:
@@ -648,9 +583,6 @@ def batch_xlsx(
     if flatten:
         all_fnames = [*list(fieldnames), SOURCE_JOB_FIELD]
         used_flatten_names: set[str] = set()
-        # Pre-register "Combined" so the loop's make_unique_sheet_name
-        # call is consistent with the inline logic that previously
-        # lived in the router.
         base = "Combined"
         sheet_name = make_unique_sheet_name(base, used_flatten_names)
         ws = wb.create_sheet(title=sheet_name)
@@ -662,8 +594,8 @@ def batch_xlsx(
                 ws.append(vals)
     else:
         used_sheet_names: set[str] = set()
-        current_ws = None
-        current_jid = None
+        current_ws: Any = None
+        current_jid: str | None = None
         for jid, job_name, page in _stream_pages_sync():
             if jid != current_jid:
                 current_jid = jid

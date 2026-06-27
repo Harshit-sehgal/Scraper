@@ -16,7 +16,7 @@ import logging
 import re
 import secrets
 import time
-from typing import Annotated, Any, ClassVar
+from typing import Annotated, Any, ClassVar, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -91,7 +91,7 @@ class KnowledgeMergeRequest(BaseModel):
 class ModeBody(BaseModel):
     """Request body for switching operator modes."""
 
-    mode: str
+    mode: Literal["manual", "auto"]
 
 
 def _require_admin_key(request: Request) -> None:
