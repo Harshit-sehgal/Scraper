@@ -115,19 +115,21 @@ class TestSetMode:
 
     @pytest.mark.asyncio
     async def test_set_mode_invalid(self, client) -> None:
+        """Values outside the OperatorMode Literal return 422 via Pydantic validation."""
         resp = await client.post("/api/operator/mode", json={"mode": "invalid_mode"})
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "detail" in resp.json()
 
     @pytest.mark.asyncio
-    async def test_set_mode_case_insensitive(self, client) -> None:
+    async def test_set_mode_valid_lowercase(self, client) -> None:
+        """The Literal constraint is case-sensitive; send lowercase values."""
         with patch.object(_visualization_mod, "get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.STEALTH
             mock_instance.set_operator_mode.return_value = {"stealth": True}
             mock_dash.return_value = mock_instance
 
-            resp = await client.post("/api/operator/mode", json={"mode": "STEALTH"})
+            resp = await client.post("/api/operator/mode", json={"mode": "stealth"})
             assert resp.status_code == 200
             assert resp.json()["active_mode"] == "stealth"
 

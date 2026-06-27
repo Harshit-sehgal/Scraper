@@ -89,9 +89,13 @@ class KnowledgeMergeRequest(BaseModel):
 
 
 class ModeBody(BaseModel):
-    """Request body for switching operator modes."""
+    """Request body for switching operator modes.
 
-    mode: Literal["manual", "auto"]
+    The accepted values mirror ``app.visualization.OperatorMode``:
+    ``production``, ``benchmark``, ``forensic``, ``stealth``, ``low_cost``.
+    """
+
+    mode: Literal["production", "benchmark", "forensic", "stealth", "low_cost"]
 
 
 def _require_admin_key(request: Request) -> None:

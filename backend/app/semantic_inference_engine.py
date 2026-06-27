@@ -89,18 +89,6 @@ class RoleEmbeddingEngine:
         """Legacy access to symbolic compatibility dict."""
         return self.ws.role_compatibility  # type: ignore[no-any-return]
 
-    @property
-    def co_occurrence(self) -> dict[tuple[str, str, str, str], int]:
-        return self.ws.role_co_occurrence  # type: ignore[no-any-return]
-
-    @property
-    def total_co_occurrences(self) -> int:
-        return self.ws.total_co_occurrences  # type: ignore[no-any-return]
-
-    @total_co_occurrences.setter
-    def total_co_occurrences(self, value: int) -> None:
-        self.ws.total_co_occurrences = value
-
     def get_compatibility(self, role: str, stype: SemanticType, token: SemanticToken | None = None) -> float:
         """Geometric compatibility: dot product in the role manifold."""
         role_vec = self.manifold.get(role)
@@ -444,31 +432,6 @@ class RoleEmbeddingEngine:
                         # Strength 1.0 = full attractor pull
                         force = diff * strength * 0.1 * base_rate
                         role_vec[k] = max(0.0, min(1.0, role_vec[k] + force))
-
-    def learn_co_occurrence(self, assignment_a: tuple[str, ...], assignment_b: tuple[str, ...], success: bool) -> None:
-        key = assignment_a + assignment_b
-        self.ws.increment_co_occurrence(key, 1 if success else -1)
-
-    def get_co_occurrence_boost(self, role_a: str, type_a: str, role_b: str, type_b: str) -> float:
-        key = (role_a, type_a, role_b, type_b)
-        count = self.co_occurrence.get(key, 0)
-        if self.total_co_occurrences == 0:
-            return 0.0
-        return max(-0.1, min(0.1, count / self.total_co_occurrences))
-
-    def propagate_co_occurrence(self, assignments: dict[str, tuple[str, str]]) -> dict[str, float]:
-        boosts: dict[str, float] = {}
-        items = list(assignments.items())
-        for i in range(len(items)):
-            role_i, (type_i, _) = items[i]
-            boost = 0.0
-            for j in range(len(items)):
-                if i == j:
-                    continue
-                role_j, (type_j, _) = items[j]
-                boost += self.get_co_occurrence_boost(role_i, type_i, role_j, type_j)
-            boosts[role_i] = boost / max(len(items) - 1, 1)
-        return boosts
 
     def learn_contradiction(self, role_a: str, role_b: str, token_type: str) -> None:  # noqa: ARG002, RUF100
         from app.instability_api import InstabilityAPI
