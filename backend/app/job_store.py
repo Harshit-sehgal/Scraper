@@ -25,6 +25,7 @@ from threading import Lock
 from typing import Any
 
 from app.models import Job, JobStatus
+from app.utils.datetime_normalization import format_datetime, parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                     if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                         job.status = JobStatus.FAILED
                         job.error = "Recovered after restart while still in progress."
-                        job.completed_at = datetime.datetime.now(datetime.UTC).isoformat()
+                        job.completed_at = format_datetime(datetime.datetime.now(datetime.UTC))
                         job.cancel_requested = False
 
                         row = _job_to_row(job)
@@ -286,7 +287,7 @@ def _sync_job_events(
         if hasattr(entry, "model_dump"):
             try:
                 entry_dict = entry.model_dump()
-            except Exception:
+            except (AttributeError, TypeError, ValueError):
                 entry_dict = {
                     "timestamp": "",
                     "level": "info",
@@ -603,7 +604,7 @@ def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
     so two workers on the same host can coexist. See the v6
     migration in :func:`_ensure_schema`.
     """
-    now = datetime.datetime.now(datetime.UTC).isoformat()
+    now = format_datetime(datetime.datetime.now(datetime.UTC))
     with _DB_LOCK:
         conn = _get_connection()
         try:
@@ -661,7 +662,11 @@ def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict[str, Any]:
     alive = False
     if last_heartbeat:
         try:
-            delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_heartbeat)
+            parsed = parse_datetime(last_heartbeat)
+            # parse_datetime may return None on unparseable input; the except
+            # branch below already handles that. Narrow for the arithmetic op.
+            assert parsed is not None  # noqa: S101
+            delta = datetime.datetime.now(datetime.UTC) - parsed
             alive = delta.total_seconds() < ttl_seconds
         except (ValueError, TypeError):
             alive = False
@@ -697,7 +702,9 @@ def get_all_worker_healths(ttl_seconds: int = 60) -> list[dict]:
         alive = False
         if last_hb:
             try:
-                delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_hb)
+                parsed = parse_datetime(last_hb)
+                assert parsed is not None  # noqa: S101 — guarded by try/except below
+                delta = datetime.datetime.now(datetime.UTC) - parsed
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False

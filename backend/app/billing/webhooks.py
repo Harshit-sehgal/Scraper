@@ -33,7 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.billing.models import PlanTierId, SubscriptionStatus
 from app.billing.service import resolve_tier_from_plan_id
 from app.config import settings
-from app.utils.rbac import UserRole, require_role
+from app.utils.rbac import UserRole, require_principal, require_role
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class _SubscriptionStore:
                     )
                 else:
                     raise
-        except Exception:
+        except (OSError, RuntimeError):
             os.close(lock_fd)
             raise
         return lock_fd
@@ -317,7 +317,7 @@ async def billing_webhook(request: Request) -> dict[str, str]:
             msg = "Webhook payload must be a JSON object"
             raise TypeError(msg)
         body: dict[str, Any] = loaded
-    except Exception as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
         logger.debug("Invalid billing webhook JSON body: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
 
@@ -590,8 +590,19 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
 @router.get("/subscriptions", status_code=200)
 async def list_subscriptions(
     _role: Annotated[str, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    principal: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
 ) -> dict[str, Any]:
-    """List all tracked subscriptions (admin/operator only)."""
+    """List all tracked subscriptions (admin/operator only).
+
+    Requires a global (unscoped) admin/operator key.  Project-scoped
+    operator keys cannot enumerate subscriptions across organisations.
+    """
+    _role, _user_id, org_id, project_id = principal
+    if org_id or project_id:
+        raise HTTPException(status_code=403, detail="Global admin/operator key required to list subscriptions")
     return {
         "total": len(_subscription_store),
         "subscriptions": _subscription_store.values(),
@@ -602,8 +613,19 @@ async def list_subscriptions(
 async def get_subscription(
     customer_id: str,
     _role: Annotated[str, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    principal: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+    ],
 ) -> dict[str, Any]:
-    """Get subscription details for a customer (admin/operator only)."""
+    """Get subscription details for a customer (admin/operator only).
+
+    Requires a global (unscoped) admin/operator key.  Project-scoped
+    operator keys cannot access billing information across organisations.
+    """
+    _role, _user_id, org_id, project_id = principal
+    if org_id or project_id:
+        raise HTTPException(status_code=403, detail="Global admin/operator key required")
     sub = get_customer_subscription(customer_id)
     if sub is None:
         return {"customer_id": customer_id, "plan_tier": "free", "status": "unknown"}

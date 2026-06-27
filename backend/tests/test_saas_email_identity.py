@@ -489,6 +489,23 @@ class TestPasswordResetAPI:
         resp = client.post("/api/saas/password-reset/request", json=body)
         assert resp.status_code == 429
 
+    def test_password_reset_allowed_without_dev_auth(self, client, monkeypatch):
+        from app import main
+        # Force ALLOW_INSECURE_DEV_AUTH to False (mimics production mode)
+        monkeypatch.setattr(main.settings, "ALLOW_INSECURE_DEV_AUTH", False)
+
+        resp = client.post(
+            "/api/saas/password-reset/request",
+            json={"email": "nonexistent@example.com"},
+        )
+        assert resp.status_code != 403
+
+        resp_reset = client.post(
+            "/api/saas/password-reset/reset",
+            json={"token": "some-token", "new_password": "NewSecurePass456!"},
+        )
+        assert resp_reset.status_code != 403
+
 
 class TestBruteForcePrevention:
     @staticmethod

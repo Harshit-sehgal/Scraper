@@ -17,6 +17,7 @@ import logging
 from typing import Any
 
 from app.models import JobStatus
+from app.utils.datetime_normalization import parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,9 @@ def _age_in_days(iso_timestamp: str | None) -> float | None:
     if not iso_timestamp:
         return None
     try:
-        dt = datetime.datetime.fromisoformat(iso_timestamp)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=datetime.UTC)
+        dt = parse_datetime(iso_timestamp)
+        if dt is None:
+            return None
         return (_now_utc() - dt).total_seconds() / 86400.0
     except (ValueError, TypeError, AttributeError):
         return None

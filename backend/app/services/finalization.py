@@ -15,6 +15,7 @@ from app.models import JobStatus
 from app.services._job_log import log_job_message as _log
 from app.services.job_state_machine import transition_to
 from app.services.status_classifier import classify_job_status, job_completion_message
+from app.utils.datetime_normalization import parse_datetime
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -23,15 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_job_timestamp(value: Any) -> datetime.datetime | None:
-    if not value:
-        return None
+    """Parse a job timestamp string using the central normalizer.
+
+    Falls back to ``None`` for unparseable values (matching the
+    pre-migration behaviour of ``fromisoformat`` + ``ValueError``).
+    """
     try:
-        parsed = datetime.datetime.fromisoformat(str(value))
+        return parse_datetime(str(value)) if value else None
     except ValueError:
         return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=datetime.UTC)
-    return parsed.astimezone(datetime.UTC)
 
 
 def _record_job_duration_metric(job: Any) -> None:

@@ -18,6 +18,7 @@ from app.audit_logger import log_rbac_event
 from app.models import ScheduledJob, ScheduledJobFrequency, ScrapeMode
 from app.url_safety import validate_public_http_url
 from app.utils.aup import require_aup_accepted
+from app.utils.datetime_normalization import parse_datetime
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 
@@ -279,8 +280,12 @@ async def detect_changes(
     frequency_met: bool | None = None
     if last and previous:
         try:
-            last_t = datetime.datetime.fromisoformat(str(last.get("ran_at") or ""))
-            prev_t = datetime.datetime.fromisoformat(str(previous.get("ran_at") or ""))
+            last_t = parse_datetime(str(last.get("ran_at") or ""))
+            prev_t = parse_datetime(str(previous.get("ran_at") or ""))
+            if last_t is None or prev_t is None:
+                # Missing/unparseable timestamps: leave frequency_met None
+                # so the caller can distinguish "unknown" from "definitively unmet".
+                raise ValueError("unparseable ran_at")
             gap_seconds = (last_t - prev_t).total_seconds()
             expected = _EXPECTED_GAP_SECONDS.get(str(job.get("frequency") or "").lower())
             if expected is not None:

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 from app.models import Job
 from app.services.job_state_machine import mark_recovered_failed
 from app.storage_interface import JobRepository
+from app.utils.datetime_normalization import parse_datetime
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -1057,7 +1058,9 @@ class PostgresRepositoryBase(JobRepository, ABC):
         alive = False
         if last_heartbeat:
             try:
-                delta = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromisoformat(last_heartbeat)
+                parsed = parse_datetime(last_heartbeat)
+                assert parsed is not None  # noqa: S101 — guarded by try/except below
+                delta = datetime.datetime.now(datetime.UTC) - parsed
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
                 alive = False

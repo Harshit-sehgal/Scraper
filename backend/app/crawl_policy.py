@@ -390,14 +390,14 @@ class CrawlPolicyEngine:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:
+        except (ValueError, UnicodeDecodeError):
             return None
 
     @staticmethod
     def _extract_path(url: str) -> str:
         try:
             return urlparse(url).path or "/"
-        except Exception:
+        except (ValueError, UnicodeDecodeError):
             return "/"
 
     async def _check_robots_txt(self, domain: str) -> None:

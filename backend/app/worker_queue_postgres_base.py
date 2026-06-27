@@ -26,6 +26,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
+from app.utils.datetime_normalization import format_datetime
 from app.worker_queue import Priority, QueueTask, _record_scheduled_job_usage
 
 if TYPE_CHECKING:
@@ -444,8 +445,12 @@ class PostgresWorkerQueueBase(ABC):
                 _ts_fields = ("created_at", "started_at", "completed_at", "scheduled_at")
                 for _f in _ts_fields:
                     v = row.get(_f)
-                    if isinstance(v, (datetime.datetime, datetime.date)):
-                        row[_f] = v.strftime("%Y-%m-%d %H:%M:%S")
+                    # format_datetime accepts datetime | None. ``date`` is left
+                    # alone — the schema uses TIMESTAMP columns, so reaching
+                    # this branch implies a malformed row that callers must
+                    # tolerate as-is.
+                    if isinstance(v, datetime.datetime):
+                        row[_f] = format_datetime(v)
 
                 return QueueTask.from_dict(
                     {

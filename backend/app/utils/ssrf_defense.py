@@ -85,7 +85,7 @@ class SSRFDefense:
 
             return True, ip
 
-        except Exception:
+        except (ValueError, TypeError, UnicodeError, socket.gaierror):
             logger.exception("URL validation error")
             return False, "URL validation failed"
 
@@ -132,6 +132,6 @@ class DNSRebindingDefense:
 
             return False
 
-        except Exception:
+        except (socket.gaierror, OSError, ValueError, TypeError):
             logger.exception("DNS rebinding check error")
             return False

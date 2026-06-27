@@ -138,6 +138,13 @@ async def api_key_middleware(request: Request, call_next):
         # returning session state from the cookie itself).
         if request.url.path in ("/api/session", "/api/session/me"):
             return await call_next(request)
+        # Password reset endpoints are exempt from API key middleware.
+        # They are called by unauthenticated users reset flows.
+        if request.url.path in (
+            "/api/saas/password-reset/request",
+            "/api/saas/password-reset/reset",
+        ):
+            return await call_next(request)
         # Self-service account signup is intentionally public. It remains
         # covered by body-size limits and the global rate limiter.
         if request.url.path == "/api/saas/signup":

@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.utils.datetime_normalization import format_datetime, parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class QueueTask:
         self.payload = payload or {}
         self.priority = priority
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
+        self.created_at = format_datetime(datetime.datetime.now(tz=datetime.UTC))
         self.started_at: str | None = None
         self.completed_at: str | None = None
         self.attempts = 0
@@ -217,11 +218,15 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
 _CURRENT_QUEUE_SCHEMA_VERSION = 3
 
 # SQLite's ``datetime('now')`` returns ``"YYYY-MM-DD HH:MM:SS"`` (no ``T``/``Z``).
-# We use the same format from Python so textual ``scheduled_at <= datetime('now')``
-# comparisons work in both directions. Timestamps are UTC (mirroring Postgres's
-# ``NOW()``) so the SQLite and Postgres backends produce identical orderings
+# Canonical UTC wire-format (ISO 8601 with explicit offset) is managed
+# by ``app.utils.datetime_normalization.format_datetime``.  We use it
+# instead of ``_TIMESTAMP_FORMAT`` so the SQLite and Postgres backends
+# produce identical, sortable strings.  Timestamps are UTC (mirroring
+# Postgres's ``NOW()``) so textual comparisons in SQL work correctly
 # regardless of the host's local time zone.
-_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+#
+# Legacy rows stored in the old ``"%Y-%m-%d %H:%M:%S"`` format are
+# handled transparently by ``parse_datetime()`` on read paths.
 
 
 def _ensure_schema(db_path: Path | None = None) -> None:
@@ -461,7 +466,7 @@ class WorkerQueue:
                 conn.execute("BEGIN IMMEDIATE")
                 row = conn.execute("""SELECT * FROM tasks
                        WHERE status = 'pending'
-                         AND scheduled_at <= datetime('now')
+                         AND scheduled_at <= strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')
                        ORDER BY priority ASC, created_at ASC
                        LIMIT 1""").fetchone()
 
@@ -477,7 +482,7 @@ class WorkerQueue:
                     },
                 )
                 task.status = TaskStatus.RUNNING
-                task.started_at = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
+                task.started_at = format_datetime(datetime.datetime.now(tz=datetime.UTC))
                 task.attempts += 1
 
                 conn.execute(
@@ -491,7 +496,7 @@ class WorkerQueue:
                 conn.close()
 
     def _complete_sync(self, task_id: str, result: dict | None) -> None:
-        now = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
+        now = format_datetime(datetime.datetime.now(tz=datetime.UTC))
         conn = self._conn()
         try:
             # Fetch task for history
@@ -563,8 +568,8 @@ class WorkerQueue:
                     else:
                         backoff = float(min(2 ** (attempts - 1) * 30, 3600))
 
-                    retry_at = (datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=backoff)).strftime(
-                        _TIMESTAMP_FORMAT,
+                    retry_at = format_datetime(
+                        datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=backoff),
                     )
                     conn.execute(
                         "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
@@ -642,7 +647,7 @@ class WorkerQueue:
         task_type: str | None = None,
     ) -> None:
         """Mark a task as failed. Retries if attempts remain."""
-        now = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
+        now = format_datetime(datetime.datetime.now(tz=datetime.UTC))
         async with self._in_flight_lock:
             await asyncio.to_thread(
                 self._fail_sync,
@@ -733,7 +738,7 @@ class WorkerQueue:
 
     async def cancel(self, task_id: str) -> bool:
         """Cancel a task. Handles both pending (SQLite) and in-flight (asyncio) tasks."""
-        now = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FORMAT)
+        now = format_datetime(datetime.datetime.now(tz=datetime.UTC))
         async with self._in_flight_lock:
             # Check in-flight tasks first (running tasks)
             if task_id in self._in_flight:
@@ -801,7 +806,8 @@ class WorkerQueue:
                     timeout_secs = row["timeout_seconds"] or 300
                     started_at_str = row["started_at"]
                     try:
-                        started_at = datetime.datetime.fromisoformat(started_at_str)
+                        started_at = parse_datetime(started_at_str)
+                        assert started_at is not None  # noqa: S101 — guarded by try/except below
                         elapsed = (now - started_at).total_seconds()
                         if elapsed > timeout_secs * 2:
                             conn.execute(
@@ -1071,7 +1077,7 @@ class WorkerQueue:
             running = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()[0]
             retrying = conn.execute("""SELECT COUNT(*) FROM tasks
                    WHERE status = 'pending'
-                     AND scheduled_at > datetime('now')""").fetchone()[0]
+                     AND scheduled_at > strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')""").fetchone()[0]
             dead_letter = conn.execute("SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'").fetchone()[0]
             completed_24h = conn.execute("""SELECT COUNT(*) FROM task_history
                    WHERE finished_at >= datetime('now', '-1 day')""").fetchone()[0]
@@ -1128,7 +1134,7 @@ class WorkerQueue:
                 """INSERT INTO tasks
                    (id, type, payload, priority, status, created_at,
                     scheduled_at, attempts, max_attempts, timeout_seconds)
-                    VALUES (?, ?, ?, ?, 'pending', ?, datetime('now'), 0, ?, ?)""",
+                    VALUES (?, ?, ?, ?, 'pending', ?, strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'), 0, ?, ?)""",
                 (
                     task_data["id"],
                     task_data["type"],

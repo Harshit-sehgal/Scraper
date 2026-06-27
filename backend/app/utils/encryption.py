@@ -296,7 +296,7 @@ def encrypt(plaintext: str, user_id: str | None = None) -> str:
             per_user = True
         except EncryptionError:
             raise
-        except Exception as e:
+        except (ValueError, TypeError, OSError) as e:
             logger.warning("Failed to derive per-user key, using app-level: %s", e)
             key = _get_key(key_version)
     else:
@@ -516,5 +516,5 @@ def is_encrypted(value: str) -> bool:
         payload_bytes = base64.b64decode(value)
         payload = json.loads(payload_bytes.decode("utf-8"))
         return all(k in payload for k in ("v", "c", "n", "t"))
-    except Exception:
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError):
         return False

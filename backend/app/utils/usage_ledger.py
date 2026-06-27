@@ -16,6 +16,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from app.utils.datetime_normalization import parse_datetime
+
 
 class UsageType(Enum):
     """Types of usage that can be tracked."""
@@ -431,15 +433,13 @@ def _format_dt(value: datetime | None) -> str | None:
 
 
 def _parse_dt(value: object) -> datetime | None:
+    """Parse a timestamp string using the central normalizer."""
     if not value:
         return None
     try:
-        parsed = datetime.fromisoformat(str(value))
-    except ValueError:
+        return parse_datetime(str(value))
+    except (ValueError, TypeError):
         return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed
 
 
 # Global ledger instance

@@ -23,6 +23,7 @@ from app.selector_discovery import analyze_url_for_fields
 from app.storage_interface import get_job_repository
 from app.url_analyzer import analyze_url as _url_analyze
 from app.url_safety import validate_public_http_url
+from app.utils.datetime_normalization import parse_datetime
 from app.utils.rbac import UserRole, require_role
 
 logger = logging.getLogger(__name__)
@@ -542,7 +543,8 @@ def _render_basic_metrics_text() -> str:
                 try:
                     import datetime as _dt
 
-                    age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
+                    last_hb_dt = parse_datetime(str(last_hb))
+                    age = (_dt.datetime.now(_dt.UTC) - last_hb_dt).total_seconds() if last_hb_dt else -1.0
                 except (ValueError, TypeError):
                     age = -1.0
             else:
@@ -865,7 +867,8 @@ async def metrics(request: Request):
                     try:
                         import datetime as _dt
 
-                        age = (_dt.datetime.now(_dt.UTC) - _dt.datetime.fromisoformat(str(last_hb))).total_seconds()
+                        last_hb_dt = parse_datetime(str(last_hb))
+                        age = (_dt.datetime.now(_dt.UTC) - last_hb_dt).total_seconds() if last_hb_dt else -1.0
                     except (ValueError, TypeError):
                         age = -1.0
                 else:

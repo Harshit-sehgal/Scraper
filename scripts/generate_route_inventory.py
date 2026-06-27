@@ -80,6 +80,7 @@ def _env(*, experimental: bool) -> dict[str, str]:
             "DATAFORGE_ALLOW_INSECURE_DEV_AUTH": "false",
             "DATAFORGE_SKIP_DB_CHECK": "true",
             "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true" if experimental else "false",
+            "DATAFORGE_LOG_LEVEL": "ERROR",
         },
     )
     return env

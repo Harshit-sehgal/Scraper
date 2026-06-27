@@ -230,7 +230,7 @@ class JobCreationService:
         try:
             _ctx = resolve_auth_context(request, allow_cookie=True)
             return user_id, _ctx.org_id, _ctx.project_id
-        except Exception:
+        except (ValueError, AttributeError, KeyError, RuntimeError):
             return user_id, "", ""
 
     def _validate_urls(self, job_data: JobCreate) -> list[str]:
