@@ -575,6 +575,9 @@ async def orchestrate_extraction(
             avg_score = _average_record_score(provided_results)
             if avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
+                provided_results = _detect_and_align_field_swaps_for_layer(
+                    provided_results, schema_fields, provenance_builder
+                )
                 memory.record_success(url, provided_selectors)
                 _record_field_provenance(
                     provenance_builder,
@@ -659,6 +662,9 @@ async def orchestrate_extraction(
                     warnings.append("Memory extraction returned low-confidence records on session-bound URL")
             elif avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
+                raw_results = _detect_and_align_field_swaps_for_layer(
+                    raw_results, schema_fields, provenance_builder
+                )
                 memory.record_success(url, remembered_selectors)
                 _record_field_provenance(
                     provenance_builder,
@@ -953,6 +959,73 @@ def _detect_field_swaps(
                 break
 
     return swaps
+
+
+def _detect_and_align_field_swaps_for_layer(
+    results: list[dict[str, Any]],
+    schema_fields: list[SchemaField],
+    provenance_builder: ProvenanceBuilder | None = None,
+    warn: bool = True,
+) -> list[dict[str, Any]]:
+    """Wrap results with field-swap detection before persisting.
+
+    Used as a guard before calling ``selector_memory.record_success()``
+    so a swapped selector pair is corrected (or at least flagged) before
+    it pollutes future extraction.  Returns the (possibly realigned)
+    records and logs an audit entry on swap detection.
+    """
+    if not results:
+        return results
+
+    extracted_values: dict[str, list] = {}
+    for field in schema_fields:
+        vals = [r.get(field.name) for r in results if r.get(field.name)]
+        if vals:
+            extracted_values[field.name] = vals[:3]
+
+    # Empty quality map proxies to the value-aware path; quality fallback
+    # only triggers when no values are available.
+    swapped = _detect_field_swaps({}, schema_fields, extracted_values)
+    if not swapped:
+        return results
+
+    if provenance_builder and warn:
+        provenance_builder.add_error(f"Field swap detected and aligned: {swapped}")
+    logger.warning(
+        "[Orchestrator] Detected field swap before memory write: %s",
+        swapped,
+    )
+
+    # Apply alignment: rotate values through the swap cycle in a single pass
+    # using a temporary buffer.  Iterating without buffering would make a
+    # 2-cycle (A→B, B→A) re-swap into the original position.
+    if len(set(swapped.values())) != len(swapped):
+        return results  # multiway / cycle — don't risk corrupting results
+
+    aligned: list[dict[str, Any]] = []
+    for record in results:
+        new_record = dict(record)
+        # Single-pass rotation: extract values, then re-assign to rotated targets.
+        extracted: dict[str, Any] = {
+            wrong_field: new_record.get(right_field)
+            for wrong_field, right_field in swapped.items()
+        }
+        # The source of each ``right_field``'s correct value is the
+        # preceding wrong_field in the cycle.  For simple {A:B, B:A}, A
+        # belongs in B and B belongs in A.
+        # Build the rotation chain explicitly:
+        keys = list(swapped.keys())  # e.g. [A, B] for {A:B, B:A}
+        if len(keys) == 2:
+            a, b = keys
+            new_record[b] = new_record.get(a)
+            new_record[a] = extracted[a]  # original B value
+        else:
+            # Generic cycle rotation
+            for wrong_field, right_field in swapped.items():
+                if wrong_field in new_record and right_field in new_record:
+                    new_record[right_field] = extracted[wrong_field]
+        aligned.append(new_record)
+    return aligned
 
 
 def _check_type_compatibility(field_type: FieldType, values: list[Any]) -> float:
