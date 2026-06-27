@@ -69,7 +69,6 @@ async def run_discovery_phase(
                 safe_urls.append(url)
             except ValueError as exc:
                 logger.debug("Skipping discovered URL that failed safety validation: %s", exc)
-                pass
     job.discovered_urls = safe_discovered
     job.urls = safe_urls
 

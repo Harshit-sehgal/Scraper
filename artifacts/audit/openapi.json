@@ -28,6 +28,7 @@
               "write",
               "admin"
             ],
+            "maxLength": 32,
             "title": "Scope",
             "type": "string"
           }
@@ -42,30 +43,37 @@
         "description": "Response after creating an API key \u2014 raw key shown only here.",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "key_prefix": {
+            "maxLength": 128,
             "title": "Key Prefix",
             "type": "string"
           },
           "name": {
+            "maxLength": 255,
             "title": "Name",
             "type": "string"
           },
           "project_id": {
+            "maxLength": 64,
             "title": "Project Id",
             "type": "string"
           },
           "raw_key": {
+            "maxLength": 256,
             "title": "Raw Key",
             "type": "string"
           },
           "scope": {
+            "maxLength": 32,
             "title": "Scope",
             "type": "string"
           }
@@ -108,20 +116,24 @@
         "description": "API key metadata (raw key only shown once at creation).",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "key_prefix": {
+            "maxLength": 128,
             "title": "Key Prefix",
             "type": "string"
           },
           "last_used_at": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -131,16 +143,19 @@
             "title": "Last Used At"
           },
           "name": {
+            "maxLength": 255,
             "title": "Name",
             "type": "string"
           },
           "project_id": {
+            "maxLength": 64,
             "title": "Project Id",
             "type": "string"
           },
           "revoked_at": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -150,6 +165,7 @@
             "title": "Revoked At"
           },
           "scope": {
+            "maxLength": 32,
             "title": "Scope",
             "type": "string"
           }
@@ -160,9 +176,7 @@
           "name",
           "scope",
           "key_prefix",
-          "created_at",
-          "last_used_at",
-          "revoked_at"
+          "created_at"
         ],
         "title": "ApiKeyResponse",
         "type": "object"
@@ -187,6 +201,7 @@
           "aup_accepted_at": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -198,6 +213,7 @@
           "aup_version_accepted": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -207,6 +223,7 @@
             "title": "Aup Version Accepted"
           },
           "current_aup_version": {
+            "maxLength": 64,
             "title": "Current Aup Version",
             "type": "string"
           },
@@ -215,14 +232,13 @@
             "type": "boolean"
           },
           "user_id": {
+            "maxLength": 64,
             "title": "User Id",
             "type": "string"
           }
         },
         "required": [
           "user_id",
-          "aup_accepted_at",
-          "aup_version_accepted",
           "requires_acceptance",
           "current_aup_version"
         ],
@@ -278,6 +294,7 @@
         "description": "Response from POST /api/billing/checkout.",
         "properties": {
           "approval_url": {
+            "maxLength": 2048,
             "title": "Approval Url",
             "type": "string"
           },
@@ -291,6 +308,7 @@
             "type": "string"
           },
           "token": {
+            "maxLength": 512,
             "title": "Token",
             "type": "string"
           }
@@ -338,23 +356,28 @@
         "description": "One denylist row, as returned by the admin endpoints.",
         "properties": {
           "added_at": {
+            "maxLength": 64,
             "title": "Added At",
             "type": "string"
           },
           "added_by": {
+            "maxLength": 128,
             "title": "Added By",
             "type": "string"
           },
           "domain": {
+            "maxLength": 512,
             "title": "Domain",
             "type": "string"
           },
           "path_prefix": {
             "default": "",
+            "maxLength": 512,
             "title": "Path Prefix",
             "type": "string"
           },
           "reason": {
+            "maxLength": 1024,
             "title": "Reason",
             "type": "string"
           }
@@ -398,12 +421,14 @@
           "domain": {
             "default": "",
             "description": "Preferred domain to search, e.g. 'example.com'",
+            "maxLength": 253,
             "title": "Domain",
             "type": "string"
           },
           "location": {
             "default": "",
             "description": "Geographic focus, e.g. 'New York, USA'",
+            "maxLength": 256,
             "title": "Location",
             "type": "string"
           },
@@ -439,6 +464,7 @@
           "origin_location": {
             "default": "",
             "description": "Center point for radius-aware optimization",
+            "maxLength": 256,
             "title": "Origin Location",
             "type": "string"
           },
@@ -457,6 +483,7 @@
           },
           "topic": {
             "description": "What topic / data to search for",
+            "maxLength": 512,
             "title": "Topic",
             "type": "string"
           }
@@ -472,10 +499,12 @@
         "properties": {
           "message": {
             "default": "Verification email sent. Check your inbox.",
+            "maxLength": 1024,
             "title": "Message",
             "type": "string"
           },
           "user_id": {
+            "maxLength": 64,
             "title": "User Id",
             "type": "string"
           }
@@ -490,6 +519,7 @@
         "description": "Email verification status for the authenticated user.",
         "properties": {
           "email": {
+            "maxLength": 320,
             "title": "Email",
             "type": "string"
           },
@@ -500,6 +530,7 @@
           "email_verified_at": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -511,8 +542,7 @@
         },
         "required": [
           "email",
-          "email_verified",
-          "email_verified_at"
+          "email_verified"
         ],
         "title": "EmailVerificationStatusResponse",
         "type": "object"
@@ -522,6 +552,7 @@
         "properties": {
           "token": {
             "description": "Verification token (from email link)",
+            "maxLength": 512,
             "title": "Token",
             "type": "string"
           }
@@ -536,6 +567,7 @@
         "description": "Response after successful email verification.",
         "properties": {
           "message": {
+            "maxLength": 1024,
             "title": "Message",
             "type": "string"
           },
@@ -599,6 +631,7 @@
           "distance_unit": {
             "anyOf": [
               {
+                "maxLength": 10,
                 "type": "string"
               },
               {
@@ -611,6 +644,7 @@
           },
           "field_name": {
             "description": "Which schema field to filter on",
+            "maxLength": 64,
             "title": "Field Name",
             "type": "string"
           },
@@ -621,6 +655,7 @@
           "origin_address": {
             "anyOf": [
               {
+                "maxLength": 512,
                 "type": "string"
               },
               {
@@ -633,6 +668,7 @@
           "value": {
             "default": "",
             "description": "Value to compare against",
+            "maxLength": 2048,
             "title": "Value",
             "type": "string"
           }
@@ -662,12 +698,14 @@
         "properties": {
           "email": {
             "description": "Email address to invite",
+            "maxLength": 320,
             "title": "Email",
             "type": "string"
           },
           "role": {
             "default": "member",
             "description": "Role to assign (member/admin/viewer)",
+            "maxLength": 32,
             "title": "Role",
             "type": "string"
           }
@@ -719,14 +757,17 @@
         "description": "Response after responding to an invitation.",
         "properties": {
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "message": {
+            "maxLength": 1024,
             "title": "Message",
             "type": "string"
           },
           "status": {
+            "maxLength": 32,
             "title": "Status",
             "type": "string"
           }
@@ -743,34 +784,42 @@
         "description": "Invitation details.",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "expires_at": {
+            "maxLength": 64,
             "title": "Expires At",
             "type": "string"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "invited_by_user_id": {
+            "maxLength": 64,
             "title": "Invited By User Id",
             "type": "string"
           },
           "invited_email": {
+            "maxLength": 320,
             "title": "Invited Email",
             "type": "string"
           },
           "org_id": {
+            "maxLength": 64,
             "title": "Org Id",
             "type": "string"
           },
           "role": {
+            "maxLength": 32,
             "title": "Role",
             "type": "string"
           },
           "status": {
+            "maxLength": 32,
             "title": "Status",
             "type": "string"
           }
@@ -794,6 +843,7 @@
           "auth_profile_id": {
             "anyOf": [
               {
+                "maxLength": 128,
                 "type": "string"
               },
               {
@@ -812,6 +862,7 @@
           "deduplicate_field": {
             "default": "",
             "description": "Field to use for deduplication",
+            "maxLength": 64,
             "title": "Deduplicate Field",
             "type": "string"
           },
@@ -834,6 +885,7 @@
           "location": {
             "default": "",
             "description": "Location focus for auto-discovery",
+            "maxLength": 256,
             "title": "Location",
             "type": "string"
           },
@@ -900,6 +952,7 @@
           "preferred_domain": {
             "default": "",
             "description": "Preferred domain for auto-discovery",
+            "maxLength": 253,
             "title": "Preferred Domain",
             "type": "string"
           },
@@ -941,6 +994,7 @@
           "topic": {
             "default": "",
             "description": "Topic for auto-discovery",
+            "maxLength": 512,
             "title": "Topic",
             "type": "string"
           },
@@ -964,22 +1018,27 @@
         "description": "Membership details.",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "membership_id": {
+            "maxLength": 64,
             "title": "Membership Id",
             "type": "string"
           },
           "org_id": {
+            "maxLength": 64,
             "title": "Org Id",
             "type": "string"
           },
           "role": {
+            "maxLength": 32,
             "title": "Role",
             "type": "string"
           },
           "user_id": {
+            "maxLength": 64,
             "title": "User Id",
             "type": "string"
           }
@@ -1037,18 +1096,22 @@
         "description": "Organization details.",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "created_by_user_id": {
+            "maxLength": 64,
             "title": "Created By User Id",
             "type": "string"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "name": {
+            "maxLength": 255,
             "title": "Name",
             "type": "string"
           }
@@ -1067,12 +1130,14 @@
         "properties": {
           "new_password": {
             "description": "New password (min 8 characters)",
+            "maxLength": 128,
             "minLength": 8,
             "title": "New Password",
             "type": "string"
           },
           "token": {
             "description": "Reset token (from email link)",
+            "maxLength": 512,
             "title": "Token",
             "type": "string"
           }
@@ -1089,6 +1154,7 @@
         "properties": {
           "message": {
             "default": "Password has been reset successfully.",
+            "maxLength": 1024,
             "title": "Message",
             "type": "string"
           }
@@ -1101,6 +1167,7 @@
         "properties": {
           "email": {
             "description": "Email address for the account to reset",
+            "maxLength": 320,
             "title": "Email",
             "type": "string"
           }
@@ -1116,6 +1183,7 @@
         "properties": {
           "message": {
             "default": "If that email exists, a reset link has been sent.",
+            "maxLength": 1024,
             "title": "Message",
             "type": "string"
           }
@@ -1127,26 +1195,32 @@
         "description": "Pending invitation details (returned to the invited user).",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "expires_at": {
+            "maxLength": 64,
             "title": "Expires At",
             "type": "string"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "invited_email": {
+            "maxLength": 320,
             "title": "Invited Email",
             "type": "string"
           },
           "org_id": {
+            "maxLength": 64,
             "title": "Org Id",
             "type": "string"
           },
           "role": {
+            "maxLength": 32,
             "title": "Role",
             "type": "string"
           }
@@ -1194,6 +1268,7 @@
           },
           "tier": {
             "default": "free",
+            "maxLength": 32,
             "title": "Tier",
             "type": "string"
           }
@@ -1216,6 +1291,7 @@
           },
           "org_id": {
             "description": "Parent organization ID",
+            "maxLength": 64,
             "title": "Org Id",
             "type": "string"
           }
@@ -1253,22 +1329,27 @@
         "description": "Project details.",
         "properties": {
           "created_at": {
+            "maxLength": 64,
             "title": "Created At",
             "type": "string"
           },
           "created_by_user_id": {
+            "maxLength": 64,
             "title": "Created By User Id",
             "type": "string"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
           "name": {
+            "maxLength": 255,
             "title": "Name",
             "type": "string"
           },
           "org_id": {
+            "maxLength": 64,
             "title": "Org Id",
             "type": "string"
           }
@@ -1300,6 +1381,7 @@
           "description": {
             "default": "",
             "description": "Optional hint for the LLM about what this field is",
+            "maxLength": 1024,
             "title": "Description",
             "type": "string"
           },
@@ -1332,6 +1414,7 @@
         "properties": {
           "intent": {
             "description": "Natural language description of what data to scrape",
+            "maxLength": 4096,
             "title": "Intent",
             "type": "string"
           },
@@ -1398,17 +1481,20 @@
           "display_name": {
             "default": "",
             "description": "Optional human-readable name",
+            "maxLength": 255,
             "title": "Display Name",
             "type": "string"
           },
           "email": {
             "description": "User email (becomes login)",
+            "maxLength": 320,
             "title": "Email",
             "type": "string"
           },
           "org_name": {
             "anyOf": [
               {
+                "maxLength": 255,
                 "type": "string"
               },
               {
@@ -1420,6 +1506,7 @@
           },
           "password": {
             "description": "Minimum 8 characters",
+            "maxLength": 128,
             "minLength": 8,
             "title": "Password",
             "type": "string"
@@ -1427,6 +1514,7 @@
           "project_name": {
             "anyOf": [
               {
+                "maxLength": 255,
                 "type": "string"
               },
               {
@@ -1448,23 +1536,28 @@
         "description": "Response after successful signup.",
         "properties": {
           "email": {
+            "maxLength": 320,
             "title": "Email",
             "type": "string"
           },
           "message": {
             "default": "Account created successfully. Please accept the AUP.",
+            "maxLength": 1024,
             "title": "Message",
             "type": "string"
           },
           "organization_id": {
+            "maxLength": 64,
             "title": "Organization Id",
             "type": "string"
           },
           "project_id": {
+            "maxLength": 64,
             "title": "Project Id",
             "type": "string"
           },
           "user_id": {
+            "maxLength": 64,
             "title": "User Id",
             "type": "string"
           }
@@ -1517,6 +1610,7 @@
           },
           "url": {
             "description": "The URL to analyze for data extraction",
+            "maxLength": 2048,
             "title": "Url",
             "type": "string"
           }
@@ -1565,6 +1659,7 @@
           "aup_accepted_at": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -1576,6 +1671,7 @@
           "aup_version_accepted": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -1585,18 +1681,22 @@
             "title": "Aup Version Accepted"
           },
           "display_name": {
+            "maxLength": 255,
             "title": "Display Name",
             "type": "string"
           },
           "email": {
+            "maxLength": 320,
             "title": "Email",
             "type": "string"
           },
           "status": {
+            "maxLength": 32,
             "title": "Status",
             "type": "string"
           },
           "user_id": {
+            "maxLength": 64,
             "title": "User Id",
             "type": "string"
           }
@@ -1605,9 +1705,7 @@
           "user_id",
           "email",
           "display_name",
-          "status",
-          "aup_accepted_at",
-          "aup_version_accepted"
+          "status"
         ],
         "title": "UserProfileResponse",
         "type": "object"
@@ -1871,6 +1969,7 @@
           "stop_condition": {
             "default": "none",
             "description": "Stop condition: none, no_more_records, duplicate_threshold, custom",
+            "maxLength": 64,
             "title": "Stop Condition",
             "type": "string"
           },

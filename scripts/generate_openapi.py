@@ -33,6 +33,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -43,17 +44,31 @@ DOCS_OUT_DIR = REPO / "docs"
 
 
 def _run_subprocess(enable_experimental: bool) -> dict[str, Any]:
-    """Bootstrap the app in a clean interpreter and dump its OpenAPI schema."""
+    """Bootstrap the app in a clean interpreter and dump its OpenAPI schema.
+
+    Writes the spec to a temp file from within the subprocess to avoid
+    stdout-parsing fragility — FastAPI import-time logging can bleed
+    into stdout, and multi-line pretty-printed JSON cannot be parsed
+    from a single line.
+    """
+    # mkstemp avoids SIM115: we need delete=False so the subprocess can
+    # write to the path, and we close the fd immediately since we only
+    # need the path.
+    fd, tmp_path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    tmp_path_repr = repr(tmp_path)
+
     env_value = "true" if enable_experimental else "false"
     script = (
-        "import json,sys;"
-        "os=__import__('os');"
+        "import json,os;"
+        f"from pathlib import Path;"
+        f"_p = Path({tmp_path_repr});"
         "os.environ['DATAFORGE_DOTENV_PATH']='/dev/null';"
         "os.environ['DATAFORGE_ENV']='development';"
         "os.environ['DATAFORGE_STORAGE_BACKEND']='sqlite';"
         f"os.environ['DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES']='{env_value}';"
         "from app.main import app;"
-        "sys.stdout.write(json.dumps(app.openapi(), indent=2, sort_keys=True));"
+        "_p.write_text(json.dumps(app.openapi(), indent=2, sort_keys=True));"
     )
     env = os.environ.copy()
     env["DATAFORGE_DOTENV_PATH"] = "/dev/null"
@@ -75,15 +90,17 @@ def _run_subprocess(enable_experimental: bool) -> dict[str, Any]:
         cwd=str(BACKEND),
         timeout=60,
     )
-    if result.returncode != 0:
-        msg = (
-            f"openapi generation failed (rc={result.returncode}):\n"
-            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
-        )
-        raise RuntimeError(
-            msg,
-        )
-    return json.loads(result.stdout)
+    try:
+        spec_raw = Path(tmp_path).read_text()
+        if not spec_raw.strip():
+            msg = (
+                f"openapi generation produced empty spec file (rc={result.returncode}):\n"
+                f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+            )
+            raise RuntimeError(msg)
+        return json.loads(spec_raw)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 def _summarize(spec: dict[str, Any]) -> dict[str, int]:

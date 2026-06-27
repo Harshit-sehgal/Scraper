@@ -448,7 +448,7 @@ def _default_async_backend() -> httpcore.AsyncNetworkBackend:
     noticed.
     """
     if hasattr(httpcore, "AnyIOBackend"):
-        return httpcore.AnyIOBackend()
+        return httpcore.AnyIOBackend()  # type: ignore[return-value]
     logger.warning(
         "httpcore.AnyIOBackend unavailable; falling back to private _backends.auto.AutoBackend. "
         "Upgrade httpcore to a version that exposes AnyIOBackend publicly.",

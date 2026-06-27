@@ -137,7 +137,6 @@ async def run_finalization(
             record_job_succeeded()
     except ImportError as exc:
         logger.debug("metrics_collector not available, skipping job metric recording: %s", exc)
-        pass
     job.progress_current = job.progress_total
     _record_job_completed_usage(job)
 

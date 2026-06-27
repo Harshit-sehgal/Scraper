@@ -15,6 +15,7 @@ import pytest
 
 # ─── _extract_json_payload ─────────────────────────────────────────────
 from app.llm_bridge import (
+    ALLOWED_SANDBOX_MODULES,
     SubstratePluginManager,
     _call_openai_compatible_json,
     _call_openai_compatible_text,
@@ -32,6 +33,17 @@ from app.llm_bridge import (
     reset_plugin_manager,
     reset_silent_failure_counts,
 )
+
+
+def _register_allow_listed_handler(mgr: SubstratePluginManager, name: str, handler) -> None:
+    """Register a handler whose ``__module__`` is allow-listed.
+
+    Without this the LAW 15 sandbox refuses to dispatch handlers defined
+    in ``tests.*`` modules — they need to look like they live in
+    ``app.llm_bridge`` so the protective guard accepts them.
+    """
+    handler.__module__ = "app.llm_bridge"
+    mgr.register_handler(name, handler)
 
 
 class TestExtractJsonPayload:
@@ -450,7 +462,7 @@ class TestSubstratePluginManager:
         def handler(**kwargs) -> str:
             return f"processed {kwargs.get('x')}"
 
-        mgr.register_handler("echo", handler)
+        _register_allow_listed_handler(mgr, "echo", handler)
         result = mgr.call_tool("echo", x=42)
         assert result == "processed 42"
 
@@ -465,7 +477,7 @@ class TestSubstratePluginManager:
         def handler(**kwargs) -> str:
             return "done"
 
-        mgr.register_handler("h1", handler)
+        _register_allow_listed_handler(mgr, "h1", handler)
         mgr.call_tool("h1", foo="bar")
         assert len(mgr._execution_history) == 1
         assert mgr._execution_history[0]["handler"] == "h1"
@@ -478,7 +490,7 @@ class TestSubstratePluginManager:
             msg = "oops"
             raise ValueError(msg)
 
-        mgr.register_handler("failing", handler)
+        _register_allow_listed_handler(mgr, "failing", handler)
         with pytest.raises(ValueError):
             mgr.call_tool("failing")
         assert mgr._execution_history[0]["status"] == "error"
@@ -492,7 +504,7 @@ class TestSubstratePluginManager:
         def handler(**kwargs) -> str:
             return "should not reach"
 
-        mgr.register_handler("blocked", handler)
+        _register_allow_listed_handler(mgr, "blocked", handler)
 
         with patch("app.policy_engine.get_policy_engine") as mock_policy:
             policy_instance = MagicMock()

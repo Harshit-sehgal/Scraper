@@ -121,7 +121,6 @@ def register_jobs_write_routes(
                     safe_results.append(r)
                 except ValueError as exc:
                     logger.debug("Skipping invalid URL %r in safety check: %s", url, exc)
-                    pass
         return {"urls": safe_results}
 
     @router.post("/api/schema/suggest")

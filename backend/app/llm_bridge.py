@@ -269,7 +269,6 @@ async def _call_openai_compatible_json(
                         continue
                     except (ValueError, TypeError) as exc:
                         logger.debug("Could not parse retry-after header value %r: %s", retry_after, exc)
-                        pass
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
@@ -325,7 +324,6 @@ async def _call_openai_compatible_text(
                         continue
                     except (ValueError, TypeError) as exc:
                         logger.debug("Could not parse retry-after header value %r: %s", retry_after, exc)
-                        pass
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:

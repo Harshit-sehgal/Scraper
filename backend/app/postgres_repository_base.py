@@ -879,7 +879,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "DELETE FROM idempotency_keys WHERE created_at < NOW() - INTERVAL %s",
                     (f"{int(older_than_days)} days",),
                 )
-                return int(cur.rowcount) if cur.rowcount else 0
+                return int(cur.rowcount) if cur is not None and cur.rowcount else 0
         except _DB_OPS_ERRORS:
             logger.exception("prune_idempotency_keys failed")
             return 0
@@ -946,7 +946,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         self._ensure()
         with self._conn() as conn:
             cur = self._execute(conn, "DELETE FROM jobs WHERE id = %s", (job_id,))
-            deleted = cur.rowcount
+            deleted = cur.rowcount if cur is not None else 0
             self._execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
             self._execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
             self._execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))

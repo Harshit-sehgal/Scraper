@@ -214,7 +214,6 @@ def _auth_was_attempted(request: Request) -> bool:
             return True
     except (AttributeError, TypeError) as exc:
         logger.debug("Could not access request cookies: %s", exc)
-        pass
     return False
 
 

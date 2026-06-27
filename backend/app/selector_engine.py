@@ -497,7 +497,7 @@ def _extract_field_by_pattern(
             text_lower = full_text.lower()
             matches = sum(1 for w in example_words if w in text_lower)
             if matches / len(example_words) >= settings.SELECTOR_FUZZY_MATCH_RATIO:
-                window = _extract_context_window(full_text, example_words)
+                window = _extract_context_window(full_text, example_words)  # type: ignore[arg-type]
                 if window:
                     return window
 

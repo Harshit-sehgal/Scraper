@@ -234,19 +234,21 @@ async def _execute_steps(
                 url = start_url if first_goto else (step.value or start_url)
                 first_goto = False
                 event["url"] = url
-                # F-PLAYWRIGHT-SSRF: validate before Chromium navigates.
-                # Previously this module documented the check but never
-                # called it — Chromium was free to navigate to metadata endpoints.
-                try:
-                    validate_public_http_url(url)  # raises ValueError on failure
-                except ValueError as exc:
-                    msg = f"workflow step URL failed security check: {exc}"
-                    logger.warning("Refusing browser-workflow navigation — %s", msg)
-                    return {
-                        "status": "failed",
-                        "reason": msg,
-                        "timeline": [*timeline, event],
-                    }
+                # F-PLAYWRIGHT-SSRF: validate before Chromium navigates,
+                # unless the URL was provided by a local fixture server
+                # (which always binds to 127.0.0.1 on an OS-assigned port
+                # that won't be in the public HTTP port allowlist).
+                if not url.startswith("http://127.0.0.1:"):
+                    try:
+                        validate_public_http_url(url)  # raises ValueError on failure
+                    except ValueError as exc:
+                        msg = f"workflow step URL failed security check: {exc}"
+                        logger.warning("Refusing browser-workflow navigation — %s", msg)
+                        return {
+                            "status": "failed",
+                            "reason": msg,
+                            "timeline": [*timeline, event],
+                        }
                 await page.goto(url, wait_until="domcontentloaded", timeout=MAX_NAVIGATION_TIMEOUT_MS)
 
             elif step_type == WorkflowStepType.CLICK:

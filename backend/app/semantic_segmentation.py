@@ -68,7 +68,6 @@ def to_semantic_type(value: object) -> SemanticType:
             return SemanticType(raw_value)
         except (ValueError, TypeError) as exc:
             logger.debug("Cannot convert value %r to SemanticType directly, falling back to string mapping: %s", raw_value, exc)
-            pass
     return candidate_type_to_semantic(str(value))
 
 

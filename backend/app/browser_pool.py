@@ -198,6 +198,9 @@ class BrowserPool:
                             mask_proxy_url(proxy_config["server"]),
                         )
 
+            if self._browser is None:
+                msg = "Browser not initialised before context creation"
+                raise RuntimeError(msg)
             try:
                 context = await self._browser.new_context(**context_options)
             except (Error, OSError, RuntimeError):

@@ -137,7 +137,6 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
             import psycopg
         except ImportError as exc:
             logger.debug("Optional psycopg (v3) driver not available: %s", exc)
-            pass
         else:
             register_db_error_class(psycopg.Error)
         super().__init__(auto_ensure_schema=auto_ensure_schema)

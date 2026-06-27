@@ -202,7 +202,6 @@ def _build(failure_class: str, confidence: float) -> ZeroResultClassification:
             record_anti_bot_classification(failure_class)
     except (ImportError, AttributeError, TypeError, ValueError) as exc:
         logger.debug("Could not record anti-bot classification metric: %s", exc)
-        pass
 
     return ZeroResultClassification(
         zero_result=True,

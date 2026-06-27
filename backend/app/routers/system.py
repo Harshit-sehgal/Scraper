@@ -151,7 +151,6 @@ async def system_status(
             response["workers"] = worker_healths
     except (AttributeError, ImportError, RuntimeError) as exc:
         logger.warning("Failed to fetch worker health status: %s", exc)
-        pass
 
     # Queue status
     try:
@@ -166,7 +165,6 @@ async def system_status(
         }
     except (AttributeError, ImportError, RuntimeError) as exc:
         logger.warning("Failed to fetch queue status: %s", exc)
-        pass
 
     if settings.ENV.lower() != "production":
         from app.state_store import get_state_file_path
@@ -277,7 +275,6 @@ async def csp_violations(request: Request):
         record_csp_violation(directive_label)
     except (ImportError, AttributeError, TypeError, ValueError) as exc:
         logger.debug("metrics_collector not available, skipping CSP violation metric: %s", exc)
-        pass
 
     # Sanitise log values: truncate and remove newlines to prevent log injection
     def _sanitise(val: object, max_len: int = 120) -> str:

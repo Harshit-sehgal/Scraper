@@ -714,7 +714,6 @@ async def scrape_url(
             ab_engine.record_block(intel.domain, anti_bot)
     except (ImportError, AttributeError, TypeError, ValueError, RuntimeError, OSError, KeyError) as exc:
         logger.warning("Could not record anti-bot block: %s", exc)
-        pass
 
     soup_for_density = BeautifulSoup(html, "html.parser")
     token_density = len(soup_for_density.get_text()) / max(1, dom_nodes)
@@ -778,7 +777,6 @@ async def scrape_url(
         get_anti_bot_engine().record_success(intel.domain)
     except (ImportError, AttributeError) as exc:
         logger.warning("Could not record anti-bot success feedback: %s", exc)
-        pass
 
     # ── Step 5: Motif Feedback ────────────────────────────────────
     new_motifs = run_all_adaptive_hooks(

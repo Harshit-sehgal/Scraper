@@ -362,7 +362,6 @@ class RegressionCapture:
                 pruned += 1
             except OSError as exc:
                 logger.debug("Could not delete stale fixture %s: %s", fpath, exc)
-                pass
 
         if pruned > 0:
             self._save_registry()

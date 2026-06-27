@@ -92,9 +92,12 @@ class GlobalCognitiveScheduler:
 
             task = heapq.heappop(self._task_queue)
 
-            try:
-                pressure = self.ws.get_system_pressure()
-            except AttributeError:
+            if self.ws is not None:
+                try:
+                    pressure = self.ws.get_system_pressure()
+                except AttributeError:
+                    pressure = 1.0
+            else:
                 pressure = 1.0
 
             if pressure > self._preemption_threshold and task.priority > TaskPriority.URGENT:

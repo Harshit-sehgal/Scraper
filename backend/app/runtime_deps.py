@@ -46,14 +46,12 @@ def _default_schedule_task(coro: Coroutine[Any, Any, Any]) -> asyncio.Task | Non
         return schedule_background_task(coro)
     except ImportError as exc:
         logger.debug("Could not import schedule_background_task: %s", exc)
-        pass
     try:
         loop = asyncio.get_running_loop()
         if loop.is_running():
             return loop.create_task(coro)
     except RuntimeError as exc:
         logger.debug("No running event loop for background task: %s", exc)
-        pass
     return None
 
 

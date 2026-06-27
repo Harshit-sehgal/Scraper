@@ -7,10 +7,11 @@ import asyncio
 import logging
 import re
 import threading
-from typing import Any
+from typing import Any, cast
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
+from geopy.location import Location
 
 from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Geocoding & Distance (Nominatim; no paid API key required)
 # ──────────────────────────────────────────────
 
-_geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=settings.GEOCODER_TIMEOUT)
+_geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=cast(object, settings.GEOCODER_TIMEOUT))
 _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", "pincode")
 
 
@@ -40,7 +41,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
     backoff = 1.0  # Base delay in seconds
     for attempt in range(max_retries):
         try:
-            location = await asyncio.to_thread(_geocoder.geocode, address)
+            location = cast(Location | None, await asyncio.to_thread(_geocoder.geocode, address))
             if location:
                 coords = (location.latitude, location.longitude)
                 cache.set(address, location.latitude, location.longitude, location.address)

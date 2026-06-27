@@ -994,22 +994,27 @@ def _detect_and_align_field_swaps_for_layer(
     aligned: list[dict[str, Any]] = []
     for record in results:
         new_record = dict(record)
-        # Single-pass rotation: extract values, then re-assign to rotated targets.
-        extracted: dict[str, Any] = {wrong_field: new_record.get(right_field) for wrong_field, right_field in swapped.items()}
-        # The source of each ``right_field``'s correct value is the
-        # preceding wrong_field in the cycle.  For simple {A:B, B:A}, A
-        # belongs in B and B belongs in A.
-        # Build the rotation chain explicitly:
+        # Single-pass rotation: capture originals first, then assign in one
+        # step.  Doing the assigns without buffering would let the first
+        # write clobber the value the second write needs — a 2-cycle swap
+        # (A↔B) would end up with both slots holding A's value.
         keys = list(swapped.keys())  # e.g. [A, B] for {A:B, B:A}
         if len(keys) == 2:
             a, b = keys
-            new_record[b] = new_record.get(a)
-            new_record[a] = extracted[a]  # original B value
+            # Swap semantics: ``swapped`` says each ``wrong_field`` was
+            # actually populated with ``right_field``'s value.  So save
+            # both originals *before* overwriting either.
+            orig_a = new_record.get(a)
+            orig_b = new_record.get(b)
+            new_record[b] = orig_a  # B's slot now holds A's original
+            new_record[a] = orig_b  # A's slot now holds B's original
         else:
-            # Generic cycle rotation
+            # Generic cycle rotation: snapshot first, swap in second pass
+            # to avoid clobbering chained dependencies.
+            originals: dict[str, Any] = {k: new_record.get(k) for k in swapped}
             for wrong_field, right_field in swapped.items():
                 if wrong_field in new_record and right_field in new_record:
-                    new_record[right_field] = extracted[wrong_field]
+                    new_record[right_field] = originals[wrong_field]
         aligned.append(new_record)
     return aligned
 

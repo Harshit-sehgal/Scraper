@@ -186,13 +186,37 @@ class TestSsrfRejects:
         assert counts == {"private_ip": 50, "dns_filter": 50}
 
     def test_browser_failure_reasons_do_not_create_unbounded_ssrf_labels(self, reset_metrics) -> None:
-        from app.metrics_collector import get_ssrf_rejects, record_browser_launch
+        """Verify browser launch failures are tracked in error counters, not SSRF rejects.
+
+        ``record_browser_launch`` writes to the error counter (with the
+        crash reason in the label) and the browser-outcome counter, but
+        MUST NOT add entries to ``_ssrf_rejects`` — otherwise every
+        unique pid/hostname/worker-id would create a new Prometheus
+        label, breaking the cardinality contract.
+        """
+        from app.metrics_collector import (
+            get_browser_launch_outcomes,
+            get_errors,
+            get_ssrf_rejects,
+            record_browser_launch,
+        )
 
         for index in range(25):
             record_browser_launch(False, reason=f"chromium crash pid={index}")
 
-        counts = get_ssrf_rejects()
-        assert counts == {"other": 25}
+        # SSRF rejects must be completely empty — no label explosion
+        assert get_ssrf_rejects() == {}, "browser failures must not leak into SSRF rejects"
+
+        # Browser outcomes recorded correctly
+        assert get_browser_launch_outcomes() == {"failure": 25}
+
+        # Error counter has all 25 unique reasons (that's acceptable because
+        # error counters are high-cardinality by design — they're logged, not
+        # Prometheus-exported as metric labels)
+        errors = get_errors()
+        assert len(errors) == 25, f"expected 25 unique error keys, got {len(errors)}"
+        for idx in range(25):
+            assert errors.get(f"browser_crash:chromium crash pid={idx}") == 1
 
 
 class TestRepoQueryLatency:

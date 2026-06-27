@@ -94,7 +94,6 @@ async def body_size_middleware(request: Request, call_next):
                 )
         except (ValueError, TypeError) as exc:
             logger.debug("Ignoring invalid Content-Length header: %s", exc)
-            pass
 
     chunks: list[bytes] = []
     bytes_received = 0

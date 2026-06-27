@@ -27,6 +27,7 @@ from typing import Any
 from bs4 import BeautifulSoup, Tag
 
 from app.browser_network_capture import get_captures
+from app.utils.html_size import enforce_html_size
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,11 @@ def collect_page_evidence(
     MIN_HTML_LENGTH: int = 50
     if not html or len(html.strip()) < MIN_HTML_LENGTH:
         return evidence
+
+    # ── Bound input size defensively so BeautifulSoup can never stall on a
+    #    pathological payload.  Oversized HTML is silently truncated; the
+    #    raw length is preserved in ``html_length`` for telemetry.
+    html = enforce_html_size(html, url=url, must_truncate=True)
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -385,7 +391,6 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                 jsonld_data.append(data)
         except (json.JSONDecodeError, TypeError) as exc:
             logger.debug("Skipping unparseable JSON-LD script: %s", exc)
-            pass
     if jsonld_data:
         hydration["jsonld"] = jsonld_data[:10]
 
@@ -403,7 +408,6 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                 hydration["nextjs_initial_state"] = _truncate_large_values(data["initialState"])
         except (json.JSONDecodeError, TypeError) as exc:
             logger.debug("Skipping unparseable __NEXT_DATA__: %s", exc)
-            pass
 
     # Window __INITIAL_STATE__
     for script in soup.find_all("script"):
@@ -434,7 +438,6 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                             hydration[var_name] = _truncate_large_values(data)
                         except (json.JSONDecodeError, TypeError) as exc:
                             logger.debug("Skipping unparseable initial state JSON: %s", exc)
-                            pass
 
     # Apollo / Relay state
     for script in soup.find_all("script"):
@@ -449,7 +452,6 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                     hydration["apollo_state"] = _truncate_large_values(data)
                 except (json.JSONDecodeError, TypeError) as exc:
                     logger.debug("Skipping unparseable Apollo state JSON: %s", exc)
-                    pass
 
     return hydration
 

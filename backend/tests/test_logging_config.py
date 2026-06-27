@@ -12,6 +12,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+from collections.abc import Generator
 
 import pytest
 from app.logging_config import (
@@ -24,9 +25,6 @@ from app.logging_config import (
     configure_logging,
     reset_for_tests,
 )
-
-
-from collections.abc import Generator
 
 
 @pytest.fixture

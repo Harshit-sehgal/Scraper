@@ -437,7 +437,6 @@ def get_workflow_repository() -> WorkflowRepository:
                 backend = (getattr(settings, "WORKFLOW_BACKEND", "") or "").strip().lower()
             except ImportError as exc:
                 logger.debug("Could not import settings for workflow backend detection: %s", exc)
-                pass
         if not backend:
             backend = "json"
 

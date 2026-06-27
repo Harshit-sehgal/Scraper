@@ -50,7 +50,6 @@ try:
     _DB_FALLBACK_ERRORS = (*_DB_FALLBACK_ERRORS, _Psycopg2Error)
 except ImportError as exc:
     logger.debug("Optional psycopg2 driver not available: %s", exc)
-    pass
 
 try:
     from psycopg import Error as _Psycopg3Error
@@ -58,7 +57,6 @@ try:
     _DB_FALLBACK_ERRORS = (*_DB_FALLBACK_ERRORS, _Psycopg3Error)
 except ImportError as exc:
     logger.debug("Optional psycopg (v3) driver not available: %s", exc)
-    pass
 
 
 # ─── H5: Redis-backed rate limiting for distributed deployments ────────
@@ -799,7 +797,6 @@ class RateLimiterMiddleware:
             response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
         except (AttributeError, TypeError, ValueError) as exc:
             logger.debug("Could not attach rate-limit headers: %s", exc)
-            pass
 
     # ── Main middleware dispatch ───────────────────────────────────────
 

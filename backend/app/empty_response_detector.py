@@ -9,6 +9,7 @@ redirect, and other degenerate cases.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -17,6 +18,8 @@ from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.utils.html_size import HTMLSizeExceeded, enforce_html_size
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -112,7 +115,7 @@ EMPTY_PAGE_SIGNALS: dict[str, list[re.Pattern]] = {
 }
 
 
-def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseCheck:  # noqa: ARG001, C901, PLR0912, RUF100
+def detect_empty_response(html: str, status_code: int = 200, url: str | None = None) -> EmptyResponseCheck:  # noqa: ARG001, C901, PLR0912, RUF100
     """Detect if an HTTP response is effectively empty despite returning 200.
 
     Checks for various "empty but 200" conditions: blank pages, cookie walls,
@@ -122,6 +125,8 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
     Args:
         html: The page HTML content
         status_code: HTTP status code (defaults to 200)
+        url: Optional source URL of the page (used for HTML size limit
+            diagnostics when the payload is rejected).
 
     Returns:
         EmptyResponseCheck with classification and suggestions
@@ -136,6 +141,29 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
             text_length=0,
             data_signals=0,
             suggestions=["The URL may be incorrect or the server returned an empty page"],
+        )
+
+    # ── Step 0: Enforce HTML size cap before any regex pattern matching ──
+    try:
+        html = enforce_html_size(html, url=url, must_truncate=False)
+    except HTMLSizeExceeded as exc:
+        logger.warning(
+            "Skipping empty-response detection: HTML payload of %d bytes exceeds %d-byte cap (url=%s)",
+            exc.observed,
+            exc.limit,
+            exc.url or url,
+        )
+        return EmptyResponseCheck(
+            is_empty=False,
+            empty_type="",
+            confidence=0.0,
+            message=(
+                f"HTML payload of {exc.observed:,} bytes exceeds the "
+                f"{exc.limit:,}-byte limit; empty-response detection skipped"
+            ),
+            text_length=0,
+            data_signals=0,
+            suggestions=["Reduce page size or increase DATAFORGE_MAX_HTML_BYTES before retrying"],
         )
 
     # ── Step 1: Check raw HTML for empty-page signals (before stripping tags) ──

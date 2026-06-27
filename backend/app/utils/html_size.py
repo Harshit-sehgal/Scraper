@@ -129,15 +129,18 @@ def enforce_html_size(
 
 
 def truncate_html(html: str, *, cap: int) -> str:
-    """Return the first ``cap`` bytes of ``html`` with a cut-off sentinel.
+    """Return a copy of ``html`` whose length is at most ``cap`` bytes.
 
-    The sentinel is appended *after* the cap is applied so the returned
-    string is exactly ``cap`` bytes.  This lets downstream parsers
-    gracefully degrade (the partial final tag is small noise as long as
-    the cap isn't so tight that it slices through attribute values).
+    A trailing sentinel is included so downstream parsers see that the
+    payload was cut (rather than treating the last few chars as valid).
+    The sentinel is appended *inside* the cap so the returned string is
+    ``<= cap`` bytes — never larger than the caller can atomically copy.
     """
     if len(html) <= cap:
         return html
-    # Strip the last few characters to avoid cutting inside a long
-    # attribute value; ``html.parser`` is forgiving about partial tags.
-    return html[:cap] + "\n<!-- truncated by DATAFORGE_MAX_HTML_BYTES -->"
+    sentinel = "\n<!-- truncated by DATAFORGE_MAX_HTML_BYTES -->"
+    # Reserve room for the sentinel; if cap < len(sentinel), just clip.
+    if cap <= len(sentinel):
+        return html[:max(0, cap - 0)]  # cap smaller than sentinel; just cut
+    keep = cap - len(sentinel)
+    return html[:keep] + sentinel

@@ -32,7 +32,6 @@ class NonBlockingRLock:
                     return self._lock.acquire(blocking=True, timeout=1.0)
             except RuntimeError as exc:
                 logger.debug("No running event loop detected, falling back to blocking acquire: %s", exc)
-                pass
         return self._lock.acquire(blocking=blocking, timeout=timeout)
 
     def release(self) -> None:

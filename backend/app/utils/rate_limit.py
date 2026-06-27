@@ -83,7 +83,6 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
         return float(raw)
     except (ValueError, TypeError) as exc:
         logger.debug("Retry-After header not numeric, trying HTTP-date: %s", exc)
-        pass
 
     # Try parsing as HTTP-date
     try:
@@ -94,7 +93,6 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
         return max(0.0, delta)
     except Exception as exc:  # nosec B110  # noqa: RUF100, S110
         logger.debug("Retry-After header unparseable as HTTP-date: %s", exc)
-        pass
 
     return None
 

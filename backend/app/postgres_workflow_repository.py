@@ -47,7 +47,6 @@ def _try_register_driver_errors() -> None:
                 register_wf_db_error_class(err_cls)
         except ImportError as exc:
             logger.debug("Postgres driver %s not available: %s", mod_name, exc)
-            pass
 
 
 _try_register_driver_errors()
@@ -203,7 +202,7 @@ class _PostgresWorkflowRepositoryBase(WorkflowRepository, ABC):
         self._ensure_schema()
         with self._conn() as conn:
             cur = self._execute(conn, "DELETE FROM workflows WHERE id = %s", (workflow_id,))
-            return (cur.rowcount or 0) > 0
+            return (cur.rowcount if cur is not None else 0) > 0
 
     def count_workflows(self) -> int:
         self._ensure_schema()

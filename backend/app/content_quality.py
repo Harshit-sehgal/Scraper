@@ -104,8 +104,7 @@ def _assess_content_quality(html: str, profile) -> dict[str, Any]:
 
     # ── Data Container Detection ────────────────────────────────────
     data_container_count = 0
-    has_profile_selector = profile is not None and hasattr(profile, "container_selector")
-    container_selector = profile.container_selector if has_profile_selector else None
+    container_selector = profile.container_selector if profile is not None and hasattr(profile, "container_selector") else None
 
     if container_selector and container_selector != "body":
         try:
