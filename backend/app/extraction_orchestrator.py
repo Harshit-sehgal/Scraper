@@ -40,7 +40,6 @@ class ExtractionResult:
         method: str,
         selector_success: bool = False,
         selectors: dict | None = None,
-        page_closed: bool = False,
         network_diagnostics: list[str] | None = None,
     ) -> None:
         self.records = records

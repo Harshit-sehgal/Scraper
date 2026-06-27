@@ -104,7 +104,7 @@ class CircuitBreaker:
         await self._check_state()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, _exc_val, _exc_tb):
         """Context manager exit."""
         if exc_type is None:
             await self._on_success()
