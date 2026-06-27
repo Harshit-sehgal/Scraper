@@ -238,6 +238,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
 
     best_container = None
     best_headers: list[str] = []
+    sample_texts: list[str] = []
     max_items = 0
     confidence = 0.0
 
@@ -248,7 +249,6 @@ def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
 
         # Check if these are actual data cards (not just styled divs)
         item_count = 0
-        sample_texts: list[str] = []
 
         for container in containers[:20]:
             if isinstance(container, str):

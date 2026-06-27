@@ -353,16 +353,22 @@ class WorkerQueue:
     def set_max_concurrency(self, value: int) -> None:
         """Resize the concurrency budget at runtime.
 
-        Public API that replaces the previous reliance on the private
-        ``_max_concurrency`` attribute. The semaphore is swapped atomically;
-        the in-flight dict is left as-is so tasks already running keep
-        their slot until they complete.
+        The semaphore is swapped atomically.  For new acquires, the
+        effective budget is ``value - in_flight`` (floored at 1) so that
+        total concurrency never exceeds the caller's intent even while
+        in-flight tasks are still releasing against their captured old
+        semaphore reference.
         """
         if value < 1:
             msg = f"max_concurrency must be >= 1, got {value}"
             raise ValueError(msg)
         self._max_concurrency = value
-        self._concurrency_sem = asyncio.Semaphore(value)
+        in_flight_count = len(self._in_flight)
+        # Effective budget for *new* acquires: the caller wanted value
+        # total slots.  in_flight tasks are occupying slots via the old
+        # semaphore.  The remainder is what the new semaphore can offer.
+        effective = max(1, value - in_flight_count)
+        self._concurrency_sem = asyncio.Semaphore(effective)
 
     def get_poll_interval(self) -> float:
         """Return the worker poll interval in seconds (public accessor)."""
@@ -803,7 +809,8 @@ class WorkerQueue:
                                 (f"Stuck for {elapsed:.0f}s (timeout={timeout_secs}s)", task_id),
                             )
                             recovered += 1
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as exc:
+                        logger.debug("Skipping stuck-task recovery for %s: unparseable started_at: %s", task_id, exc)
                         continue
 
                 if recovered > 0:
@@ -842,7 +849,12 @@ class WorkerQueue:
         """Main worker loop: dequeue and dispatch tasks."""
         last_stuck_check = time.monotonic()
         STUCK_CHECK_INTERVAL = 60.0  # Check for stuck tasks every 60 seconds
+        # Sentinel re-bound each iteration. Declared at loop scope so the
+        # outer except below can reference it without Pyright flagging
+        # ``possibly unbound`` when control can take the TimeoutError /
+        # ``if not acquired`` exit paths.
         while self._running:
+            acquired_sem_ref: asyncio.Semaphore | None = None
             try:
                 # Periodic stuck-task detection
                 now = time.monotonic()
@@ -865,8 +877,10 @@ class WorkerQueue:
                     # ``set_max_concurrency`` swaps ``self._concurrency_sem``
                     # atomically; we must release the *same* semaphore we acquired.
                     acquired_sem = self._concurrency_sem
+                    acquired_sem_ref = acquired_sem
                     acquired = True
                 except TimeoutError:
+                    logger.debug("Concurrency semaphore acquire timed out, retrying poll")
                     continue
                 if not acquired:
                     continue
@@ -929,10 +943,15 @@ class WorkerQueue:
             except Exception:
                 logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
-                # before installing the done-callback.
-                if acquired_sem:
+                # before installing the done-callback. ``acquired_sem``
+                # is declared as None at the top of the iteration and
+                # rebound after a successful ``acquire()``; the local
+                # ``__released_sem`` snapshot here keeps Pyright's flow
+                # analysis happy while preserving runtime semantics.
+                released_sem = acquired_sem_ref
+                if released_sem is not None:
                     with contextlib.suppress(ValueError):
-                        acquired_sem.release()
+                        released_sem.release()
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
@@ -1219,5 +1238,5 @@ def reset_worker_queue() -> None:
         from app.worker_queue_postgres import reset_postgres_worker_queue
 
         reset_postgres_worker_queue()
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.debug("worker_queue_postgres not available, skipping postgres queue reset: %s", exc)

@@ -49,15 +49,15 @@ try:
     import psycopg2
 
     _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, psycopg2.Error)  # type: ignore[misc]
-except ImportError:
-    pass
+except ImportError as exc:
+    logger.debug("Optional psycopg2 driver not available: %s", exc)
 
 try:
     import psycopg
 
     _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, psycopg.Error)  # type: ignore[misc]
-except ImportError:
-    pass
+except ImportError as exc:
+    logger.debug("Optional psycopg (v3) driver not available: %s", exc)
 
 # Exceptions that a task handler might raise (everything except
 # BaseException subclasses like SystemExit / KeyboardInterrupt).
@@ -742,6 +742,9 @@ class PostgresWorkerQueueBase(ABC):
 
     async def _worker_loop(self) -> None:
         """Main worker loop: dequeue and dispatch tasks."""
+        # Sentinel declared at loop scope for Pyright — see worker_queue.py
+        # for the same pattern and rationale.
+        acquired_sem_ref: asyncio.Semaphore | None = None
         while self._running:
             try:
                 # Acquire a concurrency permit *before* dequeue so the
@@ -756,8 +759,10 @@ class PostgresWorkerQueueBase(ABC):
                         timeout=self._poll_interval,
                     )
                     acquired_sem = self._concurrency_sem
+                    acquired_sem_ref = acquired_sem
                     acquired = True
-                except TimeoutError:
+                except TimeoutError as exc:
+                    logger.debug("Semaphore acquisition timed out, will retry: %s", exc)
                     continue
                 if not acquired:
                     continue
@@ -813,11 +818,11 @@ class PostgresWorkerQueueBase(ABC):
                 logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callbacks.
-                if acquired_sem:
+                if acquired_sem_ref is not None:
                     from contextlib import suppress
 
                     with suppress(ValueError):
-                        acquired_sem.release()
+                        acquired_sem_ref.release()
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
