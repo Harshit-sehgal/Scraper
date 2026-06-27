@@ -147,7 +147,7 @@ async def test_playwright_captures_cookies(browser_server) -> None:
             wait_until="domcontentloaded",
         )
         cookies = await page.context.cookies()
-        cookie_names = {c["name"] for c in cookies}
+        cookie_names = {c.get("name", "") for c in cookies}
         assert "server_sid" in cookie_names, f"Cookie not set. Got: {cookie_names}"
         await browser.close()
 

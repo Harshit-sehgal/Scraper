@@ -125,7 +125,7 @@ class TestCoerceValue:
 
     def test_coerce_phone(self) -> None:
         result = coerce_value("+1 (555) 123-4567", FieldType.PHONE)
-        assert result is not None
+        assert result is not None and isinstance(result, str)
         assert all(c in result for c in ["+", "1", "5", "5", "5"])
         assert coerce_value(None, FieldType.PHONE) is None
 

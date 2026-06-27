@@ -1,0 +1,14 @@
+{
+  "include": ["app", "tests"],
+  "ignore": ["../scripts", "../artifacts", "benchmarks"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": false,
+  "reportCallIssue": "warning",
+  "reportArgumentType": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportOptionalSubscript": "warning",
+  "reportReturnType": "warning",
+  "reportGeneralTypeIssues": "warning"
+}
