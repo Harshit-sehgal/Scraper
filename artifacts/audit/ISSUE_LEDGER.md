@@ -1,6 +1,6 @@
 # DataForge Scraper - Issue Ledger
 
-Date: 2026-06-26
+Date: 2026-06-27
 Commit baseline before this audit update: `918aaf02`
 Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T221113Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
@@ -10,14 +10,20 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 10 |
-| Fixed issues | 95 |
+| Open verified/deferred issues | 4 |
+| Fixed issues | 101 |
 | Not reproducible issues | 3 |
 | Candidate issues | 3 |
 | P0 issue rows | 15 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 14 |
 
+> Updated 2026-06-27: Fixed six verified issues (P1-AUTH-PASSWORD-RESET-001,
+> P1-BILLING-TENANT-LEAK-001, P1-ARCH-QUOTA-001, P2-SAAS-TENANT-BYPASS-001,
+> P2-SEC-GUARDIAN-001, P2-DEV-LOGGING-JSON-ERROR-001) in security audit session.
+> 12/12 quick validation green, full test suite passes.
+> (open verified/deferred 10 -> 4, fixed 95 -> 101).
+>
 > Updated 2026-06-18: `P1-AUTHPROFILE-002` and `P1-SECURITY-AUDIT-001`
 > moved from `verified` → `fixed` (open verified 18 → 16, fixed 8 → 10).
 > `CAND-P1-ROUTE-TENANT-001` moved from `candidate` → `fixed` after
@@ -1962,7 +1968,7 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 ### P1-AUTH-PASSWORD-RESET-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** security_auth_exemption
 - **file_path:** `backend/app/middlewares.py`
 - **line_function:** `api_key_middleware lines 127-180`
@@ -1975,10 +1981,10 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 - **blocked_by:** None.
 - **notes:** Discovered in codebase-wide quality and security audit.
 
-### P1-SEC-TENANT-001
+### P1-BILLING-TENANT-LEAK-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** tenant_isolation / billing_subscriptions
 - **file_path:** `backend/app/billing/webhooks.py:590-611`
 - **line_function:** `list_subscriptions / get_subscription`
@@ -1994,7 +2000,7 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 ### P1-ARCH-QUOTA-001
 
 - **priority:** P1
-- **status:** verified
+- **status:** fixed
 - **category:** plan_enforcement / quota_isolation
 - **file_path:** `backend/app/utils/usage_ledger.py` and `backend/app/plan_enforcer.py`
 - **line_function:** `_quota_key / get_quota`
@@ -2010,7 +2016,7 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 ### P2-SAAS-TENANT-BYPASS-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** tenant_isolation_saas
 - **file_path:** `backend/app/saas/router.py`
 - **line_function:** `delete_organization / delete_project / get_project`
@@ -2026,7 +2032,7 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 ### P2-SEC-GUARDIAN-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** security_controls / query_guard
 - **file_path:** `backend/app/utils/cross_tenant_guard.py`
 - **line_function:** `guard_cross_tenant`
@@ -2042,7 +2048,7 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 ### P2-DEV-LOGGING-JSON-ERROR-001
 
 - **priority:** P2
-- **status:** verified
+- **status:** fixed
 - **category:** developer_tooling
 - **file_path:** `scripts/generate_route_inventory.py`
 - **line_function:** `_raw_method_paths line 307`
@@ -2055,4 +2061,8 @@ This section adds 6 new verified issues found during the codebase audit on 2026-
 - **blocked_by:** None.
 - **notes:** Discovered in codebase-wide quality and security audit.
 
-## End of ledger entries — total 111 (39 historical + 66 added 2026-06-25 + 6 added 2026-06-27)
+## Session 96 — Resolved 2026-06-27 (Codebase Audit Remediation)
+
+All 6 issues identified in the audit were addressed. Fixed status applied to P1-AUTH-PASSWORD-RESET-001, P1-BILLING-TENANT-LEAK-001, P1-ARCH-QUOTA-001, P2-SAAS-TENANT-BYPASS-001, P2-SEC-GUARDIAN-001, and P2-DEV-LOGGING-JSON-ERROR-001.
+
+## End of ledger entries — total 117 (39 historical + 66 added 2026-06-25 + 6 added 2026-06-27 + 6 resolved 2026-06-27)

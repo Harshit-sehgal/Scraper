@@ -315,7 +315,7 @@ class UsageLedger:
     ) -> list[UsageRecord]:
         """Get usage records for a user."""
         with self._lock:
-            records = [r for r in self._records if user_id in {r.user_id, r.org_id, r.project_id}]
+            records = [r for r in self._records if user_id in (r.user_id, r.org_id, r.project_id)]
 
             if usage_type:
                 records = [r for r in records if r.usage_type == usage_type]

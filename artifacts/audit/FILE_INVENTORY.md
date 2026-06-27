@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-27T16:05:23+00:00 from `33181` files in the current checkout._
+_Generated: 2026-06-27T16:19:59+00:00 from `33339` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,10 +12,10 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 33181 |
+| Total files inventoried | 33339 |
 | Project-owned files | 1065 |
 | Project-owned files deeply inspected | 1055 |
-| Skipped generated/vendor/binary/cache/log/archive files | 32126 |
+| Skipped generated/vendor/binary/cache/log/archive files | 32284 |
 | Files needing follow-up | 7 |
 
 ## By Classification
@@ -31,12 +31,12 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | docker_deployment | 13 | 13 | 13 | 0 |
 | database_migration | 3 | 3 | 3 | 0 |
 | asset | 0 | 0 | 0 | 0 |
-| generated | 231 | 0 | 0 | 231 |
+| generated | 222 | 0 | 0 | 222 |
 | vendor | 17477 | 0 | 0 | 17477 |
-| cache | 6088 | 0 | 0 | 6088 |
-| binary | 1422 | 0 | 0 | 1422 |
+| cache | 6136 | 0 | 0 | 6136 |
+| binary | 1455 | 0 | 0 | 1455 |
 | archive | 1 | 0 | 0 | 1 |
-| log | 6897 | 0 | 0 | 6897 |
+| log | 6983 | 0 | 0 | 6983 |
 | unknown | 7 | 7 | 0 | 7 |
 
 ## Top-Level Counts
@@ -44,12 +44,12 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | Top-level path | Files |
 | --- | ---: |
 | `.venv/` | 11325 |
-| `artifacts/` | 6960 |
+| `artifacts/` | 7046 |
 | `node_modules/` | 6151 |
-| `.git/` | 3463 |
-| `backend/` | 2140 |
+| `.git/` | 3511 |
+| `backend/` | 2131 |
 | `.mypy_cache/` | 1479 |
-| `MagicMock/` | 1098 |
+| `MagicMock/` | 1131 |
 | `frontend/` | 244 |
 | `docs/` | 92 |
 | `scripts/` | 75 |
@@ -111,13 +111,13 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Extension | Files |
 | --- | ---: |
-| `.md` | 7123 |
+| `.md` | 7204 |
 | `.py` | 6937 |
-| `(none)` | 4589 |
+| `(none)` | 4637 |
 | `.js` | 2807 |
 | `.pyc` | 2537 |
-| `.json` | 2274 |
-| `.db` | 1420 |
+| `.json` | 2276 |
+| `.db` | 1449 |
 | `.pyi` | 1217 |
 | `.ts` | 889 |
 | `.cjs` | 534 |
