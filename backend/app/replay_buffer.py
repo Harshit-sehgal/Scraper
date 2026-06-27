@@ -32,7 +32,7 @@ _CHECKPOINT_INTERVAL = 500
 class _CheckpointIndex:
     """In-memory index of checkpoints for O(log N) seek."""
 
-    __slots__ = ("entries", "_indices")
+    __slots__ = ("_indices", "entries")
 
     def __init__(self) -> None:
         # entries: list of (global_idx, segment_path, segment_offset,
@@ -48,12 +48,12 @@ class _CheckpointIndex:
         """Find the nearest checkpoint at or before target_idx."""
         if not self._indices:
             return None
-        
+
         pos = bisect.bisect_right(self._indices, target_idx)
-        
+
         if pos == 0:
             return None
-        
+
         return self.entries[pos - 1]
 
     def clear(self) -> None:
@@ -141,10 +141,10 @@ class ReplayBuffer:
             # Write to current segment
             filepath = self._ensure_segment()
             line = json.dumps(entry, separators=(",", ":"))
-            
+
             # Capture offset BEFORE writing so the checkpoint points to the start of this entry
             segment_offset = self._current_segment_file.tell()
-            
+
             self._current_segment_file.write(line + "\n")
             self._current_segment_file.flush()
 
@@ -177,7 +177,7 @@ class ReplayBuffer:
         if self._current_segment_file is None:
             seg_name = f"segment_{self._current_segment_idx:06d}.jsonl"
             filepath = self._base_dir / seg_name
-            self._current_segment_file = open(filepath, "a", encoding="utf-8")
+            self._current_segment_file = open(filepath, "a", encoding="utf-8")  # noqa: SIM115
             self._segments.append(seg_name)
             return filepath
         return Path(self._current_segment_file.name)
@@ -234,7 +234,7 @@ class ReplayBuffer:
                 return
 
             # Copy segment list to avoid race conditions during file I/O
-            segments_to_process = [segment_name] + self._get_subsequent_segments(segment_name)
+            segments_to_process = [segment_name, *self._get_subsequent_segments(segment_name)]
 
         # 2. Stream forward from checkpoint, skipping entries < start_idx
         for i, seg_name in enumerate(segments_to_process):
@@ -278,7 +278,7 @@ class ReplayBuffer:
                 return None
 
             # Copy segment list to avoid race conditions during file I/O
-            segments_to_process = [seg_name] + self._get_subsequent_segments(seg_name)
+            segments_to_process = [seg_name, *self._get_subsequent_segments(seg_name)]
 
         # Clone the checkpoint snapshot as starting state, unpacking delta
         # encoding
@@ -425,7 +425,7 @@ class ReplayBuffer:
             self._current_segment_count = total_lines
 
         if self._segments:
-            self._current_segment_file = open(self._base_dir / self._segments[-1], "a", encoding="utf-8")
+            self._current_segment_file = open(self._base_dir / self._segments[-1], "a", encoding="utf-8")  # noqa: SIM115
 
     def _get_subsequent_segments(self, current_seg: str) -> list[str]:
         """Return segments that come after current_seg in sorted order."""
