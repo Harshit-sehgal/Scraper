@@ -25,6 +25,7 @@ from threading import Lock
 from typing import Any
 
 from app.models import Job, JobStatus
+from app.services.job_state_machine import mark_recovered_failed as _mark_recovered_failed
 from app.utils.datetime_normalization import format_datetime, parse_datetime
 
 logger = logging.getLogger(__name__)
@@ -132,10 +133,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                 dirty_recovery = False
                 for job in jobs_store.values():
                     if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-                        job.status = JobStatus.FAILED
-                        job.error = "Recovered after restart while still in progress."
-                        job.completed_at = format_datetime(datetime.datetime.now(datetime.UTC))
-                        job.cancel_requested = False
+                        _mark_recovered_failed(job)
 
                         row = _job_to_row(job)
                         columns = ", ".join(row.keys())
