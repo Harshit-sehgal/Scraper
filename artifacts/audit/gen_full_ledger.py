@@ -436,6 +436,7 @@ def main() -> int:
             )
         ):
             deep = True
+            actual_skip = ""
             purpose, findings, issues, recommendation, follow = inspect_file(abspath, rel, classification, purpose_seed, "")
         else:
             deep = False

@@ -301,6 +301,7 @@ class ReplayBuffer:
                     except json.JSONDecodeError as exc:
                         logger.debug("Skipping malformed entry during replay reconstruct: %s", exc)
                         continue
+                    idx = entry.get("idx")
                     if i == 0 and idx < cp_idx:
                         continue
                     if idx > target_idx:
@@ -398,6 +399,7 @@ class ReplayBuffer:
                     except json.JSONDecodeError as exc:
                         logger.debug("Skipping malformed entry during rebuild: %s", exc)
                         continue
+                    idx = entry.get("idx")
                     if idx >= self._next_global_idx:
                         self._next_global_idx = idx + 1
                     self._total_entries += 1

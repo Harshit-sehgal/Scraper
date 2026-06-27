@@ -309,8 +309,7 @@ def record_browser_launch(success: bool, *, reason: str | None = None) -> None:
         _browser_launch_outcomes[outcome] = _browser_launch_outcomes.get(outcome, 0) + 1
 
     if not success:
-        key = f"browser_crash:{reason}" if reason else "browser_crash:unknown"
-        _increment_ssrf_reject(key)
+        record_error(f"browser_crash:{reason}" if reason else "browser_crash:unknown")
 
 
 def record_ssrf_reject(reason: str) -> None:
