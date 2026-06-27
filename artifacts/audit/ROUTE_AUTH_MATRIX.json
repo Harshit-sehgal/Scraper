@@ -1,5 +1,5 @@
 {
-  "route_count": 143,
+  "route_count": 144,
   "routes": [
     {
       "method": "GET",
@@ -294,6 +294,18 @@
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
       "path": "/api/jobs/{job_id}/export/json",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/headers",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
       "route_dependency": "require_principal",

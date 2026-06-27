@@ -1,5 +1,5 @@
 {
-  "route_count": 154,
+  "route_count": 155,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -414,6 +414,22 @@
       "required_role_if_known": "operator-or-admin",
       "response_model_if_known": "",
       "router_module": "app.routers.exports",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "update_job_headers",
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/headers",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
     },

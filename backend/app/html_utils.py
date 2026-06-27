@@ -384,6 +384,7 @@ async def fetch_page_content(
     anti_bot_stealth: bool = False,
     extra_headers: dict[str, str] | None = None,
     usage_context: dict[str, Any] | None = None,
+    cookies: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
     """Load a URL in a pooled headless browser context or via plain HTTP.
 
@@ -436,6 +437,7 @@ async def fetch_page_content(
                 strategy=strategy,
                 extra_headers=extra_headers,
                 timeout_ms=timeout_ms,
+                cookies=cookies,
             )
             if html:
                 # Basic anti-bot check on httpx result
@@ -477,6 +479,15 @@ async def fetch_page_content(
         pool = get_browser_pool()
         # Pass strategy to get_context for specialized setup
         context = await pool.get_context(domain, strategy=strategy)
+        if cookies:
+            cookie_list = []
+            for name, value in cookies.items():
+                cookie_list.append({
+                    "name": name,
+                    "value": value,
+                    "url": url,
+                })
+            await context.add_cookies(cookie_list)
         page = await context.new_page()
         if extra_headers:
             await page.set_extra_http_headers(extra_headers)
@@ -732,6 +743,7 @@ async def _fetch_with_httpx(
     strategy: FetchStrategy | None = None,
     extra_headers: dict[str, str] | None = None,
     timeout_ms: int | None = None,
+    cookies: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
     """Internal helper for httpx fetching with retries."""
     from app.strategy_evolution import FetchStrategy  # research-shell, lazy
@@ -774,6 +786,7 @@ async def _fetch_with_httpx(
         timeout=httpx.Timeout(timeout_seconds),
         headers=headers,
         follow_redirects=False,
+        cookies=cookies,
     ) as client:
         for attempt in range(max(1, settings.MAX_RETRIES)):
             retry_count = attempt

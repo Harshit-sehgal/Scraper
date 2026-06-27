@@ -3,7 +3,16 @@
 Date: 2026-06-13
 Commit: `7d47045`
 
-Data lifecycle management for scraped data, exports, and account data. Current state: partial. Implementation exists for recycle bin; full retention policy and enforcement remain follow-up work.
+> ⚠️ **STATUS: SUPERSEDED**
+>
+> This document is kept for historical reference only. Retention
+> is implemented and live; consult `COMPLIANCE_RETENTION.md` for the
+> current authoritative policy (windows: 90 days completed jobs,
+> 30 days recycle bin, 7 days idempotency keys; enforcement via
+> `app/utils/data_retention.py` called on startup and on the
+> configured interval).
+
+The remainder of this file describes the pre-implementation plan.
 
 ---
 

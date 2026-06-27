@@ -151,6 +151,9 @@ async def run_finalization(
         _log(job, job.error, level="warning", persist_fn=persist_fn)
     await _persist_critical(job, persist_single_critical_fn, persist_single_fn, persist_fn)
 
+    # Fire outbound webhook if configured
+    await _deliver_webhook_if_configured(job)
+
     logger.info("Completed (%s): %d total results", job.status.value, len(all_raw_results))
 
 
@@ -169,6 +172,25 @@ async def _persist_critical(
         await run_in_threadpool(persist_single_fn)
     else:
         await run_in_threadpool(persist_fn)
+
+
+async def _deliver_webhook_if_configured(job: Any) -> None:
+    """Fire outbound webhook if the job has a ``webhook_url`` configured.
+
+    Webhook delivery is best-effort — failures are logged but never
+    prevent the job from being marked terminal.
+    """
+    webhook_url = getattr(job, "webhook_url", None)
+    if not webhook_url:
+        return
+    try:
+        from app.services.webhook_delivery import deliver_webhook
+
+        await deliver_webhook(job)
+    except (ImportError, RuntimeError, ValueError) as exc:
+        logger.debug("Webhook delivery skipped for job %s: %s", getattr(job, "id", ""), exc)
+    except Exception:
+        logger.exception("Webhook delivery threw unexpected error for job %s", getattr(job, "id", ""))
 
 
 async def _run_in_threadpool(fn: Callable, *args: Any) -> Any:

@@ -192,6 +192,8 @@ async def run_scraping_phase(
                             "project_id": getattr(job, "project_id", "") or "",
                             "job_id": getattr(job, "id", "") or "",
                         },
+                        headers=getattr(job, "headers", None),
+                        cookies=getattr(job, "cookies", None),
                     ),
                     timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                 )

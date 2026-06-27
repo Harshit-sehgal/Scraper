@@ -98,6 +98,7 @@ class CrawlPolicyEngine:
 
     def __init__(self) -> None:
         self._domains: dict[str, DomainState] = defaultdict(lambda: DomainState(domain=""))
+        self._robots_allowed: dict[str, set[str]] = defaultdict(set)  # domain -> Allow paths
         self._global_active_fetches = 0
         self._max_concurrency = settings.CRAWL_PER_DOMAIN_CONCURRENCY
         self._max_global_concurrency = settings.CRAWL_MAX_TOTAL_CONCURRENCY
@@ -168,7 +169,8 @@ class CrawlPolicyEngine:
 
         if self._respect_robots:
             path = self._extract_path(url)
-            if self._is_path_disallowed(path, state.robots_disallowed):
+            allowed_paths = self._robots_allowed.get(domain, set())
+            if self._is_path_disallowed(path, state.robots_disallowed, allowed_paths):
                 logger.info("robots.txt disallows %s on %s", path, domain)
                 return f"robots.txt disallows {path} on {domain}"
 
@@ -420,6 +422,7 @@ class CrawlPolicyEngine:
                 text = resp.text
                 current_agent = None
                 disallowed_paths: set[str] = set()
+                allowed_paths: set[str] = set()
                 crawl_delay = 0.0
 
                 for line in text.splitlines():
@@ -440,18 +443,25 @@ class CrawlPolicyEngine:
                         if path:
                             disallowed_paths.add(path)
 
+                    if line.lower().startswith("allow:"):
+                        path = line.split(":", 1)[1].strip()
+                        if path:
+                            allowed_paths.add(path)
+
                     if line.lower().startswith("crawl-delay:"):
                         with contextlib.suppress(ValueError):
                             crawl_delay = float(line.split(":", 1)[1].strip())
 
                 state.robots_disallowed = disallowed_paths
                 state.crawl_delay = crawl_delay
+                self._robots_allowed[domain] = allowed_paths
 
                 if disallowed_paths:
                     logger.debug(
-                        "robots.txt for %s: %d disallowed paths, delay=%.1fs",
+                        "robots.txt for %s: %d disallowed paths, %d allowed paths, delay=%.1fs",
                         domain,
                         len(disallowed_paths),
+                        len(allowed_paths),
                         crawl_delay,
                     )
 
@@ -463,19 +473,51 @@ class CrawlPolicyEngine:
             # Non-fatal — proceed without robots.txt constraints
 
     @staticmethod
-    def _is_path_disallowed(path: str, disallowed: set[str]) -> bool:
-        """Check if a path is disallowed by robots.txt rules."""
+    def _is_path_disallowed(
+        path: str,
+        disallowed: set[str],
+        allowed: set[str] | None = None,
+    ) -> bool:
+        """Check if a path is disallowed by robots.txt rules.
+
+        If ``allowed`` is provided, an Allow directive that matches
+        takes precedence over a matching Disallow (per RFC 9309 /
+        Google spec — the most specific match wins; we use a
+        longest-pattern-match heuristic).
+        """
         if not disallowed:
             return False
+
+        best_disallow_len = -1
+        disallowed_match = False
         for pattern in disallowed:
             if pattern == "/":
-                return True
+                best_disallow_len = max(best_disallow_len, 1)
+                disallowed_match = True
+                continue
             if pattern.endswith("*"):
                 if path.startswith(pattern[:-1]):
-                    return True
+                    best_disallow_len = max(best_disallow_len, len(pattern))
+                    disallowed_match = True
             elif path == pattern or path.startswith(pattern):
-                return True
-        return False
+                best_disallow_len = max(best_disallow_len, len(pattern))
+                disallowed_match = True
+
+        if not disallowed_match:
+            return False
+
+        # Check Allow override — longest match wins
+        best_allow_len = -1
+        for pattern in allowed or set():
+            if pattern.endswith("*"):
+                if path.startswith(pattern[:-1]):
+                    best_allow_len = max(best_allow_len, len(pattern))
+            elif path == pattern or path.startswith(pattern):
+                best_allow_len = max(best_allow_len, len(pattern))
+
+        # Allow takes precedence when the allow pattern is at least
+        # as long as the disallow pattern (per RFC 9309 §2.2.2).
+        return best_allow_len < best_disallow_len
 
 
 # ─── Singleton Accessor ─────────────────────────────────────────────────

@@ -200,6 +200,23 @@ class JobCreate(BaseModel):
     auth_profile_id: str | None = Field(
         default=None, description="Optional auth profile ID to use for authenticated scraping", max_length=128
     )
+    headers: dict[str, str] = Field(default_factory=dict, description="Custom HTTP headers to send with requests")
+    cookies: dict[str, str] = Field(default_factory=dict, description="Custom cookies to inject into requests/browser contexts")
+    webhook_url: str | None = Field(
+        default=None,
+        description="URL to POST job-completion webhook to. Must be https:// or http://.",
+        max_length=2048,
+    )
+    webhook_secret: str | None = Field(
+        default=None,
+        description="HMAC-SHA256 secret for signing webhook payloads. If set, the X-DataForge-Signature header is included.",
+        max_length=128,
+    )
+    fetch_strategy: str = Field(
+        default="",
+        description="User-requested fetch strategy (playwright_full, httpx_smart, hybrid, etc.). Empty means auto-select.",
+        max_length=32,
+    )
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -256,6 +273,48 @@ class JobCreate(BaseModel):
                 if not isinstance(v, str) or len(v) > 500:
                     msg = f"search_params value for '{k}' exceeds max length of 500"
                     raise ValueError(msg)
+
+        # ── headers limits ────────────────────────────────────────────────
+        if self.headers:
+            if len(self.headers) > 50:
+                msg = "headers must have at most 50 keys"
+                raise ValueError(msg)
+            for k, v in self.headers.items():
+                if not isinstance(k, str) or len(k) > 100:
+                    msg = f"headers key '{k}' exceeds max length of 100"
+                    raise ValueError(msg)
+                if not isinstance(v, str) or len(v) > 2000:
+                    msg = f"headers value for '{k}' exceeds max length of 2000"
+                    raise ValueError(msg)
+
+        # ── cookies limits ────────────────────────────────────────────────
+        if self.cookies:
+            if len(self.cookies) > 50:
+                msg = "cookies must have at most 50 keys"
+                raise ValueError(msg)
+            for k, v in self.cookies.items():
+                if not isinstance(k, str) or len(k) > 100:
+                    msg = f"cookies key '{k}' exceeds max length of 100"
+                    raise ValueError(msg)
+                if not isinstance(v, str) or len(v) > 4096:
+                    msg = f"cookies value for '{k}' exceeds max length of 4096"
+                    raise ValueError(msg)
+
+        # ── webhook_url validation ─────────────────────────────────────
+        if self.webhook_url:
+            stripped = self.webhook_url.strip()
+            if not stripped.startswith(("https://", "http://")):
+                msg = "webhook_url must start with https:// or http://"
+                raise ValueError(msg)
+            self.webhook_url = stripped
+
+        # ── fetch_strategy validation ──────────────────────────────────
+        if self.fetch_strategy:
+            from app.strategy_evolution import FETCH_STRATEGY_VALUES
+
+            if self.fetch_strategy not in FETCH_STRATEGY_VALUES:
+                msg = f"fetch_strategy must be one of {sorted(FETCH_STRATEGY_VALUES)}, got {self.fetch_strategy!r}"
+                raise ValueError(msg)
 
         return self
 
@@ -332,6 +391,106 @@ class Job(BaseModel):
     acquisition_mode: str = Field(
         default="standard", description="Acquisition mode: standard, aggressive, or deep_scan", max_length=16
     )
+    headers: dict[str, str] = Field(default_factory=dict, description="Custom HTTP headers to send with requests")
+    cookies: dict[str, str] = Field(default_factory=dict, description="Custom cookies to inject into requests/browser contexts")
+    webhook_url: str | None = Field(
+        default=None,
+        description="URL to POST job-completion webhook to",
+        max_length=2048,
+    )
+    webhook_secret: str | None = Field(
+        default=None,
+        description="HMAC-SHA256 secret for signing webhook payloads",
+        max_length=128,
+    )
+    webhook_delivered: bool = Field(default=False, description="Whether the job-completion webhook was delivered")
+    webhook_delivered_at: str | None = Field(
+        default=None, description="ISO timestamp when webhook was last delivered", max_length=64
+    )
+    fetch_strategy: str = Field(
+        default="",
+        description="User-requested fetch strategy. Empty means auto-select.",
+        max_length=32,
+    )
+
+
+class JobHeadersUpdate(BaseModel):
+    """Request body to update job headers and cookies."""
+
+    headers: dict[str, str] = Field(default_factory=dict, description="Custom HTTP headers to send with requests")
+    cookies: dict[str, str] = Field(default_factory=dict, description="Custom cookies to inject into requests/browser contexts")
+
+    @model_validator(mode="after")
+    def validate_limits(self):
+        if self.headers:
+            if len(self.headers) > 50:
+                msg = "headers must have at most 50 keys"
+                raise ValueError(msg)
+            for k, v in self.headers.items():
+                if not isinstance(k, str) or len(k) > 100:
+                    msg = f"headers key '{k}' exceeds max length of 100"
+                    raise ValueError(msg)
+                if not isinstance(v, str) or len(v) > 2000:
+                    msg = f"headers value for '{k}' exceeds max length of 2000"
+                    raise ValueError(msg)
+
+        if self.cookies:
+            if len(self.cookies) > 50:
+                msg = "cookies must have at most 50 keys"
+                raise ValueError(msg)
+            for k, v in self.cookies.items():
+                if not isinstance(k, str) or len(k) > 100:
+                    msg = f"cookies key '{k}' exceeds max length of 100"
+                    raise ValueError(msg)
+                if not isinstance(v, str) or len(v) > 4096:
+                    msg = f"cookies value for '{k}' exceeds max length of 4096"
+                    raise ValueError(msg)
+        return self
+
+
+class JobWebhookUpdate(BaseModel):
+    """Request body to update job webhook configuration."""
+
+    webhook_url: str | None = Field(
+        default=None,
+        description="URL to POST job-completion webhook to. Set to null to remove.",
+        max_length=2048,
+    )
+    webhook_secret: str | None = Field(
+        default=None,
+        description="HMAC-SHA256 secret for signing webhook payloads. Set to null to remove signing.",
+        max_length=128,
+    )
+
+    @model_validator(mode="after")
+    def validate_webhook_url(self):
+        if self.webhook_url:
+            stripped = self.webhook_url.strip()
+            if not stripped.startswith(("https://", "http://")):
+                msg = "webhook_url must start with https:// or http://"
+                raise ValueError(msg)
+            self.webhook_url = stripped
+        return self
+
+
+class JobStrategyUpdate(BaseModel):
+    """Request body to update a job's fetch strategy."""
+
+    fetch_strategy: str = Field(
+        ...,
+        description="Fetch strategy to use (playwright_full, httpx_smart, hybrid, etc.). Empty string resets to auto-select.",
+        max_length=32,
+    )
+
+    @model_validator(mode="after")
+    def validate_fetch_strategy(self):
+        if self.fetch_strategy:
+            from app.strategy_evolution import FETCH_STRATEGY_VALUES
+
+            if self.fetch_strategy not in FETCH_STRATEGY_VALUES:
+                msg = f"fetch_strategy must be one of {sorted(FETCH_STRATEGY_VALUES)}, got {self.fetch_strategy!r}"
+                raise ValueError(msg)
+        return self
 
 
 # ─── Workflow System ──────────────────────────────────────────────────────

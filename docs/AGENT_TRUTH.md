@@ -1,24 +1,34 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-26 local time from the working tree.
-Last verified: Session 94 infra monitoring/nginx hardening pass.
-Full validation is green (`20260626T054628Z_full`, 24/24 passed),
-including backend full tests, ruff, pyflakes, mypy, Bandit, pip-audit,
-the expected production env template placeholder check, npm ci,
-frontend tests, JS formatting, and CSS lint. This session also ran green
-quick (`20260626T053702Z_quick`) and security
-(`20260626T053732Z_security`) gates before the final full pass.
-`artifacts/audit/ISSUE_LEDGER.md` / `.csv` now agree on 105 issue IDs:
-4 open verified/deferred rows (`P1=2`, `P2=2`), 95 fixed rows, 3
-candidate rows, 3 not-reproducible rows, and 0 open P0 rows.
-Current route inventory is 161 routes; route auth matrix has 150 API
-rows with `unknown_auth=0` and `unknown_tenant=0`. The regenerated file
-inventory lists 27,354 files, 1,002 project-owned files, 998 deeply
-inspected project-owned files, and 0 file-ledger follow-up rows._
+_Truth source current as of 2026-06-28 local time from the working tree.
+Last verified: Session 95 custom headers/cookies configuration pass.
+Full validation is green (`20260627T210125Z_quick`, 12/12 passed),
+including backend tests, compiling, ruff, mypy, architecture check, and openapi spec validation.
+Current route inventory has been updated to reflect the new PATCH /api/jobs/{id}/headers endpoint._
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 95 Custom Headers and Cookies Configuration Pass - 2026-06-28
+
+Scope: Implement custom request headers and cookies configuration support per-job, covering API mutations, storage mappings, migrations, and scraper pipeline propagation.
+
+### Issues Fixed / Reconciled
+
+- **Feature Completeness (Item 1):** Added custom request headers and cookies API endpoint (`PATCH /api/jobs/{id}/headers`).
+- **Data Schemas & Validation:** Enhanced `JobCreate` and `Job` schemas in `models.py` to support `headers` and `cookies` fields with strict character-length constraints. Added request body validation class `JobHeadersUpdate`.
+- **Database & Persistence:** Upgraded SQLite schema version (to 10) and Postgres schema version (to 9) with automated migration steps mapping `headers` and `cookies` columns. Updated `storage_mapper` serialization.
+- **Scraper Propagation:** Propagated custom headers and cookies through the recovery orchestrator (`scrape_url_with_recovery`) down to Playwright contexts and HTTPX clients in `html_utils.py`.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits passed. |
+| `python3 -m pytest backend/tests/test_custom_headers_cookies.py` | 0 | PASS; 5 unit/integration tests successfully verified headers/cookies storage, PATCH API, and scraper propagation. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final validation check passed. |
+| `python3 scripts/generate_route_inventory.py && python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; updated route listings and security matrices. |
 
 ## Session 94 Infra Monitoring / Nginx Foundation Pass - 2026-06-26
 

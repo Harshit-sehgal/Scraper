@@ -32,7 +32,10 @@ from app.discovery import (
 from app.models import (
     DiscoveryRequest,
     JobCreate,
+    JobHeadersUpdate,
     JobStatus,
+    JobStrategyUpdate,
+    JobWebhookUpdate,
     SchemaSuggestionRequest,
 )
 from app.plan_enforcer import require_plan_limit
@@ -45,6 +48,7 @@ from app.services.job_creation_service import (
 )
 from app.services.job_mutation_service import (
     JobCancellerService,
+    JobHeadersService,
     JobRecleanerService,
 )
 from app.storage_interface import get_job_repository
@@ -191,6 +195,114 @@ def register_jobs_write_routes(
         role, user_id, org_id, project_id = _auth_tuple(auth)
         service = JobRecleanerService(manager)
         return await service.reclean_job(job_id, role, user_id, org_id, project_id)
+
+    @router.patch("/api/jobs/{job_id}/headers")
+    async def update_job_headers(
+        job_id: str,
+        body: JobHeadersUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update custom request headers and cookies for a job."""
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        service = JobHeadersService(manager)
+        return await service.update_headers(
+            job_id,
+            role,
+            user_id,
+            org_id,
+            project_id,
+            headers=body.headers,
+            cookies=body.cookies,
+        )
+
+    @router.patch("/api/jobs/{job_id}/webhook")
+    async def update_job_webhook(
+        job_id: str,
+        body: JobWebhookUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update webhook URL and signing secret for a job."""
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_job_webhook")
+            job.webhook_url = body.webhook_url
+            job.webhook_secret = body.webhook_secret
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+        log_job_event(actor=user_id or "system", action="job_webhook_updated", job_id=job_id)
+        return {
+            "job_id": job.id,
+            "webhook_url": job.webhook_url,
+            "webhook_secret_set": job.webhook_secret is not None,
+            "status": "success",
+        }
+
+    @router.post("/api/jobs/{job_id}/webhook/redeliver")
+    async def redeliver_job_webhook(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Manually re-deliver the job-completion webhook."""
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "redeliver_webhook")
+            if not job.webhook_url:
+                raise HTTPException(status_code=400, detail="Job has no webhook_url configured")
+
+        from app.services.webhook_delivery import deliver_webhook
+
+        success = await deliver_webhook(job)
+        if success:
+            repo = get_job_repository()
+            await run_in_threadpool(repo.save_single, job)
+        return {"job_id": job_id, "delivered": success}
+
+    @router.patch("/api/jobs/{job_id}/strategy")
+    async def update_job_strategy(
+        job_id: str,
+        body: JobStrategyUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update the fetch strategy for a job."""
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_job_strategy")
+            job.fetch_strategy = body.fetch_strategy
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+        log_job_event(actor=user_id or "system", action="job_strategy_updated", job_id=job_id)
+        return {
+            "job_id": job.id,
+            "fetch_strategy": job.fetch_strategy,
+            "status": "success",
+        }
 
     @router.delete("/api/jobs/{job_id}")
     async def delete_job(

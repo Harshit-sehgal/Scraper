@@ -354,3 +354,44 @@ class JobRecleanerService:
             "after_records": filtered_count,
             "warnings": reclean_warnings,
         }
+
+
+class JobHeadersService:
+    """Encapsulates the business logic for updating a job's custom headers and cookies."""
+
+    def __init__(self, manager: JobStoreManager) -> None:
+        self._manager = manager
+
+    async def update_headers(
+        self,
+        job_id: str,
+        role: UserRole,
+        user_id: str,
+        org_id: str,
+        project_id: str,
+        headers: dict[str, str],
+        cookies: dict[str, str],
+    ) -> dict[str, Any]:
+        """Update a job's custom headers and cookies."""
+        from fastapi import HTTPException
+        from starlette.concurrency import run_in_threadpool
+
+        with self._manager.lock:
+            if job_id not in self._manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = self._manager.jobs_store[job_id]
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_job_headers")
+
+            job.headers = dict(headers)
+            job.cookies = dict(cookies)
+
+        from app.storage_interface import get_job_repository
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+
+        return {
+            "job_id": job.id,
+            "headers": job.headers,
+            "cookies": job.cookies,
+            "status": "success",
+        }

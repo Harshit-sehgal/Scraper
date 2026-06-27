@@ -45,6 +45,11 @@ class FetchStrategy(StrEnum):
     CACHED = "cached"  # Use cached response from domain
 
 
+# Frozen set of all valid fetch strategy string values, used by the API layer
+# for validation without importing the enum.
+FETCH_STRATEGY_VALUES: frozenset[str] = frozenset(s.value for s in FetchStrategy)
+
+
 @dataclass
 class StrategyPerformance:
     """Performance metrics for a fetch strategy on a domain."""

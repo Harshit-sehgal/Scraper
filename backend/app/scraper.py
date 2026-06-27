@@ -472,6 +472,8 @@ async def scrape_url_attempt(
     search_params: dict[str, str] | None = None,
     attempt_ctx: AttemptContext | None = None,
     usage_context: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    cookies: dict[str, str] | None = None,
 ) -> ScrapeAttemptResult:
     """Scrape a single URL and return an enriched ScrapeAttemptResult
     with full metadata (HTML, telemetry, acquisition lineage, zero-result
@@ -496,6 +498,8 @@ async def scrape_url_attempt(
         search_params=search_params,
         attempt_ctx=attempt_ctx,
         usage_context=usage_context,
+        headers=headers,
+        cookies=cookies,
     )
 
     records = list(raw)
@@ -552,6 +556,8 @@ async def scrape_url(
     search_params: dict[str, str] | None = None,
     attempt_ctx: AttemptContext | None = None,
     usage_context: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    cookies: dict[str, str] | None = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL.
 
@@ -573,6 +579,12 @@ async def scrape_url(
 
     if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContext):
         attempt_ctx = None
+    if attempt_ctx is None:
+        attempt_ctx = AttemptContext()
+    if headers:
+        attempt_ctx.extra_headers.update(headers)
+    if cookies:
+        attempt_ctx.cookies.update(cookies)
     if min_record_score is None:
         min_record_score = settings.DEFAULT_MIN_RECORD_SCORE
     if attempt_ctx and attempt_ctx.min_record_score_override is not None:
@@ -652,6 +664,7 @@ async def scrape_url(
             anti_bot_stealth=attempt_ctx.anti_bot_stealth if attempt_ctx else False,
             extra_headers=attempt_ctx.extra_headers if attempt_ctx else None,
             usage_context=usage_context,
+            cookies=attempt_ctx.cookies if attempt_ctx else None,
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True

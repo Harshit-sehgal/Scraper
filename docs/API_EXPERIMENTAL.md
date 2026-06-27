@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-27 18:42:27 UTC
+**Generated:** 2026-06-27 22:59:31 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -33,9 +33,13 @@ For the diff between stable and experimental, see
 | GET | `/api/jobs/{job_id}/export/excel` |
 | GET | `/api/jobs/{job_id}/export/json` |
 | GET | `/api/jobs/{job_id}/results` |
+| PATCH | `/api/jobs/{job_id}/headers` |
+| PATCH | `/api/jobs/{job_id}/strategy` |
+| PATCH | `/api/jobs/{job_id}/webhook` |
 | POST | `/api/jobs` |
 | POST | `/api/jobs/{job_id}/cancel` |
 | POST | `/api/jobs/{job_id}/reclean` |
+| POST | `/api/jobs/{job_id}/webhook/redeliver` |
 
 ## Recycle Bin Routes
 
@@ -83,6 +87,7 @@ For the diff between stable and experimental, see
 | POST | `/api/scraper/diagnostics` |
 | POST | `/api/scraper/ml/learn` |
 | POST | `/api/scraper/ml/optimize/domain/{domain}` |
+| POST | `/api/scraper/preview` |
 | POST | `/api/scraper/regressions/generate-all-tests` |
 | POST | `/api/scraper/regressions/{entry_id}/generate-test` |
 | POST | `/api/scraper/selectors/cleanup` |
@@ -182,6 +187,7 @@ For the diff between stable and experimental, see
 | POST | `/api/auth-profiles/{profile_id}/validate` |
 | POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
+| POST | `/api/compliance/gdpr/forget` |
 | POST | `/api/saas/aup/accept` |
 | POST | `/api/saas/email-verification/send` |
 | POST | `/api/saas/email-verification/verify` |
@@ -203,4 +209,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 143
+**Total routes:** 149

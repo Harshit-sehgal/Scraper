@@ -92,6 +92,8 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "started_at": job.started_at if job.started_at is not None else "",
         "results_on_disk": job.results_on_disk,
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
+        "headers": json.dumps(job.headers if hasattr(job, "headers") and job.headers is not None else {}),
+        "cookies": json.dumps(job.cookies if hasattr(job, "cookies") and job.cookies is not None else {}),
     }
 
 
@@ -157,6 +159,8 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "results_file_path": row.get("results_file_path") or None,
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
+                "headers": json.loads(row.get("headers", "{}")),
+                "cookies": json.loads(row.get("cookies", "{}")),
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:

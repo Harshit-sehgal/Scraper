@@ -334,6 +334,8 @@ class JobCreationService:
             created_by=user_id,
             org_id=org_id,
             project_id=project_id,
+            headers=job_data.headers,
+            cookies=job_data.cookies,
         )
 
     def _record_usage(

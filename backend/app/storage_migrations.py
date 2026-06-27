@@ -18,8 +18,8 @@ from app.storage_mapper import job_to_row, row_to_job
 
 logger = logging.getLogger(__name__)
 
-SQLITE_SCHEMA_VERSION = 9
-POSTGRES_SCHEMA_VERSION = 8
+SQLITE_SCHEMA_VERSION = 10
+POSTGRES_SCHEMA_VERSION = 9
 
 # ───────────────────────────────────────────────────────────────────────
 # SQLite migrations
@@ -147,7 +147,9 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
                     deduplicate_field TEXT DEFAULT '',
                     started_at TEXT DEFAULT '',
                     results_on_disk INTEGER DEFAULT 0,
-                    results_file_path TEXT DEFAULT ''
+                    results_file_path TEXT DEFAULT '',
+                    headers TEXT DEFAULT '{}',
+                    cookies TEXT DEFAULT '{}'
                 )
             """)
             conn.execute("""
@@ -255,7 +257,9 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
                     deduplicate_field TEXT DEFAULT '',
                     started_at TEXT DEFAULT '',
                     results_on_disk INTEGER DEFAULT 0,
-                    results_file_path TEXT DEFAULT ''
+                    results_file_path TEXT DEFAULT '',
+                    headers TEXT DEFAULT '{}',
+                    cookies TEXT DEFAULT '{}'
                 )
             """)
 
@@ -429,6 +433,16 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_project_id ON workflows(project_id)")
             current = 9
+
+        if current < 10:
+            for table_name in ["jobs", "recycle_bin"]:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                v10_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+                if "headers" not in v10_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN headers TEXT DEFAULT '{{}}'")
+                if "cookies" not in v10_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN cookies TEXT DEFAULT '{{}}'")
+            current = 10
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
@@ -672,6 +686,15 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                     execute_fn(conn, idx_sql)
                 except Exception:
                     logger.debug("CREATE INDEX failed: %s", idx_sql)
+
+        if current < 9:
+            for table_name in ["jobs", "recycle_bin"]:
+                try:
+                    execute_fn(conn, f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS headers TEXT DEFAULT '{{}}'")
+                    execute_fn(conn, f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS cookies TEXT DEFAULT '{{}}'")
+                except Exception:
+                    logger.debug("ALTER TABLE %s ADD COLUMN headers/cookies failed", table_name)
+            current = 9
 
         execute_fn(conn, "DELETE FROM schema_version")
         execute_fn(conn, "INSERT INTO schema_version (version) VALUES (%s)", (POSTGRES_SCHEMA_VERSION,))

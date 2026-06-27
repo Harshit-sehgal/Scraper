@@ -5,11 +5,17 @@ across all DataForge stores: jobs, workflows, auth profiles,
 scheduled monitoring jobs, and SaaS identity records.
 
 This implements the ``delete-my-data`` gap from Prompt 12.
+
+Roadmap (Comp #8): GDPR right-to-erasure receipt and /compliance/gdpr/forget
+alias endpoint with audit trail.
 """
 
 from __future__ import annotations
 
+import datetime
+import hashlib
 import logging
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -229,9 +235,63 @@ async def delete_my_data(
         {k: v for k, v in summary.items() if v > 0},
     )
 
+    # ── GDPR deletion receipt ───────────────────────────────────────
+    # Roadmap Comp #8: A machine-readable deletion receipt enables the
+    # subject to prove compliance. The receipt_token is a SHA-256
+    # fingerprint of (user_id + timestamp + summary) — tampering with
+    # any field invalidates the token. The audit logger also records
+    # the deletion event for immutable compliance evidence.
+    receipt_id = str(uuid.uuid4())
+    receipt_timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+    receipt_payload = f"{user_id}:{receipt_timestamp}:{summary}".encode()
+    receipt_token = hashlib.sha256(receipt_payload).hexdigest()[:16]
+
+    from app.audit_logger import log_admin_action
+
+    log_admin_action(
+        actor=user_id,
+        action="gdpr_data_deletion",
+        resource="user_data",
+        details={
+            "receipt_id": receipt_id,
+            "receipt_token": receipt_token,
+            **summary,
+        },
+    )
+
     return {
         "status": "ok",
         "user_id": user_id,
         "summary": summary,
         "message": "All user data has been deleted.",
+        "receipt": {
+            "id": receipt_id,
+            "timestamp": receipt_timestamp,
+            "token": receipt_token,
+        },
     }
+
+
+# ---------------------------------------------------------------------------
+# GDPR right-to-erasure alias (Roadmap Comp #8)
+# ---------------------------------------------------------------------------
+
+
+compliance_router = APIRouter(prefix="/api/compliance/gdpr", tags=["compliance"])
+
+
+@compliance_router.post("/forget", status_code=200)
+async def gdpr_forget(
+    auth: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+) -> dict[str, Any]:
+    """GDPR right-to-erasure (alias for DELETE /api/user/data).
+
+    Accepts POST so it can be called by compliance automation tools
+    that prefer POST semantics for destructive operations. Delegates
+    to the canonical ``delete_my_data`` handler and returns the same
+    GDPR deletion receipt.
+    """
+    return await delete_my_data(auth)

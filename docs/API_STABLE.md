@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-27 18:42:27 UTC
+**Generated:** 2026-06-27 22:59:31 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -29,9 +29,13 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/jobs/{job_id}/export/excel` |
 | GET | `/api/jobs/{job_id}/export/json` |
 | GET | `/api/jobs/{job_id}/results` |
+| PATCH | `/api/jobs/{job_id}/headers` |
+| PATCH | `/api/jobs/{job_id}/strategy` |
+| PATCH | `/api/jobs/{job_id}/webhook` |
 | POST | `/api/jobs` |
 | POST | `/api/jobs/{job_id}/cancel` |
 | POST | `/api/jobs/{job_id}/reclean` |
+| POST | `/api/jobs/{job_id}/webhook/redeliver` |
 
 ## Recycle Bin Routes
 
@@ -67,6 +71,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/scraper/stats` |
 | GET | `/api/scraper/telemetry` |
 | POST | `/api/scraper/diagnostics` |
+| POST | `/api/scraper/preview` |
 | POST | `/api/scraper/regressions/generate-all-tests` |
 | POST | `/api/scraper/regressions/{entry_id}/generate-test` |
 | POST | `/api/scraper/selectors/cleanup` |
@@ -143,6 +148,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | POST | `/api/auth-profiles/{profile_id}/validate` |
 | POST | `/api/billing/checkout` |
 | POST | `/api/billing/webhook` |
+| POST | `/api/compliance/gdpr/forget` |
 | POST | `/api/saas/aup/accept` |
 | POST | `/api/saas/email-verification/send` |
 | POST | `/api/saas/email-verification/verify` |
@@ -164,4 +170,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 108
+**Total routes:** 114

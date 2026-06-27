@@ -885,6 +885,14 @@
             "description": "Optional auth profile ID to use for authenticated scraping",
             "title": "Auth Profile Id"
           },
+          "cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom cookies to inject into requests/browser contexts",
+            "title": "Cookies",
+            "type": "object"
+          },
           "deduplicate": {
             "default": true,
             "description": "Remove duplicate records",
@@ -898,6 +906,13 @@
             "title": "Deduplicate Field",
             "type": "string"
           },
+          "fetch_strategy": {
+            "default": "",
+            "description": "User-requested fetch strategy (playwright_full, httpx_smart, hybrid, etc.). Empty means auto-select.",
+            "maxLength": 32,
+            "title": "Fetch Strategy",
+            "type": "string"
+          },
           "filters": {
             "description": "Post-processing filters",
             "items": {
@@ -906,6 +921,14 @@
             "maxItems": 100,
             "title": "Filters",
             "type": "array"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom HTTP headers to send with requests",
+            "title": "Headers",
+            "type": "object"
           },
           "intent": {
             "default": "",
@@ -1038,12 +1061,110 @@
             "maxItems": 100,
             "title": "Urls",
             "type": "array"
+          },
+          "webhook_secret": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "HMAC-SHA256 secret for signing webhook payloads. If set, the X-DataForge-Signature header is included.",
+            "title": "Webhook Secret"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL to POST job-completion webhook to. Must be https:// or http://.",
+            "title": "Webhook Url"
           }
         },
         "required": [
           "name"
         ],
         "title": "JobCreate",
+        "type": "object"
+      },
+      "JobHeadersUpdate": {
+        "description": "Request body to update job headers and cookies.",
+        "properties": {
+          "cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom cookies to inject into requests/browser contexts",
+            "title": "Cookies",
+            "type": "object"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom HTTP headers to send with requests",
+            "title": "Headers",
+            "type": "object"
+          }
+        },
+        "title": "JobHeadersUpdate",
+        "type": "object"
+      },
+      "JobStrategyUpdate": {
+        "description": "Request body to update a job's fetch strategy.",
+        "properties": {
+          "fetch_strategy": {
+            "description": "Fetch strategy to use (playwright_full, httpx_smart, hybrid, etc.). Empty string resets to auto-select.",
+            "maxLength": 32,
+            "title": "Fetch Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fetch_strategy"
+        ],
+        "title": "JobStrategyUpdate",
+        "type": "object"
+      },
+      "JobWebhookUpdate": {
+        "description": "Request body to update job webhook configuration.",
+        "properties": {
+          "webhook_secret": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "HMAC-SHA256 secret for signing webhook payloads. Set to null to remove signing.",
+            "title": "Webhook Secret"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL to POST job-completion webhook to. Set to null to remove.",
+            "title": "Webhook Url"
+          }
+        },
+        "title": "JobWebhookUpdate",
         "type": "object"
       },
       "MembershipResponse": {
@@ -2839,6 +2960,30 @@
         ]
       }
     },
+    "/api/compliance/gdpr/forget": {
+      "post": {
+        "description": "GDPR right-to-erasure (alias for DELETE /api/user/data).\n\nAccepts POST so it can be called by compliance automation tools\nthat prefer POST semantics for destructive operations. Delegates\nto the canonical ``delete_my_data`` handler and returns the same\nGDPR deletion receipt.",
+        "operationId": "gdpr_forget_api_compliance_gdpr_forget_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Gdpr Forget Api Compliance Gdpr Forget Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gdpr Forget",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
     "/api/discover": {
       "post": {
         "description": "Auto-discover best URLs to scrape for a topic.",
@@ -3376,6 +3521,57 @@
         "summary": "Export Json"
       }
     },
+    "/api/jobs/{job_id}/headers": {
+      "patch": {
+        "description": "Update custom request headers and cookies for a job.",
+        "operationId": "update_job_headers_api_jobs__job_id__headers_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobHeadersUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job Headers",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/reclean": {
       "post": {
         "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.\n\nDelegates business logic to ``JobRecleanerService``.",
@@ -3476,6 +3672,149 @@
           }
         },
         "summary": "Get Job Results",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/strategy": {
+      "patch": {
+        "description": "Update the fetch strategy for a job.",
+        "operationId": "update_job_strategy_api_jobs__job_id__strategy_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobStrategyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job Strategy",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/webhook": {
+      "patch": {
+        "description": "Update webhook URL and signing secret for a job.",
+        "operationId": "update_job_webhook_api_jobs__job_id__webhook_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobWebhookUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job Webhook",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/webhook/redeliver": {
+      "post": {
+        "description": "Manually re-deliver the job-completion webhook.",
+        "operationId": "redeliver_job_webhook_api_jobs__job_id__webhook_redeliver_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redeliver Job Webhook",
         "tags": [
           "jobs"
         ]
@@ -5318,6 +5657,46 @@
           }
         },
         "summary": "Get Selector Memory Brief",
+        "tags": [
+          "scraper"
+        ]
+      }
+    },
+    "/api/scraper/preview": {
+      "post": {
+        "description": "Dry-run an extraction without persisting a job (Roadmap Feat #19).\n\nAccepts the same ``JobCreate`` payload as job creation. Runs the\nextraction pipeline on the first URL only and returns sample results\nfor inspection. No job is created, no data is stored.\n\nUseful for testing selectors, validating schemas, and previewing\nextraction quality before committing to a full job.",
+        "operationId": "preview_extraction_api_scraper_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Extraction",
         "tags": [
           "scraper"
         ]

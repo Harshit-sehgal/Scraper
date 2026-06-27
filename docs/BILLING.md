@@ -1,5 +1,11 @@
 # Billing & Usage Documentation
 
+> ⚠️ **For the current plan tiers, quota limits, and billing
+> integration status, see `USAGE_AND_BILLING.md`. This file is
+> retained for the usage-ledger API examples below; the pricing
+> table below is superseded by the four-tier model (Free, Starter,
+> Pro, Enterprise) documented in `USAGE_AND_BILLING.md`.
+
 ## Overview
 
 DataForge includes a usage ledger and quota system for tracking API usage and enforcing limits.

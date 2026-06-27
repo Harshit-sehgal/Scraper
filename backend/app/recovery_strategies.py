@@ -91,6 +91,7 @@ class AttemptContext:
     proxy_profile: str | None = None
     search_params: dict[str, str] | None = None
     extra_headers: dict[str, str] = field(default_factory=dict)
+    cookies: dict[str, str] = field(default_factory=dict)
     skip_networkidle: bool = False
     scroll_attempts: int | None = None
     anti_bot_stealth: bool = False

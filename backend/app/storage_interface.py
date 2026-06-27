@@ -51,6 +51,8 @@ _JOBS_COLUMNS_SQL = [
     "started_at TEXT DEFAULT ''",
     "results_on_disk BOOLEAN DEFAULT FALSE",
     "results_file_path TEXT DEFAULT ''",
+    "headers TEXT DEFAULT '{}'",
+    "cookies TEXT DEFAULT '{}'",
     "updated_at TEXT DEFAULT ''",
     "deleted_at TEXT DEFAULT NULL",
 ]

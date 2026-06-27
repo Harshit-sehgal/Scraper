@@ -107,6 +107,8 @@ async def scrape_url_with_recovery(
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
     usage_context: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    cookies: dict[str, str] | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.
 
@@ -148,6 +150,10 @@ async def scrape_url_with_recovery(
     attempt = 0
     last_error: Exception | None = None
     attempt_ctx = AttemptContext()
+    if headers:
+        attempt_ctx.extra_headers.update(headers)
+    if cookies:
+        attempt_ctx.cookies.update(cookies)
     result: Any = None
 
     while attempt < max_recovery_attempts:
@@ -197,6 +203,8 @@ async def scrape_url_with_recovery(
                     search_params=search_params,
                     attempt_ctx=attempt_ctx,
                     usage_context=usage_context,
+                    headers=headers,
+                    cookies=cookies,
                 )
                 results = list(result)  # Extract records as a plain list
 

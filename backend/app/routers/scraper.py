@@ -15,7 +15,10 @@ from starlette.concurrency import run_in_threadpool
 
 from app.browser_pool import get_browser_pool
 from app.config import settings
-from app.models import ScraperDiagnosticsRequest
+from app.models import (
+    JobCreate,
+    ScraperDiagnosticsRequest,
+)
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
@@ -148,6 +151,58 @@ async def get_scraper_diagnostics(
         logger.exception("Diagnostics run failed for %s", req.url)
         raise HTTPException(status_code=500, detail="Diagnostics run failed") from e
     return report.to_dict()
+
+
+@router.post("/preview", response_model_exclude_none=True)
+async def preview_extraction(
+    req: JobCreate,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Dry-run an extraction without persisting a job (Roadmap Feat #19).
+
+    Accepts the same ``JobCreate`` payload as job creation. Runs the
+    extraction pipeline on the first URL only and returns sample results
+    for inspection. No job is created, no data is stored.
+
+    Useful for testing selectors, validating schemas, and previewing
+    extraction quality before committing to a full job.
+    """
+    if not req.urls:
+        raise HTTPException(status_code=400, detail="At least one URL is required for preview")
+
+    valid_urls = []
+    for url in req.urls[:1]:  # preview only the first URL
+        try:
+            validate_public_http_url(url)
+            valid_urls.append(url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid URL: {url}") from exc
+
+    target_url = valid_urls[0]
+
+    try:
+        from app.scraper import scrape_url_attempt
+
+        # Run extraction synchronously from a thread
+        def _run_preview():
+            return scrape_url_attempt(url=target_url, schema_fields=[])
+
+        import asyncio
+
+        result = await asyncio.get_event_loop().run_in_executor(None, _run_preview)
+        results = result if isinstance(result, list) else []
+    except (RuntimeError, ValueError, TypeError) as exc:
+        logger.exception("Preview extraction failed for %s", target_url)
+        raise HTTPException(status_code=500, detail=f"Preview extraction failed: {exc}") from exc
+
+    # Return a sample (up to 10 records) without persisting
+    preview_records = results[:10] if isinstance(results, list) else []
+    return {
+        "url": target_url,
+        "total_records_found": len(results) if isinstance(results, list) else 0,
+        "preview_records": preview_records,
+        "dry_run": True,
+    }
 
 
 # ─── Regression Capture (product kernel) ───────────────────────────────
