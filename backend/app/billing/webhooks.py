@@ -597,12 +597,17 @@ async def list_subscriptions(
 ) -> dict[str, Any]:
     """List all tracked subscriptions (admin/operator only).
 
-    Requires a global (unscoped) admin/operator key.  Project-scoped
-    operator keys cannot enumerate subscriptions across organisations.
+    Enforces tenant scoping for project-scoped operator keys.
     """
     _role, _user_id, org_id, project_id = principal
     if org_id or project_id:
-        raise HTTPException(status_code=403, detail="Global admin/operator key required to list subscriptions")
+        subs = [
+            sub for sub in _subscription_store.values() if sub.get("customer_id") == org_id or sub.get("customer_id") == _user_id
+        ]
+        return {
+            "total": len(subs),
+            "subscriptions": subs,
+        }
     return {
         "total": len(_subscription_store),
         "subscriptions": _subscription_store.values(),
@@ -620,11 +625,10 @@ async def get_subscription(
 ) -> dict[str, Any]:
     """Get subscription details for a customer (admin/operator only).
 
-    Requires a global (unscoped) admin/operator key.  Project-scoped
-    operator keys cannot access billing information across organisations.
+    Enforces tenant scoping for project-scoped operator keys.
     """
     _role, _user_id, org_id, project_id = principal
-    if org_id or project_id:
+    if (org_id or project_id) and customer_id not in {org_id, _user_id}:
         raise HTTPException(status_code=403, detail="Global admin/operator key required")
     sub = get_customer_subscription(customer_id)
     if sub is None:

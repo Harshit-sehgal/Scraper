@@ -481,7 +481,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         sql = (
             "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
-            "progress_total, error "
+            "progress_total, error, org_id, project_id "
             "FROM jobs WHERE deleted_at IS NULL"
         )
         if cursor:
@@ -515,8 +515,13 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "progress_current": row.get("progress_current", 0) or 0,
                     "progress_total": row.get("progress_total", 0) or 0,
                     "error": row.get("error") or None,
+                    "org_id": row.get("org_id", "") or "",
+                    "project_id": row.get("project_id", "") or "",
                 },
             )
+        from app.utils.cross_tenant_guard import guard_cross_tenant
+
+        guard_cross_tenant(summaries, context="PostgresRepositoryBase.list_job_summaries")
         return summaries
 
     def count_jobs_by_status(self, include_deleted: bool = False) -> dict[str, int]:
@@ -545,6 +550,9 @@ class PostgresRepositoryBase(JobRepository, ABC):
         self._ensure()
         with self._conn() as conn:
             rows = self._fetch_all(conn, "SELECT * FROM recycle_bin")
+            from app.utils.cross_tenant_guard import guard_cross_tenant
+
+            guard_cross_tenant(rows, context="PostgresRepositoryBase.get_recycle_bin")
             jobs: dict[str, Job] = {}
             for row in rows:
                 job = row_to_job(row)
@@ -559,7 +567,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         sql = (
             "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
-            "progress_total, error, deleted_at "
+            "progress_total, error, deleted_at, org_id, project_id "
             "FROM recycle_bin WHERE 1=1"
         )
         if cursor:
@@ -594,8 +602,13 @@ class PostgresRepositoryBase(JobRepository, ABC):
                     "progress_total": row.get("progress_total", 0) or 0,
                     "error": row.get("error") or None,
                     "deleted_at": row.get("deleted_at") or None,
+                    "org_id": row.get("org_id", "") or "",
+                    "project_id": row.get("project_id", "") or "",
                 },
             )
+        from app.utils.cross_tenant_guard import guard_cross_tenant
+
+        guard_cross_tenant(summaries, context="PostgresRepositoryBase.list_recycle_summaries")
         return summaries
 
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:

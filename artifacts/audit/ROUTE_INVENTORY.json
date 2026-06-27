@@ -1010,7 +1010,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "get_project",
       "method": "GET",

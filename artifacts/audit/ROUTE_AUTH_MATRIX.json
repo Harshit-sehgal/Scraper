@@ -752,7 +752,7 @@
       "path": "/api/saas/projects/{project_id}",
       "public_protected_unknown": "protected",
       "required_role": "authenticated-user",
-      "route_dependency": "require_role_with_user",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"

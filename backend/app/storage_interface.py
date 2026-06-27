@@ -502,7 +502,7 @@ class SQLiteJobRepository(JobRepository):
         sql = (
             "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
-            "progress_total, error, deleted_at "
+            "progress_total, error, deleted_at, org_id, project_id "
             "FROM recycle_bin "
             "WHERE " + where + " "  # nosec B608  # noqa: RUF100, S608
             "ORDER BY created_at DESC LIMIT ?"
@@ -541,8 +541,13 @@ class SQLiteJobRepository(JobRepository):
                     "progress_total": d.get("progress_total", 0) or 0,
                     "error": d.get("error") or None,
                     "deleted_at": d.get("deleted_at") or None,
+                    "org_id": d.get("org_id", "") or "",
+                    "project_id": d.get("project_id", "") or "",
                 },
             )
+        from app.utils.cross_tenant_guard import guard_cross_tenant
+
+        guard_cross_tenant(summaries, context="SQLiteJobRepository.list_recycle_summaries")
         return summaries
 
     def get_job(self, job_id: str) -> Job | None:
@@ -585,7 +590,7 @@ class SQLiteJobRepository(JobRepository):
         sql = (
             "SELECT id, name, status, mode, topic, urls, created_by, created_at, started_at, "
             "completed_at, total_records, filtered_records, progress_current, "
-            "progress_total, error "
+            "progress_total, error, org_id, project_id "
             "FROM jobs "
             "WHERE " + where + " "  # nosec B608  # noqa: RUF100, S608
             "ORDER BY created_at DESC LIMIT ?"
@@ -624,8 +629,13 @@ class SQLiteJobRepository(JobRepository):
                     "progress_current": d.get("progress_current", 0) or 0,
                     "progress_total": d.get("progress_total", 0) or 0,
                     "error": d.get("error") or None,
+                    "org_id": d.get("org_id", "") or "",
+                    "project_id": d.get("project_id", "") or "",
                 },
             )
+        from app.utils.cross_tenant_guard import guard_cross_tenant
+
+        guard_cross_tenant(summaries, context="SQLiteJobRepository.list_job_summaries")
         return summaries
 
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:

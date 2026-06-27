@@ -2746,7 +2746,7 @@
     },
     "/api/billing/subscriptions": {
       "get": {
-        "description": "List all tracked subscriptions (admin/operator only).\n\nRequires a global (unscoped) admin/operator key.  Project-scoped\noperator keys cannot enumerate subscriptions across organisations.",
+        "description": "List all tracked subscriptions (admin/operator only).\n\nEnforces tenant scoping for project-scoped operator keys.",
         "operationId": "list_subscriptions_api_billing_subscriptions_get",
         "responses": {
           "200": {
@@ -2770,7 +2770,7 @@
     },
     "/api/billing/subscriptions/{customer_id}": {
       "get": {
-        "description": "Get subscription details for a customer (admin/operator only).\n\nRequires a global (unscoped) admin/operator key.  Project-scoped\noperator keys cannot access billing information across organisations.",
+        "description": "Get subscription details for a customer (admin/operator only).\n\nEnforces tenant scoping for project-scoped operator keys.",
         "operationId": "get_subscription_api_billing_subscriptions__customer_id__get",
         "parameters": [
           {

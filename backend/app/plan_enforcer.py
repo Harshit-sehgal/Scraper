@@ -184,29 +184,32 @@ def require_plan_limit(usage_type: UsageType, *, quantity: int = 1):
     async def dependency(request: Request) -> dict[str, Any]:
         try:
             ctx = resolve_auth_context(request)
-            user_id = ctx.user_id
+            quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
+            actor = ctx.user_id
         except HTTPException:
             # If auth hasn't resolved yet, skip plan check (the route's own
             # auth dependency will handle it)
             return {"skipped": True}
 
-        allowed, details = check_usage_limit(user_id, usage_type, quantity)
+        allowed, details = check_usage_limit(quota_owner, usage_type, quantity)
         if not allowed:
             logger.warning(
-                "Plan limit exceeded: user=%s tier=%s type=%s current=%s limit=%s",
-                user_id,
+                "Plan limit exceeded: user=%s (quota_owner=%s) tier=%s type=%s current=%s limit=%s",
+                actor,
+                quota_owner,
                 details["tier"],
                 usage_type.value,
                 details["current_usage"],
                 details["limit"],
             )
             log_rbac_event(
-                actor=user_id,
+                actor=actor,
                 action=f"quota_exceeded:{usage_type.value}",
                 resource=f"plan:{usage_type.value}",
                 role=details["tier"],
                 outcome="denied",
                 details={
+                    "quota_owner": quota_owner,
                     "current_usage": details["current_usage"],
                     "limit": details["limit"],
                     "period": details["period"],

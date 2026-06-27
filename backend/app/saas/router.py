@@ -421,6 +421,9 @@ async def delete_organization(
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
+    if _org_id and _org_id != org_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
+
     store = get_identity_store()
     org = store.get_organization(org_id)
     if not org:
@@ -568,12 +571,12 @@ async def list_org_projects(
 async def get_project(
     project_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ) -> ProjectResponse:
     """Get a single project by ID."""
-    _role, user_id = auth
+    role, user_id, _org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
@@ -584,6 +587,20 @@ async def get_project(
     # Verify user is a member of the project org
     if not get_identity_store().is_org_member(user_id, project.org_id):
         raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    # Enforce project-level scope
+    from app.utils.rbac import can_access_scoped_resource
+
+    if not can_access_scoped_resource(
+        role,
+        user_id,
+        _org_id,
+        _project_id,
+        resource_owner_id=project.created_by_user_id,
+        resource_org_id=project.org_id,
+        resource_project_id=project.id,
+    ):
+        raise HTTPException(status_code=403, detail="Cross-project access forbidden")
 
     return ProjectResponse(
         id=project.id,
@@ -620,6 +637,20 @@ async def delete_project(
     # Verify caller is a member of the org
     if not store.is_org_member(user_id, project.org_id) and role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    # Enforce project-level scope
+    from app.utils.rbac import can_access_scoped_resource
+
+    if not can_access_scoped_resource(
+        role,
+        user_id,
+        _org_id,
+        _project_id,
+        resource_owner_id=project.created_by_user_id,
+        resource_org_id=project.org_id,
+        resource_project_id=project.id,
+    ):
+        raise HTTPException(status_code=403, detail="Cross-project access forbidden")
 
     store.delete_project(project_id)
 
@@ -1713,6 +1744,7 @@ class UsageSummaryResponse(BaseModel):
 
 @router.get("/usage", response_model=UsageSummaryResponse)
 async def get_usage_summary(
+    request: Request,
     auth: Annotated[
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
@@ -1728,14 +1760,22 @@ async def get_usage_summary(
         raise HTTPException(status_code=401, detail="authenticated user required")
 
     try:
+        from app.utils.rbac import resolve_auth_context
+
+        ctx = resolve_auth_context(request)
+        quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
+    except Exception:
+        quota_owner = user_id
+
+    try:
         from app.utils.usage_ledger import UsageType, get_usage_ledger
 
         ledger = get_usage_ledger()
-        jobs_usage = ledger.get_usage(user_id, UsageType.JOB_CREATED)
-        pages_usage = ledger.get_usage(user_id, UsageType.PAGE_FETCHED)
-        scheduled_usage = ledger.get_usage(user_id, UsageType.SCHEDULED_JOB)
-        ai_usage = ledger.get_usage(user_id, UsageType.AI_STRUCTURING)
-        api_usage = ledger.get_usage(user_id, UsageType.API_REQUEST)
+        jobs_usage = ledger.get_usage(quota_owner, UsageType.JOB_CREATED)
+        pages_usage = ledger.get_usage(quota_owner, UsageType.PAGE_FETCHED)
+        scheduled_usage = ledger.get_usage(quota_owner, UsageType.SCHEDULED_JOB)
+        ai_usage = ledger.get_usage(quota_owner, UsageType.AI_STRUCTURING)
+        api_usage = ledger.get_usage(quota_owner, UsageType.API_REQUEST)
 
         return UsageSummaryResponse(
             jobs_created=sum(r.quantity for r in jobs_usage),

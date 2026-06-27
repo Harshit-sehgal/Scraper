@@ -849,3 +849,156 @@ def test_viewer_member_cannot_issue_admin_scope_key(client, monkeypatch, tmp_pat
             if rank > max_rank:
                 # This scope MUST be rejected for this role.
                 assert rank > max_rank, f"{role} role must not be permitted to issue {scope}-scope keys"
+
+
+def test_project_scoped_key_cannot_access_another_orgs_billing_subscriptions(client, monkeypatch, tmp_path) -> None:
+    import app.billing.webhooks as billing_webhooks
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+
+    billing_webhooks.set_customer_subscription(
+        customer_id=org_b.organization.id,
+        tier="pro",
+        status="active",
+        subscription_id="sub-b",
+    )
+
+    try:
+        resp_list = client.get(
+            "/api/billing/subscriptions",
+            headers={"X-API-Key": write_key_a.raw_key},
+        )
+        assert resp_list.status_code == 200
+        subscriptions = resp_list.json().get("subscriptions", [])
+        assert all(sub.get("customer_id") != org_b.organization.id for sub in subscriptions)
+
+        resp_get = client.get(
+            f"/api/billing/subscriptions/{org_b.organization.id}",
+            headers={"X-API-Key": write_key_a.raw_key},
+        )
+        assert resp_get.status_code == 403
+    finally:
+        reset_identity_store(None)
+        billing_webhooks.delete_customer_subscription(org_b.organization.id)
+
+
+def test_shared_org_quota_across_multiple_keys(client, monkeypatch, tmp_path) -> None:
+    from app.saas import ApiKeyScope
+    from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, _, keys = _setup_saas_accounts(tmp_path)
+
+    # Issue two write/operator keys for the same Org A (Project A)
+    key_1 = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-key-1",
+        scope=ApiKeyScope.WRITE,
+    )
+    key_2 = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-key-2",
+        scope=ApiKeyScope.WRITE,
+    )
+
+    ledger = get_usage_ledger()
+    # Reset any existing quotas/usage
+    ledger._quotas.clear()
+    ledger._records.clear()
+
+    import app.plan_enforcer
+    from app.billing.models import PlanTierId
+
+    monkeypatch.setitem(app.plan_enforcer._PLAN_LIMITS, ("pro", UsageType.JOB_CREATED), 2)
+    monkeypatch.setattr("app.billing.service.get_user_tier_from_billing", lambda uid: PlanTierId.PRO)
+
+    try:
+        # Create first job with key_1 -> Should succeed
+        resp1 = client.post(
+            "/api/jobs",
+            headers={"X-API-Key": key_1.raw_key},
+            json={"name": "Job 1", "urls": ["https://example.com/1"]},
+        )
+        assert resp1.status_code == 201
+
+        # Create second job with key_2 -> Should succeed
+        resp2 = client.post(
+            "/api/jobs",
+            headers={"X-API-Key": key_2.raw_key},
+            json={"name": "Job 2", "urls": ["https://example.com/2"]},
+        )
+        assert resp2.status_code == 201
+
+        # Create third job with key_1 -> Should fail with 429 because org quota is 2
+        resp3 = client.post(
+            "/api/jobs",
+            headers={"X-API-Key": key_1.raw_key},
+            json={"name": "Job 3", "urls": ["https://example.com/3"]},
+        )
+        assert resp3.status_code == 429
+
+        # Create third job with key_2 -> Should also fail with 429
+        resp4 = client.post(
+            "/api/jobs",
+            headers={"X-API-Key": key_2.raw_key},
+            json={"name": "Job 4", "urls": ["https://example.com/4"]},
+        )
+        assert resp4.status_code == 429
+    finally:
+        reset_identity_store(None)
+        ledger._quotas.clear()
+        ledger._records.clear()
+
+
+def test_project_scoped_key_cannot_access_or_delete_other_projects(client, monkeypatch, tmp_path) -> None:
+    from app.saas import ApiKeyScope
+    from app.saas.identity_store import get_identity_store
+    from app.saas.models import Project
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, _, keys = _setup_saas_accounts(tmp_path)
+
+    store = get_identity_store()
+    proj_b = store.create_project(
+        Project(
+            org_id=org_a.organization.id,
+            name="ProjB-UnderOrgA",
+            created_by_user_id=org_a.user.id,
+        )
+    )
+
+    # Issue a write/operator key scoped to Project A
+    key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="scoped-to-a",
+        scope=ApiKeyScope.WRITE,
+    )
+
+    try:
+        # Access Project B using Key A -> Should be Forbidden (403)
+        resp_get = client.get(
+            f"/api/saas/projects/{proj_b.id}",
+            headers={"X-API-Key": key_a.raw_key},
+        )
+        assert resp_get.status_code == 403
+
+        # Delete Project B using Key A -> Should be Forbidden (403)
+        resp_del = client.delete(
+            f"/api/saas/projects/{proj_b.id}",
+            headers={"X-API-Key": key_a.raw_key},
+        )
+        assert resp_del.status_code == 403
+    finally:
+        reset_identity_store(None)

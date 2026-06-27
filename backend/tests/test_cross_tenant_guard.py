@@ -73,3 +73,51 @@ def test_reset_clears_counter():
     assert get_cross_tenant_alert_count() == 1
     reset_cross_tenant_alert_count()
     assert get_cross_tenant_alert_count() == 0
+
+
+def test_repository_list_jobs_triggers_cross_tenant_guard(monkeypatch, tmp_path) -> None:
+    from app.models import Job
+    from app.storage_interface import SQLiteJobRepository
+
+    # Setup database file in temporary directory
+    db_file = tmp_path / "test_jobs.db"
+    import os
+
+    # We monkeypatch the DB path in job_store
+    monkeypatch.setattr("app.job_store._get_db_path", lambda: db_file)
+
+    try:
+        # Initialize repository
+        repo = SQLiteJobRepository()
+
+        # Create two jobs with different org_ids
+        job_1 = Job(
+            id="job-1",
+            name="Job 1",
+            org_id="org-a",
+            urls=["https://example.com/1"],
+        )
+        job_2 = Job(
+            id="job-2",
+            name="Job 2",
+            org_id="org-b",
+            urls=["https://example.com/2"],
+        )
+
+        # Save both jobs
+        repo.save_single(job_1)
+        repo.save_single(job_2)
+
+        # Reset alert count, then call list_job_summaries
+        reset_cross_tenant_alert_count()
+        summaries = repo.list_job_summaries(limit=10)
+
+        # Confirm both are returned and different org_ids exist
+        assert len(summaries) == 2
+        assert {s["org_id"] for s in summaries} == {"org-a", "org-b"}
+
+        # Assert cross-tenant guard was triggered
+        assert get_cross_tenant_alert_count() == 1
+    finally:
+        if db_file.exists():
+            os.remove(db_file)

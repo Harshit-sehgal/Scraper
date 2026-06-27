@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-27 15:56:37 UTC
+**Generated:** 2026-06-27 16:05:03 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
@@ -70,7 +70,7 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/saas/plan` | `app.saas.router` | `get_plan_info` | stable | protected | authenticated-user | require_role_with_user |  | PlanInfoResponse | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects` | `app.saas.router` | `create_project` | stable | protected | operator-or-admin | require_aup_accepted, require_role_with_user |  | ProjectResponse | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}` | `app.saas.router` | `delete_project` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/saas/projects/{project_id}` | `app.saas.router` | `get_project` | stable | protected | authenticated-user | require_role_with_user |  | ProjectResponse | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/projects/{project_id}` | `app.saas.router` | `get_project` | stable | protected | authenticated-user | require_principal |  | ProjectResponse | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/projects/{project_id}/keys` | `app.saas.router` | `list_project_api_keys` | stable | protected | authenticated-user | require_role_with_user |  | ApiKeyListResponse | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects/{project_id}/keys` | `app.saas.router` | `create_api_key` | stable | protected | operator-or-admin | require_aup_accepted, require_role_with_user |  | ApiKeyCreateResponse | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | `app.saas.router` | `revoke_api_key` | stable | protected | operator-or-admin | require_role_with_user |  |  | route dependency accepts admin/operator |

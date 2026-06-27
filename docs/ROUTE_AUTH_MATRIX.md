@@ -74,7 +74,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/saas/plan` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects` | protected | operator-or-admin | require_aup_accepted, require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/saas/projects/{project_id}` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/projects/{project_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/projects/{project_id}/keys` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects/{project_id}/keys` | protected | operator-or-admin | require_aup_accepted, require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |

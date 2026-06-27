@@ -23,17 +23,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Exception tuple for DB rollback — when psycopg is imported successfully
-# in Psycopg3Repository.__init__, ``psycopg.Error`` is included; otherwise
-# the tuple omits it.  The ``__init__`` import ensures the module is
-# available before any connection is opened.
-try:
-    import psycopg as _psycopg
-
-    _DB_ROLLBACK_ERRORS: tuple[type[BaseException], ...] = (_psycopg.Error, OSError, TypeError, ValueError)
-except ImportError:  # pragma: no cover
-    _DB_ROLLBACK_ERRORS = (OSError, TypeError, ValueError)
-
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)
 # ───────────────────────────────────────────────────────────────────────

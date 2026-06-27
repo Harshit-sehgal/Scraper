@@ -276,7 +276,7 @@ class UsageLedger:
                 if existing is not None:
                     return existing
 
-            quota_key = self._quota_key(user_id, usage_type)
+            quota_key = self._quota_key(org_id or project_id or user_id, usage_type)
             quota = self._quotas.get(quota_key)
             if quota is not None and quota.current_usage + quantity > quota.limit:
                 msg = f"quota exceeded for {usage_type.value}: {quota.current_usage + quantity}/{quota.limit}"
@@ -315,7 +315,7 @@ class UsageLedger:
     ) -> list[UsageRecord]:
         """Get usage records for a user."""
         with self._lock:
-            records = [r for r in self._records if r.user_id == user_id]
+            records = [r for r in self._records if user_id in {r.user_id, r.org_id, r.project_id}]
 
             if usage_type:
                 records = [r for r in records if r.usage_type == usage_type]
