@@ -26,6 +26,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_rbac_event
@@ -381,4 +382,112 @@ def create_exports_router(jobs_store: dict[str, Any]):
         )
 
     # ─── Batch export ────────────────────────────────────────────
+
+    class BatchExportRequest(BaseModel):
+        """Request body for batch export."""
+        job_ids: list[str] = Field(..., min_length=1, max_length=50, description="Job IDs to export")
+        format: str = Field(default="csv", description="Export format: csv, json, or xlsx")
+        flatten: bool = Field(default=True, description="Combine into single output when True")
+
+    @router.post("/api/exports/batch")
+    async def batch_export(
+        body: BatchExportRequest,
+        request: Request,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        fmt = body.format.lower()
+        if fmt not in {"csv", "json", "xlsx"}:
+            raise HTTPException(status_code=400, detail=f"Unsupported format: {fmt}")
+
+        try:
+            # Build job metadata from the store
+            job_meta: list[tuple[str, str, bool, str | None]] = []
+            for jid in body.job_ids:
+                job = jobs_store.get(jid)
+                if job is None:
+                    continue
+                _ensure_export_job_access(job, auth, f"batch_export_{fmt}")
+                on_disk = getattr(job, "results_on_disk", False)
+                file_path = getattr(job, "results_file_path", None)
+                job_meta.append((jid, getattr(job, "name", jid), on_disk, file_path))
+
+            if not job_meta:
+                raise HTTPException(status_code=404, detail="No accessible jobs found")
+
+            def _count(jid: str) -> int | None:
+                job = jobs_store.get(jid)
+                if job is None:
+                    return None
+                return len(getattr(job, "results", []) or [])
+
+            def _sample(jid: str) -> list[dict]:
+                job = jobs_store.get(jid)
+                if job is None:
+                    return []
+                return list(getattr(job, "results", []) or [])[:5]
+
+            def _results(jid: str) -> list[dict] | None:
+                job = jobs_store.get(jid)
+                if job is None:
+                    return None
+                return list(getattr(job, "results", []) or [])
+
+            manifest = await export_service.build_batch_manifest(job_meta, None, _count)
+            union, _ = await export_service.discover_fieldnames_union(job_meta, None, _sample)
+
+            if fmt == "csv":
+                pages = export_service.iter_batch_pages(job_meta, None, _results)
+                stream = export_service.batch_csv_stream(pages, union, flatten=body.flatten)
+                _record_export_outcome("csv", True)
+                _log_export_access(auth[1], "csv", body.job_ids, request, success=True)
+                return StreamingResponse(
+                    stream,
+                    media_type="text/csv",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="batch-export-{export_service.batch_export_timestamp()}.csv"'
+                    },
+                )
+            if fmt == "json":
+                pages = export_service.iter_batch_pages(job_meta, None, _results)
+                stream = export_service.batch_json_stream(pages, flatten=body.flatten, manifest=manifest)
+                _record_export_outcome("json", True)
+                _log_export_access(auth[1], "json", body.job_ids, request, success=True)
+                return StreamingResponse(
+                    stream,
+                    media_type="application/json",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="batch-export-{export_service.batch_export_timestamp()}.json"'
+                    },
+                )
+            if fmt == "xlsx":
+                xlsx_bytes = await run_in_threadpool(
+                    export_service.batch_xlsx,
+                    job_meta,
+                    fieldnames=union,
+                    flatten=body.flatten,
+                    manifest=manifest,
+                    page_loader=None,
+                    get_inmemory_results=_results,
+                )
+                _record_export_outcome("xlsx", True)
+                _log_export_access(auth[1], "xlsx", body.job_ids, request, success=True)
+                return StreamingResponse(
+                    iter([xlsx_bytes]),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="batch-export-{export_service.batch_export_timestamp()}.xlsx"'
+                    },
+                )
+        except HTTPException:
+            _record_export_outcome(fmt, False)
+            _log_export_access(auth[1], fmt, body.job_ids, request, success=False)
+            raise
+        except Exception:
+            _record_export_outcome(fmt, False)
+            _log_export_access(auth[1], fmt, body.job_ids, request, success=False)
+            raise
+
     return router

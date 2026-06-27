@@ -62,6 +62,32 @@ _token_usage_lock = threading.Lock()
 _token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
+class LLMCascadeExhausted(RuntimeError):
+    """Raised when every provider in the LLM cascade fails.
+
+    Carries the last exception encountered so callers can log useful
+    diagnostic context.  The legacy ``{}`` / ``""`` silent-fallback
+    is retained for opt-in backwards-compatible callers, but new
+    callers should default ``raise_on_failure=True`` so empty data
+    cannot be persisted as if it were a real response.
+    """
+
+    def __init__(
+        self,
+        public_name: str,
+        last_exception: BaseException | None,
+        attempt_count: int = 0,
+    ) -> None:
+        self.public_name = public_name
+        self.last_exception = last_exception
+        self.attempt_count = attempt_count
+        msg = (
+            f"{public_name}: all providers failed (attempts={attempt_count}, "
+            f"last_error={last_exception!r})"
+        )
+        super().__init__(msg)
+
+
 def get_token_usage() -> dict[str, int]:
     """Get accumulated token usage across all LLM calls in this process."""
     with _token_usage_lock:
@@ -358,7 +384,35 @@ def _public_llm_fallbacks_enabled() -> bool:
     return bool(settings.LLM_ENABLE_PUBLIC_FALLBACKS)
 
 
-async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+def _handle_silent_failure(
+    name: str,
+    last_err: BaseException | None,
+    *,
+    raise_on_failure: bool,
+    attempt_count: int = 0,
+) -> None:
+    """Either raise ``LLMCascadeExhausted`` or record-and-return-empty.
+
+    Callers invoke this when their provider cascade has fully exhausted
+    itself without producing a parseable result.  When
+    ``raise_on_failure=True`` we surface the cascade exhaustion as a
+    ``LLMCascadeExhausted`` exception so the caller can decide how to
+    handle data-integrity-sensitive empty results.  When ``False`` we
+    fall back to the legacy empty-sentinel behaviour (still tracked
+    via :func:`_record_silent_failure` for metrics).
+    """
+    if raise_on_failure:
+        raise LLMCascadeExhausted(name, last_err, attempt_count)
+    _record_silent_failure(name, last_err)
+
+
+async def llm_json(
+    messages: list[dict],
+    temperature: float | None = None,
+    timeout: int | None = None,
+    *,
+    raise_on_failure: bool | None = None,
+):
     try:
         from app.metrics_collector import record_llm_call
 
@@ -462,11 +516,21 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
-    _record_silent_failure("llm_json", last_err)
+    if raise_on_failure is None:
+        from app.utils.llm_bridge_settings import llm_raise_on_failure_default
+
+        raise_on_failure = llm_raise_on_failure_default()
+    _handle_silent_failure("llm_json", last_err, raise_on_failure=raise_on_failure)
     return {}
 
 
-async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+async def llm_json_fast(
+    messages: list[dict],
+    temperature: float | None = None,
+    timeout: int | None = None,
+    *,
+    raise_on_failure: bool | None = None,
+):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     try:
         from app.metrics_collector import record_llm_call
@@ -528,7 +592,13 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     return {}
 
 
-async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
+async def llm_text(
+    messages: list[dict],
+    temperature: float | None = None,
+    timeout: int | None = None,
+    *,
+    raise_on_failure: bool | None = None,
+) -> str:
     try:
         from app.metrics_collector import record_llm_call
 
