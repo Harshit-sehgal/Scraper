@@ -107,6 +107,13 @@ Rules:
                 {"role": "user", "content": prompt},
             ]
 
+            # Note: llm_json_fast and llm_json default to raise_on_failure=None
+            # which resolves via env var ``DATAFORGE_LLM_RAISE_ON_FAILURE``.
+            # Cleaning is intentionally permissive — empty result is
+            # accepted as "no cleaning needed" rather than crashing the
+            # whole chunk pipeline.  Production deployments that prefer
+            # fail-loud can flip the env var to True; the chunk loop
+            # gracefully handles LLMCascadeExhausted via _LLM_CALL_ERRORS.
             raw_response = None
             try:
                 res_fast = _llm_json_fast(messages)

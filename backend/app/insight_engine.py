@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from app.config import settings
+from app.llm_bridge import LLMCascadeExhausted
 from app.llm_bridge import llm_json as _llm_json
 from app.llm_bridge import llm_text as _llm_text
 
@@ -27,7 +28,16 @@ async def generate_data_insight(results: list[dict]) -> str:
         {"role": "system", "content": "You are a data analyst. Provide concise, valuable insights."},
         {"role": "user", "content": prompt},
     ]
-    response = await _llm_text(messages, temperature=settings.INSIGHT_TEMPERATURE, timeout=settings.INSIGHT_TIMEOUT_SECONDS)
+    try:
+        response = await _llm_text(
+            messages,
+            temperature=settings.INSIGHT_TEMPERATURE,
+            timeout=settings.INSIGHT_TIMEOUT_SECONDS,
+            raise_on_failure=True,
+        )
+    except LLMCascadeExhausted as exc:
+        logger.warning("[InsightEngine] Insight generation LLM cascade exhausted: %s", exc)
+        return ""
     return response or "Analysis generation encountered an upstream model error."
 
 
@@ -55,7 +65,17 @@ Maximum number of fields: {max_fields}
         {"role": "system", "content": "You are a schema architect. Return only JSON."},
         {"role": "user", "content": prompt},
     ]
-    return await _llm_json(messages, temperature=settings.LLM_TEMPERATURE, timeout=settings.LLM_TIMEOUT)  # type: ignore[no-any-return]
+    try:
+        result = await _llm_json(
+            messages,
+            temperature=settings.LLM_TEMPERATURE,
+            timeout=settings.LLM_TIMEOUT,
+            raise_on_failure=True,
+        )
+    except LLMCascadeExhausted as exc:
+        logger.warning("[InsightEngine] Schema suggestion LLM cascade exhausted: %s", exc)
+        return {}
+    return result  # type: ignore[no-any-return]
 
 
 def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) -> dict[str, Any]:

@@ -33,6 +33,35 @@ from app.llm_bridge import (
     reset_silent_failure_counts,
 )
 
+# The cascade breaker is a module-level singleton.  Tests exercise the
+# cascade paths by mocking individual backends — we must keep the
+# breaker disabled so partial-failure scenarios don't accumulate
+# state across tests and prevent later cases from running.
+from app.utils.llm_circuit_breaker import reset_cascade_breaker
+
+
+@pytest.fixture(autouse=True)
+def _isolate_cascade_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable and reset the cascade breaker for every test in this module.
+
+    The breaker looks at ``settings.LLM_CIRCUIT_ENABLED`` (a Pydantic
+    field initialised from the ``DATAFORGE_LLM_CIRCUIT_ENABLED`` env
+    var on first ``Settings()`` construction).  We set the env var
+    *before* the test runs and force a settings rebuild for the
+    duration of the test, and we additionally reset the singleton
+    state so any state carried from previous tests is wiped.
+    """
+    monkeypatch.setenv("DATAFORGE_LLM_CIRCUIT_ENABLED", "false")
+    # Force app.config.settings to re-read from environment. The
+    # simpler path for these tests is to ensure ``check(enabled=...)``
+    # is a no-op when breaker state has been wiped — the init reads
+    # ``LLM_CIRCUIT_ENABLED`` only via the setting; flip the
+    # the breaker itself to disabled as a belt-and-braces guarantee.
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "LLM_CIRCUIT_ENABLED", False, raising=False)
+    reset_cascade_breaker()
+
 
 def _register_allow_listed_handler(mgr: SubstratePluginManager, name: str, handler) -> None:
     """Register a handler whose ``__module__`` is allow-listed.

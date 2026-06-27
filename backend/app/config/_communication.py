@@ -59,6 +59,23 @@ class CommunicationSettings(BaseSettings):
     LLM_ENABLE_PUBLIC_FALLBACKS: bool = False
     """Allow unauthenticated public LLM fallbacks such as Pollinations/g4f."""
 
+    # ─── LLM Cascade Circuit Breaker ──────────────────────────────────
+    LLM_CIRCUIT_FAILURE_THRESHOLD: int = 5
+    """Open the cascade circuit after this many consecutive cascade
+    exhaustions (from any provider).  Lets the caller fail fast
+    instead of paying full timeout cost on every subsequent call."""
+    LLM_CIRCUIT_OPEN_WINDOW_SECONDS: int = 60
+    """How long the cascade circuit stays open before auto-resetting
+    to half-open.  Half-open lets a single probe call through."""
+    LLM_CIRCUIT_HALF_OPEN_MAX_PROBES: int = 1
+    """How many probe calls are permitted while the circuit is
+    half-open.  If all succeed, the circuit closes; otherwise it
+    re-opens for another full window."""
+    LLM_CIRCUIT_ENABLED: bool = True
+    """Master switch for the cascade circuit breaker.  Disable when
+    running unit tests that intentionally exhaust cascades for
+    failure-path validation."""
+
     # ─── LLM Provider Models ───────────────────────────────────────────
     GROQ_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
     """Default model for Groq LLM calls."""

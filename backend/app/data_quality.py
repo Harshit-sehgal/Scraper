@@ -236,7 +236,27 @@ def _field_score(value: Any, field_type: FieldType) -> float:
         digits = re.sub(r"\D", "", str(value))
         return 1.0 if 7 <= len(digits) <= 15 else 0.3
     if field_type == FieldType.DATE:
-        return 1.0 if str(value) else 0.0
+        text = str(value)
+        if not text:
+            return 0.0
+        # Validate date-like format: ISO (2024-01-15), US (01/15/2024),
+        # EU (15/01/2024), or textual (15 Jan 2024, January 15, 2024)
+        import re as _date_re
+
+        if _date_re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}", text):
+            return 1.0
+        if _date_re.search(
+            r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}", text, _date_re.IGNORECASE
+        ):
+            return 1.0
+        if _date_re.search(
+            r"\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}", text, _date_re.IGNORECASE
+        ):
+            return 1.0
+        # Has digits and reasonable length but didn't match known formats
+        if len(text) >= 6 and any(c.isdigit() for c in text):
+            return 0.5
+        return 0.0
     if field_type == FieldType.LOCATION:
         return 1.0 if len(str(value)) > 3 else 0.3
     return 0.5
