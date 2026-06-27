@@ -78,6 +78,7 @@ class TestDomainStatePersistence:
             engine.record_result("https://site.com", success=True)
 
             state = engine.get_domain_state("site.com")
+            assert state is not None
             assert state["consecutive_failures"] == 0
 
             conn = _policy_db_conn(db_path)

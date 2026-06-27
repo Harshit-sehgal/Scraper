@@ -38,17 +38,6 @@ def test_resolve_pg_driver_normalizes_explicit_driver(monkeypatch) -> None:
     assert resolve_pg_driver(runtime_env="development") == "psycopg3"
 
 
-@pytest.mark.asyncio
-async def test_system_manifest_reports_central_pg_driver(monkeypatch) -> None:
-    """The diagnostics endpoint must not hardcode a separate PG-driver default.
-
-    Note: system_manifest endpoint has been removed from the system router.
-    This test is preserved as a no-op to maintain the test structure.
-    """
-    import pytest as _pytest
-    _pytest.skip("system_manifest endpoint removed from system router")
-
-
 def test_production_without_pg_driver_fails_fast(monkeypatch) -> None:
     """In production with STORAGE_BACKEND=postgres, missing DATAFORGE_PG_DRIVER
     must raise RuntimeError rather than silently defaulting to psycopg2.

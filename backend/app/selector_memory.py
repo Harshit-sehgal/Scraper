@@ -36,6 +36,7 @@ DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD = 0.5
 SELECTOR_CLEANUP_CHECK_INTERVAL = 86400  # Run cleanup every 24 hours
 SELECTOR_AGE_DECAY_THRESHOLD = 14 * 86400  # Start decaying after 14 days
 SELECTOR_FRESHNESS_THRESHOLD = 7 * 86400  # Penalize if not used in 7 days
+SELECTOR_MAX_AGE_BEFORE_EVICTION = 90 * 86400  # Evict entries older than 90 days
 
 
 @dataclass
@@ -177,10 +178,34 @@ class SelectorMemory:
             "low_confidence_selectors": [],
         }
 
+        now = time.time()
         domains_to_delete: list[str] = []
 
         for domain, entry in self._memory.items():
             stats["domains_checked"] = int(stats["domains_checked"]) + 1
+
+            # Evict entries that haven't been used in MAX_AGE_BEFORE_EVICTION seconds
+            last_success = entry.get("last_success", 0) or 0
+            last_failure = entry.get("last_failure", 0) or 0
+            last_activity = max(last_success, last_failure)
+            if last_activity > 0 and (now - last_activity) > SELECTOR_MAX_AGE_BEFORE_EVICTION:
+                logger.info(
+                    "Evicting stale selector for %s (last activity %.1f days ago)",
+                    domain,
+                    (now - last_activity) / 86400,
+                )
+                stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
+                stats["deleted_domains"].append(domain)
+                stats["low_confidence_selectors"].append(
+                    {
+                        "domain": domain,
+                        "score": 0.0,
+                        "reason": f"stale (last activity {(now - last_activity)/86400:.1f}d ago)",
+                    },
+                )
+                domains_to_delete.append(domain)
+                continue
+
             confidence = self._compute_confidence(entry)
 
             if confidence.final_score < threshold:

@@ -17,7 +17,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from app.utils.rbac import UserRole
 
-
 # ─── rate_limit_stats ────────────────────────────────────────────────
 
 

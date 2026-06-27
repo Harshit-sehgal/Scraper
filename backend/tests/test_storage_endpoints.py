@@ -332,19 +332,6 @@ class TestReadyWithMockedPostgres:
         assert "error" in data
 
 
-class TestSystemManifest:
-    def test_manifest_returns_version_and_aup(self, client) -> None:
-        """The manifest endpoint should expose the project version and AUP version."""
-        response = client.get("/api/system/manifest")
-        assert response.status_code == 200
-        body = response.json()
-        assert body["project"] == "DataForge Scraper"
-        assert "version" in body and body["version"] != "unknown"
-        assert body["aup_version"]  # non-empty
-        assert "storage_backend" in body
-        assert "encryption_key_version" in body
-
-
 class TestSystemAuditLog:
     def test_audit_log_requires_admin(self, client, monkeypatch) -> None:
         """Non-admin callers should not see the audit log."""

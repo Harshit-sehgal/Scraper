@@ -104,6 +104,8 @@ class CrawlPolicyEngine:
         self._default_delay = settings.CRAWL_DEFAULT_DELAY_SECONDS
         self._max_retries = settings.CRAWL_MAX_RETRIES_PER_DOMAIN
         self._cooldown_seconds = settings.CRAWL_COOLDOWN_SECONDS
+        self._max_cooldown_seconds = getattr(settings, "CRAWL_MAX_COOLDOWN_SECONDS", 3600)
+        self._cooldown_multiplier = getattr(settings, "CRAWL_COOLDOWN_MULTIPLIER", 2.0)
         self._respect_robots = settings.CRAWL_RESPECT_ROBOTS
         self._max_pages_per_domain = settings.CRAWL_MAX_PAGES_PER_DOMAIN
         # Async lock to prevent race conditions on domain budget reservations.
@@ -205,12 +207,23 @@ class CrawlPolicyEngine:
             else:
                 state.consecutive_failures += 1
                 if state.consecutive_failures >= self._max_retries:
-                    state.cooldown_until = time.time() + self._cooldown_seconds
+                    # Exponential backoff: each failure cycle doubles the cooldown,
+                    # capped at max_cooldown_seconds. This prevents rapid re-queuing
+                    # against a hard-blocked domain while still giving it a chance
+                    # to recover.
+                    cycle = state.consecutive_failures - self._max_retries + 1
+                    cooldown = min(
+                        self._cooldown_seconds * (self._cooldown_multiplier ** cycle),
+                        self._max_cooldown_seconds,
+                    )
+                    state.cooldown_until = time.time() + cooldown
                     logger.warning(
-                        "Domain %s: %d consecutive failures, cooling down for %ds",
+                        "Domain %s: %d consecutive failures, exponential cooldown %.0fs (cycle %d, max %ds)",
                         domain,
                         state.consecutive_failures,
-                        self._cooldown_seconds,
+                        cooldown,
+                        cycle,
+                        self._max_cooldown_seconds,
                     )
 
             # Persist key state to SQLite so cooldowns and failure counts

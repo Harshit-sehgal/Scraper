@@ -671,13 +671,8 @@ def batch_xlsx(
 
 
 # ════════════════════════════════════════════════════════════════════
-# Small helpers
+# Async helpers
 # ════════════════════════════════════════════════════════════════════
-
-
-def batch_export_timestamp(now: datetime.datetime | None = None) -> str:
-    """Return the canonical ``YYYYMMDD_HHMMSS`` stamp used in batch filenames."""
-    return (now or datetime.datetime.now(datetime.UTC)).strftime("%Y%m%d_%H%M%S")
 
 
 async def _call_async(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
@@ -694,12 +689,4 @@ async def _call_async(func: Callable[..., Any], *args: Any, **kwargs: Any) -> An
     if hasattr(result, "__await__"):
         return await result
     return result
-
-
-def get_inmemory_results_map(jobs_store: dict[str, Any], job_ids: Iterable[str]) -> dict[str, list[dict] | None]:
-    """Build a ``job_id -> results`` map for in-memory lookups (batch helpers)."""
-    res: dict[str, list[dict] | None] = {}
-    for jid in job_ids:
-        job = jobs_store.get(jid)
-        res[jid] = job.results if job is not None else None
     return res

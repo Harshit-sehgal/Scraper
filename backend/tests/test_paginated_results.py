@@ -84,11 +84,3 @@ def test_get_job_results_next_offset(client, seed_job_with_results) -> None:
     assert data3["next_offset"] is None
 
 
-def test_backfill_metadata_endpoint(client, seed_job_with_results) -> None:
-    """backfill-metadata endpoint has been removed from the system router.
-    
-    Verify that the endpoint returns 404 for the removed route.
-    """
-    job = seed_job_with_results
-    r = client.post(f"/api/jobs/{job.id}/backfill-metadata")
-    assert r.status_code == 404

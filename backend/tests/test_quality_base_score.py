@@ -10,7 +10,6 @@ Verifies that:
 from __future__ import annotations
 
 import pytest
-
 from app.config import settings
 from app.models import FieldType, SchemaField
 from app.utils.quality import _value_quality, score_record_quality
@@ -102,7 +101,7 @@ class TestRecordLevelScoring:
             _sf("name", FieldType.STRING, required=True),
             _sf("price", FieldType.CURRENCY, required=True),
         ]
-        record = {"name": "Apple MacBook Pro 16\"", "price": "$2,499"}
+        record = {"name": 'Apple MacBook Pro 16"', "price": "$2,499"}
         score = score_record_quality(record, fields)
         assert score > 0.5, (
             f"Real product record must score above 0.5, got {score}"

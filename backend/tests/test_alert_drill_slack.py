@@ -35,7 +35,7 @@ from scripts.run_alert_delivery_drill import (  # noqa: I001
 
 
 def _base_config(**overrides) -> AlertDrillConfig:
-    defaults = {
+    defaults: dict[str, str | float | int | bool | dict[str, str]] = {
         "alertmanager_url": "http://localhost:9093",
         "alertname": "TestDrill",
         "severity": "info",
@@ -52,8 +52,8 @@ def _base_config(**overrides) -> AlertDrillConfig:
         "slack_webhook_enabled": False,
         "extra_labels": {},
     }
-    defaults.update(overrides)
-    return AlertDrillConfig(**defaults)
+    defaults.update(overrides)  # type: ignore[typeddict-item]
+    return AlertDrillConfig(**defaults)  # type: ignore[arg-type]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

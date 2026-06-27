@@ -242,11 +242,12 @@ class TestSelectorMemoryCleanup:
         # Create a healthy selector
         domain = "healthy-domain.com"
         import time
+
         from app.selector_memory import SelectorMemory
 
         now = time.time()
         # Use the composite key that matches a real URL with a path
-        composite_key = SelectorMemory._extract_domain(f"https://{domain}/page")
+        composite_key: str = SelectorMemory._extract_domain(f"https://{domain}/page") or domain  # type: ignore[assignment]
         selector_memory._memory[composite_key] = {
             "selectors": {"css": ".product"},
             "success_count": 10,
@@ -333,7 +334,7 @@ class TestRecoveryHandlers:
 
         # Create a cached selector
         domain = "test.com"
-        composite_key = SelectorMemory._extract_domain(f"https://{domain}/page")
+        composite_key: str = SelectorMemory._extract_domain(f"https://{domain}/page") or domain  # type: ignore[assignment]
         selector_memory._memory[composite_key] = {
             "selectors": {"css": ".item"},
             "success_count": 5,

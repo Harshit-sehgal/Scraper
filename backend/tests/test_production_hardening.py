@@ -175,23 +175,6 @@ def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatc
     assert result_file.exists(), "The result file was deleted, but it should have been preserved!"
 
 
-def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
-    """backfill-metadata endpoint has been removed. Verify the route returns 404."""
-    job_id = "test_backfill_job"
-    job = Job(
-        id=job_id,
-        name="Test Backfill Job",
-        mode=ScrapeMode.MANUAL,
-        urls=["https://example.com"],
-        status=JobStatus.COMPLETED,
-        results=[{"source_url": "https://example.com/item", "source_type": "unknown"}],
-    )
-    main_mod.jobs_store[job_id] = job
-
-    resp = client.post(f"/api/jobs/{job_id}/backfill-metadata")
-    assert resp.status_code == 404
-
-
 def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:
     """Verify that if enqueue fails in production, the job is removed from memory and repository (not left orphaned)."""
     from app.config import settings
