@@ -79,6 +79,18 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
 
         validate_production_credentials(settings)
 
+    # Startup configuration validation — logs warnings for missing secrets
+    # in production-like envs, malformed integers/booleans, and suspect
+    # storage backends.  Best-effort; does not raise (mock environments
+    # are legitimate).
+    try:
+        from app.utils.env_validation import validate_startup_config
+
+        validate_startup_config()
+    except Exception as exc:
+        # Never let validator noise take the app down.
+        logger.debug("Startup config validation skipped: %s", exc)
+
     # Warn if API keys are empty (dev/test only — production validates above)
     if (
         settings.ENV.lower() != "production"
@@ -270,7 +282,6 @@ def schedule_background_task(coro):
             t.result()
         except asyncio.CancelledError as exc:
             logger.debug("Background task cancelled: %s", exc)
-            pass
         except _SHUTDOWN_EXCEPTIONS:
             logger.exception("Background task failed")
 
@@ -381,7 +392,7 @@ async def _process_due_scheduled_jobs() -> None:
             from app.routers.jobs_state import save_job
 
             job_name = str(scheduled.get("job_name") or scheduled.get("name") or "Scheduled Job")
-            job = Job(
+            job = Job(  # type: ignore[call-arg]
                 name=f"{job_name} (scheduled {now_dt.strftime('%Y-%m-%d %H:%M')})",
                 mode=mode,
                 urls=urls,

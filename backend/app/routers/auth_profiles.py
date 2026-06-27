@@ -124,7 +124,7 @@ async def create_auth_profile(
         validate_public_domain(domain)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    profile = AuthProfile(
+    profile = AuthProfile(  # type: ignore[call-arg]
         name=name.strip(),
         description=description.strip() if description else "",
         domain=domain.strip().lower(),

@@ -135,7 +135,7 @@ async def create_scheduled_job(
     """
     _role, user_id, org_id, project_id = auth
     validated_urls = _validate_urls(urls or [])
-    job = ScheduledJob(
+    job = ScheduledJob(  # type: ignore[call-arg]
         name=name.strip(),
         user_id=user_id,
         org_id=org_id,

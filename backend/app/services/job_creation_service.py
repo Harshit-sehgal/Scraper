@@ -209,7 +209,6 @@ class JobCreationService:
             record_job_created()
         except ImportError as exc:
             logger.debug("Optional metrics collector not available: %s", exc)
-            pass
 
         # Step 7: Record idempotency key
         if idem_key:
@@ -313,7 +312,7 @@ class JobCreationService:
         project_id: str,
     ) -> Job:
         """Construct a Job domain object from validated input."""
-        return Job(
+        return Job(  # type: ignore[call-arg]
             name=job_data.name,
             mode=job_data.mode,
             intent=job_data.intent,
