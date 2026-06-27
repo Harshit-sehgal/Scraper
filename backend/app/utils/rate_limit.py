@@ -8,6 +8,7 @@ of burning retries on transient rate-limit blocks.
 import datetime
 import logging
 import re
+import threading
 import time
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,10 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
 _RATE_LIMIT_STATE: dict[str, float] = {}
 """In-memory rate-limit state keyed by domain / task-type: next_allowed_at timestamp."""
 
+_RATE_LIMIT_LOCK = threading.RLock()
+"""Guards every read/write of ``_RATE_LIMIT_STATE`` so concurrent workers
+do not race during exponential-backoff updates or eviction sweeps."""
+
 
 def get_cooldown_seconds(domain_or_type: str) -> float:
     """Return the cooldown remaining (seconds) for a domain or task type.
@@ -107,7 +112,8 @@ def get_cooldown_seconds(domain_or_type: str) -> float:
     Checks if we're currently cooling down after a rate-limit hit.
     """
     now = time.time()
-    next_allowed = _RATE_LIMIT_STATE.get(domain_or_type, 0.0)
+    with _RATE_LIMIT_LOCK:
+        next_allowed = _RATE_LIMIT_STATE.get(domain_or_type, 0.0)
     remaining = next_allowed - now
     return max(0.0, remaining)
 
@@ -130,17 +136,18 @@ def mark_rate_limited(
 
     """
     now = time.time()
-    if retry_after is not None:
-        cooldown = min(retry_after, max_cooldown)
-    else:
-        existing = _RATE_LIMIT_STATE.get(domain_or_type, now)
-        backoff = min((existing - now) * 2 + 30, max_cooldown)
-        cooldown = max(backoff, 30.0)
+    with _RATE_LIMIT_LOCK:
+        if retry_after is not None:
+            cooldown = min(retry_after, max_cooldown)
+        else:
+            existing = _RATE_LIMIT_STATE.get(domain_or_type, now)
+            backoff = min((existing - now) * 2 + 30, max_cooldown)
+            cooldown = max(backoff, 30.0)
 
-    _RATE_LIMIT_STATE[domain_or_type] = now + cooldown
+        _RATE_LIMIT_STATE[domain_or_type] = now + cooldown
 
-    # Evict expired entries when the dict grows too large
-    if len(_RATE_LIMIT_STATE) > 1000:
-        expired = [k for k, v in _RATE_LIMIT_STATE.items() if v < now]
-        for k in expired:
-            _RATE_LIMIT_STATE.pop(k, None)
+        # Evict expired entries when the dict grows too large
+        if len(_RATE_LIMIT_STATE) > 1000:
+            expired = [k for k, v in _RATE_LIMIT_STATE.items() if v < now]
+            for k in expired:
+                _RATE_LIMIT_STATE.pop(k, None)

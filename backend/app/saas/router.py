@@ -1765,6 +1765,7 @@ async def get_usage_summary(
         ctx = resolve_auth_context(request)
         quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
     except Exception:
+        logger.debug("Quota context resolution failed; falling back to user_id: %s", user_id)
         quota_owner = user_id
 
     try:

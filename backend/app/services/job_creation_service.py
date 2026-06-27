@@ -178,8 +178,10 @@ class JobCreationService:
                     raise JobCreationError(
                         status_code=400, detail="M2: Semantic mode is not available. Use 'fast' or 'browser' mode instead."
                     )
-            except (ImportError, RuntimeError):
-                raise JobCreationError(status_code=503, detail="M2: Semantic pipeline unavailable; try again later.")
+            except (ImportError, RuntimeError) as modal_err:
+                raise JobCreationError(
+                    status_code=503, detail="M2: Semantic pipeline unavailable; try again later."
+                ) from modal_err
 
         # Step 3: Handle idempotency
         idem_key = self._extract_idempotency_key(request)

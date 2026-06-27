@@ -18,7 +18,7 @@ import secrets
 import time
 from typing import Annotated, Any, ClassVar, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -96,6 +96,45 @@ class ModeBody(BaseModel):
     """
 
     mode: Literal["production", "benchmark", "forensic", "stealth", "low_cost"]
+
+
+class DomainSelectorsBody(BaseModel):
+    """Request body for ``optimize_domain_selectors``.
+
+    A field-name → CSS-selector mapping (``dict[str, str]``) shaped to
+    match ``app.selector_ml_optimizer.optimize_selectors``. Extra keys
+    are rejected so a malicious client cannot smuggle unrelated
+    structures through; nested dicts / lists in values are also rejected
+    to keep the cap predictable (the optimizer only inspects one selector
+    string per field).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    MAX_SELECTORS: ClassVar[int] = 500
+    """Hard cap on the number of selectors in a single request."""
+
+    MAX_SELECTOR_LENGTH: ClassVar[int] = 1024
+    """Hard cap on a single selector string."""
+
+    selectors: dict[str, str] = Field(
+        ...,
+        description="Mapping of field names (e.g. 'title') to CSS/XPath selectors.",
+    )
+
+    @classmethod
+    def validate_payload(cls, data: dict[str, Any]) -> DomainSelectorsBody:
+        """Validate and cap payload size. Operates on a shallow copy."""
+        payload = dict(data) if isinstance(data, dict) else data
+        selectors = payload.get("selectors") if isinstance(payload, dict) else None
+        if isinstance(selectors, dict) and len(selectors) > cls.MAX_SELECTORS:
+            payload["selectors"] = dict(list(selectors.items())[: cls.MAX_SELECTORS])
+        if isinstance(payload.get("selectors"), dict):
+            trimmed = {
+                str(k)[: cls.MAX_SELECTOR_LENGTH]: str(v)[: cls.MAX_SELECTOR_LENGTH] for k, v in payload["selectors"].items()
+            }
+            payload["selectors"] = trimmed
+        return cls(**payload)
 
 
 def _require_admin_key(request: Request) -> None:
@@ -1021,17 +1060,21 @@ async def get_operator_health_summary(
 async def optimize_domain_selectors(
     domain: str,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],  # noqa: B008, RUF100
-    selectors: dict | None = None,
+    body: Annotated[DomainSelectorsBody | None, Body()] = None,
 ):
     """Optimize selectors for a domain using ML predictions.
 
     EXPERIMENTAL / RESEARCH ONLY — backed by ``app.selector_ml_optimizer``.
+    Pass ``{"selectors": {...}}`` in the request body to seed the
+    optimizer; omit the body to optimise selectors cached for the
+    domain in ``app.selector_memory``.
     """
     if not re.fullmatch(r"[a-z0-9.\-]{1,253}", domain):
         raise HTTPException(
             status_code=400,
             detail=("Invalid domain. Allowed characters: lowercase letters, digits, dot, hyphen. Max length: 253."),
         )
+    selectors: dict[str, str] | None = body.selectors if body is not None else None
     try:
         from app.selector_memory import get_selector_memory
         from app.selector_ml_optimizer import get_selector_optimizer

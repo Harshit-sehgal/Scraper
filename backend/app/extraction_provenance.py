@@ -230,7 +230,8 @@ class ProvenanceBuilder:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except (ValueError, TypeError):
+            logger.debug("Malformed URL in _extract_domain: %s", url)
             return "unknown"
 
 

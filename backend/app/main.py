@@ -259,7 +259,6 @@ def configure_exception_handlers(app: FastAPI) -> None:
     """
     import logging
     import secrets
-    import traceback as _traceback
 
     logger = logging.getLogger("dataforge.errors")
 
@@ -284,12 +283,14 @@ def configure_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def _unhandled_exception_handler(_request: Any, exc: Exception) -> JSONResponse:
         trace_id = secrets.token_hex(8)
-        logger.error(
-            "Unhandled exception (%s): %s trace_id=%s\n%s",
+        # ``logger.exception`` automatically captures the active
+        # exception's traceback, so the previous manual ``format_exc``
+        # is unnecessary here.
+        logger.exception(
+            "Unhandled exception (%s): %s trace_id=%s",
             type(exc).__name__,
             exc,
             trace_id,
-            _traceback.format_exc(),
         )
         # The client never sees the full message — they would otherwise
         # leak stack frames. The trace_id is enough to look up logs.

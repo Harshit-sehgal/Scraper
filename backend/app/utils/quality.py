@@ -1,9 +1,12 @@
+import logging
 import re
 from statistics import mean
 from typing import Any
 
 from app.config import settings
 from app.models import FieldType, SchemaField
+
+logger = logging.getLogger(__name__)
 
 
 def clamp01(value: float) -> float:
@@ -35,7 +38,8 @@ def compute_source_breakdown(results: list[dict]) -> dict[str, Any]:
 def safe_score(value: Any) -> float:
     try:
         return float(value)
-    except Exception:
+    except (TypeError, ValueError):
+        logger.debug("safe_score: non-coercible value of type %s", type(value).__name__)
         return 0.0
 
 

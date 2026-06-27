@@ -223,7 +223,11 @@ def _settings_or_defaults():
             _settings.LLM_CIRCUIT_OPEN_WINDOW_SECONDS,
             _settings.LLM_CIRCUIT_HALF_OPEN_MAX_PROBES,
         )
-    except Exception:
+    except Exception as exc:
+        logger.debug(
+            "LLM cascade breaker settings unavailable; falling back to defaults: %s",
+            exc,
+        )
         return (True, _DEFAULT_FAIL_THRESHOLD, _DEFAULT_OPEN_WINDOW, _DEFAULT_HALF_OPEN_PROBES)
 
 

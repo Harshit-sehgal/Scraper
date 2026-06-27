@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+import time
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -45,7 +46,9 @@ class GracefulDegradation:
             result = await primary_fn(*args, **kwargs)
             # Cache successful result
             self._cache[key] = result
-            self._cache_ttl[key] = asyncio.get_event_loop().time() + cache_ttl
+            # ``time.monotonic`` is loop-independent and avoids the
+            # deprecated ``asyncio.get_event_loop().time()`` pattern.
+            self._cache_ttl[key] = time.monotonic() + cache_ttl
             return result
         except Exception as e:
             logger.warning("Primary function %s failed: %s", key, e)
@@ -53,7 +56,7 @@ class GracefulDegradation:
             # Check cache first
             if key in self._cache:
                 cache_time = self._cache_ttl.get(key, 0)
-                if asyncio.get_event_loop().time() < cache_time:
+                if time.monotonic() < cache_time:
                     logger.info("Using cached result for %s", key)
                     return self._cache[key]
 
