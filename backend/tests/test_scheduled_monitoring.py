@@ -184,3 +184,58 @@ class TestScheduledMonitoringEndpoints:
     def test_404_on_missing(self, client: TestClient):
         resp = client.get("/api/scheduled/nonexistent-id")
         assert resp.status_code == 404
+
+    # ---- SSRF guard tests (LAW 8) ------------------------------------
+
+    def test_create_rejects_loopback_url(self, client: TestClient):
+        """Creating a scheduled job with a localhost URL must 400."""
+        resp = client.post(
+            "/api/scheduled?name=Bad&job_name=Bad&urls=http://localhost:8080/",
+        )
+        assert resp.status_code == 400
+        assert "security check" in resp.json()["detail"].lower()
+
+    def test_create_rejects_metadata_endpoint(self, client: TestClient):
+        """Creating a scheduled job with the AWS metadata IP must 400."""
+        resp = client.post(
+            "/api/scheduled?name=Bad&job_name=Bad&urls=http://169.254.169.254/latest/meta-data/",
+        )
+        assert resp.status_code == 400
+
+    def test_create_accepts_public_url(self, client: TestClient):
+        """Creating a scheduled job with a public URL must 201."""
+        resp = client.post(
+            "/api/scheduled?name=Good&job_name=Good&urls=https://example.com/",
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert "https://example.com/" in body["urls"]
+
+    def test_create_deduplicates_urls(self, client: TestClient):
+        """Duplicate URLs must be deduplicated on the way in."""
+        resp = client.post(
+            "/api/scheduled?name=Dup&job_name=Dup&urls=https://example.com/&urls=https://example.com/",
+        )
+        assert resp.status_code == 201
+        assert resp.json()["urls"] == ["https://example.com/"]
+
+    def test_update_rejects_loopback_url(self, client: TestClient):
+        """Updating a scheduled job with a loopback URL must 400."""
+        create = client.post("/api/scheduled?name=Update&job_name=Update")
+        assert create.status_code == 201
+        job_id = create.json()["id"]
+        update = client.put(
+            f"/api/scheduled/{job_id}?urls=http://127.0.0.1:9000/",
+        )
+        assert update.status_code == 400
+
+    def test_update_accepts_valid_urls(self, client: TestClient):
+        """Updating with a valid URL list must succeed."""
+        create = client.post("/api/scheduled?name=UpdateOK&job_name=UpdateOK")
+        assert create.status_code == 201
+        job_id = create.json()["id"]
+        update = client.put(
+            f"/api/scheduled/{job_id}?urls=https://example.com/&urls=https://other.com/",
+        )
+        assert update.status_code == 200
+        assert len(update.json()["urls"]) == 2

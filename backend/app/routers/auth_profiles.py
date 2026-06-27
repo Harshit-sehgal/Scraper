@@ -15,6 +15,7 @@ import json
 import logging
 from typing import Annotated, Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.audit_logger import log_admin_action, log_rbac_event
@@ -299,7 +300,7 @@ async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | N
     target_url = f"https://{domain}/"
 
     try:
-        import httpx
+        from app.url_safety import get_safe_async_client
 
         # Build cookie jar from stored cookies
         cookie_dict: dict[str, str] = {}
@@ -309,7 +310,7 @@ async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | N
             if name and value:
                 cookie_dict[name] = value
 
-        async with httpx.AsyncClient(
+        async with get_safe_async_client(
             cookies=cookie_dict,
             follow_redirects=True,
             timeout=15.0,

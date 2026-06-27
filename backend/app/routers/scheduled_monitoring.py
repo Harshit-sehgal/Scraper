@@ -15,7 +15,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.audit_logger import log_rbac_event
-from app.models import ScheduledJob, ScheduledJobFrequency
+from app.models import ScheduledJob, ScheduledJobFrequency, ScrapeMode
+from app.url_safety import validate_public_http_url
 from app.utils.aup import require_aup_accepted
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
@@ -38,6 +39,26 @@ _EXPECTED_GAP_SECONDS: dict[str, int] = {
 _scheduled_jobs = JSONFileStore(
     Path(__file__).resolve().parents[2] / "data" / "scheduled_jobs.json",
 )
+
+
+def _validate_urls(urls: list[str]) -> list[str]:
+    """Strip, deduplicate, and SSRF-validate a list of URLs.
+
+    Raises HTTPException 400 if any URL fails the public-URL check.
+    """
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for u in urls:
+        u = u.strip()
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        try:
+            validate_public_http_url(u)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"URL failed security check: {exc}") from exc
+        cleaned.append(u)
+    return cleaned
 
 
 def _now_iso() -> str:
@@ -105,12 +126,15 @@ async def create_scheduled_job(
     _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
     frequency: ScheduledJobFrequency = ScheduledJobFrequency.DAILY,
     job_name: str = "",
+    urls: Annotated[list[str] | None, Query()] = None,
 ):
     """Create a new scheduled (recurring) scraping job.
 
-    Requires AUP acceptance.
+    Requires AUP acceptance.  Every URL in *urls* is validated
+    against the project's SSRF guard before it is stored.
     """
     _role, user_id, org_id, project_id = auth
+    validated_urls = _validate_urls(urls or [])
     job = ScheduledJob(
         name=name.strip(),
         user_id=user_id,
@@ -118,11 +142,16 @@ async def create_scheduled_job(
         project_id=project_id,
         frequency=frequency,
         job_name=job_name.strip() or f"Scheduled: {name}",
-        next_run_at=_now_iso(),
+        urls=validated_urls,
+        mode=ScrapeMode.MANUAL if validated_urls else ScrapeMode.AUTO,
     )
-    _scheduled_jobs.upsert(job.id, job.model_dump())
+    record = job.model_dump()
+    # next_run_at is a runtime scheduling field stored alongside the
+    # model data but not part of the Pydantic schema.
+    record["next_run_at"] = _now_iso()
+    _scheduled_jobs.upsert(job.id, record)
     logger.info("Scheduled job created: %s (%s)", job.name, job.id)
-    return job.model_dump()
+    return record
 
 
 @router.get("", status_code=200)
@@ -165,8 +194,13 @@ async def update_scheduled_job(
     name: str | None = None,
     frequency: ScheduledJobFrequency | None = None,
     enabled: bool | None = None,
+    urls: Annotated[list[str] | None, Query()] = None,
 ):
-    """Update an existing scheduled job."""
+    """Update an existing scheduled job.
+
+    If *urls* is provided, each URL is SSRF-validated before being
+    stored on the scheduled job record.
+    """
     existing = _get_visible_scheduled_job(job_id, auth)
     if name is not None:
         existing["name"] = name.strip()
@@ -174,6 +208,9 @@ async def update_scheduled_job(
         existing["frequency"] = frequency.value
     if enabled is not None:
         existing["enabled"] = enabled
+    if urls is not None:
+        existing["urls"] = _validate_urls(urls)
+        existing["mode"] = ScrapeMode.MANUAL.value if existing["urls"] else ScrapeMode.AUTO.value
     existing["updated_at"] = _now_iso()
     _write_back(existing)
     return existing

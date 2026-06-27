@@ -4760,7 +4760,7 @@
         ]
       },
       "post": {
-        "description": "Create a new scheduled (recurring) scraping job.\n\nRequires AUP acceptance.",
+        "description": "Create a new scheduled (recurring) scraping job.\n\nRequires AUP acceptance.  Every URL in *urls* is validated\nagainst the project's SSRF guard before it is stored.",
         "operationId": "create_scheduled_job_api_scheduled_post",
         "parameters": [
           {
@@ -4789,6 +4789,25 @@
               "default": "",
               "title": "Job Name",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "urls",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Urls"
             }
           }
         ],
@@ -4893,7 +4912,7 @@
         ]
       },
       "put": {
-        "description": "Update an existing scheduled job.",
+        "description": "Update an existing scheduled job.\n\nIf *urls* is provided, each URL is SSRF-validated before being\nstored on the scheduled job record.",
         "operationId": "update_scheduled_job_api_scheduled__job_id__put",
         "parameters": [
           {
@@ -4951,6 +4970,25 @@
                 }
               ],
               "title": "Enabled"
+            }
+          },
+          {
+            "in": "query",
+            "name": "urls",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Urls"
             }
           }
         ],
