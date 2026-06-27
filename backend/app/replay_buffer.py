@@ -253,6 +253,9 @@ class ReplayBuffer:
                     except json.JSONDecodeError as exc:
                         logger.debug("Skipping malformed entry in segment %d: %s", i, exc)
                         continue
+                    idx = entry.get("idx")
+                    if idx is not None and idx < start_idx:
+                        continue
                     yield entry
 
     def reconstruct_state_at(self, target_idx: int) -> dict | None:
@@ -308,7 +311,10 @@ class ReplayBuffer:
                         break
                     # Apply delta to state
                     for k, change in entry.get("delta", {}).items():
-                        state[k] = change.get("to", change)
+                        if isinstance(change, dict):
+                            state[k] = change.get("to", change)
+                        else:
+                            state[k] = change
 
         return state
 
