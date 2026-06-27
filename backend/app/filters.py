@@ -7,16 +7,14 @@ import asyncio
 import logging
 import re
 import threading
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
+from geopy.location import Location  # used in cast() below for async.to_thread geocode result narrowing
 
 from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField
-
-if TYPE_CHECKING:
-    from geopy.location import Location
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
     backoff = 1.0  # Base delay in seconds
     for attempt in range(max_retries):
         try:
-            location = cast("Location | None", await asyncio.to_thread(_geocoder.geocode, address))
+            location = cast(Location | None, await asyncio.to_thread(_geocoder.geocode, address))  # noqa: TC006
             if location:
                 coords = (location.latitude, location.longitude)
                 cache.set(address, location.latitude, location.longitude, location.address)
