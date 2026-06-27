@@ -6,7 +6,8 @@ Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 import asyncio
 import logging
 import re
-from typing import Any, NoReturn
+import threading
+from typing import Any
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -261,22 +262,63 @@ def enforce_schema_integrity(record: dict[str, Any], schema_fields: list[SchemaF
 # ──────────────────────────────────────────────
 
 
+# Maximum input string length for regex matching.  ReDoS requires long
+# strings to trigger catastrophic backtracking; capping the input at 10K
+# characters eliminates the risk for virtually all filter-rule use cases
+# (scraped field values are typically short strings).
+_REGEX_INPUT_MAX_LEN = 10_000
+
+
 def _safe_regex_search(compiled: "re.Pattern[str]", text: str, timeout: float = 2.0) -> bool:
-    """Execute a compiled regex search with a timeout to prevent ReDoS."""
-    import signal
+    """Execute a compiled regex search with a timeout to prevent ReDoS.
 
-    def _alarm_handler(_signum, _frame) -> NoReturn:
-        raise TimeoutError
+    Strategy (two-layer defense):
 
-    old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
-    signal.alarm(int(timeout))
-    try:
-        return bool(compiled.search(text))
-    except TimeoutError:
+    1. **Length cap** — truncate input to ``_REGEX_INPUT_MAX_LEN`` chars.
+       Catastrophic backtracking requires long strings; scraped field
+       values are typically short, so this alone prevents the vast
+       majority of ReDoS vectors.
+
+    2. **Thread + timeout** — run the regex in a daemon thread and wait
+       only up to *timeout* seconds.  Unlike ``signal.alarm()``, this
+       works from any thread context (including
+       ``run_in_threadpool`` workers).  If the regex times out, we
+       return ``False`` immediately; the daemon thread will eventually
+       finish and clean up, but it cannot block the caller or prevent
+       process exit.
+
+    This replaces the old ``signal.alarm()`` implementation which
+    silently no-ops when called from a non-main thread.
+    """
+    if len(text) > _REGEX_INPUT_MAX_LEN:
+        logger.debug(
+            "Regex input truncated from %d to %d chars (ReDoS mitigation)",
+            len(text),
+            _REGEX_INPUT_MAX_LEN,
+        )
+        text = text[:_REGEX_INPUT_MAX_LEN]
+
+    result: list[bool] = []
+    exc_holder: list[Exception] = []
+
+    def _run() -> None:
+        try:
+            result.append(bool(compiled.search(text)))
+        except re.error as exc:
+            exc_holder.append(exc)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout)
+
+    if thread.is_alive():
+        logger.warning("Regex search timed out after %.1fs — possible ReDoS pattern", timeout)
         return False
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
+
+    if exc_holder:
+        return False
+
+    return result[0] if result else False
 
 
 async def apply_filter(record: dict[str, Any], rule: FilterRule, schema_fields: list[SchemaField]) -> bool:  # noqa: ARG001, C901, PLR0911, PLR0912, RUF100

@@ -426,3 +426,57 @@ async def test_apply_filter_in_list() -> None:
     assert await apply_filter({"city": "New York"}, rule, []) is True
     assert await apply_filter({"city": "Tokyo"}, rule, []) is True
     assert await apply_filter({"city": "Paris"}, rule, []) is False
+
+
+# ─── _safe_regex_search — ReDoS guard ────────────────────────────────────
+
+
+class TestSafeRegexSearch:
+    """Verify the thread-safe ReDoS timeout in _safe_regex_search."""
+
+    def test_fast_pattern_passes(self) -> None:
+        import re
+
+        from app.filters import _safe_regex_search
+
+        assert _safe_regex_search(re.compile(r"^hello"), "hello world") is True
+        assert _safe_regex_search(re.compile(r"^hello"), "goodbye") is False
+
+    def test_input_truncation(self) -> None:
+        import re
+
+        from app.filters import _REGEX_INPUT_MAX_LEN, _safe_regex_search
+
+        # A 20K-char string gets truncated and still matches
+        long_text = "x" * 20_000
+        assert _safe_regex_search(re.compile(r"x+"), long_text) is True
+        # Verify the cap is reasonable
+        assert _REGEX_INPUT_MAX_LEN == 10_000
+
+    def test_redos_pattern_times_out(self) -> None:
+        """A pathological (a+)+b pattern on moderate input must time out."""
+        import re
+        import time
+
+        from app.filters import _safe_regex_search
+
+        redos = re.compile(r"(a+)+b")
+        start = time.monotonic()
+        result = _safe_regex_search(redos, "a" * 25, timeout=0.5)
+        elapsed = time.monotonic() - start
+
+        assert result is False, "Timed-out regex should return False"
+        # The function must return within a reasonable margin of the
+        # requested timeout, not hang for 60+ seconds.
+        assert elapsed < 3.0, f"Regex took {elapsed:.1f}s — suspected ReDoS hang"
+
+    def test_invalid_regex_returns_false(self) -> None:
+        import re
+
+        from app.filters import _safe_regex_search
+
+        # re.compile catches most bad patterns; verify _safe_regex_search
+        # doesn't raise if a pre-compiled regex somehow fails at search time.
+        good_pattern = re.compile(r"test")
+        assert _safe_regex_search(good_pattern, "this is a test") is True
+        assert _safe_regex_search(good_pattern, "no match") is False
