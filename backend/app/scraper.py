@@ -300,7 +300,7 @@ async def _classify_and_capture_zero_result(
     potential_zero_classification = classify_zero_result(
         acquisition_lineage={"state": fetch_method},
         session_detection=session_detection,
-        empty_check=empty_check.to_dict() if empty_check is not None and hasattr(empty_check, "to_dict") else None,
+        empty_check=empty_check.to_dict() if empty_check is not None else None,
         anti_bot_score=anti_bot_score,
         final_url=url,
         html=html,
@@ -635,8 +635,8 @@ async def scrape_url(
     js_render_delay = 0.0
     fetch_method = recommended_strategy.value
     retry_count = 0
+    fetch_start = time.time()
     try:
-        fetch_start = time.time()
         fetch_strategy = recommended_strategy
         if attempt_ctx and getattr(attempt_ctx, "fetch_strategy", None):
             with contextlib.suppress(ValueError):

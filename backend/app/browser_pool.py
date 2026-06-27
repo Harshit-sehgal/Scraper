@@ -229,7 +229,11 @@ class BrowserPool:
                         cookie_string, domain
                     )
                     if parsed_cookies:
-                        await context.add_cookies(parsed_cookies)
+                        # Pyright: parsed_cookies are dicts, but Playwright's
+                        # add_cookies() accepts Sequence[SetCookieParam].
+                        # Runtime accepts our dict shape; the type ignore
+                        # documents that the structural guarantee is satisfied.
+                        await context.add_cookies(parsed_cookies)  # type: ignore[arg-type]
                         logger.debug(
                             "[BrowserPool] Injected %d persisted cookies for %s",
                             len(parsed_cookies),

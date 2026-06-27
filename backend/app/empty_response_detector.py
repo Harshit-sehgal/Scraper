@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -45,6 +46,24 @@ class EmptyResponseCheck:
     def __post_init__(self):
         if self.suggestions is None:
             self.suggestions = []
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a plain dict for classification/telemetry payloads.
+
+        Returns all fields, omitting ``suggestions`` when empty to keep
+        downstream serialization tidy.
+        """
+        result: dict[str, Any] = {
+            "is_empty": self.is_empty,
+            "empty_type": self.empty_type,
+            "confidence": self.confidence,
+            "message": self.message,
+            "text_length": self.text_length,
+            "data_signals": self.data_signals,
+        }
+        if self.suggestions:
+            result["suggestions"] = list(self.suggestions)
+        return result
 
 
 # Patterns that indicate a page has real data content
