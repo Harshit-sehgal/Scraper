@@ -241,7 +241,7 @@ class ReplayBuffer:
             seg_path = self._base_dir / seg_name
             if not seg_path.exists():
                 continue
-            with open(seg_path) as f:
+            with open(seg_path, encoding="utf-8") as f:
                 if i == 0:
                     f.seek(segment_offset)
                 for line in f:
@@ -298,7 +298,7 @@ class ReplayBuffer:
             if not seg_path.exists():
                 return None
 
-            with open(seg_path) as f:
+            with open(seg_path, encoding="utf-8") as f:
                 if i == 0:
                     f.seek(offset)
                 for line in f:
@@ -397,7 +397,7 @@ class ReplayBuffer:
             self._segments.append(seg_path.name)
             total_lines = 0
             # Rebuild checkpoint index by scanning this segment
-            with open(seg_path) as f:
+            with open(seg_path, encoding="utf-8") as f:
                 while True:
                     pos = f.tell()
                     line = f.readline()
@@ -454,7 +454,7 @@ class ReplayBuffer:
         """Count non-empty lines in a segment file."""
         count = 0
         try:
-            with open(seg_path) as f:
+            with open(seg_path, encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         count += 1
