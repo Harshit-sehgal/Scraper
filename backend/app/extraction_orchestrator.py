@@ -998,7 +998,12 @@ def _detect_and_align_field_swaps_for_layer(
         # write clobber the value the second write needs — a 2-cycle swap
         # (A↔B) would end up with both slots holding A's value.
         keys = list(swapped.keys())  # e.g. [A, B] for {A:B, B:A}
-        if len(keys) == 2:
+        # Only use the fast 2-cycle swap path when the two keys genuinely
+        # form a bidirectional swap (A↔B).  Otherwise fall through to the
+        # generic path — an arbitrary 2-key map like {A: B, C: D} would
+        # otherwise corrupt records by swapping A↔C instead of forwarding
+        # A→B and C→D independently.
+        if len(keys) == 2 and swapped.get(keys[0]) == keys[1] and swapped.get(keys[1]) == keys[0]:
             a, b = keys
             # Swap semantics: ``swapped`` says each ``wrong_field`` was
             # actually populated with ``right_field``'s value.  So save

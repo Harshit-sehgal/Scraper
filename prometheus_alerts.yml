@@ -304,3 +304,42 @@ groups:
         annotations:
           summary: "Public HTTPS endpoint probe is failing"
           description: "The TLS probe to {{ $labels.instance }} has failed for more than 2 minutes. The endpoint may be down, the certificate may be invalid, or the TLS handshake may be broken. F-MON-004."
+
+      # 23. LLM Cascade Failure Rate Alert — NEW
+      # Fires when the LLM cascade circuit breaker has tripped (or is
+      # close to tripping). The two signals we use:
+      #   * ``llm_cascade_consecutive_failures_total`` — running
+      #     tally of consecutive cascade exhaustions
+      #   * ``llm_cascade_state`` — current breaker state (0=closed,
+      #     1=half-open, 2=open)
+      # When either signal suggests the breaker is firing repeatedly,
+      # operators should investigate provider availability (Groq
+      # rate-limits, Pollinations outages, g4f reliability).
+      - alert: LLMCascadeRepeatedFailures
+        expr: |
+          (
+            delta(llm_cascade_consecutive_failures_total[5m]) > 3
+          )
+          or
+          (
+            llm_cascade_state == 2
+          )
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM cascade is failing repeatedly"
+          description: "The LLM cascade has failed {{ $value }} times in the last 5 minutes, or the breaker is currently OPEN. LLM-powered scrapers may be silently producing empty structured data. Verify provider availability and check ``get_silent_failure_counts()`` in app.llm_bridge."
+
+      # 24. Silent LLM Empty Response Rate — NEW
+      # Even when the breaker stays closed, individual success-low-then
+      # silent-empty patterns indicate data-integrity risk. Fires when
+      # silent-empty responses exceed 0.1/s over 10 minutes.
+      - alert: LLMSilentEmptyResponseElevated
+        expr: rate(llm_silent_failure_total[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM silent-empty-return rate is elevated"
+          description: "Silent-empty LLM responses are occurring at {{ $value | humanize }} per second (threshold > 0.1/s). Callers may be persisting empty structured data. Investigate ``get_silent_failure_counts()`` and consider enabling DATAFORGE_LLM_RAISE_ON_FAILURE=true."

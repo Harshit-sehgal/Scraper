@@ -163,6 +163,20 @@ def _get_client_ip_for_audit(request: Request) -> str:
 
 
 # ════════════════════════════════════════════════════════════════════
+# Batch export request model (module-level so Pydantic can resolve
+# forward references during OpenAPI schema generation)
+# ════════════════════════════════════════════════════════════════════
+
+
+class BatchExportRequest(BaseModel):
+    """Request body for batch export."""
+
+    job_ids: list[str] = Field(..., min_length=1, max_length=50, description="Job IDs to export")
+    format: str = Field(default="csv", description="Export format: csv, json, or xlsx")
+    flatten: bool = Field(default=True, description="Combine into single output when True")
+
+
+# ════════════════════════════════════════════════════════════════════
 # Router factory
 # ════════════════════════════════════════════════════════════════════
 
@@ -383,12 +397,6 @@ def create_exports_router(jobs_store: dict[str, Any]):
 
     # ─── Batch export ────────────────────────────────────────────
 
-    class BatchExportRequest(BaseModel):
-        """Request body for batch export."""
-        job_ids: list[str] = Field(..., min_length=1, max_length=50, description="Job IDs to export")
-        format: str = Field(default="csv", description="Export format: csv, json, or xlsx")
-        flatten: bool = Field(default=True, description="Combine into single output when True")
-
     @router.post("/api/exports/batch")
     async def batch_export(
         body: BatchExportRequest,
@@ -437,6 +445,8 @@ def create_exports_router(jobs_store: dict[str, Any]):
 
             manifest = await export_service.build_batch_manifest(job_meta, None, _count)
             union, _ = await export_service.discover_fieldnames_union(job_meta, None, _sample)
+
+            _record_export_usage(auth[1], fmt, body.job_ids, request)
 
             if fmt == "csv":
                 pages = export_service.iter_batch_pages(job_meta, None, _results)
