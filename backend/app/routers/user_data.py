@@ -73,35 +73,24 @@ async def delete_my_data(
     try:
         from app.globals import jobs_store
 
-        if hasattr(jobs_store, "get_all_jobs"):
-            all_jobs = jobs_store.get_all_jobs()
-        elif hasattr(jobs_store, "list_jobs"):
-            all_jobs = jobs_store.list_jobs()
-        else:
-            all_jobs = {}
-
-        if isinstance(all_jobs, dict):
-            for job_id, job in all_jobs.items():
-                if isinstance(job, dict):
-                    owner = str(job.get("created_by") or job.get("created_by_fingerprint") or job.get("user_id", ""))
-                    rfp = job.get("result_file_path")
-                else:
-                    owner = str(
-                        getattr(job, "created_by", "")
-                        or getattr(job, "created_by_fingerprint", "")
-                        or getattr(job, "user_id", ""),
-                    )
-                    rfp = getattr(job, "result_file_path", None)
-                if owner == user_id:
-                    job_ids_to_delete.append(job_id)
-                    job_result_paths[job_id] = rfp
-            for jid in job_ids_to_delete:
-                if hasattr(jobs_store, "delete_job"):
-                    jobs_store.delete_job(jid)
-                elif hasattr(jobs_store, "remove_job"):
-                    jobs_store.remove_job(jid)
-                else:
-                    all_jobs.pop(jid, None)
+        # ``jobs_store`` is always a plain ``dict[str, Job]`` at runtime;
+        # the repository-style method dispatch (get_all_jobs / list_jobs /
+        # delete_job / remove_job) is dead code that the type checker could
+        # not narrow through ``hasattr`` on a typed dict.
+        for job_id, job in list(jobs_store.items()):
+            if isinstance(job, dict):
+                owner = str(job.get("created_by") or job.get("created_by_fingerprint") or job.get("user_id", ""))
+                rfp = job.get("result_file_path")
+            else:
+                owner = str(
+                    getattr(job, "created_by", "") or getattr(job, "created_by_fingerprint", "") or getattr(job, "user_id", ""),
+                )
+                rfp = getattr(job, "result_file_path", None)
+            if owner == user_id:
+                job_ids_to_delete.append(job_id)
+                job_result_paths[job_id] = rfp
+        for jid in job_ids_to_delete:
+            jobs_store.pop(jid, None)
         summary["jobs_deleted"] = len(job_ids_to_delete)
     except (RuntimeError, OSError, ValueError, TypeError) as e:
         logger.warning("Failed to delete jobs for user %s: %s", user_id, e)

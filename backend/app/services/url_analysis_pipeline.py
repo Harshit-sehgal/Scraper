@@ -328,19 +328,20 @@ class URLAnalysisPipeline:
                 search_params=ctx.search_params,
             )
 
-            if ctx.search_recovery.get("success") and ctx.search_recovery.get("fresh_html"):
+            recovery = ctx.search_recovery or {}
+            if recovery.get("success") and recovery.get("fresh_html"):
                 logger.info(
                     "[URLAnalyzer] Recovery succeeded -> %s, re-analyzing fresh page",
-                    ctx.search_recovery.get("fresh_url", ""),
+                    recovery.get("fresh_url", ""),
                 )
-                ctx.html = ctx.search_recovery["fresh_html"]
+                ctx.html = recovery["fresh_html"]
                 ctx.fetch_method = "search_form_post"
-                if ctx.search_recovery.get("fresh_url"):
-                    ctx.final_url = ctx.search_recovery["fresh_url"]
+                if recovery.get("fresh_url"):
+                    ctx.final_url = recovery["fresh_url"]
                 ctx.redirect_info = build_redirect(
                     original_url=ctx.url,
                     final_url=ctx.final_url,
-                    search_recovery=ctx.search_recovery,
+                    search_recovery=recovery,
                     search_form=ctx.search_form,
                     search_params=ctx.search_params,
                     fetch_method=ctx.fetch_method,
