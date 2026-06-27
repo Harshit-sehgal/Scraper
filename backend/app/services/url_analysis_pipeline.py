@@ -429,7 +429,7 @@ class URLAnalysisPipeline:
             result = None
 
         ctx.suggested_fields = rename_fields(build_llm(result, ctx.patterns))
-        ctx.suggested_fields.sort(key=lambda f: f["confidence"], reverse=True)
+        ctx.suggested_fields.sort(key=lambda f: f.get("confidence", 0.0), reverse=True)
         ctx.suggested_fields = ctx.suggested_fields[: settings.URL_ANALYZER_MAX_FIELDS]
 
         ctx.item_container = ctx.profile.container_selector

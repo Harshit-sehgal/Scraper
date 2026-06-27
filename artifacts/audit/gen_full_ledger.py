@@ -606,8 +606,6 @@ def main() -> int:
         )
     OUT_MD.write_text("".join(md), encoding="utf-8")
 
-    for tier in CLASSIFICATIONS:
-        pass
     return 0
 
 
