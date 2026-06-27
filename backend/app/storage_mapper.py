@@ -94,6 +94,13 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
         "headers": json.dumps(job.headers if hasattr(job, "headers") and job.headers is not None else {}),
         "cookies": json.dumps(job.cookies if hasattr(job, "cookies") and job.cookies is not None else {}),
+        "webhook_url": job.webhook_url if hasattr(job, "webhook_url") and job.webhook_url is not None else "",
+        "webhook_secret": job.webhook_secret if hasattr(job, "webhook_secret") and job.webhook_secret is not None else "",
+        "webhook_delivered": bool(getattr(job, "webhook_delivered", False)),
+        "webhook_delivered_at": (
+            job.webhook_delivered_at if getattr(job, "webhook_delivered_at", None) is not None else ""
+        ),
+        "fetch_strategy": job.fetch_strategy if hasattr(job, "fetch_strategy") and job.fetch_strategy is not None else "",
     }
 
 
@@ -161,6 +168,11 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
                 "headers": json.loads(row.get("headers", "{}")),
                 "cookies": json.loads(row.get("cookies", "{}")),
+                "webhook_url": row.get("webhook_url") or None,
+                "webhook_secret": row.get("webhook_secret") or None,
+                "webhook_delivered": bool(row.get("webhook_delivered", False)),
+                "webhook_delivered_at": row.get("webhook_delivered_at") or None,
+                "fetch_strategy": row.get("fetch_strategy") or None,
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:

@@ -18,8 +18,8 @@ from app.storage_mapper import job_to_row, row_to_job
 
 logger = logging.getLogger(__name__)
 
-SQLITE_SCHEMA_VERSION = 10
-POSTGRES_SCHEMA_VERSION = 9
+SQLITE_SCHEMA_VERSION = 11
+POSTGRES_SCHEMA_VERSION = 10
 
 # ───────────────────────────────────────────────────────────────────────
 # SQLite migrations
@@ -444,6 +444,28 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
                     conn.execute(f"ALTER TABLE {table_name} ADD COLUMN cookies TEXT DEFAULT '{{}}'")
             current = 10
 
+        if current < 11:
+            # v11 — proficiency preservation for the 6 Job fields that
+            # were added to storage_mapper.py but never persisted (the
+            # CRITICAL data-loss gap). Adding them as separate ALTERs so
+            # existing rows survive; new rows default to empty/false.
+            for table_name in ["jobs", "recycle_bin"]:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                v11_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+                additions = [
+                    ("webhook_url", "TEXT DEFAULT ''"),
+                    ("webhook_secret", "TEXT DEFAULT ''"),
+                    ("webhook_delivered", "BOOLEAN DEFAULT FALSE"),
+                    ("webhook_delivered_at", "TEXT DEFAULT ''"),
+                    ("fetch_strategy", "TEXT DEFAULT ''"),
+                ]
+                for col_name, col_ddl in additions:
+                    if col_name not in v11_cols:
+                        conn.execute(
+                            f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}",
+                        )
+            current = 11
+
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
         conn.commit()
@@ -695,6 +717,30 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                 except Exception:
                     logger.debug("ALTER TABLE %s ADD COLUMN headers/cookies failed", table_name)
             current = 9
+
+        if current < 10:
+            # v10 — proficiency preservation for the 5 Job fields that
+            # were added to storage_mapper.py but never persisted in
+            # Postgres (the CRITICAL data-loss gap). ALTER TABLE IF NOT
+            # EXISTS so repeated runs are idempotent.
+            for table_name in ["jobs", "recycle_bin"]:
+                for col_name, col_ddl in (
+                    ("webhook_url", "TEXT DEFAULT ''"),
+                    ("webhook_secret", "TEXT DEFAULT ''"),
+                    ("webhook_delivered", "BOOLEAN DEFAULT FALSE"),
+                    ("webhook_delivered_at", "TEXT DEFAULT ''"),
+                    ("fetch_strategy", "TEXT DEFAULT ''"),
+                ):
+                    try:
+                        execute_fn(
+                            conn,
+                            f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_ddl}",
+                        )
+                    except Exception:
+                        logger.debug(
+                            "ALTER TABLE %s ADD COLUMN %s failed", table_name, col_name,
+                        )
+            current = 10
 
         execute_fn(conn, "DELETE FROM schema_version")
         execute_fn(conn, "INSERT INTO schema_version (version) VALUES (%s)", (POSTGRES_SCHEMA_VERSION,))

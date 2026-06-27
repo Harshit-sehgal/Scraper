@@ -55,6 +55,11 @@ _JOBS_COLUMNS_SQL = [
     "cookies TEXT DEFAULT '{}'",
     "updated_at TEXT DEFAULT ''",
     "deleted_at TEXT DEFAULT NULL",
+    "webhook_url TEXT DEFAULT ''",
+    "webhook_secret TEXT DEFAULT ''",
+    "webhook_delivered BOOLEAN DEFAULT FALSE",
+    "webhook_delivered_at TEXT DEFAULT ''",
+    "fetch_strategy TEXT DEFAULT ''",
 ]
 
 
