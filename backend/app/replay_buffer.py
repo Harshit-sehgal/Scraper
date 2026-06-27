@@ -302,7 +302,6 @@ class ReplayBuffer:
                         logger.debug("Skipping malformed entry during replay reconstruct: %s", exc)
                         continue
                     idx = entry.get("idx")
-                    idx = entry.get("idx")
                     if i == 0 and idx < cp_idx:
                         continue
                     if idx > target_idx:
@@ -401,7 +400,6 @@ class ReplayBuffer:
                         logger.debug("Skipping malformed entry during rebuild: %s", exc)
                         continue
                     idx = entry.get("idx")
-                    idx = entry.get("idx")
                     if idx >= self._next_global_idx:
                         self._next_global_idx = idx + 1
                     self._total_entries += 1
@@ -481,8 +479,7 @@ class ReplayBuffer:
 
         # Stream from the latest checkpoint backward (or forward from a recent point)
         # We stream from near the end for efficiency
-        total = self._total_entries
-        start = max(0, total - 500)  # Scan last 500 entries max
+        start = max(0, self._next_global_idx - 500)  # Scan last 500 entries max
 
         for entry in self.stream_from(start):
             metadata = entry.get("metadata", {})
