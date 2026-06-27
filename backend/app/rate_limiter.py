@@ -94,19 +94,32 @@ class RedisRateLimiter:
 
 # ─── Trusted-proxy allowlist ──────────────────────────────────────────
 # Only TCP peers whose address is in this list may inject X-Forwarded-For
-# headers. The previous implementation trusted ANY RFC1918 / loopback
-# address, which means a malicious client on a co-tenant VPC could forge
-# XFF values to evade per-IP rate limits. Operators should set
-# ``DATAFORGE_TRUSTED_PROXIES`` to the exact CIDR list of the load
-# balancer / reverse proxy that fronts the API. The default is the
-# localhost / RFC1918 ranges, which is safe behind a single-hop proxy
-# (nginx on the same host, Docker bridge) but should be tightened in
-# any environment with multiple internal subnets.
-_TRUSTED_PROXIES_DEFAULT = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-_TRUSTED_PROXIES_ENV = (os.environ.get("DATAFORGE_TRUSTED_PROXIES") or _TRUSTED_PROXIES_DEFAULT).strip()
+# headers. The previous default of ``127.0.0.0/8`` + RFC1918 ranges
+# (10/8, 172.16/12, 192.168/16) meant any neighbour inside the same VPC
+# could forge XFF values and evade per-IP rate limits. Operators must now
+# set ``DATAFORGE_TRUSTED_PROXIES`` explicitly to the exact CIDR list of
+# the load balancer / reverse proxy that fronts the API.  The new
+# default is loopback only, which is correct for single-host deployments
+# (nginx on the same machine) but secure in any environment: peers
+# outside loopback cannot inject XFF.
+# Production deployments MUST set the env var; an earnest ``WARNING``
+# fires at startup if it is not configured.
+_LOOPBACK_ONLY_DEFAULT = "127.0.0.0/8,::1/128"
+_TRUSTED_PROXIES_ENV = (os.environ.get("DATAFORGE_TRUSTED_PROXIES") or _LOOPBACK_ONLY_DEFAULT).strip()
 _TRUSTED_PROXY_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = tuple(
     ipaddress.ip_network(cidr.strip(), strict=False) for cidr in _TRUSTED_PROXIES_ENV.split(",") if cidr.strip()
 )
+if not os.environ.get("DATAFORGE_TRUSTED_PROXIES"):
+    # Use the explicit-default banner so operators recognise they
+    # have *not* opted in to broader ranges.
+    logger.warning(
+        "DATAFORGE_TRUSTED_PROXIES is unset — trusted-proxy list "
+        "defaults to LOOPBACK ONLY (%s). Any peers outside loopback "
+        "cannot inject X-Forwarded-For, but legitimate proxy hops "
+        "across VPCs / containers will be IGNORED. Set the env var "
+        "explicitly if your reverse proxy is not on the same host.",
+        _LOOPBACK_ONLY_DEFAULT,
+    )
 
 
 def _is_trusted_proxy(client_host: str) -> bool:

@@ -110,25 +110,20 @@ def _require_admin_key(request: Request) -> None:
     must be flagged, not hidden.
     """
     if not settings.ADMIN_API_KEY:
-        logger.warning(
+        # Fail-closed: regardless of environment, if no admin key is
+        # configured then admin operations are disabled.  The old
+        # dev-mode fallback to the regular API key was a privilege-
+        # escalation vector — a dev build shipped to staging could let
+        # regular-key holders access admin endpoints.
+        logger.error(
             "ADMIN_API_KEY is unset; admin-key-guarded endpoints are "
-            "falling back to the regular API key check. This is a "
-            "configuration error in production.",
+            "DISABLED.  Set DATAFORGE_ADMIN_API_KEY to enable admin "
+            "operations.",
         )
-        # Fail-closed: require admin key in production or test
-        if settings.ENV.lower() not in ("development", "dev", "local"):
-            raise HTTPException(
-                status_code=403,
-                detail="ADMIN_API_KEY is not configured. Admin operations are disabled.",
-            )
-        # In development: fall back to regular API key check
-        api_key = request.headers.get("X-API-Key", "")
-        if not api_key or not settings.API_KEY or not secrets.compare_digest(api_key, settings.API_KEY):
-            raise HTTPException(
-                status_code=403,
-                detail="Admin API key not configured. Provide valid API key.",
-            )
-        return
+        raise HTTPException(
+            status_code=403,
+            detail="ADMIN_API_KEY is not configured. Admin operations are disabled.",
+        )
     provided = request.headers.get("X-Admin-Key", "")
     if not secrets.compare_digest(provided, settings.ADMIN_API_KEY):
         raise HTTPException(

@@ -79,6 +79,18 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
 
         validate_production_credentials(settings)
 
+        # SMOKE_TEST_MODE bypasses SSRF host-allowlist checks; if it
+        # leaks to production (via a stray .env or compose env block),
+        # any caller can reach internal hosts through the API.
+        if getattr(settings, "SMOKE_TEST_MODE", False):
+            msg = (
+                "SMOKE_TEST_MODE is ENABLED in production — this bypasses "
+                "SSRF host-allowlist checks and allows internal-network "
+                "access.  Set DATAFORGE_SMOKE_TEST_MODE=false before "
+                "deploying to production."
+            )
+            raise ValueError(msg)
+
     # Startup configuration validation — logs warnings for missing secrets
     # in production-like envs, malformed integers/booleans, and suspect
     # storage backends.  Best-effort; does not raise (mock environments
@@ -148,6 +160,49 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
     # Resolve the repository lazily
     global job_repo
     job_repo = get_job_repository()
+
+    # DB schema version fence — fail fast if the connected schema
+    # does not match the version this build of the code expects.
+    # Without this check a mid-week migration could leave jobs
+    # silently broken (the "schema drift" hazard noted in the
+    # audit). In production/staging we hard-fail; in dev we
+    # warn so a developer with a stale DB can still boot.
+    try:
+        from app.storage_migrations import POSTGRES_SCHEMA_VERSION
+
+        if job_repo is not None:
+            backend = getattr(job_repo, "backend", None) or "unknown"
+            fencer = getattr(job_repo, "get_storage_status", None) or getattr(job_repo, "health_check", None)
+            if callable(fencer):
+                status = fencer()
+                actual_version = status.get("schema_version") if isinstance(status, dict) else None
+                expected_version = status.get("expected_version") if isinstance(status, dict) else None
+                expected_version = expected_version or POSTGRES_SCHEMA_VERSION
+                if actual_version is not None and int(actual_version) != int(expected_version):
+                    msg = (
+                        f"DB schema version mismatch on backend={backend}: "
+                        f"connected schema_version={actual_version}, expected "
+                        f"{expected_version}. Refusing to start to avoid "
+                        f"data corruption."
+                    )
+                    if settings.ENV.lower() in ("production", "staging"):
+                        raise RuntimeError(msg)
+                    logger.error(
+                        "%s — continuing in dev mode; fix in prod by running the migration before deploying.",
+                        msg,
+                    )
+                else:
+                    logger.info(
+                        "Schema version fence passed (backend=%s version=%s)",
+                        backend,
+                        actual_version,
+                    )
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        # Never let a fence failure (other than a hard mismatch) take
+        # the app down — log and move on.
+        logger.debug("Schema version fence skipped: %s", exc)
 
     # SSRF transport self-check: confirm the safe-transport factory still
     # injects a SafeAsyncNetworkBackend into the httpx connection pool.
