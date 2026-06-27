@@ -273,14 +273,20 @@ class ReplayBuffer:
         with self._lock:
             checkpoint = self._checkpoints.find_nearest(target_idx)
             if checkpoint is None:
-                return None
+                # No checkpoints — start from beginning of first segment
+                segment_name = self._segments[0] if self._segments else None
+                if segment_name is None:
+                    return None
+                cp_idx = 0
+                offset = 0
+            else:
+                cp_idx, segment_name, offset, _snapshot = checkpoint
 
-            cp_idx, seg_name, offset, _snapshot = checkpoint
             if cp_idx > target_idx:
                 return None
 
             # Copy segment list to avoid race conditions during file I/O
-            segments_to_process = [seg_name, *self._get_subsequent_segments(seg_name)]
+            segments_to_process = [segment_name, *self._get_subsequent_segments(segment_name)]
 
         # Start with an empty state and apply all deltas from the checkpoint
         # index (inclusive) to the target index.

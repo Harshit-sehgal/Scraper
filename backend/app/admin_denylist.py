@@ -61,11 +61,12 @@ DENYLIST_TABLE = "domain_denylist"
 
 _CREATE_TABLE_SQL = f"""
     CREATE TABLE IF NOT EXISTS {DENYLIST_TABLE} (
-        domain TEXT PRIMARY KEY,
+        domain TEXT NOT NULL,
         reason TEXT NOT NULL DEFAULT '',
         added_by TEXT NOT NULL DEFAULT '',
         added_at TEXT NOT NULL DEFAULT (datetime('now')),
-        path_prefix TEXT NOT NULL DEFAULT ''
+        path_prefix TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (domain, path_prefix)
     )
 """
 
@@ -181,11 +182,10 @@ class DomainDenylist:
             query = """
                 INSERT INTO domain_denylist (domain, reason, added_by, path_prefix)
                 VALUES (?, ?, ?, ?)
-                ON CONFLICT(domain) DO UPDATE SET
+                ON CONFLICT(domain, path_prefix) DO UPDATE SET
                     reason=excluded.reason,
                     added_by=excluded.added_by,
-                    added_at=datetime('now'),
-                    path_prefix=excluded.path_prefix
+                    added_at=datetime('now')
                 """
             conn.execute(query, (domain, reason, added_by, path_prefix))
         self._invalidate_cache()
