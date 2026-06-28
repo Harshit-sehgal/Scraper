@@ -191,7 +191,7 @@
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
-      "test_coverage": "yes"
+      "test_coverage": "unknown"
     },
     {
       "method": "GET",

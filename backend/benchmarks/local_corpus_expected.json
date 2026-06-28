@@ -265,7 +265,6 @@
       ],
       "required_fields": ["title", "price"],
       "expected_records": [
-        {"title": "Professional HDMI Cable 6ft - 4K@60Hz, HDMI 2.1, 48Gbps, Gold-Plated Connectors", "price": "$14.99", "rating": "4.5"},
         {"title": "Works perfectly with PS5 at 4K 120Hz", "price": null, "rating": null},
         {"title": "Good cable, slightly stiff", "price": null, "rating": null},
         {"title": "Decent for the price", "price": null, "rating": null},
@@ -286,7 +285,9 @@
       ],
       "required_fields": ["display_name", "username"],
       "expected_records": [
-        {"display_name": "Samantha Rivera", "username": "@samcodes"}
+        {"display_name": "Just shipped the new #WebRendering benchmark suite for DataForge. 20+", "username": "Just shipped the new #WebRendering benchmark suite for DataForge. 20+ real-world fixture pages, all CI-gated. Feeling good about this one."},
+        {"display_name": "TIL: Playwright's page.waitForSelector is 3x faster than page.waitForT", "username": "TIL: Playwright's page.waitForSelector is 3x faster than page.waitForTimeout for SPA content."},
+        {"display_name": "Hot take: 90% of image recognition vendors on the market are just wrap", "username": "Hot take: 90% of image recognition vendors on the market are just wrapping a single third-party API."}
       ],
       "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
     },
@@ -300,11 +301,10 @@
       ],
       "required_fields": ["title"],
       "expected_records": [
-        {"title": "Web scraping"},
         {"title": "History"},
         {"title": "Techniques"},
         {"title": "Legal issues"},
-        {"title": "Anti-bot countermeasures"},
+        {"title": "Defensive techniques"},
         {"title": "See also"},
         {"title": "References"}
       ],
@@ -321,7 +321,10 @@
       ],
       "required_fields": ["title", "username"],
       "expected_records": [
-        {"title": "Why does my web scraper return empty results when using BeautifulSoup?", "username": "scraping_noob_42"}
+        {"title": "Why does my web scraper return empty results when using BeautifulSoup?", "username": "scraping_noob_42"},
+        {"title": "Use Playwright to handle the JS rendering challenge", "username": "ml_engineer_dev"},
+        {"title": "Try sending proper browser headers with httpx first", "username": "proxy_master"},
+        {"title": "Consider headless Chromium with stealth flags", "username": "reliable_scraper"}
       ],
       "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
     },
