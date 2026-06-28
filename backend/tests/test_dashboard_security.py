@@ -17,7 +17,7 @@ def test_dashboard_security_headers(client) -> None:
     # Verify Content Security Policy is configured correctly in the app settings if served
     from app.config import settings
 
-    assert settings.ENV in ("development", "production")
+    assert settings.ENV in ("development", "production", "test")
 
 
 def test_dashboard_unauthenticated_api_access(client) -> None:

@@ -26,11 +26,17 @@ from app.models import FieldType, SchemaField
 logger = logging.getLogger(__name__)
 
 
-# ─── Test environment defaults (session-scoped autouse fixture) ────────────
-# Module-level ``os.environ`` mutations leak across pytest runs and into
-# the developer's shell. This session-scoped fixture sets the same
-# defaults the tests require but rolls them back when the session ends
-# by re-applying the original snapshot after ``yield``.
+# Set test environment defaults BEFORE any module-level ``from app.main
+# import app`` (which instantiates ``app.config.settings`` and freezes
+# values read from ``os.environ``).  The session fixture below restores
+# whatever the host environment had originally.
+#
+# Direct module-level ``os.environ.setdefault`` calls leak into the
+# developer's shell when pytest is hard-killed (``-9``, ``kill -9``,
+# OOM).  We snapshot here and rely on ``_test_env_defaults`` to restore
+# on graceful teardown; if pytest is hard-killed the leak is part of a
+# bigger problem and the developer can rerun ``validate_local.py`` or
+# unset the vars manually.
 _TEST_ENV_KEYS = (
     "DATAFORGE_STATE_FILE",
     "DATAFORGE_DB_CONNECT_TIMEOUT",
@@ -54,34 +60,30 @@ _TEST_ENV_DEFAULTS = {
     "DATAFORGE_STORAGE_BACKEND": "sqlite",
     "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
 }
+_HOST_ENV_BEFORE_TESTS = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
+for _key, _value in _TEST_ENV_DEFAULTS.items():
+    # Use setdefault so a developer's intentional override (e.g. CI's
+    # real ``DATAFORGE_API_KEY``) is preserved.
+    os.environ.setdefault(_key, _value)
+os.environ.pop("DATAFORGE_DATABASE_URL", None)
+del _key, _value
 
 
 @pytest.fixture(autouse=True, scope="session")
 def _test_env_defaults():
-    """Set test-suite env defaults and restore the host on teardown.
+    """Restore the host environment at graceful teardown.
 
-    The previous implementation mutated ``os.environ`` at import time so
-    the variables leaked into a developer's shell after the pytest run
-    ended. This fixture keeps the same end state for the duration of one
-    pytest run, then restores the host environment on teardown.
-
-    Note: direct ``python3 backend/tests/test_xyz.py`` invocations
-    bypass pytest fixtures. The same defaults are reapplied as a
-    fallback at module import below so direct invocations keep working.
+    Env defaults are already applied at module import so that
+    ``app.config.settings`` is instantiated with the test values. This
+    fixture only restores the host environment after the pytest run.
     """
-    snapshot = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
-    for key, value in _TEST_ENV_DEFAULTS.items():
-        os.environ[key] = value
-    os.environ.pop("DATAFORGE_DATABASE_URL", None)
-    try:
-        yield
-    finally:
-        for key in _TEST_ENV_KEYS:
-            original = snapshot.get(key)
-            if original is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = original
+    yield
+    for key in _TEST_ENV_KEYS:
+        original = _HOST_ENV_BEFORE_TESTS.get(key)
+        if original is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = original
 
 
 def pytest_addoption(parser) -> None:

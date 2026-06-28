@@ -163,9 +163,7 @@ class TestCreateProvider:
         assert isinstance(provider, StaticListProvider)
         assert provider.fetch_proxies() == ["http://a:8080", "http://b:8080"]
 
-    def test_file_type_returns_json_provider(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_file_type_returns_json_provider(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         f = tmp_path / "p.json"
         f.write_text(json.dumps(["http://c:9090"]))
         from app.config import settings
@@ -200,9 +198,7 @@ class TestCreateProvider:
 
 
 class TestProxyManagerWithProvider:
-    def test_delegates_to_json_provider(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_delegates_to_json_provider(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         f = tmp_path / "proxies.json"
         f.write_text(json.dumps(["http://p1:8080", "http://p2:8080"]))
 
@@ -217,9 +213,7 @@ class TestProxyManagerWithProvider:
         assert mgr.enabled
         assert mgr._proxy_list == ["http://p1:8080", "http://p2:8080"]
 
-    def test_refresh_from_provider(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_refresh_from_provider(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         f = tmp_path / "proxies.json"
         f.write_text(json.dumps(["http://p1:8080"]))
 
@@ -254,4 +248,3 @@ class TestProxyManagerWithProvider:
         count = mgr.refresh_from_provider()
         assert count == 1
         assert mgr._proxy_list == ["http://mocked:1234"]
-

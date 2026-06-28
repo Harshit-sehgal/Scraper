@@ -87,15 +87,11 @@ class ProxyManager:
                 )
                 return
             except (ImportError, RuntimeError, ValueError, OSError) as exc:
-                logger.warning(
-                    "Provider '%s' failed (%s); falling back to PROXY_LIST", provider_type, exc
-                )
+                logger.warning("Provider '%s' failed (%s); falling back to PROXY_LIST", provider_type, exc)
 
         if settings.PROXY_LIST:
             self._proxy_list = [p.strip() for p in settings.PROXY_LIST.split(",") if p.strip()]
-            logger.info(
-                "Proxy manager initialized with %d proxies from PROXY_LIST", len(self._proxy_list)
-            )
+            logger.info("Proxy manager initialized with %d proxies from PROXY_LIST", len(self._proxy_list))
         else:
             logger.warning("Proxy rotation enabled but PROXY_LIST is empty")
 

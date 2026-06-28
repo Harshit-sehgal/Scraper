@@ -476,9 +476,14 @@ class AntiBotEngine:
 
         # If score indicates hard block, record proxy failure for the domain
         # so domain-aware rotation can skip this proxy for this domain.
+        # Then immediately rotate so the *next* attempt uses a fresh IP
+        # instead of repeating against a burned endpoint.  Without this the
+        # proxy stays on the failing address for PROXY_ROTATION_FAILURE_THRESHOLD
+        # consecutive attempts, which damages IP reputation on every retry.
         if score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD and self.proxy_manager.enabled:
             self.proxy_manager.record_failure(domain=domain)
-            logger.info("Hard block detected on %s, recorded proxy failure", domain)
+            self.proxy_manager.rotate(domain=domain)
+            logger.info("Hard block detected on %s, recorded proxy failure and rotated", domain)
 
     def record_success(self, domain: str) -> None:
         """Record successful fetch from domain."""

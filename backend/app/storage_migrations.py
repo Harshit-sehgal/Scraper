@@ -40,6 +40,8 @@ def _job_from_raw(raw: dict[str, Any]) -> dict[str, Any]:
         "discovered_urls",
         "selectors_map",
         "search_params",
+        "headers",
+        "cookies",
     ]:
         if field in out and not isinstance(out[field], str):
             out[field] = json.dumps(out[field])

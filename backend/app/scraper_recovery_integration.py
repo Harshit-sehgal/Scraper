@@ -279,7 +279,7 @@ async def scrape_url_with_recovery(
             if attempt > 1:
                 state = AcquisitionState.RECOVERED
                 user_message = "Scrape succeeded after recovery actions."
-            elif anti_bot_score > 0.5:
+            elif anti_bot_score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD:
                 state = AcquisitionState.ANTI_BOT_BLOCKED
                 user_message = "Page may have anti-bot protections."
                 try:
