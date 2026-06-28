@@ -441,8 +441,8 @@ class RegressionCapture:
         durably persisted as a unit.
         """
         fixture_path = self._fixtures_dir / filename
-        tmp_path = fixture_path.with_suffix(fixture_path.suffix + ".tmp")
         fd: int | None = None
+        tmp_path: str | None = None
         try:
             fd, tmp_path = tempfile.mkstemp(
                 dir=fixture_path.parent,
