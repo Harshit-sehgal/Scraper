@@ -44,6 +44,10 @@ backend/app/data/
 *.sqlite-journal
 *.lock
 
+# pytest MagicMock test artifacts
+MagicMock/
+backend/MagicMock/
+
 # Local generated exports/outputs
 exports/
 output/

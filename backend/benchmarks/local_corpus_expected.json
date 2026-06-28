@@ -1,5 +1,5 @@
 {
-  "version": "2026-06-24.local-corpus.v1",
+  "version": "2026-06-29.local-corpus.v2",
   "required_categories": [
     "static product pages",
     "listing pages",
@@ -14,7 +14,13 @@
     "empty/no-result pages",
     "malformed HTML",
     "login-required mock pages",
-    "blocked/challenge mock pages"
+    "blocked/challenge mock pages",
+    "affiliate product pages",
+    "social media profiles",
+    "wiki / infobox pages",
+    "Q&A / forum pages",
+    "ecommerce listing grid",
+    "multi-page pagination"
   ],
   "aggregate_thresholds": {
     "min_row_f1": 0.9,
@@ -246,6 +252,131 @@
       "expected_records": [],
       "expected_failure_classes": ["session_bound_url", "search_replay_required"],
       "thresholds": {"max_false_positive_records": 0}
+    },
+    {
+      "id": "affiliate_hdmi_cable_product",
+      "categories": ["affiliate product pages"],
+      "fixture": "affiliate_product.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true},
+        {"name": "rating", "type": "string", "required": false}
+      ],
+      "required_fields": ["title", "price"],
+      "expected_records": [
+        {"title": "Professional HDMI Cable 6ft - 4K@60Hz, HDMI 2.1, 48Gbps, Gold-Plated Connectors", "price": "$14.99", "rating": "4.5"},
+        {"title": "Works perfectly with PS5 at 4K 120Hz", "price": null, "rating": null},
+        {"title": "Good cable, slightly stiff", "price": null, "rating": null},
+        {"title": "Decent for the price", "price": null, "rating": null},
+        {"title": "Articulating TV Wall Mount", "price": "$34.99", "rating": null},
+        {"title": "Reusable Cable Ties (50-pack)", "price": "$7.99", "rating": null},
+        {"title": "12-Outlet Surge Protector", "price": "$24.99", "rating": null}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "social_profile_samcodes",
+      "categories": ["social media profiles"],
+      "fixture": "social_profile.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "display_name", "type": "string", "required": true},
+        {"name": "username", "type": "string", "required": true}
+      ],
+      "required_fields": ["display_name", "username"],
+      "expected_records": [
+        {"display_name": "Samantha Rivera", "username": "@samcodes"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "wikipedia_web_scraping_article",
+      "categories": ["wiki / infobox pages"],
+      "fixture": "wikipedia_article.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [
+        {"title": "Web scraping"},
+        {"title": "History"},
+        {"title": "Techniques"},
+        {"title": "Legal issues"},
+        {"title": "Anti-bot countermeasures"},
+        {"title": "See also"},
+        {"title": "References"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "stackoverflow_empty_results_qa",
+      "categories": ["Q&A / forum pages"],
+      "fixture": "stackoverflow_qa.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "username", "type": "string", "required": true}
+      ],
+      "required_fields": ["title", "username"],
+      "expected_records": [
+        {"title": "Why does my web scraper return empty results when using BeautifulSoup?", "username": "scraping_noob_42"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "ebay_vintage_watches_listing",
+      "categories": ["ecommerce listing grid"],
+      "fixture": "ecommerce_listing.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["title", "price"],
+      "expected_records": [
+        {"title": "Omega Speedmaster Professional Moonwatch 42mm — 1971 Vintage", "price": "$4,299.00"},
+        {"title": "Rolex Datejust 1601 — Steel/Gold — Sigma Dial — 1972", "price": "$3,850.00"},
+        {"title": "Seiko Pogue 6139-6002 — Yellow Dial — Space Chronograph — 1976", "price": "$875.00"},
+        {"title": "Cartier Tank Française — 18k Gold — Manual Wind — 1968", "price": "$6,200.00"},
+        {"title": "Heuer Autavia 2446C — Valjoux 72 — PVD Case — 1969", "price": "$7,800.00"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "multi_page_search_pagination",
+      "categories": ["multi-page pagination"],
+      "fixture": "multi_page_pagination.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "stars", "type": "number", "required": false}
+      ],
+      "required_fields": ["title"],
+      "expected_records": [
+        {"title": "Scrapy — Fast High-level Web Crawling Framework", "stars": 54.2},
+        {"title": "Playwright — Reliable end-to-end testing for modern web apps", "stars": 69.8},
+        {"title": "Beautiful Soup — Python library for pulling data out of HTML", "stars": 3.0},
+        {"title": "Selenium WebDriver — Browser automation framework", "stars": 30.9},
+        {"title": "Colly — Elegant Scraper and Crawler Framework for Golang", "stars": 23.8},
+        {"title": "Crawlee — Web scraping and browser automation library", "stars": 16.5},
+        {"title": "HTTPX — A next-generation HTTP client for Python", "stars": 7.3},
+        {"title": "Puppeteer — Headless Chrome Node.js API", "stars": 89.1},
+        {"title": "Apache Nutch — Extensible and scalable web crawler", "stars": 2.8},
+        {"title": "Cheerio — Fast, flexible, and lean implementation of jQuery for the server", "stars": 28.9},
+        {"title": "Goutte — PHP web scraper based on Symfony components", "stars": 9.3},
+        {"title": "MechanicalSoup — Python library for automating website interaction", "stars": 4.7},
+        {"title": "GNU Wget — Non-interactive network downloader", "stars": 5.2},
+        {"title": "Ferret — Declarative web scraping for Go", "stars": 5.8},
+        {"title": "Apify SDK — Scalable web scraping and crawling platform", "stars": 2.9},
+        {"title": "AutoScraper — Smart, automatic, fast, and lightweight web scraper for Python", "stars": 5.9},
+        {"title": "Splash — JavaScript rendering service with HTTP API", "stars": 4.1},
+        {"title": "Heritrix — Extensible, web-scale, archival-quality crawler", "stars": 2.8},
+        {"title": "Portia — Visual scraping for Scrapy", "stars": 9.1},
+        {"title": "pyspider — Powerful spider system in Python", "stars": 16.4}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
     }
   ]
 }

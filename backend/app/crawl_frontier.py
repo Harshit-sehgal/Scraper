@@ -150,29 +150,58 @@ class CrawlFrontier:
         import sqlite3
         from urllib.parse import urlparse
 
+        # Snapshot existing frontier state so a mid-loop DB failure can
+        # be rolled back without leaving in-memory structures partially
+        # mutated. L3: previously a mid-iteration exception (e.g. an
+        # OOM during a UV row parse) left _completed / _queue / _pending
+        # quietly half-loaded; operators saw a stale frontier on the next
+        # request with no error surface.
+        snapshot_completed = set(self._completed)
+        snapshot_failed = dict(self._failed)
+        snapshot_queue = list(self._queue)
+        snapshot_pending = set(self._pending)
+        snapshot_domain_counts = dict(self._domain_page_counts)
+        # Allocate fresh containers we can swap in atomically on success.
+        new_completed: set[str] = set()
+        new_failed: dict[str, int] = {}
+        new_queue: list[CrawlItem] = []
+        new_pending: set[str] = set()
+        new_domain_counts: dict[str, int] = {}
+
         try:
             with sqlite3.connect(self._db_path) as conn:
                 # Load completed
                 for row in conn.execute("SELECT url FROM completed"):
-                    self._completed.add(row[0])
-                    domain = urlparse(row[0]).netloc
-                    self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
+                    url = row[0]
+                    new_completed.add(url)
+                    domain = urlparse(url).netloc
+                    new_domain_counts[domain] = new_domain_counts.get(domain, 0) + 1
 
                 # Load failed
                 for row in conn.execute("SELECT url, count FROM failed"):
-                    self._failed[row[0]] = row[1]
+                    new_failed[row[0]] = row[1]
 
                 # Load queue
                 for row in conn.execute("SELECT priority, url, depth, source_url, added_at FROM queue"):
-                    if row[1] not in self._completed:
+                    if row[1] not in new_completed:
                         item = CrawlItem(priority=row[0], url=row[1], depth=row[2], source_url=row[3], added_at=row[4])
-                        self._queue.append(item)
-                        self._pending.add(row[1])
+                        new_queue.append(item)
+                        new_pending.add(row[1])
 
                 # Heapify to establish priority invariant
-                heapq.heapify(self._queue)
+                heapq.heapify(new_queue)
         except _DB_FALLBACK_ERRORS:
+            # L3: discard the partially-loaded fresh state and keep the
+            # pre-call snapshot — frontier stays internally consistent.
             logger.exception("Failed to load frontier state from SQLite")
+            return
+
+        # Commit the freshly loaded state atomically.
+        self._completed = new_completed
+        self._failed = new_failed
+        self._queue = new_queue
+        self._pending = new_pending
+        self._domain_page_counts = new_domain_counts
 
     async def add_url(self, url: str, priority: int = 10, depth: int = 0, source_url: str | None = None) -> bool:
         """Add a URL to the frontier if it hasn't been crawled yet."""

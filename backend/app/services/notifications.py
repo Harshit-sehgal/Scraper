@@ -1,4 +1,5 @@
 import logging
+import threading
 
 import httpx
 
@@ -15,11 +16,24 @@ class TelegramNotifier:
         self.chat_id = settings.TELEGRAM_CHAT_ID
         self.enabled = settings.TELEGRAM_ENABLED
         self._client: httpx.AsyncClient | None = None
+        # L1: protect lazy client init from races when multiple coroutines
+        # call _get_client() concurrently — without a guard two callers
+        # can both observe None, both build a client, and leak the loser.
+        self._client_lock = threading.Lock()
 
     def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=30.0)
-        return self._client
+        # Fast-path: client already alive — no lock needed for the common
+        # case where the singleton was initialised on a prior call.
+        client = self._client
+        if client is not None and not client.is_closed:
+            return client
+        with self._client_lock:
+            # Re-check under lock so only the first racer builds a client.
+            client = self._client
+            if client is None or client.is_closed:
+                client = httpx.AsyncClient(timeout=30.0)
+                self._client = client
+            return client
 
     async def send_message(self, text: str) -> None:
         """Send a simple text message to the connected chat."""
