@@ -114,6 +114,47 @@ def display_url(raw: str) -> str:
     return urllib.parse.urlunparse((parsed.scheme, netloc, parsed.path.rstrip("/"), "", "", ""))
 
 
+def _redact_secret(value: str, *, visible_prefix: int = 3, visible_suffix: int = 3) -> str:
+    """Redact a secret string, keeping only the first and last few characters.
+
+    Tokens, API keys, and webhook URL paths all carry sensitive material.
+    Return a form like ``abc***xyz`` that is recognisable during debugging
+    but cannot be used to authenticate.
+    """
+    if not value:
+        return value
+    if len(value) <= visible_prefix + visible_suffix:
+        return f"{value[:visible_prefix]}***"
+    return f"{value[:visible_prefix]}***{value[-visible_suffix:]}"
+
+
+def _redact_webhook_url(url: str) -> str:
+    """Redact a webhook URL so the host is visible but the path tokens are masked.
+
+    Slack incoming webhook URLs embed secret tokens in the path after
+    ``/services/`` (e.g. ``/services/T00/B00/xxxx``). This function
+    preserves the host for operational debugging while masking every path
+    segment that could contain a credential.
+    """
+    if not url:
+        return url
+    parsed = urllib.parse.urlparse(url.strip())
+    netloc = parsed.hostname or ""
+    if parsed.port:
+        netloc = f"{netloc}:{parsed.port}"
+    segments = [s for s in parsed.path.split("/") if s]
+    redacted_path = "/"
+    if parsed.path.startswith("/services") and len(segments) >= 2:
+        # Keep /services but redact every segment after it
+        redacted_segments = [segments[0]]
+        for seg in segments[1:]:
+            redacted_segments.append(_redact_secret(seg))
+        redacted_path = "/" + "/".join(redacted_segments)
+    elif segments:
+        redacted_path = "/" + "/".join(_redact_secret(s) for s in segments)
+    return urllib.parse.urlunparse((parsed.scheme, netloc, redacted_path, "", "", ""))
+
+
 def endpoint(base_url: str, path: str) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
@@ -235,7 +276,7 @@ def send_slack_webhook(
     if not url:
         return SlackWebhookResult(False, None, "no_webhook_url")
     if not url.startswith("https://hooks.slack.com/"):
-        return SlackWebhookResult(False, None, f"invalid_webhook_url_prefix:{display_url(url)}")
+        return SlackWebhookResult(False, None, f"invalid_webhook_url_prefix:{_redact_webhook_url(url)}")
 
     timestamp_iso = rfc3339(utc_now())
     alertmanager_url_display = display_url(alertmanager_url)
@@ -277,7 +318,7 @@ def send_slack_webhook(
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f":white_check_mark: Webhook URL: `{display_url(url)}`",
+                        "text": f":white_check_mark: Webhook URL: `{_redact_webhook_url(url)}`",
                     }
                 ],
             },

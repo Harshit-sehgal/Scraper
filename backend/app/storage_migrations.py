@@ -466,6 +466,25 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
                         )
             current = 11
 
+        if current < 12:
+            # v12 — Feat 4 user-configurable extraction params + Feat 9
+            # job-level rate limiting. Integer columns for per-job overrides.
+            # hydration_wait_ms / scroll_attempts: 0 = use platform default.
+            # request_delay_ms: 0 = no extra delay.
+            # max_concurrent_urls: 4 = platform default.
+            for table_name in ["jobs", "recycle_bin"]:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                v12_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+                for col_name, col_ddl in [
+                    ("hydration_wait_ms", "INTEGER DEFAULT 0"),
+                    ("scroll_attempts", "INTEGER DEFAULT 0"),
+                    ("request_delay_ms", "INTEGER DEFAULT 0"),
+                    ("max_concurrent_urls", "INTEGER DEFAULT 4"),
+                ]:
+                    if col_name not in v12_cols:
+                        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}")
+            current = 12
+
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
         conn.commit()
@@ -743,6 +762,29 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                             col_name,
                         )
             current = 10
+
+        if current < 11:
+            # v11 — Feat 4 user-configurable extraction params + Feat 9
+            # job-level rate limiting. Persist the per-job overrides.
+            for table_name in ["jobs", "recycle_bin"]:
+                for col_name, col_ddl in (
+                    ("hydration_wait_ms", "INTEGER DEFAULT 0"),
+                    ("scroll_attempts", "INTEGER DEFAULT 0"),
+                    ("request_delay_ms", "INTEGER DEFAULT 0"),
+                    ("max_concurrent_urls", "INTEGER DEFAULT 4"),
+                ):
+                    try:
+                        execute_fn(
+                            conn,
+                            f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_ddl}",
+                        )
+                    except Exception:
+                        logger.debug(
+                            "ALTER TABLE %s ADD COLUMN %s failed",
+                            table_name,
+                            col_name,
+                        )
+            current = 11
 
         execute_fn(conn, "DELETE FROM schema_version")
         execute_fn(conn, "INSERT INTO schema_version (version) VALUES (%s)", (POSTGRES_SCHEMA_VERSION,))

@@ -18,6 +18,7 @@ from app.audit_logger import log_rbac_event
 from app.models import ScheduledJob, ScheduledJobFrequency, ScrapeMode
 from app.url_safety import validate_public_http_url
 from app.utils.aup import require_aup_accepted
+from app.utils.cron_parser import is_valid as is_valid_cron_expression
 from app.utils.datetime_normalization import parse_datetime
 from app.utils.json_file_store import JSONFileStore
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
@@ -45,8 +46,22 @@ _scheduled_jobs = JSONFileStore(
 def _validate_urls(urls: list[str]) -> list[str]:
     """Strip, deduplicate, and SSRF-validate a list of URLs.
 
-    Raises HTTPException 400 if any URL fails the public-URL check.
+    Raises HTTPException 400 if any URL fails the public-URL check, or
+    if the input list exceeds ``_MAX_URLS_PER_SCHEDULE`` (bounded to
+    prevent a single request from triggering tens of thousands of
+    sequential DNS resolutions, which would block a worker thread for
+    many seconds).
     """
+    if urls is None:
+        return []
+    if len(urls) > _MAX_URLS_PER_SCHEDULE:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Too many URLs in a single schedule (max {_MAX_URLS_PER_SCHEDULE}, "
+                f"got {len(urls)}). Split into multiple schedules."
+            ),
+        )
     cleaned: list[str] = []
     seen: set[str] = set()
     for u in urls:
@@ -62,8 +77,60 @@ def _validate_urls(urls: list[str]) -> list[str]:
     return cleaned
 
 
+_MAX_URLS_PER_SCHEDULE = 100
+"""Hard cap on URL count per single scheduled job.
+
+A higher value would let a single POST block a FastAPI worker on
+sequential DNS resolutions for many seconds. 100 is well above the
+typical use case (single-page recurring scrapes) and prevents DoS via
+oversized request bodies.
+"""
+
+
 def _now_iso() -> str:
     return datetime.datetime.now(datetime.UTC).isoformat()
+
+
+# Per-job cron-fallback counters keyed by job id. Used to detect and
+# disable jobs whose cron expressions reject on every dispatch (hot-loop
+# indicator). When a job's counter exceeds ``_CRON_LOOP_THRESHOLD`` we
+# emit a single CRITICAL log + audit event to alert operators. The
+# counter is in-process only — restart resets it; combined with the
+# empty next_run_at returned above, the worst case is at most one
+# extra fallback per process restart, never an unbounded hot loop.
+_cron_fallback_counts: dict[str, int] = {}
+_CRON_LOOP_THRESHOLD = 5
+
+
+def _record_cron_fallback(*, job_id: str) -> None:
+    """Track cron-expression rejections per job and trip a circuit on hot loops.
+
+    ``next_after`` raises on malformed input. Without this counter, the
+    scheduler would re-run the broken job every loop tick forever. With
+    this counter + the validation guard above, we (1) refuse to set a
+    next-run timestamp on bad expressions, and (2) alert operators when
+    a single job repeatedly fails to produce one.
+    """
+    if not job_id:
+        return
+    key = str(job_id)
+    count = _cron_fallback_counts.get(key, 0) + 1
+    _cron_fallback_counts[key] = count
+    if count == _CRON_LOOP_THRESHOLD:
+        logger.critical(
+            "Scheduled job %s has triggered cron fallback %d times — likely a malformed expression. "
+            "The job will not be re-scheduled; please review the cron_expression field.",
+            key,
+            count,
+        )
+        from app.audit_logger import log_admin_action
+
+        log_admin_action(
+            actor="system",
+            action="scheduled_job_cron_loop_detected",
+            resource="scheduled_jobs",
+            details={"job_id": key, "fallback_count": count},
+        )
 
 
 def _write_back(record: dict[str, Any]) -> None:
@@ -79,6 +146,76 @@ def _write_back(record: dict[str, Any]) -> None:
         msg = "scheduled-job dict missing 'id' before write-back"
         raise RuntimeError(msg)
     _scheduled_jobs.upsert(job_id, record)
+
+
+def _compute_next_run(job: ScheduledJob) -> str:
+    """Compute the ISO-8601 next-run-at timestamp for a newly created scheduled job."""
+    from app.utils.cron_parser import is_valid as is_valid_cron
+    from app.utils.cron_parser import next_after as cron_next_after
+
+    now = datetime.datetime.now(datetime.UTC)
+    cron_expr = (job.cron_expression or "").strip()
+    if cron_expr:
+        # Validate the expression upfront. ``next_after`` accepts a wide
+        # input surface and a deeply malformed expression would otherwise
+        # raise at every loop tick — producing an apparent hot-loop where
+        # the scheduler picks up the job, runs it, recomputes "now", and
+        # dispatches again immediately. Validating here lets the
+        # creation/PUT path reject those expressions and we fall through
+        # to a sane frequency-based fallback (or reject outright when no
+        # frequency is provided).
+        if not is_valid_cron(cron_expr):
+            logger.warning(
+                "Scheduled job %s has invalid cron expression %r — refusing to schedule",
+                getattr(job, "id", "<unknown>"),
+                cron_expr,
+            )
+            _record_cron_fallback(job_id=getattr(job, "id", "<unknown>"))
+            return ""  # Scheduler loop will treat empty next_run_at as "do not re-run"
+        try:
+            nxt = cron_next_after(now, cron_expr)
+            return nxt.isoformat()
+        except Exception:
+            logger.warning("Cron expression %r failed; falling back to 'now'", cron_expr)
+            _record_cron_fallback(job_id=getattr(job, "id", "<unknown>"))
+    # Fallback: run immediately (the processor loop will respect frequency deltas)
+    return now.isoformat()
+
+
+def _compute_next_from_record(record: dict[str, Any]) -> str:
+    """Recompute next_run_at for an existing record (after a parameter change)."""
+    from app.utils.cron_parser import is_valid as is_valid_cron
+    from app.utils.cron_parser import next_after as cron_next_after
+
+    now = datetime.datetime.now(datetime.UTC)
+    cron_expr = str(record.get("cron_expression") or "").strip()
+    if cron_expr:
+        if not is_valid_cron(cron_expr):
+            logger.warning(
+                "Scheduled record %s has invalid cron expression %r — leaving next_run_at blank",
+                record.get("id", "<unknown>"),
+                cron_expr,
+            )
+            _record_cron_fallback(job_id=record.get("id", "<unknown>"))
+            return ""
+        try:
+            nxt = cron_next_after(now, cron_expr)
+            return nxt.isoformat()
+        except Exception:
+            logger.warning("Cron expression %r failed; falling back to 'now'", cron_expr)
+            _record_cron_fallback(job_id=record.get("id", "<unknown>"))
+    # Frequency-based: compute from hardcoded deltas
+    from datetime import timedelta
+
+    _DELTAS: dict[str, timedelta] = {
+        "hourly": timedelta(hours=1),
+        "daily": timedelta(days=1),
+        "weekly": timedelta(weeks=1),
+        "monthly": timedelta(days=30),
+    }
+    freq = str(record.get("frequency") or "daily").lower()
+    delta = _DELTAS.get(freq, timedelta(days=1))
+    return (now + delta).isoformat()
 
 
 def _can_access_scheduled_job(item: dict[str, Any], auth: tuple[UserRole, str, str, str]) -> bool:
@@ -128,12 +265,25 @@ async def create_scheduled_job(
     frequency: ScheduledJobFrequency = ScheduledJobFrequency.DAILY,
     job_name: str = "",
     urls: Annotated[list[str] | None, Query()] = None,
+    cron_expression: str | None = None,
+    timezone: str = "UTC",
 ):
     """Create a new scheduled (recurring) scraping job.
 
     Requires AUP acceptance.  Every URL in *urls* is validated
     against the project's SSRF guard before it is stored.
+
+    When ``cron_expression`` is provided it takes precedence over
+    ``frequency`` for computing next-run times.  The expression
+    follows standard 5-field cron syntax (minute hour dom month dow).
     """
+    if cron_expression is not None:
+        cron_expression = cron_expression.strip()
+        if cron_expression and not is_valid_cron_expression(cron_expression):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid cron expression: {cron_expression!r}",
+            )
     _role, user_id, org_id, project_id = auth
     validated_urls = _validate_urls(urls or [])
     job = ScheduledJob(  # type: ignore[call-arg]
@@ -142,6 +292,8 @@ async def create_scheduled_job(
         org_id=org_id,
         project_id=project_id,
         frequency=frequency,
+        cron_expression=cron_expression or None,
+        timezone=timezone or "UTC",
         job_name=job_name.strip() or f"Scheduled: {name}",
         urls=validated_urls,
         mode=ScrapeMode.MANUAL if validated_urls else ScrapeMode.AUTO,
@@ -149,7 +301,7 @@ async def create_scheduled_job(
     record = job.model_dump()
     # next_run_at is a runtime scheduling field stored alongside the
     # model data but not part of the Pydantic schema.
-    record["next_run_at"] = _now_iso()
+    record["next_run_at"] = _compute_next_run(job)
     _scheduled_jobs.upsert(job.id, record)
     logger.info("Scheduled job created: %s (%s)", job.name, job.id)
     return record
@@ -196,12 +348,25 @@ async def update_scheduled_job(
     frequency: ScheduledJobFrequency | None = None,
     enabled: bool | None = None,
     urls: Annotated[list[str] | None, Query()] = None,
+    cron_expression: str | None = None,
+    timezone: str | None = None,
 ):
     """Update an existing scheduled job.
 
     If *urls* is provided, each URL is SSRF-validated before being
     stored on the scheduled job record.
+
+    When ``cron_expression`` is provided it takes precedence over
+    ``frequency`` for computing next-run times.  Pass an empty string
+    to clear a previously set cron expression.
     """
+    if cron_expression is not None:
+        cron_expression = cron_expression.strip()
+        if cron_expression and not is_valid_cron_expression(cron_expression):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid cron expression: {cron_expression!r}",
+            )
     existing = _get_visible_scheduled_job(job_id, auth)
     if name is not None:
         existing["name"] = name.strip()
@@ -212,7 +377,15 @@ async def update_scheduled_job(
     if urls is not None:
         existing["urls"] = _validate_urls(urls)
         existing["mode"] = ScrapeMode.MANUAL.value if existing["urls"] else ScrapeMode.AUTO.value
+    if cron_expression is not None:
+        # Empty string → clear the cron expression; revert to frequency-based.
+        existing["cron_expression"] = cron_expression or None
+    if timezone is not None:
+        existing["timezone"] = timezone or "UTC"
     existing["updated_at"] = _now_iso()
+    # Recompute next_run_at when scheduling parameters change
+    if cron_expression is not None or frequency is not None or timezone is not None:
+        existing["next_run_at"] = _compute_next_from_record(existing)
     _write_back(existing)
     return existing
 

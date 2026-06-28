@@ -31,7 +31,7 @@ from app.utils.datetime_normalization import format_datetime, parse_datetime
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 11
+_CURRENT_SCHEMA_VERSION = 12
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 

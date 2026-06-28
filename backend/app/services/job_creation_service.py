@@ -336,6 +336,11 @@ class JobCreationService:
             project_id=project_id,
             headers=job_data.headers,
             cookies=job_data.cookies,
+            fetch_strategy=job_data.fetch_strategy,
+            hydration_wait_ms=job_data.hydration_wait_ms,
+            scroll_attempts=job_data.scroll_attempts,
+            request_delay_ms=job_data.request_delay_ms,
+            max_concurrent_urls=job_data.max_concurrent_urls,
         )
 
     def _record_usage(

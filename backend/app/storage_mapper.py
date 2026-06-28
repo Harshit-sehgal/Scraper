@@ -101,6 +101,8 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "fetch_strategy": job.fetch_strategy if hasattr(job, "fetch_strategy") and job.fetch_strategy is not None else "",
         "hydration_wait_ms": job.hydration_wait_ms if getattr(job, "hydration_wait_ms", None) is not None else 0,
         "scroll_attempts": job.scroll_attempts if getattr(job, "scroll_attempts", None) is not None else 0,
+        "request_delay_ms": job.request_delay_ms if getattr(job, "request_delay_ms", None) is not None else 0,
+        "max_concurrent_urls": job.max_concurrent_urls if getattr(job, "max_concurrent_urls", None) is not None else 4,
     }
 
 
@@ -177,6 +179,8 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 # not persisted — the platform falls back to its defaults.
                 "hydration_wait_ms": row.get("hydration_wait_ms") or None,
                 "scroll_attempts": row.get("scroll_attempts") or None,
+                "request_delay_ms": row.get("request_delay_ms", 0),
+                "max_concurrent_urls": row.get("max_concurrent_urls") or 4,
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:

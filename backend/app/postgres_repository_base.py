@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 10
+_CURRENT_SCHEMA_VERSION = 11
 
 _JOB_COLUMNS: frozenset[str] = frozenset(
     {
@@ -86,6 +86,10 @@ _JOB_COLUMNS: frozenset[str] = frozenset(
         "webhook_delivered",
         "webhook_delivered_at",
         "fetch_strategy",
+        "hydration_wait_ms",
+        "scroll_attempts",
+        "request_delay_ms",
+        "max_concurrent_urls",
     }
 )
 

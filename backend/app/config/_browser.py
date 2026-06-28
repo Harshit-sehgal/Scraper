@@ -18,7 +18,13 @@ class BrowserSettings(BaseSettings):
     BROWSER_VIEWPORT_HEIGHT: int = 900
     """Height of browser viewport."""
     BROWSER_MAX_CONTEXTS: int = 10
-    """Maximum number of browser contexts before restarting the browser."""
+    """Maximum number of concurrent isolated context acquisitions (acquire_context)."""
+    BROWSER_MAX_REUSABLE_CONTEXTS: int = 10
+    """Maximum number of cached reusable domain-keyed contexts (get_context).
+    When exceeded, the least-recently-used context is evicted to make room."""
+    BROWSER_MAX_PROCESSES: int = 1
+    """Maximum concurrent Chromium processes. Enforced at launch to prevent
+    accidental multi-process resource exhaustion."""
     BROWSER_CONTEXT_LIFETIME: int = 50
     """Number of pages a single context can fetch before being replaced."""
     BROWSER_IDLE_TIMEOUT: int = 300

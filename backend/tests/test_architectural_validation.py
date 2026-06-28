@@ -10,6 +10,7 @@ This test suite validates:
 """
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -390,8 +391,13 @@ class TestAsyncBoundaries:
             try:
                 with open(py_file) as f:
                     content = f.read()
-                    # Look for async def with blocking calls
-                    if "async def" in content and "requests." in content:
+                    # Look for async def with blocking calls. Match an
+                    # actual method call (``requests.method`` after a
+                    # dot) rather than the bare word ``requests.`` —
+                    # the latter matches docstrings ("such-and-such
+                    # requests"). Also exclude commented-out lines.
+                    _norm = "\n".join(line for line in content.splitlines() if not line.strip().startswith("#"))
+                    if "async def" in _norm and re.search(r"\brequests\.(get|post|put|delete|head|request)\b", _norm):
                         # Async with blocking requests library
                         async_violations.append(py_file.name)
             except BaseException:  # noqa: RUF100, S110

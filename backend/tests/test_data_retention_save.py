@@ -97,33 +97,77 @@ class TestRetentionRoundTrip:
         assert "job-old" in jobs_store  # still exists
 
     def test_save_state_is_called_for_real_deletions(self) -> None:
-        """When retention actually deletes jobs, save_state must be called.
+        r"""When retention actually deletes jobs, save_state must be called.
 
-        The endpoint /api/system/retention/enforce wires enforce_retention
-        to save_state; the helper itself just mutates the in-memory stores
-        and returns counts. We simulate the endpoint's call chain here.
+        `enforce_retention` internally calls `app.state_store.save_state`
+        after the in-memory mutation so the purge is durable across
+        restart. The pre-fix behaviour only mutated the in-memory dict
+        and relied on the next `save_state` from a different caller —
+        which produced silent data resurrection on container restart.
         """
         from app.utils.data_retention import enforce_retention
 
         jobs_store: dict[str, Job] = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
         recycle_bin_store: dict[str, Job] = {}
 
-        with patch("app.job_store.save_state") as mock_save:
-            result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
-            # The endpoint then calls save_state with the pruned stores.
-            # Mirror that here to verify the full round-trip.
-            if result["jobs_purged"] > 0 or result["recycle_purged"] > 0:
-                mock_save(jobs_store, recycle_bin_store, prune_missing=True)
+        with patch("app.state_store.save_state") as mock_save:
+            enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
 
-        # assert that the in-store dict was actually mutated
+        # The in-memory store must be mutated.
         assert "job-old" not in jobs_store
-        # save_state was invoked with the pruned state
+        # save_state was invoked with the pruned state to persist.
         assert mock_save.called
         call_args = mock_save.call_args
         assert "job-old" not in call_args[0][0]
         assert call_args[0][1] == recycle_bin_store
-        # prune_missing=True is wired by the retention endpoint
-        assert call_args.kwargs.get("prune_missing") is True
+
+    def test_save_state_not_called_for_dry_run(self) -> None:
+        """A dry-run retention sweep must not call save_state — nothing was mutated."""
+        from app.utils.data_retention import enforce_retention
+
+        jobs_store: dict[str, Job] = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
+        recycle_bin_store: dict[str, Job] = {}
+
+        with patch("app.state_store.save_state") as mock_save:
+            enforce_retention(jobs_store, recycle_bin_store, dry_run=True)
+
+        assert mock_save.call_count == 0
+
+    def test_save_state_not_called_when_nothing_purged(self) -> None:
+        """No-op retention sweeps must not call save_state — avoids spurious disk writes."""
+        from app.utils.data_retention import enforce_retention
+
+        jobs_store: dict[str, Job] = {"active": _fake_job("active", status=JobStatus.RUNNING)}
+        recycle_bin_store: dict[str, Job] = {}
+
+        with patch("app.state_store.save_state") as mock_save:
+            enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
+
+        assert mock_save.call_count == 0
+        # The in-memory dict is unchanged
+        assert "active" in jobs_store
+
+    def test_retention_uses_jobs_store_lock(self) -> None:
+        r"""The retention sweep must acquire `_jobs_store_lock` so concurrent
+        mutations to `jobs_store` cannot tear-read or pop mid-iteration.
+        """
+        from app.utils.data_retention import enforce_retention
+
+        jobs_store: dict[str, Job] = {"job-old": _fake_job("old", completed_at=_days_ago(100))}
+        recycle_bin_store: dict[str, Job] = {}
+
+        # Patch the lock in `app.globals` — `enforce_retention` reads it
+        # lazily. Use a real `threading.Lock` context manager, not a
+        # MagicMock, so the `with` statement works correctly.
+        import threading
+
+        lock = threading.Lock()
+        with patch("app.globals._jobs_store_lock", lock):
+            with patch("app.state_store.save_state"):
+                result = enforce_retention(jobs_store, recycle_bin_store, dry_run=False)
+
+        assert result["jobs_purged"] == 1
+        assert "job-old" not in jobs_store
 
     def test_retention_config_returns_expected_keys(self) -> None:
         from app.utils.data_retention import get_retention_config

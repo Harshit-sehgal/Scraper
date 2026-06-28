@@ -286,6 +286,9 @@ class TestRealWorkerHandler:
             usage_context=None,
             headers=None,
             cookies=None,
+            hydration_wait_ms=None,
+            scroll_attempts=None,
+            fetch_strategy=None,
         ):
             sample_records = [
                 {

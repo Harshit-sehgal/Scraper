@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-28 02:02:50 UTC
+**Generated:** 2026-06-28 07:21:32 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -33,6 +33,7 @@ For the diff between stable and experimental, see
 | GET | `/api/jobs/{job_id}/export/excel` |
 | GET | `/api/jobs/{job_id}/export/json` |
 | GET | `/api/jobs/{job_id}/results` |
+| PATCH | `/api/jobs/{job_id}/extraction` |
 | PATCH | `/api/jobs/{job_id}/headers` |
 | PATCH | `/api/jobs/{job_id}/strategy` |
 | PATCH | `/api/jobs/{job_id}/webhook` |
@@ -209,4 +210,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 149
+**Total routes:** 150

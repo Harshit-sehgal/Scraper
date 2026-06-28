@@ -109,6 +109,9 @@ async def scrape_url_with_recovery(
     usage_context: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     cookies: dict[str, str] | None = None,
+    hydration_wait_ms: int | None = None,
+    scroll_attempts: int | None = None,
+    fetch_strategy: str | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.
 
@@ -121,6 +124,9 @@ async def scrape_url_with_recovery(
         max_recovery_attempts: Maximum recovery attempts before giving up
         selectors_map: Pre-discovered CSS selectors map from URL analysis
         search_params: Optional search parameters for session-bound URL recovery
+        hydration_wait_ms: User-override hydration wait (ms); None = platform default
+        scroll_attempts: User-override scroll attempt count; None = platform default
+        fetch_strategy: User-requested fetch strategy; None / "" = auto-select
 
     Returns:
         Tuple of (results, recovery_stats) where:
@@ -154,6 +160,12 @@ async def scrape_url_with_recovery(
         attempt_ctx.extra_headers.update(headers)
     if cookies:
         attempt_ctx.cookies.update(cookies)
+    if hydration_wait_ms is not None:
+        attempt_ctx.hydration_wait_ms = hydration_wait_ms
+    if scroll_attempts is not None:
+        attempt_ctx.scroll_attempts = scroll_attempts
+    if fetch_strategy:
+        attempt_ctx.fetch_strategy = fetch_strategy
     result: Any = None
 
     while attempt < max_recovery_attempts:

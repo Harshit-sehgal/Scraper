@@ -491,7 +491,12 @@ class TestSubstratePluginManager:
             return f"processed {kwargs.get('x')}"
 
         _register_allow_listed_handler(mgr, "echo", handler)
-        result = mgr.call_tool("echo", x=42)
+
+        def _fake_sandboxed_call(self, handler_name, handler, kwargs):
+            return handler(**kwargs)
+
+        with patch.object(SubstratePluginManager, "_sandboxed_call", _fake_sandboxed_call):
+            result = mgr.call_tool("echo", x=42)
         assert result == "processed 42"
 
     def test_call_tool_unknown_handler(self) -> None:
@@ -506,7 +511,12 @@ class TestSubstratePluginManager:
             return "done"
 
         _register_allow_listed_handler(mgr, "h1", handler)
-        mgr.call_tool("h1", foo="bar")
+
+        def _fake_sandboxed_call(self, handler_name, handler, kwargs):
+            return handler(**kwargs)
+
+        with patch.object(SubstratePluginManager, "_sandboxed_call", _fake_sandboxed_call):
+            mgr.call_tool("h1", foo="bar")
         assert len(mgr._execution_history) == 1
         assert mgr._execution_history[0]["handler"] == "h1"
         assert mgr._execution_history[0]["status"] == "success"
@@ -519,8 +529,13 @@ class TestSubstratePluginManager:
             raise ValueError(msg)
 
         _register_allow_listed_handler(mgr, "failing", handler)
-        with pytest.raises(ValueError):
-            mgr.call_tool("failing")
+
+        def _fake_sandboxed_call(self, handler_name, handler, kwargs):
+            return handler(**kwargs)
+
+        with patch.object(SubstratePluginManager, "_sandboxed_call", _fake_sandboxed_call):
+            with pytest.raises(ValueError):
+                mgr.call_tool("failing")
         assert mgr._execution_history[0]["status"] == "error"
 
     def test_call_tool_respects_policy_block(self) -> None:

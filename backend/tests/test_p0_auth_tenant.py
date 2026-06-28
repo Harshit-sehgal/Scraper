@@ -292,8 +292,7 @@ def test_issue_135_flag_off_blocks_env_backed_cross_tenant_access(monkeypatch) -
         resource_org_id="other_org",
     )
     assert access is False, (
-        "can_access_scoped_resource MUST NOT return True for env-backed "
-        "operator access to another owner's resource (issue #135)."
+        "can_access_scoped_resource MUST NOT return True for env-backed operator access to another owner's resource (issue #135)."
     )
 
     # 3. ADMIN role is unaffected by the flag (still all-access).
@@ -320,8 +319,7 @@ def test_issue_135_flag_off_blocks_env_backed_cross_tenant_access(monkeypatch) -
             resource_org_id="other_org",
         )
         assert access is True, (
-            "With ENABLE_OPERATOR_CROSS_TENANT=True env-backed operators "
-            "retain legacy all-access for self-hosted mode."
+            "With ENABLE_OPERATOR_CROSS_TENANT=True env-backed operators retain legacy all-access for self-hosted mode."
         )
     finally:
         monkeypatch.setattr(settings, "ENABLE_OPERATOR_CROSS_TENANT", False)

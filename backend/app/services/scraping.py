@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.llm_bridge import get_llm_call_count, reset_llm_call_count
+from app.models import JobStatus
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -23,6 +24,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 ScrapeResult = tuple[int, list[dict], bool, dict]
+
+# Feat 9 — module-level async lock shared across _scrape_single_url tasks
+# within the same scrape phase.  Used to serialise the per-job
+# ``request_delay_ms`` throttle so that sibling tasks of the same job do
+# not skip the throttle by all entering the fetch at the same time.
+_JOB_DELAY_LOCK = asyncio.Lock()
 
 
 def _record_page_fetch(job: Any, url: str) -> bool:
@@ -84,7 +91,16 @@ async def run_scraping_phase(
     warnings: list[str] = []
     started_at = time.monotonic()
 
-    semaphore = asyncio.Semaphore(settings.JOB_MAX_PARALLEL_URLS)
+    # Feat 9 — per-job concurrency cap.  Use the job's user-configurable
+    # ``max_concurrent_urls`` (default 4) when present, else fall back to
+    # the platform-wide ``JOB_MAX_PARALLEL_URLS`` setting.
+    try:
+        job_max_concurrent = int(getattr(job, "max_concurrent_urls", settings.JOB_MAX_PARALLEL_URLS))
+        if job_max_concurrent < 1:
+            job_max_concurrent = settings.JOB_MAX_PARALLEL_URLS
+    except (TypeError, ValueError):
+        job_max_concurrent = settings.JOB_MAX_PARALLEL_URLS
+    semaphore = asyncio.Semaphore(min(job_max_concurrent, settings.JOB_MAX_PARALLEL_URLS))
     domain_semaphores: dict[str, asyncio.Semaphore] = {}
     job_lock = asyncio.Lock()
     completed_count = 0
@@ -110,9 +126,27 @@ async def run_scraping_phase(
             warnings.append(msg)
 
     async def _scrape_single_url(idx: int, url: str) -> ScrapeResult:
+        # Feat 9 — per-job delay between consecutive URL fetches.  This is
+        # a fairness throttle inside a single job: it ensures the scraper
+        # does not hammer the target domain even when the semaphore allows
+        # high concurrency.  Sleeps BEFORE the actual fetch.  Acquiring an
+        # extra per-job delay lock prevents burst fetches from sibling
+        # concurrent tasks within the same job.
+        job_delay_ms = int(getattr(job, "request_delay_ms", 0) or 0)
+        if job_delay_ms > 0:
+            try:
+                async with _JOB_DELAY_LOCK:
+                    await asyncio.sleep(job_delay_ms / 1000.0)
+            except RuntimeError:
+                # Event loop changed mid-flight; skip the throttle.
+                logger.debug("Per-job rate-limit delay skipped (loop mismatch)")
+
+        # Corrected cancellation check: Check both flag and DB signal,
+        # then update flag if signaled.
         if job.cancel_requested or await cancel_check():
             job.cancel_requested = True
             return idx, [], False, {}
+
         elapsed = time.monotonic() - started_at
         if elapsed > max_job_runtime_seconds:
             await _safe_warning(f"Job runtime limit reached at {int(elapsed)}s; partial results returned.")
@@ -194,6 +228,9 @@ async def run_scraping_phase(
                         },
                         headers=getattr(job, "headers", None),
                         cookies=getattr(job, "cookies", None),
+                        hydration_wait_ms=getattr(job, "hydration_wait_ms", None),
+                        scroll_attempts=getattr(job, "scroll_attempts", None),
+                        fetch_strategy=getattr(job, "fetch_strategy", None) or None,
                     ),
                     timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                 )
@@ -277,14 +314,24 @@ async def run_scraping_phase(
             break
 
         if job.cancel_requested or await cancel_check():
-            job.cancel_requested = True
+            # Guard mutation of job state using the global store lock
+            from app.globals import _jobs_store_lock
+            with _jobs_store_lock:
+                job.cancel_requested = True
+                from app.services.job_state_machine import transition_to
+                # Use transition_to to strictly follow the state machine
+                try:
+                    transition_to(job, JobStatus.CANCELED, error="Canceled during scraping phase")
+                except ValueError:
+                    # Job might have transitioned elsewhere (e.g. FAILED)
+                    pass
+
             for task in scrape_tasks:
                 if not task.done():
                     task.cancel()
             await asyncio.gather(*scrape_tasks, return_exceptions=True)
-            from app.utils.job import mark_job_canceled
 
-            mark_job_canceled(job)
+            # Now that status is updated via transition_to, cleanup is final
             return all_raw_results, urls_with_records, warnings, []
 
         await asyncio.sleep(0.25)
@@ -298,10 +345,15 @@ async def run_scraping_phase(
 
     for _idx, results, success, _meta in sorted(scraped, key=lambda x: x[0]):
         if job.cancel_requested or await cancel_check():
-            job.cancel_requested = True
-            from app.utils.job import mark_job_canceled
-
-            mark_job_canceled(job)
+            # Guard mutation of job state using the global store lock
+            from app.globals import _jobs_store_lock
+            with _jobs_store_lock:
+                job.cancel_requested = True
+                from app.services.job_state_machine import transition_to
+                try:
+                    transition_to(job, JobStatus.CANCELED, error="Canceled during result aggregation")
+                except ValueError:
+                    pass
             return all_raw_results, urls_with_records, warnings, scraped
         if success:
             all_raw_results.extend(results)

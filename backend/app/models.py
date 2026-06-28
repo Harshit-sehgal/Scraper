@@ -237,6 +237,23 @@ class JobCreate(BaseModel):
             "None means the platform picks a sensible default."
         ),
     )
+    request_delay_ms: int = Field(
+        default=0,
+        ge=0,
+        le=60_000,
+        description=(
+            "Minimum delay between consecutive URL fetches within this job (milliseconds). "
+            "Use this to avoid overwhelming a target domain. 0 = no extra delay."
+        ),
+    )
+    max_concurrent_urls: int = Field(
+        default=4,
+        ge=1,
+        le=20,
+        description=(
+            "Maximum number of URLs that can be fetched concurrently within this job. Lower values reduce load on target domains."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -448,6 +465,18 @@ class Job(BaseModel):
         le=20,
         description="User-overridable number of scroll attempts before content extraction. None = use platform default.",
     )
+    request_delay_ms: int = Field(
+        default=0,
+        ge=0,
+        le=60_000,
+        description="Per-job delay between consecutive URL fetches (milliseconds). 0 = no delay (use platform throttle).",
+    )
+    max_concurrent_urls: int = Field(
+        default=4,
+        ge=1,
+        le=20,
+        description="Maximum number of URLs that can be fetched concurrently within this job.",
+    )
     fetch_strategy: str = Field(
         default="",
         description="User-requested fetch strategy. Empty means auto-select.",
@@ -564,8 +593,7 @@ class JobExtractionUpdate(BaseModel):
         ge=0,
         le=20,
         description=(
-            "Override the number of auto-scroll attempts before capturing page content. "
-            "Set to 0 to disable scrolling entirely."
+            "Override the number of auto-scroll attempts before capturing page content. Set to 0 to disable scrolling entirely."
         ),
     )
     max_pages: int | None = Field(
@@ -574,11 +602,22 @@ class JobExtractionUpdate(BaseModel):
         le=100,
         description="Override the maximum number of pages to follow when pagination is enabled.",
     )
+    request_delay_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=60_000,
+        description=("Override the minimum delay between consecutive URL fetches (milliseconds). 0 means no extra delay."),
+    )
+    max_concurrent_urls: int | None = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Override the maximum concurrent URLs within this job.",
+    )
     selectors_map: dict | None = Field(
         default=None,
         description=(
-            "Override CSS selectors map for extraction. Shape: "
-            "``{item_container: str, fields: {field_name: selector}}``."
+            "Override CSS selectors map for extraction. Shape: ``{item_container: str, fields: {field_name: selector}}``."
         ),
     )
 
@@ -588,15 +627,13 @@ class JobExtractionUpdate(BaseModel):
             return self
         if not isinstance(self.selectors_map, dict):
             msg = "selectors_map must be an object"
-            raise ValueError(msg)
+            raise TypeError(msg)
         if len(self.selectors_map) > 20:
             msg = "selectors_map must have at most 20 keys"
             raise ValueError(msg)
         # Validate value shapes to keep the dict clean before persistence.
         item_container = self.selectors_map.get("item_container")
-        if item_container is not None and (
-            not isinstance(item_container, str) or len(item_container) > 500
-        ):
+        if item_container is not None and (not isinstance(item_container, str) or len(item_container) > 500):
             msg = "selectors_map.item_container must be a string of at most 500 chars"
             raise ValueError(msg)
         fields = self.selectors_map.get("fields")
@@ -862,6 +899,11 @@ class ScheduledJob(BaseModel):
     Each scheduled job is linked to a base job template. When the
     schedule fires, a new job is created from the template and
     queued for execution.
+
+    Scheduling can be specified via the ``frequency`` enum (RHoulY/
+    DAILY/WEEKLY/MONTHLY) or via a standard cron expression
+    (``cron_expression``).  When ``cron_expression`` is set it takes
+    precedence over ``frequency``.
     """
 
     # Identity
@@ -875,6 +917,20 @@ class ScheduledJob(BaseModel):
 
     # Scheduling
     frequency: ScheduledJobFrequency = Field(default=ScheduledJobFrequency.DAILY)
+    cron_expression: str | None = Field(
+        default=None,
+        description=(
+            "Standard 5-field cron expression (minute hour dom month dow). "
+            "When set, takes precedence over ``frequency``. "
+            "Example: ``0 9 * * 1-5`` for weekdays at 09:00 UTC."
+        ),
+        max_length=128,
+    )
+    timezone: str = Field(
+        default="UTC",
+        description="IANA timezone for cron scheduling (default UTC).",
+        max_length=64,
+    )
     last_run_at: str | None = Field(None, max_length=64)
 
     # Job template (snapshot of a JobCreate payload)

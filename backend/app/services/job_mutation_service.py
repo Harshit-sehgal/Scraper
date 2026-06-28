@@ -16,6 +16,7 @@ import datetime
 import logging
 from typing import Any
 
+from app.audit_logger import log_job_event
 from app.config import settings
 from app.models import JobStatus
 from app.routers.jobs_state import JobStoreManager, save_job
@@ -394,5 +395,78 @@ class JobHeadersService:
             "job_id": job.id,
             "headers": job.headers,
             "cookies": job.cookies,
+            "status": "success",
+        }
+
+
+class JobExtractionUpdateService:
+    """Business logic for PATCH /api/jobs/{id}/extraction — user-configurable extraction params."""
+
+    # Sentinel for "parameter not provided" — distinct from None (which
+    # means "explicitly reset to platform default").
+    _UNSET: Any = object()
+
+    def __init__(self, manager: JobStoreManager) -> None:
+        self._manager = manager
+
+    async def update_extraction_params(
+        self,
+        job_id: str,
+        role: UserRole,
+        user_id: str,
+        org_id: str,
+        project_id: str,
+        *,
+        hydration_wait_ms: int | None = _UNSET,  # type: ignore[assignment]
+        scroll_attempts: int | None = _UNSET,  # type: ignore[assignment]
+        max_pages: int | None = _UNSET,  # type: ignore[assignment]
+        selectors_map: dict | None = _UNSET,  # type: ignore[assignment]
+        request_delay_ms: int | None = _UNSET,  # type: ignore[assignment]
+        max_concurrent_urls: int | None = _UNSET,  # type: ignore[assignment]
+    ) -> dict[str, Any]:
+        """Update per-job extraction configuration.
+
+        Any parameter set to ``_UNSET`` (sentinel) is left unchanged on the job.
+        Passing ``None`` explicitly resets the field to the platform default
+        (inside the model, ``None`` already means "use platform default").
+        """
+        from fastapi import HTTPException
+        from starlette.concurrency import run_in_threadpool
+
+        with self._manager.lock:
+            if job_id not in self._manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = self._manager.jobs_store[job_id]
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_job_extraction")
+
+            if hydration_wait_ms is not self._UNSET:
+                job.hydration_wait_ms = hydration_wait_ms
+            if scroll_attempts is not self._UNSET:
+                job.scroll_attempts = scroll_attempts
+            if max_pages is not self._UNSET:
+                job.max_pages = max_pages  # type: ignore[assignment]
+            if selectors_map is not self._UNSET:
+                job.selectors_map = selectors_map if selectors_map is not None else {}
+            if request_delay_ms is not self._UNSET:
+                # On the Job model this is a non-Optional int (default 0);
+                # treat ``None`` as 0 to honour "reset to platform default".
+                job.request_delay_ms = request_delay_ms if request_delay_ms is not None else 0
+            if max_concurrent_urls is not self._UNSET:
+                job.max_concurrent_urls = max_concurrent_urls if max_concurrent_urls is not None else 4
+
+        from app.storage_interface import get_job_repository
+
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+
+        log_job_event(actor=user_id or "system", action="job_extraction_updated", job_id=job_id)
+        return {
+            "job_id": job.id,
+            "hydration_wait_ms": job.hydration_wait_ms,
+            "scroll_attempts": job.scroll_attempts,
+            "max_pages": job.max_pages,
+            "selectors_map": job.selectors_map,
+            "request_delay_ms": job.request_delay_ms,
+            "max_concurrent_urls": job.max_concurrent_urls,
             "status": "success",
         }

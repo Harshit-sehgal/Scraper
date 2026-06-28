@@ -345,6 +345,18 @@ async def get_domain_selector_confidence(
 
     Requires operator or admin.
     """
+    # Validate domain is a plausible hostname (RFC 1035: max 253 chars,
+    # only letters, digits, dots, hyphens, underscores). Reject giant
+    # inputs, path separators, and injection characters that could sneak
+    # into downstream URL construction.
+    import re as _re
+
+    _DOMAIN_RE = _re.compile(r"^[a-zA-Z0-9._-]{1,253}$")
+    if not _DOMAIN_RE.match(domain):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid domain: {domain!r} — must be 1-253 chars, only letters/digits/dots/hyphens/underscores",
+        )
     selector_memory = get_selector_memory()
 
     # Create a fake URL to extract domain

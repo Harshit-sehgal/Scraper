@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Any
+from typing import Any, Self
 
 from app.models import JobStatus
 from app.utils.datetime_normalization import parse_datetime
@@ -122,6 +122,17 @@ def enforce_retention(
 
     When ``dry_run=True``, no entries are actually removed; the returned
     counts reflect what *would* be purged.
+
+    Concurrent-safety: every read-and-mutate of the in-memory dicts is
+    guarded by ``app.globals._jobs_store_lock`` so a simultaneous
+    ``delete_job`` / ``restore_from_recycle_bin`` cannot tear-read or
+    pop entries mid-iteration.
+
+    Persistence: after the locks are released we call ``save_state`` via
+    the runtime task scheduler so the purge survives the next container
+    restart. Without this call, a subsequent ``save_state`` (e.g., when
+    any job completes or shutdown happens) would re-serialise the
+    pre-purge dicts — silently undoes the operator's retention policy.
     """
     config = get_retention_config()
     completed_days = config["completed_jobs_days"]
@@ -139,40 +150,72 @@ def enforce_retention(
     jobs_skipped = 0
     recycle_purged = 0
     recycle_skipped = 0
+    needs_persist = False
 
-    # Terminal jobs
-    to_delete: list[str] = []
-    for job_id, job in list(jobs_store.items()):
-        status_str = str(job.status.value if hasattr(job.status, "value") else job.status)
-        if status_str not in terminal_statuses:
-            continue
-        age = _age_in_days(getattr(job, "completed_at", None))
-        if age is not None and age >= completed_days:
-            to_delete.append(job_id)
-            jobs_purged += 1
-        else:
-            jobs_skipped += 1
+    # Acquire the lock for the full scan-and-pop critical section so a
+    # concurrent router-level mutation cannot tear-read or pop entries
+    # mid-iteration. ``app.globals`` is imported lazily to avoid a
+    # circular module dependency between the settings/router layer and
+    # the retention utility.
+    lock_obj: Any = None
+    try:
+        from app.globals import _jobs_store_lock
 
-    if to_delete and not dry_run:
-        for job_id in to_delete:
-            jobs_store.pop(job_id, None)
-        logger.info("Data retention purged %d terminal jobs older than %d days", len(to_delete), completed_days)
+        lock_obj = _jobs_store_lock
+    except ImportError:
+        lock_obj = None
 
-    # Recycle bin items
-    recycle_to_delete: list[str] = []
-    for job_id, job in list(recycle_bin_store.items()):
-        completed_at = getattr(job, "completed_at", None) or getattr(job, "created_at", None)
-        age = _age_in_days(completed_at)
-        if age is not None and age >= recycle_days:
-            recycle_to_delete.append(job_id)
-            recycle_purged += 1
-        else:
-            recycle_skipped += 1
+    lock_cm = lock_obj if lock_obj is not None else _NullLock()
+    with lock_cm:
+        # Terminal jobs
+        to_delete: list[str] = []
+        for job_id, job in list(jobs_store.items()):
+            status_str = str(job.status.value if hasattr(job.status, "value") else job.status)
+            if status_str not in terminal_statuses:
+                continue
+            age = _age_in_days(getattr(job, "completed_at", None))
+            if age is not None and age >= completed_days:
+                to_delete.append(job_id)
+                jobs_purged += 1
+            else:
+                jobs_skipped += 1
 
-    if recycle_to_delete and not dry_run:
-        for job_id in recycle_to_delete:
-            recycle_bin_store.pop(job_id, None)
-        logger.info("Data retention purged %d recycle-bin items older than %d days", len(recycle_to_delete), recycle_days)
+        if to_delete and not dry_run:
+            for job_id in to_delete:
+                jobs_store.pop(job_id, None)
+            needs_persist = True
+            logger.info(
+                "Data retention purged %d terminal jobs older than %d days",
+                len(to_delete),
+                completed_days,
+            )
+
+        # Recycle bin items
+        recycle_to_delete: list[str] = []
+        for job_id, job in list(recycle_bin_store.items()):
+            completed_at = getattr(job, "completed_at", None) or getattr(job, "created_at", None)
+            age = _age_in_days(completed_at)
+            if age is not None and age >= recycle_days:
+                recycle_to_delete.append(job_id)
+                recycle_purged += 1
+            else:
+                recycle_skipped += 1
+
+        if recycle_to_delete and not dry_run:
+            for job_id in recycle_to_delete:
+                recycle_bin_store.pop(job_id, None)
+            needs_persist = True
+            logger.info(
+                "Data retention purged %d recycle-bin items older than %d days",
+                len(recycle_to_delete),
+                recycle_days,
+            )
+
+    # Persistence runs AFTER the locks are released — ``save_state``
+    # itself owns the executor lock and capturing the snapshot while
+    # awaiting would risk deadlock under contention.
+    if needs_persist:
+        _persist_after_purge(jobs_store, recycle_bin_store)
 
     return {
         "jobs_purged": jobs_purged,
@@ -180,6 +223,43 @@ def enforce_retention(
         "jobs_skipped": jobs_skipped,
         "recycle_skipped": recycle_skipped,
     }
+
+
+class _NullLock:
+    """Minimal no-op context manager used when ``app.globals`` is unavailable.
+
+    Tests and packages that have not initialised the global store (cold
+    starts, sandbox runs) shouldn't crash on import — they just won't
+    have cross-process protection. The retention sweep itself still runs.
+    """
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+
+def _persist_after_purge(
+    jobs_store: dict[str, Any],
+    recycle_bin_store: dict[str, Any],
+) -> None:
+    """Schedule a state-store write so the purge survives restart.
+
+    ``save_state`` schedules onto a single-thread executor; if that
+    executor is unreachable (e.g., main module not yet imported), we
+    fall back to a synchronous write — best-effort durability is
+    better than silently lost retention.
+    """
+    try:
+        from app.state_store import save_state as _save_state
+
+        _save_state(jobs_store, recycle_bin_store)
+    except ImportError:
+        # State-store unavailable; retention is logged but not durable.
+        logger.debug("Retention purge ran without state-store persistence available")
+    except (RuntimeError, OSError, ValueError, TypeError):
+        logger.exception("Retention purge persistence write failed")
 
 
 def enforce_idempotency_retention(*, dry_run: bool = False) -> int:

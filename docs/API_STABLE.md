@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-28 02:02:50 UTC
+**Generated:** 2026-06-28 07:21:32 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -29,6 +29,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/jobs/{job_id}/export/excel` |
 | GET | `/api/jobs/{job_id}/export/json` |
 | GET | `/api/jobs/{job_id}/results` |
+| PATCH | `/api/jobs/{job_id}/extraction` |
 | PATCH | `/api/jobs/{job_id}/headers` |
 | PATCH | `/api/jobs/{job_id}/strategy` |
 | PATCH | `/api/jobs/{job_id}/webhook` |
@@ -170,4 +171,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 114
+**Total routes:** 115

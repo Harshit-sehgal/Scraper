@@ -60,6 +60,10 @@ _JOBS_COLUMNS_SQL = [
     "webhook_delivered BOOLEAN DEFAULT FALSE",
     "webhook_delivered_at TEXT DEFAULT ''",
     "fetch_strategy TEXT DEFAULT ''",
+    "hydration_wait_ms INTEGER DEFAULT 0",
+    "scroll_attempts INTEGER DEFAULT 0",
+    "request_delay_ms INTEGER DEFAULT 0",
+    "max_concurrent_urls INTEGER DEFAULT 4",
 ]
 
 

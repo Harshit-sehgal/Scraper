@@ -474,10 +474,22 @@ async def _process_due_scheduled_jobs() -> None:
             # Execute the job
             await run_job_wrapper(job.id)
 
-            # Update next_run_at based on frequency
-            frequency = str(scheduled.get("frequency") or "daily").lower()
-            delta = _FREQUENCY_DELTAS.get(frequency, timedelta(days=1))
-            next_run_dt = now_dt + delta
+            # Update next_run_at — prefer cron expression, fall back to frequency delta
+            cron_expr = str(scheduled.get("cron_expression") or "").strip()
+            if cron_expr:
+                try:
+                    from app.utils.cron_parser import next_after as cron_next_after
+
+                    next_run_dt = cron_next_after(now_dt, cron_expr)
+                except Exception:
+                    logger.warning("Cron %r failed; falling back to frequency delta", cron_expr)
+                    frequency = str(scheduled.get("frequency") or "daily").lower()
+                    delta = _FREQUENCY_DELTAS.get(frequency, timedelta(days=1))
+                    next_run_dt = now_dt + delta
+            else:
+                frequency = str(scheduled.get("frequency") or "daily").lower()
+                delta = _FREQUENCY_DELTAS.get(frequency, timedelta(days=1))
+                next_run_dt = now_dt + delta
             scheduled["next_run_at"] = next_run_dt.isoformat()
             scheduled["last_run_at"] = now_iso
             scheduled["last_run_status"] = "completed"

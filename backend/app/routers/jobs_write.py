@@ -32,6 +32,7 @@ from app.discovery import (
 from app.models import (
     DiscoveryRequest,
     JobCreate,
+    JobExtractionUpdate,
     JobHeadersUpdate,
     JobStatus,
     JobStrategyUpdate,
@@ -48,6 +49,7 @@ from app.services.job_creation_service import (
 )
 from app.services.job_mutation_service import (
     JobCancellerService,
+    JobExtractionUpdateService,
     JobHeadersService,
     JobRecleanerService,
 )
@@ -303,6 +305,58 @@ def register_jobs_write_routes(
             "fetch_strategy": job.fetch_strategy,
             "status": "success",
         }
+
+    @router.patch("/api/jobs/{job_id}/extraction")
+    async def update_job_extraction(
+        job_id: str,
+        body: JobExtractionUpdate,
+        request: Request,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update per-job extraction configuration: hydration wait, scroll attempts,
+        max pages, and CSS selectors map.
+
+        Only the fields present in the JSON body are applied; absent fields
+        are left unchanged.  Passing ``null`` for an integer field resets
+        it to the platform default.
+        """
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        service = JobExtractionUpdateService(manager)
+
+        # Extract only the keys that were actually sent in the raw JSON body
+        # so that ``...``-sentinel semantics work correctly: a key that was
+        # NOT sent is truly absent; a key sent with value ``null`` is present
+        # with value ``None``.
+        raw_body: dict[str, Any] = {}
+        try:
+            raw_body = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(status_code=400, detail="Invalid JSON body") from None
+        body_keys = set(raw_body.keys())
+
+        _UNSET = JobExtractionUpdateService._UNSET
+
+        def _val(field: str) -> Any:
+            if field not in body_keys:
+                return _UNSET
+            return getattr(body, field)
+
+        return await service.update_extraction_params(
+            job_id,
+            role,
+            user_id,
+            org_id,
+            project_id,
+            hydration_wait_ms=_val("hydration_wait_ms"),
+            scroll_attempts=_val("scroll_attempts"),
+            max_pages=_val("max_pages"),
+            selectors_map=_val("selectors_map"),
+            request_delay_ms=_val("request_delay_ms"),
+            max_concurrent_urls=_val("max_concurrent_urls"),
+        )
 
     @router.delete("/api/jobs/{job_id}")
     async def delete_job(

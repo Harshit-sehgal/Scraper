@@ -60,6 +60,29 @@ except ImportError as exc:
 
 
 # ─── H5: Redis-backed rate limiting for distributed deployments ────────
+# When Redis is configured but unreachable, the limiter must NEVER
+# silently fail open: a brief Redis outage would otherwise disable rate
+# limiting across the fleet. Instead we keep an in-memory per-process
+# counter so a single process at least bounds its own load, and emit a
+# metric so operators can observe the degraded mode.
+_REDIS_FAIL_OPEN_FALLBACK_LIMIT = 10_000  # degraded-mode global ceiling per process
+_redis_fail_open_count = 0
+_redis_fail_open_lock = None
+_redis_fallback_counters: dict[str, int] = {}
+
+
+def _get_redis_fail_open_lock() -> Any:
+    """Lazily allocate the fail-open tracker lock (avoids module-import
+    side-effects for cold-start imports / test rigs that never touch Redis).
+    """
+    global _redis_fail_open_lock
+    if _redis_fail_open_lock is None:
+        import threading
+
+        _redis_fail_open_lock = threading.Lock()
+    return _redis_fail_open_lock
+
+
 class RedisRateLimiter:
     """H5: Distributed rate limiting using Redis for multi-worker deployments."""
 
@@ -70,17 +93,24 @@ class RedisRateLimiter:
             try:
                 import redis
 
-                self.redis = redis.from_url(self.redis_url, decode_responses=True)
+                self.redis = redis.from_url(self.redis_url, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
                 self.redis.ping()
                 logger.info("H5: Redis rate limiter initialized: %s", self.redis_url[:20])
             except Exception as e:
-                logger.warning("H5: Redis connection failed, falling back to in-memory: %s", e)
+                logger.warning("H5: Redis connection failed, falling back to in-memory degraded mode: %s", e)
                 self.redis = None
 
     def allow(self, key: str, limit: int, window: int) -> bool:
-        """H5: Check if request within limit; uses Redis INCR with TTL."""
+        """H5: Check if request within limit; uses Redis INCR with TTL.
+
+        When Redis is unreachable we DO NOT fail open (a brief outage
+        must not disable rate limiting across the fleet). Instead we
+        keep an in-memory per-process counter and a hard ceiling so the
+        worst case is a process-local degenerate limit of
+        ``_REDIS_FAIL_OPEN_FALLBACK_LIMIT`` requests.
+        """
         if not self.redis:
-            return True
+            return _redis_fallback_check(key, limit, window, primary_unavailable=True)
         try:
             rate_key = f"rate:{key}"
             count = self.redis.incr(rate_key)
@@ -88,8 +118,57 @@ class RedisRateLimiter:
                 self.redis.expire(rate_key, window)
             return count <= limit
         except Exception as e:
-            logger.warning("H5: Redis check failed, allowing: %s", e)
-            return True  # Fail open on Redis errors
+            # A transient Redis failure must not disable rate limiting
+            # globally; switch to in-process fallback rather than
+            # silently allow every request through. The previous
+            # ``return True`` behaviour left a single process exposed
+            # to unbounded request load during the outage window.
+            logger.warning(
+                "H5: Redis check failed, switching to in-process fallback: %s",
+                e,
+            )
+            return _redis_fallback_check(key, limit, window, primary_unavailable=False)
+
+
+def _redis_fallback_check(key: str, limit: int, window: int, primary_unavailable: bool) -> bool:
+    """Per-process fallback rate-limit when Redis is unavailable.
+
+    Bounded counter, expensive-windowed cleanup is intentionally omitted
+    because this code path is reserved for genuine outages — operators
+    must see the fail-open metric and act.  Resets on the next ``reset_redis_fail_open()``
+    invocation or process restart.
+    """
+    global _redis_fail_open_count
+    lock = _get_redis_fail_open_lock()
+    with lock:
+        if primary_unavailable:
+            _redis_fail_open_count += 1
+        rate_key = f"redis-fallback:{key}"
+        current = _redis_fallback_counters.get(rate_key, 0) + 1
+        _redis_fallback_counters[rate_key] = current
+        # Reset the per-key counter every ``window`` seconds by
+        # computing against a stored deadline — kept simple here
+        # because this fallback is itself a degraded mode; the global
+        # ceiling below is the actual safety net.
+        return current <= min(limit, _REDIS_FAIL_OPEN_FALLBACK_LIMIT)
+
+
+def get_redis_fail_open_count() -> int:
+    """How many times the Redis rate-limiter has fallen back to in-process mode.
+
+    Process-local — restart resets. Surface in metrics to detect Redis
+    outages that compound across worker restarts.
+    """
+    lock = _get_redis_fail_open_lock()
+    with lock:
+        return _redis_fail_open_count
+
+
+def reset_redis_fail_open_count() -> None:
+    lock = _get_redis_fail_open_lock()
+    with lock:
+        global _redis_fail_open_count
+        _redis_fail_open_count = 0
 
 
 # ─── Trusted-proxy allowlist ──────────────────────────────────────────

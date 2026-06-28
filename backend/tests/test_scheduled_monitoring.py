@@ -1,5 +1,9 @@
 """Tests for the Scheduled Monitoring router."""
 
+import logging
+from datetime import UTC
+from unittest.mock import patch
+
 from app.models import ScheduledJob, ScheduledJobFrequency
 from fastapi.testclient import TestClient
 
@@ -12,6 +16,109 @@ class TestScheduledJobModel:
         assert job.name == "Daily Scrape"
         assert job.frequency == ScheduledJobFrequency.DAILY
         assert job.enabled is True
+
+
+class TestCronExpressionLoopGuard:
+    """The cron-expression handler must reject malformed expressions to
+    prevent runaway re-execution loops. See F-SCHEDULER-001, F-SCHEDULER-002.
+    """
+
+    def setup_method(self) -> None:
+        # Reset the per-process fallback counters between tests.
+        from app.routers import scheduled_monitoring
+
+        scheduled_monitoring._cron_fallback_counts.clear()
+
+    def test_malformed_cron_returns_blank_next_run(self) -> None:
+        """“not-a-cron-expression” must return "" to halt re-execution."""
+        from app.routers import scheduled_monitoring
+
+        record = {
+            "id": "sched-1",
+            "cron_expression": "not-a-cron-expression",
+            "frequency": "daily",
+        }
+        with patch("app.utils.cron_parser.is_valid", return_value=False):
+            nxt = scheduled_monitoring._compute_next_from_record(record)
+        assert nxt == ""
+
+    def test_valid_cron_returns_future_timestamp(self) -> None:
+        """A real cron expression must produce a future ISO timestamp."""
+        from datetime import datetime, timedelta
+
+        from app.routers import scheduled_monitoring
+
+        record = {
+            "id": "sched-1",
+            "cron_expression": "*/5 * * * *",  # every 5 minutes
+            "frequency": "hourly",
+        }
+        with patch("app.utils.cron_parser.is_valid", return_value=True):
+            nxt = scheduled_monitoring._compute_next_from_record(record)
+        # Should be a non-empty ISO timestamp in the near future
+        assert nxt
+        assert isinstance(nxt, str)
+        parsed = datetime.fromisoformat(nxt)
+        assert parsed > datetime.now(UTC) - timedelta(minutes=1)
+
+    def test_record_cron_fallback_increments_per_job(self) -> None:
+        """Each call increments only the targeted job counter."""
+        from app.routers import scheduled_monitoring
+
+        scheduled_monitoring._record_cron_fallback(job_id="sched-A")
+        scheduled_monitoring._record_cron_fallback(job_id="sched-A")
+        scheduled_monitoring._record_cron_fallback(job_id="sched-B")
+        assert scheduled_monitoring._cron_fallback_counts["sched-A"] == 2
+        assert scheduled_monitoring._cron_fallback_counts["sched-B"] == 1
+
+    def test_threshold_triggers_critical_log_and_audit(self, caplog) -> None:
+        """Hitting the loop threshold emits CRITICAL + audit event."""
+        from app.routers import scheduled_monitoring
+
+        with patch("app.audit_logger.log_admin_action") as mock_audit:
+            with caplog.at_level(logging.CRITICAL, logger="app.routers.scheduled_monitoring"):
+                # Hit the threshold (CRON_LOOP_THRESHOLD == 5)
+                for _ in range(scheduled_monitoring._CRON_LOOP_THRESHOLD):
+                    scheduled_monitoring._record_cron_fallback(job_id="sched-loop")
+        # The audit event fires once at the threshold
+        assert mock_audit.called
+        # The CRITICAL log message mentions the cron-loop detection
+        critical_logs = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+        assert any("cron_loop" in r.getMessage() or "cron fallback" in r.getMessage() for r in critical_logs)
+
+
+class TestURLListBound:
+    """The scheduler endpoints must reject oversized URL lists (DoS via DNS)."""
+
+    def test_max_urls_constant_is_bounded(self) -> None:
+        """A hard cap must exist and be small enough to prevent DoS."""
+        from app.routers import scheduled_monitoring
+
+        assert hasattr(scheduled_monitoring, "_MAX_URLS_PER_SCHEDULE")
+        assert scheduled_monitoring._MAX_URLS_PER_SCHEDULE <= 1000
+
+    def test_validate_urls_rejects_oversized_input(self) -> None:
+        """Validate that oversized URL input raises HTTPException before DNS resolution."""
+        from app.routers import scheduled_monitoring
+        from app.url_safety import set_dns_resolver
+        from fastapi import HTTPException
+
+        # Inject a fake DNS resolver so the test never blocks on real DNS.
+        # The cap is checked *before* per-URL validation so the resolver
+        # is never actually called, but we set it defensively.
+        set_dns_resolver(lambda _host: ["93.184.216.34"])
+        try:
+            urls = [f"https://example.com/path{i}" for i in range(scheduled_monitoring._MAX_URLS_PER_SCHEDULE + 1)]
+            try:
+                scheduled_monitoring._validate_urls(urls)
+            except HTTPException as exc:
+                assert exc.status_code == 400
+                assert "Too many URLs" in exc.detail or "max" in exc.detail.lower()
+                return
+            msg = f"Expected HTTPException for {len(urls)} URLs"
+            raise AssertionError(msg)
+        finally:
+            set_dns_resolver(None)
 
     def test_job_id_generated(self):
         job = ScheduledJob(name="Auto ID", job_name="Auto ID Run")

@@ -77,13 +77,17 @@ def _add_file_handler(audit_logger: logging.Logger, log_path: Path) -> None:
 
 
 def _get_audit_logger() -> logging.Logger:
-    """Get or create the audit logger singleton."""
+    """Get or create the audit logger singleton.
+
+    The entire check-and-mutate path runs under ``_audit_lock`` so
+    concurrent threads cannot duplicate file handlers or race on
+    ``_logger.handlers`` iteration.  The previous fast-path (checking
+    ``_logger is not None`` before the lock) was removed because it
+    allowed two threads to call ``_add_file_handler`` simultaneously
+    — either duplicating the handler (double-log) or causing a
+    concurrent-iteration ``RuntimeError``.
+    """
     global _logger
-    if _logger is not None:
-        log_path = _audit_log_path()
-        if not _has_file_handler(_logger, log_path):
-            _add_file_handler(_logger, log_path)
-        return _logger
     with _audit_lock:
         if _logger is not None:
             log_path = _audit_log_path()

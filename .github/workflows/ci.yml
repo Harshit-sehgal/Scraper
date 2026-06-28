@@ -224,9 +224,16 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: python -m playwright install-deps chromium
 
-      - name: Run full test suite (serial + flaky retry)
+      - name: Run full test suite (serial + flaky retry, browser tests enabled)
+        # Roadmap §1 #3: browser-marked tests are now part of the CI
+        # default gate. Playwright Chromium is already cached above.
+        # --run-browser enables @pytest.mark.browser tests that were
+        # previously skipped on push/PR (only ran weekly). This prevents
+        # browser E2E regressions from silently merging.
         run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m pytest --reruns 3 --reruns-delay 10 \
+            --run-browser -o addopts= \
             -q backend/tests --tb=short
 
       - name: Enforce coverage floors

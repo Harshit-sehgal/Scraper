@@ -42,9 +42,16 @@ class BrowserPool:
         self._browser: Browser | None = None
         self._contexts: dict[str, BrowserContext] = {}
         self._context_use_count: dict[str, int] = {}
+        self._context_last_used: dict[str, float] = {}
         self._lock = asyncio.Lock()
         self._last_activity = time.time()
         self._cleanup_task: asyncio.Task | None = None
+
+        # Process cap — at most BROWSER_MAX_PROCESSES Chromium instances
+        # may be launched. Tracked atomically so concurrent callers
+        # cannot race past the limit.
+        self._process_count = 0
+        self._process_lock = threading.Lock()
 
         # Hard recycling states
         self._active_fetches = 0

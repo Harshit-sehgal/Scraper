@@ -930,6 +930,20 @@
             "title": "Headers",
             "type": "object"
           },
+          "hydration_wait_ms": {
+            "anyOf": [
+              {
+                "maximum": 120000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override the post-navigation hydration wait (milliseconds). Higher values help lazy-loaded content; lower values speed up simple pages. None means the platform picks a sensible default.",
+            "title": "Hydration Wait Ms"
+          },
           "intent": {
             "default": "",
             "description": "Natural language extraction intent",
@@ -943,6 +957,14 @@
             "maxLength": 256,
             "title": "Location",
             "type": "string"
+          },
+          "max_concurrent_urls": {
+            "default": 4,
+            "description": "Maximum number of URLs that can be fetched concurrently within this job. Lower values reduce load on target domains.",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Concurrent Urls",
+            "type": "integer"
           },
           "max_distance_km": {
             "anyOf": [
@@ -1011,6 +1033,14 @@
             "title": "Preferred Domain",
             "type": "string"
           },
+          "request_delay_ms": {
+            "default": 0,
+            "description": "Minimum delay between consecutive URL fetches within this job (milliseconds). Use this to avoid overwhelming a target domain. 0 = no extra delay.",
+            "maximum": 60000.0,
+            "minimum": 0.0,
+            "title": "Request Delay Ms",
+            "type": "integer"
+          },
           "schema_fields": {
             "description": "Data schema to extract",
             "items": {
@@ -1019,6 +1049,20 @@
             "maxItems": 50,
             "title": "Schema Fields",
             "type": "array"
+          },
+          "scroll_attempts": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override how many scroll-down steps to perform before capturing page content. Needed for infinite-scroll pages; set to 0 to disable scrolling. None means the platform picks a sensible default.",
+            "title": "Scroll Attempts"
           },
           "search_params": {
             "anyOf": [
@@ -1093,6 +1137,96 @@
           "name"
         ],
         "title": "JobCreate",
+        "type": "object"
+      },
+      "JobExtractionUpdate": {
+        "description": "Request body to update per-job extraction behaviour flags.\n\nAll fields are optional; absent or ``null`` fields leave the existing value intact\n(or restore the platform default when the field is ``null``).  This lets callers\nPATCH a single knob without having to re-send the entire job config.",
+        "properties": {
+          "hydration_wait_ms": {
+            "anyOf": [
+              {
+                "maximum": 120000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override post-navigation hydration wait (ms). Set to 0 for a fast page-load exit; set to a positive value to wait longer for JavaScript hydration.",
+            "title": "Hydration Wait Ms"
+          },
+          "max_concurrent_urls": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override the maximum concurrent URLs within this job.",
+            "title": "Max Concurrent Urls"
+          },
+          "max_pages": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override the maximum number of pages to follow when pagination is enabled.",
+            "title": "Max Pages"
+          },
+          "request_delay_ms": {
+            "anyOf": [
+              {
+                "maximum": 60000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override the minimum delay between consecutive URL fetches (milliseconds). 0 means no extra delay.",
+            "title": "Request Delay Ms"
+          },
+          "scroll_attempts": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override the number of auto-scroll attempts before capturing page content. Set to 0 to disable scrolling entirely.",
+            "title": "Scroll Attempts"
+          },
+          "selectors_map": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override CSS selectors map for extraction. Shape: ``{item_container: str, fields: {field_name: selector}}``.",
+            "title": "Selectors Map"
+          }
+        },
+        "title": "JobExtractionUpdate",
         "type": "object"
       },
       "JobHeadersUpdate": {
@@ -3521,6 +3655,57 @@
         "summary": "Export Json"
       }
     },
+    "/api/jobs/{job_id}/extraction": {
+      "patch": {
+        "description": "Update per-job extraction configuration: hydration wait, scroll attempts,\nmax pages, and CSS selectors map.\n\nOnly the fields present in the JSON body are applied; absent fields\nare left unchanged.  Passing ``null`` for an integer field resets\nit to the platform default.",
+        "operationId": "update_job_extraction_api_jobs__job_id__extraction_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobExtractionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job Extraction",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/headers": {
       "patch": {
         "description": "Update custom request headers and cookies for a job.",
@@ -5203,7 +5388,7 @@
         ]
       },
       "post": {
-        "description": "Create a new scheduled (recurring) scraping job.\n\nRequires AUP acceptance.  Every URL in *urls* is validated\nagainst the project's SSRF guard before it is stored.",
+        "description": "Create a new scheduled (recurring) scraping job.\n\nRequires AUP acceptance.  Every URL in *urls* is validated\nagainst the project's SSRF guard before it is stored.\n\nWhen ``cron_expression`` is provided it takes precedence over\n``frequency`` for computing next-run times.  The expression\nfollows standard 5-field cron syntax (minute hour dom month dow).",
         "operationId": "create_scheduled_job_api_scheduled_post",
         "parameters": [
           {
@@ -5251,6 +5436,32 @@
                 }
               ],
               "title": "Urls"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cron_expression",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cron Expression"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "default": "UTC",
+              "title": "Timezone",
+              "type": "string"
             }
           }
         ],
@@ -5355,7 +5566,7 @@
         ]
       },
       "put": {
-        "description": "Update an existing scheduled job.\n\nIf *urls* is provided, each URL is SSRF-validated before being\nstored on the scheduled job record.",
+        "description": "Update an existing scheduled job.\n\nIf *urls* is provided, each URL is SSRF-validated before being\nstored on the scheduled job record.\n\nWhen ``cron_expression`` is provided it takes precedence over\n``frequency`` for computing next-run times.  Pass an empty string\nto clear a previously set cron expression.",
         "operationId": "update_scheduled_job_api_scheduled__job_id__put",
         "parameters": [
           {
@@ -5432,6 +5643,38 @@
                 }
               ],
               "title": "Urls"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cron_expression",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cron Expression"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timezone"
             }
           }
         ],

@@ -11,6 +11,7 @@ Storage safety features:
 import atexit
 import concurrent.futures
 import datetime
+import errno  # Phase 73-HIGH: recoverable fsync codes
 import json
 import logging
 import os
@@ -154,6 +155,30 @@ def _write_state_to_disk(path: Path, payload: dict[str, Any]) -> None:
                 finally:
                     os.close(fd)
                 temp_path.replace(path)
+                # Phase 73-HIGH: fsync the parent directory so the rename
+                # entry is durable on disk. Without this, a crash between
+                # ``replace`` and a subsequent clean shutdown can leave
+                # the directory's inode flushed but the new ``path``
+                # entry missing — meaning the old file is recovered on
+                # restart, silently losing the latest snapshot. This is
+                # the classical "lost rename" failure mode documented
+                # in PostgreSQL, SQLite, and all crash-safe journaled
+                # storage. We swallow ENOTSUP (e.g., some FUSE mounts)
+                # and EROFS (read-only FS) because the rename itself
+                # was successful and the data is durable on disk.
+                try:
+                    dir_fd = os.open(str(path.parent), os.O_RDONLY)
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
+                except (OSError, AttributeError) as fsync_exc:
+                    # ENOTSUP / EROFS are non-fatal: the data was
+                    # persisted; only the directory entry durability is
+                    # best-effort on those filesystems.
+                    _err = getattr(fsync_exc, "errno", None)
+                    if _err not in (None, getattr(errno, "ENOTSUP", -1), getattr(errno, "EROFS", -1)):
+                        logger.warning("Parent-dir fsync failed for %s: %s", path.parent, fsync_exc)
                 # Success — clean up old backups
                 old_backup = path.with_suffix(path.suffix + ".bak.old")
                 if old_backup.exists():
