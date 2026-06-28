@@ -18,8 +18,8 @@ from app.storage_mapper import job_to_row, row_to_job
 
 logger = logging.getLogger(__name__)
 
-SQLITE_SCHEMA_VERSION = 11
-POSTGRES_SCHEMA_VERSION = 10
+SQLITE_SCHEMA_VERSION = 12
+POSTGRES_SCHEMA_VERSION = 11
 
 # ───────────────────────────────────────────────────────────────────────
 # SQLite migrations

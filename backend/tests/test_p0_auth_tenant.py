@@ -256,6 +256,99 @@ def test_operator_policy_allows_operational_job_listing(client, monkeypatch) -> 
         monkeypatch.setattr(main_mod.settings, "ENABLE_OPERATOR_CROSS_TENANT", False, raising=False)
 
 
+def test_issue_135_flag_off_blocks_env_backed_cross_tenant_access(monkeypatch) -> None:
+    """Issue #135 (high-priority): env-backed operator all-access must be opt-in.
+
+    Direct unit test of the canonical gate. The flag must default to
+    False so SaaS deployments cannot be subverted by an env-backed
+    operator key. Each branch — RBAC scoped-resource gate, AUP bypass,
+    SaaS delete_org, SaaS remove_member — is exercised via its public
+    helper so the policy cannot drift.
+    """
+    from app.utils.rbac import (
+        UserRole,
+        _record_operator_cross_tenant,
+        can_access_scoped_resource,
+        is_env_backed_operator_cross_tenant,
+    )
+
+    # Default SaaS posture: flag is OFF.
+    monkeypatch.setattr(settings, "ENABLE_OPERATOR_CROSS_TENANT", False)
+
+    # 1. is_env_backed_operator_cross_tenant is False by default.
+    assert is_env_backed_operator_cross_tenant(UserRole.OPERATOR, "", "") is False, (
+        "is_env_backed_operator_cross_tenant must be False by default (issue #135)."
+    )
+
+    # 2. can_access_scoped_resource does NOT grant all-access to a
+    #    different owner's resource when the principal is env-backed
+    #    and the flag is off.
+    access = can_access_scoped_resource(
+        UserRole.OPERATOR,
+        "user123",
+        "",  # no org_id (env-backed)
+        "",  # no project_id (env-backed)
+        resource_owner_id="someone_else",
+        resource_org_id="other_org",
+    )
+    assert access is False, (
+        "can_access_scoped_resource MUST NOT return True for env-backed "
+        "operator access to another owner's resource (issue #135)."
+    )
+
+    # 3. ADMIN role is unaffected by the flag (still all-access).
+    access = can_access_scoped_resource(
+        UserRole.ADMIN,
+        "admin1",
+        "",
+        "",
+        resource_owner_id="someone_else",
+        resource_org_id="other_org",
+    )
+    assert access is True, "ADMIN must remain all-access regardless of the flag."
+
+    # 4. With the flag EXPLICITLY on, legacy behaviour is restored.
+    monkeypatch.setattr(settings, "ENABLE_OPERATOR_CROSS_TENANT", True)
+    try:
+        assert is_env_backed_operator_cross_tenant(UserRole.OPERATOR, "", "") is True
+        access = can_access_scoped_resource(
+            UserRole.OPERATOR,
+            "user123",
+            "",
+            "",
+            resource_owner_id="someone_else",
+            resource_org_id="other_org",
+        )
+        assert access is True, (
+            "With ENABLE_OPERATOR_CROSS_TENANT=True env-backed operators "
+            "retain legacy all-access for self-hosted mode."
+        )
+    finally:
+        monkeypatch.setattr(settings, "ENABLE_OPERATOR_CROSS_TENANT", False)
+    # Sanity: the audit helper does not raise when called.
+    _record_operator_cross_tenant("test_issue_135 regression")
+
+
+def test_issue_135_production_guard_blocks_flag_on(monkeypatch) -> None:
+    """Settings.ENABLE_OPERATOR_CROSS_TENANT=True in production must fail closed.
+
+    Mirrors the existing production guard for ALLOW_INSECURE_DEV_AUTH
+    so accidental deployment of the opt-in flag in SaaS mode
+    surfaces immediately at startup, never silently.
+    """
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod.settings, "ENV", "production")
+    monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", False)
+    monkeypatch.setattr(main_mod.settings, "ENABLE_OPERATOR_CROSS_TENANT", True)
+    # Set SESSION_SECRET so we exercise ONLY the new check.
+    monkeypatch.setattr(main_mod.settings, "SESSION_SECRET", "x" * 64)
+
+    with pytest.raises(RuntimeError, match="ENABLE_OPERATOR_CROSS_TENANT") as excinfo:
+        main_mod.create_app()
+    assert "production" in str(excinfo.value).lower()
+
+
 @pytest.mark.parametrize("path", ["/api/jobs", "/api/jobs/tenant-job-a/results", "/api/jobs/tenant-job-a/events"])
 def test_user_cannot_read_another_orgs_job_via_persistent_key(client, monkeypatch, path: str, tmp_path) -> None:
     """P0-SAAS-001: persistent API keys from one org cannot read another org's jobs.

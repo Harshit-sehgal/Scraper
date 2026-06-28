@@ -217,6 +217,26 @@ class JobCreate(BaseModel):
         description="User-requested fetch strategy (playwright_full, httpx_smart, hybrid, etc.). Empty means auto-select.",
         max_length=32,
     )
+    hydration_wait_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=120_000,
+        description=(
+            "Override the post-navigation hydration wait (milliseconds). "
+            "Higher values help lazy-loaded content; lower values speed up simple pages. "
+            "None means the platform picks a sensible default."
+        ),
+    )
+    scroll_attempts: int | None = Field(
+        default=None,
+        ge=0,
+        le=20,
+        description=(
+            "Override how many scroll-down steps to perform before capturing page content. "
+            "Needed for infinite-scroll pages; set to 0 to disable scrolling. "
+            "None means the platform picks a sensible default."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -416,6 +436,18 @@ class Job(BaseModel):
     webhook_delivered_at: str | None = Field(
         default=None, description="ISO timestamp when webhook was last delivered", max_length=64
     )
+    hydration_wait_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=120_000,
+        description="User-overridable post-navigation hydration wait (milliseconds). None = use platform default.",
+    )
+    scroll_attempts: int | None = Field(
+        default=None,
+        ge=0,
+        le=20,
+        description="User-overridable number of scroll attempts before content extraction. None = use platform default.",
+    )
     fetch_strategy: str = Field(
         default="",
         description="User-requested fetch strategy. Empty means auto-select.",
@@ -507,6 +539,78 @@ class JobStrategyUpdate(BaseModel):
             if self.fetch_strategy not in FETCH_STRATEGY_VALUES:
                 msg = f"fetch_strategy must be one of {sorted(FETCH_STRATEGY_VALUES)}, got {self.fetch_strategy!r}"
                 raise ValueError(msg)
+        return self
+
+
+class JobExtractionUpdate(BaseModel):
+    """Request body to update per-job extraction behaviour flags.
+
+    All fields are optional; absent or ``null`` fields leave the existing value intact
+    (or restore the platform default when the field is ``null``).  This lets callers
+    PATCH a single knob without having to re-send the entire job config.
+    """
+
+    hydration_wait_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=120_000,
+        description=(
+            "Override post-navigation hydration wait (ms). Set to 0 for a fast page-load "
+            "exit; set to a positive value to wait longer for JavaScript hydration."
+        ),
+    )
+    scroll_attempts: int | None = Field(
+        default=None,
+        ge=0,
+        le=20,
+        description=(
+            "Override the number of auto-scroll attempts before capturing page content. "
+            "Set to 0 to disable scrolling entirely."
+        ),
+    )
+    max_pages: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="Override the maximum number of pages to follow when pagination is enabled.",
+    )
+    selectors_map: dict | None = Field(
+        default=None,
+        description=(
+            "Override CSS selectors map for extraction. Shape: "
+            "``{item_container: str, fields: {field_name: selector}}``."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_selectors_map_shape(self) -> "JobExtractionUpdate":
+        if self.selectors_map is None:
+            return self
+        if not isinstance(self.selectors_map, dict):
+            msg = "selectors_map must be an object"
+            raise ValueError(msg)
+        if len(self.selectors_map) > 20:
+            msg = "selectors_map must have at most 20 keys"
+            raise ValueError(msg)
+        # Validate value shapes to keep the dict clean before persistence.
+        item_container = self.selectors_map.get("item_container")
+        if item_container is not None and (
+            not isinstance(item_container, str) or len(item_container) > 500
+        ):
+            msg = "selectors_map.item_container must be a string of at most 500 chars"
+            raise ValueError(msg)
+        fields = self.selectors_map.get("fields")
+        if fields is not None:
+            if not isinstance(fields, dict) or len(fields) > 30:
+                msg = "selectors_map.fields must be an object with at most 30 keys"
+                raise ValueError(msg)
+            for k, v in fields.items():
+                if not isinstance(k, str) or len(k) > 64:
+                    msg = "selectors_map.fields keys must be strings of at most 64 chars"
+                    raise ValueError(msg)
+                if not isinstance(v, str) or len(v) > 500:
+                    msg = f"selectors_map.fields[{k}] must be a string of at most 500 chars"
+                    raise ValueError(msg)
         return self
 
 

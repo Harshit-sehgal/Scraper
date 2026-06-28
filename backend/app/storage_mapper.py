@@ -99,6 +99,8 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "webhook_delivered": bool(getattr(job, "webhook_delivered", False)),
         "webhook_delivered_at": (job.webhook_delivered_at if getattr(job, "webhook_delivered_at", None) is not None else ""),
         "fetch_strategy": job.fetch_strategy if hasattr(job, "fetch_strategy") and job.fetch_strategy is not None else "",
+        "hydration_wait_ms": job.hydration_wait_ms if getattr(job, "hydration_wait_ms", None) is not None else 0,
+        "scroll_attempts": job.scroll_attempts if getattr(job, "scroll_attempts", None) is not None else 0,
     }
 
 
@@ -171,6 +173,10 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "webhook_delivered": bool(row.get("webhook_delivered", False)),
                 "webhook_delivered_at": row.get("webhook_delivered_at") or None,
                 "fetch_strategy": row.get("fetch_strategy") or "",
+                # hydration_wait_ms and scroll_attempts default to None when
+                # not persisted — the platform falls back to its defaults.
+                "hydration_wait_ms": row.get("hydration_wait_ms") or None,
+                "scroll_attempts": row.get("scroll_attempts") or None,
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:
