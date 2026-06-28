@@ -1,12 +1,13 @@
 """Tests for LLM bridge sandbox — LAW 15 subprocess isolation enforcement.
 
-Verifies that ``SubstratePluginManager.call_tool`` attempts subprocess
-sandboxing through the allow-list handler modules, refuses non-allow-listed
-handlers, and falls back gracefully on subprocess errors for allow-listed handlers.
+Verifies that ``SubstratePluginManager.call_tool`` always dispatches
+through ``_sandboxed_call`` and that ``_sandboxed_call`` rejects on
+subprocess failures with ``SandboxError`` (fail-closed per LAW 15).
 """
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -80,90 +81,57 @@ def test_builtin_modules_rejected():
             pm.call_tool(f"evil_{module_name or 'empty'}")
 
 
-# ─── Existing sandbox-fallback contract ──────────────────────────────────
+# ─── Existing sandbox-fail-closed contract ──────────────────────────────────
 
 
-class TestSandboxCall:
-    """_sandboxed_call attempts subprocess then falls back."""
+class TestSandboxCallInProcessPatch:
+    """Tests that patch ``_sandboxed_call`` to run in-process for handlers
+    whose subprocess is unavailable in test environments. This replaces the
+    old ``DATAFORGE_SANDBOX_DISABLED`` env-var bypass with a targeted
+    ``unittest.mock.patch.object`` on the instance method.
+    """
 
-    def test_fallback_to_in_process_on_subprocess_error(self) -> None:
-        """When subprocess.run raises OSError, the allow-listed handler runs in-process."""
+    @pytest.fixture(autouse=True)
+    def _enable_in_process_dispatch(self):
+        """Patch _sandboxed_call to run handler(**kwargs) in-process.
+
+        This fixture applies to every test in this class and is the
+        canonical way to exercise the dispatch chain when subprocess
+        isolation is unavailable (e.g., tests where qualname resolution
+        fails across process boundaries).
+        """
+
+        def _fake_sandboxed_call(self, handler_name, handler, kwargs):
+            return handler(**kwargs)
+
+        with patch.object(SubstratePluginManager, "_sandboxed_call", _fake_sandboxed_call):
+            yield
+
+    def test_in_process_dispatch_on_patched_sandbox(self) -> None:
+        """When _sandboxed_call is patched, the handler executes in-process."""
         pm = SubstratePluginManager()
         handler = MagicMock(return_value="in-process-result")
-        _register_allow_listed_handler(pm, "fallback_tool", handler)
+        _register_allow_listed_handler(pm, "patched_tool", handler)
 
-        with patch("subprocess.run", side_effect=OSError("subprocess unavailable")):
-            result = pm.call_tool("fallback_tool")
+        result = pm.call_tool("patched_tool")
 
         assert result == "in-process-result"
         handler.assert_called_once()
 
-    def test_fallback_on_subprocess_timeout(self) -> None:
-        """When subprocess times out, an allow-listed handler runs in-process."""
-        import subprocess
-
-        pm = SubstratePluginManager()
-        handler = MagicMock(return_value="timeout-fallback")
-        _register_allow_listed_handler(pm, "timeout_tool", handler)
-
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="python", timeout=30)):
-            result = pm.call_tool("timeout_tool")
-
-        assert result == "timeout-fallback"
-        handler.assert_called_once()
-
-    def test_fallback_on_nonzero_exit(self) -> None:
-        """When subprocess exits non-zero (but worker did NOT refuse), allow-listed handler runs in-process."""
-        pm = SubstratePluginManager()
-        handler = MagicMock(return_value="nonzero-fallback")
-        _register_allow_listed_handler(pm, "nonzero_tool", handler)
-
-        mock_proc = MagicMock()
-        mock_proc.returncode = 1
-        mock_proc.stderr = "import error"
-        mock_proc.stdout = ""
-
-        # Non-allow-listed handlers now raise PermissionError on the
-        # top-level guard before reaching the subprocess.  Allow-listed
-        # handlers still get the fallback path.
-        with patch("subprocess.run", return_value=mock_proc):
-            result = pm.call_tool("nonzero_tool")
-
-        assert result == "nonzero-fallback"
-
-    def test_fallback_on_invalid_json_output(self) -> None:
-        """Allow-listed handler runs in-process when subprocess returns non-JSON."""
-        pm = SubstratePluginManager()
-        handler = MagicMock(return_value="bad-json-fallback")
-        _register_allow_listed_handler(pm, "bad_json_tool", handler)
-
-        mock_proc = MagicMock()
-        mock_proc.returncode = 0
-        mock_proc.stdout = "not valid json"
-        mock_proc.stderr = ""
-
-        with patch("subprocess.run", return_value=mock_proc):
-            result = pm.call_tool("bad_json_tool")
-
-        assert result == "bad-json-fallback"
-
-
-class TestExecutionHistory:
-    """call_tool records result in execution history."""
-
-    def test_success_recorded_in_history(self) -> None:
+    def test_in_process_dispatch_success_recorded(self) -> None:
+        """call_tool records success in execution history with patched sandbox."""
         pm = SubstratePluginManager()
         handler = MagicMock(return_value="ok")
         _register_allow_listed_handler(pm, "hist_tool", handler)
 
-        with patch("subprocess.run", side_effect=OSError("sandbox unavailable")):
-            pm.call_tool("hist_tool")
+        pm.call_tool("hist_tool")
 
         assert len(pm._execution_history) == 1
         assert pm._execution_history[0]["handler"] == "hist_tool"
         assert pm._execution_history[0]["status"] == "success"
 
-    def test_error_recorded_in_history(self) -> None:
+    def test_in_process_dispatch_error_recorded(self) -> None:
+        """call_tool records errors in execution history with patched sandbox."""
         pm = SubstratePluginManager()
 
         def bad_handler():
@@ -172,43 +140,121 @@ class TestExecutionHistory:
 
         _register_allow_listed_handler(pm, "bad_tool", bad_handler)
 
-        with patch("subprocess.run", side_effect=OSError("sandbox unavailable")):
-            with pytest.raises(RuntimeError, match="deliberate failure"):
-                pm.call_tool("bad_tool")
+        with pytest.raises(RuntimeError, match="deliberate failure"):
+            pm.call_tool("bad_tool")
 
         assert len(pm._execution_history) == 1
         assert pm._execution_history[0]["status"] == "error"
 
-    def test_history_truncation(self) -> None:
+    def test_history_truncation_with_patched_sandbox(self) -> None:
         """History is truncated when it exceeds max size."""
         pm = SubstratePluginManager()
         pm._max_history = 4
         handler = MagicMock(return_value="ok")
         _register_allow_listed_handler(pm, "trunc_tool", handler)
 
-        with patch("subprocess.run", side_effect=OSError("sandbox unavailable")):
-            for _ in range(6):
-                pm.call_tool("trunc_tool")
+        for _ in range(6):
+            pm.call_tool("trunc_tool")
 
         assert len(pm._execution_history) <= 4
 
-
-class TestNativeTools:
-    """Built-in native tools register and execute successfully."""
-
-    def test_role_merger_registered(self) -> None:
+    def test_native_role_merger_with_patched_sandbox(self) -> None:
+        """role_merger dispatches (and returns 'Fail: No WS') when sandbox is patched."""
         pm = SubstratePluginManager()
-        assert "role_merger" in pm.get_available_tools()
-
-    def test_manifold_compressor_registered(self) -> None:
-        pm = SubstratePluginManager()
-        assert "manifold_compressor" in pm.get_available_tools()
-
-    def test_role_merger_no_ws(self) -> None:
-        pm = SubstratePluginManager()
-        with patch("subprocess.run", side_effect=OSError("sandbox unavailable")):
-            result = pm.call_tool("role_merger")
+        result = pm.call_tool("role_merger")
         assert result == "Fail: No WS"
+
+
+class TestSandboxRaisesOnFailure:
+    """LAW 15 fail-closed: _sandboxed_call raises SandboxError on all
+    subprocess failure modes — no in-process fallback is permitted.
+    """
+
+    def test_sandbox_error_on_os_error(self) -> None:
+        from app.llm_bridge import SandboxError
+
+        pm = SubstratePluginManager()
+        handler = MagicMock()
+        _register_allow_listed_handler(pm, "os_tool", handler)
+
+        with patch("subprocess.run", side_effect=OSError("subprocess unavailable")):
+            with pytest.raises(SandboxError, match="in-process fallback is disabled"):
+                pm.call_tool("os_tool")
+
+        # Handler must never execute in-process on sandbox failure
+        handler.assert_not_called()
+
+    def test_sandbox_error_on_timeout(self) -> None:
+        import subprocess as sp
+
+        from app.llm_bridge import SandboxError
+
+        pm = SubstratePluginManager()
+        handler = MagicMock()
+        _register_allow_listed_handler(pm, "timeout_tool", handler)
+
+        with patch(
+            "subprocess.run",
+            side_effect=sp.TimeoutExpired(cmd="python", timeout=30),
+        ):
+            with pytest.raises(SandboxError, match="in-process fallback is disabled"):
+                pm.call_tool("timeout_tool")
+
+        handler.assert_not_called()
+
+    def test_sandbox_error_on_nonzero_exit(self) -> None:
+        from app.llm_bridge import SandboxError
+
+        pm = SubstratePluginManager()
+        handler = MagicMock()
+        _register_allow_listed_handler(pm, "nonzero_tool", handler)
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 1
+        mock_proc.stderr = "import error"
+        mock_proc.stdout = ""
+
+        with patch("subprocess.run", return_value=mock_proc):
+            with pytest.raises(SandboxError, match="in-process fallback is disabled"):
+                pm.call_tool("nonzero_tool")
+
+        handler.assert_not_called()
+
+    def test_sandbox_error_on_invalid_json(self) -> None:
+        from app.llm_bridge import SandboxError
+
+        pm = SubstratePluginManager()
+        handler = MagicMock()
+        _register_allow_listed_handler(pm, "json_tool", handler)
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "not valid json"
+        mock_proc.stderr = ""
+
+        with patch("subprocess.run", return_value=mock_proc):
+            with pytest.raises(SandboxError, match="in-process fallback is disabled"):
+                pm.call_tool("json_tool")
+
+        handler.assert_not_called()
+
+    def test_sandbox_error_on_ok_false(self) -> None:
+        from app.llm_bridge import SandboxError
+
+        pm = SubstratePluginManager()
+        handler = MagicMock()
+        _register_allow_listed_handler(pm, "bad_ok_tool", handler)
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = json.dumps({"ok": False, "result": "sandbox rejected"})
+        mock_proc.stderr = ""
+
+        with patch("subprocess.run", return_value=mock_proc):
+            with pytest.raises(SandboxError, match="in-process fallback is disabled"):
+                pm.call_tool("bad_ok_tool")
+
+        handler.assert_not_called()
 
 
 class TestGetPluginManager:

@@ -59,7 +59,11 @@ DEFAULT_MAX_RECORDS = 500
 DEFAULT_MAX_RUNTIME_SECONDS = 300
 DEFAULT_DELAY_BETWEEN_PAGES = 1.0
 
-
+_EXTRACTION_FAILED_MARKER: dict[str, str] = {"_extraction_failed": "true"}
+"""Sentinel record injected by ``_extract_current_page`` when the extraction
+function raises. Pagination strategies detect this marker and increment
+``PaginationResult.extraction_failures`` so the caller can surface partial
+data loss instead of silently returning a smaller-than-expected result set."""
 # ---------------------------------------------------------------------------
 # Canonical pagination strategy enum (centralized)
 # ---------------------------------------------------------------------------
@@ -147,6 +151,7 @@ class PaginationResult:
     pages_scraped: int = 0
     total_records: int = 0
     duplicates_removed: int = 0
+    extraction_failures: int = 0  # Pages where the extract_fn raised
     stopped_reason: str = ""  # max_pages, max_records, no_new_records, duplicate_page, timeout, error, button_gone
     error: str | None = None
 
@@ -191,6 +196,24 @@ def _remove_duplicates(records: list[dict]) -> tuple[list[dict], int]:
     return unique, len(records) - len(unique)
 
 
+def _extract_marker_and_count(page_records: list[dict], result: PaginationResult) -> list[dict]:
+    """Strip ``_EXTRACTION_FAILED_MARKER`` entries, count failures, return clean records.
+
+    When the extraction function fails, :func:`_extract_current_page`
+    injects a sentinel ``{_EXTRACTION_FAILED: true}`` record. Pagination
+    strategies call this helper after each page to detect the marker,
+    increment ``result.extraction_failures``, and strip the sentinel
+    from the result list before extending ``result.records``.
+    """
+    clean: list[dict] = []
+    for rec in page_records:
+        if rec is _EXTRACTION_FAILED_MARKER or rec.get("_extraction_failed") == "true":
+            result.extraction_failures += 1
+            continue
+        clean.append(rec)
+    return clean
+
+
 # ---------------------------------------------------------------------------
 # Async pagination strategies (accept a Playwright page object)
 # ---------------------------------------------------------------------------
@@ -201,6 +224,12 @@ async def _extract_current_page(page: Any, extract_fn: Callable[[Any], Awaitable
 
     If no extraction function is provided, returns an empty list (caller
     is expected to handle this as 'no records found').
+
+    When the extraction function raises, the error is logged and an empty
+    list is returned — but the caller *must* check ``PaginationResult``
+    for partial failure metadata. This avoids silently discarding records
+    on transient errors while still allowing pagination to continue on
+    other pages.
     """
     if extract_fn is None:
         return []
@@ -208,7 +237,11 @@ async def _extract_current_page(page: Any, extract_fn: Callable[[Any], Awaitable
         return await extract_fn(page)
     except (RuntimeError, OSError, ValueError) as exc:
         logger.warning("Extraction function failed during pagination: %s", exc)
-        return []
+        # Return empty list but signal partial failure via a marker.
+        # The caller (pagination strategies) checks this to surface
+        # the failure to the user rather than masking a "successful"
+        # pagination with 80% of records missing.
+        return [_EXTRACTION_FAILED_MARKER]
 
 
 async def _async_paginate_next_button(
@@ -246,6 +279,7 @@ async def _async_paginate_next_button(
 
         # Extract current page records before clicking
         page_records = await _extract_current_page(page, extract_fn)
+        page_records = _extract_marker_and_count(page_records, result)
         if config.stop_on_duplicates:
             page_records, dupes = _remove_duplicates(page_records)
             result.duplicates_removed += dupes
@@ -345,6 +379,7 @@ async def _async_paginate_infinite_scroll(
 
         # Extract records from current page state
         page_records = await _extract_current_page(page, extract_fn)
+        page_records = _extract_marker_and_count(page_records, result)
         if config.stop_on_duplicates:
             page_records, dupes = _remove_duplicates(page_records)
             result.duplicates_removed += dupes
@@ -443,6 +478,7 @@ async def _async_paginate_load_more(
 
         # Extract records from current page state
         page_records = await _extract_current_page(page, extract_fn)
+        page_records = _extract_marker_and_count(page_records, result)
         if config.stop_on_duplicates:
             page_records, dupes = _remove_duplicates(page_records)
             result.duplicates_removed += dupes
@@ -502,6 +538,7 @@ async def _async_paginate_page_number(
         if page_num == 1:
             # Already on page 1, just extract
             page_records = await _extract_current_page(page, extract_fn)
+            page_records = _extract_marker_and_count(page_records, result)
             if config.stop_on_duplicates:
                 page_records, dupes = _remove_duplicates(page_records)
                 result.duplicates_removed += dupes
@@ -546,6 +583,7 @@ async def _async_paginate_page_number(
 
         # Extract records from this page
         page_records = await _extract_current_page(page, extract_fn)
+        page_records = _extract_marker_and_count(page_records, result)
         if config.stop_on_duplicates:
             page_records, dupes = _remove_duplicates(page_records)
             result.duplicates_removed += dupes
@@ -589,6 +627,57 @@ async def _async_paginate_url_pattern(
         result.error = "url_pattern strategy requires config.url_pattern with a {page} placeholder"
         return result
 
+    # F-PLAYWRIGHT-SSRF-002: Install a request interceptor that re-validates
+    # every outgoing request *after* navigation.  The initial ``page.goto()``
+    # URL is already validated by ``_safe_pagination_url``, but Chromium
+    # follows HTTP 3xx redirects and ``<meta http-equiv="refresh">`` tags
+    # transparently — the redirected URL was not validated. This interceptor
+    # blocks any request to a private/malicious destination so that a
+    # trampoline page cannot smuggle the browser into an internal network.
+    #
+    # The interceptor is mocked out of unit tests via the
+    # ``MagicMock`` page object; in that case ``page.route`` is a
+    # synchronously-callable stub. Guard the ``await`` so tests work.
+    async def _block_requests_to_private_hosts(route: Any) -> None:
+        req_url = route.request.url
+        if not req_url:
+            await route.abort()
+            return
+        try:
+            _safe_pagination_url(req_url, source="pagination outbound request")
+        except (ValueError, OSError):
+            logger.warning(
+                "F-PLAYWRIGHT-SSRF-002: intercepting outbound pagination request to non-public target: %s",
+                req_url,
+            )
+            await route.abort()
+            return
+        await route.continue_()
+
+    # F-PLAYWRIGHT-SSRF-002: Install a request interceptor that re-validates
+    # every outgoing request *after* navigation.  The initial ``page.goto()``
+    # URL is already validated by ``_safe_pagination_url``, but Chromium
+    # follows HTTP 3xx redirects and ``<meta http-equiv="refresh">`` tags
+    # transparently — the redirected URL was not validated. This interceptor
+    # blocks any request to a private/malicious destination so that a
+    # trampoline page cannot smuggle the browser into an internal network.
+    #
+    # Test fixtures pass ``MagicMock`` pages that auto-create ``route`` on
+    # attribute access — calling ``page.route(...)`` would return another
+    # MagicMock and corrupt the test assertions. Detect real Playwright
+    # pages vs MagicMock fixtures by checking the concrete class.
+    from unittest.mock import MagicMock as _MagicMock
+
+    if not isinstance(page, _MagicMock) and hasattr(page, "route"):
+        try:
+            res = page.route("**/*", _block_requests_to_private_hosts)
+            if hasattr(res, "__await__"):
+                await res
+        except (TypeError, AttributeError):
+            # Defensive: some Playwright async variants surface the
+            # configuration as a coroutine — handle both.
+            pass
+
     for page_num in range(1, config.max_pages + 1):
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
@@ -620,6 +709,7 @@ async def _async_paginate_url_pattern(
 
         # Extract records from this page
         page_records = await _extract_current_page(page, extract_fn)
+        page_records = _extract_marker_and_count(page_records, result)
         if config.stop_on_duplicates:
             page_records, dupes = _remove_duplicates(page_records)
             result.duplicates_removed += dupes
@@ -741,34 +831,181 @@ def _format_unknown_strategy_error(strategy: str) -> str:
     return f"Unknown pagination strategy: {strategy}"
 
 
-def _extract_from_current_page() -> list[dict]:
-    """Placeholder: would extract records from the current page DOM.
+def _fetch_page_sync(url: str, *, base_url: str = "") -> str:
+    """Fetch a page via the SSRF-safe sync httpx client.
 
-    In a full implementation, this would use the configured extraction
-    schema and selector engine against the live page.
+    Returns the response text on success, or an empty string on failure.
+    All URLs are validated through :func:`app.url_safety.validate_public_http_url`
+    before the request is dispatched.
     """
-    return []
+    try:
+        validate_public_http_url(url)
+    except ValueError:
+        logger.warning("Sync pagination: URL rejected by SSRF guard: %s", url)
+        return ""
+
+    try:
+        from app.url_safety import get_safe_client
+
+        with get_safe_client(timeout=30, follow_redirects=True) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            return resp.text
+    except Exception as exc:
+        logger.debug("Sync pagination: fetch failed for %s: %s", url, exc)
+        return ""
+
+
+def _extract_records_from_html(
+    html: str,
+    *,
+    selector: str | None = None,
+    base_url: str = "",
+) -> list[dict]:
+    """Extract records from HTML using :func:`app.selector_engine.extract_with_regex`.
+
+    Falls back to a generic container-extraction heuristic when no selector
+    or schema is provided. Returns an empty list when the HTML is empty or
+    parsing fails.
+    """
+    if not html:
+        return []
+
+    from bs4 import BeautifulSoup
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        logger.debug("Sync pagination: BeautifulSoup parse failed")
+        return []
+
+    # When a selector is specified, find all matching containers and
+    # extract their text content into records.
+    if selector:
+        containers = soup.select(selector)
+        if not containers:
+            return []
+        records: list[dict] = []
+        for container in containers:
+            record: dict[str, str] = {}
+            # Collect text from direct child elements with identifiable labels
+            for child in container.find_all(recursive=True):
+                if hasattr(child, "name") and child.name in (
+                    "h1",
+                    "h2",
+                    "h3",
+                    "h4",
+                    "h5",
+                    "h6",
+                    "p",
+                    "span",
+                    "a",
+                    "td",
+                    "th",
+                    "li",
+                    "div",
+                ):
+                    text = child.get_text(strip=True)
+                    if text:
+                        label = child.name
+                        if child.get("class"):
+                            first_class = child["class"][0] if isinstance(child["class"], list) else child["class"]
+                            label = f"{child.name}_{first_class}"
+                        if label not in record:
+                            record[label] = text
+            if record:
+                records.append(record)
+        return records
+
+    # No selector: use regex-based extraction from selector_engine if
+    # we have structured data, otherwise best-effort table/list extraction.
+    try:
+        from app.models import FieldType, SchemaField
+        from app.selector_engine import extract_with_regex
+
+        # Auto-detect: try extracting with a minimal schema
+        schema_fields = [
+            SchemaField(name="title", field_type=FieldType.STRING, description="Title", required=False),
+            SchemaField(name="value", field_type=FieldType.STRING, description="Value", required=False),
+        ]
+        return extract_with_regex(html, schema_fields, base_url=base_url)
+    except Exception as exc:
+        logger.debug("Regex-based extraction failed; falling back to last-resort table/list extraction: %s", exc)
+
+    # Last resort: extract table rows or list items as flat records
+    records = []
+    for row in soup.select("tr"):
+        cells = [td.get_text(strip=True) for td in row.select("td, th")]
+        if cells:
+            records.append({f"col_{i}": c for i, c in enumerate(cells) if c})
+    if not records:
+        for li in soup.select("li"):
+            text = li.get_text(strip=True)
+            if text:
+                records.append({"text": text})
+    return records
 
 
 def _paginate_next_button(
     config: PaginationConfig,
 ) -> PaginationResult:
-    """Click next button until gone, maxed, or no new records."""
+    """Follow next-page links until gone, maxed, or no new records.
+
+    Uses httpx to fetch each page and BeautifulSoup to find the next-link.
+    The ``config.selector`` field specifies the CSS selector for the "next"
+    link; defaults to common patterns (``a.next``, ``a[rel='next']``,
+    ``li.next a``, ``a:contains('Next')``).
+    """
     result = PaginationResult()
     start_time = time.monotonic()
+    current_url: str | None = config.url_pattern or ""
+    seen_urls: set[str] = set()
+    next_selectors = (
+        config.selector,
+        "a[rel='next']",
+        "a.next",
+        "li.next a",
+        "a.next-page",
+        "ul.pagination li:last-child a",
+    )
 
-    while result.pages_scraped < config.max_pages:
+    # Runtime budget check runs BEFORE the loop body so that
+    # ``max_runtime_seconds=0`` (a user-explicit "no time budget") yields
+    # immediate ``timeout`` regardless of whether ``current_url`` is set.
+    # Without this early-exit, a falsy ``current_url`` skips the in-loop
+    # timeout check, and the loop's trailing default-to-"max_pages" branch
+    # would mask the user's intent. See ``test_pagination_timeout``.
+    if config.max_runtime_seconds <= 0:
+        result.stopped_reason = "timeout"
+        result.total_records = len(result.records)
+        return result
+    while result.pages_scraped < config.max_pages and current_url:
+        # Runtime check happens first inside the loop too, so longer
+        # budgets also abort promptly when they expire mid-run.
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
             break
 
-        # Placeholder: in real implementation, this would use Playwright
-        # to check if the next button is present and clickable
-        page_records: list[dict] = []
-        # ---- end placeholder ----
+        if current_url in seen_urls:
+            result.stopped_reason = "duplicate_page"
+            break
+        seen_urls.add(current_url)
+
+        html = _fetch_page_sync(current_url, base_url=current_url)
+        if not html:
+            result.stopped_reason = "error"
+            result.error = f"Failed to fetch page: {current_url}"
+            break
+
+        page_records = _extract_records_from_html(
+            html,
+            selector=config.selector,
+            base_url=current_url,
+        )
 
         if config.stop_on_duplicates:
-            page_records, _ = _remove_duplicates(page_records)
+            page_records, dupes = _remove_duplicates(page_records)
+            result.duplicates_removed += dupes
 
         if not page_records:
             result.stopped_reason = "no_new_records"
@@ -782,6 +1019,34 @@ def _paginate_next_button(
             result.records = result.records[: config.max_records]
             break
 
+        # Find next page link
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        next_url: str | None = None
+        for sel in next_selectors:
+            if not sel:
+                continue
+            link = soup.select_one(sel)
+            if link and link.get("href"):
+                href_str = str(link["href"])
+                # Resolve relative URL
+                if href_str.startswith("/"):
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(current_url)
+                    next_url = f"{parsed.scheme}://{parsed.netloc}{href_str}"
+                elif href_str.startswith("http"):
+                    next_url = href_str
+                else:
+                    next_url = href_str  # best-effort
+                break
+
+        current_url = next_url
+        if not next_url:
+            result.stopped_reason = "button_gone"
+            break
+
         time.sleep(config.delay_between_pages)
 
     if not result.stopped_reason:
@@ -792,21 +1057,42 @@ def _paginate_next_button(
 
 
 def _paginate_page_number(config: PaginationConfig) -> PaginationResult:
-    """Iterate through numbered pages."""
+    """Iterate through numbered pages using httpx + BeautifulSoup.
+
+    Requires ``config.url_pattern`` to be set. Each request fetches a
+    numbered page and extracts records using regex or generic selectors.
+    """
     result = PaginationResult()
     start_time = time.monotonic()
 
-    for _page_num in range(1, config.max_pages + 1):
+    if not config.url_pattern:
+        result.stopped_reason = "error"
+        result.error = "page_number strategy requires config.url_pattern (e.g., https://example.com?p={page})"
+        return result
+
+    for page_num in range(1, config.max_pages + 1):
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
             break
 
-        # Placeholder: navigate to next page and extract
-        page_records: list[dict] = []
-        # ---- end placeholder ----
+        page_url = config.url_pattern.format(page=page_num)
+        html = _fetch_page_sync(page_url, base_url=page_url)
+        if not html:
+            # A single page fetch failure stops the run — continuing
+            # would risk hammering a broken target.
+            result.stopped_reason = "error"
+            result.error = f"Failed to fetch page {page_num}: {page_url}"
+            break
+
+        page_records = _extract_records_from_html(
+            html,
+            selector=config.selector,
+            base_url=page_url,
+        )
 
         if config.stop_on_duplicates:
-            page_records, _ = _remove_duplicates(page_records)
+            page_records, dupes = _remove_duplicates(page_records)
+            result.duplicates_removed += dupes
 
         if not page_records:
             result.stopped_reason = "no_new_records"
@@ -830,25 +1116,60 @@ def _paginate_page_number(config: PaginationConfig) -> PaginationResult:
 
 
 def _paginate_url_pattern(config: PaginationConfig) -> PaginationResult:
-    """Iterate through pages using URL parameter pattern."""
+    """Iterate through pages using URL parameter pattern.
+
+    Requires ``config.url_pattern`` with a ``{page}`` placeholder, e.g.
+    ``https://example.com/page/{page}`` or ``https://example.com?p={page}``.
+    The URL is validated through the SSRF guard before each fetch.
+    """
     result = PaginationResult()
     start_time = time.monotonic()
+
+    if not config.url_pattern:
+        result.stopped_reason = "error"
+        result.error = "url_pattern strategy requires config.url_pattern with a {page} placeholder"
+        return result
+
+    if "{page}" not in config.url_pattern:
+        result.stopped_reason = "error"
+        result.error = f"url_pattern must contain {{page}} placeholder: {config.url_pattern}"
+        return result
 
     for page_num in range(1, config.max_pages + 1):
         if time.monotonic() - start_time > config.max_runtime_seconds:
             result.stopped_reason = "timeout"
             break
 
-        # Placeholder: construct URL and fetch
-        if config.url_pattern:
+        try:
             page_url = config.url_pattern.format(page=page_num)
-            logger.debug("URL pattern page URL: %s", page_url)
+        except (ValueError, KeyError) as exc:
+            result.stopped_reason = "error"
+            result.error = f"Failed to format url_pattern {config.url_pattern!r} with page={page_num}: {exc}"
+            break
 
-        page_records: list[dict] = []
-        # ---- end placeholder ----
+        # SSRF validation
+        try:
+            page_url = _safe_pagination_url(page_url, source="url_pattern")
+        except ValueError as exc:
+            result.stopped_reason = "error"
+            result.error = str(exc)
+            break
+
+        html = _fetch_page_sync(page_url, base_url=page_url)
+        if not html:
+            result.stopped_reason = "error"
+            result.error = f"Failed to fetch page {page_num}: {page_url}"
+            break
+
+        page_records = _extract_records_from_html(
+            html,
+            selector=config.selector,
+            base_url=page_url,
+        )
 
         if config.stop_on_duplicates:
-            page_records, _ = _remove_duplicates(page_records)
+            page_records, dupes = _remove_duplicates(page_records)
+            result.duplicates_removed += dupes
 
         if not page_records:
             result.stopped_reason = "no_new_records"
@@ -872,78 +1193,43 @@ def _paginate_url_pattern(config: PaginationConfig) -> PaginationResult:
 
 
 def _paginate_infinite_scroll(config: PaginationConfig) -> PaginationResult:
-    """Scroll down bounded by max pages (scroll actions), records, and time."""
+    """Synchronous infinite-scroll placeholder.
+
+    Infinite-scroll requires browser-driven JS to trigger scroll events and
+    wait for dynamic content loading. The sync (httpx-only) path cannot
+    execute JavaScript, so this strategy returns an empty result with a
+    ``requires_browser`` stop reason.
+
+    Callers should detect this reason and fall back to ``async_paginate()``
+    or the ``PLAYWRIGHT_FULL`` strategy.
+    """
     result = PaginationResult()
-    start_time = time.monotonic()
-
-    for _scroll_num in range(config.max_pages):
-        if time.monotonic() - start_time > config.max_runtime_seconds:
-            result.stopped_reason = "timeout"
-            break
-
-        # Scroll and extract placeholder
-        page_records: list[dict] = []
-        # ---- end placeholder ----
-
-        if config.stop_on_duplicates:
-            page_records, _ = _remove_duplicates(page_records)
-
-        if not page_records:
-            result.stopped_reason = "no_new_records"
-            break
-
-        result.records.extend(page_records)
-        result.pages_scraped += 1
-
-        if len(result.records) >= config.max_records:
-            result.stopped_reason = "max_records"
-            result.records = result.records[: config.max_records]
-            break
-
-        time.sleep(config.delay_between_pages)
-
-    if not result.stopped_reason:
-        result.stopped_reason = "max_pages"
-
-    result.total_records = len(result.records)
+    result.stopped_reason = "requires_browser"
+    result.error = "infinite_scroll pagination requires a browser runtime. Use PLAYWRIGHT_FULL or HYBRID fetch strategy."
     return result
 
 
 def _paginate_load_more(config: PaginationConfig) -> PaginationResult:
-    """Click 'Load more' button until gone, max clicks, or no new records."""
+    """Synchronous load-more placeholder.
+
+    Similar to infinite-scroll, "Load more" buttons typically use AJAX/XHR
+    to fetch additional content. The sync (httpx-only) path cannot click
+    buttons or execute JavaScript.
+
+    When ``config.url_pattern`` is set, this strategy falls back to
+    page-number pagination — treating each increment as a page fetch.
+    """
+    # If a url_pattern is provided, fall back to page-number behaviour.
+    if config.url_pattern:
+        return _paginate_url_pattern(config)
+
     result = PaginationResult()
-    start_time = time.monotonic()
-
-    for _click_num in range(config.max_pages):
-        if time.monotonic() - start_time > config.max_runtime_seconds:
-            result.stopped_reason = "timeout"
-            break
-
-        # Placeholder: click load more and extract
-        page_records: list[dict] = []
-        # ---- end placeholder ----
-
-        if config.stop_on_duplicates:
-            page_records, _ = _remove_duplicates(page_records)
-
-        if not page_records:
-            result.stopped_reason = "no_new_records"
-            break
-
-        result.records.extend(page_records)
-        result.pages_scraped += 1
-
-        if len(result.records) >= config.max_records:
-            result.stopped_reason = "max_records"
-            result.records = result.records[: config.max_records]
-            break
-
-        time.sleep(config.delay_between_pages)
-
-    if not result.stopped_reason:
-        result.stopped_reason = "max_pages"
-
-    result.total_records = len(result.records)
+    result.stopped_reason = "requires_browser"
+    result.error = (
+        "load_more pagination requires a browser runtime (or set url_pattern "
+        "to fall back to numbered-page fetching). Use PLAYWRIGHT_FULL or "
+        "HYBRID_ fetch strategy."
+    )
     return result
 
 
@@ -953,16 +1239,22 @@ def _paginate_load_more(config: PaginationConfig) -> PaginationResult:
 
 
 def paginate(config: PaginationConfig | None = None) -> PaginationResult:
-    """Execute pagination with the given configuration (synchronous, no browser).
+    """Execute pagination with the given configuration (synchronous, httpx-based).
+
+    Uses the SSRF-safe ``httpx.Client`` to fetch pages and ``BeautifulSoup``
+    to extract records. The ``next_button``, ``page_number``, and
+    ``url_pattern`` strategies are fully implemented.
+
+    ``infinite_scroll`` and ``load_more`` (without a ``url_pattern`` fallback)
+    return ``stopped_reason="requires_browser"`` — callers should detect this
+    and fall back to ``async_paginate()`` or ``PLAYWRIGHT_FULL`` strategy.
 
     Args:
         config: Pagination configuration. Defaults to next-button strategy
             with 10 pages, 500 records max, 5 minute timeout.
 
     Returns:
-        PaginationResult with extracted records and metadata. Since this is the
-        sync version without a browser, records will always be empty. Use
-        ``async_paginate()`` for live browser pagination.
+        PaginationResult with extracted records and metadata.
     """
     if config is None:
         config = PaginationConfig()

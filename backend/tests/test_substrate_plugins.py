@@ -1,5 +1,7 @@
+from unittest.mock import patch
+
 import pytest
-from app.llm_bridge import get_plugin_manager
+from app.llm_bridge import SubstratePluginManager, get_plugin_manager
 from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
@@ -13,6 +15,23 @@ def _register_allow_listed_handler(mgr, name, handler) -> None:
     """
     handler.__module__ = "app.llm_bridge"
     mgr.register_handler(name, handler)
+
+
+def _patch_sandbox_for_tests():
+    """Return a context manager that patches ``_sandboxed_call`` to run in-process.
+
+    Production code requires subprocess sandbox (LAW 15). Tests that register
+    handlers defined in ``tests.*`` cannot dispatch them through the real
+    sandbox because the subprocess worker cannot import test-only functions.
+    Patching ``_sandboxed_call`` to call ``handler(**kwargs)`` directly
+    mirrors the old ``DATAFORGE_SANDBOX_DISABLED`` bypass but is scoped
+    to the specific test context — not a global env var.
+    """
+
+    def _fake_sandboxed_call(self_, handler_name, handler, kwargs):
+        return handler(**kwargs)
+
+    return patch.object(SubstratePluginManager, "_sandboxed_call", _fake_sandboxed_call)
 
 
 def test_plugin_registration_and_execution() -> None:
@@ -35,8 +54,9 @@ def test_plugin_registration_and_execution() -> None:
     ws._manifold.set_manifold_vector("target_role", action_point)
     ws._topology.add(["target_role"], "tok1", instability=0.1)
 
-    # 4. Trigger dispatch
-    triggered = sos.trigger_actions()
+    # 4. Trigger dispatch with sandbox patched for test handler
+    with _patch_sandbox_for_tests():
+        triggered = sos.trigger_actions()
 
     # 5. Verify
     assert triggered == 1
@@ -60,5 +80,6 @@ def test_plugin_policy_restriction() -> None:
     ws._topology._communities = [{"a"}, {"b"}, {"c"}, {"d"}, {"e"}]
 
     # Attempt tool call directly - should be blocked by policy (inherited from ws)
-    with pytest.raises(PermissionError):
-        plugins.call_tool("p1", role="r", token="t")
+    with _patch_sandbox_for_tests():
+        with pytest.raises(PermissionError):
+            plugins.call_tool("p1", role="r", token="t")

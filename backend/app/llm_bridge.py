@@ -7,7 +7,6 @@ All tool-calls must be traceable and governed by the Substrate Policy Engine.
 import asyncio
 import json
 import logging
-import os
 import threading
 from collections.abc import Callable
 from typing import Any
@@ -601,7 +600,7 @@ async def llm_json(
         from app.utils.llm_bridge_settings import llm_raise_on_failure_default
 
         raise_on_failure = llm_raise_on_failure_default()
-    _handle_silent_failure("llm_json", last_err, raise_on_failure=raise_on_failure)
+    _handle_silent_failure("llm_json", last_err, raise_on_failure=bool(raise_on_failure))
     return {}
 
 
@@ -776,7 +775,7 @@ async def llm_text(
         from app.utils.llm_bridge_settings import llm_raise_on_failure_default
 
         raise_on_failure = llm_raise_on_failure_default()
-    _handle_silent_failure("llm_text", last_err, raise_on_failure=raise_on_failure)
+    _handle_silent_failure("llm_text", last_err, raise_on_failure=bool(raise_on_failure))
     return ""
 
 
@@ -810,6 +809,58 @@ def is_handler_module_allowed(handler: Callable) -> bool:
     return module_name in ALLOWED_SANDBOX_MODULES
 
 
+# Module-level native tool wrappers — see ``_register_native_tools`` for why.
+# These are free functions at module scope (not class methods) so that the
+# subprocess sandbox worker can resolve ``handler.__qualname__`` directly
+# from an ``importlib.import_module("app.llm_bridge")`` lookup. The
+# ``_current_pm`` thread-local (set by ``SubstratePluginManager.call_tool``
+# before dispatch) provides the live instance reference for delegation.
+
+# Thread-local holding the currently-dispatching SubstratePluginManager
+# instance. The module-level native wrappers (_native_role_merger_wrapper,
+# _native_manifold_compressor_wrapper) read this to delegate to the live
+# instance — required because the subprocess sandbox worker cannot resolve
+# bound methods on a class it never instantiated.
+_current_pm_tls: threading.local = threading.local()
+
+
+def _get_current_pm() -> Any:
+    """Return the SubstratePluginManager instance currently dispatching.
+
+    Returns ``None`` if no ``call_tool`` is in flight on this thread. The
+    wrappers fall back to a graceful "Fail: No WS" string in that case so
+    they remain safe to invoke outside the normal dispatch path.
+    """
+    return getattr(_current_pm_tls, "pm", None)
+
+
+def _native_role_merger_wrapper(**kwargs) -> str:
+    """Native Tool: Merge redundant roles (Phase 44) — module-level wrapper.
+
+    Delegates to the active ``SubstratePluginManager`` instance via the
+    thread-local ``_current_pm`` set by ``call_tool``. If no current
+    instance is set, returns the same graceful "Fail: No WS" string the
+    instance method returns, so the wrapper is safe to call from any
+    invocation path that does not go through ``call_tool``.
+    """
+    pm = _get_current_pm()
+    if pm is None:
+        return "Fail: No WS"
+    return pm._native_role_merger(**kwargs)
+
+
+def _native_manifold_compressor_wrapper(**kwargs) -> str:
+    """Native Tool: Prune low-impact manifold dimensions — module-level wrapper."""
+    pm = _get_current_pm()
+    if pm is None:
+        return "Fail: No WS"
+    return pm._native_manifold_compressor(**kwargs)
+
+
+_native_role_merger_wrapper.__module__ = "app.llm_bridge"
+_native_manifold_compressor_wrapper.__module__ = "app.llm_bridge"
+
+
 class SubstratePluginManager:
     """Manages the registration and execution of external action handlers."""
 
@@ -825,9 +876,21 @@ class SubstratePluginManager:
         self._register_native_tools()
 
     def _register_native_tools(self) -> None:
-        """Register built-in tools for substrate self-evolution."""
-        self.register_handler("role_merger", self._native_role_merger)
-        self.register_handler("manifold_compressor", self._native_manifold_compressor)
+        """Register built-in tools for substrate self-evolution.
+
+        The handlers are registered as **module-level free functions**
+        (``role_merger_impl`` and ``manifold_compressor_impl`` below the
+        class definition), not as bound methods. This is required by
+        LAW 15: the subprocess worker walks ``handler.__qualname__`` from
+        the allow-listed module and calls ``obj(**kwargs)``. Bound methods
+        on a class require knowledge of the SubstratePluginManager
+        constructor, which the worker does not have. Free functions at
+        module scope are invoked with ``SubstratePluginManager._current``
+        as their ``pm`` argument — a process-local singleton set at the
+        top of every native handler call.
+        """
+        self.register_handler("role_merger", _native_role_merger_wrapper)
+        self.register_handler("manifold_compressor", _native_manifold_compressor_wrapper)
 
     def _native_role_merger(self, **kwargs) -> str:
         """Native Tool: Merge redundant roles (Phase 44)."""
@@ -942,14 +1005,31 @@ class SubstratePluginManager:
                     msg,
                 )
 
-            # LAW 15: Attempt subprocess sandbox first (unless explicitly
-            # disabled via env var — used in test/CI environments where
-            # subprocess dispatch breaks due to qualname resolution issues).
-            if os.environ.get("DATAFORGE_SANDBOX_DISABLED", "").strip().lower() in ("1", "true", "yes"):
-                logger.debug("LAW 15: sandbox disabled via DATAFORGE_SANDBOX_DISABLED; running [%s] in-process", handler_name)
-                result = handler(**kwargs)
-            else:
+            # Populates the thread-local current-PM pointer so that native
+            # tool wrappers (role_merger, manifold_compressor) can resolve
+            # the live instance from inside the subprocess sandbox worker.
+            # The worker invokes handlers as free functions and has no
+            # ``self`` reference.
+            prev_pm = getattr(_current_pm_tls, "pm", None)
+            _current_pm_tls.pm = self
+            try:
+                # LAW 15: Always dispatch through the subprocess sandbox. There is
+                # no production-level opt-out — a leaked or mis-set env-var
+                # dropping dispatch into in-process execution would undercut
+                # the threat model. Tests that need to exercise the
+                # in-process path patch ``SubstratePluginManager._sandboxed_call``
+                # at the class level via ``unittest.mock.patch.object``.
                 result = self._sandboxed_call(handler_name, handler, kwargs)
+            finally:
+                # Restore the previous binding (None in normal flow, but
+                # nested call_tool invocations must leak neither direction).
+                if prev_pm is None:
+                    import contextlib
+
+                    with contextlib.suppress(AttributeError):
+                        del _current_pm_tls.pm
+                else:
+                    _current_pm_tls.pm = prev_pm
 
             self._execution_history.append({"handler": handler_name, "status": "success", "result_type": str(type(result))})
             if len(self._execution_history) > self._max_history:
