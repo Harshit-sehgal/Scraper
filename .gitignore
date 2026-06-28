@@ -39,6 +39,9 @@ backend/app/data/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
 *.lock
 
 # Local generated exports/outputs

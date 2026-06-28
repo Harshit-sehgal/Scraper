@@ -32,7 +32,8 @@
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97) translateY(1px);
+  transition-duration: 60ms;
 }
 
 .btn:disabled,
@@ -447,6 +448,13 @@ select.input {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
+}
+
+.card:hover {
+  border-color: var(--border-strong);
 }
 
 .card.padded-sm {
@@ -455,6 +463,10 @@ select.input {
 
 .card.flush {
   padding: 0;
+}
+
+.card.flush:hover {
+  border-color: var(--border-strong);
 }
 
 .card-header {
@@ -864,6 +876,16 @@ kbd {
   .empty-state {
     animation: none;
   }
+
+  .empty-state:hover {
+    border-color: var(--border-strong);
+  }
+}
+
+.empty-state:hover {
+  border-color: var(--border-strong);
+  animation-duration: 2s;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .empty-state .empty-icon {
@@ -930,9 +952,28 @@ kbd {
   min-width: 240px;
   max-width: 380px;
   pointer-events: auto;
+  animation: toast-slide-up 200ms var(--ease-out);
   transition:
     opacity var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
+}
+
+@keyframes toast-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
 }
 
 .toast.dismissing {
@@ -1150,6 +1191,23 @@ kbd {
   justify-content: center;
   padding-top: min(20vh, 160px);
   z-index: 1100;
+  animation: overlay-fade-in 120ms var(--ease-out);
+}
+
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-palette-overlay {
+    animation: none;
+  }
 }
 
 .command-palette {
@@ -1159,6 +1217,26 @@ kbd {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  animation: palette-scale-in 150ms var(--ease-out);
+  transform-origin: top center;
+}
+
+@keyframes palette-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-palette {
+    animation: none;
+  }
 }
 
 .command-palette-input-wrap {

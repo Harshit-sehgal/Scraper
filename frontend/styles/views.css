@@ -1089,10 +1089,21 @@
   border-radius: var(--radius);
   padding: var(--space-5) var(--space-6);
   margin-bottom: var(--space-4);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
+}
+
+#view-dashboard .dash-card:hover {
+  border-color: var(--border-strong);
 }
 
 #view-dashboard .dash-card.no-pad {
   padding: 0;
+}
+
+#view-dashboard .dash-card.no-pad:hover {
+  border-color: var(--border-strong);
 }
 
 #view-dashboard .dash-card-header {
@@ -3405,11 +3416,15 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: border-color var(--duration-base) var(--ease-out);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
+  cursor: default;
 }
 
 #view-dashboard .dash-metric:hover {
   border-color: var(--border-strong);
+  background: var(--bg-subtle);
 }
 
 #view-dashboard .dash-metric-label {
