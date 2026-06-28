@@ -1,8 +1,10 @@
 import asyncio
+import contextlib
 import ipaddress
 import logging
 import socket
 from collections.abc import Callable
+from contextlib import contextmanager
 from typing import Any
 from urllib.parse import urlparse
 
@@ -638,12 +640,50 @@ def get_safe_client(**kwargs: Any) -> httpx.Client:
 
     Same two-layer enforcement as :func:`get_safe_async_client`, for the
     sync path.
+
+    L11: the returned client is **deterministically closeable** — it
+    carries the two stacked SSRF-safe transports, and any path that
+    uses it must release the socket pool via ``with`` or explicit
+    ``.close()``. Returning a bare ``httpx.Client`` (without an
+    enforced lifecycle) was a defense-in-depth gap: a caller that
+    forgot the ``with`` block would leak a TCP pool. The factory
+    itself stays a plain factory — the contract here is the SSRF
+    transport wiring, not resource lifetime. See :func:`open_safe_client`
+    for a context-manager helper that callers can adopt when they
+    don't want to (or can't) wrap the bare client themselves.
     """
     if "transport" not in kwargs:
         transport_kwargs = {k: kwargs.pop(k) for k in _TRANSPORT_KEYS if k in kwargs}
         inner = SafeHTTPTransport(**transport_kwargs)
         kwargs["transport"] = _UrlValidatingSyncTransport(inner)
     return httpx.Client(**kwargs)
+
+
+def open_safe_client(**kwargs: Any):
+    """Context-managed variant of :func:`get_safe_client`.
+
+    L11: returns a context manager yielding the SSRF-safe
+    ``httpx.Client`` and guaranteeing ``.close()`` runs on exit,
+    even if the caller raises mid-request. Prefer this over the bare
+    factory in any new caller that doesn't already wrap ``httpx.Client``
+    in a ``with`` block to prevent socket-pool leaks.
+
+    Example::
+
+        with open_safe_client(timeout=10.0) as client:
+            response = client.get("https://example.com")
+    """
+
+    @contextmanager
+    def _cm():
+        client = get_safe_client(**kwargs)
+        try:
+            yield client
+        finally:
+            with contextlib.suppress(Exception):
+                client.close()
+
+    return _cm()
 
 
 # ───────────────────────────────────────────────────────────────────────
