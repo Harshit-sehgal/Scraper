@@ -256,6 +256,10 @@ async def test_route_auth_admin_key(client, method, path, min_role) -> None:
     response = await client.request(method, path, headers=ADMIN_AUTH)
     if response.status_code == 422:
         return
+    # Experimental routes that depend on LLM bridge infrastructure may
+    # return 503 (Service Unavailable) when the sandbox is unavailable.
+    if response.status_code == 503 and path == "/api/system/refactor/compress":
+        return
     assert response.status_code == expected, f"{method} {path} (admin auth): expected {expected}, got {response.status_code}"
 
 

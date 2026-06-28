@@ -15,6 +15,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.audit_logger import log_rbac_event
+from app.config import settings
 from app.models import ScheduledJob, ScheduledJobFrequency, ScrapeMode
 from app.url_safety import validate_public_http_url
 from app.utils.aup import require_aup_accepted
@@ -39,7 +40,7 @@ _EXPECTED_GAP_SECONDS: dict[str, int] = {
 # File-backed scheduled-job store shared across uvicorn/gunicorn workers.
 # Reads always re-read disk; writes use flock-serialised atomic rename.
 _scheduled_jobs = JSONFileStore(
-    Path(__file__).resolve().parents[2] / "data" / "scheduled_jobs.json",
+    Path(settings.DATA_DIR) / "scheduled_jobs.json",
 )
 
 

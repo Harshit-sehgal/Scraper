@@ -338,8 +338,10 @@ class TestPostgresWorkflowParity:
     @pytest.fixture(autouse=True)
     def _setup_repo(self) -> None:
         try:
+            from app.postgres_repository_base import get_database_url
             from app.postgres_workflow_repository import PostgresWorkflowRepository
 
+            get_database_url()  # eager check before lazy connection
             self.repo = PostgresWorkflowRepository()
         except (ImportError, RuntimeError) as exc:
             pytest.skip(f"Postgres not available: {exc}")

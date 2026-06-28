@@ -16,8 +16,20 @@ from starlette.concurrency import run_in_threadpool
 from app.browser_pool import get_browser_pool
 from app.config import settings
 from app.models import (
+    DomainConfidenceResponse,
     JobCreate,
+    LowConfidenceSelectorItem,
+    LowConfidenceSelectorsResponse,
+    PreviewResponse,
+    RegressionGenerateAllResponse,
+    RegressionTestGenerateResponse,
+    ScraperConfigResponse,
     ScraperDiagnosticsRequest,
+    ScraperStatsResponse,
+    SelectorCleanupResponse,
+    SelectorMemoryFullStatsResponse,
+    SelectorMemoryStatsResponse,
+    StatusResponse,
 )
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
@@ -30,7 +42,7 @@ router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/config")
+@router.get("/config", response_model=ScraperConfigResponse)
 async def get_scraper_config(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -46,7 +58,7 @@ async def get_scraper_config(
     }
 
 
-@router.get("/telemetry")
+@router.get("/telemetry", response_model=list[dict])
 async def get_recent_telemetry(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     n: int = 20,
@@ -55,25 +67,25 @@ async def get_recent_telemetry(
     return get_scrape_telemetry().get_recent(n)
 
 
-@router.get("/memory/stats")
+@router.get("/memory/stats", response_model=SelectorMemoryStatsResponse)
 async def get_selector_memory_brief(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
     """Return brief statistics on remembered selectors. Requires operator or admin."""
     memory = get_selector_memory()
-    return {
-        "domain_count": len(memory._memory),
-        "total_successes": sum(e.get("success_count", 0) for e in memory._memory.values()),
-        "total_failures": sum(e.get("failure_count", 0) for e in memory._memory.values()),
-        "top_domains": sorted(
+    return SelectorMemoryStatsResponse(
+        domain_count=len(memory._memory),
+        total_successes=sum(e.get("success_count", 0) for e in memory._memory.values()),
+        total_failures=sum(e.get("failure_count", 0) for e in memory._memory.values()),
+        top_domains=sorted(
             [{"domain": d, "success": e.get("success_count", 0)} for d, e in memory._memory.items()],
             key=lambda x: x["success"],
             reverse=True,
         )[:10],
-    }
+    )
 
 
-@router.get("/browser")
+@router.get("/browser", response_model=dict)
 async def get_browser_stats(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -81,7 +93,7 @@ async def get_browser_stats(
     return get_browser_pool().get_metrics()
 
 
-@router.get("/health/legacy")
+@router.get("/health/legacy", response_model=dict)
 async def get_legacy_domain_health(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -100,7 +112,7 @@ async def get_legacy_domain_health(
     return health
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=ScraperStatsResponse)
 async def get_scraper_stats(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -108,27 +120,29 @@ async def get_scraper_stats(
     telemetry = get_scrape_telemetry()
     recent_latency = telemetry.get_recent(10)
     recent_success = telemetry.get_recent(20)
-    return {
-        "confidence_histogram": telemetry.get_confidence_histogram(),
-        "recent_latency_avg": (
+    raw = telemetry.get_confidence_histogram()
+    confidence_histogram = [[float(k.split("-")[0]), int(v)] for k, v in raw.items()] if raw else []
+    return ScraperStatsResponse(
+        confidence_histogram=confidence_histogram,
+        recent_latency_avg=(
             sum(float(t.get("fetch_ms", 0) or 0) for t in recent_latency) / len(recent_latency) if recent_latency else 0
         ),
-        "recent_success_rate": (
+        recent_success_rate=(
             sum(1 for t in recent_success if not t.get("fallback_triggered", False)) / len(recent_success)
             if recent_success
             else 1.0
         ),
-    }
+    )
 
 
-@router.delete("/telemetry")
+@router.delete("/telemetry", response_model=StatusResponse)
 async def clear_telemetry(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
     """Clear all scrape telemetry history."""
     get_scrape_telemetry().clear()
-    return {"status": "ok"}
+    return StatusResponse(status="ok")
 
 
-@router.post("/diagnostics")
+@router.post("/diagnostics", response_model=dict)
 async def get_scraper_diagnostics(
     req: ScraperDiagnosticsRequest,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -153,7 +167,7 @@ async def get_scraper_diagnostics(
     return report.to_dict()
 
 
-@router.post("/preview", response_model_exclude_none=True)
+@router.post("/preview", response_model=PreviewResponse, response_model_exclude_none=True)
 async def preview_extraction(
     req: JobCreate,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -197,18 +211,18 @@ async def preview_extraction(
 
     # Return a sample (up to 10 records) without persisting
     preview_records = results[:10] if isinstance(results, list) else []
-    return {
-        "url": target_url,
-        "total_records_found": len(results) if isinstance(results, list) else 0,
-        "preview_records": preview_records,
-        "dry_run": True,
-    }
+    return PreviewResponse(
+        url=target_url,
+        total_records_found=len(results) if isinstance(results, list) else 0,
+        preview_records=preview_records,
+        dry_run=True,
+    )
 
 
 # ─── Regression Capture (product kernel) ───────────────────────────────
 
 
-@router.get("/regressions")
+@router.get("/regressions", response_model=dict)
 async def get_regression_archive(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -228,7 +242,7 @@ async def get_regression_archive(
         raise HTTPException(status_code=500, detail="Failed to get regression archive") from e
 
 
-@router.get("/regressions/{entry_id}")
+@router.get("/regressions/{entry_id}", response_model=dict)
 async def get_regression_detail(
     entry_id: str,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -261,7 +275,7 @@ async def get_regression_detail(
         raise HTTPException(status_code=500, detail="Failed to get regression detail") from e
 
 
-@router.post("/regressions/{entry_id}/generate-test")
+@router.post("/regressions/{entry_id}/generate-test", response_model=RegressionTestGenerateResponse)
 async def generate_regression_replay_test(
     entry_id: str,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
@@ -275,7 +289,7 @@ async def generate_regression_replay_test(
                 status_code=404,
                 detail=f"Regression entry not found or fixture missing: {entry_id}",
             )
-        return {"entry_id": entry_id, "test_code": test_code}
+        return RegressionTestGenerateResponse(entry_id=entry_id, test_code=test_code)
     except HTTPException:
         raise
     except (RuntimeError, OSError, ValueError) as e:
@@ -283,16 +297,16 @@ async def generate_regression_replay_test(
         raise HTTPException(status_code=500, detail="Failed to generate replay test") from e
 
 
-@router.post("/regressions/generate-all-tests")
+@router.post("/regressions/generate-all-tests", response_model=RegressionGenerateAllResponse)
 async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
     """Generate replay tests for all captured regressions that lack one."""
     try:
         capture = get_regression_capture()
         all_tests = await run_in_threadpool(capture.generate_all_replay_tests)
-        return {
-            "total_tests_generated": all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
-            "test_code": all_tests,
-        }
+        return RegressionGenerateAllResponse(
+            total_tests_generated=all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
+            test_code=all_tests,
+        )
     except (RuntimeError, OSError, ValueError) as e:
         logger.exception("Failed to generate all regression replay tests")
         raise HTTPException(status_code=500, detail="Failed to generate replay tests") from e
@@ -301,7 +315,7 @@ async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_r
 # ─── Selector Memory (product kernel) ─────────────────────────────────
 
 
-@router.get("/selectors/stats")
+@router.get("/selectors/stats", response_model=SelectorMemoryFullStatsResponse)
 async def get_selector_memory_stats(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -318,18 +332,18 @@ async def get_selector_memory_stats(
     selector_memory = get_selector_memory()
     stats = selector_memory.get_memory_stats()
 
-    return {
-        "total_domains": stats["total_domains"],
-        "total_selectors": stats["total_selectors"],
-        "avg_confidence": round(stats["avg_confidence"], 3),
-        "high_confidence": stats["high_confidence"],  # >= 0.75
-        "medium_confidence": stats["medium_confidence"],  # 0.5 - 0.74
-        "low_confidence": stats["low_confidence"],  # < 0.5
-        "confidence_distribution": stats["by_confidence"],
-    }
+    return SelectorMemoryFullStatsResponse(
+        total_domains=stats["total_domains"],
+        total_selectors=stats["total_selectors"],
+        avg_confidence=round(stats["avg_confidence"], 3),
+        high_confidence=stats["high_confidence"],
+        medium_confidence=stats["medium_confidence"],
+        low_confidence=stats["low_confidence"],
+        confidence_distribution=stats["by_confidence"],
+    )
 
 
-@router.get("/selectors/domain/{domain}")
+@router.get("/selectors/domain/{domain}", response_model=DomainConfidenceResponse)
 async def get_domain_selector_confidence(
     domain: str,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -366,17 +380,17 @@ async def get_domain_selector_confidence(
     if confidence is None:
         raise HTTPException(status_code=404, detail=f"No cached selectors for domain: {domain}")
 
-    return {
-        "domain": domain,
-        "raw_confidence": round(confidence.raw_confidence, 3),
-        "age_factor": round(confidence.age_factor, 3),
-        "freshness_factor": round(confidence.freshness_factor, 3),
-        "final_score": round(confidence.final_score, 3),
-        "reason": confidence.reason,
-    }
+    return DomainConfidenceResponse(
+        domain=domain,
+        raw_confidence=round(confidence.raw_confidence, 3),
+        age_factor=round(confidence.age_factor, 3),
+        freshness_factor=round(confidence.freshness_factor, 3),
+        final_score=round(confidence.final_score, 3),
+        reason=confidence.reason,
+    )
 
 
-@router.post("/selectors/cleanup")
+@router.post("/selectors/cleanup", response_model=SelectorCleanupResponse)
 async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
     """Manually trigger selector memory cleanup. Admin only.
 
@@ -389,20 +403,20 @@ async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_ro
     stats = await run_in_threadpool(selector_memory.force_cleanup)
 
     if not stats:
-        return {
-            "message": "Cleanup not performed (too soon after last cleanup)",
-            "next_cleanup_available_in_seconds": 86400,
-        }
+        return SelectorCleanupResponse(
+            message="Cleanup not performed (too soon after last cleanup)",
+            next_cleanup_available_in_seconds=86400,
+        )
 
-    return {
-        "domains_checked": stats["domains_checked"],
-        "selectors_deleted": stats["selectors_deleted"],
-        "deleted_domains": stats["deleted_domains"],
-        "low_confidence_selectors": stats["low_confidence_selectors"],
-    }
+    return SelectorCleanupResponse(
+        domains_checked=int(stats.get("domains_checked", 0)),
+        selectors_deleted=int(stats.get("selectors_deleted", 0)),
+        deleted_domains=len(stats.get("deleted_domains", [])),
+        low_confidence_selectors=len(stats.get("low_confidence_selectors", [])),
+    )
 
 
-@router.get("/selectors/low-confidence")
+@router.get("/selectors/low-confidence", response_model=LowConfidenceSelectorsResponse)
 async def get_low_confidence_selectors(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     threshold: Annotated[float, Query(ge=0, le=1)] = 0.5,
@@ -413,29 +427,29 @@ async def get_low_confidence_selectors(
     Requires operator or admin.
     """
     selector_memory = get_selector_memory()
-    low_confidence = []
+    low_confidence: list[LowConfidenceSelectorItem] = []
 
     for domain, entry in selector_memory._memory.items():
         confidence = selector_memory._compute_confidence(entry)
         if confidence.final_score < threshold:
             low_confidence.append(
-                {
-                    "domain": domain,
-                    "score": round(confidence.final_score, 3),
-                    "raw_confidence": round(confidence.raw_confidence, 3),
-                    "age_factor": round(confidence.age_factor, 3),
-                    "freshness_factor": round(confidence.freshness_factor, 3),
-                    "success_count": entry.get("success_count", 0),
-                    "failure_count": entry.get("failure_count", 0),
-                    "reason": confidence.reason,
-                },
+                LowConfidenceSelectorItem(
+                    domain=domain,
+                    score=round(confidence.final_score, 3),
+                    raw_confidence=round(confidence.raw_confidence, 3),
+                    age_factor=round(confidence.age_factor, 3),
+                    freshness_factor=round(confidence.freshness_factor, 3),
+                    success_count=entry.get("success_count", 0),
+                    failure_count=entry.get("failure_count", 0),
+                    reason=confidence.reason,
+                ),
             )
 
     # Sort by score (worst first)
-    low_confidence.sort(key=lambda x: x["score"])
+    low_confidence.sort(key=lambda x: x.score)
 
-    return {
-        "threshold": threshold,
-        "count": len(low_confidence),
-        "selectors": low_confidence,
-    }
+    return LowConfidenceSelectorsResponse(
+        threshold=threshold,
+        count=len(low_confidence),
+        selectors=low_confidence,
+    )

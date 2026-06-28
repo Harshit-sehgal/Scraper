@@ -414,14 +414,17 @@ async def list_my_organizations(
 async def get_organization(
     org_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ) -> OrgResponse:
     """Get a single organization by ID."""
-    _role, user_id = auth
+    role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
+
+    if auth_org_id and auth_org_id != org_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
 
     # Existence before permission so a request for a missing org returns
     # 404 consistently, even when the caller is not a member.
@@ -582,14 +585,17 @@ async def create_project(
 async def list_org_projects(
     org_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ) -> ProjectListResponse:
     """List all projects within an organization."""
-    _role, user_id = auth
+    role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
+
+    if auth_org_id and auth_org_id != org_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
 
     # Verify membership
     if not get_identity_store().is_org_member(user_id, org_id):
@@ -734,14 +740,17 @@ class MembershipResponse(BaseModel):
 async def list_org_members(
     org_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ) -> list[MembershipResponse]:
     """List all active members of an organization."""
-    _role, user_id = auth
+    role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
+
+    if auth_org_id and auth_org_id != org_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
 
     # Verify membership
     if not get_identity_store().is_org_member(user_id, org_id):
@@ -1271,8 +1280,8 @@ async def create_invitation(
     org_id: str,
     body: InvitationCreateRequest,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
 ) -> InvitationResponse:
     """Create a team invitation for an organization.
@@ -1280,9 +1289,12 @@ async def create_invitation(
     Requires admin/operator role in the org.
     Rate-limited to 10 invitations per 5 minutes per user to prevent spam.
     """
-    _role, user_id = auth
+    role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
+
+    if auth_org_id and auth_org_id != org_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
 
     # Rate limit: 10 invitation creates per 5 minutes per user
     _check_rate_limit(_INVITATION_CREATE_LIMITERS, user_id, max_requests=10, window_seconds=300.0, action="invitation creation")
@@ -1323,15 +1335,18 @@ async def create_invitation(
 async def list_org_invitations(
     org_id: str,
     auth: Annotated[
-        tuple[UserRole, str],
-        Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR])),
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
     ],
     status: str | None = None,
 ) -> InvitationListResponse:
     """List invitations for an organization."""
-    _role, user_id = auth
+    role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
+
+    if auth_org_id and auth_org_id != org_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
 
     store = get_identity_store()
 

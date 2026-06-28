@@ -73,7 +73,9 @@ class SelectorDecayPredictor:
     def _get_snapshots_path() -> str:
         from pathlib import Path
 
-        return str(Path(__file__).resolve().parent.parent / "data" / "selector_decay_snapshots.json")
+        from app.config import settings
+
+        return str(Path(settings.DATA_DIR) / "selector_decay_snapshots.json")
 
     def _save(self) -> None:
         import json

@@ -189,7 +189,22 @@ async def api_key_middleware(request: Request, call_next):
             )
 
         try:
+            from app.plan_enforcer import check_usage_limit
             from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+            quota_owner = auth_context.org_id or auth_context.project_id or auth_context.user_id
+            allowed, details = check_usage_limit(
+                quota_owner,
+                UsageType.API_REQUEST,
+                1,
+                org_id=auth_context.org_id,
+                project_id=auth_context.project_id,
+            )
+            if not allowed:
+                raise ValueError(
+                    f"quota exceeded for api_requests: "
+                    f"{details['current_usage'] + 1}/{details['limit']}"
+                )
 
             get_usage_ledger().record_usage(
                 auth_context.user_id,

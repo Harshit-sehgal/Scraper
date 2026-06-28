@@ -210,4 +210,68 @@ test.describe("New job form interaction", () => {
     await page.locator("#nav-new").click();
     await expect(page.locator("#view-new")).toBeVisible();
   });
+
+  test("form has job name input", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#inp-name")).toBeVisible();
+  });
+
+  test("form has intent input", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#inp-intent")).toBeVisible();
+  });
+
+  test("form has schema section", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#schema-section")).toBeVisible();
+  });
+
+  test("form has add filter button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#btn-add-filter")).toBeVisible();
+  });
+
+  test("form has schedule section", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#schedule-section")).toBeVisible();
+  });
+
+  test("form has submit button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#btn-submit")).toBeVisible();
+  });
+
+  test("schema section has add field button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#btn-add-field")).toBeVisible();
+  });
+
+  test("form has URL section in manual mode", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await page.locator("#inp-mode-manual").click();
+    await expect(page.locator("#url-section")).toBeVisible();
+  });
+
+  test("form has analyze URL button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-new").click();
+    await expect(page.locator("#btn-analyze-url")).toBeVisible();
+  });
 });

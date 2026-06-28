@@ -946,7 +946,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "get_organization",
       "method": "GET",
@@ -962,7 +962,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "list_org_invitations",
       "method": "GET",
@@ -978,7 +978,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "create_invitation",
       "method": "POST",
@@ -994,7 +994,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "list_org_members",
       "method": "GET",
@@ -1010,7 +1010,7 @@
       "tenant_scoped": "yes"
     },
     {
-      "auth_dependency_if_known": "require_role_with_user",
+      "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
       "handler_function": "list_org_projects",
       "method": "GET",
@@ -1324,7 +1324,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1340,7 +1340,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "ScraperConfigResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1356,7 +1356,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1420,7 +1420,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1452,7 +1452,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "SelectorMemoryStatsResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1516,7 +1516,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "PreviewResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1532,7 +1532,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1548,7 +1548,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "RegressionGenerateAllResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1564,7 +1564,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1580,7 +1580,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "RegressionTestGenerateResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1596,7 +1596,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "SelectorCleanupResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1612,7 +1612,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "DomainConfidenceResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1628,7 +1628,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "LowConfidenceSelectorsResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1644,7 +1644,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "SelectorMemoryFullStatsResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1660,7 +1660,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "ScraperStatsResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1756,7 +1756,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "StatusResponse",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1772,7 +1772,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "list",
       "router_module": "app.routers.scraper",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"

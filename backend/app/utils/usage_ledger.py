@@ -90,8 +90,16 @@ class UsageLedger:
             self._init_storage()
             self._load_storage()
 
-    def _quota_key(self, user_id: str, usage_type: UsageType) -> str:
-        return f"{user_id}:{usage_type.value}"
+    def _quota_key(
+        self,
+        user_id: str,
+        usage_type: UsageType,
+        *,
+        org_id: str = "",
+        project_id: str = "",
+    ) -> str:
+        owner = org_id or project_id or user_id
+        return f"{owner}:{usage_type.value}"
 
     def _idempotency_key(self, user_id: str, usage_type: UsageType, idempotency_key: str) -> str:
         return f"{user_id}:{usage_type.value}:{idempotency_key}"
@@ -169,7 +177,14 @@ class UsageLedger:
                     period_end=_parse_dt(row["period_end"]),
                     reset_date=_parse_dt(row["reset_date"]),
                 )
-                quotas[self._quota_key(quota.user_id, quota.usage_type)] = quota
+                quotas[
+                    self._quota_key(
+                        quota.user_id,
+                        quota.usage_type,
+                        org_id=quota.org_id,
+                        project_id=quota.project_id,
+                    )
+                ] = quota
 
             records: list[UsageRecord] = []
             idempotency: dict[str, UsageRecord] = {}
@@ -363,10 +378,13 @@ class UsageLedger:
         usage_type: UsageType,
         *,
         amount: int = 1,
+        org_id: str = "",
+        project_id: str = "",
     ) -> tuple[bool, Quota | None]:
-        """Check if user has quota available for the requested amount."""
+        """Check if user/tenant has quota available for the requested amount."""
         with self._lock:
-            quota = self._quotas.get(self._quota_key(user_id, usage_type))
+            key = self._quota_key(user_id, usage_type, org_id=org_id, project_id=project_id)
+            quota = self._quotas.get(key)
 
             if not quota:
                 return True, None
@@ -384,7 +402,7 @@ class UsageLedger:
         project_id: str = "",
         api_key_id: str = "",
     ) -> Quota:
-        """Set quota for a user."""
+        """Set quota for a user/tenant."""
         if limit < 0:
             msg = "quota limit must be non-negative"
             raise ValueError(msg)
@@ -398,7 +416,8 @@ class UsageLedger:
                 project_id=project_id,
                 api_key_id=api_key_id,
             )
-            self._quotas[self._quota_key(user_id, usage_type)] = quota
+            key = self._quota_key(user_id, usage_type, org_id=org_id, project_id=project_id)
+            self._quotas[key] = quota
             if self._storage_path is not None:
                 with self._connect() as conn:
                     self._persist_quota(conn, quota)
@@ -408,10 +427,14 @@ class UsageLedger:
         self,
         user_id: str,
         usage_type: UsageType,
+        *,
+        org_id: str = "",
+        project_id: str = "",
     ) -> Quota | None:
-        """Get quota for a user."""
+        """Get quota for a user/tenant."""
         with self._lock:
-            return self._quotas.get(self._quota_key(user_id, usage_type))
+            key = self._quota_key(user_id, usage_type, org_id=org_id, project_id=project_id)
+            return self._quotas.get(key)
 
     def reset_quotas(self, user_id: str | None = None) -> int:
         """Reset quotas for a user or all users."""

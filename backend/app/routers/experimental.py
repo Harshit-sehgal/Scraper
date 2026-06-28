@@ -502,12 +502,18 @@ async def system_replay_events(
 @router.post("/api/system/refactor/compress")
 async def trigger_manifold_compression(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):  # noqa: B008, RUF100
     """Trigger a manifold compression cycle."""
-    from app.llm_bridge import get_plugin_manager
+    from app.llm_bridge import SandboxError, get_plugin_manager
     from app.semantic_world_state import get_world_state
 
-    plugins = get_plugin_manager(ws=get_world_state())
-    result = plugins.call_tool("manifold_compressor")
-    return {"result": result}
+    try:
+        plugins = get_plugin_manager(ws=get_world_state())
+        result = plugins.call_tool("manifold_compressor")
+        return {"result": result}
+    except (SandboxError, ImportError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Manifold compression unavailable: {exc}",
+        ) from exc
 
 
 # ═══════════════════════════════════════════════════════════════════════

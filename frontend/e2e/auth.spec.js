@@ -72,5 +72,142 @@ test.describe("Auth flow", () => {
       await expect(page.locator("#dash-status-line")).toBeVisible();
       await expect(page.locator("#dash-status-label")).toBeVisible();
     });
+
+    test("settings view is accessible from nav", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-settings").click();
+      await expect(page.locator("#view-settings")).toBeVisible();
+    });
+
+    test("api keys view is accessible from nav", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-api-keys").click();
+      await expect(page.locator("#view-api-keys")).toBeVisible();
+    });
+
+    test("audit view is accessible from nav", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-audit").click();
+      await expect(page.locator("#view-audit")).toBeVisible();
+    });
+
+    test("workflows view is accessible from nav", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-workflows").click();
+      await expect(page.locator("#view-workflows")).toBeVisible();
+    });
+
+    test("retention view is accessible from nav", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-retention").click();
+      await expect(page.locator("#view-retention")).toBeVisible();
+    });
+
+    test("invitations view is accessible from nav", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-invitations").click();
+      await expect(page.locator("#view-invitations")).toBeVisible();
+    });
+
+    test("navigate from jobs to recycle and back", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+
+      await page.locator("#nav-jobs").click();
+      await expect(page.locator("#view-jobs")).toBeVisible();
+
+      await page.locator("#nav-recycle").click();
+      await expect(page.locator("#view-recycle")).toBeVisible();
+
+      await page.locator("#nav-jobs").click();
+      await expect(page.locator("#view-jobs")).toBeVisible();
+    });
+
+    test("dashboard governance panel visible", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-governance")).toBeVisible();
+    });
+
+    test("dashboard domains panel visible", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-domains")).toBeVisible();
+    });
+
+    test("dashboard telemetry panel visible", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-telemetry")).toBeVisible();
+    });
+
+    test("dashboard rate limits panel visible", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-rate-limits")).toBeVisible();
+    });
+
+    test("dashboard mode card shows rate limit tier", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-rate-limit-tier")).toBeVisible();
+    });
+
+    test("dashboard shows success rate KPI", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-success-rate")).toBeVisible();
+    });
+
+    test("dashboard shows active browsers KPI", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-active-browsers")).toBeVisible();
+    });
+
+    test("dashboard shows degraded domains KPI", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-domains-degraded")).toBeVisible();
+    });
+
+    test("dashboard shows predictions panel", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await page.locator("#nav-dashboard").click();
+      await expect(page.locator("#dash-predictions")).toBeVisible();
+    });
+
+    test("topbar shows cluster mode badge", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await expect(page.locator("#topbar")).toBeVisible();
+    });
+
+    test("sidebar shows user avatar", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await expect(page.locator("#user-avatar")).toBeVisible();
+    });
+
+    test("sidebar shows logout button", async ({ page }) => {
+      await page.goto("/app/");
+      await dismissApiKeyOverlay(page);
+      await expect(page.locator("#btn-logout")).toBeVisible();
+    });
   });
 });

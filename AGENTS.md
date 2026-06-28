@@ -188,6 +188,7 @@ are proven in the current checkout and target environment.
 | 80 | Fix P1 config/docs/monitoring foundation drift: README validate semantics, Telegram env docs, Grafana user prod gate, LLM provider prod gate, Alertmanager critical duplicate route, repo-latency alert reconciliation | ✅ Done |
 | 81 | Fix infra monitoring/nginx foundation drift: shared nginx security-header snippet, Alertmanager scrape/down alert, Prometheus self-scrape relabel, disabled unauthenticated lifecycle reload, Slack channel reachability gate, blackbox readiness/root-cause split, full validation green | ✅ Done |
 | 82 | Quality improvement pass: fix `/api/compliance/gdpr/forget` unknown_tenant route (add to `TENANT_SCOPED_PREFIXES`); update `ISSUE_LEDGER.md` counts (103 fixed, 0 open, 0 candidates); remove stale 4-open-issues table from `AGENTS.md`; mark F-DRIFT-001/F-FRONTEND-001/F-MON-004/P1-OPS-LOAD-ALERT-001 as resolved; regenerate route inventory/auth matrix/docs; final quick validation 12/12 green | ✅ Done |
+| 83 | Domain improvement session: fix local corpus regression (social_profile header noise, pagination titles); wire `open_safe_client` into 3 httpx callers (proxy_providers, notifications, captcha_solver); add composite DB indexes for job queues + queue tasks; fix 6 comment/data-model mismatches; improve HTML truncation error messages; add 74 new e2e tests (jobs, API keys, billing, audit, retention, settings, workflows, auth-profiles, monitoring, invitations views); regenerate docs; final quick validation 12/12 green | ✅ Done |
 
 ## Active Risks
 

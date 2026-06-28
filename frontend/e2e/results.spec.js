@@ -77,4 +77,40 @@ test.describe("Results detail view", () => {
     await expect(page.locator("#logs-panel")).toBeHidden();
     await expect(page.locator("#quality-panel")).toBeHidden();
   });
+
+  test("results view has schema display area", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#schema-display-area")).toBeAttached();
+  });
+
+  test("results view has JSON export button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#btn-json")).toBeAttached();
+  });
+
+  test("results view has CSV export button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#btn-csv")).toBeAttached();
+  });
+
+  test("results view has Excel export button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#btn-excel")).toBeAttached();
+  });
+
+  test("results view has reclean button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#btn-reclean")).toBeAttached();
+  });
+
+  test("results search input has correct placeholder", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#inp-result-search")).toHaveAttribute("placeholder", /Filter rows/);
+  });
 });

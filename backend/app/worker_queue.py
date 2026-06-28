@@ -197,7 +197,7 @@ class QueueTask:
 
 def _get_db_path() -> Path:
     """Resolve the queue database path."""
-    data_dir = Path(__file__).resolve().parent.parent / "data"
+    data_dir = Path(settings.DATA_DIR).resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir / "worker_queue.db"
 

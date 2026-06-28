@@ -60,4 +60,25 @@ test.describe("Recycle bin view", () => {
     await page.locator("#nav-jobs").click();
     await expect(page.locator("#view-jobs")).toBeVisible();
   });
+
+  test("recycle page heading is visible", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-recycle").click();
+    await expect(page.locator("#view-recycle h1")).toBeVisible();
+  });
+
+  test("recycle has refresh button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-recycle").click();
+    await expect(page.locator("#btn-refresh-recycle")).toBeVisible();
+  });
+
+  test("recycle has restore all button", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-recycle").click();
+    await expect(page.locator("#btn-restore-all")).toBeVisible();
+  });
 });

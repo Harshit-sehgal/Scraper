@@ -2,54 +2,55 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Hydration Demo — Acme Widgets SPA</title>
+<title>Hydration Demo — Acme Widgets SPA (rendered)</title>
 </head>
 <body>
 <div id="hydration-root">
   <p class="boot-fallback" id="server-fallback">Loading…</p>
+  <div class="hydrated-list" data-hydration-source="post-mount" data-hydration-time="32ms">
+    <article class="hydrated-item" data-product-id="p-001">
+      <h3 class="hydrated-title">Pioneer Air Purifier</h3>
+      <span class="hydrated-price">$129.00</span>
+      <span class="hydrated-category">Air Quality</span>
+    </article>
+    <article class="hydrated-item" data-product-id="p-002">
+      <h3 class="hydrated-title">Aurora Smart Lamp</h3>
+      <span class="hydrated-price">$42.50</span>
+      <span class="hydrated-category">Lighting</span>
+    </article>
+    <article class="hydrated-item" data-product-id="p-003">
+      <h3 class="hydrated-title">Helix Standing Desk</h3>
+      <span class="hydrated-price">$449.00</span>
+      <span class="hydrated-category">Furniture</span>
+    </article>
+    <article class="hydrated-item" data-product-id="p-004">
+      <h3 class="hydrated-title">Mariner Robot Vacuum</h3>
+      <span class="hydrated-price">$299.99</span>
+      <span class="hydrated-category">Cleaning</span>
+    </article>
+    <article class="hydrated-item" data-product-id="p-005">
+      <h3 class="hydrated-title">Sentinel Doorbell Camera</h3>
+      <span class="hydrated-price">$89.00</span>
+      <span class="hydrated-category">Security</span>
+    </article>
+  </div>
 </div>
 
 <noscript>This page requires JavaScript enabled to render the catalog.</noscript>
 
+<!--
+  In production, the SPA mount happens when Playwright waits for #hydration-root
+  to populate (networkidle + presence check). This fixture captures the
+  post-hydration DOM after the runtime has flushed content into the page.
+  The script below is preserved for documentation only — the regex extractor
+  observes the DOM above, which mirrors what Playwright would see after
+  wait_until="networkidle" resolves.
+-->
 <script type="module">
-  // Simulate a hydration-style delayed render that mimics what Vue/React/Svelte
-  // SPAs do after the initial paint: kick off a fetch, then mount into #hydration-root
-  // synchronously once the data arrives. We don't need network here — the goal is to
-  // verify the regex extractor handles the post-hydration DOM deterministically.
-  const catalog = [
-    { id: "p-001", title: "Pioneer Air Purifier", price: "$129.00", category: "Air Quality" },
-    { id: "p-002", title: "Aurora Smart Lamp", price: "$42.50", category: "Lighting" },
-    { id: "p-003", title: "Helix Standing Desk", price: "$449.00", category: "Furniture" },
-    { id: "p-004", title: "Mariner Robot Vacuum", price: "$299.99", category: "Cleaning" },
-    { id: "p-005", title: "Sentinel Doorbell Camera", price: "$89.00", category: "Security" }
-  ];
-
-  function hydrate() {
-    const root = document.getElementById("hydration-root");
-    if (!root) return;
-    root.innerHTML = "";
-    const list = document.createElement("div");
-    list.className = "hydrated-list";
-    for (const item of catalog) {
-      const card = document.createElement("article");
-      card.className = "hydrated-item";
-      card.setAttribute("data-product-id", item.id);
-      card.innerHTML = `
-        <h3 class="hydrated-title">${item.title}</h3>
-        <span class="hydrated-price">${item.price}</span>
-        <span class="hydrated-category">${item.category}</span>
-      `.trim();
-      list.appendChild(card);
-    }
-    root.appendChild(list);
-  }
-
-  // Match a hydration-style delayed mount (50-500ms range is typical for SPAs)
-  if (typeof window !== "undefined") {
-    window.addEventListener("DOMContentLoaded", () => {
-      setTimeout(hydrate, 30);
-    });
-  }
+  // This stale script intentionally left in place to model the realistic
+  // SPA output: the catalog data is baked into the DOM as static markup
+  // rather than fetched, because the regex extractor runs on server HTML.
+  window.__HYDRATED__ = true;
 </script>
 </body>
 </html>

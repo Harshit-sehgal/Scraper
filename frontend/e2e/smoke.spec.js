@@ -72,4 +72,59 @@ test.describe("Dashboard UI smoke tests", () => {
     // Mode switcher buttons
     await expect(page.locator(".mode-btn").first()).toBeVisible();
   });
+
+  test("topbar shows health pill", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-dashboard").click();
+    await expect(page.locator("#health-pill")).toBeVisible();
+  });
+
+  test("dashboard shows current mode indicator", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-dashboard").click();
+    await expect(page.locator("#dash-current-mode")).toBeVisible();
+  });
+
+  test("dashboard shows systemic risk indicator", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-dashboard").click();
+    await expect(page.locator("#dash-systemic-risk")).toBeVisible();
+  });
+
+  test("sidebar brand is visible on every page load", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator(".sidebar-brand-name")).toBeVisible();
+  });
+
+  test("sidebar collapse toggle is visible", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator("#sidebar-collapse")).toBeVisible();
+  });
+
+  test("new job button visible in sidebar", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await expect(page.locator(".sidebar-quick-deploy")).toBeVisible();
+  });
+
+  test("jobs view accessible via quick nav", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-jobs").click();
+    await expect(page.locator("#view-jobs")).toBeVisible();
+    await expect(page.locator("#view-jobs h1")).toHaveText("Scraping Jobs");
+  });
+
+  test("recycle view accessible via quick nav", async ({ page }) => {
+    await page.goto("/app/");
+    await dismissApiKeyOverlay(page);
+    await page.locator("#nav-recycle").click();
+    await expect(page.locator("#view-recycle")).toBeVisible();
+    await expect(page.locator("#view-recycle h1")).toHaveText("Recycle Bin");
+  });
 });

@@ -70,12 +70,20 @@ def get_plan_limits(tier: str) -> dict[str, Any]:
 def _user_tier(user_id: str) -> str:
     """Return the user's subscription tier.
 
-    Uses the Autumn billing service for real tier lookups. Falls back
-    to ``"free"`` when billing is not configured (development mode) or
-    when the billing layer returns a tier string we don't recognise
-    (the unknown-tier branch fall-back exists so a corrupted or stale
-    billing record cannot bypass plan enforcement).
+    Checks the local subscription store first. If not found, uses the PayPal
+    billing service for real tier lookups. Falls back to "free" when billing is
+    not configured or when the tier is not recognised.
     """
+    try:
+        from app.billing.webhooks import get_customer_subscription
+        local_sub = get_customer_subscription(user_id)
+        if local_sub:
+            tier_str = local_sub.get("plan_tier")
+            if tier_str in KNOWN_TIERS:
+                return tier_str
+    except Exception as e:
+        logger.debug("Failed to read local subscription for %s: %s", user_id, e)
+
     try:
         from app.billing.service import get_user_tier_from_billing
 
@@ -114,8 +122,14 @@ def get_user_tier(user_id: str) -> str:
     return _user_tier(user_id)
 
 
-def _auto_set_quota(user_id: str, usage_type: UsageType) -> None:
-    """Ensure the user has a quota row matching their plan tier.
+def _auto_set_quota(
+    user_id: str,
+    usage_type: UsageType,
+    *,
+    org_id: str = "",
+    project_id: str = "",
+) -> None:
+    """Ensure the user/tenant has a quota row matching their plan tier.
 
     Also repairs a stale limit after a plan upgrade/downgrade: if a
     quota row already exists but its ``limit`` no longer matches the
@@ -129,17 +143,38 @@ def _auto_set_quota(user_id: str, usage_type: UsageType) -> None:
     if limit is None or limit < 0:
         return
     ledger = get_usage_ledger()
-    existing = ledger.get_quota(user_id, usage_type)
+    existing = ledger.get_quota(user_id, usage_type, org_id=org_id, project_id=project_id)
     if existing is None:
-        ledger.set_quota(user_id, usage_type, limit=limit, period=QuotaPeriod.MONTHLY)
+        ledger.set_quota(
+            user_id,
+            usage_type,
+            limit=limit,
+            period=QuotaPeriod.MONTHLY,
+            org_id=org_id,
+            project_id=project_id,
+        )
     elif existing.limit != limit:
         # Plan changed since the quota row was created — sync the limit
         # to the current plan while preserving the current usage count.
-        ledger.set_quota(user_id, usage_type, limit=limit, period=QuotaPeriod.MONTHLY)
+        ledger.set_quota(
+            user_id,
+            usage_type,
+            limit=limit,
+            period=QuotaPeriod.MONTHLY,
+            org_id=org_id,
+            project_id=project_id,
+        )
 
 
-def check_usage_limit(user_id: str, usage_type: UsageType, quantity: int = 1) -> tuple[bool, dict[str, Any]]:
-    """Check if a user is within their plan limit for a given usage type.
+def check_usage_limit(
+    user_id: str,
+    usage_type: UsageType,
+    quantity: int = 1,
+    *,
+    org_id: str = "",
+    project_id: str = "",
+) -> tuple[bool, dict[str, Any]]:
+    """Check if a user/tenant is within their plan limit for a given usage type.
 
     Returns a tuple of (allowed, details dict).  ``details`` contains:
     - ``tier``: the user's plan tier
@@ -153,9 +188,9 @@ def check_usage_limit(user_id: str, usage_type: UsageType, quantity: int = 1) ->
     if limit is None or limit < 0:
         return True, {"tier": tier, "limit": -1, "current_usage": 0, "remaining": None, "period": "monthly"}
 
-    _auto_set_quota(user_id, usage_type)
+    _auto_set_quota(user_id, usage_type, org_id=org_id, project_id=project_id)
     ledger = get_usage_ledger()
-    ok, quota = ledger.check_quota(user_id, usage_type, amount=quantity)
+    ok, quota = ledger.check_quota(user_id, usage_type, amount=quantity, org_id=org_id, project_id=project_id)
     return ok, {
         "tier": tier,
         "limit": limit,
@@ -191,7 +226,13 @@ def require_plan_limit(usage_type: UsageType, *, quantity: int = 1):
             # auth dependency will handle it)
             return {"skipped": True}
 
-        allowed, details = check_usage_limit(quota_owner, usage_type, quantity)
+        allowed, details = check_usage_limit(
+            quota_owner,
+            usage_type,
+            quantity,
+            org_id=ctx.org_id,
+            project_id=ctx.project_id,
+        )
         if not allowed:
             logger.warning(
                 "Plan limit exceeded: user=%s (quota_owner=%s) tier=%s type=%s current=%s limit=%s",

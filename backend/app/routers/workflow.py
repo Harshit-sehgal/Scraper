@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.audit_logger import log_job_event
+from app.config import settings as app_settings
 from app.models import (
     SchemaField,
     Workflow,
@@ -49,7 +50,7 @@ draft_router = APIRouter(prefix="/api/workflow-drafts", tags=["workflow-drafts"]
 # table — the candidate issue targets workflow definitions and runs
 # specifically.
 _workflow_drafts = JSONFileStore(
-    Path(__file__).resolve().parents[2] / "data" / "workflow_drafts.json",
+    Path(app_settings.DATA_DIR) / "workflow_drafts.json",
 )
 # Run history is its own keyed store so we can paginate and filter
 # independent of the workflow definitions.

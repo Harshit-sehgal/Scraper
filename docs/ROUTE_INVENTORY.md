@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-28 22:59:42 UTC
+**Generated:** 2026-06-28 23:47:09 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
@@ -66,11 +66,11 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/saas/orgs` | `app.saas.router` | `list_my_organizations` | stable | protected | authenticated-user | require_role_with_user |  | OrgListResponse | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/orgs` | `app.saas.router` | `create_organization` | stable | protected | operator-or-admin | require_role_with_user |  | OrgResponse | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/orgs/{org_id}` | `app.saas.router` | `delete_organization` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/saas/orgs/{org_id}` | `app.saas.router` | `get_organization` | stable | protected | authenticated-user | require_role_with_user |  | OrgResponse | route dependency accepts admin/operator/user |
-| `GET` | `/api/saas/orgs/{org_id}/invitations` | `app.saas.router` | `list_org_invitations` | stable | protected | operator-or-admin | require_role_with_user |  | InvitationListResponse | route dependency accepts admin/operator |
-| `POST` | `/api/saas/orgs/{org_id}/invitations` | `app.saas.router` | `create_invitation` | stable | protected | operator-or-admin | require_role_with_user |  | InvitationResponse | route dependency accepts admin/operator |
-| `GET` | `/api/saas/orgs/{org_id}/members` | `app.saas.router` | `list_org_members` | stable | protected | authenticated-user | require_role_with_user |  | list | route dependency accepts admin/operator/user |
-| `GET` | `/api/saas/orgs/{org_id}/projects` | `app.saas.router` | `list_org_projects` | stable | protected | authenticated-user | require_role_with_user |  | ProjectListResponse | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}` | `app.saas.router` | `get_organization` | stable | protected | authenticated-user | require_principal |  | OrgResponse | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}/invitations` | `app.saas.router` | `list_org_invitations` | stable | protected | operator-or-admin | require_principal |  | InvitationListResponse | route dependency accepts admin/operator |
+| `POST` | `/api/saas/orgs/{org_id}/invitations` | `app.saas.router` | `create_invitation` | stable | protected | operator-or-admin | require_principal |  | InvitationResponse | route dependency accepts admin/operator |
+| `GET` | `/api/saas/orgs/{org_id}/members` | `app.saas.router` | `list_org_members` | stable | protected | authenticated-user | require_principal |  | list | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}/projects` | `app.saas.router` | `list_org_projects` | stable | protected | authenticated-user | require_principal |  | ProjectListResponse | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/password-reset/request` | `app.saas.router` | `request_password_reset` | stable | protected | authenticated-user |  |  | PasswordResetResponse | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/saas/password-reset/reset` | `app.saas.router` | `confirm_password_reset` | stable | protected | authenticated-user |  |  | PasswordResetConfirmResponse | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `GET` | `/api/saas/plan` | `app.saas.router` | `get_plan_info` | stable | protected | authenticated-user | require_role_with_user |  | PlanInfoResponse | route dependency accepts admin/operator/user |
@@ -88,23 +88,23 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `PUT` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `update_scheduled_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/scheduled/{job_id}/changes` | `app.routers.scheduled_monitoring` | `detect_changes` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `POST` | `/api/schema/suggest` | `app.routers.jobs_write` | `suggest_schema` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/browser` | `app.routers.scraper` | `get_browser_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/config` | `app.routers.scraper` | `get_scraper_config` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/scraper/diagnostics` | `app.routers.scraper` | `get_scraper_diagnostics` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/health/legacy` | `app.routers.scraper` | `get_legacy_domain_health` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/memory/stats` | `app.routers.scraper` | `get_selector_memory_brief` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/scraper/preview` | `app.routers.scraper` | `preview_extraction` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/regressions` | `app.routers.scraper` | `get_regression_archive` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/scraper/regressions/generate-all-tests` | `app.routers.scraper` | `generate_all_replay_tests` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `GET` | `/api/scraper/regressions/{entry_id}` | `app.routers.scraper` | `get_regression_detail` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/scraper/regressions/{entry_id}/generate-test` | `app.routers.scraper` | `generate_regression_replay_test` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `POST` | `/api/scraper/selectors/cleanup` | `app.routers.scraper` | `trigger_selector_cleanup` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `GET` | `/api/scraper/selectors/domain/{domain}` | `app.routers.scraper` | `get_domain_selector_confidence` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/selectors/low-confidence` | `app.routers.scraper` | `get_low_confidence_selectors` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/selectors/stats` | `app.routers.scraper` | `get_selector_memory_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scraper/stats` | `app.routers.scraper` | `get_scraper_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `DELETE` | `/api/scraper/telemetry` | `app.routers.scraper` | `clear_telemetry` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `GET` | `/api/scraper/telemetry` | `app.routers.scraper` | `get_recent_telemetry` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/browser` | `app.routers.scraper` | `get_browser_stats` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/config` | `app.routers.scraper` | `get_scraper_config` | stable | protected | operator-or-admin | require_role |  | ScraperConfigResponse | route dependency accepts admin/operator |
+| `POST` | `/api/scraper/diagnostics` | `app.routers.scraper` | `get_scraper_diagnostics` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/health/legacy` | `app.routers.scraper` | `get_legacy_domain_health` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/memory/stats` | `app.routers.scraper` | `get_selector_memory_brief` | stable | protected | operator-or-admin | require_role |  | SelectorMemoryStatsResponse | route dependency accepts admin/operator |
+| `POST` | `/api/scraper/preview` | `app.routers.scraper` | `preview_extraction` | stable | protected | operator-or-admin | require_role |  | PreviewResponse | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/regressions` | `app.routers.scraper` | `get_regression_archive` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/scraper/regressions/generate-all-tests` | `app.routers.scraper` | `generate_all_replay_tests` | stable | protected | admin | require_role |  | RegressionGenerateAllResponse | require_role/admin-only dependency |
+| `GET` | `/api/scraper/regressions/{entry_id}` | `app.routers.scraper` | `get_regression_detail` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/scraper/regressions/{entry_id}/generate-test` | `app.routers.scraper` | `generate_regression_replay_test` | stable | protected | admin | require_role |  | RegressionTestGenerateResponse | require_role/admin-only dependency |
+| `POST` | `/api/scraper/selectors/cleanup` | `app.routers.scraper` | `trigger_selector_cleanup` | stable | protected | admin | require_role |  | SelectorCleanupResponse | require_role/admin-only dependency |
+| `GET` | `/api/scraper/selectors/domain/{domain}` | `app.routers.scraper` | `get_domain_selector_confidence` | stable | protected | operator-or-admin | require_role |  | DomainConfidenceResponse | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/selectors/low-confidence` | `app.routers.scraper` | `get_low_confidence_selectors` | stable | protected | operator-or-admin | require_role |  | LowConfidenceSelectorsResponse | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/selectors/stats` | `app.routers.scraper` | `get_selector_memory_stats` | stable | protected | operator-or-admin | require_role |  | SelectorMemoryFullStatsResponse | route dependency accepts admin/operator |
+| `GET` | `/api/scraper/stats` | `app.routers.scraper` | `get_scraper_stats` | stable | protected | operator-or-admin | require_role |  | ScraperStatsResponse | route dependency accepts admin/operator |
+| `DELETE` | `/api/scraper/telemetry` | `app.routers.scraper` | `clear_telemetry` | stable | protected | admin | require_role |  | StatusResponse | require_role/admin-only dependency |
+| `GET` | `/api/scraper/telemetry` | `app.routers.scraper` | `get_recent_telemetry` | stable | protected | operator-or-admin | require_role |  | list | route dependency accepts admin/operator |
 | `GET` | `/api/system/audit-log` | `app.routers.system` | `get_audit_log` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
 | `POST` | `/api/system/csp-violations` | `app.routers.system` | `csp_violations` | stable | public |  |  |  |  | explicit API middleware exemption |
 | `GET` | `/api/system/rate-limit-stats` | `app.routers.system` | `rate_limit_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |

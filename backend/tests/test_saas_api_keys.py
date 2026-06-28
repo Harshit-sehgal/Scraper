@@ -163,3 +163,53 @@ class TestApiKeyManagement:
         # User1 tries to list keys for user2's project
         list_resp = client.get(f"/api/saas/projects/{project2}/keys", cookies=cookies)
         assert list_resp.status_code == 403
+
+    def test_org_endpoints_enforce_key_scoping(self, client: TestClient):
+        # 1. Sign up user 1 (gets org1, project1)
+        signup1 = client.post(
+            "/api/saas/signup",
+            json={
+                "email": "keyowner1@example.com",
+                "password": "Hunter2!@#",
+            },
+        )
+        assert signup1.status_code == 201
+        data1 = signup1.json()
+        project1_id = data1["project_id"]
+        user1_id = data1["user_id"]
+
+        from app.saas.identity_store import get_identity_store
+        org1_id = get_identity_store().get_project(project1_id).org_id
+        _accept_aup_for(user1_id)
+
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+        cookies1 = {SESSION_COOKIE: create_session_cookie(role="admin", user_id=user1_id)}
+
+        # Create API key for user 1 scoped to project1_id
+        create_key = client.post(
+            f"/api/saas/projects/{project1_id}/keys",
+            json={"name": "scoped-key-1", "scope": "write"},
+            cookies=cookies1,
+        )
+        assert create_key.status_code == 201
+        raw_key_1 = create_key.json()["raw_key"]
+
+        # 2. Sign up user 2 (gets org2, project2)
+        signup2 = client.post(
+            "/api/saas/signup",
+            json={
+                "email": "keyowner2@example.com",
+                "password": "Hunter2!@#",
+            },
+        )
+        assert signup2.status_code == 201
+        project2_id = signup2.json()["project_id"]
+        org2_id = get_identity_store().get_project(project2_id).org_id
+
+        # 3. Request Org 1 details using Key 1 -> should succeed (200)
+        get_org1 = client.get(f"/api/saas/orgs/{org1_id}", headers={"X-API-Key": raw_key_1})
+        assert get_org1.status_code == 200
+
+        # 4. Request Org 2 details using Key 1 -> should fail with 403 (Cross-tenant access forbidden)
+        get_org2 = client.get(f"/api/saas/orgs/{org2_id}", headers={"X-API-Key": raw_key_1})
+        assert get_org2.status_code == 403

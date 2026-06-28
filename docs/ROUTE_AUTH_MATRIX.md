@@ -70,11 +70,11 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/saas/orgs` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/orgs` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/orgs/{org_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/saas/orgs/{org_id}` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `GET` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/saas/orgs/{org_id}/members` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `GET` | `/api/saas/orgs/{org_id}/projects` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/saas/orgs/{org_id}/members` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/saas/orgs/{org_id}/projects` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/password-reset/request` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/saas/password-reset/reset` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `GET` | `/api/saas/plan` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |

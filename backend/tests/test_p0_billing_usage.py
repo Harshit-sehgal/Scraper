@@ -185,9 +185,11 @@ def test_api_request_middleware_records_protected_requests(client, monkeypatch) 
 
 def test_api_request_quota_is_enforced_by_middleware(client, monkeypatch) -> None:
     import app.middlewares as middlewares_mod
+    import app.plan_enforcer as plan_enforcer_mod
 
     user_id = _configure_request_metering_keys(monkeypatch)
     ledger = UsageLedger()
+    monkeypatch.setitem(plan_enforcer_mod._PLAN_LIMITS, ("free", UsageType.API_REQUEST), 1)
     ledger.set_quota(user_id, UsageType.API_REQUEST, limit=1, period=QuotaPeriod.MONTHLY)
     monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
 

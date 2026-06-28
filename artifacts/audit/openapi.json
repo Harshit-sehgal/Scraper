@@ -526,6 +526,45 @@
         "title": "DiscoveryRequest",
         "type": "object"
       },
+      "DomainConfidenceResponse": {
+        "description": "Response model for GET /api/scraper/selectors/domain/{domain}.",
+        "properties": {
+          "age_factor": {
+            "title": "Age Factor",
+            "type": "number"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "final_score": {
+            "title": "Final Score",
+            "type": "number"
+          },
+          "freshness_factor": {
+            "title": "Freshness Factor",
+            "type": "number"
+          },
+          "raw_confidence": {
+            "title": "Raw Confidence",
+            "type": "number"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "raw_confidence",
+          "age_factor",
+          "freshness_factor",
+          "final_score",
+          "reason"
+        ],
+        "title": "DomainConfidenceResponse",
+        "type": "object"
+      },
       "EmailVerificationSendResponse": {
         "description": "Response for requesting email verification.",
         "properties": {
@@ -1301,6 +1340,82 @@
         "title": "JobWebhookUpdate",
         "type": "object"
       },
+      "LowConfidenceSelectorItem": {
+        "description": "A single low-confidence selector entry.",
+        "properties": {
+          "age_factor": {
+            "title": "Age Factor",
+            "type": "number"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "freshness_factor": {
+            "title": "Freshness Factor",
+            "type": "number"
+          },
+          "raw_confidence": {
+            "title": "Raw Confidence",
+            "type": "number"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "success_count": {
+            "title": "Success Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "domain",
+          "score",
+          "raw_confidence",
+          "age_factor",
+          "freshness_factor",
+          "success_count",
+          "failure_count",
+          "reason"
+        ],
+        "title": "LowConfidenceSelectorItem",
+        "type": "object"
+      },
+      "LowConfidenceSelectorsResponse": {
+        "description": "Response model for GET /api/scraper/selectors/low-confidence.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/LowConfidenceSelectorItem"
+            },
+            "title": "Selectors",
+            "type": "array"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "threshold",
+          "count",
+          "selectors"
+        ],
+        "title": "LowConfidenceSelectorsResponse",
+        "type": "object"
+      },
       "MembershipResponse": {
         "description": "Membership details.",
         "properties": {
@@ -1566,6 +1681,36 @@
         "title": "PlanInfoResponse",
         "type": "object"
       },
+      "PreviewResponse": {
+        "description": "Response model for POST /api/scraper/preview.",
+        "properties": {
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "preview_records": {
+            "items": {},
+            "title": "Preview Records",
+            "type": "array"
+          },
+          "total_records_found": {
+            "title": "Total Records Found",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "total_records_found",
+          "preview_records",
+          "dry_run"
+        ],
+        "title": "PreviewResponse",
+        "type": "object"
+      },
       "ProjectCreateRequest": {
         "description": "Request to create a new project within an organization.",
         "properties": {
@@ -1651,6 +1796,44 @@
         "title": "ProjectResponse",
         "type": "object"
       },
+      "RegressionGenerateAllResponse": {
+        "description": "Response model for POST /api/scraper/regressions/generate-all-tests.",
+        "properties": {
+          "test_code": {
+            "title": "Test Code",
+            "type": "string"
+          },
+          "total_tests_generated": {
+            "title": "Total Tests Generated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_tests_generated",
+          "test_code"
+        ],
+        "title": "RegressionGenerateAllResponse",
+        "type": "object"
+      },
+      "RegressionTestGenerateResponse": {
+        "description": "Response model for POST /api/scraper/regressions/{entry_id}/generate-test.",
+        "properties": {
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "test_code": {
+            "title": "Test Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "test_code"
+        ],
+        "title": "RegressionTestGenerateResponse",
+        "type": "object"
+      },
       "ScheduledJobFrequency": {
         "description": "How often a scheduled job should run.",
         "enum": [
@@ -1728,6 +1911,50 @@
         "title": "ScrapeMode",
         "type": "string"
       },
+      "ScraperConfigResponse": {
+        "description": "Response model for GET /api/scraper/config.",
+        "properties": {
+          "max_records_per_source": {
+            "title": "Max Records Per Source",
+            "type": "integer"
+          },
+          "max_retries": {
+            "title": "Max Retries",
+            "type": "integer"
+          },
+          "page_settle_delay": {
+            "title": "Page Settle Delay",
+            "type": "number"
+          },
+          "playwright_timeout": {
+            "title": "Playwright Timeout",
+            "type": "integer"
+          },
+          "regex_max_containers": {
+            "title": "Regex Max Containers",
+            "type": "integer"
+          },
+          "request_timeout": {
+            "title": "Request Timeout",
+            "type": "integer"
+          },
+          "selector_snippet_max_chars": {
+            "title": "Selector Snippet Max Chars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "playwright_timeout",
+          "page_settle_delay",
+          "request_timeout",
+          "max_retries",
+          "max_records_per_source",
+          "selector_snippet_max_chars",
+          "regex_max_containers"
+        ],
+        "title": "ScraperConfigResponse",
+        "type": "object"
+      },
       "ScraperDiagnosticsRequest": {
         "description": "Request body for the scraper diagnostics endpoint.\n\nReplaces the broken inline ``fields: list[SchemaField]`` signature\nthat caused PydanticUserError in OpenAPI generation.",
         "properties": {
@@ -1760,6 +1987,196 @@
           "fields"
         ],
         "title": "ScraperDiagnosticsRequest",
+        "type": "object"
+      },
+      "ScraperStatsResponse": {
+        "description": "Response model for GET /api/scraper/stats.",
+        "properties": {
+          "confidence_histogram": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Confidence Histogram",
+            "type": "array"
+          },
+          "recent_latency_avg": {
+            "title": "Recent Latency Avg",
+            "type": "number"
+          },
+          "recent_success_rate": {
+            "title": "Recent Success Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "confidence_histogram",
+          "recent_latency_avg",
+          "recent_success_rate"
+        ],
+        "title": "ScraperStatsResponse",
+        "type": "object"
+      },
+      "SelectorCleanupResponse": {
+        "description": "Response model for POST /api/scraper/selectors/cleanup.",
+        "properties": {
+          "deleted_domains": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Domains"
+          },
+          "domains_checked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domains Checked"
+          },
+          "low_confidence_selectors": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Confidence Selectors"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "next_cleanup_available_in_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cleanup Available In Seconds"
+          },
+          "selectors_deleted": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors Deleted"
+          }
+        },
+        "title": "SelectorCleanupResponse",
+        "type": "object"
+      },
+      "SelectorMemoryFullStatsResponse": {
+        "description": "Response model for GET /api/scraper/selectors/stats.",
+        "properties": {
+          "avg_confidence": {
+            "title": "Avg Confidence",
+            "type": "number"
+          },
+          "confidence_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Confidence Distribution",
+            "type": "object"
+          },
+          "high_confidence": {
+            "title": "High Confidence",
+            "type": "integer"
+          },
+          "low_confidence": {
+            "title": "Low Confidence",
+            "type": "integer"
+          },
+          "medium_confidence": {
+            "title": "Medium Confidence",
+            "type": "integer"
+          },
+          "total_domains": {
+            "title": "Total Domains",
+            "type": "integer"
+          },
+          "total_selectors": {
+            "title": "Total Selectors",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_domains",
+          "total_selectors",
+          "avg_confidence",
+          "high_confidence",
+          "medium_confidence",
+          "low_confidence",
+          "confidence_distribution"
+        ],
+        "title": "SelectorMemoryFullStatsResponse",
+        "type": "object"
+      },
+      "SelectorMemoryStatsResponse": {
+        "description": "Response model for GET /api/scraper/memory/stats.",
+        "properties": {
+          "domain_count": {
+            "title": "Domain Count",
+            "type": "integer"
+          },
+          "top_domains": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Top Domains",
+            "type": "array"
+          },
+          "total_failures": {
+            "title": "Total Failures",
+            "type": "integer"
+          },
+          "total_successes": {
+            "title": "Total Successes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "domain_count",
+          "total_successes",
+          "total_failures",
+          "top_domains"
+        ],
+        "title": "SelectorMemoryStatsResponse",
         "type": "object"
       },
       "SignupRequest": {
@@ -1866,6 +2283,20 @@
         ],
         "title": "SourcePolicy",
         "type": "string"
+      },
+      "StatusResponse": {
+        "description": "Generic status response.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StatusResponse",
+        "type": "object"
       },
       "URLPreviewRequest": {
         "properties": {
@@ -5793,7 +6224,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Browser Stats Api Scraper Browser Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5813,7 +6248,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperConfigResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5843,7 +6280,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Scraper Diagnostics Api Scraper Diagnostics Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5873,7 +6314,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Legacy Domain Health Api Scraper Health Legacy Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5893,7 +6338,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorMemoryStatsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5923,7 +6370,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5967,7 +6416,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Regression Archive Api Scraper Regressions Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5997,7 +6450,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RegressionGenerateAllResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6028,7 +6483,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Regression Detail Api Scraper Regressions  Entry Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6069,7 +6528,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RegressionTestGenerateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6099,7 +6560,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorCleanupResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6130,7 +6593,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DomainConfidenceResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6174,7 +6639,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/LowConfidenceSelectorsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6204,7 +6671,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorMemoryFullStatsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6224,7 +6693,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperStatsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6244,7 +6715,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6274,7 +6747,14 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Recent Telemetry Api Scraper Telemetry Get",
+                  "type": "array"
+                }
               }
             },
             "description": "Successful Response"

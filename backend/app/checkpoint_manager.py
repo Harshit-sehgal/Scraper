@@ -5,6 +5,8 @@ import os
 import time
 from pathlib import Path
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,7 +102,6 @@ _manager: CheckpointManager | None = None
 def get_checkpoint_manager() -> CheckpointManager:
     global _manager
     if _manager is None:
-        # Resolve path relative to backend root
-        base = Path(__file__).parent.parent / "data" / "checkpoints"
+        base = Path(settings.DATA_DIR) / "checkpoints"
         _manager = CheckpointManager(str(base))
     return _manager
