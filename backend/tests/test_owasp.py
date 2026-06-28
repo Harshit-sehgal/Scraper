@@ -38,10 +38,18 @@ class TestOWASPTop10:
                 "urls": ["https://example.com"],
             },
         )
-        # Should sanitize input
-        if response.status_code == 200:
+        # Either the API rejected the input (400/422) or it accepted it
+        # AND sanitized the response. Vacuous passes are not allowed:
+        # a missing branch means a missing assertion.
+        assert response.status_code in (200, 201, 400, 422), (
+            f"unexpected status {response.status_code}: injection probes must be rejected or safely sanitized"
+        )
+        # Verify tables are still intact (sanity check that injection didn't execute)
+        tables_check = client.get("/api/jobs", headers=auth_headers)
+        assert tables_check.status_code in (200, 401, 403)
+        if response.status_code in (200, 201):
             data = response.json()
-            assert "DROP TABLE" not in data.get("name", "")
+            assert "DROP TABLE" not in data.get("name", ""), "SQL injection payload must be stripped from response"
 
     def test_a04_insecure_design(self, client: TestClient, auth_headers: dict):
         """A04:2021 - Insecure Design."""
@@ -105,7 +113,11 @@ class TestOWASPTop10:
                 "urls": ["https://example.com"],
             },
         )
-        if response.status_code == 200:
+        assert response.status_code in (200, 201, 400, 422), (
+            f"unexpected status {response.status_code}: data-integrity probe must be "
+            "either accepted with sane structure or rejected by validation"
+        )
+        if response.status_code in (200, 201):
             data = response.json()
             # Verify data structure — API returns job_id and status
             assert "job_id" in data or "id" in data
@@ -192,7 +204,10 @@ class TestInputValidation:
                     "urls": ["https://example.com"],
                 },
             )
-            if response.status_code == 200:
+            assert response.status_code in (200, 201, 400, 422), (
+                f"unexpected status {response.status_code}: XSS probe must be either rejected or sanitized"
+            )
+            if response.status_code in (200, 201):
                 data = response.json()
                 # Verify XSS payload is sanitized
                 assert "<script>" not in data.get("name", "")
@@ -221,9 +236,11 @@ class TestInputValidation:
                 "urls": ["https://example.com; rm -rf /"],
             },
         )
-        if response.status_code == 200:
+        assert response.status_code in (200, 201, 400, 422), (
+            f"unexpected status {response.status_code}: command-injection probe must be rejected or sanitized"
+        )
+        if response.status_code in (200, 201):
             data = response.json()
-            # Verify command is not executed — urls may not be echoed back
             urls = data.get("urls", [])
             if urls:
                 assert "rm -rf" not in urls[0]
@@ -239,8 +256,10 @@ class TestInputValidation:
                 "search": "*)(&(objectClass=*)",
             },
         )
-        # Should sanitize input
-        if response.status_code == 200:
+        assert response.status_code in (200, 201, 400, 422), (
+            f"unexpected status {response.status_code}: LDAP-injection probe must be rejected or sanitized"
+        )
+        if response.status_code in (200, 201):
             data = response.json()
             assert "*)(&(objectClass=*)" not in str(data)
 
@@ -256,7 +275,7 @@ class TestInputValidation:
             },
         )
         # Should sanitize XML input
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             assert "&xxe;" not in str(data)
 
@@ -313,13 +332,21 @@ class TestRateLimitingSecurity:
 
     def test_rate_limiting_enforcement(self, client: TestClient, auth_headers: dict):
         """Test rate limiting is enforced."""
-        # Make many rapid requests
+        # Make many rapid requests and *always* assert — previously the
+        # test looped 100x but only asserted inside the rate-limit branch
+        # so a broken rate limiter silently turned the test green.
+        statuses: list[int] = []
+        saw_retry_after = False
         for _ in range(100):
             response = client.get("/api/jobs", headers=auth_headers)
+            statuses.append(response.status_code)
             if response.status_code == 429:
-                # Rate limit hit
-                assert "retry-after" in response.headers
+                saw_retry_after = "retry-after" in response.headers
                 break
+        assert any(s == 429 for s in statuses), (
+            f"rate limiter did not fire after 100 requests; enforcement is broken. statuses={statuses}"
+        )
+        assert saw_retry_after, "rate-limit response must include the retry-after header when 429 is returned"
 
     def test_rate_limiting_bypass_prevention(self, client: TestClient, auth_headers: dict):
         """Test that rate limiting cannot be bypassed."""

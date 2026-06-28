@@ -37,6 +37,13 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
+
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "backend"
 DEFAULT_OUT_DIR = REPO / "artifacts" / "audit"
@@ -141,10 +148,10 @@ def main() -> int:
 
     stable = _run_subprocess(enable_experimental=False)
     stable_path = args.output / "openapi.json"
-    stable_path.write_text(json.dumps(stable, indent=2, sort_keys=True))
+    write_text_sync(stable_path, json.dumps(stable, indent=2, sort_keys=True))
     if not args.no_docs_copy:
         DOCS_OUT_DIR.mkdir(parents=True, exist_ok=True)
-        (DOCS_OUT_DIR / "openapi.json").write_text(json.dumps(stable, indent=2, sort_keys=True))
+        write_text_sync(DOCS_OUT_DIR / "openapi.json", json.dumps(stable, indent=2, sort_keys=True))
 
     summary = _summarize(stable)
     print(f"Wrote {stable_path}")
@@ -158,7 +165,7 @@ def main() -> int:
     if args.experimental:
         experimental = _run_subprocess(enable_experimental=True)
         experimental_path = args.output / "openapi.experimental.json"
-        experimental_path.write_text(json.dumps(experimental, indent=2, sort_keys=True))
+        write_text_sync(experimental_path, json.dumps(experimental, indent=2, sort_keys=True))
         es = _summarize(experimental)
         diff_ops = es["operation_count"] - summary["operation_count"]
         print(f"Wrote {experimental_path}")

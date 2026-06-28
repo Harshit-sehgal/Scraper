@@ -480,7 +480,17 @@ class TestLocalSessionBoundServer:
 
     @classmethod
     def teardown_class(cls) -> None:
-        cls.server.shutdown()
+        try:
+            cls.server.shutdown()
+        finally:
+            # ``server_close`` releases the listening socket promptly so
+            # the ephemeral port is recovered; ``thread.join`` ensures
+            # the daemon thread has actually exited before we leak out
+            # of pytest (otherwise a run with -x or collecting-only might
+            # leave a zombie HTTP listener).
+            cls.server.server_close()
+            if cls.thread.is_alive():
+                cls.thread.join(timeout=5)
 
     def test_local_server_serves_search_page(self) -> None:
         """Local server returns the session-bound search HTML."""

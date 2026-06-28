@@ -44,13 +44,90 @@ class ProxyManager:
         self._enabled: bool = settings.PROXY_ROTATION_ENABLED
         self._consecutive_failures: int = 0  # Track across all proxies
         self._proxy_blocked_domains: dict[str, set[str]] = defaultdict(set)  # proxy -> domains blocked on
+        self._provider: Any | None = None  # ProxyProvider for plug-in sources (None = static)
 
-        # Load proxies from config if available
-        if self._enabled and settings.PROXY_LIST:
+        # Load proxies: provider first, then env var fallback.
+        #
+        # Resolution order:
+        #   1. PROXY_PROVIDER_TYPE != "static" → delegate to
+        #      :func:`app.proxy_providers.create_provider`.
+        #   2. PROXY_PROVIDER_TYPE == "static" (default) → read
+        #      PROXY_LIST env var.
+        self._load_initial_proxies()
+
+    def _load_initial_proxies(self) -> None:
+        """Populate ``_proxy_list`` from the configured provider or env var.
+
+        Split out of ``__init__`` so tests and refresh routines can call
+        it without re-entering the constructor.
+        """
+        if not self._enabled:
+            return
+
+        provider_type = ""
+        try:
+            from app.config import settings
+
+            provider_type = (settings.PROXY_PROVIDER_TYPE or "static").strip().lower()
+        except ImportError:
+            provider_type = "static"
+
+        if provider_type and provider_type != "static":
+            try:
+                from app.proxy_providers import create_provider
+
+                provider = create_provider()
+                loaded = provider.fetch_proxies()
+                self._proxy_list = list(loaded)
+                self._provider = provider
+                logger.info(
+                    "Proxy manager initialized via '%s' provider with %d proxies",
+                    provider_type,
+                    len(self._proxy_list),
+                )
+                return
+            except (ImportError, RuntimeError, ValueError, OSError) as exc:
+                logger.warning(
+                    "Provider '%s' failed (%s); falling back to PROXY_LIST", provider_type, exc
+                )
+
+        if settings.PROXY_LIST:
             self._proxy_list = [p.strip() for p in settings.PROXY_LIST.split(",") if p.strip()]
-            logger.info("Proxy manager initialized with %d proxies", len(self._proxy_list))
-        elif self._enabled:
+            logger.info(
+                "Proxy manager initialized with %d proxies from PROXY_LIST", len(self._proxy_list)
+            )
+        else:
             logger.warning("Proxy rotation enabled but PROXY_LIST is empty")
+
+    def set_provider(self, provider: Any) -> None:
+        """Override the configured provider (test-only helper).
+
+        Replaces ``_provider`` without otherwise disturbing rotation
+        state.  The provider is *not* immediately fetched — call
+        :meth:`refresh_from_provider` to swap the pool.
+        """
+        with self._lock:
+            self._provider = provider
+
+    def refresh_from_provider(self) -> int:
+        """Re-fetch the proxy list from the configured provider.
+
+        Returns the number of proxies now in the pool (0 if no provider
+        is configured or the fetch failed).  Acquired proxies are
+        replaced wholesale so stale entries vanish on the next rotation.
+        """
+        with self._lock:
+            if self._provider is None:
+                return len(self._proxy_list)
+            try:
+                fresh = self._provider.refresh()
+            except (RuntimeError, ValueError, OSError) as exc:
+                logger.warning("Provider refresh failed: %s", exc)
+                return len(self._proxy_list)
+            self._proxy_list = [str(p).strip() for p in fresh if str(p).strip()]
+            self._current_index = 0
+            logger.info("Proxy pool refreshed via provider: %d proxies", len(self._proxy_list))
+            return len(self._proxy_list)
 
     @property
     def enabled(self) -> bool:

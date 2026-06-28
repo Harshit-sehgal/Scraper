@@ -59,7 +59,11 @@ def setup_db() -> sqlite3.Connection:
     if DB_PATH.exists():
         DB_PATH.unlink()
     conn = sqlite3.connect(str(DB_PATH))
+    # The drill verifies durability, so set ``synchronous=FULL`` (the WAL default
+    # is NORMAL which permits loss of the most-recent committed transaction
+    # on power loss).
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=FULL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 

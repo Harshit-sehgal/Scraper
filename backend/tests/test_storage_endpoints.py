@@ -2,6 +2,7 @@
 
 import httpx
 import pytest
+import pytest_asyncio
 from app.main import app
 
 # Module-level in-memory job overrides —
@@ -11,21 +12,34 @@ from app.main import app
 
 
 class LocalASGIClient:
-    """Async httpx ASGITransport test client compatible with pytest-asyncio Mode.STRICT."""
+    """Async httpx ASGITransport test client compatible with pytest-asyncio Mode.STRICT.
+
+    Creates a single ``AsyncClient`` at init time (reused across requests)
+    and requires ``aclose()`` to be called during teardown.
+    """
 
     def __init__(self, app) -> None:
-        self.app = app
+        transport = httpx.ASGITransport(app=app)
+        self._ac = httpx.AsyncClient(transport=transport, base_url="http://testserver")
 
     async def _request(self, method: str, url: str, **kwargs):
-        transport = httpx.ASGITransport(app=self.app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
-            return await ac.request(method, url, **kwargs)
+        return await self._ac.request(method, url, **kwargs)
 
     async def get(self, url: str, **kwargs):
         return await self._request("GET", url, **kwargs)
 
+    async def aclose(self) -> None:
+        await self._ac.aclose()
+
 
 client = LocalASGIClient(app)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _close_local_asgi_client():
+    """Ensure the module-level ``LocalASGIClient`` is closed after each test."""
+    yield
+    await client.aclose()
 
 
 class TestHealthEndpoint:

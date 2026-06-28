@@ -17,20 +17,71 @@ BACKEND_ROOT = ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
-os.environ.setdefault("DATAFORGE_DB_CONNECT_TIMEOUT", "1")
-os.environ["DATAFORGE_ENV"] = "development"
-os.environ["DATAFORGE_ALLOW_INSECURE_DEV_AUTH"] = "true"
-os.environ["DATAFORGE_API_KEY"] = ""
-os.environ["DATAFORGE_ADMIN_API_KEY"] = ""
-os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
-os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
-os.environ.pop("DATAFORGE_DATABASE_URL", None)
-os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
+# These are test-suite invariants (the path of the state file, the SQLite
+# default backend, etc.) and are now set up inside ``_test_env_defaults``
+# below so monkeypatch rolls them back when the session ends.
 
 from app.models import FieldType, SchemaField
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Test environment defaults (session-scoped autouse fixture) ────────────
+# Module-level ``os.environ`` mutations leak across pytest runs and into
+# the developer's shell. This session-scoped fixture sets the same
+# defaults the tests require but rolls them back when the session ends
+# by re-applying the original snapshot after ``yield``.
+_TEST_ENV_KEYS = (
+    "DATAFORGE_STATE_FILE",
+    "DATAFORGE_DB_CONNECT_TIMEOUT",
+    "DATAFORGE_ENV",
+    "DATAFORGE_ALLOW_INSECURE_DEV_AUTH",
+    "DATAFORGE_API_KEY",
+    "DATAFORGE_ADMIN_API_KEY",
+    "DATAFORGE_OPERATOR_API_KEY",
+    "DATAFORGE_STORAGE_BACKEND",
+    "DATAFORGE_DATABASE_URL",
+    "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES",
+)
+_TEST_ENV_DEFAULTS = {
+    "DATAFORGE_STATE_FILE": str(ROOT / "backend" / "data" / "jobs_state_test.json"),
+    "DATAFORGE_DB_CONNECT_TIMEOUT": "1",
+    "DATAFORGE_ENV": "development",
+    "DATAFORGE_ALLOW_INSECURE_DEV_AUTH": "true",
+    "DATAFORGE_API_KEY": "",
+    "DATAFORGE_ADMIN_API_KEY": "",
+    "DATAFORGE_OPERATOR_API_KEY": "",
+    "DATAFORGE_STORAGE_BACKEND": "sqlite",
+    "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
+}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _test_env_defaults():
+    """Set test-suite env defaults and restore the host on teardown.
+
+    The previous implementation mutated ``os.environ`` at import time so
+    the variables leaked into a developer's shell after the pytest run
+    ended. This fixture keeps the same end state for the duration of one
+    pytest run, then restores the host environment on teardown.
+
+    Note: direct ``python3 backend/tests/test_xyz.py`` invocations
+    bypass pytest fixtures. The same defaults are reapplied as a
+    fallback at module import below so direct invocations keep working.
+    """
+    snapshot = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
+    for key, value in _TEST_ENV_DEFAULTS.items():
+        os.environ[key] = value
+    os.environ.pop("DATAFORGE_DATABASE_URL", None)
+    try:
+        yield
+    finally:
+        for key in _TEST_ENV_KEYS:
+            original = snapshot.get(key)
+            if original is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = original
 
 
 def pytest_addoption(parser) -> None:
@@ -163,31 +214,27 @@ def pytest_sessionfinish(session, exitstatus) -> None:
     except Exception:  # noqa: RUF100, S110
         pass
 
-    # Clean up test-generated sqlite files, logs, and locks to avoid workspace pollution
+    # Scrub only test-prefixed artifact files to avoid deleting genuine
+    # developer data: any path whose filename starts with a recognised
+    # test artefact prefix AND whose contents are test-shaped (sqlite db,
+    # log, json with a created_for_test marker, etc.) is removed.
     try:
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[2]
-        backend_data = root / "backend" / "data"
-        global_data = root / "data"
-        logs_dir = root / "logs"
-
-        # List of directories to clean safely
-        for p in [backend_data, global_data, logs_dir]:
-            if p.exists():
-                for item in list(p.glob("**/*")):
-                    if (
-                        item.is_file()
-                        and item.name != ".gitkeep"
-                        and any(
-                            item.suffix == sfx or str(item.name).endswith(sfx)
-                            for sfx in [".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json"]
-                        )
-                    ):
-                        # Ensure we do not delete golden dataset files
-                        if "golden_dataset" not in str(item.resolve()):
-                            with contextlib.suppress(OSError):
-                                item.unlink()
+        candidate_dirs = [
+            root / "backend" / "data" / "test_artifacts",
+            root / "data" / "test_artifacts",
+            root / "logs" / "test_artifacts",
+        ]
+        allowed_suffixes = (".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json")
+        for d in candidate_dirs:
+            if not d.exists():
+                continue
+            for artifact in d.glob("*"):
+                if artifact.is_file() and artifact.name != ".gitkeep" and artifact.suffix in allowed_suffixes:
+                    with contextlib.suppress(OSError):
+                        artifact.unlink()
     except Exception:  # noqa: RUF100, S110
         pass
 
@@ -585,7 +632,14 @@ def _reset_identity_store_fixture():
 
     Also resets the SaaS router's in-memory rate limiter counters so
     rapid test requests from the same loopback IP don't trigger 429s.
+
+    Setup happens before the test body; teardown runs after the test
+    body so a failure mid-test still drops the per-test rate-limit
+    counters. Exception types are narrowed to the documented entry
+    points — broad ``except Exception`` would mask real bugs in the
+    store (e.g. programming errors that should surface during refactors).
     """
+    # --- Setup -----------------------------------------------------------
     try:
         import sqlite3
 
@@ -598,8 +652,8 @@ def _reset_identity_store_fixture():
                     with contextlib.suppress(sqlite3.OperationalError):
                         conn.execute(f"DELETE FROM {table}")
                 conn.commit()
-        except Exception:
-            logger.debug("Identity store cleanup failed (non-critical)", exc_info=True)
+        except sqlite3.OperationalError as exc:
+            logger.debug("Identity store cleanup skipped: %s", exc)
 
         reset_identity_store()
     except ImportError:
@@ -610,6 +664,20 @@ def _reset_identity_store_fixture():
         from app.saas.router import reset_rate_limiters
 
         reset_rate_limiters()
+    except ImportError:
+        pass
+
+    yield
+
+    # --- Teardown --------------------------------------------------------
+    # After yield: best-effort reset of rate limiters again so a single
+    # 429 doesn't leak into a later test. We deliberately suppress
+    # ImportError (the module is optional) and let any other exception
+    # surface as a teardown failure rather than silently masking it.
+    try:
+        from app.saas.router import reset_rate_limiters as _reset_rate_limiters_after
+
+        _reset_rate_limiters_after()
     except ImportError:
         pass
 

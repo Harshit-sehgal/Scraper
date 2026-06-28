@@ -798,6 +798,54 @@ def get_metrics_collection_errors() -> int:
         return _metrics_collection_errors
 
 
+# ── Wave-3 anti-bot metrics ───────────────────────────────────────────
+
+_captcha_solve_attempts_total: int = 0
+_captcha_solve_attempts_total_lock = threading.Lock()
+
+_cf_harvest_attempts_total: int = 0
+_cf_harvest_attempts_total_lock = threading.Lock()
+
+_proxy_provider_refresh_total: int = 0
+_proxy_provider_refresh_total_lock = threading.Lock()
+
+
+def record_captcha_solve_attempt(*, success: bool) -> None:
+    """Record a CAPTCHA solve attempt (success or failure)."""
+    global _captcha_solve_attempts_total
+    with _captcha_solve_attempts_total_lock:
+        _captcha_solve_attempts_total += 1
+
+
+def record_cf_harvest_attempt(*, success: bool) -> None:
+    """Record a cf_clearance harvest attempt (success or timeout)."""
+    global _cf_harvest_attempts_total
+    with _cf_harvest_attempts_total_lock:
+        _cf_harvest_attempts_total += 1
+
+
+def record_proxy_provider_refresh(*, proxy_count: int) -> None:
+    """Record a proxy provider refresh with resulting proxy count."""
+    global _proxy_provider_refresh_total
+    with _proxy_provider_refresh_total_lock:
+        _proxy_provider_refresh_total += 1
+
+
+def get_captcha_solve_attempts_total() -> int:
+    with _captcha_solve_attempts_total_lock:
+        return _captcha_solve_attempts_total
+
+
+def get_cf_harvest_attempts_total() -> int:
+    with _cf_harvest_attempts_total_lock:
+        return _cf_harvest_attempts_total
+
+
+def get_proxy_provider_refresh_total() -> int:
+    with _proxy_provider_refresh_total_lock:
+        return _proxy_provider_refresh_total
+
+
 def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
     global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits, _metrics_collection_errors
@@ -853,3 +901,9 @@ def reset_for_testing() -> None:
         _domain_extraction_counts.clear()
     with _metrics_collection_errors_lock:
         _metrics_collection_errors = 0
+    with _captcha_solve_attempts_total_lock:
+        _captcha_solve_attempts_total = 0
+    with _cf_harvest_attempts_total_lock:
+        _cf_harvest_attempts_total = 0
+    with _proxy_provider_refresh_total_lock:
+        _proxy_provider_refresh_total = 0

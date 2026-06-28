@@ -39,6 +39,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
+
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "backend"
 
@@ -234,9 +241,9 @@ def main() -> int:
     stable_md, exp_md, diff_md, n_stable, n_full, n_diff = generate()
 
     if args.write:
-        args.stable_out.write_text(stable_md, encoding="utf-8")
-        args.experimental_out.write_text(exp_md, encoding="utf-8")
-        args.diff_out.write_text(diff_md, encoding="utf-8")
+        write_text_sync(args.stable_out, stable_md)
+        write_text_sync(args.experimental_out, exp_md)
+        write_text_sync(args.diff_out, diff_md)
         print("wrote " + str(args.stable_out.relative_to(REPO)))
         print("wrote " + str(args.experimental_out.relative_to(REPO)))
         print("wrote " + str(args.diff_out.relative_to(REPO)))

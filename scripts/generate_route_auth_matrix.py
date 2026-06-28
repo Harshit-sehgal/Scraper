@@ -5,8 +5,17 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+from pathlib import Path
 
 from generate_route_inventory import REPO, collect_route_rows
+
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
 
 DOC_OUT = REPO / "docs" / "ROUTE_AUTH_MATRIX.md"
 JSON_OUT = REPO / "artifacts" / "audit" / "ROUTE_AUTH_MATRIX.json"
@@ -104,9 +113,10 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
 def write_outputs(rows: list[dict[str, str]]) -> None:
     unknown_auth = [row for row in rows if row["public_protected_unknown"] == "unknown"]
     unknown_tenant = [row for row in rows if row["tenant_scoped"] == "unknown"]
-    DOC_OUT.write_text(render_markdown(rows), encoding="utf-8")
+    write_text_sync(DOC_OUT, render_markdown(rows))
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
-    JSON_OUT.write_text(
+    write_text_sync(
+        JSON_OUT,
         json.dumps(
             {
                 "route_count": len(rows),
@@ -120,7 +130,6 @@ def write_outputs(rows: list[dict[str, str]]) -> None:
             sort_keys=True,
         )
         + "\n",
-        encoding="utf-8",
     )
 
 

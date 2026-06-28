@@ -263,7 +263,7 @@ async def _try_session_recovery(html: str, url: str, search_params: dict | None)
                     "[SessionRecovery] URL %s is session-bound but no search_params provided",
                     redact_url(url),
                 )
-        except (RuntimeError, OSError, TypeError, ValueError):  # nosec B110  # noqa: RUF100, S110
+        except (RuntimeError, OSError, TypeError, ValueError):
             pass
     return None
 

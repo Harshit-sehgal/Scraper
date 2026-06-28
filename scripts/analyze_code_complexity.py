@@ -7,8 +7,16 @@ import argparse
 import ast
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
 
 REPO = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = [REPO / "backend" / "app", REPO / "backend" / "tests", REPO / "frontend", REPO / "scripts"]
@@ -239,8 +247,8 @@ def main() -> int:
         "largest_symbols": [asdict(item) for item in sorted(symbols, key=lambda item: item.loc, reverse=True)[:100]],
     }
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
-    JSON_OUT.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    MD_OUT.write_text(render_markdown(files, symbols), encoding="utf-8")
+    write_text_sync(JSON_OUT, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    write_text_sync(MD_OUT, render_markdown(files, symbols))
     print(f"wrote {MD_OUT.relative_to(REPO)}")
     print(f"wrote {JSON_OUT.relative_to(REPO)}")
     print(f"files={len(files)} symbols={len(symbols)}")

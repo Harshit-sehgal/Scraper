@@ -93,6 +93,47 @@ class CommunicationSettings(BaseSettings):
     """Comma-separated list of proxy URLs (http://ip:port or socks5://ip:port)."""
     PROXY_ROTATION_FAILURE_THRESHOLD: int = 5
     """Rotate proxy after this many consecutive failures."""
+    PROXY_PROVIDER_TYPE: str = "static"
+    """Proxy provider plug-in: 'static' (PROXY_LIST), 'file', 'url', 'brightdata',
+    'oxylabs', 'smartproxy'. File/URL providers emit a JSON array of proxy URLs;
+    'brightdata'/'oxylabs'/'smartproxy' reuse the URL provider with preset
+    auth-header conventions and default endpoints."""
+    PROXY_PROVIDER_FILE: str = ""
+    """Path to JSON file containing an array of proxy URLs (used when
+    PROXY_PROVIDER_TYPE=='file')."""
+    PROXY_PROVIDER_URL: str = ""
+    """HTTP endpoint returning a JSON array of proxy URLs (used when
+    PROXY_PROVIDER_TYPE=='url'|'brightdata'|'oxylabs'|'smartproxy')."""
+    PROXY_PROVIDER_REFRESH_INTERVAL_S: int = 300
+    """Seconds between automatic proxy list refreshes from the provider.
+    Operators may invoke ProxyManager.refresh_from_provider() manually to bypass."""
+
+    # ─── CAPTCHA Solver ────────────────────────────────────────────────
+    CAPTCHA_SOLVER_ENABLED: bool = False
+    """Master switch for CAPTCHA solving integration. When True, the
+    recovery pipeline will attempt to solve detected CAPTCHAs before
+    falling through to proxy rotation + backoff."""
+    CAPTCHA_PROVIDER: str = "2captcha"
+    """CAPTCHA solver backend: '2captcha' or 'anticaptcha'."""
+    CAPTCHA_API_KEY: str = ""
+    """API key for the selected CAPTCHA solving provider."""
+    CAPTCHA_SOLVE_TIMEOUT_S: int = 120
+    """Maximum seconds to wait for a CAPTCHA solve response from the provider."""
+
+    # ─── Cloudflare Harvester ──────────────────────────────────────────
+    CF_HARVESTER_ENABLED: bool = False
+    """Enable Cloudflare cf_clearance cookie harvesting. When True and a
+    Cloudflare challenge is detected, a dedicated browser context is
+    opened to wait for the JS challenge to auto-resolve and the resulting
+    cf_clearance cookie is persisted for subsequent requests."""
+    CF_HARVESTER_TIMEOUT_S: float = 30.0
+    """Maximum seconds to wait for cf_clearance cookie after navigating
+    to a Cloudflare challenge page."""
+    CF_HARVESTER_MAX_RENDER_WAIT_S: float = 15.0
+    """Maximum seconds to wait for the page to initially render before
+    beginning the cookie-poll loop."""
+
+
 
     # ─── Anti-Bot Detection ────────────────────────────────────────────
     ANTIBOT_PLATFORM_MATCH_SCORE: float = 0.6
