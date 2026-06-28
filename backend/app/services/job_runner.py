@@ -70,10 +70,22 @@ def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persis
 
     job.logs.append(LogEntry(message=message, level=level))
     executor = _get_log_persist_executor()
+    future = None
     if persist_single_fn:
-        executor.submit(persist_single_fn)
+        future = executor.submit(persist_single_fn)
     elif persist_fn:
-        executor.submit(persist_fn)
+        future = executor.submit(persist_fn)
+
+    # M7: observe the Future so exceptions in background persist calls
+    # are logged instead of silently swallowed.
+    if future is not None:
+
+        def _on_persist_done(fut):
+            exc = fut.exception()
+            if exc is not None:
+                logger.warning("Background persist failed: %s", exc, exc_info=exc)
+
+        future.add_done_callback(_on_persist_done)
 
 
 async def run_job(

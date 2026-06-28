@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -142,9 +143,10 @@ class TelegramNotifier:
         }
 
         try:
-            # H6: wrap the request in a `with` block so the underlying
-            # urllib3 connection is always returned to its keep-alive pool.
-            with requests.post(url, json=payload, timeout=10) as response:
+            response = requests.post(url, json=payload, timeout=10)
+            try:
+                # H6: deterministically release the urllib3 connection
+                # back to its keep-alive pool by calling close() in finally.
                 if response.status_code >= 400:
                     logger.warning(
                         "Telegram send_message HTTP %s: %s",
@@ -153,6 +155,9 @@ class TelegramNotifier:
                     )
                     return False
                 return True
+            finally:
+                with suppress(Exception):
+                    response.close()
         except requests.RequestException:
             logger.exception("Telegram send_message network error")
             return False

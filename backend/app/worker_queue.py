@@ -209,9 +209,13 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     """Get a SQLite connection with WAL mode."""
     path = db_path or _get_db_path()
     conn = sqlite3.connect(str(path), timeout=10)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=FULL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=FULL")
+        conn.execute("PRAGMA foreign_keys=ON")
+    except sqlite3.Error:
+        conn.close()
+        raise
     conn.row_factory = sqlite3.Row
     return conn
 

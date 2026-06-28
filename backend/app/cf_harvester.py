@@ -126,56 +126,64 @@ async def harvest_cf_clearance(
 
         page = await context.new_page()
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=int(actual_render_wait * 1000))
-        except (TimeoutError, KeyError, ValueError, OSError) as exc:
-            logger.debug("CF harvester initial render failure (expected for challenges): %s", exc)
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=int(actual_render_wait * 1000))
+            except (TimeoutError, KeyError, ValueError, OSError) as exc:
+                logger.debug("CF harvester initial render failure (expected for challenges): %s", exc)
 
-        # Poll cookies every second up to actual_timeout seconds
-        elapsed = 0.0
-        poll_interval = 1.0
-        clearance_value: str | None = None
-        while elapsed < actual_timeout:
+            # Poll cookies every second up to actual_timeout seconds
+            elapsed = 0.0
+            poll_interval = 1.0
+            clearance_value: str | None = None
+            while elapsed < actual_timeout:
+                cookies = await context.cookies()
+                if cookies:
+                    for c in cookies:
+                        if c.get("name") == "cf_clearance":
+                            clearance_value = str(c.get("value", ""))
+                            break
+                if clearance_value:
+                    break
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+
+            if not clearance_value:
+                try:
+                    from app.metrics_collector import record_cf_harvest_attempt
+
+                    record_cf_harvest_attempt(success=False)
+                except (ImportError, AttributeError, TypeError):
+                    pass
+                logger.info("CF harvester timed out for %s after %.1fs (no cf_clearance)", domain, actual_timeout)
+                return None
+
+            # Build cookie header for the full browser cookie jar
             cookies = await context.cookies()
-            if cookies:
-                for c in cookies:
-                    if c.get("name") == "cf_clearance":
-                        clearance_value = str(c.get("value", ""))
-                        break
-            if clearance_value:
-                break
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
+            cookie_header = build_cookie_header_from_dict(cookies)
 
-        if not clearance_value:
+            try:
+                from app.anti_bot_engine import get_anti_bot_engine
+
+                get_anti_bot_engine().update_cookies(domain, cookie_header)
+            except (ImportError, AttributeError, RuntimeError, ValueError, TypeError) as exc:
+                logger.warning("CF harvester cookie persist failed: %s", exc)
+
             try:
                 from app.metrics_collector import record_cf_harvest_attempt
 
-                record_cf_harvest_attempt(success=False)
+                record_cf_harvest_attempt(success=True)
             except (ImportError, AttributeError, TypeError):
                 pass
-            logger.info("CF harvester timed out for %s after %.1fs (no cf_clearance)", domain, actual_timeout)
-            return None
 
-        # Build cookie header for the full browser cookie jar
-        cookies = await context.cookies()
-        cookie_header = build_cookie_header_from_dict(cookies)
-
-        try:
-            from app.anti_bot_engine import get_anti_bot_engine
-
-            get_anti_bot_engine().update_cookies(domain, cookie_header)
-        except (ImportError, AttributeError, RuntimeError, ValueError, TypeError) as exc:
-            logger.warning("CF harvester cookie persist failed: %s", exc)
-
-        try:
-            from app.metrics_collector import record_cf_harvest_attempt
-
-            record_cf_harvest_attempt(success=True)
-        except (ImportError, AttributeError, TypeError):
-            pass
-
-        logger.info("CF harvester captured cf_clearance for %s", domain)
-        return cookie_header
+            logger.info("CF harvester captured cf_clearance for %s", domain)
+            return cookie_header
+        finally:
+            # M8: always close the page — prevents Playwright memory leak
+            # when the polling loop exits early or the outer handler fails.
+            try:
+                await page.close()
+            except (RuntimeError, OSError, ValueError):
+                logger.debug("CF harvester page.close() failed (ignored)")
 
     except (ImportError, AttributeError, RuntimeError, ValueError, TypeError, OSError) as exc:
         try:

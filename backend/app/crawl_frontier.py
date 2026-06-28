@@ -217,7 +217,13 @@ class CrawlFrontier:
                     item.added_at,
                 )
             except _DB_FALLBACK_ERRORS:
-                logger.exception("Failed to insert URL into SQLite")
+                # M5: DB write failed — undo in-memory mutation so
+                # frontier doesn't diverge from persistent storage.
+                logger.exception("Failed to insert URL into SQLite; reverting in-memory add")
+                self._pending.discard(url)
+                # Remove from heap (rebuild — heapq has no O(log n) delete)
+                self._queue = [item for item in self._queue if item.url != url]
+                heapq.heapify(self._queue)
 
             logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
             return True
@@ -384,7 +390,11 @@ class CrawlFrontier:
                             item.added_at,
                         )
                     except _DB_FALLBACK_ERRORS:
-                        logger.exception("Failed to insert retry URL in SQLite")
+                        # M5: DB write failed — undo in-memory state.
+                        logger.exception("Failed to insert retry URL in SQLite; reverting in-memory add")
+                        self._pending.discard(url)
+                        self._queue = [it for it in self._queue if it.url != url]
+                        heapq.heapify(self._queue)
                 else:
                     # Move to completed to stop retrying
                     self._completed.add(url)

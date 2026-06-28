@@ -821,7 +821,13 @@ class SQLiteJobRepository(JobRepository):
         tmp_dir.mkdir(parents=True, exist_ok=True)
         fd, tmp_path = tempfile.mkstemp(prefix="world_state_", suffix=".json.tmp", dir=str(tmp_dir))
         try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
+            # M1: if fdopen() itself fails the raw fd leaks — guard it.
+            try:
+                fh = os.fdopen(fd, "w", encoding="utf-8")
+            except Exception:
+                os.close(fd)
+                raise
+            with fh as f:
                 f.write(json.dumps(payload, ensure_ascii=False, indent=2))
                 f.flush()
                 # fsync the temp file so the data hits disk before

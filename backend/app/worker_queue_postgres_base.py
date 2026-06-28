@@ -20,6 +20,7 @@ import contextlib
 import datetime
 import json
 import logging
+import sys
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -819,15 +820,16 @@ class PostgresWorkerQueueBase(ABC):
 
             except asyncio.CancelledError:
                 break
-            except _DB_OPS_ERRORS:
-                logger.exception("Worker loop error")
-                # Best-effort release if we acquired a permit but failed
-                # before installing the done-callbacks.
+            except BaseException:
+                # M2: release semaphore for *any* exception, not just DB errors,
+                # otherwise a non-DB crash (e.g. MemoryError, KeyboardInterrupt)
+                # leaks one permit permanently.
+                logger.exception("Worker loop error (semaphore released)")
                 if acquired_sem_ref is not None:
-                    from contextlib import suppress
-
-                    with suppress(ValueError):
+                    with contextlib.suppress(ValueError):
                         acquired_sem_ref.release()
+                if isinstance(sys.exc_info()[1], (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
+                    raise
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
