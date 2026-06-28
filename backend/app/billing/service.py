@@ -199,6 +199,8 @@ class PayPalClient:
         """Fetch a fresh bearer token via PayPal's OAuth2 token endpoint."""
         if not self._client_id or not self._client_secret:
             return
+        from contextlib import suppress
+
         try:
             resp = requests.post(
                 f"{self._api_url}/v1/oauth2/token",
@@ -207,13 +209,17 @@ class PayPalClient:
                 headers={"Accept": "application/json"},
                 timeout=30,
             )
-            resp.raise_for_status()
-            body = resp.json()
-            self._access_token = body.get("access_token", "")
-            expires_in = int(body.get("expires_in", 3600))
-            # Refresh 60s early to avoid edge-of-expiry 401s.
-            self._access_token_expires_at = time.time() + max(expires_in - 60, 60)
-            logger.debug("PayPal access token refreshed (expires_in=%ds)", expires_in)
+            try:
+                resp.raise_for_status()
+                body = resp.json()
+                self._access_token = body.get("access_token", "")
+                expires_in = int(body.get("expires_in", 3600))
+                # Refresh 60s early to avoid edge-of-expiry 401s.
+                self._access_token_expires_at = time.time() + max(expires_in - 60, 60)
+                logger.debug("PayPal access token refreshed (expires_in=%ds)", expires_in)
+            finally:
+                with suppress(Exception):
+                    resp.close()
         except (requests.RequestException, ValueError, KeyError, OSError) as e:
             logger.warning("Failed to refresh PayPal access token: %s", e)
 
@@ -275,6 +281,8 @@ class PayPalClient:
         if not token:
             return None
 
+        from contextlib import suppress
+
         try:
             resp = requests.get(
                 f"{self._api_url}/v1/billing/subscriptions/{customer_id}",
@@ -284,27 +292,31 @@ class PayPalClient:
                 },
                 timeout=30,
             )
-            if resp.status_code == 404:
-                logger.debug("Subscription %s not found in PayPal", customer_id)
-                return None
-            resp.raise_for_status()
-            body: dict[str, Any] = resp.json()
+            try:
+                if resp.status_code == 404:
+                    logger.debug("Subscription %s not found in PayPal", customer_id)
+                    return None
+                resp.raise_for_status()
+                body: dict[str, Any] = resp.json()
 
-            plan_id = str(body.get("plan_id", "") or "")
-            status_str = str(body.get("status", "ACTIVE")).lower()
-            tier = self._resolve_tier_from_plan_id(plan_id)
+                plan_id = str(body.get("plan_id", "") or "")
+                status_str = str(body.get("status", "ACTIVE")).lower()
+                tier = self._resolve_tier_from_plan_id(plan_id)
 
-            subscriber: dict[str, Any] = body.get("subscriber", {}) or {}
-            email = str(subscriber.get("email_address", "") or "")
+                subscriber: dict[str, Any] = body.get("subscriber", {}) or {}
+                email = str(subscriber.get("email_address", "") or "")
 
-            return CustomerInfo(
-                customer_id=customer_id,
-                email=email,
-                name="",
-                plan_tier=tier,
-                subscription_status=_PAYPAL_STATUS_MAP.get(status_str, SubscriptionStatus.ACTIVE),
-                subscription_id=customer_id,
-            )
+                return CustomerInfo(
+                    customer_id=customer_id,
+                    email=email,
+                    name="",
+                    plan_tier=tier,
+                    subscription_status=_PAYPAL_STATUS_MAP.get(status_str, SubscriptionStatus.ACTIVE),
+                    subscription_id=customer_id,
+                )
+            finally:
+                with suppress(Exception):
+                    resp.close()
         except (requests.RequestException, ValueError, KeyError, OSError) as e:
             logger.warning("Failed to lookup subscription %s: %s", customer_id, e)
             return None

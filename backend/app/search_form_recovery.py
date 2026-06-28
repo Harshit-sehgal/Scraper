@@ -365,17 +365,20 @@ async def _try_form_search_recovery(
             while resp.is_redirect:
                 redirects_followed += 1
                 if redirects_followed > max_redirects:
+                    await resp.aclose()
                     msg = f"Too many redirects (max {max_redirects})"
                     raise ValueError(msg)
 
                 redirect_target = resp.headers.get("location", "")
                 if not redirect_target:
+                    await resp.aclose()
                     break
 
                 from urllib.parse import urljoin
 
                 redirect_url = urljoin(str(resp.url), redirect_target)
                 validate_public_http_url(redirect_url)
+                await resp.aclose()
                 resp = await client.get(redirect_url)
 
             fresh_url = str(resp.url)

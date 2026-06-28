@@ -147,7 +147,9 @@ class _TwoCaptchaSolver(CaptchaSolver):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            from app.url_safety import get_safe_async_client
+
+            async with get_safe_async_client(timeout=30.0) as client:
                 # Submit
                 resp = await client.post(self._SUBMIT_URL, data=submit_params)
                 resp.raise_for_status()
@@ -192,7 +194,9 @@ class _TwoCaptchaSolver(CaptchaSolver):
         except ImportError:
             return False
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            from app.url_safety import get_safe_async_client
+
+            async with get_safe_async_client(timeout=10.0) as client:
                 resp = await client.get(
                     self._RESULT_URL,
                     params={"key": self._api_key, "action": "get", "id": "0", "json": "1"},
@@ -246,7 +250,9 @@ class _AntiCaptchaSolver(CaptchaSolver):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            from app.url_safety import get_safe_async_client
+
+            async with get_safe_async_client(timeout=30.0) as client:
                 resp = await client.post(self._CREATE_URL, json=create_payload)
                 resp.raise_for_status()
                 body = resp.json()
@@ -290,7 +296,9 @@ class _AntiCaptchaSolver(CaptchaSolver):
         except ImportError:
             return False
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            from app.url_safety import get_safe_async_client
+
+            async with get_safe_async_client(timeout=10.0) as client:
                 resp = await client.post(
                     "https://api.anti-captcha.com/getBalance",
                     json={"clientKey": self._api_key},

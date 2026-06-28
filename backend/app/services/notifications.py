@@ -31,7 +31,9 @@ class TelegramNotifier:
             # Re-check under lock so only the first racer builds a client.
             client = self._client
             if client is None or client.is_closed:
-                client = httpx.AsyncClient(timeout=30.0)
+                from app.url_safety import get_safe_async_client
+
+                client = get_safe_async_client(timeout=30.0)
                 self._client = client
             return client
 

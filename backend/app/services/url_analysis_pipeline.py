@@ -219,6 +219,7 @@ class URLAnalysisPipeline:
                     hops += 1
                     location = resp.headers.get("location", "")
                     if not location:
+                        await resp.aclose()
                         break
                     redirect_target = urljoin(str(resp.url), location)
                     try:
@@ -230,7 +231,9 @@ class URLAnalysisPipeline:
                             redirect_target,
                             e,
                         )
+                        await resp.aclose()
                         break
+                    await resp.aclose()
                     resp = await client.get(redirect_target, follow_redirects=False)
 
                 if str(resp.url) != ctx.url:

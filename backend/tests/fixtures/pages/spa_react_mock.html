@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hydration Demo — Acme Widgets SPA</title>
+</head>
+<body>
+<div id="hydration-root">
+  <p class="boot-fallback" id="server-fallback">Loading…</p>
+</div>
+
+<noscript>This page requires JavaScript enabled to render the catalog.</noscript>
+
+<script type="module">
+  // Simulate a hydration-style delayed render that mimics what Vue/React/Svelte
+  // SPAs do after the initial paint: kick off a fetch, then mount into #hydration-root
+  // synchronously once the data arrives. We don't need network here — the goal is to
+  // verify the regex extractor handles the post-hydration DOM deterministically.
+  const catalog = [
+    { id: "p-001", title: "Pioneer Air Purifier", price: "$129.00", category: "Air Quality" },
+    { id: "p-002", title: "Aurora Smart Lamp", price: "$42.50", category: "Lighting" },
+    { id: "p-003", title: "Helix Standing Desk", price: "$449.00", category: "Furniture" },
+    { id: "p-004", title: "Mariner Robot Vacuum", price: "$299.99", category: "Cleaning" },
+    { id: "p-005", title: "Sentinel Doorbell Camera", price: "$89.00", category: "Security" }
+  ];
+
+  function hydrate() {
+    const root = document.getElementById("hydration-root");
+    if (!root) return;
+    root.innerHTML = "";
+    const list = document.createElement("div");
+    list.className = "hydrated-list";
+    for (const item of catalog) {
+      const card = document.createElement("article");
+      card.className = "hydrated-item";
+      card.setAttribute("data-product-id", item.id);
+      card.innerHTML = `
+        <h3 class="hydrated-title">${item.title}</h3>
+        <span class="hydrated-price">${item.price}</span>
+        <span class="hydrated-category">${item.category}</span>
+      `.trim();
+      list.appendChild(card);
+    }
+    root.appendChild(list);
+  }
+
+  // Match a hydration-style delayed mount (50-500ms range is typical for SPAs)
+  if (typeof window !== "undefined") {
+    window.addEventListener("DOMContentLoaded", () => {
+      setTimeout(hydrate, 30);
+    });
+  }
+</script>
+</body>
+</html>

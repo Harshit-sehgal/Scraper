@@ -525,6 +525,7 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_org_id ON jobs(org_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at)")
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -584,6 +585,8 @@ def ensure_required_tables(conn, execute_fn: Callable) -> None:
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_org_id ON jobs(org_id)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_org_project_status ON jobs(org_id, project_id, status)",
         "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC)",
     ]:
         try:

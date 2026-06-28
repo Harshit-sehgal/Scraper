@@ -1,5 +1,6 @@
 import datetime
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -45,14 +46,22 @@ is side-effect-free.  Call :func:`shutdown_log_persist_executor` during
 application lifespan shutdown to release the thread.
 """
 
+_log_persist_executor_lock = threading.Lock()
+"""Serialises executor creation and shutdown to prevent races where
+two callers both observe ``None`` and create a duplicate executor, or a
+shutdown races with an ongoing _get_log_persist_executor call."""
+
 
 def _get_log_persist_executor() -> ThreadPoolExecutor:
     global _log_persist_executor
-    if _log_persist_executor is None:
-        _log_persist_executor = ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix="job_runner_persist",
-        )
+    if _log_persist_executor is not None:
+        return _log_persist_executor
+    with _log_persist_executor_lock:
+        if _log_persist_executor is None:
+            _log_persist_executor = ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix="job_runner_persist",
+            )
     return _log_persist_executor
 
 
@@ -63,9 +72,10 @@ def shutdown_log_persist_executor() -> None:
     dedicated thread.  Idempotent — safe to call multiple times.
     """
     global _log_persist_executor
-    if _log_persist_executor is not None:
-        _log_persist_executor.shutdown(wait=True)
-        _log_persist_executor = None
+    with _log_persist_executor_lock:
+        if _log_persist_executor is not None:
+            _log_persist_executor.shutdown(wait=True)
+            _log_persist_executor = None
 
 
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None) -> None:

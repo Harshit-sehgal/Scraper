@@ -185,6 +185,14 @@ def _ensure_schema_via(conn, fetch_one, execute) -> None:
             execute(
                 conn,
                 """
+                CREATE INDEX IF NOT EXISTS idx_queue_tasks_status_scheduled
+                    ON queue_tasks(status, scheduled_at)
+            """,
+            )
+
+            execute(
+                conn,
+                """
                 CREATE TABLE IF NOT EXISTS queue_task_history (
                     id TEXT PRIMARY KEY,
                     type TEXT NOT NULL,

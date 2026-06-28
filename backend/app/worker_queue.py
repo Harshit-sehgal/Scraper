@@ -273,6 +273,9 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                         CREATE INDEX IF NOT EXISTS idx_tasks_scheduled
                             ON tasks(scheduled_at);
 
+                        CREATE INDEX IF NOT EXISTS idx_tasks_status_scheduled
+                            ON tasks(status, scheduled_at);
+
                         CREATE TABLE IF NOT EXISTS task_history (
                             id TEXT PRIMARY KEY,
                             type TEXT NOT NULL,

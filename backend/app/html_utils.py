@@ -804,32 +804,37 @@ async def _fetch_with_httpx(
                 if strategy == FetchStrategy.HTTPX_SMART:
                     initial_host = urlparse(url).scheme + "://" + urlparse(url).netloc
                     _validate_url_safe(initial_host)
-                    await client.get(initial_host)
+                    warmup_resp = await client.get(initial_host)
+                    await warmup_resp.aclose()
 
                 current_url = url
                 max_redirects = 10
                 redirects_followed = 0
 
                 while True:
-                    resp = await client.get(current_url)
-                    if resp.is_redirect:
+                    next_resp = await client.get(current_url)
+                    if next_resp.is_redirect:
                         redirects_followed += 1
                         if redirects_followed > max_redirects:
+                            await next_resp.aclose()
                             msg = f"Too many redirects (max {max_redirects})"
                             raise ValueError(msg)
 
-                        redirect_target = resp.headers.get("location", "")
+                        redirect_target = next_resp.headers.get("location", "")
                         if not redirect_target:
+                            resp = next_resp
                             break
 
                         from urllib.parse import urljoin
 
-                        redirect_url = urljoin(str(resp.url), redirect_target)
+                        redirect_url = urljoin(str(next_resp.url), redirect_target)
 
                         # Validate the target redirect URL before fetching it!
                         _validate_url_safe(redirect_url)
+                        await next_resp.aclose()
                         current_url = redirect_url
                     else:
+                        resp = next_resp
                         break
 
                 resp.raise_for_status()

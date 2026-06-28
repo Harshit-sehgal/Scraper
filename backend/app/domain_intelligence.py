@@ -88,6 +88,8 @@ class DomainIntelligenceRegistry:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, self.path)
             tmp_path = None  # ownership transferred via rename
         except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):

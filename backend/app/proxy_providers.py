@@ -179,11 +179,14 @@ class HttpUrlProvider(ProxyProvider):
             headers["Authorization"] = self._auth_header
 
         try:
-            # H1: use a context-managed ``httpx.Client`` so the socket pool
-            # is deterministically released.  The bare ``httpx.get()`` call
-            # previously deferred pool cleanup to GC, causing fd pressure
-            # under repeated ``refresh_from_provider`` invocations.
-            with httpx.Client(timeout=10.0) as client:
+            # H1: use a context-managed SSRF-safe ``httpx.Client`` so the
+            # socket pool is deterministically released.  The bare
+            # ``httpx.get()`` call previously deferred pool cleanup to GC,
+            # causing fd pressure under repeated ``refresh_from_provider``
+            # invocations.
+            from app.url_safety import open_safe_client
+
+            with open_safe_client(timeout=10.0) as client:
                 response = client.get(self._url, headers=headers)
                 response.raise_for_status()
         except (httpx.HTTPError, OSError, ValueError) as exc:
