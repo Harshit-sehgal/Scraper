@@ -20,6 +20,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync  # noqa: E402
+
 DEFAULT_ALERTMANAGER_URL = "http://localhost:9093"
 DEFAULT_ALERTNAME = "DataForgeSyntheticAlertDrill"
 

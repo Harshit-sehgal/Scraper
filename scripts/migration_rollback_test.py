@@ -228,7 +228,7 @@ def main() -> int:
             "status": "failed",
             "error": str(e),
         }
-        (ARTIFACTS_DIR / "latest_drill.json").write_text(json.dumps(error_summary, indent=2))
+        write_text_sync(ARTIFACTS_DIR / "latest_drill.json", json.dumps(error_summary, indent=2))
         return 1
 
     finally:
