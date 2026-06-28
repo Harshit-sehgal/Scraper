@@ -239,7 +239,7 @@
       "response_model_if_known": "dict",
       "router_module": "app.routers.user_data",
       "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown"
+      "tenant_scoped": "yes"
     },
     {
       "auth_dependency_if_known": "require_role",

@@ -62,9 +62,9 @@ _TEST_ENV_DEFAULTS = {
 }
 _HOST_ENV_BEFORE_TESTS = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
 for _key, _value in _TEST_ENV_DEFAULTS.items():
-    # Use setdefault so a developer's intentional override (e.g. CI's
-    # real ``DATAFORGE_API_KEY``) is preserved.
-    os.environ.setdefault(_key, _value)
+    # Tests must override any host / .env value so pydantic-settings
+    # instantiates ``settings`` with the test values at import time.
+    os.environ[_key] = _value
 os.environ.pop("DATAFORGE_DATABASE_URL", None)
 del _key, _value
 

@@ -160,13 +160,13 @@
     {
       "method": "POST",
       "middleware_protected": "yes",
-      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "notes": "route dependency accepts admin/operator/user",
       "path": "/api/compliance/gdpr/forget",
       "public_protected_unknown": "protected",
       "required_role": "authenticated-user",
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown",
+      "tenant_scoped": "yes",
       "test_coverage": "yes"
     },
     {
@@ -1804,19 +1804,6 @@
   ],
   "unknown_auth_count": 0,
   "unknown_auth_routes": [],
-  "unknown_tenant_scope_count": 1,
-  "unknown_tenant_scope_routes": [
-    {
-      "method": "POST",
-      "middleware_protected": "yes",
-      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
-      "path": "/api/compliance/gdpr/forget",
-      "public_protected_unknown": "protected",
-      "required_role": "authenticated-user",
-      "route_dependency": "require_principal",
-      "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown",
-      "test_coverage": "yes"
-    }
-  ]
+  "unknown_tenant_scope_count": 0,
+  "unknown_tenant_scope_routes": []
 }

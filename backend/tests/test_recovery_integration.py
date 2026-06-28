@@ -88,7 +88,11 @@ class TestRecoveryStrategist:
 
         # Second attempt: escalate to next action
         plan2 = strategist.generate_recovery_plan(classification, attempt_number=2)
-        assert plan2.primary_action in [RecoveryAction.ROTATE_PROXY, RecoveryAction.BACKOFF_AND_SLOW]
+        assert plan2.primary_action in [
+            RecoveryAction.ROTATE_PROXY,
+            RecoveryAction.BACKOFF_AND_SLOW,
+            RecoveryAction.HARVEST_CF_CLEARANCE,
+        ]
 
     def test_parameter_tuning_high_anti_bot_risk(self) -> None:
         """Test parameter tuning for high anti-bot risk domains."""

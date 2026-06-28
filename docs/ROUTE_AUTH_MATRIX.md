@@ -6,7 +6,7 @@
 
 **API route rows:** 150
 **Unknown auth rows:** 0
-**Unknown tenant-scope rows:** 1
+**Unknown tenant-scope rows:** 0
 
 Unknown auth or tenant-scope rows must be tracked as candidate issues.
 
@@ -25,7 +25,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
-| `POST` | `/api/compliance/gdpr/forget` | protected | authenticated-user | require_principal | yes | unknown | yes | stable | route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required. |
+| `POST` | `/api/compliance/gdpr/forget` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |

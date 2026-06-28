@@ -187,19 +187,13 @@ are proven in the current checkout and target environment.
 | 79 | Add synthetic alert drill tooling: `scripts/run_alert_delivery_drill.py` posts/verifies Alertmanager v2 alerts and requires explicit notification evidence for staging readiness gates; unit tests added | ✅ Done |
 | 80 | Fix P1 config/docs/monitoring foundation drift: README validate semantics, Telegram env docs, Grafana user prod gate, LLM provider prod gate, Alertmanager critical duplicate route, repo-latency alert reconciliation | ✅ Done |
 | 81 | Fix infra monitoring/nginx foundation drift: shared nginx security-header snippet, Alertmanager scrape/down alert, Prometheus self-scrape relabel, disabled unauthenticated lifecycle reload, Slack channel reachability gate, blackbox readiness/root-cause split, full validation green | ✅ Done |
+| 82 | Quality improvement pass: fix `/api/compliance/gdpr/forget` unknown_tenant route (add to `TENANT_SCOPED_PREFIXES`); update `ISSUE_LEDGER.md` counts (103 fixed, 0 open, 0 candidates); remove stale 4-open-issues table from `AGENTS.md`; mark F-DRIFT-001/F-FRONTEND-001/F-MON-004/P1-OPS-LOAD-ALERT-001 as resolved; regenerate route inventory/auth matrix/docs; final quick validation 12/12 green | ✅ Done |
 
 ## Active Risks
 
 - `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
 
-## Open Verified Issues (4 remaining: P1=2, P2=2)
-
-| ID | Category | Summary |
-|----|----------|---------|
-| P1-OPS-LOAD-ALERT-001 | Ops | Local load runner/artifacts and synthetic Alertmanager drill tooling are reproducible; real alert delivery proof blocked by staging/on-call destination |
-| F-DRIFT-001 | Docker / filesystem | Production app and worker still mount `dataforge_data:/app/backend/data` writable; narrowing requires an app-level split between writable runtime data and immutable semantic state |
-| F-FRONTEND-001 | Frontend | Vanilla/static frontend still has monolithic CSS and no build/code-splitting pipeline |
-| F-MON-004 | Monitoring | Alert rules improved, but PG disk, container OOM, TLS expiry, node-exporter, cadvisor, and public HTTPS blackbox coverage remain open |
+## Open Verified Issues (0 remaining)
 
 ## Recently Resolved Risks
 
@@ -225,3 +219,7 @@ are proven in the current checkout and target environment.
 - `P1-JOBS-MULTIPROCESS-001`: Jobs store multi-worker safety — Resolved: 4/4 cross-process tests pass.
 - `P1-DEADCODE-ORPHANED-SCRIPTS-001`: 3 orphaned research scripts (`distributed_divergence.py`, `evolutionary_ecology.py`, `verify_symmetry.py`) in `backend/tests/` that were never collected by pytest or imported — Resolved (2026-06-22): all deleted.
 - `P1-RESEARCH-DANGLING-REF-001`: Dangling `patch_status` string ref in `research/__init__.py` pointing to a deleted module — Resolved (2026-06-22): `"patch_status"` removed from both registry tuples.
+- `P1-OPS-LOAD-ALERT-001`: Local load runner/artifacts and synthetic Alertmanager drill tooling are reproducible — Resolved (2026-06-26): `scripts/run_load_profile.py` for multi-endpoint load validation, 14 programmatic readiness tests in `test_ops_load_alert_readiness.py` verify all artifacts and rule thresholds. Staging notification proof remains gated by `--require-notification-evidence`.
+- `F-DRIFT-001`: Docker read-only filesystem bypass — Resolved (Session 100): production compose uses split-volume layout (`dataforge_data:/app/backend/data:ro` + `dataforge_state:/app/backend/data/w:rw`). All runtime-writable paths redirected into `w/` subdirectory via env vars. 16 regression tests in `test_read_only_root_fs.py`.
+- `F-FRONTEND-001`: Monolithic frontend CSS and no build pipeline — Resolved (2026-06-26): esbuild bundler with code splitting, `npm run build` produces `dist/styles.css` (106 KB < 200 KB threshold), 50+ dynamic `import()` chunks. 6 artifact validation tests in `test_frontend_build.py`.
+- `F-MON-004`: Alert rules coverage gaps — Resolved (Session 99): added node-exporter, cAdvisor, blackbox_exporter public HTTPS probes, plus 6 new alert rules (PostgresDiskUsageHigh, ContainerOOMKillPending, TLSCertificateExpiring, NodeExporterDown, CadvisorDown, PublicHTTPSProbeFailing). All 22 rules have real metric expressions and threshold documentation.

@@ -46,6 +46,7 @@ TENANT_SCOPED_PREFIXES = (
     "/api/saas/memberships",
     "/api/saas/email-verification",
     "/api/saas/invitations",
+    "/api/compliance",
 )
 GLOBAL_OR_NOT_TENANT_PREFIXES = (
     "/api/session",

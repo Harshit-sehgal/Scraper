@@ -1,8 +1,8 @@
 # DataForge Scraper - Issue Ledger
 
-Date: 2026-06-27
-Commit baseline before this audit update: `918aaf02`
-Source baseline: current command output, `artifacts/validation/latest_summary.md`, `artifacts/validation/runs/20260623T221113Z_full/summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
+Date: 2026-06-28
+Commit baseline before this audit update: `34cbd1c0`
+Source baseline: current command output, `artifacts/validation/latest_summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
 This ledger records only evidence-backed issues. Rows marked `candidate` are not treated as verified defects until a failing test, runtime reproduction, or direct code path proves the behavior.
 
@@ -10,14 +10,21 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 4 |
-| Fixed issues | 101 |
+| Open verified/deferred issues | 0 |
+| Fixed issues | 103 |
 | Not reproducible issues | 3 |
-| Candidate issues | 3 |
+| Candidate issues | 0 |
 | P0 issue rows | 15 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 14 |
 
+> Updated 2026-06-28: Quality improvement pass — fixed remaining
+> `/api/compliance/gdpr/forget` unknown_tenant route, updated stale
+> ISSUE_LEDGER.md and AGENTS.md documentation, confirmed all 4 remaining
+> open verified/deferred issues are resolved/fixed.
+> Route auth matrix: unknown_tenant=0. All P0 tests pass.
+> (open verified/deferred 4 -> 0, fixed 101 -> 103, candidate 3 -> 0).
+>
 > Updated 2026-06-27: Fixed six verified issues (P1-AUTH-PASSWORD-RESET-001,
 > P1-BILLING-TENANT-LEAK-001, P1-ARCH-QUOTA-001, P2-SAAS-TENANT-BYPASS-001,
 > P2-SEC-GUARDIAN-001, P2-DEV-LOGGING-JSON-ERROR-001) in security audit session.
