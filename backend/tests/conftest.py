@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # values read from ``os.environ``).  The session fixture below restores
 # whatever the host environment had originally.
 #
-# Direct module-level ``os.environ.setdefault`` calls leak into the
+# Direct module-level ``os.environ`` mutation leaks into the
 # developer's shell when pytest is hard-killed (``-9``, ``kill -9``,
 # OOM).  We snapshot here and rely on ``_test_env_defaults`` to restore
 # on graceful teardown; if pytest is hard-killed the leak is part of a
@@ -801,9 +801,9 @@ def client(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "OPERATOR_API_KEY", "")
     monkeypatch.setattr(main_mod.settings, "METRICS_TOKEN", "")
     monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", True)
-    # ENABLE_EXPERIMENTAL_ROUTES is set at conftest import time (see
-    # ``os.environ.setdefault`` above) so the experimental router is
-    # already mounted on ``app``. The settings attribute override
+    # ENABLE_EXPERIMENTAL_ROUTES is forced at conftest import time
+    # (``os.environ[_key] = _value`` above) so the experimental router
+    # is already mounted on ``app``. The settings attribute override
     # below is kept for tests that re-import app.main with the
     # flag off — they need it re-enabled for the client fixture.
     monkeypatch.setattr(main_mod.settings, "ENABLE_EXPERIMENTAL_ROUTES", True)
