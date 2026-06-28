@@ -354,3 +354,135 @@ class TestAlignProfileKeysToSchema:
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0].get("arrival_date") is None
+
+
+class TestValidateAgainstSchema:
+    """Schema validation gate — Roadmap §1 #6.
+
+    The validation gate enforces type compatibility between extracted
+    field values and the declared schema types. Required fields MUST
+    be present and non-empty. Populated fields must match their type
+    (e.g., a phone field containing a URL is a violation).
+    """
+
+    def test_valid_record_passes(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=True),
+            SchemaField(name="age", field_type=FieldType.INTEGER, description="", required=False),
+            SchemaField(name="email", field_type=FieldType.EMAIL, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
+        ]
+        record = {"name": "Alice", "age": "30", "email": "alice@example.com", "price": "$9.99"}
+        valid, violations = validate_against_schema(record, schema)
+        assert valid is True
+        assert violations == []
+
+    def test_required_missing_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)]
+        valid, violations = validate_against_schema({"name": ""}, schema)
+        assert valid is False
+        assert len(violations) == 1
+        assert "required" in violations[0]
+
+    def test_required_null_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)]
+        valid, violations = validate_against_schema({"name": None}, schema)
+        assert valid is False
+        assert "required" in violations[0]
+
+    def test_type_mismatch_email_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="email", field_type=FieldType.EMAIL, description="", required=False)]
+        valid, violations = validate_against_schema({"email": "not-an-email"}, schema)
+        assert valid is False
+        assert "email" in violations[0]
+
+    def test_type_mismatch_phone_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="phone", field_type=FieldType.PHONE, description="", required=False)]
+        valid, violations = validate_against_schema({"phone": "https://example.com"}, schema)
+        assert valid is False
+        assert "phone" in violations[0]
+
+    def test_type_mismatch_url_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="url", field_type=FieldType.URL, description="", required=False)]
+        valid, violations = validate_against_schema({"url": "example.com"}, schema)  # no scheme
+        assert valid is False
+
+    def test_type_mismatch_url_passes_with_scheme(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="url", field_type=FieldType.URL, description="", required=False)]
+        valid, _ = validate_against_schema({"url": "https://example.com"}, schema)
+        assert valid is True
+
+    def test_type_mismatch_integer_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="count", field_type=FieldType.INTEGER, description="", required=False)]
+        valid, violations = validate_against_schema({"count": "abc"}, schema)
+        assert valid is False
+
+    def test_type_mismatch_date_fails(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="date", field_type=FieldType.DATE, description="", required=False)]
+        valid, violations = validate_against_schema({"date": "yesterday"}, schema)
+        assert valid is False
+
+    def test_mixed_valid_and_invalid_fields(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="email", field_type=FieldType.EMAIL, description="", required=False),
+            SchemaField(name="phone", field_type=FieldType.PHONE, description="", required=False),
+        ]
+        record = {"name": "Alice", "email": "alice@example.com", "phone": "nope"}
+        valid, violations = validate_against_schema(record, schema)
+        assert valid is False
+        assert len(violations) == 1
+        assert "phone" in violations[0]
+
+    def test_empty_optional_field_passes(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=True),
+            SchemaField(name="age", field_type=FieldType.INTEGER, description="", required=False),
+        ]
+        valid, _ = validate_against_schema({"name": "Alice", "age": None}, schema)
+        assert valid is True
+
+    def test_currency_accepts_decimal_and_symbol(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False)]
+        valid, _ = validate_against_schema({"price": "$1,299.50"}, schema)
+        assert valid is True
+
+    def test_boolean_accepts_strings(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="active", field_type=FieldType.BOOLEAN, description="", required=False)]
+        for value in ("true", "false", "yes", "no"):
+            valid, _ = validate_against_schema({"active": value}, schema)
+            assert valid is True, f"Boolean should accept {value!r}"
+
+    def test_text_field_accepts_any_non_empty(self) -> None:
+        from app.data_utils import validate_against_schema
+
+        schema = [SchemaField(name="note", field_type=FieldType.STRING, description="", required=False)]
+        for value in ("hello", "123 Main St", "https://example.com", "$100"):
+            valid, _ = validate_against_schema({"note": value}, schema)
+            assert valid is True, f"String field should accept {value!r}"

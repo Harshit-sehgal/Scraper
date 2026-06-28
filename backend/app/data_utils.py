@@ -1,9 +1,12 @@
-"""Ensure consistent schema order and basic normalization of values."""
+"""Ensure consistent schema order, validation, and normalization of values."""
 
+from __future__ import annotations
+
+import re
 from typing import Any
 
 from app.html_utils import _is_empty_value
-from app.models import SchemaField
+from app.models import FieldType, SchemaField
 
 
 def normalize_scraped_record(record: dict[str, Any], schema_fields: list[SchemaField]) -> dict[str, Any]:
@@ -22,10 +25,97 @@ def normalize_scraped_record(record: dict[str, Any], schema_fields: list[SchemaF
     return normalized
 
 
-def _validate_extracted_data(record: dict[str, Any], schema_fields: list[SchemaField]) -> bool:
-    """Basic validation to ensure at least some meaningful data was found."""
-    from app.html_utils import _is_empty_value
+def _value_matches_schema_type(value: Any, field_type: FieldType) -> bool:
+    """Check if a value is compatible with the declared schema field type.
 
+    Used by :func:`validate_against_schema` as a validation gate (not just
+    a scoring signal). Mirrors the type-matching logic in
+    :func:`app.network_payload_extractor._value_matches_type` so both paths
+    agree on what counts as a valid value.
+    """
+    if value is None:
+        return False
+
+    s_value = value
+    if isinstance(s_value, (int, float)):
+        if field_type in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT, FieldType.CURRENCY):
+            return True
+        if field_type == FieldType.BOOLEAN:
+            return False
+
+    s = str(s_value).strip()
+    if not s:
+        return False
+
+    if field_type == FieldType.CURRENCY:
+        return bool(re.search(r"[\d.,]+", s))
+    if field_type in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT):
+        return bool(re.match(r"^-?\d+(\.\d+)?$", s))
+    if field_type == FieldType.EMAIL:
+        return bool(re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", s))
+    if field_type == FieldType.URL:
+        return s.startswith(("http://", "https://"))
+    if field_type == FieldType.DATE:
+        return bool(re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", s))
+    if field_type == FieldType.PHONE:
+        return bool(re.search(r"[\d\s\-()+]{7,}", s))
+    if field_type == FieldType.BOOLEAN:
+        return isinstance(value, bool) or s.lower() in ("true", "false", "yes", "no")
+    # FieldType.TEXT and any future enum fallback: non-empty text passes.
+    return True
+
+
+def validate_against_schema(
+    record: dict[str, Any],
+    schema_fields: list[SchemaField],
+) -> tuple[bool, list[str]]:
+    """Validate a record against the schema fields.
+
+    Returns ``(valid, violations)``:
+    - ``valid`` is True if every present (non-null) field matches its
+      declared type.
+    - ``violations`` lists the names of fields whose value does not match
+      the declared type (or were required but missing).
+
+    Required fields MUST be present and non-empty.
+    All other populated fields SHOULD match their declared type — except
+    FieldType.TEXT which accepts anything non-empty.
+
+    Used as a validation gate by the extraction pipeline after
+    ``normalize_scraped_record`` so type-mismatched records (e.g., a phone
+    field containing a URL) can be rejected or flagged before storage.
+    """
+    violations: list[str] = []
+
+    # Required fields: must be present, non-empty, and type-compatible.
+    for field in schema_fields:
+        if not field.required:
+            continue
+        val = record.get(field.name)
+        if _is_empty_value(val):
+            violations.append(f"{field.name}: required field missing or empty")
+            continue
+        if not _value_matches_schema_type(val, field.field_type):
+            violations.append(f"{field.name}: required field value does not match declared type {field.field_type.value}")
+
+    # Non-required populated fields: must match declared type when value is non-empty.
+    for field in schema_fields:
+        if field.required:
+            continue
+        val = record.get(field.name)
+        if _is_empty_value(val):
+            continue
+        if not _value_matches_schema_type(val, field.field_type):
+            violations.append(f"{field.name}: value does not match declared type {field.field_type.value}")
+
+    return len(violations) == 0, violations
+
+
+def _validate_extracted_data(record: dict[str, Any], schema_fields: list[SchemaField]) -> bool:
+    """Basic validation to ensure at least some meaningful data was found.
+
+    For stricter type-aware validation use :func:`validate_against_schema`.
+    """
     meaningful_count = 0
     for field in schema_fields:
         val = record.get(field.name)
