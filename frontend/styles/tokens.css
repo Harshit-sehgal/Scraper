@@ -6,6 +6,12 @@
    Inter for UI, JetBrains Mono for tabular data.
    Light is default; dark applies via [data-theme="dark"] on <html>. */
 
+:root {
+  transition:
+    background var(--duration-slow) var(--ease-out),
+    color var(--duration-slow) var(--ease-out);
+}
+
 :root,
 :root[data-theme="light"] {
   /* Surfaces */

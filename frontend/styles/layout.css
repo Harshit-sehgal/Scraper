@@ -131,12 +131,19 @@
   color: var(--ink-3);
   font-size: 20px;
   line-height: 1;
-  transition: background var(--duration-fast) var(--ease-out);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .sidebar-toggle:hover {
   background: var(--bg-hover);
   color: var(--ink-1);
+}
+
+.sidebar-toggle:active {
+  transform: rotate(90deg);
 }
 
 /* ═══ Sidebar ═══ */
@@ -282,6 +289,19 @@
   background: var(--bg-sidebar-item-active);
   color: var(--primary);
   font-weight: 600;
+  position: relative;
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--primary);
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
 .nav-item.active .nav-icon {
@@ -475,10 +495,28 @@
 
 .view {
   display: none;
+  animation: view-fade-in 200ms var(--ease-out);
 }
 
 .view.active {
   display: block;
+}
+
+@keyframes view-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view {
+    animation: none;
+  }
 }
 
 /* ═══ Section / Card layout helpers ═══ */
