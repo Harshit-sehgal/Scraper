@@ -808,7 +808,7 @@ class WorkerQueue:
                     started_at_str = row["started_at"]
                     try:
                         started_at = parse_datetime(started_at_str)
-                        assert started_at is not None  # noqa: S101 — guarded by try/except below
+                        assert started_at is not None  # noqa: S101  # nosec B101 — guarded by try/except below
                         elapsed = (now - started_at).total_seconds()
                         if elapsed > timeout_secs * 2:
                             conn.execute(

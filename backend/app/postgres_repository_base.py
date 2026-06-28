@@ -1083,7 +1083,7 @@ class PostgresRepositoryBase(JobRepository, ABC):
         if last_heartbeat:
             try:
                 parsed = parse_datetime(last_heartbeat)
-                assert parsed is not None  # noqa: S101 — guarded by try/except below
+                assert parsed is not None  # noqa: S101  # nosec B101 — guarded by try/except below
                 delta = datetime.datetime.now(datetime.UTC) - parsed
                 alive = delta.total_seconds() < ttl_seconds
             except (ValueError, TypeError):
