@@ -32,7 +32,13 @@ class TelegramNotifier:
         try:
             client = self._get_client()
             response = await client.post(url, json=payload)
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            finally:
+                # H5: always release the response back to the pool
+                # before the function exits — the previous pattern let
+                # undetermined responses pile up under failure paths.
+                await response.aclose()
         except Exception:
             logger.exception("Failed to send Telegram notification")
 

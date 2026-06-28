@@ -179,8 +179,13 @@ class HttpUrlProvider(ProxyProvider):
             headers["Authorization"] = self._auth_header
 
         try:
-            response = httpx.get(self._url, headers=headers, timeout=10.0)
-            response.raise_for_status()
+            # H1: use a context-managed ``httpx.Client`` so the socket pool
+            # is deterministically released.  The bare ``httpx.get()`` call
+            # previously deferred pool cleanup to GC, causing fd pressure
+            # under repeated ``refresh_from_provider`` invocations.
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(self._url, headers=headers)
+                response.raise_for_status()
         except (httpx.HTTPError, OSError, ValueError) as exc:
             logger.warning("Proxy provider HTTP fetch from %s failed: %s", self._url, exc)
             return []

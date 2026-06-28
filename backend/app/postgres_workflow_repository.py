@@ -12,6 +12,7 @@ hooks delegate to whichever psycopg driver is active.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -246,10 +247,20 @@ class PostgresWorkflowRepository(_PostgresWorkflowRepositoryBase):
 
     @contextmanager
     def _conn(self) -> Iterator:
+        # H3: commit on successful yield, rollback on user exception, and
+        # always return the connection to the pool.  The previous pattern
+        # yielded the connection and returned it to the pool without
+        # committing/rolling back, leaving any open transaction resident
+        # on the connection object across pool reuse.
         pool = self._get_pool()
         conn = pool.getconn()
         try:
             yield conn
+            conn.commit()
+        except Exception:
+            with contextlib.suppress(Exception):
+                conn.rollback()
+            raise
         finally:
             pool.putconn(conn)
 

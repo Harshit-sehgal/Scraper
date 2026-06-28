@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 from app.config import settings as _settings
@@ -74,7 +74,17 @@ def _get_pool():
                     },
                     open=False,
                 )
-                _pool.open()
+                try:
+                    _pool.open()
+                except Exception:
+                    # H2: if ``open()`` fails we must release the
+                    # partially-initialised pool and reset the module
+                    # global — otherwise the next caller reuses a dead
+                    # pool and the original connection state leaks.
+                    with suppress(Exception):
+                        _pool.close()
+                    _pool = None
+                    raise
                 logger.info(
                     "Created psycopg3 worker queue pool (min=%d, max=%d) for %s",
                     minconn,

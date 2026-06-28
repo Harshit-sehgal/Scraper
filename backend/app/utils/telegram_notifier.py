@@ -142,19 +142,20 @@ class TelegramNotifier:
         }
 
         try:
-            response = requests.post(url, json=payload, timeout=10)
+            # H6: wrap the request in a `with` block so the underlying
+            # urllib3 connection is always returned to its keep-alive pool.
+            with requests.post(url, json=payload, timeout=10) as response:
+                if response.status_code >= 400:
+                    logger.warning(
+                        "Telegram send_message HTTP %s: %s",
+                        response.status_code,
+                        response.text[:300],
+                    )
+                    return False
+                return True
         except requests.RequestException:
             logger.exception("Telegram send_message network error")
             return False
-
-        if response.status_code >= 400:
-            logger.warning(
-                "Telegram send_message HTTP %s: %s",
-                response.status_code,
-                response.text[:300],
-            )
-            return False
-        return True
 
     # ─── Threaded high-level helpers (fire-and-forget) ───────────────
     def _fire_and_forget(self, text: str) -> None:

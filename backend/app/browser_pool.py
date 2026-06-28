@@ -556,7 +556,6 @@ class BrowserPool:
             self._context_last_used.pop(lru_key, None)
             return
         ctx = self._contexts.pop(lru_key)
-        self._contexts.pop(lru_key, None)
         self._context_use_count.pop(lru_key, None)
         self._context_last_used.pop(lru_key, None)
         logger.info(
@@ -658,12 +657,17 @@ class BrowserPool:
             return False
 
         try:
-            # Try to create a dummy page and close it
+            # H4: wrap new_context + new_page in an outer try/finally so
+            # ctx.close always runs even if new_page or page.close raises —
+            # otherwise the BrowserContext leaks until pool shutdown.
             ctx = await self._browser.new_context()
-            page = await ctx.new_page()
-            await page.close()
-            await ctx.close()
-            return True
+            try:
+                page = await ctx.new_page()
+                await page.close()
+                return True
+            finally:
+                with contextlib.suppress(Exception):
+                    await ctx.close()
         except (Error, OSError, RuntimeError, ValueError) as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False
