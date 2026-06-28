@@ -9,7 +9,9 @@ Provides:
 from __future__ import annotations
 
 import logging
+import os
 import time
+from contextlib import suppress
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -125,6 +127,9 @@ class SystemGovernorDashboard:
             f.write("```\n\n")
 
             f.write("---\n * End of Dynamic System Map.*\n")
+            f.flush()
+            with suppress(OSError):
+                os.fsync(f.fileno())
 
         self.last_map_update = time.time()
 

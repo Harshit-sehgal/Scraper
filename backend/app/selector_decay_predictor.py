@@ -91,6 +91,8 @@ class SelectorDecayPredictor:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump(data, f)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, path)
             tmp_path = None  # ownership transferred via rename
         except _PERSISTENCE_ERRORS:

@@ -17,8 +17,10 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
+from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -426,9 +428,44 @@ class RegressionCapture:
         return any(e.id == content_id for e in self._registry.entries)
 
     def _save_fixture(self, filename: str, html: str) -> None:
-        """Save HTML content as a fixture file."""
+        """Save HTML content as a fixture file with durable fsync.
+
+        The fixture is written atomically via a sibling ``.tmp`` file
+        followed by ``os.replace``.  Without fsync, a power loss
+        between the rename and the filesystem journal flush could
+        leave a zero-byte or truncated fixture silent inserted
+        into the archive, which would later produce a confusing
+        ``ParserError`` in replay tests instead of the expected
+        regression signal.  ``os.fsync`` forces the kernel to push
+        the data to disk before the rename, so the new fixture is
+        durably persisted as a unit.
+        """
         fixture_path = self._fixtures_dir / filename
-        fixture_path.write_text(html, encoding="utf-8")
+        tmp_path = fixture_path.with_suffix(fixture_path.suffix + ".tmp")
+        fd: int | None = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(
+                dir=fixture_path.parent,
+                prefix=fixture_path.stem + ".",
+                suffix=".tmp",
+            )
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                fd = None  # ownership transferred to fdopen context manager
+                f.write(html)
+                f.flush()
+                with suppress(OSError):
+                    os.fsync(f.fileno())
+            os.replace(tmp_path, fixture_path)
+            tmp_path = None  # ownership transferred via rename
+        except OSError:
+            logger.exception("Failed to persist fixture %s", fixture_path)
+            with suppress(OSError):
+                if fd is not None:
+                    os.close(fd)
+            if tmp_path is not None and os.path.exists(tmp_path):
+                with suppress(OSError):
+                    os.unlink(tmp_path)
+            return
         logger.debug("Saved fixture: %s (%d bytes)", fixture_path, len(html))
 
     def _load_registry(self) -> RegressionRegistry:

@@ -90,6 +90,8 @@ class SelectorMemory:
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
                 json.dump(self._memory, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, self.path)
             tmp_path = None  # ownership transferred via rename
         except (OSError, TypeError):

@@ -26,6 +26,11 @@ This route list was generated from the FastAPI app during the audit. Production 
 | POST | `/api/jobs` | Operator or admin |
 | POST | `/api/jobs/{job_id}/cancel` | Operator or admin |
 | POST | `/api/jobs/{job_id}/reclean` | Operator or admin |
+| POST | `/api/jobs/{job_id}/webhook/redeliver` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/extraction` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/headers` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/strategy` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/webhook` | Operator or admin |
 | DELETE | `/api/jobs/{job_id}` | Admin |
 | DELETE | `/api/jobs/cleanup/terminal` | Admin |
 | GET | `/api/jobs/{job_id}/export/csv` | Operator or admin |
@@ -68,6 +73,7 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/scraper/telemetry` | Operator or admin |
 | DELETE | `/api/scraper/telemetry` | Admin |
 | POST | `/api/scraper/diagnostics` | Operator or admin |
+| POST | `/api/scraper/preview` | Operator or admin |
 | POST | `/api/scraper/regressions/generate-all-tests` | Admin |
 | POST | `/api/scraper/regressions/{entry_id}/generate-test` | Admin |
 | POST | `/api/scraper/selectors/cleanup` | Admin |
@@ -177,6 +183,7 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/billing/stub-return/{plan_tier}/{request_id}` | Unauthenticated (dev-only stub) |
 | GET | `/api/billing/subscriptions` | Operator or admin |
 | GET | `/api/billing/subscriptions/{customer_id}` | Operator or admin |
+| POST | `/api/compliance/gdpr/forget` | Authenticated user (GDPR right-to-erasure) |
 | DELETE | `/api/user/data` | Authenticated user (self-service deletion) |
 
 ## Batch Export

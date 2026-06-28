@@ -10,8 +10,10 @@ Provides:
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import time
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -189,3 +191,7 @@ class BenchmarkReporter:
             f.write(f"- **Latest Average Scrape Latency**: `{latest.latency_ms:.0f}ms`\n\n")
 
             f.write("---\n * End of Auto-Generated Dashboard Log.*\n")
+            f.flush()
+            with suppress(OSError):
+                os.fsync(f.fileno())
+        logger.debug("Wrote dashboard to %s", DASHBOARD_PATH)

@@ -389,8 +389,16 @@ class ReplayBuffer:
             self._total_checkpoints = 0
 
     def close(self) -> None:
-        """Close the buffer, ensuring all data is flushed."""
+        """Close the buffer, ensuring all data is flushed.
+
+        Performs a flush and fsync before closing to prevent data loss on crash.
+        """
         if self._current_segment_file is not None:
+            try:
+                self._current_segment_file.flush()
+                os.fsync(self._current_segment_file.fileno())
+            except (OSError, ValueError):
+                pass
             self._current_segment_file.close()
             self._current_segment_file = None
 

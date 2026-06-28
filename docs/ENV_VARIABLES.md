@@ -33,6 +33,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ADMIN_API_KEY` | - | Admin API key (global all-access) |
 | `DATAFORGE_SESSION_SECRET` | - | Session signing secret (auto-generated if not set) |
 | `DATAFORGE_ALLOW_INSECURE_DEV_AUTH` | `false` | Allow insecure auth in development |
+| `DATAFORGE_ENABLE_OPERATOR_CROSS_TENANT` | `false` | Allow env-backed operator keys (without org/project scope) cross-tenant all-access. Must be explicitly enabled for self-hosted internal operator scripts; keep disabled for SaaS deployments.
 | `DATAFORGE_BILLING_WEBHOOK_SECRET` | - | Shared secret for billing webhook HMAC/shared-secret verification |
 
 ## Rate Limiting
@@ -43,6 +44,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_RATE_LIMIT_PER_IP` | `100` | Per-IP rate limit (requests/minute) |
 | `DATAFORGE_RATE_LIMIT_PER_IP_ENABLED` | `true` | Enable per-IP rate limiting |
 | `DATAFORGE_RATE_LIMIT_DB_BACKED` | `false` | Use database-backed rate limits |
+| `DATAFORGE_RATE_LIMITER_MAX_COUNTERS` | `5000` | Maximum in-memory rate limiter counter entries before pruning oldest entries
 
 ## Worker Queue
 
@@ -70,6 +72,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ALLOWED_INTERNAL_HOSTS` | - | Comma-separated list of allowed internal hosts |
 | `DATAFORGE_DENYLIST_DB_PATH` | - | Optional SQLite path for the operator-managed domain denylist |
 | `DATAFORGE_ENCRYPTION_KEY` | - | Base64 AES-GCM key for auth-profile storage state encryption |
+| `DATAFORGE_ENCRYPTION_UID_FP_SALT` | - | Salt used in encryption UID fingerprint derivation for user identity hashing
 | `DATAFORGE_ENCRYPTION_SALT` | `default-salt-change-in-prod` | Salt used in encryption key derivation for auth-profile encryption |
 | `DATAFORGE_REDIS_URL` | - | Redis connection URL for rate-limiter distributed storage |
 | `DATAFORGE_ENCRYPTION_KEY_` | - | Prefix for versioned encryption keys such as `DATAFORGE_ENCRYPTION_KEY_V1` |
@@ -158,6 +161,7 @@ These are acceptable direct environment reads outside the config module:
 | `DATAFORGE_POST_SCROLL_RESET_DELAY` | `0.2` | Seconds to wait after resetting scroll position to top |
 | `DATAFORGE_DOM_STABILIZATION_INTERVAL` | `200` | Milliseconds between DOM mutation checks |
 | `DATAFORGE_PLAYWRIGHT_STEALTH` | `true` | Enable fingerprint-randomization overrides on every page |
+| `DATAFORGE_CF_HARVESTER_ENABLED` | `false` | Enable Cloudflare cf_clearance cookie harvester for challenge page auto-resolution
 | `DATAFORGE_STEALTH_UA_POOL` | *(long UA list)* | Comma-separated pool of user-agent strings for UA rotation |
 | `DATAFORGE_STEALTH_VIEWPORT_WIDTHS` | `1280,1366,...` | Comma-separated viewport widths pool for stealth variant |
 | `DATAFORGE_STEALTH_VIEWPORT_HEIGHTS` | `720,768,...` | Comma-separated viewport heights pool |
@@ -341,6 +345,7 @@ These are acceptable direct environment reads outside the config module:
 | `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS` | `false` | Allow unauthenticated public LLM fallbacks |
 | `DATAFORGE_G4F_JSON_MODEL` | `gpt-4o-mini` | Model for g4f JSON fallback calls |
 | `DATAFORGE_G4F_TEXT_MODEL` | `gpt-4o` | Model for g4f text fallback calls |
+| `DATAFORGE_SANDBOX_DISABLED` | - | (Historical) Bypass the LLM sandbox for research modules. Replaced by targeted `@pytest.mark.network` / `@pytest.mark.integration` markers in tests.
 
 ## Additional Security
 
