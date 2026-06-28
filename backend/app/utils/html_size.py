@@ -52,6 +52,7 @@ class HTMLSizeExceeded(ValueError):
         msg = f"HTML payload of {observed:,} bytes exceeds the {limit:,}-byte limit"
         if url:
             msg += f" (url={url})"
+        msg += "; increase DATAFORGE_MAX_HTML_BYTES to allow larger payloads"
         super().__init__(msg)
 
 
@@ -117,10 +118,10 @@ def enforce_html_size(
         return html
     if must_truncate:
         logger.warning(
-            "HTML payload exceeds %d-byte cap (%d bytes observed); truncating%s",
+            "HTML payload exceeds %d-byte cap (%d bytes observed); truncating (url=%s). Increase DATAFORGE_MAX_HTML_BYTES to avoid truncation",
             cap,
             len(html),
-            f" url={url}" if url else "",
+            url or "unknown",
         )
         return truncate_html(html, cap=cap)
     raise HTMLSizeExceeded(observed=len(html), limit=cap, url=url)

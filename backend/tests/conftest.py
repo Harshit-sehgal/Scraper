@@ -748,7 +748,7 @@ class LocalASGIClient:
 def client(monkeypatch):
     async def fake_run_job(job_id: str, **kwargs) -> None:
         # Keep jobs in pending state unless a test explicitly changes them.
-        await asyncio.sleep(0.01)
+        return
 
     def fake_schedule_background_task(coro):
         try:

@@ -111,11 +111,9 @@ def classify_zero_result(
     failure category and prescribe a recovery action.
 
     Args:
-        acquisition_lineage: Acquisition pipeline lineage metadata.
         session_detection: Output of session_url_detector.detect_session_params.
         empty_check: Output of empty_response_detector.detect_empty_response.
         anti_bot_score: Scored anti-bot risk from telemetry (0.0 - 1.0).
-        final_url: The final URL after all redirects.
         html: Raw HTML of the fetched page.
         visible_text: Visible text extracted from the page.
         detected_forms: List of detected HTML forms on the page.

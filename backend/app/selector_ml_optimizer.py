@@ -87,7 +87,7 @@ class SelectorFeatureExtractor:
 
         Args:
             selector: CSS selector string
-            dom_context: Optional HTML context for better feature extraction
+            _dom_context: Reserved for future use (currently unused).
 
         Returns:
             SelectorFeatures object

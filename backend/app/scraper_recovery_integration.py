@@ -153,6 +153,9 @@ async def scrape_url_with_recovery(
         max_recovery_attempts: Maximum recovery attempts before giving up
         selectors_map: Pre-discovered CSS selectors map from URL analysis
         search_params: Optional search parameters for session-bound URL recovery
+        usage_context: Usage context metadata for billing/telemetry.
+        headers: Custom HTTP headers for the fetch request.
+        cookies: Custom cookies for the fetch request.
         hydration_wait_ms: User-override hydration wait (ms); None = platform default
         scroll_attempts: User-override scroll attempt count; None = platform default
         fetch_strategy: User-requested fetch strategy; None / "" = auto-select

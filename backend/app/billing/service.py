@@ -335,6 +335,9 @@ class PayPalClient:
     def check_balance(self, customer_id: str, _amount: int) -> bool:
         """Check whether a customer has a valid subscription.
 
+        The ``_amount`` parameter is accepted for interface compatibility
+        but is not consulted — subscriptions cover any usage level.
+
         PayPal Subscriptions don't expose a real-time prepaid-balance counter via the
         REST API.  Instead, we verify that the customer holds an *active* subscription
         — if the subscription is missing, not configured, past-due, canceled, or if the

@@ -408,7 +408,7 @@ def assemble_single_container(
 
     Args:
         element_text: The full text of the container element.
-        schema_fields: Optional schema fields to guide field extraction.
+        schema_fields: Reserved for future use (currently unused).
 
     Returns:
         CompoundRecord if segments detected, None otherwise.

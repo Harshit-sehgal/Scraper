@@ -191,7 +191,21 @@ def run_all_adaptive_hooks(
     affected.
 
     Args:
-        Returns: Number of new motifs added (0 if none or world_state unavailable).
+        url: The target URL (unused, kept for API compatibility).
+        html: Raw HTML of the fetched page (unused, kept for API compatibility).
+        domain: Domain of the target URL.
+        results: Extracted records from the scrape.
+        schema_fields: Schema fields used for extraction.
+        world_state: Semantic world state (may be None).
+        extraction_method: The extraction method used.
+        fetch_ms: Page fetch duration in milliseconds.
+        selector_hit_rate: Hit rate of CSS selectors.
+        confidence_map: Confidence map from extraction.
+        classification: Zero-result classification (may be None).
+        anti_bot_score: Anti-bot risk score (0.0 to 1.0).
+
+    Returns:
+        Number of new motifs added (0 if none or world_state unavailable).
 
     """
     new_motifs = _run_motif_feedback(results, schema_fields, world_state)
