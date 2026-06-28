@@ -49,7 +49,10 @@ application lifespan shutdown to release the thread.
 def _get_log_persist_executor() -> ThreadPoolExecutor:
     global _log_persist_executor
     if _log_persist_executor is None:
-        _log_persist_executor = ThreadPoolExecutor(max_workers=1)
+        _log_persist_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="job_runner_persist",
+        )
     return _log_persist_executor
 
 

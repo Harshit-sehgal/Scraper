@@ -150,18 +150,9 @@ class CrawlFrontier:
         import sqlite3
         from urllib.parse import urlparse
 
-        # Snapshot existing frontier state so a mid-loop DB failure can
-        # be rolled back without leaving in-memory structures partially
-        # mutated. L3: previously a mid-iteration exception (e.g. an
-        # OOM during a UV row parse) left _completed / _queue / _pending
-        # quietly half-loaded; operators saw a stale frontier on the next
-        # request with no error surface.
-        snapshot_completed = set(self._completed)
-        snapshot_failed = dict(self._failed)
-        snapshot_queue = list(self._queue)
-        snapshot_pending = set(self._pending)
-        snapshot_domain_counts = dict(self._domain_page_counts)
         # Allocate fresh containers we can swap in atomically on success.
+        # If DB load fails midway, we discard these new_* containers and
+        # keep the existing in-memory state untouched.
         new_completed: set[str] = set()
         new_failed: dict[str, int] = {}
         new_queue: list[CrawlItem] = []
