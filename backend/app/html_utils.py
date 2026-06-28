@@ -489,7 +489,11 @@ async def fetch_page_content(
                         "url": url,
                     }
                 )
-            await context.add_cookies(cookie_list)
+            # The cookies dict shape maps directly to Playwright's
+            # SetCookieParam TypedDict — the cast is purely for the type
+            # checker since the runtime shape matches.
+            cookies_payload = list(cookie_list)
+            await context.add_cookies(cookies_payload)  # type: ignore[arg-type]
         page = await context.new_page()
         if extra_headers:
             await page.set_extra_http_headers(extra_headers)

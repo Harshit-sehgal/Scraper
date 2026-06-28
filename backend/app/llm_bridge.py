@@ -182,9 +182,15 @@ def _check_cascade_breaker() -> None:
         from app.utils.llm_circuit_breaker import LLMCircuitOpen, get_llm_cascade_breaker
 
         get_llm_cascade_breaker().check(enabled=_settings.LLM_CIRCUIT_ENABLED)
-    except LLMCircuitOpen:
-        raise
-    except (ImportError, AttributeError, RuntimeError, TypeError, ValueError, OSError):
+    except RuntimeError as _exc:
+        # LLMCircuitOpen is a RuntimeError subclass — let it propagate
+        # while swallowing other RuntimeErrors (e.g., settings init failures).
+        from app.utils.llm_circuit_breaker import LLMCircuitOpen
+
+        if isinstance(_exc, LLMCircuitOpen):
+            raise
+        logger.debug("Failed to check cascade breaker", exc_info=True)
+    except (ImportError, AttributeError, TypeError, ValueError, OSError):
         logger.debug("Failed to check cascade breaker", exc_info=True)
 
 
