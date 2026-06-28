@@ -67,9 +67,7 @@ def _env_backed_all_access(
     if role == UserRole.ADMIN and not org_id:
         # Env-backed admin with no org scope — same gate
         if settings.ENABLE_OPERATOR_CROSS_TENANT:
-            _record_operator_cross_tenant(
-                f"SaaS: env-backed ADMIN all-access — role={role.value}"
-            )
+            _record_operator_cross_tenant(f"SaaS: env-backed ADMIN all-access — role={role.value}")
             return True
         return False
 
@@ -77,11 +75,10 @@ def _env_backed_all_access(
         return False
 
     if is_env_backed_operator_cross_tenant(role, org_id, ""):
-        _record_operator_cross_tenant(
-            f"SaaS: env-backed OPERATOR all-access — role={role.value}"
-        )
+        _record_operator_cross_tenant(f"SaaS: env-backed OPERATOR all-access — role={role.value}")
         return True
     return False
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # AUP (Acceptable Use Policy)

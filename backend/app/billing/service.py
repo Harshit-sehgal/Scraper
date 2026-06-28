@@ -359,8 +359,12 @@ class PayPalClient:
                 )
                 return False
 
-            logger.debug("check_balance passed: customer=%s tier=%s status=%s",
-                         customer_id, customer.plan_tier.value, customer.subscription_status.value)
+            logger.debug(
+                "check_balance passed: customer=%s tier=%s status=%s",
+                customer_id,
+                customer.plan_tier.value,
+                customer.subscription_status.value,
+            )
             return True
         except (OSError, ValueError, RuntimeError) as e:
             logger.warning(

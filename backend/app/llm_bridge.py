@@ -1077,8 +1077,7 @@ class SubstratePluginManager:
                 )
             else:
                 logger.critical(
-                    "LAW 15: Sandbox subprocess exited %d for [%s]: %s; "
-                    "in-process fallback disabled — failing closed per LAW 15",
+                    "LAW 15: Sandbox subprocess exited %d for [%s]: %s; in-process fallback disabled — failing closed per LAW 15",
                     proc.returncode,
                     handler_name,
                     proc.stderr[:500],
@@ -1091,8 +1090,7 @@ class SubstratePluginManager:
 
         except subprocess.TimeoutExpired:
             logger.critical(
-                "LAW 15: Sandbox subprocess timed out for [%s]; "
-                "in-process fallback disabled — failing closed per LAW 15",
+                "LAW 15: Sandbox subprocess timed out for [%s]; in-process fallback disabled — failing closed per LAW 15",
                 handler_name,
             )
             _msg = (
@@ -1108,8 +1106,7 @@ class SubstratePluginManager:
             raise
         except (OSError, ValueError, TypeError, json.JSONDecodeError, AttributeError) as exc:
             logger.critical(
-                "LAW 15: Sandbox subprocess failed for [%s] (%s); "
-                "in-process fallback disabled — failing closed per LAW 15",
+                "LAW 15: Sandbox subprocess failed for [%s] (%s); in-process fallback disabled — failing closed per LAW 15",
                 handler_name,
                 exc,
             )

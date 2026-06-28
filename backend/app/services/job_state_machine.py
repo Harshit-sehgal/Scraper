@@ -201,16 +201,10 @@ def sync_from_db(
             a known ``JobStatus`` enum member.
     """
     if not isinstance(db_status, JobStatus):
-        msg = (
-            f"sync_from_db: db_status must be a JobStatus, "
-            f"got {type(db_status).__name__}"
-        )
+        msg = f"sync_from_db: db_status must be a JobStatus, got {type(db_status).__name__}"
         raise TypeError(msg)
     if not isinstance(job.status, JobStatus):
-        msg = (
-            f"sync_from_db: job.status must be a JobStatus, "
-            f"got {type(job.status).__name__}"
-        )
+        msg = f"sync_from_db: job.status must be a JobStatus, got {type(job.status).__name__}"
         raise TypeError(msg)
 
     if job.status == db_status:

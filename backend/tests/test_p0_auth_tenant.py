@@ -240,8 +240,7 @@ def test_operator_policy_allows_operational_job_listing(client, monkeypatch) -> 
     assert response.status_code == 200
     ids = {job["id"] for job in response.json()["jobs"]}
     assert "tenant-job-a" not in ids, (
-        "Env-backed operator keys MUST NOT bypass tenant isolation when "
-        "ENABLE_OPERATOR_CROSS_TENANT is False (issue #135)."
+        "Env-backed operator keys MUST NOT bypass tenant isolation when ENABLE_OPERATOR_CROSS_TENANT is False (issue #135)."
     )
 
     # Opt-in (flag on): legacy self-hosted mode restores all-access.
@@ -251,8 +250,7 @@ def test_operator_policy_allows_operational_job_listing(client, monkeypatch) -> 
         assert response.status_code == 200
         ids = {job["id"] for job in response.json()["jobs"]}
         assert "tenant-job-a" in ids, (
-            "With ENABLE_OPERATOR_CROSS_TENANT=True env-backed operators "
-            "retain legacy all-access for self-hosted mode."
+            "With ENABLE_OPERATOR_CROSS_TENANT=True env-backed operators retain legacy all-access for self-hosted mode."
         )
     finally:
         monkeypatch.setattr(main_mod.settings, "ENABLE_OPERATOR_CROSS_TENANT", False, raising=False)

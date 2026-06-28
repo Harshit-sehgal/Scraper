@@ -738,7 +738,9 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                         )
                     except Exception:
                         logger.debug(
-                            "ALTER TABLE %s ADD COLUMN %s failed", table_name, col_name,
+                            "ALTER TABLE %s ADD COLUMN %s failed",
+                            table_name,
+                            col_name,
                         )
             current = 10
 

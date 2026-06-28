@@ -140,9 +140,8 @@ class TestDeliverWebhook:
     @pytest.mark.asyncio
     async def test_failed_delivery_retries_then_returns_false(self) -> None:
         """A 500 response on every attempt should exhaust retries and return False."""
-        from unittest.mock import AsyncMock, MagicMock, patch
-
         import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
 
         mock_response = MagicMock()
         mock_response.status_code = 500

@@ -632,14 +632,15 @@ async def list_subscriptions(
     from app.utils.rbac import _record_operator_cross_tenant, is_env_backed_operator_cross_tenant
 
     if is_env_backed_operator_cross_tenant(_role, org_id, project_id):
-        _record_operator_cross_tenant(
-            f"billing: list_subscriptions all-access — role={_role.value} user={_user_id}"
-        )
+        _record_operator_cross_tenant(f"billing: list_subscriptions all-access — role={_role.value} user={_user_id}")
         return {
             "total": len(_subscription_store),
             "subscriptions": _subscription_store.values(),
         }
-    raise HTTPException(status_code=403, detail="Cross-tenant access forbidden. Set ENABLE_OPERATOR_CROSS_TENANT=true or provide a scoped API key.")
+    raise HTTPException(
+        status_code=403,
+        detail="Cross-tenant access forbidden. Set ENABLE_OPERATOR_CROSS_TENANT=true or provide a scoped API key.",
+    )
 
 
 @router.get("/subscriptions/{customer_id}", status_code=200)
@@ -666,8 +667,7 @@ async def get_subscription(
 
         if is_env_backed_operator_cross_tenant(_role, org_id, project_id):
             _record_operator_cross_tenant(
-                f"billing: get_subscription all-access customer={customer_id} — "
-                f"role={_role.value} user={_user_id}"
+                f"billing: get_subscription all-access customer={customer_id} — role={_role.value} user={_user_id}"
             )
         else:
             raise HTTPException(

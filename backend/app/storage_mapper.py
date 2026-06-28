@@ -97,9 +97,7 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "webhook_url": job.webhook_url if hasattr(job, "webhook_url") and job.webhook_url is not None else "",
         "webhook_secret": job.webhook_secret if hasattr(job, "webhook_secret") and job.webhook_secret is not None else "",
         "webhook_delivered": bool(getattr(job, "webhook_delivered", False)),
-        "webhook_delivered_at": (
-            job.webhook_delivered_at if getattr(job, "webhook_delivered_at", None) is not None else ""
-        ),
+        "webhook_delivered_at": (job.webhook_delivered_at if getattr(job, "webhook_delivered_at", None) is not None else ""),
         "fetch_strategy": job.fetch_strategy if hasattr(job, "fetch_strategy") and job.fetch_strategy is not None else "",
     }
 
