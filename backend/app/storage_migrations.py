@@ -347,40 +347,66 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
             current = 5
 
         if current < 6:
-            conn.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
-            conn.execute("""
-                CREATE TABLE worker_heartbeats (
-                    worker_id TEXT NOT NULL,
-                    last_heartbeat TEXT NOT NULL,
-                    hostname TEXT NOT NULL DEFAULT '',
-                    pid INTEGER NOT NULL DEFAULT 0,
-                    started_at TEXT NOT NULL DEFAULT '',
-                    PRIMARY KEY (worker_id, pid)
-                )
-            """)
+            backup_dropped = False
             try:
-                conn.execute(
-                    """
-                    INSERT INTO worker_heartbeats
-                        (worker_id, last_heartbeat, hostname, pid, started_at)
-                    SELECT worker_id, last_heartbeat, hostname, pid, started_at
-                    FROM (
-                        SELECT
-                            worker_id, last_heartbeat, hostname, pid, started_at,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY worker_id, pid
-                                ORDER BY last_heartbeat DESC
-                            ) AS rn
-                        FROM worker_heartbeats_v5_backup
-                    ) latest
-                    WHERE rn = 1
-                    """,
-                )
+                conn.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
+                conn.execute("""
+                    CREATE TABLE worker_heartbeats (
+                        worker_id TEXT NOT NULL,
+                        last_heartbeat TEXT NOT NULL,
+                        hostname TEXT NOT NULL DEFAULT '',
+                        pid INTEGER NOT NULL DEFAULT 0,
+                        started_at TEXT NOT NULL DEFAULT '',
+                        PRIMARY KEY (worker_id, pid)
+                    )
+                """)
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO worker_heartbeats
+                            (worker_id, last_heartbeat, hostname, pid, started_at)
+                        SELECT worker_id, last_heartbeat, hostname, pid, started_at
+                        FROM (
+                            SELECT
+                                worker_id, last_heartbeat, hostname, pid, started_at,
+                                ROW_NUMBER() OVER (
+                                    PARTITION BY worker_id, pid
+                                    ORDER BY last_heartbeat DESC
+                                ) AS rn
+                            FROM worker_heartbeats_v5_backup
+                        ) latest
+                        WHERE rn = 1
+                        """,
+                    )
+                except Exception:
+                    conn.execute("DROP TABLE worker_heartbeats")
+                    conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
+                    raise
+            finally:
+                # L4: ensure the backup table is always removed even if
+                # the migration is interrupted after the ALTER RENAME
+                # succeeded but before the explicit DROP — leaving the
+                # backup orphan would confuse the next migration run's
+                # version check and silently consume disk. We swallow
+                # any error here so a failure to drop doesn't mask the
+                # original exception (if any).
+                if not backup_dropped:
+                    try:
+                        conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
+                        backup_dropped = True
+                    except Exception:
+                        logger.debug(
+                            "L4: deferred DROP of worker_heartbeats_v5_backup failed; will retry on next migration run",
+                            exc_info=True,
+                        )
+            # Explicit drop after the successful path — idempotent with
+            # the ``finally`` above (the ``IF EXISTS`` makes the second
+            # call a no-op). Kept for clarity + immediate success log.
+            try:
+                conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
+                backup_dropped = True
             except Exception:
-                conn.execute("DROP TABLE worker_heartbeats")
-                conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
-                raise
-            conn.execute("DROP TABLE worker_heartbeats_v5_backup")
+                logger.debug("L4: explicit DROP of worker_heartbeats_v5_backup failed", exc_info=True)
             current = 6
 
         if current < 7:

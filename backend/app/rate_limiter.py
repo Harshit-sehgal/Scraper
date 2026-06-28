@@ -309,6 +309,17 @@ class DatabaseSlidingWindowCounter:
         self.key = key
         self._initialized = False
         self._fallback_counter = SlidingWindowCounter(max_requests, window_seconds)
+        # L10: explicit last-access timestamp so the LRU eviction in
+        # ``_get_or_create_counter`` works for DB-backed counters the
+        # same way it does for in-memory ones. Without it every DB
+        # counter ties at 0.0 and ``min()`` deterministically picks
+        # whichever happens to be first in dict iteration order —
+        # effectively single-key churn under attack traffic.
+        self._last_access: float = time.time()
+
+    def _touch(self) -> None:
+        """Stamp the counter as freshly used for LRU eviction."""
+        self._last_access = time.time()
 
     def _ensure_table(self) -> None:
         if self._initialized:
@@ -356,6 +367,9 @@ class DatabaseSlidingWindowCounter:
                 logger.warning("Failed to initialize SQLite rate limit table: %s", e)
 
     def allow(self) -> bool:
+        # L10: update the LRU stamp for DB-backed counters as soon as
+        # they're touched, so eviction is no longer biased toward them.
+        self._touch()
         self._ensure_table()
         from app.config import settings
 
@@ -464,6 +478,7 @@ class DatabaseSlidingWindowCounter:
                 return self._fallback_counter.allow()
 
     def remaining(self) -> int:
+        self._touch()
         self._ensure_table()
         from app.config import settings
 
@@ -501,6 +516,7 @@ class DatabaseSlidingWindowCounter:
                 return self._fallback_counter.remaining()
 
     def reset_in(self) -> float:
+        self._touch()
         self._ensure_table()
         from app.config import settings
 
@@ -598,9 +614,18 @@ class DatabaseSlidingWindowCounter:
         ``DELETE`` is a no-op on a missing table (Postgres returns 0;
         SQLite silently ignores).
         """
-        from app.config import settings
+        # L5: broaden the error filter to cover lazy-import +
+        # settings-resolution failures that aren't DB-specific. The
+        # previous ``_DB_FALLBACK_ERRORS`` tuple masked these but let
+        # other tunexpected attributes fall through unfettered.
+        try:
+            from app.config import settings
 
-        backend = settings.STORAGE_BACKEND
+            backend = settings.STORAGE_BACKEND
+        except (AttributeError, KeyError, ImportError, RuntimeError, OSError, ValueError, TypeError) as e:
+            logger.debug("rate_limits prune_all: settings unavailable: %s", e)
+            return 0
+
         cutoff = time.time() - max_age_seconds
 
         if backend == "postgres":
@@ -615,6 +640,7 @@ class DatabaseSlidingWindowCounter:
                 logger.debug("Postgres rate_limits prune_all failed")
                 return 0
         else:
+            result = 0
             try:
                 from app.job_store import _DB_LOCK, _get_connection
 
@@ -630,8 +656,7 @@ class DatabaseSlidingWindowCounter:
             except _DB_FALLBACK_ERRORS:
                 logger.debug("SQLite rate_limits prune_all failed")
                 return 0
-            else:
-                return result  # type: ignore[no-any-return]
+            return result
 
 
 class SlidingWindowCounter:

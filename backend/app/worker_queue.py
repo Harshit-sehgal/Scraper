@@ -925,10 +925,25 @@ class WorkerQueue:
                         # (RUF006). The done callback removes it.
                         _t.add_done_callback(lambda _: None)
                     except RuntimeError:
-                        logger.debug(
-                            "No running event loop to schedule _cleanup_in_flight for %s",
-                            tid,
-                        )
+                        # L9: no running loop (e.g. during interpreter
+                        # shutdown). The original code only logged and
+                        # left the task in ``self._in_flight`` until the
+                        # next task completed overwrote it. Do a
+                        # best-effort sync drop here so the in-flight
+                        # map doesn't accumulate orphans across restarts.
+                        try:
+                            self._in_flight.pop(tid, None)
+                        except Exception:
+                            logger.debug(
+                                "Sync drop of orphan in-flight task %s failed",
+                                tid,
+                                exc_info=True,
+                            )
+                        else:
+                            logger.debug(
+                                "Dropped orphan in-flight task %s during shutdown",
+                                tid,
+                            )
 
                 def _release(_fut: object, tid: str = task_id, sem: asyncio.Semaphore | None = acquired_sem) -> None:
                     # Release the semaphore permit exactly once when the

@@ -25,7 +25,46 @@ from app.models import Job
 logger = logging.getLogger(__name__)
 
 _STATE_LOCK = Lock()
-_SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+# L6: protect every access / mutation of the executor pointer. The
+# previous code reassigned the module-level ``_SAVE_EXECUTOR`` without a
+# guard, so a concurrent ``save_state()`` and ``flush_state_writes()``
+# could (a) submit to the just-shutdown instance and lose the write, or
+# (b) hand the caller a reference different from the one shutdown is
+# operating on. Both halves now share a single lock.
+_EXECUTOR_LOCK = Lock()
+_SAVE_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
+
+
+def _ensure_save_executor() -> concurrent.futures.ThreadPoolExecutor:
+    """Return the live executor instance, allocating it on first use."""
+    global _SAVE_EXECUTOR
+    if _SAVE_EXECUTOR is None:
+        with _EXECUTOR_LOCK:
+            if _SAVE_EXECUTOR is None:
+                _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=1,
+                    thread_name_prefix="state_store_writer",
+                )
+    return _SAVE_EXECUTOR
+
+
+def _get_or_build_save_executor() -> concurrent.futures.ThreadPoolExecutor:
+    """Get the current executor; if a prior shutdown left ``None``,
+    allocate a fresh one so subsequent saves don't drop their writes.
+    """
+    global _SAVE_EXECUTOR
+    current = _SAVE_EXECUTOR
+    if current is not None:
+        return current
+    with _EXECUTOR_LOCK:
+        if _SAVE_EXECUTOR is None:
+            _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix="state_store_writer",
+            )
+        return _SAVE_EXECUTOR
+
+
 _DEFAULT_STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
 
 # Keep the last backup to survive corrupt writes
@@ -226,9 +265,22 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
     }
 
     try:
-        _SAVE_EXECUTOR.submit(_write_state_to_disk, path, payload)
+        # L7: don't silently drop the write when the executor has been
+        # shut down — recover by allocating a fresh executor so the
+        # writer thread is restored. The previous branch logged and
+        # returned, leaving any post-shutdown state edits permanently
+        # in-memory.
+        executor = _ensure_save_executor()
+        try:
+            executor.submit(_write_state_to_disk, path, payload)
+        except RuntimeError:
+            # Concurrent shutdown reseated ``_SAVE_EXECUTOR`` between
+            # our lookup and submit. Re-acquire via the factory and
+            # retry once before giving up.
+            executor = _get_or_build_save_executor()
+            executor.submit(_write_state_to_disk, path, payload)
     except RuntimeError:
-        logger.warning("State executor shut down; skipping save")
+        logger.exception("Unable to schedule state save; state may be lost on shutdown")
 
 
 def flush_state_writes() -> None:
@@ -238,14 +290,30 @@ def flush_state_writes() -> None:
     This is a synchronous call that blocks until all pending writes finish.
     """
     global _SAVE_EXECUTOR
-    _SAVE_EXECUTOR.shutdown(wait=True)
+    # L6: take the executor lock for the swap so a racing save_state
+    # doesn't observe a half-rebuilt pool. ``executor`` is captured
+    # under the lock so a concurrent ``save_state`` only sees either
+    # the old (drained) or the new (live) executor — never a half-state.
+    with _EXECUTOR_LOCK:
+        current = _SAVE_EXECUTOR
+    if current is not None:
+        current.shutdown(wait=True)
     # Recreate executor for any future writes
-    _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    with _EXECUTOR_LOCK:
+        _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="state_store_writer",
+        )
 
 
 def shutdown_state_writes() -> None:
     """Drain and close the background state executor without recreating it."""
-    _SAVE_EXECUTOR.shutdown(wait=True)
+    global _SAVE_EXECUTOR
+    with _EXECUTOR_LOCK:
+        current = _SAVE_EXECUTOR
+        _SAVE_EXECUTOR = None
+    if current is not None:
+        current.shutdown(wait=True)
 
 
 atexit.register(shutdown_state_writes)
