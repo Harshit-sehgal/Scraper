@@ -849,6 +849,7 @@ def get_proxy_provider_refresh_total() -> int:
 def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
     global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits, _metrics_collection_errors
+    global _captcha_solve_attempts_total, _cf_harvest_attempts_total, _proxy_provider_refresh_total
     with _request_latencies_lock:
         _request_latencies.clear()
     with _worker_failures_lock:

@@ -133,8 +133,6 @@ class CommunicationSettings(BaseSettings):
     """Maximum seconds to wait for the page to initially render before
     beginning the cookie-poll loop."""
 
-
-
     # ─── Anti-Bot Detection ────────────────────────────────────────────
     ANTIBOT_PLATFORM_MATCH_SCORE: float = 0.6
     """Score boost when platform matches expected pattern."""
