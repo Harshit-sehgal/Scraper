@@ -23,7 +23,7 @@
         <span class="tag">web-scraping</span>
         <span class="tag">beautifulsoup</span>
         <span class="tag">playwright</span>
-        <span class="tag">anti-bot</span>
+        <span class="tag">rendering</span>
       </div>
     </div>
   </div>
@@ -41,8 +41,8 @@
         <span class="reputation">28,431</span>
         <span class="timestamp">answered Jun 20 at 15:01</span>
       </div>
-      <h3 class="answer-title">Use Playwright to handle the Cloudflare JavaScript challenge</h3>
-      <p class="answer-summary">The issue is that the website uses Cloudflare's JavaScript challenge. Use Playwright headless browser with wait_until=networkidle to extract the rendered DOM.</p>
+      <h3 class="answer-title">Use Playwright to handle the JS rendering challenge</h3>
+      <p class="answer-summary">The issue is that the website uses JS rendering. Use Playwright headless browser with wait_until=networkidle to extract the rendered DOM.</p>
     </article>
 
     <article class="answer-card">
@@ -55,7 +55,7 @@
         <span class="timestamp">answered Jun 21 at 09:42</span>
       </div>
       <h3 class="answer-title">Try sending proper browser headers with httpx first</h3>
-      <p class="answer-summary">Send proper User-Agent and Accept headers with httpx. This works for ~40% of Cloudflare-protected sites.</p>
+      <p class="answer-summary">Send proper User-Agent and Accept headers with httpx. This works for many sites with simple header checks.</p>
     </article>
 
     <article class="answer-card">
@@ -67,15 +67,15 @@
         <span class="reputation">3,521</span>
         <span class="timestamp">answered Jun 22 at 14:08</span>
       </div>
-      <h3 class="answer-title">Consider headless Detected Chrome (undetected-chromedriver)</h3>
-      <p class="answer-summary">For Selenium-based pipelines, use undetected-chromedriver to avoid Cloudflare challenges.</p>
+      <h3 class="answer-title">Consider headless Chromium with stealth flags</h3>
+      <p class="answer-summary">For Selenium-based pipelines, consider stealth flags to avoid simple checks.</p>
     </article>
   </div>
 
   <aside class="related-section">
     <h4>Related Questions</h4>
     <ul class="related-list">
-      <li class="related-entry"><a href="/questions/5121">How to handle Cloudflare Turnstile CAPTCHA in Python?</a></li>
+      <li class="related-entry"><a href="/questions/5121">How to handle a Turnstile widget in Python?</a></li>
       <li class="related-entry"><a href="/questions/5122">requests.get returns 403 for some websites even with headers</a></li>
       <li class="related-entry"><a href="/questions/5123">How to extract data from a React-rendered page?</a></li>
     </ul>
