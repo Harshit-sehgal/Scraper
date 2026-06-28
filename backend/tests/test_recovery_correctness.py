@@ -172,7 +172,7 @@ async def test_extra_headers_and_timeout_passed_to_httpx(monkeypatch) -> None:
 
     captured = {}
 
-    async def fake_httpx(url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=None, timeout_ms=None):
+    async def fake_httpx(url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=None, timeout_ms=None, cookies=None):
         captured["extra_headers"] = extra_headers
         captured["timeout_ms"] = timeout_ms
         return "<html>ok</html>", 0.0, strategy.value, 0

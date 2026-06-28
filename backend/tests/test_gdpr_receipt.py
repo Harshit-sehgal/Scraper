@@ -20,7 +20,6 @@ def _run_delete_my_data(auth):
     # Stub the JsonWorkflowRepository class check by returning a fake repo
     # that IS an instance of it (or supplying store with the right shape).
     fake_repo = MagicMock()
-    fake_store: dict[str, dict[str, str]] = {}
 
     with (
         patch("app.globals.jobs_store", {}),
@@ -34,8 +33,8 @@ def _run_delete_my_data(auth):
         patch("app.routers.auth_profiles._auth_profiles") as mock_ap,
         patch("app.routers.scheduled_monitoring._scheduled_jobs") as mock_sj,
     ):
-        mock_ap.delete_many = MagicMock(side_effect=lambda ids: len(ids))
-        mock_sj.delete_many = MagicMock(side_effect=lambda ids: len(ids))
+        mock_ap.delete_many = MagicMock(side_effect=len)
+        mock_sj.delete_many = MagicMock(side_effect=len)
 
         from app.routers.user_data import delete_my_data
 

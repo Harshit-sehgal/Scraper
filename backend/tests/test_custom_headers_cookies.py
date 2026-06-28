@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
+
+import app.main as main_mod
 import pytest
 from fastapi.testclient import TestClient
-
-from app.models import JobStatus
-import app.main as main_mod
 
 
 def test_job_create_with_headers_cookies(client: TestClient) -> None:
@@ -94,8 +93,8 @@ def test_job_headers_validation_limits(client: TestClient) -> None:
 @pytest.mark.anyio
 async def test_custom_headers_cookies_propagation(monkeypatch) -> None:
     """Verify that job-level headers and cookies are correctly propagated to fetch_page_content."""
+    from app.models import FieldType, Job, SchemaField
     from app.services.scraping import run_scraping_phase
-    from app.models import Job, SchemaField, FieldType
 
     job = Job(
         id="test-propagate-job",

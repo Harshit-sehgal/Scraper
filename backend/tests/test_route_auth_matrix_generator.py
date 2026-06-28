@@ -115,6 +115,7 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
         ("POST", "/api/saas/signup"),  # self-service account creation
         ("POST", "/api/saas/aup/accept"),  # P1-COMPLIANCE-001: AUP acceptance (idempotent, any authenticated user)
         ("DELETE", "/api/user/data"),  # self-service data deletion — any authenticated user can delete their own data
+        ("POST", "/api/compliance/gdpr/forget"),  # GDPR right-to-erasure alias — any authenticated user can request erasure
         ("POST", "/api/billing/webhook"),  # billing webhook called by PayPal (no API key)
         ("POST", "/api/saas/email-verification/send"),  # any authenticated user can request verification
         ("POST", "/api/saas/email-verification/verify"),  # any authenticated user can verify their email

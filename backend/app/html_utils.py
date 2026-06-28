@@ -482,11 +482,13 @@ async def fetch_page_content(
         if cookies:
             cookie_list = []
             for name, value in cookies.items():
-                cookie_list.append({
-                    "name": name,
-                    "value": value,
-                    "url": url,
-                })
+                cookie_list.append(
+                    {
+                        "name": name,
+                        "value": value,
+                        "url": url,
+                    }
+                )
             await context.add_cookies(cookie_list)
         page = await context.new_page()
         if extra_headers:

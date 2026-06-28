@@ -386,6 +386,7 @@ class JobHeadersService:
             job.cookies = dict(cookies)
 
         from app.storage_interface import get_job_repository
+
         repo = get_job_repository()
         await run_in_threadpool(repo.save_single, job)
 

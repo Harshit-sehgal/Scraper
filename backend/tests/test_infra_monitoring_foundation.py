@@ -172,7 +172,7 @@ def test_postgres_schema_version_tracking_is_current_checkout_reality() -> None:
     migrations = STORAGE_MIGRATIONS.read_text(encoding="utf-8")
     exported_sql = POSTGRES_MIGRATION.read_text(encoding="utf-8")
 
-    assert "POSTGRES_SCHEMA_VERSION = 8" in migrations
+    assert "POSTGRES_SCHEMA_VERSION = 9" in migrations
     assert "CREATE TABLE IF NOT EXISTS schema_version" in migrations
     assert "SELECT MAX(version) AS version FROM schema_version" in migrations
     assert "INSERT INTO schema_version (version) VALUES (%s)" in migrations

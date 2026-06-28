@@ -172,7 +172,7 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "webhook_secret": row.get("webhook_secret") or None,
                 "webhook_delivered": bool(row.get("webhook_delivered", False)),
                 "webhook_delivered_at": row.get("webhook_delivered_at") or None,
-                "fetch_strategy": row.get("fetch_strategy") or None,
+                "fetch_strategy": row.get("fetch_strategy") or "",
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:
