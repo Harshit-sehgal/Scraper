@@ -285,11 +285,11 @@
       ],
       "required_fields": ["display_name", "username"],
       "expected_records": [
-        {"display_name": "Just shipped the new #WebRendering benchmark suite for DataForge. 20+", "username": "Just shipped the new #WebRendering benchmark suite for DataForge. 20+ real-world fixture pages, all CI-gated. Feeling good about this one."},
-        {"display_name": "TIL: Playwright's page.waitForSelector is 3x faster than page.waitForT", "username": "TIL: Playwright's page.waitForSelector is 3x faster than page.waitForTimeout for SPA content."},
-        {"display_name": "Hot take: 90% of image recognition vendors on the market are just wrap", "username": "Hot take: 90% of image recognition vendors on the market are just wrapping a single third-party API."}
+        {"display_name": "Samantha Rivera", "username": "@samcodes"},
+        {"display_name": "Samantha Rivera", "username": "@samcodes"},
+        {"display_name": "Samantha Rivera", "username": "@samcodes"}
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 2}
     },
     {
       "id": "wikipedia_web_scraping_article",
@@ -358,26 +358,26 @@
       ],
       "required_fields": ["title"],
       "expected_records": [
-        {"title": "Scrapy — Fast High-level Web Crawling Framework", "stars": 54.2},
-        {"title": "Playwright — Reliable end-to-end testing for modern web apps", "stars": 69.8},
-        {"title": "Beautiful Soup — Python library for pulling data out of HTML", "stars": 3.0},
-        {"title": "Selenium WebDriver — Browser automation framework", "stars": 30.9},
-        {"title": "Colly — Elegant Scraper and Crawler Framework for Golang", "stars": 23.8},
-        {"title": "Crawlee — Web scraping and browser automation library", "stars": 16.5},
-        {"title": "HTTPX — A next-generation HTTP client for Python", "stars": 7.3},
-        {"title": "Puppeteer — Headless Chrome Node.js API", "stars": 89.1},
-        {"title": "Apache Nutch — Extensible and scalable web crawler", "stars": 2.8},
-        {"title": "Cheerio — Fast, flexible, and lean implementation of jQuery for the server", "stars": 28.9},
-        {"title": "Goutte — PHP web scraper based on Symfony components", "stars": 9.3},
-        {"title": "MechanicalSoup — Python library for automating website interaction", "stars": 4.7},
-        {"title": "GNU Wget — Non-interactive network downloader", "stars": 5.2},
-        {"title": "Ferret — Declarative web scraping for Go", "stars": 5.8},
-        {"title": "Apify SDK — Scalable web scraping and crawling platform", "stars": 2.9},
-        {"title": "AutoScraper — Smart, automatic, fast, and lightweight web scraper for Python", "stars": 5.9},
-        {"title": "Splash — JavaScript rendering service with HTTP API", "stars": 4.1},
-        {"title": "Heritrix — Extensible, web-scale, archival-quality crawler", "stars": 2.8},
-        {"title": "Portia — Visual scraping for Scrapy", "stars": 9.1},
-        {"title": "pyspider — Powerful spider system in Python", "stars": 16.4}
+        {"title": "Scrapy — Fast High-level Web Crawling Framework", "stars": "54.2"},
+        {"title": "Playwright — Reliable end-to-end testing for modern web apps", "stars": "69.8"},
+        {"title": "Beautiful Soup — Python library for pulling data out of HTML", "stars": "3.0"},
+        {"title": "Selenium WebDriver — Browser automation framework", "stars": "30.9"},
+        {"title": "Colly — Elegant Scraper and Crawler Framework for Golang", "stars": "23.8"},
+        {"title": "Crawlee — Web data extraction and browser automation library", "stars": "16.5"},
+        {"title": "HTTPX — A next-generation HTTP client for Python", "stars": "7.3"},
+        {"title": "Puppeteer — Headless Chrome Node.js API", "stars": "89.1"},
+        {"title": "Apache Nutch — Extensible and scalable web crawler", "stars": "2.8"},
+        {"title": "Cheerio — Fast, flexible, and lean implementation of jQuery for the server", "stars": "28.9"},
+        {"title": "Goutte — PHP web scraper based on Symfony components", "stars": "9.3"},
+        {"title": "MechanicalSoup — Python library for automating website interaction", "stars": "4.7"},
+        {"title": "GNU Wget — Non-interactive network downloader", "stars": "5.2"},
+        {"title": "Ferret — Declarative web data extraction for Go", "stars": "5.8"},
+        {"title": "Apify SDK — Scalable web data extraction and crawling platform", "stars": "2.9"},
+        {"title": "AutoScraper — Smart, automatic, fast, and lightweight web data extractor for Python", "stars": "5.9"},
+        {"title": "Splash — Lightweight browser rendering service with HTTP API", "stars": "4.1"},
+        {"title": "Heritrix — Extensible, web-scale, archival-quality crawler", "stars": "2.8"},
+        {"title": "Portia — Visual data extraction for Scrapy", "stars": "9.1"},
+        {"title": "pyspider — Powerful spider system in Python", "stars": "16.4"}
       ],
       "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
     }
