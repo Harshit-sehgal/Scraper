@@ -93,10 +93,7 @@ def guard_cross_tenant(
             logger.debug("Failed to record cross-tenant guard metric: %s", exc)
 
         if strict:
-            msg = (
-                f"Cross-tenant contamination detected ({context or 'unknown'}): "
-                f"{len(org_ids)} distinct org_ids in result set"
-            )
+            msg = f"Cross-tenant contamination detected ({context or 'unknown'}): {len(org_ids)} distinct org_ids in result set"
             raise CrossTenantContaminationError(msg)
 
     return org_ids
