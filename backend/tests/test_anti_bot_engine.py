@@ -143,3 +143,73 @@ class TestStealthHeaders:
         profile = engine.get_stealth_profile("example.com")
         # Should always advertise text/html support
         assert "text/html" in profile["extra_headers"]["Accept"]
+
+
+# ─── Hard-block auto-rotation ──────────────────────────────────────────
+
+
+class TestRecordBlockAutoRotates:
+    """A hard-block signal must atomically record_failure + rotate.
+
+    Without immediate rotation, ProxyManager waits for
+    PROXY_ROTATION_FAILURE_THRESHOLD consecutive failures before
+    rotating on its own — which means during a hard-block the next
+    few retries hit the same burned IP and damage its reputation.
+    """
+
+    def test_hard_block_records_failure_and_rotates(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import MagicMock
+
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_ROTATION_ENABLED", True)
+        monkeypatch.setattr(settings, "ANTIBOT_HARD_BLOCK_THRESHOLD", 0.8)
+
+        engine = AntiBotEngine()
+        engine._proxy_manager = MagicMock()  # type: ignore[attr-defined]
+        engine.proxy_manager.enabled = True
+        engine.proxy_manager.record_failure = MagicMock()
+        engine.proxy_manager.rotate = MagicMock()
+
+        engine.record_block(domain="target.example", score=0.95)
+
+        engine.proxy_manager.record_failure.assert_called_once_with(domain="target.example")
+        engine.proxy_manager.rotate.assert_called_once_with(domain="target.example")
+
+    def test_below_threshold_does_not_rotate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import MagicMock
+
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_ROTATION_ENABLED", True)
+        monkeypatch.setattr(settings, "ANTIBOT_HARD_BLOCK_THRESHOLD", 0.8)
+
+        engine = AntiBotEngine()
+        engine._proxy_manager = MagicMock()  # type: ignore[attr-defined]
+        engine.proxy_manager.enabled = True
+        engine.proxy_manager.record_failure = MagicMock()
+        engine.proxy_manager.rotate = MagicMock()
+
+        engine.record_block(domain="target.example", score=0.5)
+
+        engine.proxy_manager.record_failure.assert_not_called()
+        engine.proxy_manager.rotate.assert_not_called()
+
+    def test_proxy_disabled_skips_rotation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import MagicMock
+
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_ROTATION_ENABLED", False)
+        monkeypatch.setattr(settings, "ANTIBOT_HARD_BLOCK_THRESHOLD", 0.8)
+
+        engine = AntiBotEngine()
+        engine._proxy_manager = MagicMock()  # type: ignore[attr-defined]
+        engine.proxy_manager.enabled = False
+        engine.proxy_manager.record_failure = MagicMock()
+        engine.proxy_manager.rotate = MagicMock()
+
+        engine.record_block(domain="target.example", score=0.95)
+
+        engine.proxy_manager.record_failure.assert_not_called()
+        engine.proxy_manager.rotate.assert_not_called()
