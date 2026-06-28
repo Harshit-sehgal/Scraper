@@ -135,6 +135,7 @@ _PRODUCT_COUNTER_NAMES = (
     "workflow_run_total",
     "browser_context_created_total",
     "browser_context_failed_total",
+    "operator_cross_tenant_access_total",
 )
 
 # ── Extraction failure categories ────────────────────────────────────
@@ -694,6 +695,18 @@ def record_cross_tenant_guard_alert() -> None:
     Fires a CRITICAL log + counter; surface in Prometheus alerting.
     """
     increment_product_counter("cross_tenant_guard_alerts_total")
+
+
+def record_operator_cross_tenant_access() -> None:
+    """Increment the operator cross-tenant access counter.
+
+    Surfaced for alerting in /metrics.  Operators should monitor
+    ``operator_cross_tenant_access_total`` and alert on any non-zero
+    value in SaaS mode — the only legitimate use is for internal
+    operator scripts that have explicitly opted in via
+    ``DATAFORGE_ENABLE_OPERATOR_CROSS_TENANT=true``.
+    """
+    increment_product_counter("operator_cross_tenant_access_total")
 
 
 def get_auth_profile_ops() -> dict[str, int]:

@@ -190,7 +190,7 @@ class TestTeamInvitationStore:
             "member",
         )
 
-        result = identity_store.respond_to_invitation(invitation["id"], accept=True)
+        result = identity_store.respond_to_invitation(invitation["id"], accept=True, requesting_user_id=sample_user.id)
         assert result is not None
         assert result["status"] == "accepted"
 
@@ -206,7 +206,7 @@ class TestTeamInvitationStore:
             "member",
         )
 
-        result = identity_store.respond_to_invitation(invitation["id"], accept=False)
+        result = identity_store.respond_to_invitation(invitation["id"], accept=False, requesting_user_id=sample_user.id)
         assert result is not None
         assert result["status"] == "declined"
 
@@ -223,11 +223,11 @@ class TestTeamInvitationStore:
         )
 
         # First accept
-        first = identity_store.respond_to_invitation(invitation["id"], accept=True)
+        first = identity_store.respond_to_invitation(invitation["id"], accept=True, requesting_user_id=sample_user.id)
         assert first is not None
 
         # Second response should return None
-        assert identity_store.respond_to_invitation(invitation["id"], accept=True) is None
+        assert identity_store.respond_to_invitation(invitation["id"], accept=True, requesting_user_id=sample_user.id) is None
 
     def test_get_pending_invitation_by_email(self, identity_store, sample_user):
         org = self._make_org(identity_store, sample_user, "Pending Org", "org-6")
@@ -243,8 +243,8 @@ class TestTeamInvitationStore:
         assert identity_store.get_pending_invitation_by_email("") is None
 
     def test_respond_to_invitation_unknown(self, identity_store):
-        assert identity_store.respond_to_invitation("bad-id", accept=True) is None
-        assert identity_store.respond_to_invitation("", accept=True) is None
+        assert identity_store.respond_to_invitation("bad-id", accept=True, requesting_user_id="any-user") is None
+        assert identity_store.respond_to_invitation("", accept=True, requesting_user_id="any-user") is None
 
     def test_list_org_invitations_empty(self, identity_store):
         invites = identity_store.list_org_invitations("nonexistent")

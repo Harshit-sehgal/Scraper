@@ -340,14 +340,48 @@ async def request_id_middleware(request: Request, call_next):
     ``X-Request-ID`` response header so callers can correlate logs with
     HTTP responses.  Downstream code (workers, storage, webhooks) can
     access the ID via ``getattr(request.state, "request_id", "")``.
+
+    MEDIUM (#138): The inbound header value is sanitised before use.
+    Without validation, an attacker could supply
+    ``X-Request-ID: abc\\r\\nSet-Cookie: pwn=1`` to inject CRLF into the
+    response header (HTTP header injection / response splitting on
+    lenient parsers) or to break log lines. Constrain the value to a
+    safe charset and length; if the inbound value is rejected, fall
+    back to a freshly-generated UUID so the request still has an ID
+    and downstream correlation continues to work.
     """
     request_id = request.headers.get("X-Request-ID", "").strip()
-    if not request_id:
+    if not _is_safe_request_id(request_id):
         request_id = uuid.uuid4().hex
     request.state.request_id = request_id
     response = await call_next(request)
     response.headers.setdefault("X-Request-ID", request_id)
     return response
+
+
+# Allowed charset for inbound X-Request-ID values: ASCII letters/digits,
+# hyphen, underscore, dot. Length cap mirrors common correlation IDs and
+# limits log-line growth. Anything outside this set (including CRLF,
+# unicode, and other control chars) is rejected.
+_REQUEST_ID_MAX_LEN = 128
+_REQUEST_ID_SAFE_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.",
+)
+
+
+def _is_safe_request_id(value: str) -> bool:
+    """Return True iff ``value`` is a safe inbound X-Request-ID.
+
+    Rejects empty strings (handled separately), values containing
+    whitespace or control characters (CRLF injection risk), values
+    exceeding the length cap (log pollution), and values carrying any
+    character outside the safe charset.
+    """
+    if not value or not isinstance(value, str):
+        return False
+    if len(value) > _REQUEST_ID_MAX_LEN:
+        return False
+    return all(c in _REQUEST_ID_SAFE_CHARS for c in value)
 
 
 # ─── Access Log ────────────────────────────────────────────────────────

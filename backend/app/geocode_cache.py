@@ -36,6 +36,8 @@ class GeocodeCache:
     def _init_db(self) -> None:
         """Initialize geocode cache SQLite tables."""
         with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=FULL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS geocoding_cache (
                     query_hash TEXT PRIMARY KEY,

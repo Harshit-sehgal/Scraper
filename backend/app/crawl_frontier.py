@@ -121,6 +121,8 @@ class CrawlFrontier:
 
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self._db_path) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=FULL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS queue (
                     priority INTEGER,

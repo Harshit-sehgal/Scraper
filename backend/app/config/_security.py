@@ -18,6 +18,12 @@ class SecuritySettings(BaseSettings):
     """If set, all /api/* endpoints require X-API-Key header."""
     OPERATOR_API_KEY: str = ""
     """If set, operator routes require this key."""
+    ENABLE_OPERATOR_CROSS_TENANT: bool = False
+    """If True, env-backed operator keys (no org/project scope) retain legacy
+    all-access across tenants. Default False: operator actions must be scoped
+    to a specific org even when an env-backed OPERATOR_API_KEY is configured.
+    This is a SaaS-hardening gate — self-hosted deployments that rely on the
+    legacy blanket-operator pattern must explicitly opt in."""
     ADMIN_API_KEY: str = ""
     """If set, powerful admin routes require this key."""
     METRICS_TOKEN: str = ""

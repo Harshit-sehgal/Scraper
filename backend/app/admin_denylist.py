@@ -123,6 +123,8 @@ class DomainDenylist:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, timeout=10, isolation_level=None)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=FULL")
         conn.row_factory = sqlite3.Row
         return conn
 

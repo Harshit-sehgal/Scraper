@@ -33,6 +33,30 @@ logger = logging.getLogger(__name__)
 ENV_VAR: Final[str] = "DATAFORGE_ACCESS_LOG_ENABLED"
 DEFAULT_ENABLED: Final[bool] = True
 
+# MEDIUM (#138): keep the charset / length constraint identical to the
+# one enforced in request_id_middleware so an attacker cannot bypass
+# validation by triggering the access-log path on a different code path
+# than the request-id middleware.
+_REQUEST_ID_MAX_LEN = 128
+_REQUEST_ID_SAFE_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.",
+)
+
+
+def _is_safe_request_id(value: str) -> bool:
+    """Return True iff ``value`` is a safe inbound X-Request-ID.
+
+    Mirrors the predicate in :mod:`app.middlewares.request_id_middleware`
+    so behaviour stays identical if the access-log middleware is mounted
+    without the request-id middleware.
+    """
+    if not value or not isinstance(value, str):
+        return False
+    if len(value) > _REQUEST_ID_MAX_LEN:
+        return False
+    return all(c in _REQUEST_ID_SAFE_CHARS for c in value)
+
+
 # Paths excluded from the access log to avoid noise from health-probes
 # and other high-frequency endpoints that operators don't audit.
 _DEFAULT_NOISE_PATHS: Final[frozenset[str]] = frozenset(
@@ -98,7 +122,13 @@ class StructuredAccessLogMiddleware(BaseHTTPMiddleware):
 
         start = time.perf_counter()
         # Establish a request id so downstream logs/responses carry it.
-        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        # MEDIUM (#138): validate the inbound value before use — a hostile
+        # X-Request-ID could carry CRLF (response-splitting on lenient
+        # parsers) or excess length (log pollution). Fall back to a
+        # generated UUID if the inbound value is rejected.
+        request_id = request.headers.get("X-Request-ID", "").strip()
+        if not _is_safe_request_id(request_id):
+            request_id = uuid.uuid4().hex
 
         try:
             response = await call_next(request)

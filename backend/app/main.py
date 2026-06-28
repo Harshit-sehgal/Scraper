@@ -337,6 +337,16 @@ def create_app() -> FastAPI:
                 "Set DATAFORGE_SESSION_SECRET to a long random value and restart."
             )
             raise RuntimeError(msg)
+        if settings.ENABLE_OPERATOR_CROSS_TENANT:
+            msg = (
+                "ENABLE_OPERATOR_CROSS_TENANT is True in production. "
+                "This grants env-backed operator keys blanket all-access "
+                "across all tenants, bypassing SaaS org/project isolation. "
+                "It should only be enabled temporarily for emergency "
+                "internal operations and disabled immediately after. "
+                "Set DATAFORGE_ENABLE_OPERATOR_CROSS_TENANT=false and restart."
+            )
+            raise RuntimeError(msg)
 
     app_instance = FastAPI(
         title="DataForge — Structured Data Extraction API",

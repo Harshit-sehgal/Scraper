@@ -18,6 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from app.audit_logger import log_rbac_event
 from app.models import JobStatus
 from app.routers.jobs_state import JobStoreManager, is_worker_mode
+from app.services.job_state_machine import sync_from_db
 from app.storage_interface import get_job_repository
 from app.utils.rbac import UserRole, require_principal
 
@@ -171,10 +172,10 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     for s in summaries:
                         if s["id"] in manager.jobs_store:
                             cached = manager.jobs_store[s["id"]]
-                            # Cache sync — refresh in-memory object from DB row;
-                            # this is not a state transition, so it bypasses
-                            # job_state_machine.transition_to intentionally.
-                            cached.status = JobStatus(s["status"])
+                            # Cache sync — refresh in-memory object from DB row
+                            # via the state machine so the transition is
+                            # validated and logged for audit.
+                            sync_from_db(cached, JobStatus(s["status"]))
                             cached.completed_at = s["completed_at"]  # type: ignore[assignment]
                     stale_ids = [jid for jid in manager.jobs_store if jid not in summary_ids]
                     for jid in stale_ids:

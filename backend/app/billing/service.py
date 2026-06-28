@@ -320,17 +320,56 @@ class PayPalClient:
             return PlanTierId.FREE
         return customer.plan_tier
 
-    def check_balance(self, _customer_id: str, _amount: int) -> bool:
-        """Check whether a customer has remaining quota.
+    def check_balance(self, customer_id: str, _amount: int) -> bool:
+        """Check whether a customer has a valid subscription.
 
-        PayPal Subscriptions don't expose a real-time balance counter via the REST API.
-        We rely on the local subscription store + plan_enforcer for actual quota gating.
-        This implementation returns True in all cases (fail-open) to preserve
-        the prior API shape.
-        """
+        PayPal Subscriptions don't expose a real-time prepaid-balance counter via the
+        REST API.  Instead, we verify that the customer holds an *active* subscription
+        — if the subscription is missing, not configured, past-due, canceled, or if the
+        PayPal API returns an error, we **fail closed** and return ``False``.
+
+        Returns:
+            ``True`` when the customer has a verified active (or trialing) subscription.
+            ``False`` in all other cases, including disabled billing, API failures,
+            and non-billable subscription statuses."""
         if not self.is_configured:
-            logger.debug("Billing disabled — skipping balance check")
-        return True
+            logger.warning(
+                "Billing is not configured — denying balance check for customer=%s. "
+                "PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET env vars must be set.",
+                customer_id,
+            )
+            return False
+
+        try:
+            customer = self.get_customer(customer_id)
+            if customer is None:
+                logger.warning(
+                    "check_balance FAILED CLOSED: customer=%s not found in PayPal — access denied.",
+                    customer_id,
+                )
+                return False
+
+            billable_statuses = {SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING}
+            if customer.subscription_status not in billable_statuses:
+                logger.warning(
+                    "check_balance FAILED CLOSED: customer=%s subscription status=%s is not billable (%s) — access denied.",
+                    customer_id,
+                    customer.subscription_status.value,
+                    ", ".join(s.value for s in billable_statuses),
+                )
+                return False
+
+            logger.debug("check_balance passed: customer=%s tier=%s status=%s",
+                         customer_id, customer.plan_tier.value, customer.subscription_status.value)
+            return True
+        except (OSError, ValueError, RuntimeError) as e:
+            logger.warning(
+                "check_balance FAILED CLOSED: customer=%s — PayPal API error (%s: %s) — access denied.",
+                customer_id,
+                type(e).__name__,
+                e,
+            )
+            return False
 
     def plan_price(self, tier: PlanTierId | str) -> str:
         """Return the dollar price string used in checkout for a tier."""

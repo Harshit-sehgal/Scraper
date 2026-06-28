@@ -31,7 +31,7 @@ from app.utils.datetime_normalization import format_datetime, parse_datetime
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 10
+_CURRENT_SCHEMA_VERSION = 11
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -50,6 +50,7 @@ def _get_connection() -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=FULL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
 

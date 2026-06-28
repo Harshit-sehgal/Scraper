@@ -210,6 +210,7 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     path = db_path or _get_db_path()
     conn = sqlite3.connect(str(path), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=FULL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
     return conn

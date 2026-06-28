@@ -101,6 +101,8 @@ class UsageLedger:
             msg = "Usage ledger storage is not configured"
             raise RuntimeError(msg)
         conn = sqlite3.connect(str(self._storage_path))
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=FULL")
         conn.row_factory = sqlite3.Row
         return conn
 

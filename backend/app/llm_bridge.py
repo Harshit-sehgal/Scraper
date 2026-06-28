@@ -85,6 +85,17 @@ class LLMCascadeExhausted(RuntimeError):
         super().__init__(msg)
 
 
+class SandboxError(RuntimeError):
+    """Raised when LAW 15 subprocess sandbox isolation fails.
+
+    Per LAW 15, in-process fallback is **disabled**: if the subprocess
+    sandbox cannot execute the handler, the call must fail rather than
+    run untrusted code with full process privileges.  Operators should
+    treat this as a CRITICAL signal — the sandbox boundary has been
+    breached or is unavailable.
+    """
+
+
 def get_token_usage() -> dict[str, int]:
     """Get accumulated token usage across all LLM calls in this process."""
     with _token_usage_lock:
@@ -947,9 +958,11 @@ class SubstratePluginManager:
     ) -> Any:
         """LAW 15 sandboxed execution with subprocess isolation.
 
-        Attempts to run the handler in a subprocess with timeouts and
-        resource limits. Falls back to in-process execution if the
-        subprocess infrastructure fails, logging a warning.
+        Runs the handler in a subprocess with timeouts and resource
+        limits.  If the subprocess fails for any reason the call is
+        **rejected** — in-process fallback is disabled per LAW 15 so
+        that a compromised sandbox cannot escalate to full-process
+        privileges.
         """
         # Defense in depth: validate the handler's module against the
         # allow-list BEFORE we let any data leave this process. (The caller
@@ -1021,11 +1034,28 @@ class SubstratePluginManager:
                     out = json.loads(proc.stdout)
                     if out.get("ok"):
                         return out["result"]
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    logger.warning(
-                        "Sandbox subprocess returned invalid JSON for [%s]; falling back",
+                    # returncode 0 but "ok" is falsy — sandbox returned unexpected payload
+                    logger.critical(
+                        "LAW 15: Sandbox subprocess returned ok=false for [%s]; "
+                        "in-process fallback disabled — failing closed per LAW 15",
                         handler_name,
                     )
+                    _msg = (
+                        f"LAW 15 sandbox subprocess returned ok=false for [{handler_name}]; "
+                        f"in-process fallback is disabled per LAW 15."
+                    )
+                    raise SandboxError(_msg)
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    logger.critical(
+                        "LAW 15: Sandbox subprocess returned invalid JSON for [%s]; "
+                        "in-process fallback disabled — failing closed per LAW 15",
+                        handler_name,
+                    )
+                    _msg = (
+                        f"LAW 15 sandbox subprocess returned invalid JSON for [{handler_name}]; "
+                        f"in-process fallback is disabled per LAW 15."
+                    )
+                    raise SandboxError(_msg)
             elif proc.returncode == 2:
                 # Worker explicitly rejected the dispatch
                 logger.warning(
@@ -1039,40 +1069,53 @@ class SubstratePluginManager:
                     msg,
                 )
             else:
-                logger.warning(
-                    "Sandbox subprocess exited %d for [%s]: %s",
+                logger.critical(
+                    "LAW 15: Sandbox subprocess exited %d for [%s]: %s; "
+                    "in-process fallback disabled — failing closed per LAW 15",
                     proc.returncode,
                     handler_name,
                     proc.stderr[:500],
                 )
+                _msg = (
+                    f"LAW 15 sandbox subprocess exited {proc.returncode} for [{handler_name}]; "
+                    f"in-process fallback is disabled per LAW 15."
+                )
+                raise SandboxError(_msg)
 
         except subprocess.TimeoutExpired:
-            logger.warning(
-                "Sandbox subprocess timed out for [%s]; falling back to in-process",
+            logger.critical(
+                "LAW 15: Sandbox subprocess timed out for [%s]; "
+                "in-process fallback disabled — failing closed per LAW 15",
                 handler_name,
             )
+            _msg = (
+                f"LAW 15 sandbox subprocess timed out for [{handler_name}]; "
+                f"in-process fallback is disabled per LAW 15. "
+                f"Investigate the subprocess timeout immediately."
+            )
+            raise SandboxError(_msg) from None
         except PermissionError:
             # Re-raise — the sandbox worker explicitly refused. We must
             # not silently fall back to in-process for this case (that
             # would defeat the entire LAW 15 sandbox).
             raise
         except (OSError, ValueError, TypeError, json.JSONDecodeError, AttributeError) as exc:
-            logger.warning(
-                "Sandbox subprocess failed for [%s] (%s); falling back to in-process",
+            logger.critical(
+                "LAW 15: Sandbox subprocess failed for [%s] (%s); "
+                "in-process fallback disabled — failing closed per LAW 15",
                 handler_name,
                 exc,
             )
+            _msg = (
+                f"LAW 15 sandbox subprocess failed for [{handler_name}]: {exc}; "
+                f"in-process fallback is disabled per LAW 15. "
+                f"Investigate the subprocess failure immediately."
+            )
+            raise SandboxError(_msg) from exc
 
-        # Fallback: in-process execution with warning.
-        # Production keeps the in-process fallback for availability but
-        # logs loud that LAW 15 was bypassed.
-        logger.warning(
-            "LAW 15: Executing handler [%s] in-process (subprocess sandbox unavailable). "
-            "Module=%s was allow-listed; review the warning above for the original sandbox failure.",
-            handler_name,
-            module_name,
-        )
-        return handler(**kwargs)
+        # Unreachable: all non-success branches above raise.
+        # If new code paths are added that reach this point they MUST
+        # also raise rather than fall back to in-process execution.
 
     def get_available_tools(self) -> list[str]:
         return list(self._handlers.keys())

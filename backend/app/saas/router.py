@@ -33,12 +33,55 @@ from app.saas.models import (
 )
 from app.saas.service import SignupService
 from app.utils.aup import require_aup_accepted
-from app.utils.rbac import UserRole, require_principal, require_role_with_user
+from app.utils.rbac import UserRole, _record_operator_cross_tenant, require_principal, require_role_with_user
 from app.utils.usage_ledger import UsageType
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/saas", tags=["saas"])
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Internal helper: env-backed operator all-access gate (issue #135)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _env_backed_all_access(
+    role: UserRole,
+    org_id: str = "",
+) -> bool:
+    """Return True iff the principal is an env-backed admin/operator and cross-tenant access is explicitly enabled.
+
+    This is the single gate used by every SaaS route that previously
+    granted blanket all-access to env-backed operators. When the gate
+    returns ``False`` the caller MUST enforce its own tenant-scoped
+    ownership check (e.g. ``created_by_user_id`` or org membership).
+
+    Every ``True`` return is accompanied by an audit log entry and a
+    Prometheus counter increment so operators can monitor unexpected key
+    usage.
+    """
+    from app.config import settings
+    from app.utils.rbac import is_env_backed_operator_cross_tenant
+
+    if role == UserRole.ADMIN and not org_id:
+        # Env-backed admin with no org scope — same gate
+        if settings.ENABLE_OPERATOR_CROSS_TENANT:
+            _record_operator_cross_tenant(
+                f"SaaS: env-backed ADMIN all-access — role={role.value}"
+            )
+            return True
+        return False
+
+    if role != UserRole.OPERATOR or org_id:
+        return False
+
+    if is_env_backed_operator_cross_tenant(role, org_id, ""):
+        _record_operator_cross_tenant(
+            f"SaaS: env-backed OPERATOR all-access — role={role.value}"
+        )
+        return True
+    return False
 
 # ═══════════════════════════════════════════════════════════════════════
 # AUP (Acceptable Use Policy)
@@ -429,13 +472,17 @@ async def delete_organization(
     if not org:
         raise HTTPException(status_code=404, detail="organization not found")
 
-    # Enforce ownership: env-backed admins/operators retain all-access;
-    # SaaS-scoped keys must be the org creator.
-    if (role not in (UserRole.ADMIN, UserRole.OPERATOR) or _org_id) and org.created_by_user_id != user_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Only the organization owner can delete it",
-        )
+    # Enforce ownership: scoped keys must be the org creator. Env-backed
+    # admins/operators retain all-access ONLY when
+    # ENABLE_OPERATOR_CROSS_TENANT is explicitly True (issue #135).
+    if not _env_backed_all_access(role, _org_id):
+        if _org_id and _org_id != org_id:
+            raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
+        if org.created_by_user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the organization owner can delete it",
+            )
 
     store.delete_organization(org_id)
 
@@ -741,14 +788,11 @@ async def remove_member(
     if not membership:
         raise HTTPException(status_code=404, detail="membership not found")
 
-    # Env-backed admins and operators retain all-access (no org scope).
+    # Env-backed admins and operators retain all-access ONLY when
+    # ENABLE_OPERATOR_CROSS_TENANT is explicitly True (issue #135).
     # For SaaS-scoped keys, the caller MUST be a member of the target
     # membership's org.
-    if (
-        role != UserRole.ADMIN
-        and (role != UserRole.OPERATOR or org_id)
-        and not get_identity_store().is_org_member(user_id, membership.org_id)
-    ):
+    if not _env_backed_all_access(role, org_id) and not get_identity_store().is_org_member(user_id, membership.org_id):
         log_job_event(
             actor=user_id,
             action="member_remove",

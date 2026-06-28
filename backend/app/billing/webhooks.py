@@ -614,7 +614,10 @@ async def list_subscriptions(
 ) -> dict[str, Any]:
     """List all tracked subscriptions (admin/operator only).
 
-    Enforces tenant scoping for project-scoped operator keys.
+    Enforces tenant scoping for project-scoped operator keys. Env-backed
+    operator all-access (no org/project scope) is gated behind
+    ENABLE_OPERATOR_CROSS_TENANT (issue #135). When the flag is off,
+    unscoped requests are rejected with 403.
     """
     _role, _user_id, org_id, project_id = principal
     if org_id or project_id:
@@ -625,10 +628,18 @@ async def list_subscriptions(
             "total": len(subs),
             "subscriptions": subs,
         }
-    return {
-        "total": len(_subscription_store),
-        "subscriptions": _subscription_store.values(),
-    }
+    # Env-backed (no org or project scope): require explicit opt-in.
+    from app.utils.rbac import _record_operator_cross_tenant, is_env_backed_operator_cross_tenant
+
+    if is_env_backed_operator_cross_tenant(_role, org_id, project_id):
+        _record_operator_cross_tenant(
+            f"billing: list_subscriptions all-access — role={_role.value} user={_user_id}"
+        )
+        return {
+            "total": len(_subscription_store),
+            "subscriptions": _subscription_store.values(),
+        }
+    raise HTTPException(status_code=403, detail="Cross-tenant access forbidden. Set ENABLE_OPERATOR_CROSS_TENANT=true or provide a scoped API key.")
 
 
 @router.get("/subscriptions/{customer_id}", status_code=200)
@@ -642,11 +653,27 @@ async def get_subscription(
 ) -> dict[str, Any]:
     """Get subscription details for a customer (admin/operator only).
 
-    Enforces tenant scoping for project-scoped operator keys.
+    Enforces tenant scoping for project-scoped operator keys.  Env-backed
+    operator all-access is gated behind ENABLE_OPERATOR_CROSS_TENANT
+    (issue #135).  When the flag is off, unscoped calls are rejected.
     """
     _role, _user_id, org_id, project_id = principal
-    if (org_id or project_id) and customer_id not in {org_id, _user_id}:
-        raise HTTPException(status_code=403, detail="Global admin/operator key required")
+    if org_id or project_id:
+        if customer_id not in {org_id, _user_id}:
+            raise HTTPException(status_code=403, detail="Cross-tenant access forbidden")
+    else:
+        from app.utils.rbac import _record_operator_cross_tenant, is_env_backed_operator_cross_tenant
+
+        if is_env_backed_operator_cross_tenant(_role, org_id, project_id):
+            _record_operator_cross_tenant(
+                f"billing: get_subscription all-access customer={customer_id} — "
+                f"role={_role.value} user={_user_id}"
+            )
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="Cross-tenant access forbidden. Set ENABLE_OPERATOR_CROSS_TENANT=true or provide a scoped API key.",
+            )
     sub = get_customer_subscription(customer_id)
     if sub is None:
         return {"customer_id": customer_id, "plan_tier": "free", "status": "unknown"}

@@ -15,6 +15,51 @@ from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
+# ── Operator all-access audit counter (kept module-private) ────────────
+_operator_cross_tenant_access_count: int = 0
+
+
+def _record_operator_cross_tenant(reason: str) -> None:
+    """Record a CRITICAL audit event whenever env-backed operator
+    cross-tenant all-access is exercised.
+
+    This is the single audit funnel for every site that grants
+    env-backed operator all-access (AUP bypass, scoped-resource check,
+    org-delete, member-remove, etc.). Operators can alert off the
+    dedicated Prometheus counter ``operator_cross_tenant_access_total``
+    to detect unexpected key use.
+    """
+    global _operator_cross_tenant_access_count
+    _operator_cross_tenant_access_count += 1
+    logger.critical(
+        "OPERATOR CROSS-TENANT ACCESS (#%d): env-backed operator "
+        "all-access exercised — %s. If this is not expected, rotate "
+        "DATAFORGE_OPERATOR_API_KEY immediately and disable "
+        "DATAFORGE_ENABLE_OPERATOR_CROSS_TENANT in production.",
+        _operator_cross_tenant_access_count,
+        reason,
+    )
+    try:
+        from app.audit_logger import log_admin_action
+
+        log_admin_action(
+            actor="env-operator",
+            action="operator_cross_tenant_access",
+            resource="rbac",
+            details={
+                "reason": reason,
+                "access_count": _operator_cross_tenant_access_count,
+            },
+        )
+    except ImportError:
+        pass
+    try:
+        from app.metrics_collector import record_operator_cross_tenant_access
+
+        record_operator_cross_tenant_access()
+    except ImportError:
+        pass
+
 
 class UserRole(StrEnum):
     ADMIN = "admin"
@@ -331,6 +376,22 @@ def require_principal(allowed_roles: list[UserRole]):
     return dependency
 
 
+def is_env_backed_operator_cross_tenant(role: UserRole, org_id: str, project_id: str) -> bool:
+    """Return True if the principal is an env-backed operator AND cross-tenant access is enabled.
+
+    This helper lets router code (saas/router, billing, etc.) make the
+    same gate-check that ``can_access_scoped_resource`` applies
+    internally, without duplicating the import / flag read.  Every call
+    site that uses this MUST also call
+    :func:`_record_operator_cross_tenant` for audit traceability.
+    """
+    if role != UserRole.OPERATOR or org_id or project_id:
+        return False
+    from app.config import settings
+
+    return settings.ENABLE_OPERATOR_CROSS_TENANT
+
+
 def can_access_scoped_resource(
     role: UserRole,
     user_id: str,
@@ -343,14 +404,50 @@ def can_access_scoped_resource(
 ) -> bool:
     """Return whether an authenticated principal can access a scoped resource.
 
-    Admins can access all resources. Env-backed operators also retain
-    all-access because they have no org/project scope. Persistent SaaS WRITE
-    keys map to operator but carry org/project ids, so they remain scoped.
+    Admins can access all resources (no change — admin is the global
+    superuser role and is assumed to be explicitly provisioned per-tenant
+    for SaaS keys).
+
+    Env-backed operator all-access is gated behind
+    ``settings.ENABLE_OPERATOR_CROSS_TENANT`` (default False).  When the
+    flag is *disabled*, env-backed operators (``org_id=""`` and
+    ``project_id=""``) fall through to the owner-match check at the
+    bottom, same as a regular USER.  The flag MUST be explicitly enabled
+    for internal operator scripts that need cross-tenant read access.
+
+    Whenever the gate IS enabled and env-backed operator all-access is
+    exercised, a CRITICAL audit log entry is emitted via
+    :func:`_record_operator_cross_tenant`.
+
+    Persistent SaaS WRITE keys map to operator but carry org/project
+    ids, so they remain scoped regardless of the flag.
     """
     if role == UserRole.ADMIN:
         return True
+
+    # Env-backed operator cross-tenant gate (issue #135).
+    # When the principal is an env-backed operator (empty org_id and
+    # project_id), legacy behaviour granted blanket all-access.  This
+    # is now gated behind an explicit opt-in flag so SaaS deployments
+    # are isolated by default.
     if role == UserRole.OPERATOR and not org_id and not project_id:
-        return True
+        from app.config import settings
+
+        if settings.ENABLE_OPERATOR_CROSS_TENANT:
+            _record_operator_cross_tenant(
+                f"can_access_scoped_resource(user={user_id}, "
+                f"resource_org={resource_org_id}, "
+                f"resource_project={resource_project_id})"
+            )
+            return True
+        # Flag is off — fall through to stricter owner/scoped checks
+        # so env-backed operator keys do NOT bypass tenant isolation.
+        logger.warning(
+            "Env-backed operator all-access DENIED: "
+            "ENABLE_OPERATOR_CROSS_TENANT is False. "
+            "Principal user=%s will be checked against ownership only.",
+            user_id,
+        )
 
     owner = str(resource_owner_id or "")
     resource_org = str(resource_org_id or "")

@@ -179,6 +179,70 @@ def mark_recovered_failed(job: Any) -> None:
         )
 
 
+def sync_from_db(
+    job: Any,
+    db_status: JobStatus,
+) -> None:
+    """Refresh a cached in-memory job's status from the database
+    (authoritative source of truth) with state-machine validation.
+
+    Unlike ``transition_to``, this handles the case where the DB row
+    already reflects a legitimate state change made by another process.
+    It validates that *both* the old status *and* the new status are
+    part of the known state set and that the transition is legal
+    according to ``_VALID_TRANSITIONS``.
+
+    If the statuses are the same, it is a no-op (idempotent).
+
+    Raises:
+        ValueError: If the transition is not valid according to the
+            state machine.
+        TypeError: If either that ``status`` or ``db_status`` is not
+            a known ``JobStatus`` enum member.
+    """
+    if not isinstance(db_status, JobStatus):
+        msg = (
+            f"sync_from_db: db_status must be a JobStatus, "
+            f"got {type(db_status).__name__}"
+        )
+        raise TypeError(msg)
+    if not isinstance(job.status, JobStatus):
+        msg = (
+            f"sync_from_db: job.status must be a JobStatus, "
+            f"got {type(job.status).__name__}"
+        )
+        raise TypeError(msg)
+
+    if job.status == db_status:
+        return
+
+    # Validate the transition against the state machine.
+    # The DB is the authoritative source — a status it holds must
+    # represent a real state transition, even if another worker
+    # performed it.  We still enforce the transition table so we
+    # never accept a status that is impossible under the declared graph.
+    allowed = _VALID_TRANSITIONS.get(job.status)
+    if allowed is None or db_status not in allowed:
+        valid = allowed or set()
+        msg = (
+            f"H7: Invalid state sync: {job.status.value!r} → "
+            f"{db_status.value!r}. "
+            f"Allowed transitions from {job.status.value!r}: "
+            f"{[s.value for s in valid] or ['(none — terminal)']}"
+        )
+        raise ValueError(msg)
+
+    old_status = job.status
+    job.status = db_status
+
+    logger.info(
+        "Job %s: cache sync from DB %r → %r",
+        getattr(job, "id", "?"),
+        old_status.value,
+        db_status.value,
+    )
+
+
 # ── Internal helpers ───────────────────────────────────────────────────
 
 _TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(

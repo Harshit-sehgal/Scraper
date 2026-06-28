@@ -47,12 +47,41 @@ async def require_aup_accepted(request: Request) -> dict[str, Any]:
         # auth dependency will handle it)
         return {"skipped": True}
 
-    # Env-backed admins and operators bypass AUP enforcement
-    # (they are infra/ops, not end-users). Session-cookie admins are
-    # real SaaS users (an admin role within a persistent identity)
-    # and must accept the policy like any other end-user.
+    # Env-backed admins and operators bypass AUP enforcement ONLY when
+    # cross-tenant access is explicitly enabled (issue #135). When the
+    # flag is off (the default in SaaS), env-backed admin/operator
+    # principals fall through to standard AUP enforcement like any
+    # other end-user. Session-cookie admins are real SaaS users with a
+    # persistent identity and always stay under AUP enforcement.
     if role in (UserRole.ADMIN, UserRole.OPERATOR) and not ctx.org_id and ctx.source != "session":
-        return {"skipped": True, "role": role.value, "user_id": user_id}
+        from app.config import settings as _aup_settings
+
+        if _aup_settings.ENABLE_OPERATOR_CROSS_TENANT:
+            try:
+                from app.audit_logger import log_admin_action
+
+                log_admin_action(
+                    actor=user_id,
+                    action="aup_bypass_env_backed_admin_operator",
+                    resource="aup",
+                    details={"role": role.value, "reason": "env_backed_cross_tenant"},
+                )
+            except ImportError:
+                pass
+            try:
+                from app.metrics_collector import record_operator_cross_tenant_access
+
+                record_operator_cross_tenant_access()
+            except ImportError:
+                pass
+            return {"skipped": True, "role": role.value, "user_id": user_id}
+        logger.warning(
+            "AUP bypass DENIED for env-backed %s user=%s: "
+            "ENABLE_OPERATOR_CROSS_TENANT is False; falling through to "
+            "standard AUP enforcement.",
+            role.value,
+            user_id,
+        )
 
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required for AUP check.")
