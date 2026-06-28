@@ -118,6 +118,7 @@ _scheduled_job_ops_lock = threading.Lock()
 
 # Data retention operation counters: action -> count
 _retention_ops: dict[str, int] = {}
+_retention_ops_lock = threading.Lock()
 
 # Product-level counters aligned with docs/OBSERVABILITY.md required metrics.
 _product_totals: dict[str, int] = {}
@@ -160,7 +161,13 @@ _extraction_failure_counts_lock = threading.Lock()
 # Roadmap Obs #1: per-domain success/failure counters and latency.
 _domain_extraction_counts: dict[str, dict[str, int]] = {}
 _domain_extraction_counts_lock = threading.Lock()
-_retention_ops_lock = threading.Lock()
+
+# Cumulative count of internal metrics-collection failures observed by the
+# /metrics endpoint (e.g. when a collector raised an unexpected exception).
+# Tracked alongside the other counters to share the same lock-protected
+# increment/read pattern that the rest of this module uses.
+_metrics_collection_errors: int = 0
+_metrics_collection_errors_lock = threading.Lock()
 
 # Rate limit hit counters: incremented by the rate limiter middleware when
 # a request is blocked by the aggregate global tier or the per-IP tier.
@@ -759,9 +766,30 @@ def get_rate_limit_per_ip_hits() -> int:
         return _rate_limit_per_ip_hits
 
 
+def record_metrics_collection_error() -> None:
+    """Increment the cumulative count of /metrics collection failures.
+
+    Called by the metrics endpoint when one of its collectors raises an
+    unexpected exception. Logged separately from
+    :func:`record_error` because these errors signal a bug in our
+    own observability code — they should be investigated rather than
+    silently absorbed. Exposed as the Prometheus metric
+    ``dataforge_metrics_collection_error_total``.
+    """
+    global _metrics_collection_errors
+    with _metrics_collection_errors_lock:
+        _metrics_collection_errors += 1
+
+
+def get_metrics_collection_errors() -> int:
+    """Return the current count of /metrics collection failures."""
+    with _metrics_collection_errors_lock:
+        return _metrics_collection_errors
+
+
 def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
-    global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits
+    global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits, _metrics_collection_errors
     with _request_latencies_lock:
         _request_latencies.clear()
     with _worker_failures_lock:
@@ -812,3 +840,5 @@ def reset_for_testing() -> None:
         _extraction_failure_counts.clear()
     with _domain_extraction_counts_lock:
         _domain_extraction_counts.clear()
+    with _metrics_collection_errors_lock:
+        _metrics_collection_errors = 0

@@ -142,6 +142,18 @@ class WorkflowRepository(ABC):
         """Delete a workflow. Return True if a row was removed."""
 
     @abstractmethod
+    def delete_by_user(self, user_id: str) -> int:
+        """Atomically delete every workflow owned by *user_id*.
+
+        Performs the ownership check and the delete inside the same
+        transaction / file-lock so a concurrent ``upsert`` cannot
+        leak a row whose ``user_id`` was reassigned. Returns the
+        number of records removed.
+
+        Used by the GDPR / delete-my-data pipeline.
+        """
+
+    @abstractmethod
     def count_workflows(self) -> int:
         """Return the total number of workflow rows."""
 
@@ -207,6 +219,17 @@ class JsonWorkflowRepository(WorkflowRepository):
 
     def delete(self, workflow_id: str) -> bool:
         return self._store.delete(workflow_id)
+
+    def delete_by_user(self, user_id: str) -> int:
+        """Atomic delete of *user_id*'s workflows inside one flocked RMW.
+
+        Pushes the ownership predicate into the store so the read,
+        filter, and delete all happen inside the same
+        ``_read_modify_write`` lock. Eliminates the TOCTOU window
+        previously created by ``_store.values()`` + ``delete_many``.
+        """
+        predicate = lambda rec, _uid=user_id: rec.get("user_id") == _uid  # noqa: E731
+        return self._store.delete_where(predicate)
 
     def count_workflows(self) -> int:
         return len(self._store)
@@ -380,6 +403,36 @@ class SQLiteWorkflowRepository(WorkflowRepository):
                 cur = conn.execute("DELETE FROM workflows WHERE id = ?", (workflow_id,))
                 conn.commit()
                 return cur.rowcount > 0
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+    def delete_by_user(self, user_id: str) -> int:
+        """Atomic delete of *user_id*'s workflows in a single SQL statement.
+
+        ``DELETE FROM workflows WHERE user_id = ?`` evaluates the
+        ownership predicate on the rows visible at delete time under
+        the existing ``_DB_LOCK``. This is materially safer than the
+        previous ``list_workflows(user_id=...)`` + ``repo.delete(id)``
+        loop, where a concurrent ``upsert`` could reassign a row's
+        ``user_id`` between the snapshot and the per-row delete (or
+        insert a new row after the snapshot that would never be
+        inspected and so could leak the user's data without being
+        deleted).
+        """
+        from app.job_store import _DB_LOCK
+
+        with _DB_LOCK:
+            conn = self._db_connection()
+            try:
+                cur = conn.execute(
+                    "DELETE FROM workflows WHERE user_id = ?",
+                    (user_id,),
+                )
+                conn.commit()
+                return cur.rowcount
             except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
                 conn.rollback()
                 raise

@@ -214,6 +214,13 @@ class _PostgresWorkflowRepositoryBase(WorkflowRepository, ABC):
             logger.exception("count_workflows failed")
             return 0
 
+    def delete_by_user(self, user_id: str) -> int:
+        """Delete every workflow owned by *user_id* in a single transaction."""
+        self._ensure_schema()
+        with self._conn() as conn:
+            cur = self._execute(conn, "DELETE FROM workflows WHERE user_id = %s", (user_id,))
+            return cur.rowcount if cur is not None else 0
+
     def health_check(self) -> dict[str, Any]:
         try:
             count = self.count_workflows()

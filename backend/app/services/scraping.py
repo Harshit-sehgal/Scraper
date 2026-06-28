@@ -7,6 +7,7 @@ acquisition lineage tracking, and cancellation monitoring.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -321,12 +322,11 @@ async def run_scraping_phase(
                 job.cancel_requested = True
                 from app.services.job_state_machine import transition_to
 
-                # Use transition_to to strictly follow the state machine
-                try:
+                # Use transition_to to strictly follow the state machine.
+                # A ValueError just means the job transitioned elsewhere
+                # (e.g. FAILED) before the cancel could apply — not fatal.
+                with contextlib.suppress(ValueError):
                     transition_to(job, JobStatus.CANCELED, error="Canceled during scraping phase")
-                except ValueError:
-                    # Job might have transitioned elsewhere (e.g. FAILED)
-                    pass
 
             for task in scrape_tasks:
                 if not task.done():
@@ -354,10 +354,8 @@ async def run_scraping_phase(
                 job.cancel_requested = True
                 from app.services.job_state_machine import transition_to
 
-                try:
+                with contextlib.suppress(ValueError):
                     transition_to(job, JobStatus.CANCELED, error="Canceled during result aggregation")
-                except ValueError:
-                    pass
             return all_raw_results, urls_with_records, warnings, scraped
         if success:
             all_raw_results.extend(results)

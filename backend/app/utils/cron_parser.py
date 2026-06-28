@@ -98,14 +98,14 @@ class CronError(ValueError):
 # ── Low-level field expansion ────────────────────────────────────────
 
 
-_EMPTY_TOKEN = "empty cron token"
+_EMPTY_TOKEN = "empty cron token"  # nosec B105
 _INVALID_STEP = "step must be positive: {step}"
 _INVALID_VALUE_TPL = "invalid cron value: {token}"
 _OUT_OF_RANGE_TPL = "value {value} out of range {lo}-{hi}"
 _MALFORMED_RANGE_TPL = "malformed range: {token}"
 _NO_NEXT_RUN_TPL = "no scheduled time found within 8 years for cron expression: {expression}"
 _EMPTY_FIELD_TPL = "empty cron field at position {idx}"
-_DUPLICATE_TOKEN_TPL = "duplicate token {token!r} in cron field {idx}"
+_DUPLICATE_TOKEN_TPL = "duplicate token {token!r} in cron field {idx}"  # nosec B105
 _EXPR_EMPTY = "cron expression is empty"
 _FIELDS_REQUIRED_TPL = "cron expression must have 5 fields (minute hour dom month dow), got {n}"
 
@@ -135,7 +135,7 @@ def _expand_token(token: str, lo: int, hi: int, names: dict[str, int] | None = N
             return set()
         return {v for v in range(min(rng), max(rng) + 1, step) if v in rng}
 
-    if token == "*":
+    if token == "*":  # nosec B105
         return set(range(lo, hi + 1))
 
     # Plain range: ``A-B``

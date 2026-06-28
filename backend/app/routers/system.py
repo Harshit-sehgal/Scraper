@@ -7,7 +7,6 @@ import contextlib
 import json
 import logging
 import secrets
-import threading
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -379,8 +378,6 @@ async def analyze_url(
 
 # ─── Prometheus /metrics ────────────────────────────────────────────────
 
-METRICS_COLLECTION_ERRORS = 0
-_METRICS_ERRORS_LOCK = threading.Lock()
 _METRICS_TOKEN_WARN_EMITTED = False
 
 
@@ -428,6 +425,7 @@ def _render_basic_metrics_text() -> str:
         get_health_check_latencies,
         get_job_durations,
         get_llm_calls,
+        get_metrics_collection_errors,
         get_page_fetch_durations,
         get_product_totals,
         get_rate_limit_global_hits,
@@ -580,7 +578,7 @@ def _render_basic_metrics_text() -> str:
             lines.append(_basic_metric_line("dataforge_page_fetch_duration_seconds_count", len(page_fetch_durations)))
             lines.append(_basic_metric_line("dataforge_page_fetch_duration_seconds_sum", sum(page_fetch_durations)))
 
-    lines.append(_basic_metric_line("dataforge_metrics_collection_error_total", METRICS_COLLECTION_ERRORS))
+    lines.append(_basic_metric_line("dataforge_metrics_collection_error_total", get_metrics_collection_errors()))
 
     errors_dict = get_errors()
     for err_type, count in errors_dict.items():
@@ -737,7 +735,8 @@ async def metrics(request: Request):
                 },
             )
 
-    global METRICS_COLLECTION_ERRORS
+    from app.metrics_collector import record_metrics_collection_error
+
     try:
         from prometheus_client import Gauge, Histogram, generate_latest
     except ModuleNotFoundError:
@@ -781,8 +780,7 @@ async def metrics(request: Request):
         backend_gauge.labels(backend=backend).set(1)
     except (AttributeError, ImportError, RuntimeError):
         backend_ok = 0
-        with _METRICS_ERRORS_LOCK:
-            METRICS_COLLECTION_ERRORS += 1
+        record_metrics_collection_error()
         logger.exception("Metrics: backend collection failed")
 
     backend_ok_gauge = Gauge(
@@ -807,8 +805,7 @@ async def metrics(request: Request):
         queue_dead_letter.set(q_status.get("dead_letter", 0))
     except (AttributeError, ImportError, RuntimeError):
         queue_ok = 0
-        with _METRICS_ERRORS_LOCK:
-            METRICS_COLLECTION_ERRORS += 1
+        record_metrics_collection_error()
         logger.exception("Metrics: queue collection failed")
 
     queue_ok_gauge = Gauge(
@@ -875,8 +872,7 @@ async def metrics(request: Request):
                     age = -1.0
                 hb_age_gauge.labels(worker_id=wid, hostname=hostname, pid=pid).set(age)
     except (AttributeError, ImportError, RuntimeError):
-        with _METRICS_ERRORS_LOCK:
-            METRICS_COLLECTION_ERRORS += 1
+        record_metrics_collection_error()
         logger.debug("Metrics: worker heartbeat collection failed")
 
     # Request duration histogram
@@ -944,7 +940,9 @@ async def metrics(request: Request):
         "Total collection errors encountered",
         registry=registry,
     )
-    error_total_gauge.set(METRICS_COLLECTION_ERRORS)
+    from app.metrics_collector import get_metrics_collection_errors
+
+    error_total_gauge.set(get_metrics_collection_errors())
 
     # Cumulative error counts
     from app.metrics_collector import get_errors, get_llm_calls, get_requests_total
@@ -1074,8 +1072,7 @@ async def metrics(request: Request):
                 rate = float(summary.get("failure_rate", 0.0) or 0.0)
                 domain_failure_gauge.labels(domain=domain).set(rate)
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
-        with _METRICS_ERRORS_LOCK:
-            METRICS_COLLECTION_ERRORS += 1
+        record_metrics_collection_error()
         logger.debug("Metrics: domain failure-rate collection failed")
 
     # Repository query latencies — p50 / p95 derived from the ring buffer.

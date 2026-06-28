@@ -233,13 +233,23 @@ def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> b
     the job ID using the standard path convention.
 
     Returns True if the file was deleted, False otherwise.
+
+    TOCTOU hardening: the previous ``path.exists()`` then ``path.unlink()``
+    pattern had a window in which an attacker could replace the path with
+    a symlink (symlink swap) and redirect the unlink. The fix is to call
+    ``path.unlink()`` directly inside a ``try / except FileNotFoundError``
+    — if the file is gone we simply return False, and if it exists it is
+    removed atomically from the VFS. ``_resolve_results_path`` already
+    validates the path stays inside the managed results directory, so the
+    unlink target is safe.
     """
     path = _resolve_results_path(job_id, file_path)
-    if path.exists():
-        try:
-            path.unlink()
-            logger.info("Successfully deleted results file from disk for job %s", job_id)
-            return True
-        except Exception:
-            logger.exception("Failed to delete results file from disk for job %s", job_id)
-    return False
+    try:
+        path.unlink()
+        logger.info("Successfully deleted results file from disk for job %s", job_id)
+        return True
+    except FileNotFoundError:
+        return False
+    except Exception:
+        logger.exception("Failed to delete results file from disk for job %s", job_id)
+        return False

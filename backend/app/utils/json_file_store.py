@@ -22,6 +22,7 @@ import logging
 import os
 import tempfile
 import threading
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -208,6 +209,30 @@ class JSONFileStore:
         self._read_modify_write(_mutate)
         return removed
 
+    def delete_where(self, predicate: Callable[[dict[str, Any]], bool]) -> int:
+        """Remove records matching *predicate* inside a single flocked
+        read-modify-write (avoids TOCTOU vs. separate ``values()`` + ``delete_many``).
+
+        The *predicate* is called for each record inside the exclusive
+        flock so no concurrent mutation can reassign ownership, add, or
+        remove a record between the check and the delete.  Returns the
+        number of records removed.
+
+        Typical use — GDPR right-to-erasure::
+
+            store.delete_where(lambda r: r.get("user_id") == caller_id)
+        """
+        removed: list[int] = [0]
+
+        def _mutate(s: dict[str, dict[str, Any]]) -> None:
+            to_remove = [rid for rid, rec in s.items() if predicate(rec)]
+            for rid in to_remove:
+                del s[rid]
+                removed[0] += 1
+
+        self._read_modify_write(_mutate)
+        return removed[0]
+
     def delete_many(self, record_ids: list[str]) -> int:
         """Remove many records in a single flocked read-modify-write.
 
@@ -215,6 +240,12 @@ class JSONFileStore:
         caller wants to purge many records owned by a single
         principal (e.g. ``delete-my-data`` purging all of a
         user's workflows in one tick).
+
+        .. deprecated-operation::
+            For GDPR / delete-my-data flows prefer :meth:`delete_where`
+            which evaluates the ownership predicate inside the lock
+            and eliminates the TOCTOU window between a ``values()`` read
+            and a ``delete_many`` write.
         """
         target_ids = set(record_ids)
         removed: list[int] = [0]

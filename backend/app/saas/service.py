@@ -318,6 +318,26 @@ class ApiKeyService:
     def revoke(self, api_key_id: str) -> ApiKey | None:
         return self.store.revoke_api_key(api_key_id)
 
+    def revoke_for_user(self, user_id: str) -> int:
+        """Revoke every active API key belonging to *user_id*.
+
+        Only keys whose ``user_id`` matches the given id are revoked —
+        this is a tenancy guard so a caller invoking delete-my-data
+        cannot revoke another member's keys in a shared org.
+
+        Returns the count of keys revoked.
+        """
+        count = 0
+        memberships = self.store.list_user_memberships(user_id, include_removed=True)
+        for membership in memberships:
+            projects = self.store.list_org_projects(membership.org_id)
+            for project in projects:
+                for key in self.store.list_project_api_keys(project.id, include_revoked=False):
+                    if key.user_id == user_id:
+                        self.store.revoke_api_key(key.id)
+                        count += 1
+        return count
+
     def list_for_project(self, project_id: str, include_revoked: bool = False) -> list[ApiKey]:
         return self.store.list_project_api_keys(project_id, include_revoked=include_revoked)
 

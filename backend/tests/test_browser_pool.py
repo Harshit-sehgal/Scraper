@@ -1,10 +1,13 @@
 """Unit tests for browser_pool — BrowserPool lifecycle, metrics, and context management."""
 
 import asyncio
+import threading
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.browser_pool import BrowserPool, get_browser_pool
+from app.config import settings
 from playwright.async_api import Error
 
 
@@ -996,3 +999,215 @@ class TestEnsureBrowser:
             await pool._ensure_browser()
 
         assert pool._browser is new_browser
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reusable Context Cap (LRU eviction)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestReusableContextCap:
+    """Verify the reusable context pool enforces a cap with LRU eviction.
+
+    Fix for Finding #13: get_context previously let ``_contexts`` grow
+    unbounded for unique domains — a memory-amplification DoS risk.
+    """
+
+    @pytest.mark.asyncio
+    async def test_evict_lru_when_at_cap(self) -> None:
+        pool = BrowserPool()
+        # Seed the pool at the cap
+        for i in range(3):
+            ctx = _sync_mock_context()
+            key = f"d{i}:default"
+            pool._contexts[key] = ctx
+            pool._context_use_count[key] = 1
+            pool._context_last_used[key] = time.time() + i  # older first
+
+        with patch("app.browser_pool.settings.BROWSER_MAX_REUSABLE_CONTEXTS", 3):
+            await pool._evict_lru_if_needed()
+
+        # d0 (oldest) evicted, d1/d2 remain
+        assert "d0:default" not in pool._contexts
+        assert "d1:default" in pool._contexts
+        assert "d2:default" in pool._contexts
+        # Last-used index only contains surviving keys
+        assert "d0:default" not in pool._context_last_used
+        assert "d1:default" in pool._context_last_used
+        assert "d2:default" in pool._context_last_used
+
+    @pytest.mark.asyncio
+    async def test_evict_handles_disconnect(self) -> None:
+        """If ctx.close() raises an unhandled type, eviction still clears dict."""
+        pool = BrowserPool()
+
+        bad_ctx = _sync_mock_context()
+        bad_ctx.close.side_effect = AttributeError("unexpected")  # Not in suppress list
+        pool._contexts["d0:default"] = bad_ctx
+        pool._context_use_count["d0:default"] = 1
+        pool._context_last_used["d0:default"] = time.time()
+
+        with patch("app.browser_pool.settings.BROWSER_MAX_REUSABLE_CONTEXTS", 1):
+            await pool._evict_lru_if_needed()
+        # dict still cleaned up
+        assert "d0:default" not in pool._contexts
+
+    @pytest.mark.asyncio
+    async def test_no_evict_under_cap(self) -> None:
+        pool = BrowserPool()
+        pool._contexts["d0:default"] = _sync_mock_context()
+        pool._context_use_count["d0:default"] = 1
+        pool._context_last_used["d0:default"] = time.time()
+
+        with patch("app.browser_pool.settings.BROWSER_MAX_REUSABLE_CONTEXTS", 5):
+            await pool._evict_lru_if_needed()
+        assert "d0:default" in pool._contexts
+
+    @pytest.mark.asyncio
+    async def test_get_context_enforces_cap_with_fresh_domains(self) -> None:
+        """Calling get_context with N unique domains with cap == 2 stays bounded."""
+        pool = BrowserPool()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_browser.new_context.return_value = _sync_mock_context()
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.async_playwright"),
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1280),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 720),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
+            patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
+            patch("app.browser_pool.settings.BROWSER_MAX_REUSABLE_CONTEXTS", 2),
+        ):
+            for i in range(5):
+                await pool.get_context(f"domain{i}.com")
+
+        assert len(pool._contexts) <= 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Process Cap (atomic slot reservation)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestProcessCap:
+    """Verify the global Chromium process cap is enforced atomically."""
+
+    def test_initial_state(self) -> None:
+        pool = BrowserPool()
+        assert pool._process_count == 0
+        assert isinstance(pool._process_lock, type(threading.Lock()))
+
+    def test_reserve_increments(self) -> None:
+        pool = BrowserPool()
+        with patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 1):
+            assert pool._try_reserve_process_slot() is True
+            assert pool._process_count == 1
+
+    def test_second_reserve_under_cap_succeeds(self) -> None:
+        pool = BrowserPool()
+        with patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 2):
+            assert pool._try_reserve_process_slot() is True
+            assert pool._try_reserve_process_slot() is True
+            assert pool._process_count == 2
+
+    def test_reserve_blocked_at_cap(self) -> None:
+        pool = BrowserPool()
+        with patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 1):
+            pool._try_reserve_process_slot()
+            assert pool._try_reserve_process_slot() is False
+            assert pool._process_count == 1
+
+    def test_release_decrements(self) -> None:
+        pool = BrowserPool()
+        with patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 1):
+            pool._try_reserve_process_slot()
+            pool._release_process_slot()
+            assert pool._process_count == 0
+
+    def test_release_at_zero_no_underflow(self) -> None:
+        """Release when count is 0 must not produce a negative count."""
+        pool = BrowserPool()
+        pool._process_count = 0
+        pool._release_process_slot()
+        assert pool._process_count == 0
+
+    def test_release_after_close_allows_relaunch(self) -> None:
+        """close() must return the slot so a subsequent launch can succeed."""
+        pool = BrowserPool()
+        pool._browser = _sync_browser_mock(is_connected=True)
+        with patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 1):
+            pool._try_reserve_process_slot()
+            asyncio.run(pool.close())
+            assert pool._process_count == 0
+            # A fresh reservation should now succeed
+            assert pool._try_reserve_process_slot() is True
+
+    @pytest.mark.asyncio
+    async def test_ensure_browser_refuses_when_at_cap(self) -> None:
+        """If process cap is already met, _ensure_browser raises RuntimeError."""
+        pool = BrowserPool()
+        pool._process_count = 1  # Already at the cap
+        with patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 1):
+            with pytest.raises(RuntimeError, match="Process cap reached"):
+                await pool._ensure_browser()
+
+    @pytest.mark.asyncio
+    async def test_slot_released_on_launch_failure(self) -> None:
+        """If chromium.launch raises, the reserved slot must be released."""
+        pool = BrowserPool()
+
+        with (
+            patch("app.browser_pool.async_playwright") as mock_async_pw,
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.BROWSER_MAX_PROCESSES", 1),
+            patch("app.browser_pool.settings.BROWSER_SECURITY_HARDENING", False),
+        ):
+            mock_pw = AsyncMock()
+            mock_pw.chromium.launch.side_effect = Error("launch failed")
+            mock_pw_manager = MagicMock()
+            mock_pw_manager.start = AsyncMock(return_value=mock_pw)
+            mock_async_pw.return_value = mock_pw_manager
+
+            with pytest.raises(Exception, match="launch failed"):
+                await pool._ensure_browser()
+
+            # Slot was reserved and then released on failure
+            assert pool._process_count == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# release_context: try/finally safety on unexpected close exception types
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestReleaseContextSlotSafety:
+    """release_context must always release its semaphore slot, even if
+    ctx.close() raises an unexpected (not in the suppress list) exception.
+    """
+
+    @pytest.mark.asyncio
+    async def test_release_always_releases_semaphore_on_unexpected_exception(self) -> None:
+        pool = BrowserPool()
+        bad_ctx = _sync_mock_context()
+        # AttributeError is NOT in the contextlib.suppress list but the
+        # finally block in release_context must still return the slot.
+        bad_ctx.close.side_effect = AttributeError("unexpected")
+
+        pool._isolated_contexts["iso:bad"] = bad_ctx
+        pool._active_acquires = 1
+        await pool._concurrency_semaphore.acquire()
+        assert pool._concurrency_semaphore._value == settings.BROWSER_MAX_CONTEXTS - 1
+
+        with pytest.raises(AttributeError):
+            await pool.release_context("iso:bad")
+        # Counter reset on the finally path
+        assert pool._active_acquires == 0
+        # Semaphore back at full capacity even though the close raised
+        assert pool._concurrency_semaphore._value == settings.BROWSER_MAX_CONTEXTS

@@ -183,7 +183,7 @@ async def scrape_url_with_recovery(
 
     start_time = time.time()
     attempt = 0
-    last_error: Exception | None = None
+    last_error: BaseException | None = None
     attempt_ctx = AttemptContext()
     if headers:
         attempt_ctx.extra_headers.update(headers)

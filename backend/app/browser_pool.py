@@ -398,6 +398,7 @@ class BrowserPool:
 
             self._contexts[context_key] = context
             self._context_use_count[context_key] = 1
+            self._context_last_used[context_key] = time.time()
             self.active_contexts = len(self._contexts)
 
             return context
@@ -458,22 +459,33 @@ class BrowserPool:
     async def release_context(self, ctx_id: str) -> None:
         """Close an isolated context and release its concurrency slot.
 
-        Always releases the semaphore slot even if ``ctx.close()`` raises
-        an unexpected exception type — preventing permanent slot leaks.
+        Slot release (counter decrement + semaphore release) is always
+        executed in a ``finally`` block so a ``ctx.close()`` failure cannot
+        leak a slot. Unexpected close exception types are still propagated
+        to the caller.
         """
         ctx = self._isolated_contexts.pop(ctx_id, None)
-        if ctx:
-            with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
-                await ctx.close()
-        # ALWAYS release the semaphore and decrement counter, even if
-        # the close() above raised an unexpected type. Single event loop,
-        # cooperative scheduling — the read-modify-write sequence is
-        # race-free. ``max(0, ...)`` is a defensive guard against any
-        # future edge case that might double-decrement.
+        # Wrap close + counter decrement + semaphore release all in
+        # try/finally so that *any* unexpected ``ctx.close()`` failure
+        # still releases the slot AND decrements the active acquire
+        # counter. Single event loop, cooperative scheduling — the
+        # read-modify-write sequence is race-free. ``max(0, ...)`` is a
+        # defensive guard against any future edge case that might
+        # double-decrement.
         try:
-            self._active_acquires = max(0, self._active_acquires - 1)
+            if ctx:
+                # Narrow suppress list preserves the historical contract
+                # of propagating unexpected exception types. If a context
+                # raises something exotic, the finally below still
+                # releases the slot and decrements _active_acquires.
+                with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
+                    await ctx.close()
             self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
         finally:
+            # Always decrement the counter and release the semaphore,
+            # even if ctx.close() raised. ``max(0, ...)`` defends against
+            # any double-decrement edge case.
+            self._active_acquires = max(0, self._active_acquires - 1)
             self._concurrency_semaphore.release()
 
     async def _create_isolated_context(
@@ -539,7 +551,7 @@ class BrowserPool:
         if not self._context_last_used:
             return
         # Get key with the oldest last-used timestamp
-        lru_key = min(self._context_last_used, key=self._context_last_used.get)
+        lru_key = min(self._context_last_used, key=lambda k: self._context_last_used[k])  # type: ignore[arg-type,return-value]
         if lru_key not in self._contexts:
             self._context_last_used.pop(lru_key, None)
             return
@@ -552,7 +564,9 @@ class BrowserPool:
             cap,
             lru_key,
         )
-        with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
+        # Best-effort cleanup: any close-time exception is swallowed so a
+        # dying context cannot keep the eviction from succeeding.
+        with contextlib.suppress(Exception):
             await ctx.close()
 
     def _try_reserve_process_slot(self) -> bool:
@@ -704,6 +718,11 @@ class BrowserPool:
                 except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                     logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
+                # Return the process slot so the cap can be re-armed
+                # after the next launch. If no slot had been reserved
+                # (e.g. browser reference leaked without our tracking),
+                # ``_release_process_slot`` is a no-op.
+                self._release_process_slot()
 
             if self._cleanup_task and not self._cleanup_task.done():
                 self._cleanup_task.cancel()
@@ -808,6 +827,9 @@ class BrowserPool:
             except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
                 logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
+            # Return the process slot so the cap is reset for the next
+            # launch. Mirrors the close() path.
+            self._release_process_slot()
 
         if self._playwright:
             try:

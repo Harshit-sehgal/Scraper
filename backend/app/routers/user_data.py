@@ -27,6 +27,28 @@ router = APIRouter(prefix="/api/user", tags=["user-data"])
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _owns_user_predicate(user_id: str):
+    """Return a predicate that matches records owned by *user_id*.
+
+    Used with :meth:`JSONFileStore.delete_where` so the ownership
+    check runs inside the store's flocked read-modify-write
+    transaction, eliminating the TOCTOU race between a ``values()``
+    snapshot and a subsequent ``delete_many`` call.
+    """
+
+    def _predicate(record: dict, _uid=user_id) -> bool:
+        rec_user = record.get("user_id")
+        rec_id = record.get("id")
+        return str(rec_user) == _uid and bool(rec_id)
+
+    return _predicate
+
+
+# ---------------------------------------------------------------------------
 # Delete-my-data endpoint
 # ---------------------------------------------------------------------------
 
@@ -117,112 +139,72 @@ async def delete_my_data(
     except (OSError, ValueError, TypeError) as e:
         logger.debug("Failed to delete job results from disk: %s", e)
 
-    # 3. Delete workflows owned by the user (single flocked batch via delete_many).
+    # 3. Delete workflows owned by the user (atomic per-backend).
+    #
+    # Previously this phase read ``.values()`` unlocked and then called
+    # ``delete_many(ids)`` — a TOCTOU window in which a concurrent
+    # ``upsert`` could (a) reassign a workflow's ``user_id`` to a
+    # different user and have us delete it anyway, or (b) insert a
+    # brand-new row owned by the caller after the snapshot that would
+    # never be inspected.  Each backend now offers a ``delete_by_user``
+    # API that pushes the ownership predicate into a single
+    # flock/transaction.
     try:
         from app.routers.workflow import _get_workflow_repo
-        from app.workflow_repository import JsonWorkflowRepository
 
         repo = _get_workflow_repo()
-
-        if isinstance(repo, JsonWorkflowRepository):
-            # JSON store supports batch delete_many for efficiency.
-            workflow_store = repo._store
-            workflow_ids_to_delete: list[str] = [
-                str(wf.get("id", "")) for wf in workflow_store.values() if str(wf.get("user_id", "")) == user_id and wf.get("id")
-            ]
-            if workflow_ids_to_delete:
-                summary["workflows_deleted"] = workflow_store.delete_many(workflow_ids_to_delete)
-            else:
-                summary["workflows_deleted"] = 0
-        else:
-            # SQL-backed repos: iterate and delete individually.
-            user_wfs = repo.list_workflows(user_id=user_id, limit=500)
-            deleted = 0
-            for wf in user_wfs:
-                if repo.delete(str(wf.get("id", ""))):
-                    deleted += 1
-            summary["workflows_deleted"] = deleted
+        summary["workflows_deleted"] = repo.delete_by_user(user_id)
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete workflows for user %s: %s", user_id, e)
 
-    # 4. Delete auth profiles owned by the user (single flocked batch via delete_many).
+    # 4. Delete auth profiles owned by the user (atomic flocked delete_where).
     try:
         from app.routers.auth_profiles import _auth_profiles as auth_profile_store
 
-        profile_ids_to_delete: list[str] = [
-            str(prof.get("id", ""))
-            for prof in auth_profile_store.values()
-            if str(prof.get("user_id", "")) == user_id and prof.get("id")
-        ]
-        if profile_ids_to_delete:
-            summary["auth_profiles_deleted"] = auth_profile_store.delete_many(profile_ids_to_delete)
-        else:
-            summary["auth_profiles_deleted"] = 0
+        profile_predicate = _owns_user_predicate(user_id)
+        summary["auth_profiles_deleted"] = auth_profile_store.delete_where(profile_predicate)
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete auth profiles for user %s: %s", user_id, e)
 
-    # 5. Delete scheduled monitoring jobs owned by the user (single flocked batch via delete_many).
+    # 5. Delete scheduled monitoring jobs owned by the user (atomic flocked delete_where).
     try:
         from app.routers.scheduled_monitoring import _scheduled_jobs as schedule_store
 
-        schedule_ids_to_delete: list[str] = [
-            str(sched.get("id", ""))
-            for sched in schedule_store.values()
-            if str(sched.get("user_id", "")) == user_id and sched.get("id")
-        ]
-        if schedule_ids_to_delete:
-            summary["scheduled_jobs_deleted"] = schedule_store.delete_many(schedule_ids_to_delete)
-        else:
-            summary["scheduled_jobs_deleted"] = 0
+        schedule_predicate = _owns_user_predicate(user_id)
+        summary["scheduled_jobs_deleted"] = schedule_store.delete_where(schedule_predicate)
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Failed to delete scheduled jobs for user %s: %s", user_id, e)
 
     # 6. Revoke API keys and remove SaaS identity records
+    #
+    # Tenancy: only the caller's own resources are touched.
+    # ``revoke_for_user`` and ``remove_member`` both use the
+    # canonical ``user.id`` returned by ``get_user`` — no
+    # unvalidated fallback to the raw caller id.
     try:
         from app.saas.identity_store import get_identity_store
         from app.saas.service import ApiKeyService, MembershipService
 
         store = get_identity_store()
+        user = store.get_user(user_id) if hasattr(store, "get_user") else None
+        if not user and hasattr(store, "get_user_by_email"):
+            user = store.get_user_by_email(user_id)
 
-        # Revoke all API keys issued by this user
-        api_key_service = ApiKeyService(store=store)
-        try:
-            if hasattr(store, "get_user_by_email"):
-                user = store.get_user(user_id) or store.get_user_by_email(user_id)
-                if user:
-                    # The user_id might be a UUID, not an email — try to find keys
-                    memberships = store.list_user_memberships(user.id, include_removed=True)
-                    for membership in memberships:
-                        projects = store.list_org_projects(membership.org_id)
-                        for project in projects:
-                            keys = api_key_service.list_for_project(project.id)
-                            for key in keys:
-                                if key.user_id == user.id:
-                                    api_key_service.revoke(key.id)
-                                    summary["api_keys_revoked"] += 1
-        except (RuntimeError, ValueError, TypeError) as e:
-            logger.debug("Failed to revoke API keys: %s", e)
+        if user:
+            try:
+                api_key_service = ApiKeyService(store=store)
+                summary["api_keys_revoked"] = api_key_service.revoke_for_user(user.id)
+            except (RuntimeError, ValueError, TypeError) as e:
+                logger.debug("Failed to revoke API keys: %s", e)
 
-        # Remove memberships
-        membership_service = MembershipService(store=store)
-        # The user_id here might be an API key fingerprint, not a SaaS user.
-        # Try to find the user by user_id or email.
-        try:
-            user = store.get_user(user_id)
-            if not user:
-                # Try to match via memberships directly
-                memberships = store.list_user_memberships(user_id, include_removed=True)
-                for membership in memberships:
-                    membership_service.remove_member(membership.id)
-                    summary["memberships_removed"] += 1
-            else:
-                # Remove all memberships for this user
+            try:
+                membership_service = MembershipService(store=store)
                 memberships = store.list_user_memberships(user.id, include_removed=True)
                 for membership in memberships:
                     membership_service.remove_member(membership.id)
                     summary["memberships_removed"] += 1
-        except (RuntimeError, ValueError, TypeError) as e:
-            logger.debug("Failed to remove memberships: %s", e)
+            except (RuntimeError, ValueError, TypeError) as e:
+                logger.debug("Failed to remove memberships: %s", e)
 
     except ImportError:
         logger.debug("SaaS identity store not available")
