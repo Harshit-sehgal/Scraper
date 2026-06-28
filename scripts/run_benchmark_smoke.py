@@ -15,6 +15,13 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT_DIR = REPO_ROOT / "artifacts" / "benchmarks"
 JSON_PATH = ARTIFACT_DIR / "latest_smoke.json"
@@ -130,54 +137,52 @@ def main() -> int:
             "markdown": str(MD_PATH.relative_to(REPO_ROOT)),
         },
     }
-    JSON_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_sync(JSON_PATH, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
-    MD_PATH.write_text(
-        "\n".join(
-            [
-                "# Benchmark Smoke Result",
-                "",
-                f"- generated_at: {payload['generated_at']}",
-                f"- status: {status}",
-                f"- exit_code: {exit_code}",
-                f"- duration_seconds: {duration}",
-                "- live_sites_used: false",
-                f"- command: `{' '.join(COMMAND)}`",
-                "",
-                "## Local Corpus",
-                "",
-                (
-                    "\n".join(
-                        [
-                            f"- status: {corpus_report['status']}",
-                            f"- version: {corpus_report['version']}",
-                            f"- case_count: {corpus_report['aggregate']['case_count']}",
-                            f"- row_f1: {corpus_report['aggregate']['row_f1']}",
-                            f"- field_f1: {corpus_report['aggregate']['field_f1']}",
-                            f"- false_positive_records: {corpus_report['aggregate']['false_positive_records']}",
-                            f"- artifacts: `{corpus_report.get('artifacts', {})}`",
-                        ],
-                    )
-                    if corpus_report
-                    else f"- error: {corpus_error or 'not run'}"
-                ),
-                "",
-                "## Stdout",
-                "",
-                "```text",
-                stdout.strip(),
-                "```",
-                "",
-                "## Stderr",
-                "",
-                "```text",
-                stderr.strip(),
-                "```",
-                "",
-            ],
-        ),
-        encoding="utf-8",
+    md_content = "\n".join(
+        [
+            "# Benchmark Smoke Result",
+            "",
+            f"- generated_at: {payload['generated_at']}",
+            f"- status: {status}",
+            f"- exit_code: {exit_code}",
+            f"- duration_seconds: {duration}",
+            "- live_sites_used: false",
+            f"- command: `{' '.join(COMMAND)}`",
+            "",
+            "## Local Corpus",
+            "",
+            (
+                "\n".join(
+                    [
+                        f"- status: {corpus_report['status']}",
+                        f"- version: {corpus_report['version']}",
+                        f"- case_count: {corpus_report['aggregate']['case_count']}",
+                        f"- row_f1: {corpus_report['aggregate']['row_f1']}",
+                        f"- field_f1: {corpus_report['aggregate']['field_f1']}",
+                        f"- false_positive_records: {corpus_report['aggregate']['false_positive_records']}",
+                        f"- artifacts: `{corpus_report.get('artifacts', {})}`",
+                    ],
+                )
+                if corpus_report
+                else f"- error: {corpus_error or 'not run'}"
+            ),
+            "",
+            "## Stdout",
+            "",
+            "```text",
+            stdout.strip(),
+            "```",
+            "",
+            "## Stderr",
+            "",
+            "```text",
+            stderr.strip(),
+            "```",
+            "",
+        ],
     )
+    write_text_sync(MD_PATH, md_content)
 
     print(f"Benchmark smoke status: {status}")
     print(f"Wrote {JSON_PATH.relative_to(REPO_ROOT)}")

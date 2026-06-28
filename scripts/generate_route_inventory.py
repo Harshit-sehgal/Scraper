@@ -21,6 +21,7 @@ JSON_OUT = REPO / "artifacts" / "audit" / "ROUTE_INVENTORY.json"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+from _fsync_helper import write_text_sync
 from fastapi_route_iter import iter_app_routes
 
 PUBLIC_API_EXEMPT = {
@@ -384,9 +385,9 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
 
 
 def write_outputs(rows: list[dict[str, str]]) -> None:
-    DOC_OUT.write_text(render_markdown(rows), encoding="utf-8")
+    write_text_sync(DOC_OUT, render_markdown(rows))
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
-    JSON_OUT.write_text(json.dumps({"route_count": len(rows), "routes": rows}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_sync(JSON_OUT, json.dumps({"route_count": len(rows), "routes": rows}, indent=2, sort_keys=True) + "\n")
 
 
 def main() -> int:

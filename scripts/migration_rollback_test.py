@@ -34,7 +34,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from _fsync_helper import write_text_sync  # noqa: E402
+from _fsync_helper import write_text_sync
 
 ARTIFACTS_DIR = Path("artifacts/migration_drill")
 DB_PATH = ARTIFACTS_DIR / "drill.db"

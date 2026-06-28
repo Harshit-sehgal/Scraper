@@ -21,6 +21,13 @@ from typing import Any
 
 import httpx
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
+
 DEFAULT_URL = "http://localhost:8000/health"
 DEFAULT_P95_THRESHOLD_MS = 250.0
 
@@ -282,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     json_payload = json.dumps(result.to_dict(), indent=2, sort_keys=True)
     if args.json_file:
         args.json_file.parent.mkdir(parents=True, exist_ok=True)
-        args.json_file.write_text(json_payload + "\n", encoding="utf-8")
+        write_text_sync(args.json_file, json_payload + "\n")
 
     if args.json:
         print(json_payload)

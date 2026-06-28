@@ -32,6 +32,13 @@ from urllib.parse import urlparse
 
 import httpx
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
+
 DEFAULT_BASE_URL = "http://localhost:8000"
 DEFAULT_PROFILE: tuple[tuple[str, int], ...] = (
     ("/health", 200),
@@ -288,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
     payload = json.dumps(asdict(result), indent=2, sort_keys=True)
     if args.json_file:
         args.json_file.parent.mkdir(parents=True, exist_ok=True)
-        args.json_file.write_text(payload + "\n", encoding="utf-8")
+        write_text_sync(args.json_file, payload + "\n")
     if args.json:
         print(payload)
     else:
