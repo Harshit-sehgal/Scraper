@@ -1319,9 +1319,16 @@ async def respond_to_invitation(
         raise HTTPException(status_code=401, detail="authenticated user required")
 
     store = get_identity_store()
-    result = store.respond_to_invitation(invitation_id, accept=body.accept)
+    result = store.respond_to_invitation(
+        invitation_id, accept=body.accept, requesting_user_id=user_id,
+    )
     if result is None:
-        raise HTTPException(status_code=404, detail="Invitation not found or already responded to")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Invitation not found, expired, or not addressed to this user"
+            ),
+        )
 
     status = "accepted" if body.accept else "declined"
     log_job_event(

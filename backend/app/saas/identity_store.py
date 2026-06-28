@@ -267,7 +267,7 @@ class IdentityStore(ABC):
     def list_org_invitations(self, org_id: str, status: str | None = None) -> list[dict]: ...
 
     @abstractmethod
-    def respond_to_invitation(self, invitation_id: str, accept: bool) -> dict | None: ...
+    def respond_to_invitation(self, invitation_id: str, accept: bool, *, requesting_user_id: str) -> dict | None: ...
 
     @abstractmethod
     def get_pending_invitation_by_email(self, email: str) -> dict | None: ...
@@ -980,8 +980,24 @@ class SQLiteIdentityStore(IdentityStore):
             rows = conn.execute(sql, tuple(params)).fetchall()
         return [dict(r) for r in rows]
 
-    def respond_to_invitation(self, invitation_id: str, accept: bool) -> dict | None:
-        if not invitation_id:
+    def respond_to_invitation(
+        self,
+        invitation_id: str,
+        accept: bool,
+        *,
+        requesting_user_id: str,
+    ) -> dict | None:
+        """Accept or decline a team invitation.
+
+        ``requesting_user_id`` MUST match the user the invitation was
+        addressed to. The check is performed by comparing email lower-
+        case so a user in another org cannot accept invitations
+        addressed to someone else (IDOR defense). Returns ``None`` for
+        unrecognised invitations, expired invitations, and email-
+        mismatched invitations alike so we do not leak the existence
+        of pending invitations.
+        """
+        if not invitation_id or not requesting_user_id:
             return None
         now = _now_iso()
         new_status = "accepted" if accept else "declined"
@@ -991,6 +1007,23 @@ class SQLiteIdentityStore(IdentityStore):
                 (invitation_id, now),
             ).fetchone()
             if not row:
+                return None
+            # IDOR defense: the responder must be the user the
+            # invitation was addressed to. Compare by email since the
+            # invitation is keyed by email address, not user_id.
+            requesting_user = conn.execute(
+                "SELECT email FROM users WHERE id = ?",
+                (requesting_user_id,),
+            ).fetchone()
+            if not requesting_user:
+                return None
+            if (requesting_user["email"] or "").strip().lower() != (row["invited_email"] or "").strip().lower():
+                logger.warning(
+                    "Invitation IDOR defense: user %s attempted to accept invitation %s addressed to %s",
+                    requesting_user_id,
+                    invitation_id,
+                    row["invited_email"],
+                )
                 return None
             conn.execute(
                 "UPDATE team_invitations SET status = ?, responded_at = ? WHERE id = ?",

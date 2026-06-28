@@ -38,20 +38,33 @@ def reset_cross_tenant_alert_count() -> None:
     _cross_tenant_alerts = 0
 
 
-def guard_cross_tenant(rows: list[dict[str, Any]], *, context: str = "") -> set[str]:
+class CrossTenantContaminationError(Exception):
+    """Raised when a result set spans multiple org_ids AND ``strict=True``.
+
+    Hard-block mode is opted-in by callers that own per-user data
+    boundaries. Admin / operator all-access queries still use
+    ``strict=False`` so they can legitimately span multiple org_ids.
+    """
+
+
+def guard_cross_tenant(
+    rows: list[dict[str, Any]],
+    *,
+    context: str = "",
+    strict: bool = False,
+) -> set[str]:
     """Inspect ``rows`` for ``org_id`` field and alert on contamination.
 
-    Returns the set of distinct ``org_id`` values.  If more than one
-    distinct ``org_id`` is found, logs a ``CRITICAL`` alert and
-    increments the process-wide counter.
+    In the default ``strict=False`` mode this is telemetry-only — the
+    function logs a ``CRITICAL``-level message and increments a
+    process-wide counter so operators can investigate. Production
+    traffic must not be blocked by a guardian that may fire during
+    legitimate admin/operator all-access queries.
 
-    Args:
-        rows: The result set from a database query.
-        context: An optional label (e.g. the endpoint or query type)
-            included in the alert message for operational triage.
-
-    Returns:
-        The set of distinct ``org_id`` values found.
+    With ``strict=True``, this raises
+    :class:`CrossTenantContaminationError` on contamination, which
+    callers should wrap in a 500 response. Use ``strict=True`` for
+    any non-admin endpoint that owns per-user data boundaries.
     """
     global _cross_tenant_alerts
 
@@ -64,9 +77,10 @@ def guard_cross_tenant(rows: list[dict[str, Any]], *, context: str = "") -> set[
     if len(org_ids) > 1:
         _cross_tenant_alerts += 1
         logger.critical(
-            "CROSS-TENANT GUARD: query returned rows from %d distinct "
+            "CROSS-TENANT GUARD%s: query returned rows from %d distinct "
             "org_ids (%s)%s. This may indicate a missing WHERE clause. "
             "investigate immediately.",
+            " (STRICT)" if strict else "",
             len(org_ids),
             ", ".join(sorted(org_ids)),
             f" [context={context}]" if context else "",
@@ -77,5 +91,12 @@ def guard_cross_tenant(rows: list[dict[str, Any]], *, context: str = "") -> set[
             record_cross_tenant_guard_alert()
         except Exception as exc:
             logger.debug("Failed to record cross-tenant guard metric: %s", exc)
+
+        if strict:
+            msg = (
+                f"Cross-tenant contamination detected ({context or 'unknown'}): "
+                f"{len(org_ids)} distinct org_ids in result set"
+            )
+            raise CrossTenantContaminationError(msg)
 
     return org_ids

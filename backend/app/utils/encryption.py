@@ -155,14 +155,19 @@ def _derive_test_key(version: str) -> bytes:
     return hashlib.sha256(f"test-key-{version}".encode()).digest()
 
 
-def _get_key_version() -> str:
+def _get_key_version(override: str | None = None) -> str:
     """Return the active key version for NEW encryptions.
 
     Resolution order:
-    1. DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION env var
-    2. DATAFORGE_ENCRYPTION_KEY_VERSION env var (legacy)
-    3. 'v1' (default)
+    1. ``override`` argument (used by reencrypt_payload to thread a
+       caller-supplied version without mutating os.environ; avoids the
+       multi-thread key-confusion race).
+    2. DATAFORGE_ACTIVE_ENCRYPTION_KEY_VERSION env var
+    3. DATAFORGE_ENCRYPTION_KEY_VERSION env var (legacy)
+    4. 'v1' (default)
     """
+    if override:
+        return override
     active = os.environ.get(_ACTIVE_KEY_VERSION_ENV, "")
     if active:
         return active
@@ -242,7 +247,7 @@ def _aes_gcm_decrypt(ciphertext: bytes, tag: bytes, nonce: bytes, key: bytes) ->
 # ---------------------------------------------------------------------------
 
 
-def encrypt(plaintext: str, user_id: str | None = None) -> str:
+def encrypt(plaintext: str, user_id: str | None = None, key_version_override: str | None = None) -> str:
     """Encrypt a plaintext string with optional per-user key derivation.
 
     C8: When ``user_id`` is provided, a per-user key is derived via
@@ -263,10 +268,20 @@ def encrypt(plaintext: str, user_id: str | None = None) -> str:
 
     The encrypt function records a ``pu`` flag in the payload so :func:`decrypt`
     can re-derive the same per-user key when handed the matching ``user_id``.
+
+    Args:
+        plaintext: The string to encrypt.
+        user_id: When provided, derive a per-user key so one key
+            compromise doesn't expose all users' data.
+        key_version_override: Optional explicit key version (e.g. used
+            by :func:`reencrypt_payload` to migrate to a known target).
+            Mutating ``os.environ`` from concurrent threads to drive
+            the version selector caused a key-confusion race — this
+            parameter threads the version through instead.
     """
     import hashlib
 
-    key_version = _get_key_version()
+    key_version = _get_key_version(override=key_version_override)
     key: bytes | None = None
     per_user: bool = False
 
@@ -487,19 +502,13 @@ def reencrypt_payload(encrypted_payload: str, target_key_version: str | None = N
     """
     plaintext = decrypt(encrypted_payload)
 
-    # Temporarily override the active key version for re-encryption
-    original_active_value = os.environ.get(_ACTIVE_KEY_VERSION_ENV)
-    if target_key_version:
-        os.environ[_ACTIVE_KEY_VERSION_ENV] = target_key_version
-
-    try:
-        return encrypt(plaintext)
-    finally:
-        if target_key_version:
-            if original_active_value:
-                os.environ[_ACTIVE_KEY_VERSION_ENV] = original_active_value
-            else:
-                os.environ.pop(_ACTIVE_KEY_VERSION_ENV, None)
+    # Thread the target version through ``encrypt`` directly rather than
+    # mutating ``os.environ``. Mutating the env var from concurrent
+    # threads races with other encrypt calls — one caller could read a
+    # version mid-overwrite and produce ciphertext under a key that
+    # disagrees with the version string it stamps into the payload
+    # (classic "key confusion"), silently breaking key-rotation decryption.
+    return encrypt(plaintext, key_version_override=target_key_version)
 
 
 def is_encrypted(value: str) -> bool:

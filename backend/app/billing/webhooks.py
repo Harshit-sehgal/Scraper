@@ -267,17 +267,19 @@ def _signature_candidates(header_value: str) -> list[str]:
 
 
 def _verify_billing_webhook(request: Request, raw_body: bytes) -> None:
-    """Verify webhook authenticity when a billing webhook secret is configured."""
+    """Verify webhook authenticity when a billing webhook secret is configured.
+
+    In production we ALWAYS require HMAC body verification. The
+    secret-in-header shortcut is only accepted in non-production
+    environments because HTTP headers are routinely logged by proxies,
+    CDNs, and load balancers, which would leak the raw shared secret
+    to anyone with log access.
+    """
     secret = _configured_webhook_secret()
     if not secret:
         if _is_production_env():
             raise HTTPException(status_code=503, detail="Billing webhook secret is not configured.")
         return
-
-    for header in _SECRET_HEADERS:
-        provided = request.headers.get(header, "").strip()
-        if provided and hmac.compare_digest(provided, secret):
-            return
 
     signature_header = ""
     for header in _SIGNATURE_HEADERS:
@@ -288,6 +290,21 @@ def _verify_billing_webhook(request: Request, raw_body: bytes) -> None:
     for candidate in _signature_candidates(signature_header):
         if hmac.compare_digest(candidate, expected):
             return
+
+    # Production must require HMAC body verification. The secret-in-header
+    # bypass is dev-only because headers are logged by ingress proxies.
+    if not _is_production_env():
+        for header in _SECRET_HEADERS:
+            provided = request.headers.get(header, "").strip()
+            if provided and hmac.compare_digest(provided, secret):
+                logger.warning(
+                    "Billing webhook accepted via secret-in-header (DEV ONLY). "
+                    "Header names like '%s' are routinely logged by proxies/CDNs. "
+                    "HMAC body verification will be required in production.",
+                    header,
+                )
+                return
+
     raise HTTPException(status_code=401, detail="Invalid billing webhook signature.")
 
 
