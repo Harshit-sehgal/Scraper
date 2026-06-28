@@ -137,6 +137,7 @@ _PRODUCT_COUNTER_NAMES = (
     "browser_context_created_total",
     "browser_context_failed_total",
     "operator_cross_tenant_access_total",
+    "dedup_lookup_miss_total",
 )
 
 # ── Extraction failure categories ────────────────────────────────────
@@ -535,6 +536,16 @@ def record_job_failed() -> None:
 
 def record_quota_rejected() -> None:
     increment_product_counter("quota_rejected_total")
+
+
+def record_dedup_lookup_miss() -> None:
+    """Record a dedup lookup that failed open (DB error / cache miss during outage).
+
+    Sustained high rates indicate the storage backend is not accepting
+    idempotency-key lookups, which means duplicate job submissions are
+    possible. Alert on this counter.
+    """
+    increment_product_counter("dedup_lookup_miss_total")
 
 
 def record_auth_failed() -> None:

@@ -33,6 +33,13 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_gzip_sync, write_text_sync
+
 ARTIFACTS_DIR = Path("artifacts/backup_drill")
 CONTAINER_NAME = "dataforge-drill-pg"
 PG_IMAGE = "postgres:15-alpine"
@@ -203,10 +210,11 @@ def run_backup() -> Path:
     if result.returncode != 0:
         log(f"Backup failed (exit {result.returncode}): {result.stderr}")
         sys.exit(1)
-    import gzip
 
-    with gzip.open(backup_path, "wt") as f:
-        f.write(result.stdout)
+    # fsync-safe gzip write — the .gz file is the primary integrity
+    # artifact of the drill; a power-loss between write and close
+    # would leave a recoverable-but-suspect backup.
+    write_gzip_sync(backup_path, result.stdout)
     # Integrity check
     subprocess.run(["gunzip", "-t", str(backup_path)], check=True)
     log(f"Backup created and verified: {backup_path} ({backup_path.stat().st_size} bytes)")
@@ -357,7 +365,7 @@ def main() -> int:
             "notes": "Backup/restore drill completed successfully. Data integrity verified.",
         }
         summary_path = ARTIFACTS_DIR / "latest_drill.json"
-        summary_path.write_text(json.dumps(summary, indent=2))
+        write_text_sync(summary_path, json.dumps(summary, indent=2))
         log(f"Summary written to {summary_path}")
         log("Backup/Restore drill PASSED.")
         return 0
@@ -369,7 +377,7 @@ def main() -> int:
             "status": "failed",
             "error": str(e),
         }
-        (ARTIFACTS_DIR / "latest_drill.json").write_text(json.dumps(error_summary, indent=2))
+        write_text_sync(ARTIFACTS_DIR / "latest_drill.json", json.dumps(error_summary, indent=2))
         return 1
 
     finally:

@@ -29,6 +29,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync  # noqa: E402
+
 ARTIFACTS_DIR = Path("artifacts/migration_drill")
 DB_PATH = ARTIFACTS_DIR / "drill.db"
 
@@ -209,7 +216,7 @@ def main() -> int:
             "notes": "Migration rollback drill completed. Additive columns can be rolled back without data loss.",
         }
         summary_path = ARTIFACTS_DIR / "latest_drill.json"
-        summary_path.write_text(json.dumps(summary, indent=2))
+        write_text_sync(summary_path, json.dumps(summary, indent=2))
         log(f"Summary written to {summary_path}")
         log("Migration Rollback Drill PASSED.")
         return 0

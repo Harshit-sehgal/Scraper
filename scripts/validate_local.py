@@ -17,6 +17,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# Make ``scripts/_fsync_helper`` importable regardless of whether
+# ``python3 scripts/validate_local.py`` is run from the repo root or
+# with ``scripts/`` as the CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+
+from _fsync_helper import write_text_sync
+
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = ROOT / "artifacts" / "validation"
 COMMANDS_DIR = VALIDATION_DIR / "commands"
@@ -127,7 +137,7 @@ def write_command_log(index: int, result: dict[str, Any], commands_dir: Path) ->
             "",
         ],
     )
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text_sync(path, "\n".join(lines))
     return path
 
 
@@ -397,7 +407,7 @@ def summarize(mode: str, run_id: str, archive_dir: Path, results: list[dict[str,
 
 def write_summary(summary: dict[str, Any], archive_dir: Path) -> None:
     VALIDATION_DIR.mkdir(parents=True, exist_ok=True)
-    SUMMARY_JSON.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_sync(SUMMARY_JSON, json.dumps(summary, indent=2, sort_keys=True) + "\n")
 
     lines = [
         "# Latest Validation Summary",
@@ -426,14 +436,14 @@ def write_summary(summary: dict[str, Any], archive_dir: Path) -> None:
             f"{result['exit_code']} | `{log_path}` |",
         )
     lines.append("")
-    SUMMARY_MD.write_text("\n".join(lines), encoding="utf-8")
+    write_text_sync(SUMMARY_MD, "\n".join(lines))
 
     archive_summary = copy.deepcopy(summary)
     for result in archive_summary["results"]:
         if result.get("archive_log_path"):
             result["log_path"] = result["archive_log_path"]
     archive_dir.mkdir(parents=True, exist_ok=True)
-    (archive_dir / "summary.json").write_text(json.dumps(archive_summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_sync(archive_dir / "summary.json", json.dumps(archive_summary, indent=2, sort_keys=True) + "\n")
 
     archive_lines = lines.copy()
     for index, line in enumerate(archive_lines):
@@ -441,7 +451,7 @@ def write_summary(summary: dict[str, Any], archive_dir: Path) -> None:
             archive_lines[index] = f"- archive_dir: `{archive_dir.relative_to(ROOT)}`"
         elif line.startswith("| ") and "`artifacts/validation/commands/" in line:
             archive_lines[index] = line.replace("artifacts/validation/commands/", f"{archive_dir.relative_to(ROOT)}/commands/")
-    (archive_dir / "summary.md").write_text("\n".join(archive_lines), encoding="utf-8")
+    write_text_sync(archive_dir / "summary.md", "\n".join(archive_lines))
 
 
 def parse_args() -> argparse.Namespace:

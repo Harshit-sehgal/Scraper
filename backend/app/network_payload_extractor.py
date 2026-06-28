@@ -394,7 +394,8 @@ def extract_from_network_payloads(
     for raw in payloads:
         try:
             payload = json.loads(raw) if isinstance(raw, str) else raw
-        except Exception:  # nosec B112  # noqa: RUF100, S112
+        except (json.JSONDecodeError, TypeError, ValueError):
+            logger.debug("Skipping unparseable network payload in extract_from_network_payloads")
             continue
 
         candidates = find_record_arrays(payload)

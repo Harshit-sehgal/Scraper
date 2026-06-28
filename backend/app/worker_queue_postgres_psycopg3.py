@@ -123,8 +123,8 @@ def _conn() -> Iterator:
                 from app.metrics_collector import record_error
 
                 record_error("database")
-            except (RuntimeError, ValueError, TypeError):  # nosec B110  # noqa: RUF100, S110
-                pass
+            except (RuntimeError, ValueError, TypeError):
+                logger.debug("Failed to record database error metric during rollback")
             raise
 
 
@@ -186,8 +186,8 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
                     from app.metrics_collector import record_error
 
                     record_error("database")
-                except (RuntimeError, ValueError, TypeError):  # nosec B110  # noqa: RUF100, S110
-                    pass
+                except (RuntimeError, ValueError, TypeError):
+                    logger.debug("Failed to record database error metric during rollback (psycopg3 pool)")
                 raise
 
     def _fetch_all(self, conn, sql: str, params=None) -> list[dict]:

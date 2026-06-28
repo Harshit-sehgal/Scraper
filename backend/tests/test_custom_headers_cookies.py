@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import app.main as main_mod
 import pytest
@@ -108,7 +108,7 @@ async def test_custom_headers_cookies_propagation(monkeypatch) -> None:
     mock_scrape = AsyncMock(return_value=([], {}))
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape)
 
-    mock_save = AsyncMock()
+    mock_save = MagicMock()
     await run_scraping_phase(
         job,
         max_job_runtime_seconds=60,

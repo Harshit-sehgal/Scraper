@@ -1,5 +1,5 @@
 {
-  "route_count": 144,
+  "route_count": 150,
   "routes": [
     {
       "method": "GET",
@@ -160,6 +160,18 @@
     {
       "method": "POST",
       "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/compliance/gdpr/forget",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
       "path": "/api/discover",
       "public_protected_unknown": "protected",
@@ -305,6 +317,18 @@
       "method": "PATCH",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/extraction",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/jobs/{job_id}/headers",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
@@ -332,6 +356,42 @@
       "path": "/api/jobs/{job_id}/results",
       "public_protected_unknown": "protected",
       "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/strategy",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/webhook",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/webhook/redeliver",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
@@ -1058,6 +1118,18 @@
       "test_coverage": "yes"
     },
     {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/scraper/preview",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
@@ -1732,6 +1804,19 @@
   ],
   "unknown_auth_count": 0,
   "unknown_auth_routes": [],
-  "unknown_tenant_scope_count": 0,
-  "unknown_tenant_scope_routes": []
+  "unknown_tenant_scope_count": 1,
+  "unknown_tenant_scope_routes": [
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/compliance/gdpr/forget",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "yes"
+    }
+  ]
 }

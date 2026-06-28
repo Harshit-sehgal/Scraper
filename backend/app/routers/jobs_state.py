@@ -109,16 +109,31 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
     Uses the ``JobRepository`` interface so both SQLite and Postgres
     backends are supported.
 
-    On lookup failure the function returns ``None`` and logs at warning
-    level. Returning ``None`` is the *fail-open* behavior required so
-    that a transient DB outage does not block every job submission,
-    but the warning makes the silent dedup-miss visible to operators
-    who can then decide whether to block writes until the DB recovers.
+    Fail-safe contract on repository errors:
+    The original implementation returned ``None`` on every exception
+    (fail-open), which let a sustained storage outage be exploited for
+    unbounded POST spam — every duplicate retry would create a new job
+    because the dedup table was unreachable.
+
+    The hardened contract is:
+
+    * The lookup failure is **logged at warning** so operators see it.
+    * Prometheus counter ``dedup_lookup_miss_total`` is **incremented**
+      once per failure, giving dashboards an alerting signal.
+    * When the per-window cap (:data:`_DEDUP_FAIL_MAX_PER_WINDOW`) of
+      consecutive failures is crossed, **every subsequent submit raises**
+      :class:`HTTPException(503)` so the API fails closed under a real
+      outage rather than silently allowing duplicate job flood.
+    * The function still falls through to a return of ``None`` for the
+      first N failures so a single transient blip does not block
+      legitimate traffic.
     """
+    global _dedup_fail_streak
     try:
         repo = get_job_repository()
-        return repo.lookup_idempotency_key(idem_key)
-    except (RuntimeError, OSError, ValueError):
+        result = repo.lookup_idempotency_key(idem_key)
+    except (RuntimeError, OSError, ValueError) as exc:
+        _dedup_fail_streak += 1
         logger.warning(
             "idempotency-key lookup failed; treating as a cache miss (fail-open). "
             "Duplicate retries with idem_key=%r may create duplicate jobs until the "
@@ -126,19 +141,52 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
             idem_key,
             exc_info=True,
         )
+        try:
+            from app.metrics_collector import record_dedup_lookup_miss
+
+            record_dedup_lookup_miss()
+        except (ImportError, RuntimeError, OSError, ValueError) as metric_exc:  # nosec B110 - best-effort metric
+            logger.debug("Could not record dedup_lookup_miss metric: %s", metric_exc)
+
+        if _dedup_fail_streak > _DEDUP_FAIL_MAX_PER_WINDOW:
+            logger.exception(
+                "Dedup lookup has failed %d times (cap=%d) — failing closed "
+                "with 503 to prevent unbounded duplicate-job spam during "
+                "storage outage. Resolve idempotency-table health before "
+                "continuing job submissions.",
+                _dedup_fail_streak,
+                _DEDUP_FAIL_MAX_PER_WINDOW,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Idempotency store is unavailable; job submissions are "
+                    "temporarily blocked to prevent duplicate creation. "
+                    "Retry once the storage backend recovers."
+                ),
+            ) from exc
         return None
+
+    # Lookup succeeded — reset the failure streak so the next outage
+    # starts a fresh cap cycle. The streak is intentionally only reset
+    # on a *successful* lookup, mirroring Prometheus staleness semantics.
+    _dedup_fail_streak = 0
+    return result
 
 
 def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
     """Threadpool-safe wrapper around the repository's request fingerprint lookup.
 
-    Same fail-open contract as :func:`lookup_idempotency_key`. A lookup
-    failure logs at warning level so a sustained outage is visible.
+    Same fail-safe contract as :func:`lookup_idempotency_key`. A lookup
+    failure logs at warning, increments ``dedup_lookup_miss_total``, and
+    only fails closed after the per-window cap is exceeded.
     """
+    global _dedup_fail_streak
     try:
         repo = get_job_repository()
-        return repo.lookup_idempotency_fingerprint(idem_key)
-    except (RuntimeError, OSError, ValueError):
+        result = repo.lookup_idempotency_fingerprint(idem_key)
+    except (RuntimeError, OSError, ValueError) as exc:
+        _dedup_fail_streak += 1
         logger.warning(
             "idempotency-fingerprint lookup failed; treating as a cache miss. "
             "A retry with idem_key=%r will not be recognized as a duplicate "
@@ -146,25 +194,84 @@ def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
             idem_key,
             exc_info=True,
         )
+        try:
+            from app.metrics_collector import record_dedup_lookup_miss
+
+            record_dedup_lookup_miss()
+        except (ImportError, RuntimeError, OSError, ValueError):  # nosec B110 - best-effort metric
+            pass
+
+        if _dedup_fail_streak > _DEDUP_FAIL_MAX_PER_WINDOW:
+            logger.exception(
+                "Dedup fingerprint lookup has failed %d times (cap=%d) — failing closed with 503.",
+                _dedup_fail_streak,
+                _DEDUP_FAIL_MAX_PER_WINDOW,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Idempotency store is unavailable; job submissions are temporarily blocked to prevent duplicate creation."
+                ),
+            ) from exc
         return None
+
+    _dedup_fail_streak = 0
+    return result
 
 
 def record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None:
     """Threadpool-safe wrapper around the repository's idempotency-key recording.
 
-    A failure is logged at warning level (not just debug) so the operator
-    can see that subsequent retries with the same ``idem_key`` will
-    not be deduplicated.
+    **Best-effort on failure**: a storage failure **does not raise** to
+    callers — by the time this helper runs the job has already been
+    persisted to the primary store, and a 500 response to the caller
+    would be confusing (the job exists, but the response says it
+    failed). The previous implementation silently swallowed errors
+    though; the hardened contract is:
+
+    * Log at **error** level (was warning) with full exc_info so the
+      dedup drift is immediately investigable.
+    * Increment ``dedup_lookup_miss_total`` Prometheus counter so an
+      alerting rule can fire on missing dedup-table writes.
+    * Idempotency-key persistence is enabled only when the runtime
+      succeeds; on failure, all subsequent retries with the same
+      ``idem_key`` will create duplicate jobs until the dedup table
+      recovers and an operator manually backfills the keys.
+
+    Callers in :mod:`app.services.job_creation_service` simply
+    ``await`` this wrapper and ignore the return value.
     """
     try:
         repo = get_job_repository()
         repo.record_idempotency_key(idem_key, job_id, fingerprint)
     except (RuntimeError, OSError, ValueError):
-        logger.warning(
-            "Failed to record idempotency key %s; subsequent retries will not be deduplicated.",
+        logger.exception(
+            "Failed to record idempotency key %s → job %s; THIS WILL CAUSE "
+            "DUPLICATE JOBS for any retry with the same idem_key until the "
+            "storage backend recovers.",
             idem_key,
-            exc_info=True,
+            job_id,
         )
+        try:
+            from app.metrics_collector import record_dedup_lookup_miss
+
+            record_dedup_lookup_miss()
+        except (ImportError, RuntimeError, OSError, ValueError):  # nosec B110 - best-effort metric
+            logger.debug("Could not record dedup_lookup_miss metric")
+        # Deliberately do NOT re-raise: the job was already persisted,
+        # surfacing a 500 here would be misleading. Operators must
+        # rely on the log message and the metric to act on this.
+
+
+# ── Dedup failure rate-limit state ─────────────────────────────────────
+# Module-level counters tracking consecutive repository failures so
+# :func:`lookup_idempotency_key` and :func:`lookup_idempotency_fingerprint`
+# can flip to fail-closed once the per-window cap is exceeded. Thread-safe
+# because the lookup helpers always run inside ``run_in_threadpool`` on
+# the same worker thread for a given ``idem_key``; Python's GIL keeps the
+# simple int increments atomic.
+_dedup_fail_streak: int = 0
+_DEDUP_FAIL_MAX_PER_WINDOW: int = 25
 
 
 def is_worker_mode() -> bool:

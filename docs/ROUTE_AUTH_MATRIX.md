@@ -4,9 +4,9 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 144
+**API route rows:** 150
 **Unknown auth rows:** 0
-**Unknown tenant-scope rows:** 0
+**Unknown tenant-scope rows:** 1
 
 Unknown auth or tenant-scope rows must be tracked as candidate issues.
 
@@ -25,6 +25,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
+| `POST` | `/api/compliance/gdpr/forget` | protected | authenticated-user | require_principal | yes | unknown | yes | stable | route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required. |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
@@ -37,9 +38,13 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/jobs/{job_id}/export/csv` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/excel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/json` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/extraction` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/headers` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/jobs/{job_id}/reclean` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/results` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `PATCH` | `/api/jobs/{job_id}/strategy` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/webhook` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/webhook/redeliver` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/operator/dashboard` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `DELETE` | `/api/operator/denylist` | protected | admin | require_role_with_user | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/operator/denylist` | protected | operator-or-admin | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator |
@@ -100,6 +105,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/scraper/ml/learn` | protected | operator-or-admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | route dependency accepts admin/operator |
 | `POST` | `/api/scraper/ml/optimize/domain/{domain}` | protected | operator-or-admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | route dependency accepts admin/operator |
 | `GET` | `/api/scraper/ml/optimize/domain/{domain}/history` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
+| `POST` | `/api/scraper/preview` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/scraper/regressions` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/scraper/regressions/generate-all-tests` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/scraper/regressions/{entry_id}` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |

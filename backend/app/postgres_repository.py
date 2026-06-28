@@ -129,8 +129,8 @@ def _db_conn() -> Iterator[psycopg2.extensions.connection]:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:  # nosec B110  # noqa: RUF100, S110
-            pass
+        except Exception:
+            logger.debug("Failed to record database error metric during psycopg2 rollback")
         raise
     finally:
         pool.putconn(conn)

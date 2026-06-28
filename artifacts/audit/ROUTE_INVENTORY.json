@@ -1,5 +1,5 @@
 {
-  "route_count": 155,
+  "route_count": 161,
   "routes": [
     {
       "auth_dependency_if_known": "",
@@ -226,6 +226,22 @@
       "tenant_scoped": "no"
     },
     {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "gdpr_forget",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/compliance/gdpr/forget",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "authenticated-user",
+      "response_model_if_known": "dict",
+      "router_module": "app.routers.user_data",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown"
+    },
+    {
       "auth_dependency_if_known": "require_role",
       "category": "stable API routes",
       "handler_function": "discover",
@@ -420,6 +436,22 @@
     {
       "auth_dependency_if_known": "require_principal",
       "category": "stable API routes",
+      "handler_function": "update_job_extraction",
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/extraction",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.routers.jobs_write",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
       "handler_function": "update_job_headers",
       "method": "PATCH",
       "middleware_protected": "yes",
@@ -462,6 +494,54 @@
       "required_role_if_known": "authenticated-user",
       "response_model_if_known": "",
       "router_module": "app.routers.jobs_read",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "update_job_strategy",
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/strategy",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.routers.jobs_write",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "update_job_webhook",
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/webhook",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.routers.jobs_write",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes"
+    },
+    {
+      "auth_dependency_if_known": "require_principal",
+      "category": "stable API routes",
+      "handler_function": "redeliver_job_webhook",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/webhook/redeliver",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
     },
@@ -1423,6 +1503,22 @@
       "response_model_if_known": "",
       "router_module": "app.routers.experimental",
       "stable_or_experimental": "experimental",
+      "tenant_scoped": "no"
+    },
+    {
+      "auth_dependency_if_known": "require_role",
+      "category": "stable API routes",
+      "handler_function": "preview_extraction",
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/scraper/preview",
+      "public_or_protected": "protected",
+      "request_model_if_known": "",
+      "required_role_if_known": "operator-or-admin",
+      "response_model_if_known": "",
+      "router_module": "app.routers.scraper",
+      "stable_or_experimental": "stable",
       "tenant_scoped": "no"
     },
     {

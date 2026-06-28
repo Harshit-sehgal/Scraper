@@ -11,6 +11,14 @@ import contextlib
 import os
 import secrets
 import sys
+from pathlib import Path
+
+# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _fsync_helper import write_text_sync
 
 TARGET_FILE = ".env.production"
 SECRET_DIR = ".secrets"
@@ -124,13 +132,7 @@ GRAFANA_PASSWORD={grafana_password}
         }
         for filename, value in secret_files.items():
             secret_path = os.path.join(SECRET_DIR, filename)
-            fd_secret = os.open(
-                secret_path,
-                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-                0o600,
-            )
-            with os.fdopen(fd_secret, "w") as f:
-                f.write(value)
+            write_text_sync(secret_path, value, perm=0o600)
 
         # Create the file with mode 0o600 atomically. Setting the
         # umask before ``open`` closes the small window during which
@@ -141,18 +143,12 @@ GRAFANA_PASSWORD={grafana_password}
         # and the ``os.chmod`` in the original implementation.
         # ``os.open`` with ``O_CREAT|O_WRONLY|O_TRUNC`` applies the
         # mode at inode-creation time, before any data is written.
-        fd = os.open(
-            TARGET_FILE,
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-            0o600,
-        )
         try:
-            with os.fdopen(fd, "w") as f:
-                f.write(config_content)
+            write_text_sync(TARGET_FILE, config_content, perm=0o600)
         except Exception:
-            # If the write itself fails, close and unlink the
-            # half-written file so we don't leave a 0o600 stub
-            # with a misleading ``.env.production`` next to it.
+            # If the write itself fails, clean up the half-written
+            # file so we don't leave a 0o600 stub with a misleading
+            # ``.env.production`` next to it.
             with contextlib.suppress(OSError):
                 os.unlink(TARGET_FILE)
             raise
