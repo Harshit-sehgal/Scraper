@@ -151,8 +151,6 @@ async def run_workflow_in_browser(
                             "detail": str(exc)[:200],
                         }
                     )
-                finally:
-                    await page.close()
 
             except Exception as exc:
                 return _browser_failure(
@@ -163,6 +161,13 @@ async def run_workflow_in_browser(
                     timeline=timeline,
                     last_url=last_url,
                 )
+            finally:
+                # C2: ensure the Playwright Page is always closed, even on
+                # exceptions raised by ``_execute_steps`` or ``page.content``
+                # — these previously short-circuited the inner ``finally`` and
+                # let page handles accumulate in the BrowserPool's LRU.
+                with suppress(Exception):
+                    await page.close()
     except ImportError:
         return _browser_failure(
             workflow,
@@ -343,7 +348,17 @@ async def _start_fixture_server(html: str) -> tuple[str, Any, int]:
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "127.0.0.1", 0)
-    await site.start()
+    try:
+        await site.start()
+    except Exception:
+        # C1: if ``site.start()`` fails (port collision, network down, etc.)
+        # we must release the just-initialised ``AppRunner`` — otherwise
+        # the runner lingers in aiohttp's internal registry until the
+        # process exits.  Re-raise after cleanup so the caller still sees
+        # the original error.
+        with suppress(Exception):
+            await runner.cleanup()
+        raise
 
     # aiohttp assigns a random port; find it from the site object
     port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
