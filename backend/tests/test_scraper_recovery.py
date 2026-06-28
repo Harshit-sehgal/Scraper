@@ -46,7 +46,7 @@ class TestRecoveryStrategist:
         plan = strategist.generate_recovery_plan(classification, attempt_number=2)
 
         # On attempt 2, primary should be the first escalation action
-        assert plan.primary_action == RecoveryAction.BACKOFF_AND_SLOW
+        assert plan.primary_action == RecoveryAction.HARVEST_CF_CLEARANCE
 
     def test_unknown_failure_falls_back(self) -> None:
         from app.recovery_strategies import RecoveryAction, RecoveryStrategist
@@ -330,6 +330,226 @@ class TestRecoveryExecutor:
         del executor.action_handlers[RecoveryAction.SKIP_DOMAIN]
 
         result = await executor.execute(plan, {"url": "http://example.com"}, AttemptContext())
+        assert result is False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CAPTCHA solve + CF harvester recovery handlers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestSolveCaptchaHandler:
+    """handle_solve_captcha delegates to the CAPTCHA solver singleton.
+
+    When the solver is disabled (_NoOpSolver), the handler returns False
+    so the executor escalates to the next recovery action (typically
+    ROTATE_PROXY).  When the solver returns a token, it is injected into
+    attempt_ctx.cookies for the next scrape attempt.
+    """
+
+    @pytest.mark.asyncio
+    async def test_captcha_recovery_returns_false_when_solver_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CAPTCHA_SOLVER_ENABLED", False)
+        # Reset solver so it picks up the setting
+        from app.captcha_solver import reset_captcha_solver
+
+        reset_captcha_solver()
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        handler = executor.action_handlers[RecoveryAction.SOLVE_CAPTCHA]
+        ctx = AttemptContext()
+        result = await handler(
+            {},
+            {"url": "https://example.com/page", "site_key": "abc123"},
+            ctx,
+        )
+        # _NoOpSolver returns None → handler returns False
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_captcha_recovery_injects_token_on_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import AsyncMock
+
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CAPTCHA_SOLVER_ENABLED", True)
+        monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "test-key")
+        monkeypatch.setattr(settings, "CAPTCHA_PROVIDER", "2captcha")
+
+        # Patch the solver factory to return a mock solver
+        mock_solver = AsyncMock()
+        mock_solver.solve = AsyncMock(return_value="solved-token-xyz")
+
+        from app.captcha_solver import reset_captcha_solver
+
+        reset_captcha_solver()
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        with patch("app.captcha_solver.get_captcha_solver", return_value=mock_solver):
+            handler = executor.action_handlers[RecoveryAction.SOLVE_CAPTCHA]
+            ctx = AttemptContext()
+            result = await handler(
+                {},
+                {
+                    "url": "https://example.com",
+                    "site_key": "site-key-abc",
+                    "captcha_type": "recaptcha",
+                },
+                ctx,
+            )
+
+        # Solver succeeded → token injected
+        assert result is True
+        assert ctx.cookies.get("captcha_token") == "solved-token-xyz"
+
+    @pytest.mark.asyncio
+    async def test_captcha_recovery_no_url_returns_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CAPTCHA_SOLVER_ENABLED", True)
+        from app.captcha_solver import reset_captcha_solver
+
+        reset_captcha_solver()
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        handler = executor.action_handlers[RecoveryAction.SOLVE_CAPTCHA]
+        ctx = AttemptContext()
+        result = await handler({}, {}, ctx)
+        assert result is False
+
+
+class TestHarvestCfClearanceHandler:
+    """handle_harvest_cf_clearance delegates to the CF harvester.
+
+    When CF_HARVESTER_ENABLED=False (default), the harvester itself
+    short-circuits and returns None, so the handler returns False and
+    the executor escalates.  On success, cookies are injected into
+    attempt_ctx.cookies.
+    """
+
+    @pytest.mark.asyncio
+    async def test_cf_harvest_recovery_returns_false_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", False)
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        handler = executor.action_handlers[RecoveryAction.HARVEST_CF_CLEARANCE]
+        ctx = AttemptContext()
+        result = await handler(
+            {},
+            {"url": "https://example.com", "domain": "example.com"},
+            ctx,
+        )
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cf_harvest_recovery_injects_cookies_on_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import AsyncMock
+
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", True)
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        mock_harvest = AsyncMock(return_value="cf_clearance=abc123; other=x")
+
+        with patch("app.cf_harvester.harvest_cf_clearance", mock_harvest):
+            handler = executor.action_handlers[RecoveryAction.HARVEST_CF_CLEARANCE]
+            ctx = AttemptContext()
+            result = await handler(
+                {},
+                {"url": "https://example.com", "domain": "example.com"},
+                ctx,
+            )
+
+        assert result is True
+        assert ctx.cookies.get("cf_clearance") == "abc123"
+
+    @pytest.mark.asyncio
+    async def test_cf_harvest_returns_false_on_harvest_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import AsyncMock
+
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", True)
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        # harvest_cf_clearance returns None → handler returns False
+        mock_harvest = AsyncMock(return_value=None)
+
+        with patch("app.cf_harvester.harvest_cf_clearance", mock_harvest):
+            handler = executor.action_handlers[RecoveryAction.HARVEST_CF_CLEARANCE]
+            ctx = AttemptContext()
+            result = await handler(
+                {},
+                {"url": "https://example.com", "domain": "example.com"},
+                ctx,
+            )
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cf_harvest_no_url_returns_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+        from app.recovery_strategies import (
+            AttemptContext,
+            RecoveryAction,
+            RecoveryExecutor,
+        )
+
+        monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", True)
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+
+        handler = executor.action_handlers[RecoveryAction.HARVEST_CF_CLEARANCE]
+        ctx = AttemptContext()
+        result = await handler({}, {}, ctx)
         assert result is False
 
 

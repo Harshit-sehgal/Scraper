@@ -40,6 +40,8 @@ class RecoveryAction(StrEnum):
     ROTATE_PROXY = "rotate_proxy"
     BACKOFF_AND_SLOW = "backoff_and_slow"
     ABORT_DOMAIN = "abort_domain"
+    SOLVE_CAPTCHA = "solve_captcha"
+    HARVEST_CF_CLEARANCE = "harvest_cf_clearance"
 
     # Extraction recovery
     FORCE_REDISCOVERY = "force_rediscovery"
@@ -182,6 +184,7 @@ class RecoveryStrategist:
         FailureCategory.ANTI_BOT_BLOCK: {
             "primary": RecoveryAction.ROTATE_PROXY,
             "escalation": [
+                RecoveryAction.HARVEST_CF_CLEARANCE,
                 RecoveryAction.BACKOFF_AND_SLOW,
                 RecoveryAction.ABORT_DOMAIN,
             ],
@@ -190,8 +193,9 @@ class RecoveryStrategist:
             "params": {"rotate_proxy": True, "delay_ms": 15000},
         },
         FailureCategory.CAPTCHA: {
-            "primary": RecoveryAction.ROTATE_PROXY,
+            "primary": RecoveryAction.SOLVE_CAPTCHA,
             "escalation": [
+                RecoveryAction.ROTATE_PROXY,
                 RecoveryAction.BACKOFF_AND_SLOW,
                 RecoveryAction.ABORT_DOMAIN,
             ],
@@ -708,6 +712,132 @@ async def handle_skip_url(
     return True
 
 
+async def handle_solve_captcha(
+    _params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Attempt to solve a detected CAPTCHA via the configured solver.
+
+    When ``settings.CAPTCHA_SOLVER_ENABLED=False`` (the default) the
+    factory returns :class:`_NoOpSolver` and ``solve()`` returns ``None``
+    — this handler then returns ``False`` so the executor escalates to
+    the next action in the recovery path (typically ROTATE_PROXY).
+
+    When a real solver is configured, the token returned by ``solve()``
+    is stuffed into ``attempt_ctx.cookies`` so the headless client which
+    receives it on the next attempt has a Cookie header set.  The
+    scraper downstream translates ``attempt_ctx.cookies`` into
+    Playwright's ``context.add_cookies()`` via the engine.
+    """
+    try:
+        from app.captcha_solver import _NoOpSolver, get_captcha_solver
+    except ImportError:
+        logger.debug("captcha_solver module unavailable; cannot solve CAPTCHA")
+        return False
+
+    try:
+        solver = get_captcha_solver()
+    except (RuntimeError, ValueError, TypeError) as exc:
+        logger.warning("CAPTCHA solver factory failed: %s", exc)
+        return False
+
+    if isinstance(solver, _NoOpSolver):
+        logger.debug("CAPTCHA solver disabled (NoOp); escalating")
+        return False
+
+    url = context.get("url", "")
+    if not url:
+        logger.debug("CAPTCHA handler called without URL; cannot solve")
+        return False
+
+    page_url = url
+    captcha_type = str(context.get("captcha_type", "recaptcha"))
+    site_key = str(context.get("site_key", ""))
+    if not site_key:
+        logger.debug("CAPTCHA handler missing site_key; cannot solve")
+        return False
+
+    try:
+        token = await solver.solve(site_key=site_key, page_url=page_url, captcha_type=captcha_type)
+    except (TimeoutError, RuntimeError, ValueError, TypeError, OSError) as exc:
+        logger.warning("CAPTCHA solve() raised: %s", exc)
+        return False
+
+    if not token:
+        logger.debug("CAPTCHA solver returned no token")
+        return False
+
+    attempt_ctx.cookies = {**attempt_ctx.cookies, "captcha_token": str(token)}
+    logger.info("Recovery: CAPTCHA solved (%s), token injected", captcha_type)
+    return True
+
+
+async def handle_harvest_cf_clearance(
+    _params: dict[str, Any],
+    context: dict[str, Any],
+    attempt_ctx: AttemptContext,
+) -> bool:
+    """Harvest a ``cf_clearance`` cookie via the CF harvester.
+
+    Default-off (``settings.CF_HARVESTER_ENABLED=False``).  When disabled
+    the harvester short-circuits and we return ``False`` so the executor
+    escalates to ``BACKOFF_AND_SLOW`` instead.
+
+    On success the harvester persists the cookie via
+    ``AntiBotEngine.update_cookies(domain, header)``; the result here is
+    a boolean indicating whether the harvest completed within its
+    timeout.  We also pass it through to ``attempt_ctx.cookies`` so the
+    next attempt can replay it directly without a second round-trip.
+    """
+    url = context.get("url", "")
+    if not url:
+        logger.debug("CF harvest handler called without URL; cannot run")
+        return False
+
+    domain = context.get("domain", "")
+    if not domain:
+        try:
+            from urllib.parse import urlparse
+
+            domain = urlparse(url).netloc
+        except (ValueError, TypeError):
+            domain = ""
+
+    if not domain:
+        logger.debug("CF harvest handler missing domain; cannot run")
+        return False
+
+    try:
+        from app.cf_harvester import harvest_cf_clearance
+    except ImportError:
+        logger.debug("cf_harvester module unavailable; cannot harvest")
+        return False
+
+    cookie_header = await harvest_cf_clearance(url, domain)
+    if not cookie_header:
+        logger.info("CF clearance harvest unsuccessful for %s; escalating", domain)
+        return False
+
+    try:
+        from urllib.parse import unquote
+
+        for piece in cookie_header.split(";"):
+            piece = piece.strip()
+            if "=" not in piece:
+                continue
+            name, _, value = piece.partition("=")
+            attempt_ctx.cookies = {
+                **attempt_ctx.cookies,
+                unquote(name.strip()): unquote(value.strip()),
+            }
+    except (ValueError, TypeError, AttributeError) as exc:
+        logger.warning("CF harvest cookie parsing failed: %s", exc)
+
+    logger.info("Recovery: cf_clearance harvested for %s", domain)
+    return True
+
+
 # ── Handler registry — maps RecoveryAction to its implementation ────
 
 _BUILTIN_HANDLERS: dict[RecoveryAction, Callable] = {
@@ -726,6 +856,8 @@ _BUILTIN_HANDLERS: dict[RecoveryAction, Callable] = {
     RecoveryAction.USE_HTTPX_FALLBACK: handle_use_httpx_fallback,
     RecoveryAction.SKIP_DOMAIN: handle_skip_domain,
     RecoveryAction.SKIP_URL: handle_skip_url,
+    RecoveryAction.SOLVE_CAPTCHA: handle_solve_captcha,
+    RecoveryAction.HARVEST_CF_CLEARANCE: handle_harvest_cf_clearance,
 }
 
 
