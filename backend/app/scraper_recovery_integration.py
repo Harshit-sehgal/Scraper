@@ -69,6 +69,35 @@ else:
 
 logger = logging.getLogger(__name__)
 
+# Narrow tuple of exceptions the recovery loop is designed to absorb.
+#
+# Every member below has a concrete origin in the try-block of
+# ``scrape_url_with_recovery``:
+#   - ``TimeoutError`` (chaos NETWORK_TIMEOUT injection)
+#   - ``ConnectionError`` (chaos BROWSER_CRASH injection)
+#   - ``PermissionError`` (chaos ANTI_BOT_ESCALATION injection)
+#   - ``RuntimeError`` (telemetry surfaced a fetch-level error)
+#   - ``ValueError`` (zero-records sentinel to trigger recovery)
+#   - ``OSError`` / ``TypeError`` / ``AttributeError`` / ``ImportError``
+#     (defensively-listed escapes documented in app.scraper._build_fetch_failure_result)
+#   - ``KeyError`` (missing keys in ``recovery_stats`` during result wiring)
+#
+# Anything outside this set is treated as a genuine programming fault and is
+# re-raised into the caller's ``asyncio.wait_for`` boundary rather than being
+# silently misclassified as a scrape failure.
+_RECOVERY_CAUGHT_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    TimeoutError,
+    ConnectionError,
+    PermissionError,
+    RuntimeError,
+    ValueError,
+    OSError,
+    TypeError,
+    AttributeError,
+    ImportError,
+    KeyError,
+)
+
 
 def _recommended_action_for_state(state: AcquisitionState) -> str:
     # Local imports removed for module-level wrappers
@@ -288,7 +317,7 @@ async def scrape_url_with_recovery(
             )
             return results, recovery_stats
 
-        except Exception as e:
+        except _RECOVERY_CAUGHT_EXCEPTIONS as e:
             last_error = e
             error_msg = str(e)
 

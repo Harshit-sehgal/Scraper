@@ -103,7 +103,15 @@ class BrowserPool:
 
             if not self._browser or not self._browser.is_connected():
                 logger.info("[BrowserPool] Launching new Chromium instance")
-                # Security hardening flags for Chromium
+                # Enforce global process cap atomically. Releasing on
+                # any failure path (launch crash, exception) prevents
+                # permanently leaked slots.
+                if not self._try_reserve_process_slot():
+                    msg = (
+                        f"[BrowserPool] Process cap reached "
+                        f"({settings.BROWSER_MAX_PROCESSES}). Refusing to launch a new Chromium process."
+                    )
+                    raise RuntimeError(msg)
                 browser_args = []
                 if settings.BROWSER_SECURITY_HARDENING:
                     browser_args.extend(
@@ -124,6 +132,7 @@ class BrowserPool:
                 except (Error, OSError, RuntimeError):
                     self.crash_count += 1
                     logger.exception("[BrowserPool] Failed to launch browser")
+                    self._release_process_slot()
                     try:
                         from app.metrics_collector import record_browser_launch
 
@@ -149,6 +158,7 @@ class BrowserPool:
             context = self._contexts.get(context_key)
             if context:
                 use_count = self._context_use_count.get(context_key, 0)
+                self._context_last_used[context_key] = time.time()
                 if use_count < settings.BROWSER_CONTEXT_LIFETIME:
                     self._context_use_count[context_key] = use_count + 1
                     self.reused_fetches += 1
@@ -157,6 +167,15 @@ class BrowserPool:
                 logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
                 await context.close()
                 self._contexts.pop(context_key, None)
+                self._context_use_count.pop(context_key, None)
+                self._context_last_used.pop(context_key, None)
+
+            # ── Reusable context cap (LRU eviction) ──────────────────────
+            # Bound the number of cached domain-keyed contexts to prevent
+            # unbounded memory growth under unique-domain attacks (DoS).
+            # All access happens under ``self._lock`` — no concurrent
+            # mutators, so the check-then-evict sequence is race-free.
+            await self._evict_lru_if_needed()
 
             # Create new context with optional proxy configuration
             from app.strategy_evolution import FetchStrategy
@@ -437,18 +456,25 @@ class BrowserPool:
             await self.release_context(ctx_id)
 
     async def release_context(self, ctx_id: str) -> None:
-        """Close an isolated context and release its concurrency slot."""
+        """Close an isolated context and release its concurrency slot.
+
+        Always releases the semaphore slot even if ``ctx.close()`` raises
+        an unexpected exception type — preventing permanent slot leaks.
+        """
         ctx = self._isolated_contexts.pop(ctx_id, None)
         if ctx:
             with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
                 await ctx.close()
-        # Same reasoning as the increment in acquire_isolated_context:
-        # single event loop, cooperative scheduling, no await between
-        # read and write.  ``max(0, ...)`` is a defensive guard against
-        # any future edge case that might cause a double-decrement.
-        self._active_acquires = max(0, self._active_acquires - 1)
-        self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
-        self._concurrency_semaphore.release()
+        # ALWAYS release the semaphore and decrement counter, even if
+        # the close() above raised an unexpected type. Single event loop,
+        # cooperative scheduling — the read-modify-write sequence is
+        # race-free. ``max(0, ...)`` is a defensive guard against any
+        # future edge case that might double-decrement.
+        try:
+            self._active_acquires = max(0, self._active_acquires - 1)
+            self.active_contexts = len(self._contexts) + len(self._isolated_contexts)
+        finally:
+            self._concurrency_semaphore.release()
 
     async def _create_isolated_context(
         self,
@@ -497,6 +523,57 @@ class BrowserPool:
         logger.debug("[BrowserPool] Created isolated context %s (active=%d)", ctx_id, self._active_acquires)
         return context
 
+    async def _evict_lru_if_needed(self) -> None:
+        """Evict the least-recently-used reusable context when at capacity.
+
+        Must be called under ``self._lock``. Raises only if the evicted
+        context's ``close()`` itself raises after repeated retry; close
+        errors are otherwise swallowed (best-effort cleanup, mirroring
+        the rest of the pool's cleanup paths).
+        """
+        cap = settings.BROWSER_MAX_REUSABLE_CONTEXTS
+        if cap < 1:
+            return
+        if len(self._contexts) < cap:
+            return
+        if not self._context_last_used:
+            return
+        # Get key with the oldest last-used timestamp
+        lru_key = min(self._context_last_used, key=self._context_last_used.get)
+        if lru_key not in self._contexts:
+            self._context_last_used.pop(lru_key, None)
+            return
+        ctx = self._contexts.pop(lru_key)
+        self._contexts.pop(lru_key, None)
+        self._context_use_count.pop(lru_key, None)
+        self._context_last_used.pop(lru_key, None)
+        logger.info(
+            "[BrowserPool] Reusable context cap reached (%d). Evicting LRU context %s",
+            cap,
+            lru_key,
+        )
+        with contextlib.suppress(Error, OSError, RuntimeError, ValueError, TypeError):
+            await ctx.close()
+
+    def _try_reserve_process_slot(self) -> bool:
+        """Atomically reserve a process slot under ``_process_lock``.
+
+        Returns True if a slot was acquired (caller may launch). The slot
+        must be released via ``_release_process_slot`` once the browser
+        exits.  Raises ``RuntimeError`` if cannot reserve (cap reached)
+        """
+        with self._process_lock:
+            if self._process_count >= settings.BROWSER_MAX_PROCESSES:
+                return False
+            self._process_count += 1
+            return True
+
+    def _release_process_slot(self) -> None:
+        """Release a previously reserved process slot."""
+        with self._process_lock:
+            if self._process_count > 0:
+                self._process_count -= 1
+
     async def _ensure_browser(self) -> None:
         """Make sure playwright + browser are initialised (shared infra)."""
         async with self._lock:
@@ -507,6 +584,14 @@ class BrowserPool:
 
             if not self._browser or not self._browser.is_connected():
                 logger.info("[BrowserPool] Launching new Chromium instance (isolated path)")
+                # Atomic process-cap reservation. Release on failure paths
+                # to avoid leaking slots across restarts.
+                if not self._try_reserve_process_slot():
+                    msg = (
+                        f"[BrowserPool] Process cap reached "
+                        f"({settings.BROWSER_MAX_PROCESSES}). Refusing to launch a new Chromium process."
+                    )
+                    raise RuntimeError(msg)
                 browser_args: list[str] = []
                 if settings.BROWSER_SECURITY_HARDENING:
                     browser_args.extend(
@@ -527,6 +612,7 @@ class BrowserPool:
                 except (Error, OSError, RuntimeError):
                     self.crash_count += 1
                     logger.exception("[BrowserPool] Failed to launch browser (isolated path)")
+                    self._release_process_slot()
                     try:
                         from app.metrics_collector import record_browser_launch
 

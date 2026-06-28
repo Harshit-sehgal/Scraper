@@ -36,20 +36,36 @@ from collections.abc import Sequence
 # ── Field metadata ────────────────────────────────────────────────────
 
 _FIELD_RANGES: tuple[tuple[int, int], ...] = (
-    (0, 59),   # minute
-    (0, 23),   # hour
-    (1, 31),   # day of month
-    (1, 12),   # month
-    (0, 6),    # day of week
+    (0, 59),  # minute
+    (0, 23),  # hour
+    (1, 31),  # day of month
+    (1, 12),  # month
+    (0, 6),  # day of week
 )
 
 _MONTH_NAMES: dict[str, int] = {
-    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
-    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+    "JAN": 1,
+    "FEB": 2,
+    "MAR": 3,
+    "APR": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUL": 7,
+    "AUG": 8,
+    "SEP": 9,
+    "OCT": 10,
+    "NOV": 11,
+    "DEC": 12,
 }
 
 _DOW_NAMES: dict[str, int] = {
-    "SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6,
+    "SUN": 0,
+    "MON": 1,
+    "TUE": 2,
+    "WED": 3,
+    "THU": 4,
+    "FRI": 5,
+    "SAT": 6,
 }
 
 # Cron convention: 0=Sunday, 1=Monday, …, 6=Saturday
@@ -232,15 +248,19 @@ def next_after(
     dow_is_restricted = dows != full_dow
 
     if dom_is_restricted and dow_is_restricted:
+
         def _day_matches(day: int, weekday: int) -> bool:
             return day in doms and weekday in dows
     elif dom_is_restricted:
+
         def _day_matches(day: int, weekday: int) -> bool:
             return day in doms
     elif dow_is_restricted:
+
         def _day_matches(day: int, weekday: int) -> bool:
             return weekday in dows
     else:
+
         def _day_matches(day: int, weekday: int) -> bool:
             return True
 
@@ -328,14 +348,27 @@ if __name__ == "__main__":  # pragma: no cover
     import sys
 
     samples: Sequence[tuple[str, datetime.datetime, datetime.datetime]] = [
-        ("*/5 * * * *", datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC), datetime.datetime(2026, 1, 1, 0, 5, tzinfo=datetime.UTC)),
-        ("0 9 * * 1-5", datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC), datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)),
-        ("@hourly", datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC), datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC)),
-        ("0 0 1 * *", datetime.datetime(2026, 1, 15, 12, 0, tzinfo=datetime.UTC), datetime.datetime(2026, 2, 1, 0, 0, tzinfo=datetime.UTC)),
+        (
+            "*/5 * * * *",
+            datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 1, 1, 0, 5, tzinfo=datetime.UTC),
+        ),
+        (
+            "0 9 * * 1-5",
+            datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC),
+        ),
+        (
+            "@hourly",
+            datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC),
+        ),
+        (
+            "0 0 1 * *",
+            datetime.datetime(2026, 1, 15, 12, 0, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 2, 1, 0, 0, tzinfo=datetime.UTC),
+        ),
     ]
     for expr, base, expected in samples:
         got = next_after(base, expr)
-        sys.stdout.write(
-            f"{expr!r:24} base={base.isoformat()} -> {got.isoformat()} "
-            f"(expected {expected.isoformat()})\n"
-        )
+        sys.stdout.write(f"{expr!r:24} base={base.isoformat()} -> {got.isoformat()} (expected {expected.isoformat()})\n")

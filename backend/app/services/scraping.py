@@ -316,9 +316,11 @@ async def run_scraping_phase(
         if job.cancel_requested or await cancel_check():
             # Guard mutation of job state using the global store lock
             from app.globals import _jobs_store_lock
+
             with _jobs_store_lock:
                 job.cancel_requested = True
                 from app.services.job_state_machine import transition_to
+
                 # Use transition_to to strictly follow the state machine
                 try:
                     transition_to(job, JobStatus.CANCELED, error="Canceled during scraping phase")
@@ -347,9 +349,11 @@ async def run_scraping_phase(
         if job.cancel_requested or await cancel_check():
             # Guard mutation of job state using the global store lock
             from app.globals import _jobs_store_lock
+
             with _jobs_store_lock:
                 job.cancel_requested = True
                 from app.services.job_state_machine import transition_to
+
                 try:
                     transition_to(job, JobStatus.CANCELED, error="Canceled during result aggregation")
                 except ValueError:
