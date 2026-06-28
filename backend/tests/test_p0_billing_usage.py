@@ -163,6 +163,9 @@ def _configure_request_metering_keys(monkeypatch: pytest.MonkeyPatch) -> str:
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-key")
     monkeypatch.setattr(settings, "ENV", "test")
     monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", False)
+    # Issue #135: quota tests rely on env-backed operator all-access.
+    # Opt-in to the legacy behaviour (default-off) and restore on teardown.
+    monkeypatch.setattr(settings, "ENABLE_OPERATOR_CROSS_TENANT", True)
     return _fingerprint_key("user-key")
 
 

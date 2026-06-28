@@ -109,8 +109,9 @@ async def deliver_webhook(job: Any) -> bool:
     if webhook_secret:
         headers["X-DataForge-Signature"] = f"sha256={_sign_payload(payload_bytes, webhook_secret)}"
 
-    from app.url_safety import get_safe_async_client
     import httpx  # for exception types only — the client is SSRF-guarded
+
+    from app.url_safety import get_safe_async_client
 
     backoff = _INITIAL_BACKOFF_SECONDS
     for attempt in range(1, MAX_RETRIES + 1):

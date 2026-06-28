@@ -220,14 +220,42 @@ def test_admin_can_read_user_job(client, monkeypatch) -> None:
 
 
 def test_operator_policy_allows_operational_job_listing(client, monkeypatch) -> None:
+    """Env-backed operator all-access is GATED behind ENABLE_OPERATOR_CROSS_TENANT.
+
+    Issue #135 hardening: by default (flag = False), env-backed operator
+    keys MUST NOT bypass tenant isolation. With the flag explicitly
+    enabled (legacy self-hosted mode), env-backed operators regain the
+    all-access that the operator role is conceptually meant to have.
+    This test exercises both branches so the lock-down and the opt-in
+    are both pinned.
+    """
+    import app.main as main_mod
+
     _configure_keys(monkeypatch, api_key="user-b-key", operator_key="operator-key")
     _seed_job("tenant-job-a", owner_key="user-a-key")
 
+    # Default (flag off): env-backed operator MUST NOT see another tenant's job.
+    monkeypatch.setattr(main_mod.settings, "ENABLE_OPERATOR_CROSS_TENANT", False, raising=False)
     response = client.get("/api/jobs", headers={"X-API-Key": "operator-key"})
-
     assert response.status_code == 200
     ids = {job["id"] for job in response.json()["jobs"]}
-    assert "tenant-job-a" in ids
+    assert "tenant-job-a" not in ids, (
+        "Env-backed operator keys MUST NOT bypass tenant isolation when "
+        "ENABLE_OPERATOR_CROSS_TENANT is False (issue #135)."
+    )
+
+    # Opt-in (flag on): legacy self-hosted mode restores all-access.
+    monkeypatch.setattr(main_mod.settings, "ENABLE_OPERATOR_CROSS_TENANT", True, raising=False)
+    try:
+        response = client.get("/api/jobs", headers={"X-API-Key": "operator-key"})
+        assert response.status_code == 200
+        ids = {job["id"] for job in response.json()["jobs"]}
+        assert "tenant-job-a" in ids, (
+            "With ENABLE_OPERATOR_CROSS_TENANT=True env-backed operators "
+            "retain legacy all-access for self-hosted mode."
+        )
+    finally:
+        monkeypatch.setattr(main_mod.settings, "ENABLE_OPERATOR_CROSS_TENANT", False, raising=False)
 
 
 @pytest.mark.parametrize("path", ["/api/jobs", "/api/jobs/tenant-job-a/results", "/api/jobs/tenant-job-a/events"])

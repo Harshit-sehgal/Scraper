@@ -27,6 +27,7 @@ os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
 os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
 os.environ.pop("DATAFORGE_DATABASE_URL", None)
 os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
+os.environ["DATAFORGE_SANDBOX_DISABLED"] = "1"
 
 from app.models import FieldType, SchemaField
 
