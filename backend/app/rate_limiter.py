@@ -558,12 +558,13 @@ class DatabaseSlidingWindowCounter:
 class SlidingWindowCounter:
     """Sliding window rate limit counter for a single key."""
 
-    __slots__ = ("_timestamps", "max_requests", "window_seconds")
+    __slots__ = ("_last_access", "_timestamps", "max_requests", "window_seconds")
 
     def __init__(self, max_requests: int, window_seconds: float) -> None:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._timestamps: list[float] = []
+        self._last_access: float = time.time()
 
     def allow(self) -> bool:
         """Check if a request is allowed, and record it if so.
@@ -571,6 +572,7 @@ class SlidingWindowCounter:
         Returns True if within limit, False if exceeded.
         """
         now = time.time()
+        self._last_access = now
         cutoff = now - self.window_seconds
 
         # Prune expired timestamps
@@ -585,6 +587,7 @@ class SlidingWindowCounter:
     def remaining(self) -> int:
         """How many requests remain in the current window."""
         now = time.time()
+        self._last_access = now
         cutoff = now - self.window_seconds
         self._timestamps = [t for t in self._timestamps if t > cutoff]
         return max(0, self.max_requests - len(self._timestamps))
@@ -729,9 +732,44 @@ class RateLimiterMiddleware:
 
         Uses ``DatabaseSlidingWindowCounter`` when ``RATE_LIMIT_DB_BACKED``
         is True, otherwise falls back to in-memory ``SlidingWindowCounter``.
+
+        MEDIUM (#140): LRU cap. Without a bound on the number of
+        concurrent counters, an attacker can flood the middleware with
+        requests from a large number of distinct IPs, causing unbounded
+        ``_counters`` growth and memory exhaustion (DoS).  When the cap
+        is hit, the least recently accessed counter is evicted — a
+        legitimate client behind the same IP that has been pushed out
+        may see one 429 then get a fresh counter on the next request.
+
+        The cap is set via ``DATAFORGE_RATE_LIMITER_MAX_COUNTERS``
+        (default 5000), which is sufficient for any reasonable traffic
+        pattern — if a deployment is hitting 5000 distinct IPs within
+        a window, it is either under attack or needs a bigger fleet
+        (and a DB-backed config for shared state).
         """
         if key in self._counters:
             return self._counters[key]
+
+        # Enforce the LRU cap BEFORE allocating a new counter.
+        _max = int(os.environ.get("DATAFORGE_RATE_LIMITER_MAX_COUNTERS", "5000"))
+        if _max > 0 and len(self._counters) >= _max:
+            # Evict the least recently accessed counter.
+            try:
+                oldest_key = min(
+                    self._counters,
+                    key=lambda k: getattr(self._counters[k], "_last_access", 0.0),
+                )
+            except (ValueError, TypeError):
+                oldest_key = None
+            if oldest_key:
+                logger.warning(
+                    "Rate limiter: LRU cap (%d) hit; evicting counter for key=%r. "
+                    "Consider increasing DATAFORGE_RATE_LIMITER_MAX_COUNTERS or "
+                    "enabling RATE_LIMIT_DB_BACKED for shared multi-process state.",
+                    _max,
+                    oldest_key,
+                )
+                del self._counters[oldest_key]
 
         from app.config import settings
 

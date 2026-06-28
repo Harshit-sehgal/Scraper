@@ -367,10 +367,37 @@ def encrypt(plaintext: str, user_id: str | None = None, key_version_override: st
             msg = "Per-user encrypt branch entered without user_id"
             raise EncryptionError(msg)
         payload["pu"] = "1"
-        payload["uid"] = user_id
-        # ``user_id`` only refers to which key subclass was used; the
-        # challenge remains reproducing hmac(user_id + salt, salt)
-        # without the salt.
+        # MEDIUM (#139): do NOT echo raw user_id into the encrypted
+        # payload. Anyone with read access to the storage layer (a
+        # database backup, a slow query log, a leaked S3 snapshot)
+        # could otherwise correlate ciphertext blobs with user
+        # identities — even if the actual ciphertext is unbreakable,
+        # the binding is the leak. Instead we pin a stable, salted
+        # HMAC fingerprint so decrypt() can correlate "this blob
+        # belongs to user X" without disclosing X in plaintext.
+        # The fingerprint is keyed by an env-var-derived key so raw
+        # backups don't trivially expose the binding.
+        import hashlib as _hashlib_fpr
+        import hmac as _hmac_fpr
+
+        _fp_salt = os.environ.get("DATAFORGE_ENCRYPTION_UID_FP_SALT", "")
+        if not _fp_salt:
+            env = os.environ.get("DATAFORGE_ENV", "development").lower()
+            if env in {"development", "test"}:
+                _fp_salt = "dataforge-dev-only-uid-fp-salt-do-not-use-in-prod"
+                logger.warning(
+                    "DATAFORGE_ENCRYPTION_UID_FP_SALT is unset; using dev salt "
+                    "for user-id fingerprint in env=%r. Set the salt env var "
+                    "in production to prevent binding leakage.",
+                    env,
+                )
+            else:
+                _fp_salt = f"env={env}:missing-salt"
+        payload["ufp"] = _hmac_fpr.new(
+            _fp_salt.encode("utf-8"),
+            user_id.encode("utf-8"),
+            _hashlib_fpr.sha256,
+        ).hexdigest()[:32]
     import json
 
     return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
@@ -413,16 +440,41 @@ def decrypt(encrypted_payload: str, user_id: str | None = None) -> str:
 
     stored_key_version = payload.get("v", DEFAULT_KEY_VERSION)
     is_per_user = payload.get("pu") == "1"
+    payload_ufp = payload.get("ufp")
+    # Legacy: old payloads may carry "uid" — we still verify against it
+    # when present for backward compatibility during key rotation.
     payload_uid = payload.get("uid")
 
     if is_per_user:
         if not user_id:
             msg = "Cannot decrypt per-user payload without the matching user_id. Re-call decrypt(payload, user_id=...)."
             raise DecryptionError(msg)
-        if payload_uid and payload_uid != user_id:
-            # Defense in depth: the payload echoes the user_id it was
-            # encrypted for. A mismatched user_id should not silently
-            # fall through to attempt other keys.
+
+        # MEDIUM (#139): verify the user-id fingerprint (ufp) instead of
+        # the raw user_id plaintext. New payloads carry ``ufp`` (HMAC
+        # of user_id); old payloads carry ``uid`` (raw user_id). Check
+        # whichever is present so existing stored data remains decryptable.
+        if payload_ufp:
+            import hashlib as _hashlib_vrf
+            import hmac as _hmac_vrf
+
+            _vrf_salt = os.environ.get("DATAFORGE_ENCRYPTION_UID_FP_SALT", "")
+            if not _vrf_salt:
+                env = os.environ.get("DATAFORGE_ENV", "development").lower()
+                if env in {"development", "test"}:
+                    _vrf_salt = "dataforge-dev-only-uid-fp-salt-do-not-use-in-prod"
+                else:
+                    _vrf_salt = f"env={env}:missing-salt"
+            expected_fingerprint = _hmac_vrf.new(
+                _vrf_salt.encode("utf-8"),
+                user_id.encode("utf-8"),
+                _hashlib_vrf.sha256,
+            ).hexdigest()[:32]
+            if payload_ufp != expected_fingerprint:
+                msg = "user_id fingerprint does not match the payload's recorded fingerprint"
+                raise DecryptionError(msg)
+        elif payload_uid and payload_uid != user_id:
+            # Legacy path for payloads created before the ufp fix.
             msg = "user_id does not match the payload's recorded user_id"
             raise DecryptionError(msg)
         # Re-derive per-user key via the same policy as encrypt(). Refuse
