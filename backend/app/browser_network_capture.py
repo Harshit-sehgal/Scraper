@@ -8,7 +8,7 @@ Usage:
     from app.browser_network_capture import setup_network_capture, store_captures, get_captures
 
     # Inside a Playwright page block:
-    captured = await setup_network_capture(page)
+    captured, console_logs = await setup_network_capture(page)
     await page.goto(url)
     store_captures(url, captured)
 
@@ -423,21 +423,27 @@ def _evict_lru_captures() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def setup_network_capture(page) -> list[dict]:
-    """Set up network response interception on a Playwright page.
+async def setup_network_capture(page) -> tuple[list[dict], list[dict]]:
+    """Set up network response interception + console log capture on a Playwright page.
 
     Registers a response listener that captures:
     - XHR / fetch responses with JSON bodies
     - GraphQL responses
     - API responses
+    - Browser console.log/warn/error messages
 
     Args:
         page: A Playwright Page object.
 
     Returns:
-        A mutable list reference that will be populated with captured
-        payloads as responses arrive. Each payload dict has:
-        - url: str
+        A tuple ``(captured_payloads, console_logs)`` where:
+        - ``captured_payloads``: mutable list of captured network payload dicts.
+        - ``console_logs``: mutable list of captured console messages.
+          Each console message has:
+          - type: str (log, warn, error, info, debug)
+          - text: str
+          - location: str
+          - args: list
         - method: str
         - resource_type: str
         - body: Any (parsed JSON)
@@ -544,8 +550,23 @@ async def setup_network_capture(page) -> list[dict]:
         except Exception as e:
             logger.debug("[BrowserNetwork] Error capturing response: %s", e)
 
+    captured_console: list[dict[str, str]] = []
+
+    async def _on_console(msg: Any) -> None:
+        try:
+            args = [await arg.json_value() for arg in msg.args]
+        except Exception:
+            args = [str(arg) for arg in msg.args]
+        captured_console.append({
+            "type": msg.type,
+            "text": msg.text,
+            "location": f"{msg.location.url}:{msg.location.line_number}",
+            "args": args[:5],
+        })
+
     page.on("response", _on_response)
-    return captured
+    page.on("console", _on_console)
+    return captured, captured_console
 
 
 def _is_irrelevant_url(url: str) -> bool:

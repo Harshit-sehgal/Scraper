@@ -12,6 +12,94 @@ const TIER_LABELS = {
   enterprise: "Enterprise",
 };
 
+/** Plan tier metadata for the comparison table.
+ *
+ * Matches the PLAN_LIMITS dict in backend/app/billing/service.py.
+ * Prices in USD/month. Enterprise uses -1 (unlimited).
+ */
+const PLANS = [
+  {
+    id: "free",
+    name: "Free",
+    price: "$0",
+    period: "/month",
+    description: "Get started with basic extraction needs",
+    features: [
+      { text: "10 jobs per month", included: true },
+      { text: "1,000 pages per month", included: true },
+      { text: "5 scheduled jobs", included: true },
+      { text: "10,000 API requests / month", included: true },
+      { text: "CSV / JSON / Excel export", included: true },
+      { text: "Community support", included: true },
+      { text: "Team collaboration", included: false },
+      { text: "Priority support", included: false },
+      { text: "Custom integrations", included: false },
+    ],
+    cta: "Current plan",
+    featured: false,
+  },
+  {
+    id: "starter",
+    name: "Starter",
+    price: "$29",
+    period: "/month",
+    description: "For growing teams with regular extraction needs",
+    features: [
+      { text: "100 jobs per month", included: true },
+      { text: "10,000 pages per month", included: true },
+      { text: "50 scheduled jobs", included: true },
+      { text: "100,000 API requests / month", included: true },
+      { text: "CSV / JSON / Excel export", included: true },
+      { text: "Email support", included: true },
+      { text: "Team collaboration (up to 3)", included: true },
+      { text: "Priority support", included: false },
+      { text: "Custom integrations", included: false },
+    ],
+    cta: "Subscribe",
+    featured: true,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "$99",
+    period: "/month",
+    description: "For organizations running extraction at scale",
+    features: [
+      { text: "1,000 jobs per month", included: true },
+      { text: "100,000 pages per month", included: true },
+      { text: "500 scheduled jobs", included: true },
+      { text: "1,000,000 API requests / month", included: true },
+      { text: "CSV / JSON / Excel export", included: true },
+      { text: "Priority support", included: true },
+      { text: "Team collaboration (unlimited)", included: true },
+      { text: "Custom integrations", included: false },
+      { text: "Dedicated account manager", included: false },
+    ],
+    cta: "Subscribe",
+    featured: false,
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: "$299",
+    period: "/month",
+    description: "For large-scale extraction with dedicated support",
+    features: [
+      { text: "Unlimited jobs", included: true },
+      { text: "Unlimited pages", included: true },
+      { text: "Unlimited scheduled jobs", included: true },
+      { text: "Unlimited API requests", included: true },
+      { text: "All export formats", included: true },
+      { text: "Priority support (24/7)", included: true },
+      { text: "Team collaboration (unlimited)", included: true },
+      { text: "Custom integrations", included: true },
+      { text: "Dedicated account manager", included: true },
+    ],
+    cta: "Contact sales",
+    featured: false,
+  },
+];
+
 /** Map the operator's currently-rendered tier label to a checkout tier id.
  *
  * The PayPal dashboard recognises only ``starter`` / ``pro`` / ``enterprise``.
@@ -93,13 +181,118 @@ function renderSubscription(sub) {
   el.appendChild(dl);
 }
 
+/** Render the plan comparison table showing all available tiers. */
+function renderPlanComparison(currentTierId) {
+  const container = document.getElementById("billing-plan-comparison");
+  if (!container) return;
+
+  container.innerHTML = `<h2 class="billing-section-heading">Compare plans</h2>
+    <div class="plan-comparison">
+      ${PLANS.map((p) => {
+        const isCurrent = p.id === currentTierId;
+        const featuredClass = p.featured ? " featured" : "";
+        return `<div class="plan-card${featuredClass}">
+          <div class="plan-card-header">
+            <span class="plan-card-name">${p.name}</span>
+            <span class="plan-card-price">${p.price}</span>
+            <span class="plan-card-price-period">${p.period}</span>
+            <p class="subtle">${p.description}</p>
+          </div>
+          <div class="plan-card-features">
+            ${p.features
+              .map(
+                (f) =>
+                  `<span class="plan-card-feature${f.included ? "" : " disabled"}">
+                <span class="icon">${f.included ? "✓" : "—"}</span>
+                ${f.text}
+              </span>`
+              )
+              .join("")}
+          </div>
+          <div class="plan-card-action">
+            ${
+              isCurrent
+                ? `<button type="button" class="btn secondary" disabled>Current plan</button>`
+                : p.id === "enterprise"
+                  ? `<a href="docs/SAAS_MODEL.md" class="btn secondary" target="_blank">Contact sales</a>`
+                  : `<button type="button" class="btn primary" data-action="upgrade-plan" data-tier="${p.id}">${p.cta}</button>`
+            }
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  // Wire upgrade buttons
+  container.querySelectorAll('[data-action="upgrade-plan"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tier = btn.dataset.tier;
+      upgradeToTier(tier);
+    });
+  });
+}
+
+/**
+ * Initiate checkout for a specific plan tier.
+ * Unlike upgradePlan() which reads the current tier from the DOM,
+ * this accepts the target tier directly.
+ */
+async function upgradeToTier(targetTier) {
+  if (!targetTier || !["starter", "pro"].includes(targetTier)) {
+    toast("Please select a valid plan tier to upgrade to.", "error");
+    return;
+  }
+
+  const origin = window.location.origin || "";
+  const returnUrl = `${origin}${window.location.pathname || "/"}?paypal_return=1&tier=${encodeURIComponent(targetTier)}`;
+  const cancelUrl = `${origin}${window.location.pathname || "/"}?paypal_cancel=1`;
+
+  let response;
+  try {
+    response = await apiFetch("/api/billing/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        plan_tier: targetTier,
+        return_url: returnUrl,
+        cancel_url: cancelUrl,
+      }),
+    });
+  } catch (err) {
+    toast(`Checkout failed: ${err.message || err}`, "error");
+    return;
+  }
+
+  if (!response || !response.ok) {
+    toast(`Checkout failed (HTTP ${response.status}). See docs/SAAS_MODEL.md.`, "error");
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    toast("Checkout returned a malformed response.", "error");
+    return;
+  }
+
+  const approvalUrl = payload?.approval_url;
+  if (!approvalUrl) {
+    toast("Checkout succeeded but no approval_url was returned.", "error");
+    return;
+  }
+
+  window.location.href = approvalUrl;
+}
+
 export async function refreshBilling() {
   try {
     const [planResp, subResp] = await Promise.all([apiFetch("/api/saas/plan"), apiFetch("/api/billing/subscriptions")]);
 
+    let currentTierId = "free";
     if (planResp.ok) {
       const plan = await planResp.json();
       renderPlan(plan);
+      currentTierId = plan.tier || "free";
     } else {
       const setText = (id, val) => {
         const el = document.getElementById(id);
@@ -117,6 +310,9 @@ export async function refreshBilling() {
       // Subscriptions endpoint may require a project id; render placeholder.
       renderSubscription(null);
     }
+
+    // Always render the plan comparison table
+    renderPlanComparison(currentTierId);
   } catch (err) {
     toast(`Failed to load billing: ${err.message || err}`, "error");
   }

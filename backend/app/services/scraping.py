@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -27,11 +28,36 @@ logger = logging.getLogger(__name__)
 
 ScrapeResult = tuple[int, list[dict], bool, dict]
 
-# Feat 9 — module-level async lock shared across _scrape_single_url tasks
-# within the same scrape phase.  Used to serialise the per-job
-# ``request_delay_ms`` throttle so that sibling tasks of the same job do
-# not skip the throttle by all entering the fetch at the same time.
-_JOB_DELAY_LOCK = asyncio.Lock()
+# Feat 9 — lazy asyncio.Lock for the per-job ``request_delay_ms`` throttle.
+#
+# Why lazy: ``asyncio.Lock()`` binds to whichever event loop is *currently*
+# running at instantiation time. If the lifecycle outlives a single loop
+# (uvloop/pytest-asyncio per-test loops, lifespan restart, child process
+# forking into a fresh loop), the captured lock raises
+# ``RuntimeError: ... is bound to a different event loop`` on next acquire.
+#
+# Instead we hold ``(loop_identity -> lock)`` and create a fresh lock
+# whenever the running loop changes. Re-binding per loop keeps the
+# throttle correct across worker restarts.
+_JOB_DELAY_LOCKS: dict[int, asyncio.Lock] = {}
+_JOB_DELAY_LOCKS_GUARD: threading.Lock = threading.Lock()
+
+
+def _get_job_delay_lock() -> asyncio.Lock:
+    """Return the asyncio.Lock bound to the *currently running* event loop.
+
+    Creates a new lock when the loop identity (id() of loop) changes,
+    so each new event loop gets its own bound lock instead of raising
+    RuntimeError on the next acquire.
+    """
+    running_loop = asyncio.get_running_loop()
+    loop_id = id(running_loop)
+    with _JOB_DELAY_LOCKS_GUARD:
+        lock = _JOB_DELAY_LOCKS.get(loop_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            _JOB_DELAY_LOCKS[loop_id] = lock
+        return lock
 
 
 def _record_page_fetch(job: Any, url: str) -> bool:
@@ -146,16 +172,24 @@ async def run_scraping_phase(
         job_delay_ms = int(getattr(job, "request_delay_ms", 0) or 0)
         if job_delay_ms > 0:
             try:
-                async with _JOB_DELAY_LOCK:
+                async with _get_job_delay_lock():
                     await asyncio.sleep(job_delay_ms / 1000.0)
             except RuntimeError:
                 # Event loop changed mid-flight; skip the throttle.
                 logger.debug("Per-job rate-limit delay skipped (loop mismatch)")
 
         # Corrected cancellation check: Check both flag and DB signal,
-        # then update flag if signaled.
-        if job.cancel_requested or await cancel_check():
-            job.cancel_requested = True
+        # then update flag if signaled. Read and write ``cancel_requested``
+        # under ``_jobs_store_lock`` so a concurrent cancel request from
+        # the API handler doesn't race the orchestrator loop, which
+        # reads/writes the same field at lines 350-355 / 400-405.
+        from app.globals import _jobs_store_lock
+
+        with _jobs_store_lock:
+            cancel_already_requested = job.cancel_requested
+        if cancel_already_requested or await cancel_check():
+            with _jobs_store_lock:
+                job.cancel_requested = True
             return idx, [], False, {}
 
         elapsed = time.monotonic() - started_at

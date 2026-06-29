@@ -285,7 +285,7 @@ class PayPalClient:
             return False
         logger.debug(
             "PayPal billing event (no-op): customer=%s event=%s value=%d extra=%s",
-            customer_id,
+            _redact_id(customer_id),
             event_name,
             value,
             kwargs,
@@ -318,7 +318,7 @@ class PayPalClient:
             )
             try:
                 if resp.status_code == 404:
-                    logger.debug("Subscription %s not found in PayPal", customer_id)
+                    logger.debug("Subscription %s not found in PayPal", _redact_id(customer_id))
                     return None
                 resp.raise_for_status()
                 body: dict[str, Any] = resp.json()

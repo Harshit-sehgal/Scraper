@@ -4463,6 +4463,51 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/debug": {
+      "get": {
+        "description": "Return diagnostic information for a job and its crawl domains.\n\nCombines job metadata, per-domain crawl-policy state, and\nquality/cascade telemetry into a single debug payload.",
+        "operationId": "debug_job_api_jobs__job_id__debug_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Debug Job Api Jobs  Job Id  Debug Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Debug Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/events": {
       "get": {
         "description": "Return a paginated, filterable view of a job's lifecycle events.\n\nEvents are read from the dedicated ``job_events`` companion\ntable when the repository supports it (storage split, v4+);\notherwise we fall back to ``Job.logs`` for back-compat. The\nresponse shape is stable for clients that poll a long-running\njob for progress.",

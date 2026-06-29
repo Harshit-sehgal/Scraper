@@ -468,7 +468,7 @@ async def _setup_playwright_page(
             await route.continue_()
 
     await page.route("**/*", _route_filter)
-    network_payloads = await setup_network_capture(page)
+    network_payloads, console_logs = await setup_network_capture(page)
     return context, page, network_payloads
 
 

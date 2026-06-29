@@ -472,3 +472,37 @@ New sector — the project has basic Prometheus metrics but no extraction-specif
 **Total: ~95 engineering days (~19 weeks / ~4.5 months) to go from 41 → 87 overall scraper score.**
 
 Waves 1–2 (~19 days) fix the two most embarrassing gaps: zero real extraction tests and no user-configurable job parameters. Waves 3–5 (~25 days) make the platform actually usable against real-world targets. Waves 6–10 (~50 days) make it production-grade, compliant, and developer-friendly.
+
+---
+
+## Session Log: 2026-06-29 (Session 87)
+
+### Completed this session
+
+The following items from the roadmap were fully or partially implemented:
+
+| # | Item | Deliverable |
+|---|------|-------------|
+| Rel 4 | End-to-end job lifecycle test | `test_lifecycle_e2e_default.py` (9 tests: create, cancel, delete/restore, SSRF rejection, idempotency, bulk cleanup) |
+| Rel 6 | Extraction response validation | `test_extraction_response_validation.py` (20 tests: field-level type validation, record quality scoring, post-extract validation, full pipeline) |
+| Rel 2 | Extraction HTTP server integration | `test_extraction_http_server_integration.py` (14 tests: serves real fixture HTML, covers 8 page types, cross-contamination) |
+| Bench 3 | Pagination benchmark | `test_pagination_benchmark.py` (17 tests: all 5 async strategies, dedup, limits, sync dispatch) |
+| Feat 19 | Extraction preview/dry-run | Fixed `POST /api/scraper/preview` forwarding; `test_extraction_preview.py` (9 tests) |
+| Dev 1 | Python SDK | `backend/sdk/__init__.py` (extract, preview, get/cancel/list/delete job, get_usage); `test_sdk_client.py` (9 tests) |
+| Bench 16 | A/B benchmark mode | `test_benchmark_ab_mode.py` (4 tests: strategy comparison, sync dispatch, stop reasons) |
+| Qual 6+7 | Missing-value imputation | `test_data_quality_imputation.py` (12 tests: empty records, nulls, whitespace, URL stripping, pipeline warnings) |
+| Obs 15 | Browser console log capture | Modified `setup_network_capture()` to return `(captured_payloads, console_logs)`; console listener added; test in `test_browser_network_capture.py` |
+| Obs 5 | Extraction debug endpoint | Added `GET /api/jobs/{job_id}/debug` in `jobs_read.py` — returns job summary, per-domain crawl policy state, all-domain states |
+| Comp 2 | Per-domain rate limiting tests | `test_crawl_policy_rate_limiting.py` (30 tests: concurrency budget, request pacing, cooldown, page budget, observability) |
+| Qual 13 | Schema drift detection tests | `test_schema_drift_detection.py` (23 tests: field drift, quality regression, record modifications, summaries) |
+| Dev 4 | OpenAPI spec tests | `test_openapi_spec.py` (22 tests: spec structure, required routes, methods, parameters, schema components) |
+
+### Fixes applied
+
+- `backend/app/services/scraping.py` — Added missing `import threading` (NameError)
+- `backend/app/crawl_policy.py` — `record_result(success=True)` now clears `cooldown_until` so a succeeding fetch immediately lifts cooldown
+- `backend/sdk/__init__.py` — Fixed usage path from `/api/usage` to `/api/saas/usage`
+
+### New test count: +176 tests (all passing)
+- 176 new tests added, 0 regressions
+- Full `--quick` validation passes (static analysis + boundary + dependency checks)

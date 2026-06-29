@@ -197,13 +197,18 @@ async def preview_extraction(
     try:
         from app.scraper import scrape_url_attempt
 
-        # Run extraction synchronously from a thread
-        def _run_preview():
-            return scrape_url_attempt(url=target_url, schema_fields=[])
+        async def _run_preview():
+            return await scrape_url_attempt(
+                url=target_url,
+                schema_fields=list(req.schema_fields),
+                min_record_score=req.min_record_score,
+                selectors_map=req.selectors_map or {},
+                search_params=req.search_params,
+                headers=req.headers or {},
+                cookies=req.cookies or {},
+            )
 
-        import asyncio
-
-        result = await asyncio.get_event_loop().run_in_executor(None, _run_preview)
+        result = await _run_preview()
         results = result if isinstance(result, list) else []
     except (RuntimeError, ValueError, TypeError) as exc:
         logger.exception("Preview extraction failed for %s", target_url)

@@ -68,8 +68,14 @@ class SelectorMemory:
         self._memory: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._last_cleanup: float = 0.0  # Track when we last cleaned up
-        self._load()
+        # Debounce controls for ``_save`` — prevents fsync amplification
+        # under failure storms (one ``record_failure`` per URL per
+        # consecutive attempt, all touching the same on-disk JSON).
+        self._pending_writes: int = 0
+        self._save_threshold: int = 8  # batch up to 8 events before persisting
         self._auto_cleanup()  # Clean up on initialization
+        # Eager initial load to populate the cache.
+        self._load()
 
     def _load(self) -> None:
         if self.path.exists():

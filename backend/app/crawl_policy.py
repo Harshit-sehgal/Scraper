@@ -207,6 +207,7 @@ class CrawlPolicyEngine:
 
             if success:
                 state.consecutive_failures = 0
+                state.cooldown_until = 0.0
             else:
                 state.consecutive_failures += 1
                 if state.consecutive_failures >= self._max_retries:

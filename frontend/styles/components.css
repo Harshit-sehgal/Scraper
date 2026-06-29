@@ -888,6 +888,191 @@ kbd {
   transition: border-color var(--duration-fast) var(--ease-out);
 }
 
+/* ─── Plan Comparison Table (Billing) ────────────────── */
+
+.plan-comparison {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+@media (max-width: 768px) {
+  .plan-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plan-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.plan-card:hover {
+  border-color: var(--border-strong);
+}
+
+.plan-card.featured {
+  border-color: var(--primary);
+  position: relative;
+}
+
+.plan-card.featured::before {
+  content: "Most Popular";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--ink-inverse);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+}
+
+.plan-card-header {
+  text-align: center;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-card-name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--ink-1);
+  margin-bottom: var(--space-1);
+}
+
+.plan-card-price {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  color: var(--ink-1);
+}
+
+.plan-card-price-period {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.plan-card-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.plan-card-feature {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  line-height: var(--leading-snug);
+}
+
+.plan-card-feature .icon {
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.plan-card-feature.disabled {
+  color: var(--ink-4);
+}
+
+.plan-card-action {
+  margin-top: var(--space-2);
+}
+
+.plan-card-action .btn {
+  width: 100%;
+}
+
+/* ═══ Responsive touch-friendly controls ───────────────── */
+
+@media (pointer: coarse) {
+  .btn {
+    min-height: 36px;
+  }
+
+  .btn.small {
+    min-height: 32px;
+  }
+
+  .input,
+  .text-input,
+  select.input {
+    min-height: 36px;
+  }
+
+  .nav-item {
+    min-height: 40px;
+  }
+
+  .icon-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* ─── Better responsive table scrolling ───────────────── */
+
+@media (max-width: 640px) {
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-jobs-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-jobs {
+    min-width: 700px;
+  }
+
+  .container {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .page-head-actions {
+    width: 100%;
+  }
+
+  .page-head-actions .btn {
+    flex: 1;
+  }
+
+  .modal {
+    width: calc(100% - var(--space-4));
+    margin: 0 var(--space-2);
+  }
+
+  .sidebar-nav {
+    padding: var(--space-2);
+  }
+}
+
 .empty-state .empty-icon {
   display: inline-flex;
   align-items: center;

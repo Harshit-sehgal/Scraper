@@ -26,6 +26,32 @@ from app.models import FieldType, SchemaField
 logger = logging.getLogger(__name__)
 
 
+# ─── Suppress benign asyncio subprocess cleanup warnings ─────────────────
+# Playwright's internal subprocess management can trigger
+# ``PytestUnraisableExceptionWarning`` during async test teardown when the
+# event loop closes before ``BaseSubprocessTransport.__del__`` completes.
+# This is a well-known CPython/asyncio interaction with subprocess transports
+# and does not indicate a real resource leak. We suppress it at the pytest
+# plugin level so CI runs are not polluted by non-actionable warnings.
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="Exception ignored in.*BaseSubprocessTransport.*__del__",
+    category=pytest.PytestUnraisableExceptionWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="Exception ignored in.*_ProactorBasePipeTransport.*__del__",
+    category=pytest.PytestUnraisableExceptionWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="coroutine.*was never awaited",
+    category=pytest.PytestUnraisableExceptionWarning,
+)
+
+
 # Set test environment defaults BEFORE any module-level ``from app.main
 # import app`` (which instantiates ``app.config.settings`` and freezes
 # values read from ``os.environ``).  The session fixture below restores

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from typing import Annotated, Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
@@ -250,6 +251,52 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         dumped.pop("results_file_path", None)
         dumped["results"] = results_list
         return dumped
+
+    @router.get("/api/jobs/{job_id}/debug", response_model=dict[str, Any])
+    async def debug_job(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+    ):
+        """Return diagnostic information for a job and its crawl domains.
+
+        Combines job metadata, per-domain crawl-policy state, and
+        quality/cascade telemetry into a single debug payload.
+        """
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_debug", project_id)
+
+        # Collect per-domain state from the crawl policy engine
+        from app.crawl_policy import get_crawl_policy
+
+        policy = get_crawl_policy()
+        domain_states = {}
+        for url in job.urls:
+            parsed = urlparse(url)
+            domain = parsed.netloc or parsed.path
+            if domain and domain not in domain_states:
+                state = policy.get_domain_state(domain)
+                if state:
+                    domain_states[domain] = state
+
+        dumped = job.model_dump(
+            include={
+                "id", "name", "status", "mode", "intent", "created_at",
+                "started_at", "completed_at", "error", "warnings", "logs",
+                "total_records", "filtered_records", "quality_score_summary",
+                "cascade_telemetry", "acquisition_mode", "quality_report",
+                "progress_current", "progress_total", "cancel_requested",
+            }
+        )
+
+        return {
+            "job": dumped,
+            "domains": domain_states if domain_states else None,
+            "all_domain_states": policy.get_all_domain_states(),
+        }
 
     @router.get("/api/jobs/{job_id}/results", response_model=JobResultsResponse)
     async def get_job_results(

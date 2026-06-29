@@ -18,7 +18,7 @@ async def test_live_network_capture_limits() -> None:
 
     page.on = fake_on
 
-    captured = await browser_network_capture.setup_network_capture(page)
+    captured, _console_logs = await browser_network_capture.setup_network_capture(page)
     assert "response" in on_calls
     _on_response = on_calls["response"]
 
@@ -53,7 +53,7 @@ async def test_live_network_capture_byte_limit() -> None:
 
     page.on = fake_on
 
-    captured = await browser_network_capture.setup_network_capture(page)
+    captured, _console_logs = await browser_network_capture.setup_network_capture(page)
     _on_response = on_calls["response"]
 
     # Simulate a single massive payload exceeding 10 MB limit
@@ -125,6 +125,22 @@ async def test_browser_state_capture_redacts_session_storage_values() -> None:
     assert "session-storage-secret-token" not in serialized
     assert state["indexed_db"] == [{"name": "search-cache", "version": 1}]
     assert state["cache_storage_keys"] == ["runtime-cache-v1"]
+
+
+@pytest.mark.asyncio
+async def test_console_log_capture_on_setup() -> None:
+    """setup_network_capture registers a console listener and returns captured logs."""
+    page = MagicMock()
+    on_calls: dict = {}
+
+    def fake_on(event: str, callback) -> None:
+        on_calls[event] = callback
+
+    page.on = fake_on
+
+    captured, console_logs = await browser_network_capture.setup_network_capture(page)
+    assert "console" in on_calls, "console listener must be registered"
+    assert isinstance(console_logs, list)
 
 
 def test_build_cookie_header_uses_raw_cookie_values_for_in_memory_reuse() -> None:

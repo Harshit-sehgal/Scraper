@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -23,8 +24,6 @@ from app.globals import _jobs_store_lock
 from app.storage_interface import get_job_repository
 
 if TYPE_CHECKING:
-    import threading
-
     from app.models import Job, JobCreate
 
 logger = logging.getLogger(__name__)
@@ -128,12 +127,11 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
       first N failures so a single transient blip does not block
       legitimate traffic.
     """
-    global _dedup_fail_streak
     try:
         repo = get_job_repository()
         result = repo.lookup_idempotency_key(idem_key)
     except (RuntimeError, OSError, ValueError) as exc:
-        _dedup_fail_streak += 1
+        streak = _increment_dedup_fail_streak()
         logger.warning(
             "idempotency-key lookup failed; treating as a cache miss (fail-open). "
             "Duplicate retries with idem_key=%r may create duplicate jobs until the "
@@ -148,13 +146,13 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
         except (ImportError, RuntimeError, OSError, ValueError) as metric_exc:  # nosec B110 - best-effort metric
             logger.debug("Could not record dedup_lookup_miss metric: %s", metric_exc)
 
-        if _dedup_fail_streak > _DEDUP_FAIL_MAX_PER_WINDOW:
+        if streak > _DEDUP_FAIL_MAX_PER_WINDOW:
             logger.exception(
                 "Dedup lookup has failed %d times (cap=%d) — failing closed "
                 "with 503 to prevent unbounded duplicate-job spam during "
                 "storage outage. Resolve idempotency-table health before "
                 "continuing job submissions.",
-                _dedup_fail_streak,
+                streak,
                 _DEDUP_FAIL_MAX_PER_WINDOW,
             )
             raise HTTPException(
@@ -170,7 +168,7 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
     # Lookup succeeded — reset the failure streak so the next outage
     # starts a fresh cap cycle. The streak is intentionally only reset
     # on a *successful* lookup, mirroring Prometheus staleness semantics.
-    _dedup_fail_streak = 0
+    _reset_dedup_fail_streak()
     return result
 
 
@@ -181,12 +179,11 @@ def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
     failure logs at warning, increments ``dedup_lookup_miss_total``, and
     only fails closed after the per-window cap is exceeded.
     """
-    global _dedup_fail_streak
     try:
         repo = get_job_repository()
         result = repo.lookup_idempotency_fingerprint(idem_key)
     except (RuntimeError, OSError, ValueError) as exc:
-        _dedup_fail_streak += 1
+        streak = _increment_dedup_fail_streak()
         logger.warning(
             "idempotency-fingerprint lookup failed; treating as a cache miss. "
             "A retry with idem_key=%r will not be recognized as a duplicate "
@@ -201,10 +198,10 @@ def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
         except (ImportError, RuntimeError, OSError, ValueError):  # nosec B110 - best-effort metric
             pass
 
-        if _dedup_fail_streak > _DEDUP_FAIL_MAX_PER_WINDOW:
+        if streak > _DEDUP_FAIL_MAX_PER_WINDOW:
             logger.exception(
                 "Dedup fingerprint lookup has failed %d times (cap=%d) — failing closed with 503.",
-                _dedup_fail_streak,
+                streak,
                 _DEDUP_FAIL_MAX_PER_WINDOW,
             )
             raise HTTPException(
@@ -215,7 +212,7 @@ def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
             ) from exc
         return None
 
-    _dedup_fail_streak = 0
+    _reset_dedup_fail_streak()
     return result
 
 
@@ -266,12 +263,38 @@ def record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None
 # ── Dedup failure rate-limit state ─────────────────────────────────────
 # Module-level counters tracking consecutive repository failures so
 # :func:`lookup_idempotency_key` and :func:`lookup_idempotency_fingerprint`
-# can flip to fail-closed once the per-window cap is exceeded. Thread-safe
-# because the lookup helpers always run inside ``run_in_threadpool`` on
-# the same worker thread for a given ``idem_key``; Python's GIL keeps the
-# simple int increments atomic.
+# can flip to fail-closed once the per-window cap is exceeded.
+#
+# Thread-safety note: ``_dedup_fail_streak`` is mutated by helpers that
+# run inside ``run_in_threadpool`` (Starlette's pool) so the GIL's
+# single-bytecode guarantee is *not* enough — ``+= 1`` decomposes to
+# ``LOAD_GLOBAL / LOAD_CONST / BINARY_ADD / STORE_GLOBAL`` and a context
+# switch may land mid-sequence. Guard every read+write with the
+# :data:`_dedup_fail_streak_lock`.
 _dedup_fail_streak: int = 0
+_dedup_fail_streak_lock: threading.Lock = threading.Lock()
 _DEDUP_FAIL_MAX_PER_WINDOW: int = 25
+
+
+def _increment_dedup_fail_streak() -> int:
+    """Atomically increment ``_dedup_fail_streak`` and return the new value."""
+    with _dedup_fail_streak_lock:
+        global _dedup_fail_streak
+        _dedup_fail_streak += 1
+        return _dedup_fail_streak
+
+
+def _get_dedup_fail_streak() -> int:
+    """Thread-safe read of ``_dedup_fail_streak``."""
+    with _dedup_fail_streak_lock:
+        return _dedup_fail_streak
+
+
+def _reset_dedup_fail_streak() -> None:
+    """Atomically reset ``_dedup_fail_streak`` to zero (on a successful lookup)."""
+    with _dedup_fail_streak_lock:
+        global _dedup_fail_streak
+        _dedup_fail_streak = 0
 
 
 def is_worker_mode() -> bool:

@@ -606,14 +606,40 @@ async def handle_backoff_and_slow(
 
 
 async def handle_abort_domain(
-    _params: dict[str, Any],
+    params: dict[str, Any],
     context: dict[str, Any],
     attempt_ctx: AttemptContext,
 ) -> bool:
-    """Mark domain for cooldown instead of retrying."""
+    """Mark domain for cooldown instead of retrying.
+
+    Mirrors ``app.recovery_handlers.handle_abort_domain`` so that calling
+    ``get_recovery_executor()`` without experimental_startularity wired in
+    (the only path that registers the better copy via
+    ``register_all_recovery_handlers``) still persists a persistent
+    cooldown via :meth:`DomainRuntimePolicy.set_abort_domain`. The
+    ``attempt_ctx.abort_domain`` flag is also set so the orchestrator
+    can short-circuit the URL before persisting a transient placeholder.
+    """
     url = context.get("url", "")
+    skip_minutes = params.get("skip_domain_minutes", 60)
+    logger.warning("Recovery: aborting domain for %s for %d minutes", url, skip_minutes)
     attempt_ctx.abort_domain = True
-    logger.warning("Recovery: aborting domain for %s", url)
+    if url:
+        try:
+            from app.domain_runtime_policy import get_domain_runtime_policy
+
+            get_domain_runtime_policy().set_abort_domain(url)
+        except (ImportError, RuntimeError, ValueError) as exc:
+            logger.debug("Could not record abort_domain cooldown: %s", exc)
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(url)
+            domain = parsed.netloc.lower() if parsed.hostname else ""
+            if domain:
+                attempt_ctx.skip_domain = domain
+        except (ImportError, ValueError) as exc:
+            logger.debug("Could not derive domain for skip_domain: %s", exc)
     return True
 
 
