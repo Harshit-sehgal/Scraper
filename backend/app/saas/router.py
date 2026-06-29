@@ -33,6 +33,7 @@ from app.saas.models import (
 )
 from app.saas.service import SignupService
 from app.utils.aup import require_aup_accepted
+from app.utils.log_redaction import redact_pii
 from app.utils.rbac import UserRole, _record_operator_cross_tenant, require_principal, require_role_with_user
 from app.utils.usage_ledger import UsageType
 
@@ -126,7 +127,7 @@ def _get_aup_user_or_none(user_id: str) -> Any | None:
     try:
         return get_identity_store().get_user(user_id)
     except (IdentityStoreError, sqlite3.Error) as exc:
-        logger.debug("AUP user lookup failed for %s: %s", user_id, exc)
+        logger.debug("AUP user lookup failed for %s: %s", redact_pii(str(user_id)), exc)
         return None
 
 
@@ -898,14 +899,14 @@ async def send_email_verification(
         )
 
     store.create_email_verification_token(user_id)
-    logger.debug("Email verification token created for %s", user.email)
+    logger.debug("Email verification token created for %s", redact_pii(user.email))
 
     log_job_event(
         actor=user_id,
         action="email_verification_sent",
         job_id="saas",
         outcome="success",
-        details={"email": user.email},
+        details={"email": redact_pii(user.email)},
     )
 
     return EmailVerificationSendResponse(user_id=user_id)
@@ -1168,13 +1169,13 @@ async def request_password_reset(
     user = store.get_user_by_email(validated_email)
     if user is not None:
         store.create_password_reset_token(user.id)
-        logger.debug("Password reset token created for %s", body.email)
+        logger.debug("Password reset token created for %s", redact_pii(body.email))
         log_job_event(
             actor=user.id,
             action="password_reset_requested",
             job_id="saas",
             outcome="success",
-            details={"email": body.email},
+            details={"email": redact_pii(body.email)},
         )
     else:
         # Avoid logging the user-supplied email at INFO — it lands in
@@ -1846,7 +1847,7 @@ async def get_usage_summary(
         ctx = resolve_auth_context(request)
         quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
     except Exception:
-        logger.debug("Quota context resolution failed; falling back to user_id: %s", user_id)
+        logger.debug("Quota context resolution failed; falling back to user_id: %s", redact_pii(str(user_id)))
         quota_owner = user_id
 
     try:

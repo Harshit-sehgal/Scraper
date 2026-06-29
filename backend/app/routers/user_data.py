@@ -21,6 +21,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.models import DeleteMyDataResponse
+from app.utils.log_redaction import redact_pii
 from app.utils.rbac import UserRole, require_principal
 
 logger = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ async def delete_my_data(
                 jobs_store.pop(jid, None)
         summary["jobs_deleted"] = len(job_ids_to_delete)
     except (RuntimeError, OSError, ValueError, TypeError) as e:
-        logger.warning("Failed to delete jobs for user %s: %s", user_id, e)
+        logger.warning("Failed to delete jobs for user %s: %s", redact_pii(str(user_id)), e)
 
     # 2. Delete workflow results from disk
     try:
@@ -156,7 +157,7 @@ async def delete_my_data(
         repo = _get_workflow_repo()
         summary["workflows_deleted"] = repo.delete_by_user(user_id)
     except (RuntimeError, ValueError, TypeError) as e:
-        logger.warning("Failed to delete workflows for user %s: %s", user_id, e)
+        logger.warning("Failed to delete workflows for user %s: %s", redact_pii(str(user_id)), e)
 
     # 4. Delete auth profiles owned by the user (atomic flocked delete_where).
     try:
@@ -165,7 +166,7 @@ async def delete_my_data(
         profile_predicate = _owns_user_predicate(user_id)
         summary["auth_profiles_deleted"] = auth_profile_store.delete_where(profile_predicate)
     except (RuntimeError, ValueError, TypeError) as e:
-        logger.warning("Failed to delete auth profiles for user %s: %s", user_id, e)
+        logger.warning("Failed to delete auth profiles for user %s: %s", redact_pii(str(user_id)), e)
 
     # 5. Delete scheduled monitoring jobs owned by the user (atomic flocked delete_where).
     try:
@@ -174,7 +175,7 @@ async def delete_my_data(
         schedule_predicate = _owns_user_predicate(user_id)
         summary["scheduled_jobs_deleted"] = schedule_store.delete_where(schedule_predicate)
     except (RuntimeError, ValueError, TypeError) as e:
-        logger.warning("Failed to delete scheduled jobs for user %s: %s", user_id, e)
+        logger.warning("Failed to delete scheduled jobs for user %s: %s", redact_pii(str(user_id)), e)
 
     # 6. Revoke API keys and remove SaaS identity records
     #
@@ -210,11 +211,11 @@ async def delete_my_data(
     except ImportError:
         logger.debug("SaaS identity store not available")
     except (RuntimeError, OSError, ValueError, TypeError) as e:
-        logger.warning("Failed to clean up SaaS identity for user %s: %s", user_id, e)
+        logger.warning("Failed to clean up SaaS identity for user %s: %s", redact_pii(str(user_id)), e)
 
     logger.info(
         "User data deleted for %s: %s",
-        user_id,
+        redact_pii(str(user_id)),
         {k: v for k, v in summary.items() if v > 0},
     )
 
