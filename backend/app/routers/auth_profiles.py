@@ -99,7 +99,7 @@ def _write_back(profile: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=dict)
 async def create_auth_profile(
     name: str,
     domain: str,
@@ -144,7 +144,7 @@ async def create_auth_profile(
     return _safe_profile(profile.model_dump())
 
 
-@router.get("", status_code=200)
+@router.get("", status_code=200, response_model=dict)
 async def list_auth_profiles(
     auth: Annotated[
         tuple[UserRole, str, str, str],
@@ -156,7 +156,7 @@ async def list_auth_profiles(
     return {"total": len(items), "items": items}
 
 
-@router.get("/{profile_id}", status_code=200)
+@router.get("/{profile_id}", status_code=200, response_model=dict)
 async def get_auth_profile(
     profile_id: str,
     auth: Annotated[
@@ -194,7 +194,7 @@ async def delete_auth_profile(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{profile_id}/start-login", status_code=200)
+@router.post("/{profile_id}/start-login", status_code=200, response_model=dict)
 async def start_login(
     profile_id: str,
     auth: Annotated[
@@ -219,7 +219,7 @@ async def start_login(
     }
 
 
-@router.post("/{profile_id}/complete-login", status_code=200)
+@router.post("/{profile_id}/complete-login", status_code=200, response_model=dict)
 async def complete_login(
     profile_id: str,
     storage_state: dict[str, Any],
@@ -360,7 +360,7 @@ async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | N
         return None
 
 
-@router.post("/{profile_id}/validate", status_code=200)
+@router.post("/{profile_id}/validate", status_code=200, response_model=dict)
 async def validate_profile(
     profile_id: str,
     auth: Annotated[
@@ -420,7 +420,7 @@ async def validate_profile(
     return {"valid": True, "status": "active", "profile": _safe_profile(profile)}
 
 
-@router.post("/{profile_id}/revoke", status_code=200)
+@router.post("/{profile_id}/revoke", status_code=200, response_model=dict)
 async def revoke_profile(
     profile_id: str,
     auth: Annotated[

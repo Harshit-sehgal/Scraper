@@ -1098,16 +1098,11 @@ class SessionDestroyResponse(BaseModel):
     message: str
 
 
-class SessionAuthenticatedResponse(BaseModel):
-    """Response model for GET /api/session/me when authenticated."""
+class SessionMeResponse(BaseModel):
+    """Response model for GET /api/session/me."""
     authenticated: bool
     role: str | None = None
     user_id: str | None = None
-
-
-class SessionUnauthenticatedResponse(BaseModel):
-    """Response model for GET /api/session/me when not authenticated."""
-    authenticated: bool
 
 
 class AuditLogResponse(BaseModel):
@@ -1116,3 +1111,101 @@ class AuditLogResponse(BaseModel):
     limit: int
     category: str
     items: list[Any]
+
+
+# ─── Scheduled Monitoring Response Models ────────────────────────────
+
+
+class ScheduledJobChangesResponse(BaseModel):
+    """Response model for GET /api/scheduled/{job_id}/changes."""
+    job_id: str
+    job_name: str
+    target_url: str
+    frequency: str
+    changes_detected: bool
+    last_run_at: str
+    last_status: str
+    previous_status: str
+    last_records_count: int
+    previous_records_count: int
+    record_count_delta: int
+    status_changed: bool
+    frequency_met: bool | None = None
+    summary_count: int
+    message: str
+
+
+# ─── Workflow Response Models ─────────────────────────────────────────
+
+
+class WorkflowRunQueuedResponse(BaseModel):
+    """Response model for POST /api/workflows/{workflow_id}/run."""
+    workflow_id: str
+    job_id: str
+    run_id: str
+    status: str
+    message: str
+
+
+# ─── Jobs Response Models ─────────────────────────────────────────────
+
+
+class JobCreateResponse(BaseModel):
+    """Response model for POST /api/jobs."""
+    id: str
+    job_id: str
+    status: str
+    idempotent_replay: bool
+
+
+class ClearTerminalResponse(BaseModel):
+    """Response model for DELETE /api/jobs/cleanup/terminal."""
+    message: str
+    cleared: int
+    kept_recent: int
+    remaining: int
+    failed: list[str] | None = None
+
+
+class JobResultsResponse(BaseModel):
+    """Response model for GET /api/jobs/{job_id}/results."""
+    job_id: str
+    results: list[Any]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+    returned: int
+
+
+class JobEventsResponse(BaseModel):
+    """Response model for GET /api/jobs/{job_id}/events."""
+    job_id: str
+    status: str
+    events: list[Any]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+# ─── User Data Response Models ────────────────────────────────────────
+
+
+class DeleteMyDataResponse(BaseModel):
+    """Response model for DELETE /api/user/data."""
+    status: str
+    user_id: str
+    summary: dict[str, int]
+    message: str
+    receipt: dict[str, str]
+
+
+# ─── Operator Response Models ─────────────────────────────────────────
+
+
+class RemoveDenylistResponse(BaseModel):
+    """Response model for DELETE /api/operator/denylist."""
+    message: str
+    domain: str
+    path_prefix: str

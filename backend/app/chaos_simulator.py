@@ -20,6 +20,7 @@ are in chaos_metrics.py.
 
 import asyncio
 import logging
+import threading
 import time
 from typing import Any, Optional
 
@@ -156,13 +157,17 @@ class ChaosSimulator:
 
 
 _simulator: Optional["ChaosSimulator"] = None
+_simulator_lock = threading.Lock()
 
 
 def get_chaos_simulator() -> ChaosSimulator:
     """Get the global chaos simulator."""
     global _simulator
-    if _simulator is None:
-        _simulator = ChaosSimulator()
+    if _simulator is not None:
+        return _simulator
+    with _simulator_lock:
+        if _simulator is None:
+            _simulator = ChaosSimulator()
     return _simulator
 
 

@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from app.admin_denylist import DenylistEntry, get_denylist
 from app.audit_logger import log_admin_action
+from app.models import RemoveDenylistResponse
 from app.utils.rbac import UserRole, require_role_with_user
 
 router = APIRouter(prefix="/api/operator", tags=["operator"])
@@ -97,7 +98,7 @@ async def add_denylist_entry(
     return _to_response(persisted)
 
 
-@router.delete("/denylist", status_code=200)
+@router.delete("/denylist", status_code=200, response_model=RemoveDenylistResponse)
 async def remove_denylist_entry(
     body: DenylistRemoveRequest,
     auth: Annotated[tuple[UserRole, str], Depends(require_role_with_user([UserRole.ADMIN]))],

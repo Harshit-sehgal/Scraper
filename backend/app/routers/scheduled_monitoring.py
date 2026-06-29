@@ -16,7 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.audit_logger import log_rbac_event
 from app.config import settings
-from app.models import ScheduledJob, ScheduledJobFrequency, ScrapeMode
+from app.models import (
+    ScheduledJob,
+    ScheduledJobChangesResponse,
+    ScheduledJobFrequency,
+    ScrapeMode,
+)
 from app.url_safety import validate_public_http_url
 from app.utils.aup import require_aup_accepted
 from app.utils.cron_parser import is_valid as is_valid_cron_expression
@@ -255,7 +260,7 @@ def _get_visible_scheduled_job(job_id: str, auth: tuple[UserRole, str, str, str]
     return item
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=dict)
 async def create_scheduled_job(
     name: str,
     auth: Annotated[
@@ -308,7 +313,7 @@ async def create_scheduled_job(
     return record
 
 
-@router.get("", status_code=200)
+@router.get("", status_code=200, response_model=dict)
 async def list_scheduled_jobs(
     auth: Annotated[
         tuple[UserRole, str, str, str],
@@ -326,7 +331,7 @@ async def list_scheduled_jobs(
     return {"total": total, "limit": limit, "offset": offset, "items": items[offset : offset + limit]}
 
 
-@router.get("/{job_id}", status_code=200)
+@router.get("/{job_id}", status_code=200, response_model=dict)
 async def get_scheduled_job(
     job_id: str,
     auth: Annotated[
@@ -338,7 +343,7 @@ async def get_scheduled_job(
     return _get_visible_scheduled_job(job_id, auth)
 
 
-@router.put("/{job_id}", status_code=200)
+@router.put("/{job_id}", status_code=200, response_model=dict)
 async def update_scheduled_job(
     job_id: str,
     auth: Annotated[
@@ -408,7 +413,7 @@ async def delete_scheduled_job(
 # ─── Change Detection ─────────────────────────────────────────────────────
 
 
-@router.get("/{job_id}/changes", status_code=200)
+@router.get("/{job_id}/changes", status_code=200, response_model=ScheduledJobChangesResponse)
 async def detect_changes(
     job_id: str,
     auth: Annotated[

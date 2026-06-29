@@ -167,7 +167,7 @@ def test_session_me_remains_public_without_configured_keys(client, monkeypatch) 
     response = client.get("/api/session/me")
 
     assert response.status_code == 200
-    assert response.json() == {"authenticated": False}
+    assert response.json()["authenticated"] is False
 
 
 def test_user_cannot_list_another_users_jobs(client, monkeypatch) -> None:

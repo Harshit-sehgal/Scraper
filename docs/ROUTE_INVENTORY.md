@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-28 23:47:09 UTC
+**Generated:** 2026-06-29 07:32:30 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
@@ -27,33 +27,33 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/billing/subscriptions` | `app.billing.webhooks` | `list_subscriptions` | stable | protected | operator-or-admin | require_principal, require_role |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions/{customer_id}` | `app.billing.webhooks` | `get_subscription` | stable | protected | operator-or-admin | require_principal, require_role |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/billing/webhook` | `app.billing.webhooks` | `billing_webhook` | stable | protected | authenticated-user |  |  | dict | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
-| `POST` | `/api/compliance/gdpr/forget` | `app.routers.user_data` | `gdpr_forget` | stable | protected | authenticated-user | require_principal |  | dict | route dependency accepts admin/operator/user |
-| `POST` | `/api/discover` | `app.routers.jobs_write` | `discover` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
+| `POST` | `/api/compliance/gdpr/forget` | `app.routers.user_data` | `gdpr_forget` | stable | protected | authenticated-user | require_principal |  | DeleteMyDataResponse | route dependency accepts admin/operator/user |
+| `POST` | `/api/discover` | `app.routers.jobs_write` | `discover` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | `app.routers.exports` | `batch_export` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/jobs` | `app.routers.jobs_read` | `list_jobs` | stable | protected | authenticated-user | require_principal |  |  | route dependency accepts admin/operator/user |
-| `POST` | `/api/jobs` | `app.routers.jobs_write` | `create_job` | stable | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role |  |  | route dependency accepts admin/operator |
-| `DELETE` | `/api/jobs/cleanup/terminal` | `app.routers.jobs_write` | `clear_terminal_jobs` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `DELETE` | `/api/jobs/{job_id}` | `app.routers.jobs_write` | `delete_job` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `GET` | `/api/jobs/{job_id}` | `app.routers.jobs_read` | `get_job` | stable | protected | authenticated-user | require_principal |  |  | route dependency accepts admin/operator/user |
-| `POST` | `/api/jobs/{job_id}/cancel` | `app.routers.jobs_write` | `cancel_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/jobs/{job_id}/events` | `app.routers.jobs_read` | `get_job_events` | stable | protected | authenticated-user | require_principal |  |  | route dependency accepts admin/operator/user |
+| `GET` | `/api/jobs` | `app.routers.jobs_read` | `list_jobs` | stable | protected | authenticated-user | require_principal |  | dict | route dependency accepts admin/operator/user |
+| `POST` | `/api/jobs` | `app.routers.jobs_write` | `create_job` | stable | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role |  | JobCreateResponse | route dependency accepts admin/operator |
+| `DELETE` | `/api/jobs/cleanup/terminal` | `app.routers.jobs_write` | `clear_terminal_jobs` | stable | protected | admin | require_role |  | ClearTerminalResponse | require_role/admin-only dependency |
+| `DELETE` | `/api/jobs/{job_id}` | `app.routers.jobs_write` | `delete_job` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
+| `GET` | `/api/jobs/{job_id}` | `app.routers.jobs_read` | `get_job` | stable | protected | authenticated-user | require_principal |  | Job | route dependency accepts admin/operator/user |
+| `POST` | `/api/jobs/{job_id}/cancel` | `app.routers.jobs_write` | `cancel_job` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/jobs/{job_id}/events` | `app.routers.jobs_read` | `get_job_events` | stable | protected | authenticated-user | require_principal |  | JobEventsResponse | route dependency accepts admin/operator/user |
 | `GET` | `/api/jobs/{job_id}/export/csv` | `app.routers.exports` | `export_csv` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/excel` | `app.routers.exports` | `export_excel` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/json` | `app.routers.exports` | `export_json` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PATCH` | `/api/jobs/{job_id}/extraction` | `app.routers.jobs_write` | `update_job_extraction` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PATCH` | `/api/jobs/{job_id}/headers` | `app.routers.jobs_write` | `update_job_headers` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/jobs/{job_id}/reclean` | `app.routers.jobs_write` | `reclean_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/jobs/{job_id}/results` | `app.routers.jobs_read` | `get_job_results` | stable | protected | authenticated-user | require_principal |  |  | route dependency accepts admin/operator/user |
-| `PATCH` | `/api/jobs/{job_id}/strategy` | `app.routers.jobs_write` | `update_job_strategy` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PATCH` | `/api/jobs/{job_id}/webhook` | `app.routers.jobs_write` | `update_job_webhook` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/jobs/{job_id}/webhook/redeliver` | `app.routers.jobs_write` | `redeliver_job_webhook` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `DELETE` | `/api/operator/denylist` | `app.routers.operator` | `remove_denylist_entry` | stable | protected | admin | require_role_with_user |  | dict | require_role/admin-only dependency |
+| `PATCH` | `/api/jobs/{job_id}/extraction` | `app.routers.jobs_write` | `update_job_extraction` | stable | protected | operator-or-admin | require_principal |  | StatusResponse | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/headers` | `app.routers.jobs_write` | `update_job_headers` | stable | protected | operator-or-admin | require_principal |  | StatusResponse | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/reclean` | `app.routers.jobs_write` | `reclean_job` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/jobs/{job_id}/results` | `app.routers.jobs_read` | `get_job_results` | stable | protected | authenticated-user | require_principal |  | JobResultsResponse | route dependency accepts admin/operator/user |
+| `PATCH` | `/api/jobs/{job_id}/strategy` | `app.routers.jobs_write` | `update_job_strategy` | stable | protected | operator-or-admin | require_principal |  | StatusResponse | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/webhook` | `app.routers.jobs_write` | `update_job_webhook` | stable | protected | operator-or-admin | require_principal |  | StatusResponse | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/webhook/redeliver` | `app.routers.jobs_write` | `redeliver_job_webhook` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `DELETE` | `/api/operator/denylist` | `app.routers.operator` | `remove_denylist_entry` | stable | protected | admin | require_role_with_user |  | RemoveDenylistResponse | require_role/admin-only dependency |
 | `GET` | `/api/operator/denylist` | `app.routers.operator` | `list_denylist` | stable | protected | operator-or-admin | require_role_with_user |  | list | route dependency accepts admin/operator |
 | `POST` | `/api/operator/denylist` | `app.routers.operator` | `add_denylist_entry` | stable | protected | admin | require_role_with_user |  | DenylistEntryResponse | require_role/admin-only dependency |
-| `DELETE` | `/api/recycle_bin` | `app.routers.jobs_write` | `clear_recycle_bin` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `GET` | `/api/recycle_bin` | `app.routers.jobs_read` | `list_recycle_bin` | stable | protected | authenticated-user | require_principal |  |  | route dependency accepts admin/operator/user |
-| `DELETE` | `/api/recycle_bin/{job_id}` | `app.routers.jobs_write` | `hard_delete_job` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
-| `POST` | `/api/recycle_bin/{job_id}/restore` | `app.routers.jobs_write` | `restore_job` | stable | protected | admin | require_role |  |  | require_role/admin-only dependency |
+| `DELETE` | `/api/recycle_bin` | `app.routers.jobs_write` | `clear_recycle_bin` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
+| `GET` | `/api/recycle_bin` | `app.routers.jobs_read` | `list_recycle_bin` | stable | protected | authenticated-user | require_principal |  | dict | route dependency accepts admin/operator/user |
+| `DELETE` | `/api/recycle_bin/{job_id}` | `app.routers.jobs_write` | `hard_delete_job` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
+| `POST` | `/api/recycle_bin/{job_id}/restore` | `app.routers.jobs_write` | `restore_job` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
 | `POST` | `/api/saas/aup/accept` | `app.saas.router` | `accept_aup` | stable | protected | authenticated-user | require_role_with_user |  | AupStatusResponse | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/aup/status` | `app.saas.router` | `get_aup_status` | stable | protected | authenticated-user | require_role_with_user |  | AupStatusResponse | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/email-verification/send` | `app.saas.router` | `send_email_verification` | stable | protected | authenticated-user | require_role_with_user |  | EmailVerificationSendResponse | route dependency accepts admin/operator/user |
@@ -81,13 +81,13 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `POST` | `/api/saas/projects/{project_id}/keys` | `app.saas.router` | `create_api_key` | stable | protected | operator-or-admin | require_aup_accepted, require_role_with_user |  | ApiKeyCreateResponse | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | `app.saas.router` | `revoke_api_key` | stable | protected | operator-or-admin | require_role_with_user |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/saas/usage` | `app.saas.router` | `get_usage_summary` | stable | protected | authenticated-user | require_role_with_user |  | UsageSummaryResponse | route dependency accepts admin/operator/user |
-| `GET` | `/api/scheduled` | `app.routers.scheduled_monitoring` | `list_scheduled_jobs` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/scheduled` | `app.routers.scheduled_monitoring` | `create_scheduled_job` | stable | protected | operator-or-admin | require_aup_accepted, require_principal |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/scheduled` | `app.routers.scheduled_monitoring` | `list_scheduled_jobs` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/scheduled` | `app.routers.scheduled_monitoring` | `create_scheduled_job` | stable | protected | operator-or-admin | require_aup_accepted, require_principal |  | dict | route dependency accepts admin/operator |
 | `DELETE` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `delete_scheduled_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `get_scheduled_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PUT` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `update_scheduled_job` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/scheduled/{job_id}/changes` | `app.routers.scheduled_monitoring` | `detect_changes` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/schema/suggest` | `app.routers.jobs_write` | `suggest_schema` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `get_scheduled_job` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `PUT` | `/api/scheduled/{job_id}` | `app.routers.scheduled_monitoring` | `update_scheduled_job` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/scheduled/{job_id}/changes` | `app.routers.scheduled_monitoring` | `detect_changes` | stable | protected | operator-or-admin | require_principal |  | ScheduledJobChangesResponse | route dependency accepts admin/operator |
+| `POST` | `/api/schema/suggest` | `app.routers.jobs_write` | `suggest_schema` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/scraper/browser` | `app.routers.scraper` | `get_browser_stats` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/scraper/config` | `app.routers.scraper` | `get_scraper_config` | stable | protected | operator-or-admin | require_role |  | ScraperConfigResponse | route dependency accepts admin/operator |
 | `POST` | `/api/scraper/diagnostics` | `app.routers.scraper` | `get_scraper_diagnostics` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
@@ -105,24 +105,24 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `GET` | `/api/scraper/stats` | `app.routers.scraper` | `get_scraper_stats` | stable | protected | operator-or-admin | require_role |  | ScraperStatsResponse | route dependency accepts admin/operator |
 | `DELETE` | `/api/scraper/telemetry` | `app.routers.scraper` | `clear_telemetry` | stable | protected | admin | require_role |  | StatusResponse | require_role/admin-only dependency |
 | `GET` | `/api/scraper/telemetry` | `app.routers.scraper` | `get_recent_telemetry` | stable | protected | operator-or-admin | require_role |  | list | route dependency accepts admin/operator |
-| `GET` | `/api/system/audit-log` | `app.routers.system` | `get_audit_log` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
+| `GET` | `/api/system/audit-log` | `app.routers.system` | `get_audit_log` | stable | protected | admin | require_role |  | AuditLogResponse | require_role/admin-only dependency |
 | `POST` | `/api/system/csp-violations` | `app.routers.system` | `csp_violations` | stable | public |  |  |  |  | explicit API middleware exemption |
-| `GET` | `/api/system/rate-limit-stats` | `app.routers.system` | `rate_limit_stats` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/system/status` | `app.routers.system` | `system_status` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/system/storage/status` | `app.routers.system` | `storage_status` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/url/analyze` | `app.routers.system` | `analyze_url` | stable | protected | operator-or-admin | require_role |  |  | route dependency accepts admin/operator |
-| `DELETE` | `/api/user/data` | `app.routers.user_data` | `delete_my_data` | stable | protected | authenticated-user | require_principal |  | dict | route dependency accepts admin/operator/user |
-| `POST` | `/api/workflow-drafts/from-url-analysis` | `app.routers.workflow` | `create_workflow_draft_from_url_analysis` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/workflow-drafts/{draft_id}/detect-fields` | `app.routers.workflow` | `detect_workflow_draft_fields` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/workflow-drafts/{draft_id}/manual-mapping` | `app.routers.workflow` | `create_workflow_from_manual_mapping` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/workflows` | `app.routers.workflow` | `list_workflows` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/workflows` | `app.routers.workflow` | `create_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/system/rate-limit-stats` | `app.routers.system` | `rate_limit_stats` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/system/status` | `app.routers.system` | `system_status` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/system/storage/status` | `app.routers.system` | `storage_status` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/url/analyze` | `app.routers.system` | `analyze_url` | stable | protected | operator-or-admin | require_role |  | dict | route dependency accepts admin/operator |
+| `DELETE` | `/api/user/data` | `app.routers.user_data` | `delete_my_data` | stable | protected | authenticated-user | require_principal |  | DeleteMyDataResponse | route dependency accepts admin/operator/user |
+| `POST` | `/api/workflow-drafts/from-url-analysis` | `app.routers.workflow` | `create_workflow_draft_from_url_analysis` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/workflow-drafts/{draft_id}/detect-fields` | `app.routers.workflow` | `detect_workflow_draft_fields` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/workflow-drafts/{draft_id}/manual-mapping` | `app.routers.workflow` | `create_workflow_from_manual_mapping` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `GET` | `/api/workflows` | `app.routers.workflow` | `list_workflows` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/workflows` | `app.routers.workflow` | `create_workflow` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `DELETE` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `delete_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `GET` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `get_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PATCH` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `patch_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PUT` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `update_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/workflows/{workflow_id}/preview` | `app.routers.workflow` | `preview_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `POST` | `/api/workflows/{workflow_id}/run` | `app.routers.workflow` | `run_workflow` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
+| `GET` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `get_workflow` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `PATCH` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `patch_workflow` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `PUT` | `/api/workflows/{workflow_id}` | `app.routers.workflow` | `update_workflow` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/workflows/{workflow_id}/preview` | `app.routers.workflow` | `preview_workflow` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
+| `POST` | `/api/workflows/{workflow_id}/run` | `app.routers.workflow` | `run_workflow` | stable | protected | operator-or-admin | require_principal |  | WorkflowRunQueuedResponse | route dependency accepts admin/operator |
 | `GET` | `/api/workflows/{workflow_id}/runs` | `app.routers.workflow` | `list_workflow_runs` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/workflows/{workflow_id}/runs/{run_id}` | `app.routers.workflow` | `get_workflow_run` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 
@@ -171,19 +171,19 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | Method | Path | Module | Handler | Boundary | Access | Role | Dependency | Request Model | Response Model | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `POST` | `/api/saas/signup` | `app.saas.router` | `signup` | stable | public |  |  |  | SignupResponse | explicit API middleware exemption |
-| `DELETE` | `/api/session` | `app.routers.session` | `destroy_session` | stable | public |  |  |  |  | explicit API middleware exemption |
-| `POST` | `/api/session` | `app.routers.session` | `create_session` | stable | public |  |  |  |  | explicit API middleware exemption |
-| `GET` | `/api/session/me` | `app.routers.session` | `get_session` | stable | public |  |  |  |  | explicit API middleware exemption |
+| `DELETE` | `/api/session` | `app.routers.session` | `destroy_session` | stable | public |  |  |  | SessionDestroyResponse | explicit API middleware exemption |
+| `POST` | `/api/session` | `app.routers.session` | `create_session` | stable | public |  |  |  | SessionCreateResponse | explicit API middleware exemption |
+| `GET` | `/api/session/me` | `app.routers.session` | `get_session` | stable | public |  |  |  | app.models.SessionAuthenticatedResponse \| app.models.SessionUnauthenticatedResponse | explicit API middleware exemption |
 
 ## Health/Readiness Routes
 
 | Method | Path | Module | Handler | Boundary | Access | Role | Dependency | Request Model | Response Model | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `GET` | `/` | `app.routers.health` | `root` | stable | public |  |  |  |  | non-API probe/static route |
+| `GET` | `/` | `app.routers.health` | `root` | stable | public |  |  |  | dict | non-API probe/static route |
 | `MOUNT` | `/app` | `starlette.routing` | `Mount` | stable | public |  |  |  |  | mounted ASGI/static route |
-| `GET` | `/health` | `app.routers.health` | `health` | stable | public |  |  |  |  | non-API probe/static route |
+| `GET` | `/health` | `app.routers.health` | `health` | stable | public |  |  |  | dict | non-API probe/static route |
 | `GET` | `/metrics` | `app.routers.system` | `metrics` | stable | protected | metrics-token-if-configured |  |  |  | settings.METRICS_TOKEN check in endpoint |
-| `GET` | `/ready` | `app.routers.health` | `ready` | stable | public |  |  |  |  | non-API probe/static route |
+| `GET` | `/ready` | `app.routers.health` | `ready` | stable | public |  |  |  | dict | non-API probe/static route |
 
 ## Docs/Openapi/Static/Dev Routes
 

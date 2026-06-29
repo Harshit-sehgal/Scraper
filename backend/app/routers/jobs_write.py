@@ -30,8 +30,10 @@ from app.discovery import (
     discover_urls,
 )
 from app.models import (
+    ClearTerminalResponse,
     DiscoveryRequest,
     JobCreate,
+    JobCreateResponse,
     JobExtractionUpdate,
     JobHeadersUpdate,
     JobStatus,
@@ -97,7 +99,7 @@ def register_jobs_write_routes(
 
     """
 
-    @router.post("/api/discover")
+    @router.post("/api/discover", response_model=dict)
     async def discover(
         req: DiscoveryRequest,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -130,7 +132,7 @@ def register_jobs_write_routes(
                     logger.debug("Skipping invalid URL %r in safety check: %s", url, exc)
         return {"urls": safe_results}
 
-    @router.post("/api/schema/suggest")
+    @router.post("/api/schema/suggest", response_model=dict)
     async def suggest_schema(
         req: SchemaSuggestionRequest,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
@@ -142,7 +144,7 @@ def register_jobs_write_routes(
 
         return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
-    @router.post("/api/jobs", status_code=201)
+    @router.post("/api/jobs", status_code=201, response_model=JobCreateResponse)
     async def create_job(
         job_data: JobCreate,
         request: Request,
@@ -167,7 +169,7 @@ def register_jobs_write_routes(
         except JobCreationError as e:
             raise HTTPException(status_code=e.status_code, detail=e.detail) from e
 
-    @router.post("/api/jobs/{job_id}/cancel")
+    @router.post("/api/jobs/{job_id}/cancel", response_model=dict)
     async def cancel_job(
         job_id: str,
         auth: Annotated[
@@ -183,7 +185,7 @@ def register_jobs_write_routes(
         service = JobCancellerService(manager)
         return await service.cancel_job(job_id, role, user_id, org_id, project_id)
 
-    @router.post("/api/jobs/{job_id}/reclean")
+    @router.post("/api/jobs/{job_id}/reclean", response_model=dict)
     async def reclean_job(
         job_id: str,
         auth: Annotated[
@@ -251,7 +253,7 @@ def register_jobs_write_routes(
             "status": "success",
         }
 
-    @router.post("/api/jobs/{job_id}/webhook/redeliver")
+    @router.post("/api/jobs/{job_id}/webhook/redeliver", response_model=dict)
     async def redeliver_job_webhook(
         job_id: str,
         auth: Annotated[
@@ -359,7 +361,7 @@ def register_jobs_write_routes(
             max_concurrent_urls=_val("max_concurrent_urls"),
         )
 
-    @router.delete("/api/jobs/{job_id}")
+    @router.delete("/api/jobs/{job_id}", response_model=dict)
     async def delete_job(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
@@ -399,7 +401,7 @@ def register_jobs_write_routes(
         log_job_event(actor="admin", action="job_recycled", job_id=job_id)
         return {"message": "Job moved to recycle bin"}
 
-    @router.delete("/api/jobs/cleanup/terminal")
+    @router.delete("/api/jobs/cleanup/terminal", response_model=ClearTerminalResponse)
     async def clear_terminal_jobs(
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
         keep_recent: Annotated[int, Query(ge=0, le=5000)] = 5,
@@ -462,7 +464,7 @@ def register_jobs_write_routes(
         )
         return result
 
-    @router.post("/api/recycle_bin/{job_id}/restore")
+    @router.post("/api/recycle_bin/{job_id}/restore", response_model=dict)
     async def restore_job(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
@@ -491,7 +493,7 @@ def register_jobs_write_routes(
                 manager.jobs_store[job_id] = manager.recycle_bin_store.pop(job_id)
         return {"message": "Job restored"}
 
-    @router.delete("/api/recycle_bin/{job_id}")
+    @router.delete("/api/recycle_bin/{job_id}", response_model=dict)
     async def hard_delete_job(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
@@ -521,7 +523,7 @@ def register_jobs_write_routes(
         log_job_event(actor="admin", action="job_hard_deleted", job_id=job_id)
         return {"message": "Job permanently deleted"}
 
-    @router.delete("/api/recycle_bin")
+    @router.delete("/api/recycle_bin", response_model=dict)
     async def clear_recycle_bin(
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
     ):

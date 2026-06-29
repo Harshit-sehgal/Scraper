@@ -19,6 +19,11 @@ from app.auth.session import (
     revoke_session_cookie,
     set_session_cookie,
 )
+from app.models import (
+    SessionCreateResponse,
+    SessionDestroyResponse,
+    SessionMeResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +32,7 @@ router = APIRouter(tags=["auth"])
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-@router.post("/api/session")
+@router.post("/api/session", response_model=SessionCreateResponse)
 async def create_session(
     response: Response,
     request: Request,
@@ -54,7 +59,7 @@ async def create_session(
     }
 
 
-@router.delete("/api/session")
+@router.delete("/api/session", response_model=SessionDestroyResponse)
 async def destroy_session(request: Request, response: Response):
     """Clear the session cookie, effectively logging out."""
     cookie = request.cookies.get(SESSION_COOKIE)
@@ -64,7 +69,7 @@ async def destroy_session(request: Request, response: Response):
     return {"status": "ok", "message": "Session cookie cleared."}
 
 
-@router.get("/api/session/me")
+@router.get("/api/session/me", response_model=SessionMeResponse)
 async def get_session(request: Request):
     """Return the current session role if authenticated via cookie."""
     role = get_session_role(request)

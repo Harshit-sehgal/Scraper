@@ -81,326 +81,264 @@ class BrowserPool:
         self.reused_fetches: int = 0
         self.crash_count: int = 0
 
-    async def get_context(self, domain: str, strategy: FetchStrategy | None = None) -> BrowserContext:
-        """Get or create a browser context for a specific domain."""
-        await self._recycle_event.wait()
+    async def _ensure_browser_launched_locked(self) -> None:
+        """Start Playwright + launch browser (caller must hold self._lock)."""
+        if not self._playwright:
+            start = time.time()
+            self._playwright = await async_playwright().start()
+            self.startup_latency_ms = (time.time() - start) * 1000
 
-        # Check if we should recycle before proceeding
+        if self._browser and self._browser.is_connected():
+            return
+
+        if not self._try_reserve_process_slot():
+            msg = (
+                f"[BrowserPool] Process cap reached "
+                f"({settings.BROWSER_MAX_PROCESSES}). Refusing to launch a new Chromium process."
+            )
+            raise RuntimeError(msg)
+        browser_args = []
+        if settings.BROWSER_SECURITY_HARDENING:
+            browser_args.extend(
+                ["--disable-dev-shm-usage", "--disable-extensions", "--disable-background-networking",
+                 "--disable-default-apps", "--disable-gpu", "--no-first-run"],
+            )
+        try:
+            self._browser = await self._playwright.chromium.launch(
+                headless=settings.PLAYWRIGHT_HEADLESS, args=browser_args or None,
+            )
+        except (Error, OSError, RuntimeError):
+            self.crash_count += 1
+            logger.exception("[BrowserPool] Failed to launch browser")
+            self._release_process_slot()
+            try:
+                from app.metrics_collector import record_browser_launch
+                record_browser_launch(success=False)
+            except (ImportError, RuntimeError, ValueError):
+                logger.debug("[BrowserPool] Failed to record browser launch failure metric")
+            raise
+        try:
+            from app.metrics_collector import record_browser_launch
+            record_browser_launch(success=True)
+        except (ImportError, RuntimeError, ValueError):
+            logger.debug("[BrowserPool] Failed to record browser launch success metric")
+
+        if not self._cleanup_task or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+
+    async def _get_existing_context(self, context_key: str) -> BrowserContext | None:
+        """Return a cached context if it hasn't exceeded its lifetime."""
+        context = self._contexts.get(context_key)
+        if context is None:
+            return None
+        use_count = self._context_use_count.get(context_key, 0)
+        self._context_last_used[context_key] = time.time()
+        if use_count < settings.BROWSER_CONTEXT_LIFETIME:
+            self._context_use_count[context_key] = use_count + 1
+            self.reused_fetches += 1
+            self.context_reuse_rate = self.reused_fetches / self.total_fetches
+            return context
+        logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
+        await context.close()
+        self._contexts.pop(context_key, None)
+        self._context_use_count.pop(context_key, None)
+        self._context_last_used.pop(context_key, None)
+        return None
+
+    def _build_stealth_context_options(self, domain: str) -> dict[str, Any]:
+        """Build context options from anti-bot stealth profile."""
+        from app.anti_bot_engine import get_anti_bot_engine
+        sp = get_anti_bot_engine().get_stealth_profile(domain)
+        return {
+            "user_agent": sp["user_agent"], "viewport": sp["viewport"],
+            "device_scale_factor": sp["device_scale_factor"],
+            "is_mobile": False, "has_touch": False,
+            "locale": sp["locale"], "timezone_id": sp["timezone"],
+        }
+
+    def _build_default_context_options(self) -> dict[str, Any]:
+        """Build context options from settings defaults."""
+        return {
+            "user_agent": settings.USER_AGENT,
+            "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
+            "device_scale_factor": 1.0, "is_mobile": False, "has_touch": False,
+            "locale": settings.STEALTH_DEFAULT_LOCALE,
+            "timezone_id": settings.STEALTH_TIMEZONE_POOL.split(",")[0],
+        }
+
+    async def _create_browser_context(self, context_options: dict[str, Any]) -> BrowserContext:
+        """Create a new browser context from options, recording metrics."""
+        if self._browser is None:
+            msg = "Browser not initialised before context creation"
+            raise RuntimeError(msg)
+        try:
+            context = await self._browser.new_context(**context_options)
+        except (Error, OSError, RuntimeError):
+            try:
+                from app.metrics_collector import record_browser_context_failed
+                record_browser_context_failed()
+            except (ImportError, RuntimeError, ValueError):
+                logger.debug("[BrowserPool] Failed to record browser context failure metric")
+            raise
+        try:
+            from app.metrics_collector import record_browser_context_created
+            record_browser_context_created()
+        except (ImportError, RuntimeError, ValueError):
+            logger.debug("[BrowserPool] Failed to record browser context creation metric")
+        return context
+
+    async def _inject_persisted_cookies(self, context: BrowserContext, domain: str) -> None:
+        """Inject anti-bot engine cookies into a Playwright context."""
+        try:
+            from app.anti_bot_engine import get_anti_bot_engine
+            cookie_string = get_anti_bot_engine().get_cookies(domain)
+            if cookie_string:
+                parsed_cookies = _parse_cookie_string_for_playwright(cookie_string, domain)
+                if parsed_cookies:
+                    await context.add_cookies(parsed_cookies)  # type: ignore[arg-type]
+                    logger.debug("[BrowserPool] Injected %d persisted cookies for %s", len(parsed_cookies), domain)
+        except (ImportError, AttributeError, TypeError, RuntimeError, OSError):
+            logger.debug("[BrowserPool] Failed to inject persisted cookies for %s", domain, exc_info=True)
+
+    def _register_page_tracking(self, context: BrowserContext) -> None:
+        """Register page creation/close event handlers for the context."""
+        def on_page(page) -> None:
+            with self._counter_lock:
+                self._active_fetches += 1
+                self._cumulative_fetches += 1
+
+            def on_close(p) -> None:
+                with self._counter_lock:
+                    self._active_fetches = max(0, self._active_fetches - 1)
+                if self._should_recycle():
+                    task = asyncio.create_task(self._check_and_trigger_recycle())
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
+
+            page.on("close", on_close)
+
+        context.on("page", on_page)
+
+    async def _apply_stealth_evasion(self, context: BrowserContext, is_stealth: bool) -> None:
+        """Inject stealth JS into the context to evade bot detection."""
+        if not (settings.PLAYWRIGHT_STEALTH or is_stealth):
+            return
+        _nav_langs_raw = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
+        _nav_langs_js = "[" + ", ".join(f"'{lang.strip()}'" for lang in _nav_langs_raw) + "]"
+        basic_js = f"""
+        Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
+        window.chrome = {{ runtime: {{}} }};
+        (function() {{
+            const pluginData = [
+                {{name:'PDF Viewer',filename:'internal-pdf-viewer',description:'Portable Document Format'}},
+                {{name:'Chrome PDF Viewer',filename:'internal-pdf-viewer',description:'Portable Document Format'}},
+                {{name:'Chromium PDF Viewer',filename:'internal-pdf-viewer',description:'Portable Document Format'}},
+                {{name:'Microsoft EDGE PDF Viewer',filename:'internal-pdf-viewer',description:'Portable Document Format'}},
+                {{name:'WebKit built-in PDF',filename:'internal-pdf-viewer',description:'Portable Document Format'}},
+            ];
+            const pluginArray = [];
+            pluginData.forEach(function(p) {{
+                const plugin = {{name:p.name,filename:p.filename,description:p.description,length:1,
+                    0:{{type:'application/pdf',suffixes:'pdf',description:p.description}}}};
+                pluginArray.push(plugin);
+            }});
+            Object.defineProperty(pluginArray, 'length', {{get: () => pluginArray.length}});
+            Object.defineProperty(navigator, 'plugins', {{get: () => pluginArray}});
+        }})();
+        Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs_js}}});
+        """
+        await context.add_init_script(basic_js)
+        if not is_stealth:
+            return
+
+        import random
+        _webgl_vendors = [
+            ("Intel Open Source Technology Center", "Intel(R) HD Graphics 630"),
+            ("Intel Open Source Technology Center", "Mesa DRI Intel(R) UHD Graphics 630"),
+            ("NVIDIA Corporation", "GeForce GTX 1060/PCIe/SSE2"),
+            ("NVIDIA Corporation", "GeForce GTX 1650/PCIe/SSE2"),
+            ("NVIDIA Corporation", "GeForce RTX 3060/PCIe/SSE2"),
+            ("AMD", "Radeon RX 580 Series"),
+            ("AMD", "Radeon(TM) RX 470 Graphics"),
+            ("Intel Open Source Technology Center", "Mesa Intel(R) UHD Graphics 770"),
+        ]
+        gl_vendor, gl_renderer = random.choice(_webgl_vendors)
+        hw_concurrency = settings.STEALTH_HARDWARE_CONCURRENCY
+        advanced_js = f"""
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter) {{
+            if (parameter === 37445) return '{gl_vendor.replace("'", "\\'")}';
+            if (parameter === 37446) return '{gl_renderer.replace("'", "\\'")}';
+            return getParameter.apply(this, arguments);
+        }};
+        if (typeof WebGL2RenderingContext !== 'undefined') {{
+            const getParam2 = WebGL2RenderingContext.prototype.getParameter;
+            WebGL2RenderingContext.prototype.getParameter = function(parameter) {{
+                if (parameter === 37445) return '{gl_vendor.replace("'", "\\'")}';
+                if (parameter === 37446) return '{gl_renderer.replace("'", "\\'")}';
+                return getParam2.apply(this, arguments);
+            }};
+        }}
+        Object.defineProperty(navigator, 'hardwareConcurrency', {{get: () => {hw_concurrency}}});
+        if (navigator.getBattery) {{
+            navigator.getBattery = () => Promise.resolve({{charging:true,chargingTime:0,dischargingTime:Infinity,level:1}});
+        }}
+        """
+        await context.add_init_script(advanced_js)
+
+    async def _await_recycle_if_needed(self) -> None:
+        """Check recycle condition and wait if recycling is in progress."""
+        await self._recycle_event.wait()
         if self._should_recycle():
             task = asyncio.create_task(self._check_and_trigger_recycle())
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
             await self._recycle_event.wait()
 
+    def _add_proxy_to_options(self, context_options: dict[str, Any], domain: str) -> None:
+        """Add proxy configuration to context options if proxy rotation is enabled."""
+        if not settings.PROXY_ROTATION_ENABLED:
+            return
+        from app.proxy_manager import get_proxy_manager
+        proxy_mgr = get_proxy_manager()
+        if not proxy_mgr.enabled:
+            return
+        proxy_config = proxy_mgr.get_proxy_for_playwright()
+        if proxy_config:
+            context_options["proxy"] = proxy_config
+            logger.debug("[BrowserPool] Creating context for %s with proxy: %s", domain, mask_proxy_url(proxy_config["server"]))
+
+    async def get_context(self, domain: str, strategy: FetchStrategy | None = None) -> BrowserContext:
+        """Get or create a browser context for a specific domain."""
+        from app.strategy_evolution import FetchStrategy
+
+        await self._await_recycle_if_needed()
         async with self._lock:
             self._last_activity = time.time()
             self.total_fetches += 1
+            await self._ensure_browser_launched_locked()
 
-            if not self._playwright:
-                start = time.time()
-                self._playwright = await async_playwright().start()
-                self.startup_latency_ms = (time.time() - start) * 1000
-
-            if not self._browser or not self._browser.is_connected():
-                logger.info("[BrowserPool] Launching new Chromium instance")
-                # Enforce global process cap atomically. Releasing on
-                # any failure path (launch crash, exception) prevents
-                # permanently leaked slots.
-                if not self._try_reserve_process_slot():
-                    msg = (
-                        f"[BrowserPool] Process cap reached "
-                        f"({settings.BROWSER_MAX_PROCESSES}). Refusing to launch a new Chromium process."
-                    )
-                    raise RuntimeError(msg)
-                browser_args = []
-                if settings.BROWSER_SECURITY_HARDENING:
-                    browser_args.extend(
-                        [
-                            "--disable-dev-shm-usage",  # Avoid /dev/shm issues in Docker
-                            "--disable-extensions",  # Prevent extension-based attacks
-                            "--disable-background-networking",  # Reduce attack surface
-                            "--disable-default-apps",  # Remove default app attack surface
-                            "--disable-gpu",  # Reduce GPU-based attack surface
-                            "--no-first-run",  # Skip first-run wizard
-                        ],
-                    )
-                try:
-                    self._browser = await self._playwright.chromium.launch(
-                        headless=settings.PLAYWRIGHT_HEADLESS,
-                        args=browser_args or None,
-                    )
-                except (Error, OSError, RuntimeError):
-                    self.crash_count += 1
-                    logger.exception("[BrowserPool] Failed to launch browser")
-                    self._release_process_slot()
-                    try:
-                        from app.metrics_collector import record_browser_launch
-
-                        record_browser_launch(success=False)
-                    except (ImportError, RuntimeError, ValueError):
-                        logger.debug("[BrowserPool] Failed to record browser launch failure metric")
-                    raise
-                try:
-                    from app.metrics_collector import record_browser_launch
-
-                    record_browser_launch(success=True)
-                except (ImportError, RuntimeError, ValueError):
-                    logger.debug("[BrowserPool] Failed to record browser launch success metric")
-
-                # Ensure background cleanup is running
-                if not self._cleanup_task or self._cleanup_task.done():
-                    self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
-
-            # Check for existing context
-            # We key by (domain, strategy) to allow different strategies for
-            # same domain
             context_key = f"{domain}:{strategy.value if strategy else 'default'}"
-            context = self._contexts.get(context_key)
-            if context:
-                use_count = self._context_use_count.get(context_key, 0)
-                self._context_last_used[context_key] = time.time()
-                if use_count < settings.BROWSER_CONTEXT_LIFETIME:
-                    self._context_use_count[context_key] = use_count + 1
-                    self.reused_fetches += 1
-                    self.context_reuse_rate = self.reused_fetches / self.total_fetches
-                    return context
-                logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
-                await context.close()
-                self._contexts.pop(context_key, None)
-                self._context_use_count.pop(context_key, None)
-                self._context_last_used.pop(context_key, None)
+            cached = await self._get_existing_context(context_key)
+            if cached is not None:
+                return cached
 
-            # ── Reusable context cap (LRU eviction) ──────────────────────
-            # Bound the number of cached domain-keyed contexts to prevent
-            # unbounded memory growth under unique-domain attacks (DoS).
-            # All access happens under ``self._lock`` — no concurrent
-            # mutators, so the check-then-evict sequence is race-free.
             await self._evict_lru_if_needed()
 
-            # Create new context with optional proxy configuration
-            from app.strategy_evolution import FetchStrategy
-
             is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
+            context_options = self._build_stealth_context_options(domain) if is_stealth else self._build_default_context_options()
+            self._add_proxy_to_options(context_options, domain)
 
-            # Use AntiBotEngine's stealth profile for enhanced fingerprint
-            # randomization
-            context_options: dict[str, Any]
-            if is_stealth:
-                from app.anti_bot_engine import get_anti_bot_engine
+            context = await self._create_browser_context(context_options)
 
-                stealth_profile = get_anti_bot_engine().get_stealth_profile(domain)
-                context_options = {
-                    "user_agent": stealth_profile["user_agent"],
-                    "viewport": stealth_profile["viewport"],
-                    "device_scale_factor": stealth_profile["device_scale_factor"],
-                    "is_mobile": False,
-                    "has_touch": False,
-                    "locale": stealth_profile["locale"],
-                    "timezone_id": stealth_profile["timezone"],
-                }
-            else:
-                context_options = {
-                    "user_agent": settings.USER_AGENT,
-                    "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
-                    "device_scale_factor": 1.0 if not is_stealth else 2.0,
-                    "is_mobile": False,
-                    "has_touch": False,
-                    "locale": settings.STEALTH_DEFAULT_LOCALE,
-                    "timezone_id": settings.STEALTH_TIMEZONE_POOL.split(",")[0],
-                }
-
-            # Add proxy if enabled
-            if settings.PROXY_ROTATION_ENABLED:
-                from app.proxy_manager import get_proxy_manager
-
-                proxy_mgr = get_proxy_manager()
-                if proxy_mgr.enabled:
-                    proxy_config = proxy_mgr.get_proxy_for_playwright()
-                    if proxy_config:
-                        context_options["proxy"] = proxy_config
-                        logger.debug(
-                            "[BrowserPool] Creating context for %s with proxy: %s",
-                            domain,
-                            mask_proxy_url(proxy_config["server"]),
-                        )
-
-            if self._browser is None:
-                msg = "Browser not initialised before context creation"
-                raise RuntimeError(msg)
-            try:
-                context = await self._browser.new_context(**context_options)
-            except (Error, OSError, RuntimeError):
-                try:
-                    from app.metrics_collector import record_browser_context_failed
-
-                    record_browser_context_failed()
-                except (ImportError, RuntimeError, ValueError):
-                    logger.debug("[BrowserPool] Failed to record browser context failure metric")
-                raise
-            try:
-                from app.metrics_collector import record_browser_context_created
-
-                record_browser_context_created()
-            except (ImportError, RuntimeError, ValueError):
-                logger.debug("[BrowserPool] Failed to record browser context creation metric")
-
-            # ── Inject Persisted Cookies ────────────────────────────
-            # httpx-based fetches get persisted cookies injected via
-            # html_utils.py.  Playwright contexts must receive them
-            # separately so cached Cloudflare/Akamai clearance cookies
-            # survive across container restarts.
-            try:
-                from app.anti_bot_engine import get_anti_bot_engine
-
-                cookie_string = get_anti_bot_engine().get_cookies(domain)
-                if cookie_string:
-                    parsed_cookies = _parse_cookie_string_for_playwright(cookie_string, domain)
-                    if parsed_cookies:
-                        # Pyright: parsed_cookies are dicts, but Playwright's
-                        # add_cookies() accepts Sequence[SetCookieParam].
-                        # Runtime accepts our dict shape; the type ignore
-                        # documents that the structural guarantee is satisfied.
-                        await context.add_cookies(parsed_cookies)  # type: ignore[arg-type]
-                        logger.debug(
-                            "[BrowserPool] Injected %d persisted cookies for %s",
-                            len(parsed_cookies),
-                            domain,
-                        )
-            except (ImportError, AttributeError, TypeError, RuntimeError, OSError):
-                logger.debug(
-                    "[BrowserPool] Failed to inject persisted cookies for %s",
-                    domain,
-                    exc_info=True,
-                )
-
-            # Register page tracking
-            def register_page_tracking(ctx) -> None:
-                def on_page(page) -> None:
-                    with self._counter_lock:
-                        self._active_fetches += 1
-                        self._cumulative_fetches += 1
-                    logger.debug(
-                        "[BrowserPool] Page created. Active: %d, Cumulative: %d",
-                        self._active_fetches,
-                        self._cumulative_fetches,
-                    )
-
-                    def on_close(p) -> None:  # noqa: ARG001, RUF100
-                        with self._counter_lock:
-                            self._active_fetches = max(0, self._active_fetches - 1)
-                        logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
-                        # Only schedule a recycle check if recycling might be
-                        # needed — this avoids creating asyncio tasks (and
-                        # unawaited-coroutine warnings in tests) when the
-                        # pool is far from any recycling threshold.
-                        if self._should_recycle():
-                            task = asyncio.create_task(self._check_and_trigger_recycle())
-                            self._background_tasks.add(task)
-                            task.add_done_callback(self._background_tasks.discard)
-
-                    page.on("close", on_close)
-
-                ctx.on("page", on_page)
-
-            register_page_tracking(context)
-
-            # Phase 80: Advanced Stealth Evasion
-            if settings.PLAYWRIGHT_STEALTH or is_stealth:
-                # Basic stealth
-                _nav_langs_raw = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
-                _nav_langs_js = "[" + ", ".join(f"'{lang.strip()}'" for lang in _nav_langs_raw) + "]"
-                stealth_js = f"""
-                Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
-                window.chrome = {{ runtime: {{}} }};
-                // Realistic navigator.plugins mock — returns a PluginArray-like
-                // object so that .length and [i].name checks pass.
-                (function() {{
-                    const pluginData = [
-                        {{name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
-                        {{name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
-                        {{name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
-                        {{name: 'Microsoft EDGE PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
-                        {{name: 'WebKit built-in PDF', filename: 'internal-pdf-viewer', description: 'Portable Document Format'}},
-                    ];
-                    const pluginArray = [];
-                    pluginData.forEach(function(p) {{
-                        const plugin = {{
-                            name: p.name,
-                            filename: p.filename,
-                            description: p.description,
-                            length: 1,
-                            0: {{type: 'application/pdf', suffixes: 'pdf', description: p.description}}
-                        }};
-                        pluginArray.push(plugin);
-                    }});
-                    Object.defineProperty(pluginArray, 'length', {{get: () => pluginArray.length}});
-                    Object.defineProperty(navigator, 'plugins', {{get: () => pluginArray}});
-                }})();
-                Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs_js}}});
-                """
-                await context.add_init_script(stealth_js)
-
-                if is_stealth:
-                    import random
-
-                    # Randomize WebGL fingerprint from a pool of
-                    # common GPU identities instead of a single
-                    # deterministic pair that every request shares.
-                    _webgl_vendors = [
-                        ("Intel Open Source Technology Center", "Intel(R) HD Graphics 630"),
-                        ("Intel Open Source Technology Center", "Mesa DRI Intel(R) UHD Graphics 630"),
-                        ("NVIDIA Corporation", "GeForce GTX 1060/PCIe/SSE2"),
-                        ("NVIDIA Corporation", "GeForce GTX 1650/PCIe/SSE2"),
-                        ("NVIDIA Corporation", "GeForce RTX 3060/PCIe/SSE2"),
-                        ("AMD", "Radeon RX 580 Series"),
-                        ("AMD", "Radeon(TM) RX 470 Graphics"),
-                        ("Intel Open Source Technology Center", "Mesa Intel(R) UHD Graphics 770"),
-                    ]
-                    _gl_vendor, _gl_renderer = random.choice(_webgl_vendors)  # nosec B311
-                    # Escape single quotes for JS string injection
-                    _gl_vendor_js = _gl_vendor.replace("'", "\\'")
-                    _gl_renderer_js = _gl_renderer.replace("'", "\\'")
-                    hw_concurrency = settings.STEALTH_HARDWARE_CONCURRENCY
-                    advanced_stealth = f"""
-                    // WebGL spoofing — randomized per context
-                    const getParameter = WebGLRenderingContext.prototype.getParameter;
-                    WebGLRenderingContext.prototype.getParameter = function(parameter) {{
-                        if (parameter === 37445) return '{_gl_vendor_js}';
-                        if (parameter === 37446) return '{_gl_renderer_js}';
-                        return getParameter.apply(this, arguments);
-                    }};
-                    // Also spoof WebGL2 if present
-                    if (typeof WebGL2RenderingContext !== 'undefined') {{
-                        const getParam2 = WebGL2RenderingContext.prototype.getParameter;
-                        WebGL2RenderingContext.prototype.getParameter = function(parameter) {{
-                            if (parameter === 37445) return '{_gl_vendor_js}';
-                            if (parameter === 37446) return '{_gl_renderer_js}';
-                            return getParam2.apply(this, arguments);
-                        }};
-                    }}
-
-                    // Hardware concurrency randomization
-                    Object.defineProperty(navigator, 'hardwareConcurrency', {{
-                        get: () => {hw_concurrency}
-                    }});
-
-                    // Battery status spoofing
-                    if (navigator.getBattery) {{
-                        navigator.getBattery = () => Promise.resolve({{
-                            charging: true,
-                            chargingTime: 0,
-                            dischargingTime: Infinity,
-                            level: 1
-                        }});
-                    }}
-                    """
-                    await context.add_init_script(advanced_stealth)
+            await self._inject_persisted_cookies(context, domain)
+            self._register_page_tracking(context)
+            await self._apply_stealth_evasion(context, is_stealth)
 
             self._contexts[context_key] = context
             self._context_use_count[context_key] = 1
             self._context_last_used[context_key] = time.time()
             self.active_contexts = len(self._contexts)
-
             return context
 
     # ── Per-request isolated context acquisition ────────────────────────
@@ -590,58 +528,7 @@ class BrowserPool:
     async def _ensure_browser(self) -> None:
         """Make sure playwright + browser are initialised (shared infra)."""
         async with self._lock:
-            if not self._playwright:
-                start = time.time()
-                self._playwright = await async_playwright().start()
-                self.startup_latency_ms = (time.time() - start) * 1000
-
-            if not self._browser or not self._browser.is_connected():
-                logger.info("[BrowserPool] Launching new Chromium instance (isolated path)")
-                # Atomic process-cap reservation. Release on failure paths
-                # to avoid leaking slots across restarts.
-                if not self._try_reserve_process_slot():
-                    msg = (
-                        f"[BrowserPool] Process cap reached "
-                        f"({settings.BROWSER_MAX_PROCESSES}). Refusing to launch a new Chromium process."
-                    )
-                    raise RuntimeError(msg)
-                browser_args: list[str] = []
-                if settings.BROWSER_SECURITY_HARDENING:
-                    browser_args.extend(
-                        [
-                            "--disable-dev-shm-usage",
-                            "--disable-extensions",
-                            "--disable-background-networking",
-                            "--disable-default-apps",
-                            "--disable-gpu",
-                            "--no-first-run",
-                        ],
-                    )
-                try:
-                    self._browser = await self._playwright.chromium.launch(
-                        headless=settings.PLAYWRIGHT_HEADLESS,
-                        args=browser_args or None,
-                    )
-                except (Error, OSError, RuntimeError):
-                    self.crash_count += 1
-                    logger.exception("[BrowserPool] Failed to launch browser (isolated path)")
-                    self._release_process_slot()
-                    try:
-                        from app.metrics_collector import record_browser_launch
-
-                        record_browser_launch(success=False)
-                    except (ImportError, RuntimeError, ValueError):
-                        logger.debug("[BrowserPool] Failed to record browser launch failure metric")
-                    raise
-                try:
-                    from app.metrics_collector import record_browser_launch
-
-                    record_browser_launch(success=True)
-                except (ImportError, RuntimeError, ValueError):
-                    logger.debug("[BrowserPool] Failed to record browser launch success metric")
-
-                if not self._cleanup_task or self._cleanup_task.done():
-                    self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+            await self._ensure_browser_launched_locked()
 
     # ── Utility ────────────────────────────────────────────────────────
 

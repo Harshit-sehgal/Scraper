@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_rbac_event
-from app.models import Job, JobStatus
+from app.models import Job, JobEventsResponse, JobResultsResponse, JobStatus
 from app.routers.jobs_state import JobStoreManager, is_worker_mode
 from app.services.job_state_machine import sync_from_db
 from app.storage_interface import get_job_repository
@@ -251,7 +251,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         dumped["results"] = results_list
         return dumped
 
-    @router.get("/api/jobs/{job_id}/results")
+    @router.get("/api/jobs/{job_id}/results", response_model=JobResultsResponse)
     async def get_job_results(
         job_id: str,
         auth: Annotated[
@@ -316,7 +316,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             "returned": len(page),
         }
 
-    @router.get("/api/jobs/{job_id}/events")
+    @router.get("/api/jobs/{job_id}/events", response_model=JobEventsResponse)
     async def get_job_events(
         job_id: str,
         auth: Annotated[

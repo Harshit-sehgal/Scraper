@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import threading
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -112,6 +113,7 @@ _DB_OPS_ERRORS: tuple[type[BaseException], ...] = (
     TypeError,
     ImportError,
 )
+_DB_OPS_ERRORS_LOCK = threading.Lock()
 
 
 def register_db_error_class(error_class: type[BaseException]) -> None:
@@ -119,8 +121,11 @@ def register_db_error_class(error_class: type[BaseException]) -> None:
     global _DB_OPS_ERRORS
     if not issubclass(error_class, BaseException):
         return
-    if error_class not in _DB_OPS_ERRORS:
-        _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, error_class)
+    # Read-test-set under lock to avoid lost updates when two drivers
+    # register concurrently (e.g. psycopg2 + psycopg3 at import time).
+    with _DB_OPS_ERRORS_LOCK:
+        if error_class not in _DB_OPS_ERRORS:
+            _DB_OPS_ERRORS = (*_DB_OPS_ERRORS, error_class)
 
 
 # ───────────────────────────────────────────────────────────────────────

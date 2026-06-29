@@ -31,7 +31,7 @@ def _sanitise_error(msg: str) -> str:
     return _PATH_PATTERN.sub("<path>", msg)
 
 
-@router.get("/")
+@router.get("/", response_model=dict)
 async def root():
     """Root path — API identification.
 
@@ -57,13 +57,13 @@ async def root():
     }
 
 
-@router.get("/health")
+@router.get("/health", response_model=dict)
 async def health():
     """Liveness probe — always returns 200 if the process is alive."""
     return {"status": "ok"}
 
 
-@router.get("/ready")
+@router.get("/ready", response_model=dict)
 async def ready():
     """Readiness probe — checks that the configured storage backend is reachable.
 

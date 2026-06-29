@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
+from app.models import AuditLogResponse
 from app.middlewares import rate_limiter as _rate_limiter
 from app.selector_discovery import analyze_url_for_fields
 from app.storage_interface import get_job_repository
@@ -54,7 +55,7 @@ class URLPreviewRequest(BaseModel):
 # ─── System / Storage Status ───────────────────────────────────────────
 
 
-@router.get("/api/system/storage/status")
+@router.get("/api/system/storage/status", response_model=dict)
 async def storage_status(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -63,7 +64,7 @@ async def storage_status(
     return await run_in_threadpool(repo.get_storage_status)
 
 
-@router.get("/api/system/status")
+@router.get("/api/system/status", response_model=dict)
 async def system_status(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -195,7 +196,7 @@ def _compute_job_counts() -> dict[str, Any]:
 # ─── Audit Log Endpoint ────────────────────────────────────────────────
 
 
-@router.get("/api/system/audit-log")
+@router.get("/api/system/audit-log", response_model=AuditLogResponse)
 async def get_audit_log(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
@@ -293,7 +294,7 @@ async def csp_violations(request: Request):
 # ─── Rate Limiter Stats ─────────────────────────────────────────────────
 
 
-@router.get("/api/system/rate-limit-stats")
+@router.get("/api/system/rate-limit-stats", response_model=dict)
 async def rate_limit_stats(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
@@ -321,7 +322,7 @@ async def rate_limit_stats(
 # ─── URL Analyzer Endpoint ──────────────────────────────────────────────
 
 
-@router.post("/api/url/analyze")
+@router.post("/api/url/analyze", response_model=dict)
 async def analyze_url(
     req: URLPreviewRequest,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],

@@ -20,6 +20,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.models import DeleteMyDataResponse
 from app.utils.rbac import UserRole, require_principal
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ def _owns_user_predicate(user_id: str):
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/data", status_code=200)
+@router.delete("/data", status_code=200, response_model=DeleteMyDataResponse)
 async def delete_my_data(
     auth: Annotated[
         tuple[UserRole, str, str, str],
@@ -262,7 +263,7 @@ async def delete_my_data(
 compliance_router = APIRouter(prefix="/api/compliance/gdpr", tags=["compliance"])
 
 
-@compliance_router.post("/forget", status_code=200)
+@compliance_router.post("/forget", status_code=200, response_model=DeleteMyDataResponse)
 async def gdpr_forget(
     auth: Annotated[
         tuple[UserRole, str, str, str],

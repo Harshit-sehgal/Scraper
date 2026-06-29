@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from typing import Any
 
@@ -101,6 +102,7 @@ _PAYPAL_STATUS_MAP: dict[str, SubscriptionStatus] = {
 # Shared across the PayPalClient instance and the webhook normalizer so
 # both see the same mapping even after an env-driven config change.
 _PLAN_ID_CACHE: dict[str, PlanTierId] | None = None
+_PLAN_ID_CACHE_LOCK = threading.Lock()
 
 
 def resolve_tier_from_plan_id(plan_id: str) -> PlanTierId:
@@ -114,12 +116,18 @@ def resolve_tier_from_plan_id(plan_id: str) -> PlanTierId:
     global _PLAN_ID_CACHE
     if not plan_id:
         return PlanTierId.FREE
-    if _PLAN_ID_CACHE is None:
-        # Build the cache once (module-level data, never changes).
-        # Detect collisions: if two env vars resolve to the same plan_id,
-        # the second wins silently (a copy-paste misconfiguration would
-        # otherwise bill STARTER customers at ENTERPRISE rates). Surface
-        # the contradiction so operators can fix it.
+    if _PLAN_ID_CACHE is not None:
+        return _PLAN_ID_CACHE.get(plan_id, PlanTierId.FREE)
+    # Build the cache once (module-level data, never changes).
+    # Detect collisions: if two env vars resolve to the same plan_id,
+    # the second wins silently (a copy-paste misconfiguration would
+    # otherwise bill STARTER customers at ENTERPRISE rates). Surface
+    # the contradiction so operators can fix it.
+    with _PLAN_ID_CACHE_LOCK:
+        # Re-check under lock (double-checked locking) so we don't
+        # rebuild the cache if a concurrent caller already finished.
+        if _PLAN_ID_CACHE is not None:
+            return _PLAN_ID_CACHE.get(plan_id, PlanTierId.FREE)
         cache: dict[str, PlanTierId] = {}
         collisions: list[tuple[str, PlanTierId, PlanTierId]] = []
         for tier, env_name in _PLAN_ID_ENV_BY_TIER.items():
@@ -405,13 +413,17 @@ class PayPalClient:
 # ---------------------------------------------------------------------------
 
 _paypal_client: PayPalClient | None = None
+_paypal_client_lock = threading.Lock()
 
 
 def get_paypal_client() -> PayPalClient:
     """Return the module-level PayPal client singleton."""
     global _paypal_client
-    if _paypal_client is None:
-        _paypal_client = PayPalClient()
+    if _paypal_client is not None:
+        return _paypal_client
+    with _paypal_client_lock:
+        if _paypal_client is None:
+            _paypal_client = PayPalClient()
     return _paypal_client
 
 
@@ -427,7 +439,8 @@ def reset_paypal_client(client: PayPalClient | None = None) -> None:
 def reset_plan_id_cache() -> None:
     """Invalidate the module-level plan-id → tier cache (for tests)."""
     global _PLAN_ID_CACHE
-    _PLAN_ID_CACHE = None
+    with _PLAN_ID_CACHE_LOCK:
+        _PLAN_ID_CACHE = None
 
 
 # ---------------------------------------------------------------------------

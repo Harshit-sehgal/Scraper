@@ -12,7 +12,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.health",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -236,7 +236,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "dict",
+      "response_model_if_known": "DeleteMyDataResponse",
       "router_module": "app.routers.user_data",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -252,7 +252,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -284,7 +284,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_read",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -300,7 +300,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "JobCreateResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -316,7 +316,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "ClearTerminalResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -332,7 +332,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -348,7 +348,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
+      "response_model_if_known": "Job",
       "router_module": "app.routers.jobs_read",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -364,7 +364,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -380,7 +380,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
+      "response_model_if_known": "JobEventsResponse",
       "router_module": "app.routers.jobs_read",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -444,7 +444,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "StatusResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -460,7 +460,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "StatusResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -476,7 +476,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -492,7 +492,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
+      "response_model_if_known": "JobResultsResponse",
       "router_module": "app.routers.jobs_read",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -508,7 +508,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "StatusResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -524,7 +524,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "StatusResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -540,7 +540,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -572,7 +572,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "dict",
+      "response_model_if_known": "RemoveDenylistResponse",
       "router_module": "app.routers.operator",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -700,7 +700,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -716,7 +716,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_read",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -732,7 +732,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -748,7 +748,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -1212,7 +1212,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scheduled_monitoring",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -1228,7 +1228,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scheduled_monitoring",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -1260,7 +1260,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scheduled_monitoring",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -1276,7 +1276,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.scheduled_monitoring",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -1292,7 +1292,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "ScheduledJobChangesResponse",
       "router_module": "app.routers.scheduled_monitoring",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -1308,7 +1308,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1820,7 +1820,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "",
+      "response_model_if_known": "SessionDestroyResponse",
       "router_module": "app.routers.session",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1836,7 +1836,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "",
+      "response_model_if_known": "SessionCreateResponse",
       "router_module": "app.routers.session",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1852,7 +1852,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "",
+      "response_model_if_known": "app.models.SessionAuthenticatedResponse \\| app.models.SessionUnauthenticatedResponse",
       "router_module": "app.routers.session",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -1900,7 +1900,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "admin",
-      "response_model_if_known": "dict",
+      "response_model_if_known": "AuditLogResponse",
       "router_module": "app.routers.system",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -2028,7 +2028,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.system",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -2140,7 +2140,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.system",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -2156,7 +2156,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.system",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -2188,7 +2188,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.system",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -2204,7 +2204,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "dict",
+      "response_model_if_known": "DeleteMyDataResponse",
       "router_module": "app.routers.user_data",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2220,7 +2220,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2236,7 +2236,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2252,7 +2252,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2268,7 +2268,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2284,7 +2284,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2316,7 +2316,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2332,7 +2332,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2348,7 +2348,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2364,7 +2364,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2380,7 +2380,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "",
+      "response_model_if_known": "WorkflowRunQueuedResponse",
       "router_module": "app.routers.workflow",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -2492,7 +2492,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.health",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"
@@ -2556,7 +2556,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.health",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"

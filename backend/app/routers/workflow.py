@@ -23,6 +23,7 @@ from app.models import (
     WorkflowCreate,
     WorkflowStatus,
     WorkflowUpdate,
+    WorkflowRunQueuedResponse,
 )
 from app.services.workflow_runner import (
     detect_fields_from_html,
@@ -200,7 +201,7 @@ def _write_back_draft(record: dict[str, Any]) -> None:
     _workflow_drafts.upsert(record_id, record)
 
 
-@draft_router.post("/from-url-analysis", status_code=201)
+@draft_router.post("/from-url-analysis", status_code=201, response_model=dict)
 async def create_workflow_draft_from_url_analysis(
     req: WorkflowDraftFromUrlAnalysisRequest,
     auth: Annotated[
@@ -246,7 +247,7 @@ async def create_workflow_draft_from_url_analysis(
     return draft
 
 
-@draft_router.post("/{draft_id}/detect-fields", status_code=200)
+@draft_router.post("/{draft_id}/detect-fields", status_code=200, response_model=dict)
 async def detect_workflow_draft_fields(
     draft_id: str,
     req: WorkflowDraftFieldDetectionRequest,
@@ -277,7 +278,7 @@ async def detect_workflow_draft_fields(
     }
 
 
-@draft_router.post("/{draft_id}/manual-mapping", status_code=201)
+@draft_router.post("/{draft_id}/manual-mapping", status_code=201, response_model=dict)
 async def create_workflow_from_manual_mapping(
     draft_id: str,
     req: WorkflowManualMappingRequest,
@@ -323,7 +324,7 @@ async def create_workflow_from_manual_mapping(
     return _workflow_to_dict(wf)
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=dict)
 async def create_workflow(
     req: WorkflowCreate,
     auth: Annotated[
@@ -376,7 +377,7 @@ async def create_workflow(
     return _workflow_to_dict(wf)
 
 
-@router.get("", status_code=200)
+@router.get("", status_code=200, response_model=dict)
 async def list_workflows(
     auth: Annotated[
         tuple[UserRole, str, str, str],
@@ -405,7 +406,7 @@ async def list_workflows(
     }
 
 
-@router.get("/{workflow_id}", status_code=200)
+@router.get("/{workflow_id}", status_code=200, response_model=dict)
 async def get_workflow(
     workflow_id: str,
     auth: Annotated[
@@ -417,7 +418,7 @@ async def get_workflow(
     return _get_visible_workflow(workflow_id, auth)
 
 
-@router.put("/{workflow_id}", status_code=200)
+@router.put("/{workflow_id}", status_code=200, response_model=dict)
 async def update_workflow(
     workflow_id: str,
     req: WorkflowUpdate,
@@ -458,7 +459,7 @@ async def update_workflow(
     return existing
 
 
-@router.patch("/{workflow_id}", status_code=200)
+@router.patch("/{workflow_id}", status_code=200, response_model=dict)
 async def patch_workflow(
     workflow_id: str,
     req: WorkflowUpdate,
@@ -490,7 +491,7 @@ async def delete_workflow(
         )
 
 
-@router.post("/{workflow_id}/run", status_code=202)
+@router.post("/{workflow_id}/run", status_code=202, response_model=WorkflowRunQueuedResponse)
 async def run_workflow(
     workflow_id: str,
     auth: Annotated[
@@ -624,7 +625,7 @@ async def get_workflow_run(
     return dict(run)
 
 
-@router.post("/{workflow_id}/preview", status_code=200)
+@router.post("/{workflow_id}/preview", status_code=200, response_model=dict)
 async def preview_workflow(
     workflow_id: str,
     auth: Annotated[

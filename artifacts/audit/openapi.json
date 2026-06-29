@@ -181,6 +181,36 @@
         "title": "ApiKeyResponse",
         "type": "object"
       },
+      "AuditLogResponse": {
+        "description": "Response model for GET /api/system/audit-log.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "items": {
+            "items": {},
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "category",
+          "items"
+        ],
+        "title": "AuditLogResponse",
+        "type": "object"
+      },
       "AupAcceptRequest": {
         "description": "Request body for recording AUP acceptance.",
         "properties": {
@@ -351,6 +381,89 @@
           "plan_tier"
         ],
         "title": "CheckoutResponse",
+        "type": "object"
+      },
+      "ClearTerminalResponse": {
+        "description": "Response model for DELETE /api/jobs/cleanup/terminal.",
+        "properties": {
+          "cleared": {
+            "title": "Cleared",
+            "type": "integer"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed"
+          },
+          "kept_recent": {
+            "title": "Kept Recent",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "message",
+          "cleared",
+          "kept_recent",
+          "remaining"
+        ],
+        "title": "ClearTerminalResponse",
+        "type": "object"
+      },
+      "DeleteMyDataResponse": {
+        "description": "Response model for DELETE /api/user/data.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "receipt": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Receipt",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Summary",
+            "type": "object"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "user_id",
+          "summary",
+          "message",
+          "receipt"
+        ],
+        "title": "DeleteMyDataResponse",
         "type": "object"
       },
       "DenylistAddRequest": {
@@ -1621,6 +1734,86 @@
         "title": "JobCreate",
         "type": "object"
       },
+      "JobCreateResponse": {
+        "description": "Response model for POST /api/jobs.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotent_replay": {
+            "title": "Idempotent Replay",
+            "type": "boolean"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "status",
+          "idempotent_replay"
+        ],
+        "title": "JobCreateResponse",
+        "type": "object"
+      },
+      "JobEventsResponse": {
+        "description": "Response model for GET /api/jobs/{job_id}/events.",
+        "properties": {
+          "events": {
+            "items": {},
+            "title": "Events",
+            "type": "array"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "events",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "JobEventsResponse",
+        "type": "object"
+      },
       "JobExtractionUpdate": {
         "description": "Request body to update per-job extraction behaviour flags.\n\nAll fields are optional; absent or ``null`` fields leave the existing value intact\n(or restore the platform default when the field is ``null``).  This lets callers\nPATCH a single knob without having to re-send the entire job config.",
         "properties": {
@@ -1732,6 +1925,57 @@
           }
         },
         "title": "JobHeadersUpdate",
+        "type": "object"
+      },
+      "JobResultsResponse": {
+        "description": "Response model for GET /api/jobs/{job_id}/results.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "results": {
+            "items": {},
+            "title": "Results",
+            "type": "array"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "results",
+          "total",
+          "limit",
+          "offset",
+          "returned"
+        ],
+        "title": "JobResultsResponse",
         "type": "object"
       },
       "JobStatus": {
@@ -2317,6 +2561,120 @@
         "title": "RegressionTestGenerateResponse",
         "type": "object"
       },
+      "RemoveDenylistResponse": {
+        "description": "Response model for DELETE /api/operator/denylist.",
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "path_prefix": {
+            "title": "Path Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "domain",
+          "path_prefix"
+        ],
+        "title": "RemoveDenylistResponse",
+        "type": "object"
+      },
+      "ScheduledJobChangesResponse": {
+        "description": "Response model for GET /api/scheduled/{job_id}/changes.",
+        "properties": {
+          "changes_detected": {
+            "title": "Changes Detected",
+            "type": "boolean"
+          },
+          "frequency": {
+            "title": "Frequency",
+            "type": "string"
+          },
+          "frequency_met": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Met"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_name": {
+            "title": "Job Name",
+            "type": "string"
+          },
+          "last_records_count": {
+            "title": "Last Records Count",
+            "type": "integer"
+          },
+          "last_run_at": {
+            "title": "Last Run At",
+            "type": "string"
+          },
+          "last_status": {
+            "title": "Last Status",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "previous_records_count": {
+            "title": "Previous Records Count",
+            "type": "integer"
+          },
+          "previous_status": {
+            "title": "Previous Status",
+            "type": "string"
+          },
+          "record_count_delta": {
+            "title": "Record Count Delta",
+            "type": "integer"
+          },
+          "status_changed": {
+            "title": "Status Changed",
+            "type": "boolean"
+          },
+          "summary_count": {
+            "title": "Summary Count",
+            "type": "integer"
+          },
+          "target_url": {
+            "title": "Target Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_name",
+          "target_url",
+          "frequency",
+          "changes_detected",
+          "last_run_at",
+          "last_status",
+          "previous_status",
+          "last_records_count",
+          "previous_records_count",
+          "record_count_delta",
+          "status_changed",
+          "summary_count",
+          "message"
+        ],
+        "title": "ScheduledJobChangesResponse",
+        "type": "object"
+      },
       "ScheduledJobFrequency": {
         "description": "How often a scheduled job should run.",
         "enum": [
@@ -2660,6 +3018,99 @@
           "top_domains"
         ],
         "title": "SelectorMemoryStatsResponse",
+        "type": "object"
+      },
+      "SessionAuthenticatedResponse": {
+        "description": "Response model for GET /api/session/me when authenticated.",
+        "properties": {
+          "authenticated": {
+            "title": "Authenticated",
+            "type": "boolean"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "authenticated"
+        ],
+        "title": "SessionAuthenticatedResponse",
+        "type": "object"
+      },
+      "SessionCreateResponse": {
+        "description": "Response model for POST /api/session.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "role",
+          "message"
+        ],
+        "title": "SessionCreateResponse",
+        "type": "object"
+      },
+      "SessionDestroyResponse": {
+        "description": "Response model for DELETE /api/session.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "SessionDestroyResponse",
+        "type": "object"
+      },
+      "SessionUnauthenticatedResponse": {
+        "description": "Response model for GET /api/session/me when not authenticated.",
+        "properties": {
+          "authenticated": {
+            "title": "Authenticated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authenticated"
+        ],
+        "title": "SessionUnauthenticatedResponse",
         "type": "object"
       },
       "SignupRequest": {
@@ -3211,6 +3662,40 @@
         "title": "WorkflowPreviewRequest",
         "type": "object"
       },
+      "WorkflowRunQueuedResponse": {
+        "description": "Response model for POST /api/workflows/{workflow_id}/run.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workflow_id": {
+            "title": "Workflow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "job_id",
+          "run_id",
+          "status",
+          "message"
+        ],
+        "title": "WorkflowRunQueuedResponse",
+        "type": "object"
+      },
       "WorkflowStatus": {
         "description": "Status of a saved workflow.",
         "enum": [
@@ -3442,7 +3927,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Root  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4017,9 +4506,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Gdpr Forget Api Compliance Gdpr Forget Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteMyDataResponse"
                 }
               }
             },
@@ -4050,7 +4537,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Discover Api Discover Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4188,7 +4679,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4231,7 +4724,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ClearTerminalResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4271,7 +4766,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Job Api Jobs  Job Id  Delete",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4362,7 +4861,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cancel Job Api Jobs  Job Id  Cancel Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4442,7 +4945,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/JobEventsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4700,7 +5205,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reclean Job Api Jobs  Job Id  Reclean Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4764,7 +5273,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/JobResultsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4911,7 +5422,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Redeliver Job Webhook Api Jobs  Job Id  Webhook Redeliver Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4952,9 +5467,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Remove Denylist Entry Api Operator Denylist Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RemoveDenylistResponse"
                 }
               }
             },
@@ -5048,7 +5561,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clear Recycle Bin Api Recycle Bin Delete",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5139,7 +5656,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Hard Delete Job Api Recycle Bin  Job Id  Delete",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5179,7 +5700,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Restore Job Api Recycle Bin  Job Id  Restore Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6298,7 +6823,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Scheduled Jobs Api Scheduled Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6401,7 +6930,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Scheduled Job Api Scheduled Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6476,7 +7009,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Scheduled Job Api Scheduled  Job Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6614,7 +7151,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Scheduled Job Api Scheduled  Job Id  Put",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6655,7 +7196,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledJobChangesResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6695,7 +7238,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Suggest Schema Api Schema Suggest Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7285,7 +7832,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDestroyResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7321,7 +7870,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCreateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7351,7 +7902,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionAuthenticatedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SessionUnauthenticatedResponse"
+                    }
+                  ],
+                  "title": "Response Get Session Api Session Me Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7404,9 +7965,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Audit Log Api System Audit Log Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AuditLogResponse"
                 }
               }
             },
@@ -7457,7 +8016,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rate Limit Stats Api System Rate Limit Stats Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7477,7 +8040,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response System Status Api System Status Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7497,7 +8064,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Storage Status Api System Storage Status Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7527,7 +8098,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Analyze Url Api Url Analyze Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7558,9 +8133,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete My Data Api User Data Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteMyDataResponse"
                 }
               }
             },
@@ -7591,7 +8164,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Workflow Draft From Url Analysis Api Workflow Drafts From Url Analysis Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7642,7 +8219,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Detect Workflow Draft Fields Api Workflow Drafts  Draft Id  Detect Fields Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7693,7 +8274,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Workflow From Manual Mapping Api Workflow Drafts  Draft Id  Manual Mapping Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7780,7 +8365,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Workflows Api Workflows Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7818,7 +8407,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Workflow Api Workflows Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7893,7 +8486,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Workflow Api Workflows  Workflow Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7942,7 +8539,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Workflow Api Workflows  Workflow Id  Patch",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7991,7 +8592,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Workflow Api Workflows  Workflow Id  Put",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -8049,7 +8654,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Workflow Api Workflows  Workflow Id  Preview Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -8090,7 +8699,9 @@
           "202": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunQueuedResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8249,7 +8860,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -8289,7 +8904,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Ready Ready Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
