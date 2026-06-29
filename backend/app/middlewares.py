@@ -297,10 +297,8 @@ async def api_key_middleware(request: Request, call_next):
                 project_id=auth_context.project_id,
             )
             if not allowed:
-                raise ValueError(
-                    f"quota exceeded for api_requests: "
-                    f"{details['current_usage'] + 1}/{details['limit']}"
-                )
+                _quota_msg = f"quota exceeded for api_requests: {details['current_usage'] + 1}/{details['limit']}"
+                raise ValueError(_quota_msg)
 
             get_usage_ledger().record_usage(
                 auth_context.user_id,
