@@ -31,7 +31,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.billing.models import PlanTierId, SubscriptionStatus
-from app.billing.service import resolve_tier_from_plan_id
+from app.billing.service import _redact_id, resolve_tier_from_plan_id
 from app.config import settings
 from app.utils.rbac import UserRole, require_principal, require_role
 
@@ -340,7 +340,7 @@ async def billing_webhook(request: Request) -> dict[str, str]:
 
     event_type, customer_id, data = _normalize_webhook(body)
 
-    logger.info("Billing webhook received: event=%s customer=%s", event_type, customer_id)
+    logger.info("Billing webhook received: event=%s customer=%s", event_type, _redact_id(customer_id))
 
     if not event_type:
         return {"status": "skipped", "reason": "No event_type provided"}
@@ -543,7 +543,7 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
                 existing.get("plan_tier", PlanTierId.FREE.value),
             )
         else:
-            logger.warning("SUSPENDED event for unknown customer=%s — no existing record to preserve", customer_id)
+            logger.warning("SUSPENDED event for unknown customer=%s — no existing record to preserve", _redact_id(customer_id))
 
     # -- Subscription cancelled / expired ------------------------------------
     elif (
@@ -560,7 +560,7 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
             tier=PlanTierId.FREE.value,
             status="canceled",
         )
-        logger.info("Subscription %s: customer=%s downgraded to free", event_type, customer_id)
+        logger.info("Subscription %s: customer=%s downgraded to free", event_type, _redact_id(customer_id))
 
     # -- Payment failed (subscription-level or sale-level) -------------------
     elif event_type == "invoice.payment_failed" or event_type in _PAYPAL_PAYMENT_FAILED_EVENTS:
@@ -572,13 +572,13 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
                 status=SubscriptionStatus.PAST_DUE.value,
                 subscription_id=existing.get("subscription_id", ""),
             )
-            logger.warning("Payment failed for customer=%s — status set to past_due", customer_id)
+            logger.warning("Payment failed for customer=%s — status set to past_due", _redact_id(customer_id))
         else:
-            logger.warning("Payment failed for unknown customer=%s — no existing record", customer_id)
+            logger.warning("Payment failed for unknown customer=%s — no existing record", _redact_id(customer_id))
 
     # -- Customer created ----------------------------------------------------
     elif event_type in ("customer.created", "CUSTOMER.CREATED"):
-        logger.info("Customer created: %s", customer_id)
+        logger.info("Customer created: %s", _redact_id(customer_id))
 
     # -- Payment completed / pending -----------------------------------------
     elif event_type in _PAYPAL_PAYMENT_COMPLETED_EVENTS:
@@ -591,9 +591,9 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
                 status=SubscriptionStatus.ACTIVE.value,
                 subscription_id=existing.get("subscription_id", ""),
             )
-            logger.info("Payment completed for customer=%s — subscription reactivated", customer_id)
+            logger.info("Payment completed for customer=%s — subscription reactivated", _redact_id(customer_id))
         else:
-            logger.info("Payment completed for unknown customer=%s — no existing record", customer_id)
+            logger.info("Payment completed for unknown customer=%s — no existing record", _redact_id(customer_id))
 
     else:
         logger.debug("Unhandled webhook event type: %s", event_type)
@@ -676,7 +676,7 @@ async def get_subscription(
 
         if is_env_backed_operator_cross_tenant(_role, org_id, project_id):
             _record_operator_cross_tenant(
-                f"billing: get_subscription all-access customer={customer_id} — role={_role.value} user={_user_id}"
+                f"billing: get_subscription all-access customer={_redact_id(customer_id)} — role={_role.value} user={_user_id}"
             )
         else:
             raise HTTPException(

@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -59,9 +59,31 @@ DEFAULT_MAX_RECORDS = 500
 DEFAULT_MAX_RUNTIME_SECONDS = 300
 DEFAULT_DELAY_BETWEEN_PAGES = 1.0
 
-_EXTRACTION_FAILED_MARKER: dict[str, str] = {"_extraction_failed": "true"}
-"""Sentinel record injected by ``_extract_current_page`` when the extraction
-function raises. Pagination strategies detect this marker and increment
+
+class _ExtractionFailedSentinel:
+    """Singleton sentinel for extraction failures during pagination.
+
+    Using a dedicated class + ``isinstance`` check is more robust than
+    comparing a dict marker with ``is`` (breaks if anyone copies the dict)
+    or ``== "true"`` (brittle if the value type changes).
+    """
+
+    _instance: _ExtractionFailedSentinel | None = None
+
+    def __new__(cls) -> _ExtractionFailedSentinel:  # noqa: PYI034 - singleton pattern
+        # Singleton sentinel — return the cached instance once created.
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return "<_EXTRACTION_FAILED>"
+
+
+_EXTRACTION_FAILED_MARKER = _ExtractionFailedSentinel()
+"""Sentinel value injected by ``_extract_current_page`` when the extraction
+function raises.  Pagination strategies detect this sentinel via
+``isinstance(rec, _ExtractionFailedSentinel)`` and increment
 ``PaginationResult.extraction_failures`` so the caller can surface partial
 data loss instead of silently returning a smaller-than-expected result set."""
 # ---------------------------------------------------------------------------
@@ -196,18 +218,21 @@ def _remove_duplicates(records: list[dict]) -> tuple[list[dict], int]:
     return unique, len(records) - len(unique)
 
 
-def _extract_marker_and_count(page_records: list[dict], result: PaginationResult) -> list[dict]:
+def _extract_marker_and_count(
+    page_records: Sequence[dict | _ExtractionFailedSentinel],
+    result: PaginationResult,
+) -> list[dict]:
     """Strip ``_EXTRACTION_FAILED_MARKER`` entries, count failures, return clean records.
 
     When the extraction function fails, :func:`_extract_current_page`
-    injects a sentinel ``{_EXTRACTION_FAILED: true}`` record. Pagination
+    injects a ``_ExtractionFailedSentinel`` record. Pagination
     strategies call this helper after each page to detect the marker,
     increment ``result.extraction_failures``, and strip the sentinel
     from the result list before extending ``result.records``.
     """
     clean: list[dict] = []
     for rec in page_records:
-        if rec is _EXTRACTION_FAILED_MARKER or rec.get("_extraction_failed") == "true":
+        if isinstance(rec, _ExtractionFailedSentinel):
             result.extraction_failures += 1
             continue
         clean.append(rec)
@@ -219,7 +244,10 @@ def _extract_marker_and_count(page_records: list[dict], result: PaginationResult
 # ---------------------------------------------------------------------------
 
 
-async def _extract_current_page(page: Any, extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None) -> list[dict]:
+async def _extract_current_page(
+    page: Any,
+    extract_fn: Callable[[Any], Awaitable[list[dict]]] | None = None,
+) -> Sequence[dict | _ExtractionFailedSentinel]:
     """Extract records from the current page using the provided extraction function.
 
     If no extraction function is provided, returns an empty list (caller

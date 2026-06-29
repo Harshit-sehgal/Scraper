@@ -2,6 +2,16 @@
   "largest_files": [
     {
       "classification": "test",
+      "loc": 6048,
+      "path": "backend/tests/fixtures/pages/large_catalog.html"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 5626,
+      "path": "frontend/dist/styles.css"
+    },
+    {
+      "classification": "test",
       "loc": 5395,
       "path": "backend/tests/fixtures/pages/38714795dea8.html"
     },
@@ -56,6 +66,16 @@
       "path": "backend/tests/fixtures/pages/e31500c37fa4.html"
     },
     {
+      "classification": "frontend_source",
+      "loc": 1986,
+      "path": "frontend/dist/chunks/chunk-LJTEMQIN.js"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 1986,
+      "path": "frontend/dist/chunks/chunk-MQBC5KK3.js"
+    },
+    {
       "classification": "test",
       "loc": 1961,
       "path": "backend/tests/fixtures/pages/76e7193c9867.html"
@@ -76,8 +96,13 @@
       "path": "backend/tests/fixtures/pages/e2650ac26583.html"
     },
     {
+      "classification": "frontend_source",
+      "loc": 1733,
+      "path": "frontend/dist/app.js"
+    },
+    {
       "classification": "backend_source",
-      "loc": 1481,
+      "loc": 1507,
       "path": "backend/app/saas/router.py"
     },
     {
@@ -137,33 +162,43 @@
     },
     {
       "classification": "backend_source",
-      "loc": 1118,
+      "loc": 1139,
       "path": "backend/app/worker_queue.py"
     },
     {
       "classification": "backend_source",
-      "loc": 1111,
+      "loc": 1132,
       "path": "backend/app/pagination_executor.py"
     },
     {
       "classification": "backend_source",
-      "loc": 1076,
+      "loc": 1081,
       "path": "backend/app/llm_bridge.py"
     },
     {
       "classification": "backend_router",
-      "loc": 1051,
+      "loc": 1057,
       "path": "backend/app/routers/experimental.py"
     },
     {
       "classification": "backend_source",
-      "loc": 1039,
+      "loc": 1046,
+      "path": "backend/app/extraction_orchestrator.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 1044,
       "path": "backend/app/postgres_repository_base.py"
     },
     {
       "classification": "backend_router",
-      "loc": 1026,
+      "loc": 1027,
       "path": "backend/app/routers/system.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 1008,
+      "path": "backend/app/models.py"
     },
     {
       "classification": "backend_source",
@@ -182,18 +217,13 @@
     },
     {
       "classification": "backend_source",
-      "loc": 964,
+      "loc": 974,
       "path": "backend/app/worker_queue_postgres_base.py"
     },
     {
       "classification": "backend_source",
-      "loc": 959,
+      "loc": 965,
       "path": "backend/app/storage_interface.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 956,
-      "path": "backend/app/extraction_orchestrator.py"
     },
     {
       "classification": "frontend_source",
@@ -202,13 +232,18 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 945,
+      "loc": 942,
       "path": "frontend/dashboard/dashboard.js"
     },
     {
       "classification": "backend_source",
       "loc": 936,
       "path": "backend/app/selector_engine.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 916,
+      "path": "backend/app/rate_limiter.py"
     },
     {
       "classification": "test",
@@ -222,13 +257,8 @@
     },
     {
       "classification": "backend_source",
-      "loc": 882,
+      "loc": 895,
       "path": "backend/app/scraper.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 864,
-      "path": "backend/app/rate_limiter.py"
     },
     {
       "classification": "test",
@@ -237,23 +267,23 @@
     },
     {
       "classification": "backend_source",
-      "loc": 853,
-      "path": "backend/app/browser_pool.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 825,
+      "loc": 831,
       "path": "backend/app/html_utils.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 817,
-      "path": "backend/app/models.py"
     },
     {
       "classification": "backend_source",
       "loc": 802,
       "path": "backend/app/topology_state.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 791,
+      "path": "backend/app/recovery_strategies.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 773,
+      "path": "backend/app/storage_migrations.py"
     },
     {
       "classification": "backend_source",
@@ -267,8 +297,8 @@
     },
     {
       "classification": "backend_source",
-      "loc": 769,
-      "path": "backend/app/recovery_strategies.py"
+      "loc": 764,
+      "path": "backend/app/browser_pool.py"
     },
     {
       "classification": "frontend_source",
@@ -287,13 +317,8 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 752,
+      "loc": 749,
       "path": "frontend/js/analyzer.js"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 738,
-      "path": "backend/app/storage_migrations.py"
     },
     {
       "classification": "backend_source",
@@ -316,14 +341,14 @@
       "path": "frontend/app.js"
     },
     {
+      "classification": "backend_source",
+      "loc": 708,
+      "path": "backend/app/metrics_collector.py"
+    },
+    {
       "classification": "test",
       "loc": 701,
       "path": "backend/tests/fixtures/pages/ab3e590b0cbc.html"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 698,
-      "path": "backend/app/metrics_collector.py"
     },
     {
       "classification": "backend_source",
@@ -349,6 +374,11 @@
       "classification": "test",
       "loc": 651,
       "path": "backend/tests/fixtures/pages/762d40cbf2ed.html"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 650,
+      "path": "backend/app/url_safety.py"
     },
     {
       "classification": "test",
@@ -377,7 +407,17 @@
     },
     {
       "classification": "frontend_source",
-      "loc": 640,
+      "loc": 645,
+      "path": "frontend/dist/chunks/chunk-FGQD52OP.js"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 645,
+      "path": "frontend/dist/chunks/chunk-RSWRJWIJ.js"
+    },
+    {
+      "classification": "frontend_source",
+      "loc": 637,
       "path": "frontend/js/results.js"
     },
     {
@@ -389,11 +429,6 @@
       "classification": "backend_source",
       "loc": 618,
       "path": "backend/app/job_store.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 618,
-      "path": "backend/app/url_safety.py"
     },
     {
       "classification": "test",
@@ -422,23 +457,23 @@
     },
     {
       "classification": "backend_source",
+      "loc": 592,
+      "path": "backend/app/billing/webhooks.py"
+    },
+    {
+      "classification": "backend_source",
+      "loc": 587,
+      "path": "backend/app/semantic_allocation_engine.py"
+    },
+    {
+      "classification": "backend_source",
       "loc": 586,
       "path": "backend/app/observability.py"
     },
     {
-      "classification": "backend_source",
-      "loc": 583,
-      "path": "backend/app/billing/webhooks.py"
-    },
-    {
       "classification": "backend_router",
-      "loc": 582,
+      "loc": 584,
       "path": "backend/app/routers/workflow.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 581,
-      "path": "backend/app/semantic_allocation_engine.py"
     },
     {
       "classification": "backend_source",
@@ -464,41 +499,6 @@
       "classification": "backend_service",
       "loc": 558,
       "path": "backend/app/services/exports.py"
-    },
-    {
-      "classification": "test",
-      "loc": 545,
-      "path": "backend/tests/test_regression_capture.py"
-    },
-    {
-      "classification": "test",
-      "loc": 544,
-      "path": "backend/tests/test_strategy_evolution.py"
-    },
-    {
-      "classification": "test",
-      "loc": 540,
-      "path": "backend/tests/fixtures/pages/714df5237eba.html"
-    },
-    {
-      "classification": "test",
-      "loc": 536,
-      "path": "backend/tests/test_p0_billing_usage.py"
-    },
-    {
-      "classification": "test",
-      "loc": 525,
-      "path": "backend/tests/test_migration_regression.py"
-    },
-    {
-      "classification": "test",
-      "loc": 522,
-      "path": "backend/tests/test_batch_exports.py"
-    },
-    {
-      "classification": "backend_source",
-      "loc": 516,
-      "path": "backend/app/chaos_scenarios.py"
     }
   ],
   "largest_symbols": [
@@ -519,20 +519,12 @@
       "path": "backend/app/semantic_world_state/topology.py"
     },
     {
-      "end_lineno": 1170,
+      "end_lineno": 1192,
       "kind": "class",
-      "lineno": 326,
-      "loc": 845,
+      "lineno": 333,
+      "loc": 860,
       "name": "WorkerQueue",
       "path": "backend/app/worker_queue.py"
-    },
-    {
-      "end_lineno": 872,
-      "kind": "class",
-      "lineno": 37,
-      "loc": 836,
-      "name": "BrowserPool",
-      "path": "backend/app/browser_pool.py"
     },
     {
       "end_lineno": 1084,
@@ -543,10 +535,10 @@
       "path": "backend/app/saas/identity_store.py"
     },
     {
-      "end_lineno": 1040,
+      "end_lineno": 1050,
       "kind": "class",
-      "lineno": 245,
-      "loc": 796,
+      "lineno": 254,
+      "loc": 797,
       "name": "PostgresWorkerQueueBase",
       "path": "backend/app/worker_queue_postgres_base.py"
     },
@@ -559,12 +551,20 @@
       "path": "backend/app/topology_state.py"
     },
     {
-      "end_lineno": 1164,
+      "end_lineno": 1169,
       "kind": "class",
-      "lineno": 415,
+      "lineno": 420,
       "loc": 750,
       "name": "PostgresRepositoryBase",
       "path": "backend/app/postgres_repository_base.py"
+    },
+    {
+      "end_lineno": 780,
+      "kind": "class",
+      "lineno": 37,
+      "loc": 744,
+      "name": "BrowserPool",
+      "path": "backend/app/browser_pool.py"
     },
     {
       "end_lineno": 694,
@@ -575,18 +575,10 @@
       "path": "backend/app/observability.py"
     },
     {
-      "end_lineno": 878,
-      "kind": "function",
-      "lineno": 274,
-      "loc": 605,
-      "name": "orchestrate_extraction",
-      "path": "backend/app/extraction_orchestrator.py"
-    },
-    {
-      "end_lineno": 1007,
+      "end_lineno": 1013,
       "kind": "class",
       "lineno": 426,
-      "loc": 582,
+      "loc": 588,
       "name": "SQLiteJobRepository",
       "path": "backend/app/storage_interface.py"
     },
@@ -599,10 +591,10 @@
       "path": "backend/app/manifold_state.py"
     },
     {
-      "end_lineno": 615,
+      "end_lineno": 618,
       "kind": "class",
       "lineno": 95,
-      "loc": 521,
+      "loc": 524,
       "name": "URLAnalysisPipeline",
       "path": "backend/app/services/url_analysis_pipeline.py"
     },
@@ -623,28 +615,36 @@
       "path": "backend/app/replay_buffer.py"
     },
     {
-      "end_lineno": 1180,
+      "end_lineno": 600,
+      "kind": "class",
+      "lineno": 97,
+      "loc": 504,
+      "name": "RegressionCapture",
+      "path": "backend/app/regression_capture.py"
+    },
+    {
+      "end_lineno": 1181,
       "kind": "function",
-      "lineno": 687,
+      "lineno": 688,
       "loc": 494,
       "name": "metrics",
       "path": "backend/app/routers/system.py"
     },
     {
-      "end_lineno": 563,
+      "end_lineno": 567,
       "kind": "function",
-      "lineno": 81,
+      "lineno": 85,
       "loc": 483,
       "name": "register_jobs_write_routes",
       "path": "backend/app/routers/jobs_write.py"
     },
     {
-      "end_lineno": 578,
+      "end_lineno": 524,
       "kind": "class",
-      "lineno": 97,
-      "loc": 482,
-      "name": "RegressionCapture",
-      "path": "backend/app/regression_capture.py"
+      "lineno": 53,
+      "loc": 472,
+      "name": "SelectorMemory",
+      "path": "backend/app/selector_memory.py"
     },
     {
       "end_lineno": 538,
@@ -663,6 +663,22 @@
       "path": "backend/app/chaos_scenarios.py"
     },
     {
+      "end_lineno": 538,
+      "kind": "class",
+      "lineno": 97,
+      "loc": 442,
+      "name": "CrawlPolicyEngine",
+      "path": "backend/app/crawl_policy.py"
+    },
+    {
+      "end_lineno": 528,
+      "kind": "function",
+      "lineno": 96,
+      "loc": 433,
+      "name": "run_sqlite_migrations",
+      "path": "backend/app/storage_migrations.py"
+    },
+    {
       "end_lineno": 452,
       "kind": "class",
       "lineno": 26,
@@ -671,28 +687,12 @@
       "path": "backend/app/semantic_inference_engine.py"
     },
     {
-      "end_lineno": 478,
+      "end_lineno": 513,
       "kind": "class",
-      "lineno": 53,
-      "loc": 426,
-      "name": "SelectorMemory",
-      "path": "backend/app/selector_memory.py"
-    },
-    {
-      "end_lineno": 521,
-      "kind": "class",
-      "lineno": 97,
-      "loc": 425,
-      "name": "CrawlPolicyEngine",
-      "path": "backend/app/crawl_policy.py"
-    },
-    {
-      "end_lineno": 501,
-      "kind": "function",
-      "lineno": 96,
-      "loc": 406,
-      "name": "run_sqlite_migrations",
-      "path": "backend/app/storage_migrations.py"
+      "lineno": 94,
+      "loc": 420,
+      "name": "CrawlFrontier",
+      "path": "backend/app/crawl_frontier.py"
     },
     {
       "end_lineno": 997,
@@ -711,20 +711,20 @@
       "path": "backend/tests/test_network_payload_extractor.py"
     },
     {
-      "end_lineno": 483,
-      "kind": "class",
-      "lineno": 94,
-      "loc": 390,
-      "name": "CrawlFrontier",
-      "path": "backend/app/crawl_frontier.py"
-    },
-    {
       "end_lineno": 399,
       "kind": "class",
       "lineno": 24,
       "loc": 376,
       "name": "HistoryState",
       "path": "backend/app/history_state.py"
+    },
+    {
+      "end_lineno": 453,
+      "kind": "class",
+      "lineno": 79,
+      "loc": 375,
+      "name": "UsageLedger",
+      "path": "backend/app/utils/usage_ledger.py"
     },
     {
       "end_lineno": 530,
@@ -743,12 +743,12 @@
       "path": "backend/app/anti_bot_engine.py"
     },
     {
-      "end_lineno": 744,
-      "kind": "function",
-      "lineno": 377,
-      "loc": 368,
-      "name": "fetch_page_content",
-      "path": "backend/app/html_utils.py"
+      "end_lineno": 682,
+      "kind": "class",
+      "lineno": 326,
+      "loc": 357,
+      "name": "DatabaseSlidingWindowCounter",
+      "path": "backend/app/rate_limiter.py"
     },
     {
       "end_lineno": 423,
@@ -757,22 +757,6 @@
       "loc": 354,
       "name": "JobRepository",
       "path": "backend/app/storage_interface.py"
-    },
-    {
-      "end_lineno": 901,
-      "kind": "function",
-      "lineno": 549,
-      "loc": 353,
-      "name": "scrape_url",
-      "path": "backend/app/scraper.py"
-    },
-    {
-      "end_lineno": 430,
-      "kind": "class",
-      "lineno": 79,
-      "loc": 352,
-      "name": "UsageLedger",
-      "path": "backend/app/utils/usage_ledger.py"
     },
     {
       "end_lineno": 1211,
@@ -791,33 +775,33 @@
       "path": "backend/app/routers/jobs_read.py"
     },
     {
-      "end_lineno": 634,
-      "kind": "class",
-      "lineno": 303,
-      "loc": 332,
-      "name": "DatabaseSlidingWindowCounter",
-      "path": "backend/app/rate_limiter.py"
+      "end_lineno": 416,
+      "kind": "function",
+      "lineno": 76,
+      "loc": 341,
+      "name": "run_scraping_phase",
+      "path": "backend/app/services/scraping.py"
     },
     {
-      "end_lineno": 445,
+      "end_lineno": 446,
       "kind": "class",
-      "lineno": 114,
+      "lineno": 115,
       "loc": 332,
       "name": "RecoveryStrategist",
       "path": "backend/app/recovery_strategies.py"
     },
     {
-      "end_lineno": 394,
+      "end_lineno": 395,
       "kind": "class",
-      "lineno": 63,
+      "lineno": 64,
       "loc": 332,
       "name": "SnapshotDesyncDetector",
       "path": "backend/app/snapshot_desync_detector.py"
     },
     {
-      "end_lineno": 1016,
+      "end_lineno": 1072,
       "kind": "class",
-      "lineno": 688,
+      "lineno": 744,
       "loc": 329,
       "name": "RateLimiterMiddleware",
       "path": "backend/app/rate_limiter.py"
@@ -839,14 +823,6 @@
       "path": "backend/app/strategy_evolution.py"
     },
     {
-      "end_lineno": 404,
-      "kind": "function",
-      "lineno": 84,
-      "loc": 321,
-      "name": "get_context",
-      "path": "backend/app/browser_pool.py"
-    },
-    {
       "end_lineno": 503,
       "kind": "function",
       "lineno": 184,
@@ -863,9 +839,9 @@
       "path": "backend/tests/test_worker_queue_postgres.py"
     },
     {
-      "end_lineno": 400,
+      "end_lineno": 401,
       "kind": "class",
-      "lineno": 96,
+      "lineno": 97,
       "loc": 305,
       "name": "GossipSubstrate",
       "path": "backend/app/gossip_substrate.py"
@@ -895,18 +871,18 @@
       "path": "backend/app/trend_analyzer.py"
     },
     {
-      "end_lineno": 365,
+      "end_lineno": 915,
       "kind": "function",
-      "lineno": 75,
-      "loc": 291,
-      "name": "run_scraping_phase",
-      "path": "backend/app/services/scraping.py"
+      "lineno": 619,
+      "loc": 297,
+      "name": "scrape_url",
+      "path": "backend/app/scraper.py"
     },
     {
-      "end_lineno": 418,
+      "end_lineno": 423,
       "kind": "function",
-      "lineno": 129,
-      "loc": 290,
+      "lineno": 131,
+      "loc": 293,
       "name": "scrape_url_with_recovery",
       "path": "backend/app/scraper_recovery_integration.py"
     },
@@ -919,25 +895,17 @@
       "path": "backend/tests/test_three_way_acquisition.py"
     },
     {
-      "end_lineno": 331,
-      "kind": "function",
-      "lineno": 59,
-      "loc": 273,
-      "name": "lifespan",
-      "path": "backend/app/lifespan.py"
-    },
-    {
-      "end_lineno": 355,
+      "end_lineno": 374,
       "kind": "class",
-      "lineno": 86,
-      "loc": 270,
+      "lineno": 93,
+      "loc": 282,
       "name": "DomainEvolutionModel",
       "path": "backend/app/domain_evolution_model.py"
     },
     {
-      "end_lineno": 683,
+      "end_lineno": 684,
       "kind": "function",
-      "lineno": 415,
+      "lineno": 416,
       "loc": 269,
       "name": "_render_basic_metrics_text",
       "path": "backend/app/routers/system.py"
@@ -983,6 +951,14 @@
       "path": "backend/tests/test_degradation_predictor.py"
     },
     {
+      "end_lineno": 424,
+      "kind": "class",
+      "lineno": 172,
+      "loc": 253,
+      "name": "PayPalClient",
+      "path": "backend/app/billing/service.py"
+    },
+    {
       "end_lineno": 272,
       "kind": "class",
       "lineno": 21,
@@ -991,20 +967,20 @@
       "path": "backend/tests/test_replay_buffer.py"
     },
     {
-      "end_lineno": 384,
+      "end_lineno": 302,
       "kind": "class",
-      "lineno": 139,
+      "lineno": 55,
+      "loc": 248,
+      "name": "SelectorDecayPredictor",
+      "path": "backend/app/selector_decay_predictor.py"
+    },
+    {
+      "end_lineno": 385,
+      "kind": "class",
+      "lineno": 140,
       "loc": 246,
       "name": "DomainHealthMonitor",
       "path": "backend/app/domain_health_alerts.py"
-    },
-    {
-      "end_lineno": 299,
-      "kind": "class",
-      "lineno": 54,
-      "loc": 246,
-      "name": "SelectorDecayPredictor",
-      "path": "backend/app/selector_decay_predictor.py"
     },
     {
       "end_lineno": 293,
@@ -1021,14 +997,6 @@
       "loc": 243,
       "name": "TestRecoveryExecutor",
       "path": "backend/tests/test_scraper_recovery.py"
-    },
-    {
-      "end_lineno": 385,
-      "kind": "class",
-      "lineno": 148,
-      "loc": 238,
-      "name": "PayPalClient",
-      "path": "backend/app/billing/service.py"
     },
     {
       "end_lineno": 449,
@@ -1087,9 +1055,9 @@
       "path": "backend/tests/test_session_recovery.py"
     },
     {
-      "end_lineno": 239,
+      "end_lineno": 240,
       "kind": "class",
-      "lineno": 18,
+      "lineno": 19,
       "loc": 222,
       "name": "SemanticOS",
       "path": "backend/app/semantic_os.py"
@@ -1191,9 +1159,17 @@
       "path": "backend/tests/test_saas_email_identity.py"
     },
     {
-      "end_lineno": 254,
+      "end_lineno": 996,
       "kind": "function",
-      "lineno": 57,
+      "lineno": 796,
+      "loc": 201,
+      "name": "orchestrate_extraction",
+      "path": "backend/app/extraction_orchestrator.py"
+    },
+    {
+      "end_lineno": 255,
+      "kind": "function",
+      "lineno": 58,
       "loc": 198,
       "name": "delete_my_data",
       "path": "backend/app/routers/user_data.py"
@@ -1223,6 +1199,14 @@
       "path": "backend/app/models.py"
     },
     {
+      "end_lineno": 331,
+      "kind": "function",
+      "lineno": 139,
+      "loc": 193,
+      "name": "_scrape_single_url",
+      "path": "backend/app/services/scraping.py"
+    },
+    {
       "end_lineno": 332,
       "kind": "class",
       "lineno": 140,
@@ -1247,9 +1231,9 @@
       "path": "backend/app/instability_state.py"
     },
     {
-      "end_lineno": 402,
+      "end_lineno": 408,
       "kind": "function",
-      "lineno": 214,
+      "lineno": 220,
       "loc": 189,
       "name": "build_allocation_graph",
       "path": "backend/app/semantic_allocation_engine.py"
@@ -1263,17 +1247,33 @@
       "path": "backend/tests/test_postgres_repository.py"
     },
     {
-      "end_lineno": 793,
+      "end_lineno": 221,
+      "kind": "class",
+      "lineno": 34,
+      "loc": 188,
+      "name": "TestApiKeyManagement",
+      "path": "backend/tests/test_saas_api_keys.py"
+    },
+    {
+      "end_lineno": 226,
+      "kind": "class",
+      "lineno": 42,
+      "loc": 185,
+      "name": "BenchmarkReporter",
+      "path": "backend/app/benchmark_reporter.py"
+    },
+    {
+      "end_lineno": 829,
       "kind": "function",
-      "lineno": 609,
+      "lineno": 645,
       "loc": 185,
       "name": "run_postgres_migrations",
       "path": "backend/app/storage_migrations.py"
     },
     {
-      "end_lineno": 342,
+      "end_lineno": 343,
       "kind": "class",
-      "lineno": 159,
+      "lineno": 160,
       "loc": 184,
       "name": "SelectorQualityPredictor",
       "path": "backend/app/selector_ml_optimizer.py"
@@ -1287,22 +1287,22 @@
       "path": "backend/tests/test_priority_queue.py"
     },
     {
-      "end_lineno": 309,
-      "kind": "function",
-      "lineno": 129,
-      "loc": 181,
-      "name": "_scrape_single_url",
-      "path": "backend/app/services/scraping.py"
-    },
-    {
       "end_lineno": 413,
       "kind": "class",
       "lineno": 233,
       "loc": 181,
       "name": "TestBestEffortRollback",
       "path": "backend/tests/test_semantic_lifecycle.py"
+    },
+    {
+      "end_lineno": 291,
+      "kind": "function",
+      "lineno": 114,
+      "loc": 178,
+      "name": "run_drill",
+      "path": "scripts/staging_smoke_test.py"
     }
   ],
-  "python_symbol_count": 11301,
-  "source_file_count": 923
+  "python_symbol_count": 11687,
+  "source_file_count": 952
 }
