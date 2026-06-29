@@ -289,6 +289,10 @@ class TestRealWorkerHandler:
             hydration_wait_ms=None,
             scroll_attempts=None,
             fetch_strategy=None,
+            wait_for_selector=None,
+            wait_for_function=None,
+            wait_for_timeout=None,
+            wait_for_navigation=None,
         ):
             sample_records = [
                 {

@@ -104,6 +104,7 @@ async def run_post_extraction_processing(
 
     """
     result_warnings: list[str] = []
+    quality_report: dict[str, Any] = {}
 
     if results:
         from app.scraper import _boost_contacts_with_page_html, process_raw_records
@@ -136,6 +137,36 @@ async def run_post_extraction_processing(
                 len(expanded),
             )
             results = expanded
+
+        # Page-type classification
+        from app.page_type_classifier import classify_page_type
+
+        page_type_result = classify_page_type(
+            html,
+            url=url,
+            record_count=len(results),
+            has_schema_org=any(r.get("_schema_org_type") for r in results),
+        )
+        for r in results:
+            r["_page_type"] = page_type_result.page_type.value
+            r["_page_type_confidence"] = page_type_result.confidence
+
+        # Data quality pipeline (cleaning + validation + scoring)
+        from app.data_quality import run_quality_pipeline
+
+        quality_report = run_quality_pipeline(results, schema_fields)
+        valid = quality_report.get("valid_records")
+        results = valid if valid is not None else results
+        for r in results:
+            r["_quality_score"] = quality_report.get("quality_score", 0.0)
+
+        # Outlier flagging for numeric fields
+        from app.utils.quality import flag_outlier_records
+
+        _NUMERIC_FIELD_TYPES = {"integer", "float", "number", "currency", "percentage", "rating"}
+        numeric_fields = [f for f in schema_fields if f.field_type in _NUMERIC_FIELD_TYPES]
+        for nf in numeric_fields:
+            results = flag_outlier_records(results, field=nf.name, method="iqr")
 
         # Scoring / dedup
         selector_meta = build_selector_field_metadata(
@@ -171,6 +202,10 @@ async def run_post_extraction_processing(
         r["_extraction_source"] = ext_result.method
         r["_extraction_confidence"] = r.get("record_score", 0.8)
         r["_extraction_provenance"] = ext_result.selectors
+
+    # Append quality pipeline warnings to result_warnings
+    if quality_report and quality_report.get("warnings"):
+        result_warnings.extend(quality_report["warnings"])
 
     # Telemetry recording
     from app.llm_bridge import get_llm_call_count

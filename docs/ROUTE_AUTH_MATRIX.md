@@ -4,7 +4,7 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 150
+**API route rows:** 176
 **Unknown auth rows:** 0
 **Unknown tenant-scope rows:** 0
 
@@ -27,22 +27,38 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
 | `POST` | `/api/compliance/gdpr/forget` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/download/{filename}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | unknown | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/batch` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/cleanup/terminal` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `DELETE` | `/api/jobs/{job_id}` | protected | admin | require_role | yes | yes | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/jobs/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs/{job_id}/cancel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/clone` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/jobs/{job_id}/debug` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/jobs/{job_id}/diff` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/jobs/{job_id}/email` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/events` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/jobs/{job_id}/export/csv` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/excel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/json` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/extraction` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/fetch-strategy` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/headers` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/jobs/{job_id}/notification-channels` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs/{job_id}/notification-channels` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/jobs/{job_id}/notification-channels/{channel_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/notification-channels/{channel_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/jobs/{job_id}/quality` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/jobs/{job_id}/quality/trends` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs/{job_id}/reclean` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/jobs/{job_id}/results` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/results` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `PATCH` | `/api/jobs/{job_id}/strategy` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/user-agent` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/wait-conditions` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/webhook` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/jobs/{job_id}/webhook/redeliver` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/operator/dashboard` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
@@ -110,6 +126,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/scraper/regressions/generate-all-tests` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/scraper/regressions/{entry_id}` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/scraper/regressions/{entry_id}/generate-test` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
+| `POST` | `/api/scraper/screenshot` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/scraper/selectors/cleanup` | protected | admin | require_role | yes | no | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/scraper/selectors/domain/{domain}` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/scraper/selectors/low-confidence` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
@@ -134,6 +151,8 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/system/csp-violations` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/system/domain-policy` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/export/knowledge` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
+| `GET` | `/api/system/extraction-health` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/system/extraction-rate` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/system/history/topology` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `POST` | `/api/system/merge/knowledge` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
 | `GET` | `/api/system/observability` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
@@ -147,7 +166,14 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/system/status` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/system/storage/status` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/system/topology` | protected | admin | require_role, verify_experimental_enabled | yes | no | yes | experimental | require_role/admin-only dependency |
+| `GET` | `/api/templates` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/templates` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `DELETE` | `/api/templates/{template_id}` | protected | admin | require_principal | yes | yes | yes | stable | require_role/admin-only dependency |
+| `GET` | `/api/templates/{template_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `PATCH` | `/api/templates/{template_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/url/analyze` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/usage/stats` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/usage/stats/record` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/user/data` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/workflow-drafts/from-url-analysis` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/workflow-drafts/{draft_id}/detect-fields` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |

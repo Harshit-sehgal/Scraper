@@ -81,7 +81,7 @@ class TestStealthInitScript:
         js = _build_stealth_init_script()
         for line in js.split("\n"):
             stripped = line.strip()
-            if stripped.startswith("'") or stripped.startswith('"'):
+            if stripped.startswith(("'", '"')):
                 assert "'\\n'" not in stripped and '"\\n"' not in stripped
 
 
@@ -107,10 +107,6 @@ class TestDataImageDetection:
         assert _has_data_image_empty_refs(text) == []
 
     def test_browser_webdriver_set_in_init_script(self) -> None:
-        from app.browser_pool import BrowserPool
-
-        pool = BrowserPool()
-        script = pool._apply_stealth_evasion.__code__
         source_lines = [
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})",
             "window.chrome = { runtime: {} }",

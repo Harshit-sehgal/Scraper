@@ -23,8 +23,8 @@ from app.utils.quality import (
 from app.utils.rbac import UserRole, require_role
 
 __all__ = [
-    "UserRole",
     "DedupConfig",
+    "UserRole",
     "build_quality_report",
     "compute_source_breakdown",
     "configurable_deduplicate_records",

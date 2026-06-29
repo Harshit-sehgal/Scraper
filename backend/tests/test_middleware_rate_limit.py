@@ -155,7 +155,7 @@ class TestRateLimiterMiddleware:
         request.url.path = "/health"
         request.method = "GET"
         call_next = AsyncMock(return_value=MagicMock())
-        _response = await rl.middleware(request, call_next)
+        await rl.middleware(request, call_next)
         call_next.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -165,7 +165,7 @@ class TestRateLimiterMiddleware:
         request.url.path = "/docs"
         request.method = "GET"
         call_next = AsyncMock(return_value=MagicMock())
-        _response = await rl.middleware(request, call_next)
+        await rl.middleware(request, call_next)
         call_next.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -175,7 +175,7 @@ class TestRateLimiterMiddleware:
         request.url.path = "/openapi.json"
         request.method = "GET"
         call_next = AsyncMock(return_value=MagicMock())
-        _response = await rl.middleware(request, call_next)
+        await rl.middleware(request, call_next)
         call_next.assert_awaited_once()
 
     def test_trusted_proxy_detection(self) -> None:

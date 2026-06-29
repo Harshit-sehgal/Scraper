@@ -329,6 +329,48 @@ class JobRecleanerService:
             }
             job.quality_report = quality
             await save_job(job)
+
+            # Record quality trend after reclean
+            try:
+                from app.data_quality import score_records as _score_records
+                from app.utils.log_redaction import redact_pii
+                from app.utils.quality_trends import get_trend_store
+
+                trend_store = get_trend_store()
+                per_rec = _score_records(list(job.results), job.schema_fields)
+                if per_rec:
+                    rec_overall = sum(r["overall"] for r in per_rec) / len(per_rec)
+                    rec_field_mean: dict[str, float] = {}
+                    rec_all_keys: set[str] = set()
+                    for r in per_rec:
+                        rec_all_keys.update(r["field_scores"].keys())
+                    for k in rec_all_keys:
+                        vals = [r["field_scores"][k] for r in per_rec if k in r["field_scores"]]
+                        if vals:
+                            rec_field_mean[k] = round(sum(vals) / len(vals), 4)
+                else:
+                    rec_overall = 0.0
+                    rec_field_mean = {}
+
+                rec_shash = trend_store.schema_hash(job.schema_fields)
+                rec_domain = trend_store.domain_for_url(job.urls[0]) if job.urls else "unknown"
+                rec_regressed = trend_store.record(
+                    domain=rec_domain,
+                    schema_hash=rec_shash,
+                    score=round(rec_overall, 3),
+                    job_id=job.id,
+                    field_scores=rec_field_mean,
+                )
+                if rec_regressed:
+                    logger.warning(
+                        "Quality regression detected after reclean for domain=%s schema=%s score=%.3f job=%s",
+                        redact_pii(rec_domain),
+                        rec_shash[:8],
+                        rec_overall,
+                        job.id,
+                    )
+            except (ImportError, RuntimeError, ValueError) as rec_exc:
+                logger.debug("Quality trend recording after reclean skipped: %s", rec_exc)
         except (RuntimeError, OSError, ValueError) as e:
             logger.exception(
                 "Job %s: Reclean failed irrecoverably, restoring previous status %s",

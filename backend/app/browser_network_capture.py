@@ -550,19 +550,28 @@ async def setup_network_capture(page) -> tuple[list[dict], list[dict]]:
         except Exception as e:
             logger.debug("[BrowserNetwork] Error capturing response: %s", e)
 
-    captured_console: list[dict[str, str]] = []
+    captured_console: list[dict[str, Any]] = []
 
     async def _on_console(msg: Any) -> None:
         try:
             args = [await arg.json_value() for arg in msg.args]
         except Exception:
             args = [str(arg) for arg in msg.args]
-        captured_console.append({
-            "type": msg.type,
-            "text": msg.text,
-            "location": f"{msg.location.url}:{msg.location.line_number}",
-            "args": args[:5],
-        })
+        location = getattr(msg, "location", None)
+        if isinstance(location, dict):
+            location_url = str(location.get("url", ""))
+            line_number = str(location.get("lineNumber") or location.get("line_number") or "")
+        else:
+            location_url = str(getattr(location, "url", ""))
+            line_number = str(getattr(location, "line_number", ""))
+        captured_console.append(
+            {
+                "type": msg.type,
+                "text": msg.text,
+                "location": f"{location_url}:{line_number}",
+                "args": [str(arg) for arg in args[:5]],
+            }
+        )
 
     page.on("response", _on_response)
     page.on("console", _on_console)

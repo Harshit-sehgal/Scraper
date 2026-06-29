@@ -1,4 +1,9 @@
-"""Qual 4: Quality trend tracking — store quality scores per-domain per-schema over time."""
+"""Qual 4: Quality trend tracking — store quality scores per-domain per-schema over time.
+
+Comprehensive tests for Roadmap Wave 7 Item 4 (in-memory trend store,
+threshold alerting, per-field breakdown).
+"""
+
 from __future__ import annotations
 
 import json
@@ -15,7 +20,10 @@ def _make_quality_report(
     n_filtered: int = 9,
     n_radius: int = 8,
 ) -> dict[str, Any]:
-    results = [{"record_score": 0.8 + i * 0.02, "source_url": f"https://{domain}/page/{i}", "source_trust_score": 0.7} for i in range(n_raw)]
+    results = [
+        {"record_score": 0.8 + i * 0.02, "source_url": f"https://{domain}/page/{i}", "source_trust_score": 0.7}
+        for i in range(n_raw)
+    ]
     final_results = results[:n_final] if n_final < n_raw else results
     return build_quality_report(
         raw_results=results,

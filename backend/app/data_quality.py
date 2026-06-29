@@ -10,8 +10,10 @@ Provides a deterministic pipeline for improving extracted data quality:
 from __future__ import annotations
 
 import json
+import math
 import re
 import urllib.parse
+from dataclasses import dataclass
 from typing import Any
 
 from app.models import FieldType, SchemaField
@@ -200,6 +202,183 @@ VALIDATORS = {
 
 
 # ---------------------------------------------------------------------------
+# Field-level type validation (Roadmap Wave 7, Item 2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FieldTypeMismatch:
+    """Single field-level type violation with diagnostic detail."""
+
+    field: str  # SchemaField.name
+    declared_type: str  # FieldType.value string
+    actual_value: Any  # The raw value as it arrived (pre-cleaning)
+    expected: str  # Human description, e.g. "numeric value"
+    error: str  # Short reason, e.g. "invalid email format"
+
+
+def _check_numeric(value: Any) -> tuple[bool, str | None]:
+    """Return (True, None) if *value* is numeric; (False, reason) otherwise."""
+    # bool subclasses int — reject it explicitly
+    if isinstance(value, bool):
+        return False, "expected numeric value, got boolean"
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and not math.isfinite(value):
+            return False, "numeric value is not finite (inf/nan)"
+        return True, None
+    if isinstance(value, str):
+        cleaned = re.sub(r"[$€£¥₹%,]", "", value.strip()).replace(",", "")
+        try:
+            float(cleaned)
+            return True, None
+        except ValueError:
+            return False, f"string '{value}' is not a valid number"
+    return False, f"expected numeric value, got {type(value).__name__}"
+
+
+def _check_email(value: Any) -> tuple[bool, str | None]:
+    """Return (True, None) if *value* is a valid email; (False, reason) otherwise."""
+    if not isinstance(value, str):
+        return False, f"expected string, got {type(value).__name__}"
+    if not value.strip():
+        return True, None  # emptiness handled by completeness, not type check
+    # Practical RFC 5322 subset (matches existing pattern in quality._value_quality)
+    if re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", value.strip()):
+        return True, None
+    return False, "invalid email format"
+
+
+def _check_url(value: Any) -> tuple[bool, str | None]:
+    """Return (True, None) if *value* is a valid URL; (False, reason) otherwise."""
+    if not isinstance(value, str):
+        return False, f"expected string, got {type(value).__name__}"
+    if not value.strip():
+        return True, None  # emptiness handled by completeness
+    try:
+        parsed = urllib.parse.urlparse(value.strip())
+    except (ValueError, UnicodeDecodeError):
+        return False, "invalid URL format"
+    if parsed.scheme.lower() == "javascript":
+        return False, "javascript: URI scheme is not a valid URL"
+    if parsed.scheme not in ("http", "https"):
+        return False, "invalid URL scheme (expected http or https)"
+    if not parsed.netloc:
+        return False, "URL is missing network location (host)"
+    return True, None
+
+
+def _check_date(value: Any) -> tuple[bool, str | None]:
+    """Return (True, None) if *value* is a parseable date; (False, reason) otherwise."""
+    if not isinstance(value, str):
+        return False, f"expected string, got {type(value).__name__}"
+    if not value.strip():
+        return True, None  # emptiness handled by completeness
+    import datetime as _dt
+
+    text = value.strip()
+    # Try ISO 8601 first
+    try:
+        _dt.date.fromisoformat(text[:10])
+        return True, None
+    except (ValueError, IndexError):
+        pass
+    try:
+        _dt.datetime.fromisoformat(text)
+        return True, None
+    except (ValueError, IndexError):
+        pass
+    # Common formats: YYYY-M[M]-D[D], D[D]/M[M]/YYYY, month name forms
+    if re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", text):
+        return True, None
+    if re.search(r"\d{1,2}[-/]\d{1,2}[-/]\d{4}", text):
+        return True, None
+    if re.search(
+        r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}",
+        text,
+        re.IGNORECASE,
+    ):
+        return True, None
+    if re.search(
+        r"\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}",
+        text,
+        re.IGNORECASE,
+    ):
+        return True, None
+    return False, "unparseable date"
+
+
+def _check_boolean(value: Any) -> tuple[bool, str | None]:
+    """Return (True, None) if *value* is a boolean; (False, reason) otherwise."""
+    if isinstance(value, bool):
+        return True, None
+    return False, f"expected boolean, got {type(value).__name__}"
+
+
+# Registry mapping FieldType to type-checker functions.
+# Absent keys are "not type-checkable" and are omitted from conformance ratios.
+TYPE_CHECKERS: dict[FieldType, Any] = {
+    FieldType.INTEGER: _check_numeric,
+    FieldType.FLOAT: _check_numeric,
+    FieldType.NUMBER: _check_numeric,
+    FieldType.CURRENCY: _check_numeric,
+    FieldType.PERCENTAGE: _check_numeric,
+    FieldType.RATING: _check_numeric,
+    FieldType.EMAIL: _check_email,
+    FieldType.URL: _check_url,
+    FieldType.DATE: _check_date,
+    FieldType.BOOLEAN: _check_boolean,
+}
+
+
+def validate_field_types(
+    record: dict,
+    schema_fields: list[SchemaField],
+) -> list[FieldTypeMismatch]:
+    """Validate every non-empty value against its declared FieldType.
+
+    Returns a (possibly empty) list of mismatches.  Empty / missing values
+    are *not* flagged — emptiness is captured by the completeness score.
+    """
+    mismatches: list[FieldTypeMismatch] = []
+    for field in schema_fields:
+        checker = TYPE_CHECKERS.get(field.field_type)
+        if checker is None:
+            continue  # not type-checkable (STRING, CODE, etc.)
+        value = record.get(field.name)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue  # emptiness is a completeness issue, not a type issue
+        ok, reason = checker(value)
+        if not ok:
+            expected = {
+                FieldType.INTEGER: "numeric value",
+                FieldType.FLOAT: "numeric value",
+                FieldType.NUMBER: "numeric value",
+                FieldType.CURRENCY: "numeric value",
+                FieldType.PERCENTAGE: "numeric value",
+                FieldType.RATING: "numeric value",
+                FieldType.EMAIL: "RFC 5322 email address",
+                FieldType.URL: "http(s) URL",
+                FieldType.DATE: "parseable date",
+                FieldType.BOOLEAN: "boolean value",
+            }.get(field.field_type, "valid value")
+            mismatches.append(
+                FieldTypeMismatch(
+                    field=field.name,
+                    declared_type=field.field_type.value,
+                    actual_value=value,
+                    expected=expected,
+                    error=reason or "type mismatch",
+                )
+            )
+    return mismatches
+
+
+def is_record_type_valid(record: dict, schema_fields: list[SchemaField]) -> bool:
+    """True iff no type mismatches found in *record*."""
+    return len(validate_field_types(record, schema_fields)) == 0
+
+
+# ---------------------------------------------------------------------------
 # Quality Score
 # ---------------------------------------------------------------------------
 
@@ -324,6 +503,113 @@ def score_record(record: dict, schema_fields: list[SchemaField]) -> float:
     return sum(field_scores) / len(field_scores)
 
 
+def score_record_detailed(
+    record: dict,
+    schema_fields: list[SchemaField],
+) -> dict[str, Any]:
+    """Compute a per-record quality score with diagnostic breakdown.
+
+    Returns dict with keys:
+        overall: float              # 0..1 weighted blend
+        completeness: float         # populated_fields / total_fields
+        type_conformance: float     # type-valid checkable fields / total_checkable_fields
+        plausibility: float         # average _field_score
+        field_scores: dict[str, float]     # per-field plausibility
+        field_type_valid: dict[str, bool]  # per-field type pass/fail
+        missing_fields: list[str]          # fields with None/""
+        mismatched_fields: list[str]       # fields with type mismatches
+    """
+    from app.config import settings
+
+    if not schema_fields:
+        return {
+            "overall": 0.0,
+            "completeness": 0.0,
+            "type_conformance": 1.0,
+            "plausibility": 0.0,
+            "field_scores": {},
+            "field_type_valid": {},
+            "missing_fields": [],
+            "mismatched_fields": [],
+        }
+
+    # 1. Completeness
+    populated = 0
+    missing: list[str] = []
+    for field in schema_fields:
+        value = record.get(field.name)
+        if value is None or (isinstance(value, str) and not value.strip()) or value == "":
+            missing.append(field.name)
+        else:
+            populated += 1
+    completeness = populated / len(schema_fields)
+
+    # 2. Type conformance
+    mismatches = validate_field_types(record, schema_fields)
+    mismatched_names = [m.field for m in mismatches]
+    field_type_valid: dict[str, bool] = {}
+    checkable_count = 0
+    for field in schema_fields:
+        value = record.get(field.name)
+        if TYPE_CHECKERS.get(field.field_type) is None:
+            continue  # not type-checkable
+        if value is None or (isinstance(value, str) and not str(value).strip()) or value == "":
+            continue  # empty — not counted in conformance
+        checkable_count += 1
+        field_type_valid[field.name] = field.name not in mismatched_names
+    type_conformance = (checkable_count - len(mismatches)) / checkable_count if checkable_count > 0 else 1.0
+
+    # 3. Plausibility
+    field_scores: dict[str, float] = {}
+    total_plaus = 0.0
+    for field in schema_fields:
+        value = record.get(field.name)
+        s = _field_score(value, field.field_type)
+        if field.required and (value is None or value == ""):
+            s = 0.0
+        field_scores[field.name] = round(s, 3)
+        total_plaus += s
+    plausibility = total_plaus / len(schema_fields) if schema_fields else 0.0
+
+    # 4. Weighted blend
+    type_weight = settings.QUALITY_TYPE_CONFORMANCE_WEIGHT
+    completeness_weight = settings.QUALITY_COMPLETENESS_WEIGHT
+    plaus_weight = settings.SCORE_QUALITY_WEIGHT
+
+    # Redistribute if type conformance is undefined (0 checkable fields)
+    if checkable_count == 0:
+        total_w = plaus_weight + completeness_weight
+        plaus_w_norm = plaus_weight / total_w if total_w > 0 else 0.0
+        comp_w_norm = completeness_weight / total_w if total_w > 0 else 0.0
+        overall = (plausibility * plaus_w_norm) + (completeness * comp_w_norm)
+    else:
+        overall = (plausibility * plaus_weight) + (type_conformance * type_weight) + (completeness * completeness_weight)
+
+    overall = max(0.0, min(1.0, overall))
+
+    return {
+        "overall": round(overall, 3),
+        "completeness": round(completeness, 3),
+        "type_conformance": round(type_conformance, 3),
+        "plausibility": round(plausibility, 3),
+        "field_scores": field_scores,
+        "field_type_valid": field_type_valid,
+        "missing_fields": missing,
+        "mismatched_fields": mismatched_names,
+    }
+
+
+def score_records(
+    records: list[dict],
+    schema_fields: list[SchemaField],
+) -> list[dict[str, Any]]:
+    """Score multiple records. Returns a list parallel to *records*.
+
+    Empty input yields an empty list.
+    """
+    return [score_record_detailed(r, schema_fields) for r in records]
+
+
 def deduplicate_records(records: list[dict]) -> tuple[list[dict], int]:
     """Remove exact duplicate records. Returns (unique_records, removed_count)."""
     seen: set[str] = set()
@@ -394,6 +680,9 @@ def run_quality_pipeline(
     if not unique_valid:
         warnings.append("No valid records after quality pipeline")
 
+    # 5. Per-record detailed quality
+    per_record_quality = score_records(unique_valid, schema_fields)
+
     return {
         "cleaned_records": cleaned,
         "valid_records": unique_valid,
@@ -405,4 +694,5 @@ def run_quality_pipeline(
         "quality_score": round(overall_score, 2),
         "field_validity": field_validity,
         "warnings": warnings,
+        "per_record_quality": per_record_quality,
     }

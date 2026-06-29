@@ -35,6 +35,7 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_ALLOW_INSECURE_DEV_AUTH` | `false` | Allow insecure auth in development |
 | `DATAFORGE_ENABLE_OPERATOR_CROSS_TENANT` | `false` | Allow env-backed operator keys (without org/project scope) cross-tenant all-access. Must be explicitly enabled for self-hosted internal operator scripts; keep disabled for SaaS deployments.
 | `DATAFORGE_BILLING_WEBHOOK_SECRET` | - | Shared secret for billing webhook HMAC/shared-secret verification |
+| `DATAFORGE_EXPORT_HMAC_KEY` | - | Optional stable HMAC key for signing exported CSV/JSON/Excel payloads; if unset, the process derives a local development key |
 
 ## Rate Limiting
 
@@ -129,6 +130,7 @@ These are acceptable direct environment reads outside the config module:
 | `backend/app/utils/data_retention.py` | `DATAFORGE_RETENTION_DAYS_COMPLETED` | Days to retain completed jobs (default `30`) |
 | `backend/app/utils/data_retention.py` | `DATAFORGE_RETENTION_DAYS_RECYCLE` | Days to retain recycle-bin jobs (default `30`) |
 | `backend/app/utils/data_retention.py` | `DATAFORGE_RETENTION_DAYS_IDEMPOTENCY` | Days to retain idempotency keys (default `7`) |
+| `backend/app/routers/exports.py` | `DATAFORGE_EXPORT_HMAC_KEY` | Stable HMAC key for export payload signatures |
 | `backend/app/lifespan.py` | `DATAFORGE_RETENTION_INTERVAL` | Retention sweep interval in seconds (default `43200` = 12h) |
 | `backend/app/admin_denylist.py` | `DATAFORGE_JOB_STORE_PATH` | Override SQLite job-store database path |
 | `scripts/check_prod_env.py` | `DATAFORGE_SKIP_DB_CHECK` | Validation script |

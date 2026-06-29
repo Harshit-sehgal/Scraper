@@ -51,6 +51,11 @@ _HMAC_KEY_CACHE: bytes | None = None
 _HMAC_KEY_LOCK = threading.Lock()
 
 
+async def _collect_export_chunks(chunks: Any) -> bytes:
+    """Collect an async byte iterator so the export payload can be signed."""
+    return b"".join([chunk async for chunk in chunks])
+
+
 def _get_export_hmac_key() -> bytes:
     """Return the HMAC key for export signing.
 
@@ -240,11 +245,16 @@ def create_exports_router(jobs_store: dict[str, Any]):
     * ``GET /api/jobs/{job_id}/export/csv``
     * ``GET /api/jobs/{job_id}/export/json``
     * ``GET /api/jobs/{job_id}/export/excel``
+    * ``GET /api/download/{filename}``  (Feat 5: binary download serve)
 
     All endpoints require admin or operator role. Auth is resolved
     through the shared :func:`app.utils.rbac.require_principal`
     dependency so export authorization can enforce org/project
     ownership before any data is streamed.
+
+    The ``GET /api/download/{filename}`` endpoint is open to all
+    authenticated principals — it serves previously-downloaded binary
+    files (PDF, images, ZIPs, etc.) fetched via ``extract_binary=True``.
     """
     router = APIRouter()
 
@@ -303,6 +313,40 @@ def create_exports_router(jobs_store: dict[str, Any]):
         _ensure_export_job_access(job, auth, action)
         return job
 
+    def _ensure_binary_download_access(
+        filename: str,
+        meta: dict[str, Any] | None,
+        auth: tuple[UserRole, str, str, str],
+    ) -> None:
+        if meta is None:
+            raise HTTPException(status_code=404, detail="Binary file not found")
+        role, user_id, org_id, project_id = auth
+        if can_access_scoped_resource(
+            role,
+            user_id,
+            org_id,
+            project_id,
+            resource_owner_id=str(meta.get("created_by") or ""),
+            resource_org_id=str(meta.get("org_id") or ""),
+            resource_project_id=str(meta.get("project_id") or ""),
+        ):
+            return
+        log_rbac_event(
+            actor=user_id,
+            action="download_binary",
+            resource=f"binary:{filename}",
+            role=role.value,
+            outcome="denied",
+            details={
+                "owner_id": str(meta.get("created_by") or ""),
+                "org_id": str(meta.get("org_id") or ""),
+                "project_id": str(meta.get("project_id") or ""),
+                "job_id": str(meta.get("job_id") or ""),
+                "policy": "mvp_owner_org_project",
+            },
+        )
+        raise HTTPException(status_code=404, detail="Binary file not found")
+
     # ─── Single-job exports ─────────────────────────────────────────
 
     @router.get("/api/jobs/{job_id}/export/csv")
@@ -336,7 +380,9 @@ def create_exports_router(jobs_store: dict[str, Any]):
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
             # Compute content signature for integrity verification
-            body_bytes = b"".join(export_service.stream_csv_from_disk(job, load_paginated_job_results_from_disk))
+            body_bytes = await _collect_export_chunks(
+                export_service.stream_csv_from_disk(job, load_paginated_job_results_from_disk),
+            )
             sig = sign_export_payload(job_id, "csv", body_bytes)
             return StreamingResponse(
                 iter([body_bytes]),
@@ -391,7 +437,9 @@ def create_exports_router(jobs_store: dict[str, Any]):
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
-            body_bytes = b"".join(export_service.stream_json_from_disk(job, load_paginated_job_results_from_disk))
+            body_bytes = await _collect_export_chunks(
+                export_service.stream_json_from_disk(job, load_paginated_job_results_from_disk),
+            )
             sig = sign_export_payload(job_id, "json", body_bytes)
             return StreamingResponse(
                 iter([body_bytes]),
@@ -466,6 +514,54 @@ def create_exports_router(jobs_store: dict[str, Any]):
             headers={
                 "Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"',
                 "X-Export-Signature": sig,
+            },
+        )
+
+    # ─── Binary download serve (Feat 5) ──────────────────────────
+
+    @router.get("/api/download/{filename}")
+    async def serve_binary_download(
+        filename: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Serve a previously-downloaded binary file (PDF, image, ZIP, etc.).
+
+        Files are stored by ``scrape_url(extract_binary=True)`` in the
+        configured ``DATA_DIR/binaries/`` directory. The endpoint streams
+        the file with the correct Content-Type and Content-Disposition so
+        browsers download it natively.
+
+        Returns 404 if the file does not exist or has been cleaned up.
+        """
+        import mimetypes
+
+        from app.binary_handler import _iter_binary_file, get_binary_file_path, get_binary_metadata
+
+        meta = get_binary_metadata(filename)
+        _ensure_binary_download_access(filename, meta, auth)
+
+        # Path-traversal safe: get_binary_file_path sanitizes the filename internally.
+        file_path = get_binary_file_path(filename)
+        if file_path is None:
+            raise HTTPException(status_code=404, detail="Binary file not found")
+
+        # Determine content type
+        content_type = "application/octet-stream"
+        if meta:
+            content_type = meta.get("content_type", content_type)
+        guessed, _ = mimetypes.guess_type(filename)
+        if guessed:
+            content_type = guessed
+
+        return StreamingResponse(
+            _iter_binary_file(filename),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(file_path.stat().st_size),
             },
         )
 

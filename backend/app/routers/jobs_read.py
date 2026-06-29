@@ -9,6 +9,7 @@ which is called from ``app.routers.jobs.create_jobs_router``.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Annotated, Any
 from urllib.parse import urlparse
@@ -284,11 +285,26 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
 
         dumped = job.model_dump(
             include={
-                "id", "name", "status", "mode", "intent", "created_at",
-                "started_at", "completed_at", "error", "warnings", "logs",
-                "total_records", "filtered_records", "quality_score_summary",
-                "cascade_telemetry", "acquisition_mode", "quality_report",
-                "progress_current", "progress_total", "cancel_requested",
+                "id",
+                "name",
+                "status",
+                "mode",
+                "intent",
+                "created_at",
+                "started_at",
+                "completed_at",
+                "error",
+                "warnings",
+                "logs",
+                "total_records",
+                "filtered_records",
+                "quality_score_summary",
+                "cascade_telemetry",
+                "acquisition_mode",
+                "quality_report",
+                "progress_current",
+                "progress_total",
+                "cancel_requested",
             }
         )
 
@@ -381,14 +397,12 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
 
         if sort_by:
             reverse = sort_order.lower() == "desc"
-            try:
+            with contextlib.suppress(TypeError, KeyError):
                 page = sorted(
                     page,
-                    key=lambda r: (str(r.get(sort_by, "")) if isinstance(r, dict) else ""),
+                    key=lambda r: str(r.get(sort_by, "")) if isinstance(r, dict) else "",
                     reverse=reverse,
                 )
-            except (TypeError, KeyError):
-                pass
 
         next_offset = offset + limit if (offset + limit) < total else None
 
@@ -570,8 +584,8 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
         compare_to: str = "",
-        record_key: str | None = Query(default=None),
-        field_threshold: float = Query(default=0.05, ge=0.0, le=1.0),
+        record_key: Annotated[str | None, Query()] = None,
+        field_threshold: Annotated[float, Query(ge=0.0, le=1.0)] = 0.05,
     ):
         if not compare_to:
             raise HTTPException(status_code=400, detail="compare_to query parameter is required")
@@ -581,6 +595,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         baseline_job = await run_in_threadpool(manager.get_job, compare_to)
         _ensure_job_access(baseline_job, role, user_id, org_id, "read_job_diff", project_id)
         from app.extraction_diff import compute_extraction_diff
+
         diff = compute_extraction_diff(
             list(baseline_job.results),
             list(current_job.results),
@@ -588,3 +603,93 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             field_threshold=field_threshold,
         )
         return diff.to_dict()
+
+    @router.get("/api/jobs/{job_id}/quality", response_model=dict[str, Any])
+    async def get_job_quality(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        limit: Annotated[int, Query(ge=1, le=500)] = 200,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ):
+        """Return per-record quality scores for a completed job.
+
+        Computes completeness, type conformance, and plausibility for
+        each record and returns a paginated list of detailed scores.
+        """
+        from app.data_quality import score_records as _score_records
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_quality", project_id)
+
+        # Status gate: only completed-ish jobs have stable results
+        if job.status not in {
+            JobStatus.COMPLETED,
+            JobStatus.DEGRADED,
+            JobStatus.EMPTY_RESULT,
+        }:
+            raise HTTPException(status_code=409, detail="Job not yet completed")
+
+        # Load results (handle disk-offloaded jobs)
+        results_list: list[dict] = []
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+
+            results_list = await run_in_threadpool(load_job_results_from_disk, job.id, job.results_file_path)
+        else:
+            results_list = list(job.results)
+
+        total = len(results_list)
+        page = results_list[offset : offset + limit]
+        per_record = _score_records(page, job.schema_fields)
+        overall_quality = round(sum(r["overall"] for r in per_record) / len(per_record), 3) if per_record else 0.0
+        next_offset = offset + limit if (offset + limit) < total else None
+
+        return {
+            "job_id": job_id,
+            "overall_quality": overall_quality,
+            "record_count": total,
+            "offset": offset,
+            "limit": limit,
+            "next_offset": next_offset,
+            "records": per_record,
+        }
+
+    @router.get("/api/jobs/{job_id}/quality/trends", response_model=dict[str, Any])
+    async def get_job_quality_trends(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        since: Annotated[str | None, Query()] = None,
+    ):
+        """Return quality trend history for the domain+schema of a given job.
+
+        Includes per-field score breakdown, aggregate summary stats, and
+        the configured alert threshold.
+        """
+        from app.utils.quality_trends import get_trend_store
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_quality_trends", project_id)
+
+        trend_store = get_trend_store()
+        domain = trend_store.domain_for_url(job.urls[0]) if job.urls else "unknown"
+        shash = trend_store.schema_hash(job.schema_fields)
+        samples = trend_store.history(domain, shash, limit=limit, since_ts=since)
+        summary_data = trend_store.summary(domain, shash)
+
+        return {
+            "job_id": job_id,
+            "domain": domain,
+            "schema_hash": shash,
+            "summary": summary_data,
+            "samples": samples,
+            "alert_threshold": trend_store._alert_threshold,
+        }

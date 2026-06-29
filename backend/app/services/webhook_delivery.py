@@ -72,7 +72,7 @@ _WEBHOOK_TIMEOUT_SECONDS: float = 10.0
 BACKOFF_SEQUENCE_SECONDS: tuple[float, ...] = (
     _INITIAL_BACKOFF_SECONDS,
     _INITIAL_BACKOFF_SECONDS * _BACKOFF_MULTIPLIER,
-    _INITIAL_BACKOFF_SECONDS * (_BACKOFF_MULTIPLIER ** 2),
+    _INITIAL_BACKOFF_SECONDS * (_BACKOFF_MULTIPLIER**2),
 )
 
 
@@ -145,11 +145,9 @@ async def deliver_webhook(
         job_user_id = str(getattr(job, "created_by", "") or "")
         job_org_id = str(getattr(job, "org_id", "") or "")
         job_project_id = str(getattr(job, "project_id", "") or "")
-        if not _tenant_matches(caller_user_id, caller_org_id, caller_project_id,
-                               job_user_id, job_org_id, job_project_id):
+        if not _tenant_matches(caller_user_id, caller_org_id, caller_project_id, job_user_id, job_org_id, job_project_id):
             logger.warning(
-                "Webhook delivery refused: tenant mismatch for job %s "
-                "(caller=%s, job owner=%s org=%s project=%s)",
+                "Webhook delivery refused: tenant mismatch for job %s (caller=%s, job owner=%s org=%s project=%s)",
                 getattr(job, "id", ""),
                 caller_user_id,
                 job_user_id,
@@ -282,6 +280,4 @@ def _tenant_matches(
         return True
     if caller_org_id and caller_org_id == job_org_id:
         return True
-    if caller_project_id and caller_project_id == job_project_id:
-        return True
-    return False
+    return bool(caller_project_id and caller_project_id == job_project_id)

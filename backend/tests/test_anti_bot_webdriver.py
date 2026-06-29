@@ -33,10 +33,6 @@ def _build_webdriver_spoof_script() -> str:
 
 def _extract_init_script_properties() -> dict[str, list[str]]:
     """Extract properties set by the browser pool's init script."""
-    from app.browser_pool import BrowserPool
-
-    pool = BrowserPool()
-    source = pool._apply_stealth_evasion.__code__
     props: dict[str, list[str]] = {"navigator": [], "window": [], "chrome": []}
     return props
 

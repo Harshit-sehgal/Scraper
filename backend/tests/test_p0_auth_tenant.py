@@ -1008,6 +1008,149 @@ def test_project_scoped_key_cannot_access_another_orgs_billing_subscriptions(cli
         billing_webhooks.delete_customer_subscription(org_b.organization.id)
 
 
+def test_project_scoped_key_cannot_access_another_orgs_extraction_template(client, monkeypatch, tmp_path) -> None:
+    from app.routers import jobs_write
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    jobs_write._extraction_templates_store.clear()
+
+    try:
+        created = client.post(
+            "/api/templates",
+            headers={"X-API-Key": write_key_b.raw_key},
+            json={
+                "id": "org-b-template",
+                "name": "Org B template",
+                "config": {"hydration_wait_ms": 250},
+                "schema_fields": [{"name": "title", "field_type": "string"}],
+            },
+        )
+        assert created.status_code == 201, created.text
+
+        listed = client.get("/api/templates", headers={"X-API-Key": write_key_a.raw_key})
+        assert listed.status_code == 200
+        assert all(item["id"] != "org-b-template" for item in listed.json())
+
+        for method, path, json_body in [
+            ("GET", "/api/templates/org-b-template", None),
+            ("PATCH", "/api/templates/org-b-template", {"name": "stolen"}),
+            ("DELETE", "/api/templates/org-b-template", None),
+        ]:
+            denied = client.request(method, path, headers={"X-API-Key": write_key_a.raw_key}, json=json_body)
+            assert denied.status_code in {403, 404}
+
+        owner_get = client.get("/api/templates/org-b-template", headers={"X-API-Key": write_key_b.raw_key})
+        assert owner_get.status_code == 200
+        assert owner_get.json()["name"] == "Org B template"
+    finally:
+        reset_identity_store(None)
+        jobs_write._extraction_templates_store.clear()
+
+
+def test_project_scoped_key_cannot_download_another_orgs_binary(client, monkeypatch, tmp_path) -> None:
+    from app import binary_handler
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    filename = "org-b-report.pdf"
+    binaries_dir = tmp_path / "binaries"
+    binaries_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(binary_handler, "_get_binaries_dir", lambda: binaries_dir)
+    (binaries_dir / filename).write_bytes(b"%PDF-1.4 org b")
+    with binary_handler._binary_store_lock:
+        binary_handler._binary_store.clear()
+        binary_handler._binary_store[filename] = {
+            "content_type": "application/pdf",
+            "file_size": 14,
+            "saved_path": str(binaries_dir / filename),
+            "download_url": f"/api/download/{filename}",
+            "filename": filename,
+            "original_url": "https://example.com/report.pdf",
+            "created_by": org_b.user.id,
+            "org_id": org_b.organization.id,
+            "project_id": org_b.project.id,
+        }
+
+    try:
+        denied = client.get(f"/api/download/{filename}", headers={"X-API-Key": write_key_a.raw_key})
+        assert denied.status_code in {403, 404}
+
+        owner = client.get(f"/api/download/{filename}", headers={"X-API-Key": write_key_b.raw_key})
+        assert owner.status_code == 200
+        assert owner.content == b"%PDF-1.4 org b"
+    finally:
+        reset_identity_store(None)
+        with binary_handler._binary_store_lock:
+            binary_handler._binary_store.clear()
+
+
+def test_project_scoped_key_cannot_read_another_orgs_usage_stats(client, monkeypatch, tmp_path) -> None:
+    from app.routers import jobs_write
+    from app.saas import ApiKeyScope
+
+    _configure_keys(monkeypatch)
+    reset_identity_store, org_a, org_b, keys = _setup_saas_accounts(tmp_path)
+    write_key_a = keys.issue(
+        project_id=org_a.project.id,
+        user_id=org_a.user.id,
+        name="org-a-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    write_key_b = keys.issue(
+        project_id=org_b.project.id,
+        user_id=org_b.user.id,
+        name="org-b-write",
+        scope=ApiKeyScope.WRITE,
+    )
+    jobs_write._usage_stats_store.clear()
+
+    try:
+        recorded = client.post(
+            "/api/usage/stats/record",
+            headers={"X-API-Key": write_key_b.raw_key},
+            json={"api_key": "org-b-key", "requests": 3, "records": 7, "failures": 1, "latency_ms": 90},
+        )
+        assert recorded.status_code == 200, recorded.text
+
+        listed = client.get("/api/usage/stats", headers={"X-API-Key": write_key_a.raw_key})
+        assert listed.status_code == 200
+        assert "org-b-key" not in listed.json().get("keys", {})
+
+        owner = client.get("/api/usage/stats", headers={"X-API-Key": write_key_b.raw_key})
+        assert owner.status_code == 200
+        assert owner.json()["keys"]["org-b-key"]["records"] == 7
+    finally:
+        reset_identity_store(None)
+        jobs_write._usage_stats_store.clear()
+
+
 def test_shared_org_quota_across_multiple_keys(client, monkeypatch, tmp_path) -> None:
     from app.saas import ApiKeyScope
     from app.utils.usage_ledger import UsageType, get_usage_ledger

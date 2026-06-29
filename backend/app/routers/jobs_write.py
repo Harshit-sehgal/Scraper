@@ -75,6 +75,7 @@ from app.services.job_mutation_service import (
 from app.storage_interface import get_job_repository
 from app.utils.rbac import (
     UserRole,
+    can_access_scoped_resource,
     require_principal,
     require_role,
 )
@@ -88,8 +89,10 @@ logger = logging.getLogger(__name__)
 # Module-level stores for secondary features (templates, notification channels, usage)
 _extraction_templates_store: dict[str, dict[str, Any]] = {}
 _notification_channels_store: dict[str, list[dict[str, Any]]] = {}
-_usage_stats_store: dict[str, dict[str, int]] = {}
+_usage_stats_store: dict[str, dict[str, Any]] = {}
 _usage_stats_lock = threading.Lock()
+_TEMPLATE_INTERNAL_KEYS = {"created_by", "org_id", "project_id"}
+_USAGE_INTERNAL_KEYS = {"api_key", "created_by", "org_id", "project_id"}
 
 
 def _auth_tuple(auth) -> tuple:
@@ -101,6 +104,99 @@ def _auth_tuple(auth) -> tuple:
         return auth
     role, user_id = auth
     return role, user_id, "", ""
+
+
+def _template_store_key(template_id: str, *, user_id: str, org_id: str, project_id: str) -> str:
+    if project_id:
+        scope = f"project:{project_id}"
+    elif org_id:
+        scope = f"org:{org_id}"
+    else:
+        scope = f"user:{user_id}"
+    return f"{scope}:{template_id}"
+
+
+def _template_public_view(template: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in template.items() if key not in _TEMPLATE_INTERNAL_KEYS}
+
+
+def _can_access_template(
+    template: dict[str, Any],
+    *,
+    role: UserRole,
+    user_id: str,
+    org_id: str,
+    project_id: str,
+) -> bool:
+    return can_access_scoped_resource(
+        role,
+        user_id,
+        org_id,
+        project_id,
+        resource_owner_id=str(template.get("created_by") or ""),
+        resource_org_id=str(template.get("org_id") or ""),
+        resource_project_id=str(template.get("project_id") or ""),
+    )
+
+
+def _find_accessible_template(
+    template_id: str,
+    *,
+    role: UserRole,
+    user_id: str,
+    org_id: str,
+    project_id: str,
+) -> tuple[str, dict[str, Any]] | None:
+    direct_key = _template_store_key(template_id, user_id=user_id, org_id=org_id, project_id=project_id)
+    direct_template = _extraction_templates_store.get(direct_key)
+    if direct_template and _can_access_template(
+        direct_template,
+        role=role,
+        user_id=user_id,
+        org_id=org_id,
+        project_id=project_id,
+    ):
+        return direct_key, direct_template
+
+    for key, template in _extraction_templates_store.items():
+        if template.get("id") != template_id:
+            continue
+        if _can_access_template(template, role=role, user_id=user_id, org_id=org_id, project_id=project_id):
+            return key, template
+    return None
+
+
+def _scoped_store_key(display_key: str, *, user_id: str, org_id: str, project_id: str) -> str:
+    if project_id:
+        scope = f"project:{project_id}"
+    elif org_id:
+        scope = f"org:{org_id}"
+    else:
+        scope = f"user:{user_id}"
+    return f"{scope}:{display_key}"
+
+
+def _usage_public_view(stats: dict[str, Any]) -> dict[str, int]:
+    return {key: int(value) for key, value in stats.items() if key not in _USAGE_INTERNAL_KEYS and isinstance(value, int)}
+
+
+def _can_access_usage_stats(
+    stats: dict[str, Any],
+    *,
+    role: UserRole,
+    user_id: str,
+    org_id: str,
+    project_id: str,
+) -> bool:
+    return can_access_scoped_resource(
+        role,
+        user_id,
+        org_id,
+        project_id,
+        resource_owner_id=str(stats.get("created_by") or ""),
+        resource_org_id=str(stats.get("org_id") or ""),
+        resource_project_id=str(stats.get("project_id") or ""),
+    )
 
 
 async def _delete_job_logic(
@@ -735,57 +831,112 @@ def register_jobs_write_routes(
     @router.post("/api/templates", status_code=201, response_model=dict)
     async def create_template(
         body: ExtractionTemplate,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
-        if body.id in _extraction_templates_store:
+        _role, user_id, org_id, project_id = _auth_tuple(auth)
+        store_key = _template_store_key(body.id, user_id=user_id, org_id=org_id, project_id=project_id)
+        if store_key in _extraction_templates_store:
             raise HTTPException(status_code=409, detail="Template already exists")
         now = datetime.datetime.now(datetime.UTC).isoformat()
         body.created_at = now
         body.updated_at = now
-        _extraction_templates_store[body.id] = body.model_dump()
-        return _extraction_templates_store[body.id]
+        template = body.model_dump()
+        template.update(
+            {
+                "created_by": user_id,
+                "org_id": org_id,
+                "project_id": project_id,
+            }
+        )
+        _extraction_templates_store[store_key] = template
+        return _template_public_view(template)
 
     @router.get("/api/templates", response_model=list[dict])
     async def list_templates(
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
-        return list(_extraction_templates_store.values())
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        return [
+            _template_public_view(template)
+            for template in _extraction_templates_store.values()
+            if _can_access_template(template, role=role, user_id=user_id, org_id=org_id, project_id=project_id)
+        ]
 
     @router.get("/api/templates/{template_id}", response_model=dict)
     async def get_template(
         template_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
-        tpl = _extraction_templates_store.get(template_id)
-        if not tpl:
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        found = _find_accessible_template(
+            template_id,
+            role=role,
+            user_id=user_id,
+            org_id=org_id,
+            project_id=project_id,
+        )
+        if found is None:
             raise HTTPException(status_code=404, detail="Template not found")
-        return tpl
+        _key, tpl = found
+        return _template_public_view(tpl)
 
     @router.patch("/api/templates/{template_id}", response_model=dict)
     async def update_template(
         template_id: str,
         body: ExtractionTemplateUpdate,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
-        if template_id not in _extraction_templates_store:
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        found = _find_accessible_template(
+            template_id,
+            role=role,
+            user_id=user_id,
+            org_id=org_id,
+            project_id=project_id,
+        )
+        if found is None:
             raise HTTPException(status_code=404, detail="Template not found")
-        tpl = _extraction_templates_store[template_id]
+        store_key, tpl = found
         patch_data = body.model_dump(exclude_unset=True)
         for key, value in patch_data.items():
             if value is not None:
                 tpl[key] = value
         tpl["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
-        _extraction_templates_store[template_id] = tpl
-        return tpl
+        _extraction_templates_store[store_key] = tpl
+        return _template_public_view(tpl)
 
     @router.delete("/api/templates/{template_id}", status_code=204)
     async def delete_template(
         template_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN])),
+        ],
     ):
-        if template_id not in _extraction_templates_store:
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        found = _find_accessible_template(
+            template_id,
+            role=role,
+            user_id=user_id,
+            org_id=org_id,
+            project_id=project_id,
+        )
+        if found is None:
             raise HTTPException(status_code=404, detail="Template not found")
-        del _extraction_templates_store[template_id]
+        store_key, _tpl = found
+        del _extraction_templates_store[store_key]
 
     # ═══════════════════════════════════════════════════════════════════════
     # Batch URL Submission (Feat 13)
@@ -973,6 +1124,7 @@ def register_jobs_write_routes(
                 raise HTTPException(status_code=404, detail="Job not found")
             job = manager.jobs_store[job_id]
             from app.services.job_mutation_service import _ensure_job_write_access
+
             _ensure_job_write_access(job, role, user_id, org_id, project_id, "delete_job_results")
 
             before = len(job.results)
@@ -1013,9 +1165,19 @@ def register_jobs_write_routes(
 
         Shows requests/day, records extracted, failures, average latency.
         """
-        _role, user_id, _org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         with _usage_stats_lock:
-            key_stats = dict(_usage_stats_store)
+            key_stats = {
+                str(stats.get("api_key") or key): _usage_public_view(stats)
+                for key, stats in _usage_stats_store.items()
+                if _can_access_usage_stats(
+                    stats,
+                    role=role,
+                    user_id=user_id,
+                    org_id=org_id,
+                    project_id=project_id,
+                )
+            }
         if not key_stats:
             key_stats = {user_id or "default": {"requests": 0, "records": 0, "failures": 0, "latency_ms": 0}}
         return {"keys": key_stats}
@@ -1029,17 +1191,25 @@ def register_jobs_write_routes(
         ],
     ):
         """Record a usage event for the dashboard."""
-        _role, user_id, _org_id, _project_id = _auth_tuple(auth)
+        _role, user_id, org_id, project_id = _auth_tuple(auth)
         key = body.api_key or user_id or "default"
+        store_key = _scoped_store_key(key, user_id=user_id, org_id=org_id, project_id=project_id)
         with _usage_stats_lock:
-            if key not in _usage_stats_store:
-                _usage_stats_store[key] = {"requests": 0, "records": 0, "failures": 0, "latency_ms": 0}
-            _usage_stats_store[key]["requests"] += body.requests or 1
-            _usage_stats_store[key]["records"] += body.records or 0
-            _usage_stats_store[key]["failures"] += body.failures or 0
-            _usage_stats_store[key]["latency_ms"] = max(
-                _usage_stats_store[key]["latency_ms"], body.latency_ms or 0
-            )
+            if store_key not in _usage_stats_store:
+                _usage_stats_store[store_key] = {
+                    "api_key": key,
+                    "created_by": user_id,
+                    "org_id": org_id,
+                    "project_id": project_id,
+                    "requests": 0,
+                    "records": 0,
+                    "failures": 0,
+                    "latency_ms": 0,
+                }
+            _usage_stats_store[store_key]["requests"] += body.requests or 1
+            _usage_stats_store[store_key]["records"] += body.records or 0
+            _usage_stats_store[store_key]["failures"] += body.failures or 0
+            _usage_stats_store[store_key]["latency_ms"] = max(_usage_stats_store[store_key]["latency_ms"], body.latency_ms or 0)
         return {"status": "recorded", "key": key}
 
     # ═══════════════════════════════════════════════════════════════════════

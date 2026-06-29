@@ -1,11 +1,17 @@
 """Tests for missing-value imputation and data normalization (Roadmap Qual 6, 7).
 
-Verifies that the quality pipeline handles missing values, null fields,
-and data normalization correctly.
+Also covers Roadmap Wave 7 Item 3: per-record quality scoring with
+detailed breakdown (completeness, type conformance, plausibility).
 """
+
 from __future__ import annotations
 
-from app.data_quality import clean_record, run_quality_pipeline
+from app.data_quality import (
+    clean_record,
+    run_quality_pipeline,
+    score_record_detailed,
+    score_records,
+)
 from app.models import FieldType, SchemaField
 
 
@@ -110,3 +116,143 @@ class TestDataNormalization:
         records = [{"email": "not-an-email"}]
         result = run_quality_pipeline(records, fields)
         assert len(result["warnings"]) >= 0
+
+
+# ---------------------------------------------------------------------------
+# Roadmap Wave 7, Item 3 — Per-record quality scoring tests
+# ---------------------------------------------------------------------------
+
+
+class TestPerRecordQualityScoring:
+    def test_perfect_record_score_one(self) -> None:
+        fields = [
+            _field("name", FieldType.STRING),
+            _field("price", FieldType.CURRENCY),
+        ]
+        record = {"name": "Widget Alpha", "price": 9.99}
+        result = score_record_detailed(record, fields)
+        assert result["overall"] == 1.0
+        assert result["completeness"] == 1.0
+        assert result["type_conformance"] == 1.0
+
+    def test_empty_record_score_zero(self) -> None:
+        fields = [_field("name", FieldType.STRING)]
+        result = score_record_detailed({}, fields)
+        assert result["overall"] == 0.0
+        assert result["completeness"] == 0.0
+
+    def test_missing_fields_lower_completeness(self) -> None:
+        fields = [
+            _field("name", FieldType.STRING),
+            _field("price", FieldType.CURRENCY),
+            _field("url", FieldType.URL),
+        ]
+        record = {"name": "Widget"}  # price and url missing
+        result = score_record_detailed(record, fields)
+        assert result["completeness"] < 1.0
+        assert result["completeness"] > 0.0
+        assert "price" in result["missing_fields"]
+        assert "url" in result["missing_fields"]
+
+    def test_wrong_types_lower_conformance(self) -> None:
+        fields = [
+            _field("price", FieldType.CURRENCY),
+            _field("email", FieldType.EMAIL),
+        ]
+        record = {"price": "not_a_number", "email": "no-at-sign"}
+        result = score_record_detailed(record, fields)
+        assert result["type_conformance"] == 0.0
+        assert "price" in result["mismatched_fields"]
+        assert "email" in result["mismatched_fields"]
+
+    def test_overall_blends_three_components(self) -> None:
+        fields = [_field("name", FieldType.STRING), _field("price", FieldType.CURRENCY)]
+        record = {"name": "Widget", "price": 10.0}
+        result = score_record_detailed(record, fields)
+        assert 0.0 <= result["overall"] <= 1.0
+        assert result["completeness"] > 0.0
+        assert result["type_conformance"] > 0.0
+        assert result["plausibility"] > 0.0
+
+    def test_field_scores_dict_populated(self) -> None:
+        fields = [_field("name", FieldType.STRING), _field("price", FieldType.CURRENCY)]
+        record = {"name": "W", "price": 5.0}
+        result = score_record_detailed(record, fields)
+        assert "name" in result["field_scores"]
+        assert "price" in result["field_scores"]
+
+    def test_missing_fields_list_populated(self) -> None:
+        fields = [_field("name", FieldType.STRING, required=True), _field("price", FieldType.CURRENCY)]
+        record = {"price": 5.0}
+        result = score_record_detailed(record, fields)
+        assert "name" in result["missing_fields"]
+
+    def test_mismatched_fields_list_populated(self) -> None:
+        fields = [_field("price", FieldType.CURRENCY)]
+        record = {"price": "abc"}
+        result = score_record_detailed(record, fields)
+        assert "price" in result["mismatched_fields"]
+
+    def test_score_records_batch_parallel(self) -> None:
+        fields = [_field("name", FieldType.STRING), _field("price", FieldType.CURRENCY)]
+        records = [
+            {"name": "A", "price": 1.0},
+            {"name": "B", "price": 2.0},
+        ]
+        results = score_records(records, fields)
+        assert len(results) == 2
+        assert all(r["overall"] > 0.0 for r in results)
+
+    def test_score_records_empty_input(self) -> None:
+        fields = [_field("name", FieldType.STRING)]
+        results = score_records([], fields)
+        assert results == []
+
+    def test_run_quality_pipeline_includes_per_record_quality(self) -> None:
+        fields = [
+            _field("name", FieldType.STRING),
+            _field("price", FieldType.CURRENCY),
+        ]
+        records = [
+            {"name": "Widget A", "price": "$10.00"},
+            {"name": "Widget B", "price": "$20.00"},
+        ]
+        result = run_quality_pipeline(records, fields)
+        assert "per_record_quality" in result
+        assert "quality_score" in result  # existing key still present
+        assert "valid_records" in result  # existing key still present
+        assert len(result["per_record_quality"]) > 0
+
+    def test_optional_field_absent_not_in_missing_fields(self) -> None:
+        fields = [_field("name", FieldType.STRING), _field("email", FieldType.EMAIL, required=False)]
+        record = {"name": "Widget"}
+        result = score_record_detailed(record, fields)
+        # email IS in missing_fields (it's missing), but required is False,
+        # so it shouldn't drag the completeness/overall too low
+        assert result["completeness"] > 0.0
+
+    def test_all_return_keys_present_on_empty_input(self) -> None:
+        result = score_record_detailed({}, [_field("name", FieldType.STRING)])
+        expected_keys = {
+            "overall",
+            "completeness",
+            "type_conformance",
+            "plausibility",
+            "field_scores",
+            "field_type_valid",
+            "missing_fields",
+            "mismatched_fields",
+        }
+        assert expected_keys.issubset(result.keys())
+
+    def test_no_schema_fields_returns_zero(self) -> None:
+        result = score_record_detailed({"name": "X"}, [])
+        assert result["overall"] == 0.0
+
+    def test_type_conformance_undefined_when_no_checkable_fields(self) -> None:
+        # Only STRING fields — no type checking possible
+        fields = [_field("name", FieldType.STRING)]
+        record = {"name": "Widget"}
+        result = score_record_detailed(record, fields)
+        # When no checkable fields, conformance defaults to 1.0
+        assert result["type_conformance"] == 1.0

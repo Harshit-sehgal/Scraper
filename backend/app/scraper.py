@@ -632,8 +632,16 @@ async def scrape_url(
     usage_context: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     cookies: dict[str, str] | None = None,
+    extract_binary: bool = False,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL.
+
+    When ``extract_binary=True`` and the URL points to binary content
+    (PDF, ZIP, image, …), the handler downloads and saves the file to
+    disk, returning a single record with ``_binary_file_url``,
+    ``_binary_content_type``, ``_binary_file_size``, and
+    ``_binary_filename`` keys. The normal HTML extraction pipeline is
+    bypassed entirely.
 
     Returns a ``ScrapeAttemptResult`` (a ``list`` subclass) that behaves as
     a plain ``list[dict]`` for backward compatibility while carrying
@@ -642,6 +650,42 @@ async def scrape_url(
     For callers that need the richest possible metadata, use
     ``scrape_url_attempt()`` instead.
     """
+    # ── Feat 5: Binary download fast-path ──────────────────────────
+    if extract_binary:
+        from app.binary_handler import (
+            _detect_content_type_from_url,
+            download_binary,
+            is_binary_content_type,
+        )
+
+        content_type = _detect_content_type_from_url(url)
+        if content_type and is_binary_content_type(content_type):
+            meta = await download_binary(
+                url,
+                headers=headers,
+                cookies=cookies,
+                usage_context=usage_context,
+            )
+            record = {
+                "_binary_file_url": meta["download_url"],
+                "_binary_content_type": meta["content_type"],
+                "_binary_file_size": meta["file_size"],
+                "_binary_filename": meta["filename"],
+                "source_url": url,
+                "scraped_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+            }
+            logger.info("Binary download for %s → %s (%s)", url, meta["filename"], meta["content_type"])
+            return ScrapeAttemptResult(
+                [record],
+                html=None,
+                final_url=url,
+                fetch_method="binary_download",
+                extraction_method="binary_download",
+                telemetry=get_scrape_telemetry(),
+                zero_result_classification=None,
+                data_evidence_score=1.0,
+            )
+
     from bs4 import BeautifulSoup
 
     from app.domain_intelligence import get_domain_intelligence

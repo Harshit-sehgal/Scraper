@@ -31,9 +31,12 @@ PUBLIC_API_EXEMPT = {
     "/api/saas/signup",
 }
 TENANT_SCOPED_PREFIXES = (
+    "/api/download",
     "/api/jobs",
     "/api/recycle_bin",
     "/api/exports",
+    "/api/templates",
+    "/api/usage",
     "/api/workflows",
     "/api/workflow-drafts",
     "/api/auth-profiles",

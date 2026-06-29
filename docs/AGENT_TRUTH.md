@@ -13,6 +13,64 @@ This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
 
+## 2026-06-29 - Tenant Scoped Download/Templates/Usage and Stale Test Cleanup
+
+Scope: continue the repo-wide audit/fix loop on the current dirty
+checkout. Fixed three tenant-isolation leaks in newly added/staged
+feature surfaces, repaired route/env docs drift, made `docs_lint.py`
+robust against app startup logs on stdout, and cleaned stale test code
+that full `pyflakes` exposed.
+
+### Issues Fixed
+
+- `F-TENANT-TEMPLATE-001`: `/api/templates` used a shared module-level
+  store with no owner/org/project metadata, so a project-scoped key from
+  another org could list and mutate another tenant's extraction template.
+- `F-TENANT-BINARY-DOWNLOAD-001`: `/api/download/{filename}` served any
+  stored binary by filename to any operator/admin without checking the
+  binary metadata owner/org/project.
+- `F-TENANT-USAGE-STATS-001`: `/api/usage/stats` returned the entire
+  in-memory stats map, leaking another org's per-key usage counters.
+- `F-DOC-ROUTE-ENV-DRIFT-001`: `docs/API.md` was missing live routes and
+  `docs/ENV_VARIABLES.md` missed `DATAFORGE_EXPORT_HMAC_KEY`.
+- `F-DOCS-LINT-STDOUT-001`: `scripts/docs_lint.py` failed to parse its
+  subprocess JSON when app startup logs were emitted to stdout.
+- `F-TEST-PYFLAKES-STALE-001`: stale test locals/imports and missing
+  fixture references kept full `pyflakes` and focused test collection
+  from being clean.
+- `F-FORM-FILLING-ENGINE-001`: the new form-filling module did not
+  handle synchronous test doubles for Playwright-style methods, emitted
+  empty standalone pseudo-forms, and hid its HTTP client import from
+  tests.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before this pass was green; 12/12 quick validation steps passed. |
+| `python3 -m pytest backend/tests/test_p0_auth_tenant.py::test_project_scoped_key_cannot_access_another_orgs_extraction_template -q -o addopts=` | 1 | RED before fix; Org A listed Org B's `org-b-template`. |
+| `python3 -m pytest backend/tests/test_p0_auth_tenant.py::test_project_scoped_key_cannot_download_another_orgs_binary -q -o addopts=` | 1 | RED before fix; Org A received HTTP 200 for Org B's binary. |
+| `python3 -m pytest backend/tests/test_p0_auth_tenant.py::test_project_scoped_key_cannot_read_another_orgs_usage_stats -q -o addopts=` | 1 | RED before fix; Org A saw `org-b-key` usage counters. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS after classifier/code fixes; `routes=176 unknown_auth=0 unknown_tenant=0`. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variable docs match code. |
+| `python3 scripts/docs_lint.py` | 0 | PASS; `132 routes match between app and API.md (stable routes only)`. |
+| `python3 -m pytest backend/tests/test_route_auth_matrix_generator.py backend/tests/test_extraction_templates.py backend/tests/test_api_usage_dashboard.py backend/tests/test_binary_download.py backend/tests/test_p0_auth_tenant.py::test_project_scoped_key_cannot_access_another_orgs_extraction_template backend/tests/test_p0_auth_tenant.py::test_project_scoped_key_cannot_download_another_orgs_binary backend/tests/test_p0_auth_tenant.py::test_project_scoped_key_cannot_read_another_orgs_usage_stats -q -o addopts=` | 0 | PASS; 52 tests passed. |
+| `python3 -m pytest backend/tests/test_anti_bot_profile_persistence.py backend/tests/test_bulk_result_delete.py backend/tests/test_anti_bot_detection_check.py backend/tests/test_middleware_rate_limit.py backend/tests/test_form_filling_engine.py backend/tests/test_anti_bot_webdriver.py -q -o addopts=` | 0 | PASS; 132 tests passed after stale-test and form-filling fixes. |
+| `python3 -m pytest backend/tests/test_form_filling_engine.py -q -o addopts=` | 0 | PASS; 37 form-filling tests passed. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no output. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m mypy backend/app/form_filling_engine.py backend/app/binary_handler.py backend/app/routers/exports.py backend/app/routers/jobs_write.py` | 0 | PASS; no issues found in 4 source files. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; file audit ledger regenerated. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+| `python3 scripts/validate_local.py --quick` | 0 | Final quick validation green; 12/12 steps passed and `artifacts/validation/latest_summary.md` updated. |
+
+### Remaining Observations
+
+- Full validation was not run in this pass; only quick validation plus
+  targeted tests/static checks above were run.
+- The checkout remains dirty with broader pre-existing feature changes
+  from the active audit/fix workstream; inspect `git status --short`
+  before assuming ownership of unrelated files.
+
 ## 2026-06-29 - Extraction Orchestrator Validation Fix
 
 Scope: fix a current checkout regression where the extraction cascade's

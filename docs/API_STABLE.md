@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-29 19:03:17 UTC
+**Generated:** 2026-06-29 21:39:38 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -22,6 +22,8 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | --- | --- |
 | DELETE | `/api/jobs/cleanup/terminal` |
 | DELETE | `/api/jobs/{job_id}` |
+| DELETE | `/api/jobs/{job_id}/notification-channels/{channel_id}` |
+| DELETE | `/api/jobs/{job_id}/results` |
 | GET | `/api/jobs` |
 | GET | `/api/jobs/{job_id}` |
 | GET | `/api/jobs/{job_id}/debug` |
@@ -30,14 +32,24 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/jobs/{job_id}/export/csv` |
 | GET | `/api/jobs/{job_id}/export/excel` |
 | GET | `/api/jobs/{job_id}/export/json` |
+| GET | `/api/jobs/{job_id}/notification-channels` |
+| GET | `/api/jobs/{job_id}/quality` |
+| GET | `/api/jobs/{job_id}/quality/trends` |
 | GET | `/api/jobs/{job_id}/results` |
 | PATCH | `/api/jobs/{job_id}/extraction` |
+| PATCH | `/api/jobs/{job_id}/fetch-strategy` |
 | PATCH | `/api/jobs/{job_id}/headers` |
+| PATCH | `/api/jobs/{job_id}/notification-channels/{channel_id}` |
 | PATCH | `/api/jobs/{job_id}/strategy` |
 | PATCH | `/api/jobs/{job_id}/user-agent` |
+| PATCH | `/api/jobs/{job_id}/wait-conditions` |
 | PATCH | `/api/jobs/{job_id}/webhook` |
 | POST | `/api/jobs` |
+| POST | `/api/jobs/batch` |
 | POST | `/api/jobs/{job_id}/cancel` |
+| POST | `/api/jobs/{job_id}/clone` |
+| POST | `/api/jobs/{job_id}/email` |
+| POST | `/api/jobs/{job_id}/notification-channels` |
 | POST | `/api/jobs/{job_id}/reclean` |
 | POST | `/api/jobs/{job_id}/webhook/redeliver` |
 
@@ -120,6 +132,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | DELETE | `/api/saas/projects/{project_id}` |
 | DELETE | `/api/saas/projects/{project_id}/keys/{key_id}` |
 | DELETE | `/api/scheduled/{job_id}` |
+| DELETE | `/api/templates/{template_id}` |
 | DELETE | `/api/user/data` |
 | DELETE | `/api/workflows/{workflow_id}` |
 | GET | `/api/auth-profiles` |
@@ -127,6 +140,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/billing/stub-return/{plan_tier}/{request_id}` |
 | GET | `/api/billing/subscriptions` |
 | GET | `/api/billing/subscriptions/{customer_id}` |
+| GET | `/api/download/{filename}` |
 | GET | `/api/saas/aup/status` |
 | GET | `/api/saas/email-verification/status` |
 | GET | `/api/saas/invitations/pending` |
@@ -143,10 +157,14 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/scheduled` |
 | GET | `/api/scheduled/{job_id}` |
 | GET | `/api/scheduled/{job_id}/changes` |
+| GET | `/api/templates` |
+| GET | `/api/templates/{template_id}` |
+| GET | `/api/usage/stats` |
 | GET | `/api/workflows` |
 | GET | `/api/workflows/{workflow_id}` |
 | GET | `/api/workflows/{workflow_id}/runs` |
 | GET | `/api/workflows/{workflow_id}/runs/{run_id}` |
+| PATCH | `/api/templates/{template_id}` |
 | PATCH | `/api/workflows/{workflow_id}` |
 | POST | `/api/auth-profiles` |
 | POST | `/api/auth-profiles/{profile_id}/complete-login` |
@@ -168,6 +186,8 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | POST | `/api/saas/projects/{project_id}/keys` |
 | POST | `/api/saas/signup` |
 | POST | `/api/scheduled` |
+| POST | `/api/templates` |
+| POST | `/api/usage/stats/record` |
 | POST | `/api/workflow-drafts/from-url-analysis` |
 | POST | `/api/workflow-drafts/{draft_id}/detect-fields` |
 | POST | `/api/workflow-drafts/{draft_id}/manual-mapping` |
@@ -177,4 +197,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 121
+**Total routes:** 141

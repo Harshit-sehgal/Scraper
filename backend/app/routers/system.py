@@ -361,7 +361,7 @@ async def extraction_health(
         fail_count = counts.get("failed", 0) or counts.get("failure", 0) or 0
         if fail_count > 0:
             domain_failures.append({"domain": _key, "failure_count": fail_count})
-    domain_failures.sort(key=lambda d: d["failure_count"], reverse=True)  # type: ignore[arg-type]
+    domain_failures.sort(key=lambda d: int(str(d["failure_count"])), reverse=True)
     top_failing = domain_failures[:10]
 
     # ── Failure categories (bonus for the dashboard) ───────────────────
@@ -729,10 +729,10 @@ def _render_basic_metrics_text() -> str:
         from app.domain_runtime_policy import get_domain_runtime_policy
 
         for domain, summary in get_domain_runtime_policy().get_summary().items():
-            total_attempts = int(summary.get("total_attempts", 0) or 0)
+            total_attempts = int(str(summary.get("total_attempts", 0) or 0))
             if total_attempts <= 0:
                 continue
-            rate = float(summary.get("failure_rate", 0.0) or 0.0)
+            rate = float(str(summary.get("failure_rate", 0.0) or 0.0))
             lines.append(_basic_metric_line("dataforge_domain_failure_rate", rate, {"domain": domain}))
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         logger.debug("Metrics fallback: domain failure-rate collection failed")
@@ -1152,10 +1152,10 @@ def _add_domain_latency_csp_rate_gauges(registry) -> None:
                 registry=registry,
             )
             for domain, summary in domain_summaries.items():
-                total_attempts = int(summary.get("total_attempts", 0) or 0)
+                total_attempts = int(str(summary.get("total_attempts", 0) or 0))
                 if total_attempts <= 0:
                     continue
-                rate = float(summary.get("failure_rate", 0.0) or 0.0)
+                rate = float(str(summary.get("failure_rate", 0.0) or 0.0))
                 domain_failure_gauge.labels(domain=domain).set(rate)
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         record_metrics_collection_error()

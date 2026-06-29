@@ -1319,6 +1319,29 @@ class JobEventsResponse(BaseModel):
     next_offset: int | None = None
 
 
+class JobQualityResponse(BaseModel):
+    """Response model for GET /api/jobs/{job_id}/quality."""
+
+    job_id: str
+    overall_quality: float
+    record_count: int
+    offset: int
+    limit: int
+    next_offset: int | None = None
+    records: list[Any]
+
+
+class JobQualityTrendsResponse(BaseModel):
+    """Response model for GET /api/jobs/{job_id}/quality/trends."""
+
+    job_id: str
+    domain: str
+    schema_hash: str
+    summary: dict[str, Any]
+    samples: list[Any]
+    alert_threshold: float
+
+
 # ─── User Data Response Models ────────────────────────────────────────
 
 

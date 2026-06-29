@@ -128,3 +128,45 @@ async def run_post_processing(
     scraped_at = datetime.datetime.now(datetime.UTC).isoformat()
     for record in job.results:
         record["scraped_at"] = scraped_at
+
+    # Step 7: Record quality trend
+    try:
+        from app.data_quality import score_records as _score_records
+        from app.utils.log_redaction import redact_pii
+        from app.utils.quality_trends import get_trend_store
+
+        trend_store = get_trend_store()
+        per_rec = _score_records(list(job.results), job.schema_fields)
+        if per_rec:
+            overall = sum(r["overall"] for r in per_rec) / len(per_rec)
+            field_mean: dict[str, float] = {}
+            all_keys: set[str] = set()
+            for r in per_rec:
+                all_keys.update(r["field_scores"].keys())
+            for k in all_keys:
+                vals = [r["field_scores"][k] for r in per_rec if k in r["field_scores"]]
+                if vals:
+                    field_mean[k] = round(sum(vals) / len(vals), 4)
+        else:
+            overall = 0.0
+            field_mean = {}
+
+        shash = trend_store.schema_hash(job.schema_fields)
+        domain = trend_store.domain_for_url(job.urls[0]) if job.urls else "unknown"
+        regressed = trend_store.record(
+            domain=domain,
+            schema_hash=shash,
+            score=round(overall, 3),
+            job_id=job.id,
+            field_scores=field_mean,
+        )
+        if regressed:
+            logger.warning(
+                "Quality regression detected for domain=%s schema=%s score=%.3f job=%s",
+                redact_pii(domain),
+                shash[:8],
+                overall,
+                job.id,
+            )
+    except (ImportError, RuntimeError, ValueError) as exc:
+        logger.debug("Quality trend recording skipped: %s", exc)

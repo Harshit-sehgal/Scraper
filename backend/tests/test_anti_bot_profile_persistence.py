@@ -13,6 +13,8 @@ class TestProfilePersistence:
         engine = AntiBotEngine()
         ua_a = engine.get_stealth_profile("alpha.example")["user_agent"]
         ua_b = engine.get_stealth_profile("beta.example")["user_agent"]
+        assert ua_a
+        assert ua_b
         assert "alpha.example" in engine._ua_history
         assert "beta.example" in engine._ua_history
 

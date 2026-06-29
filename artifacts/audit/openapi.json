@@ -3249,6 +3249,48 @@
         "title": "URLPreviewRequest",
         "type": "object"
       },
+      "UsageRecord": {
+        "description": "Request body for recording usage events (Feat 30).",
+        "properties": {
+          "api_key": {
+            "default": "",
+            "description": "API key identifier",
+            "maxLength": 128,
+            "title": "Api Key",
+            "type": "string"
+          },
+          "failures": {
+            "default": 0,
+            "description": "Number of failures",
+            "minimum": 0.0,
+            "title": "Failures",
+            "type": "integer"
+          },
+          "latency_ms": {
+            "default": 0,
+            "description": "Maximum latency in milliseconds",
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "records": {
+            "default": 0,
+            "description": "Number of records extracted",
+            "minimum": 0.0,
+            "title": "Records",
+            "type": "integer"
+          },
+          "requests": {
+            "default": 1,
+            "description": "Number of requests to record",
+            "minimum": 0.0,
+            "title": "Requests",
+            "type": "integer"
+          }
+        },
+        "title": "UsageRecord",
+        "type": "object"
+      },
       "UsageSummaryResponse": {
         "description": "Current usage summary for the authenticated user.",
         "properties": {
@@ -4539,6 +4581,44 @@
         ]
       }
     },
+    "/api/download/{filename}": {
+      "get": {
+        "description": "Serve a previously-downloaded binary file (PDF, image, ZIP, etc.).\n\nFiles are stored by ``scrape_url(extract_binary=True)`` in the\nconfigured ``DATA_DIR/binaries/`` directory. The endpoint streams\nthe file with the correct Content-Type and Content-Disposition so\nbrowsers download it natively.\n\nReturns 404 if the file does not exist or has been cleaned up.",
+        "operationId": "serve_binary_download_api_download__filename__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Serve Binary Download"
+      }
+    },
     "/api/exports/batch": {
       "post": {
         "operationId": "batch_export_api_exports_batch_post",
@@ -5699,6 +5779,147 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/quality": {
+      "get": {
+        "description": "Return per-record quality scores for a completed job.\n\nComputes completeness, type conformance, and plausibility for\neach record and returns a paginated list of detailed scores.",
+        "operationId": "get_job_quality_api_jobs__job_id__quality_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Quality Api Jobs  Job Id  Quality Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Quality",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/quality/trends": {
+      "get": {
+        "description": "Return quality trend history for the domain+schema of a given job.\n\nIncludes per-field score breakdown, aggregate summary stats, and\nthe configured alert threshold.",
+        "operationId": "get_job_quality_trends_api_jobs__job_id__quality_trends_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Quality Trends Api Jobs  Job Id  Quality Trends Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Quality Trends",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/reclean": {
       "post": {
         "description": "Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs.\n\nDelegates business logic to ``JobRecleanerService``.",
@@ -5745,6 +5966,81 @@
       }
     },
     "/api/jobs/{job_id}/results": {
+      "delete": {
+        "description": "Delete results for a job, optionally filtered by date range.\n\nRoadmap Feat 26 \u2014 Bulk result delete with optional date range filter.",
+        "operationId": "delete_job_results_api_jobs__job_id__results_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Job Results Api Jobs  Job Id  Results Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Job Results",
+        "tags": [
+          "jobs"
+        ]
+      },
       "get": {
         "description": "Return a paginated slice of job results with search/filter/sort (Feat 25).\n\nSupports:\n- **q**: Full-text search across all result field values.\n- **field**: Filter results to only include records where this field exists.\n- **sort_by**: Field name to sort results by.\n- **sort_order**: ``asc`` or ``desc`` (default ``asc``).",
         "operationId": "get_job_results_api_jobs__job_id__results_get",
@@ -9075,6 +9371,74 @@
         "summary": "Analyze Url",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/usage/stats": {
+      "get": {
+        "description": "Return per-key usage statistics for the usage dashboard (Feat 30).\n\nShows requests/day, records extracted, failures, average latency.",
+        "operationId": "get_usage_stats_api_usage_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Usage Stats Api Usage Stats Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Usage Stats",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/usage/stats/record": {
+      "post": {
+        "description": "Record a usage event for the dashboard.",
+        "operationId": "record_usage_api_usage_stats_record_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Usage Api Usage Stats Record Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Usage",
+        "tags": [
+          "jobs"
         ]
       }
     },

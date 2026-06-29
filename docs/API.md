@@ -2,7 +2,7 @@
 
 This route list was generated from the FastAPI app during the audit. Production app config disables `/docs`, `/redoc`, and `/openapi.json`; Nginx behavior still needs runtime validation in a started production stack.
 
-**Note:** The access levels below reflect the *intended* contract. A fresh generated route-auth matrix (via `scripts/route_auth_matrix.py`) should be checked against this table after any auth reclassification.
+**Note:** The access levels below reflect the *intended* contract. A fresh generated route-auth matrix (via `python3 scripts/generate_route_auth_matrix.py`) should be checked against this table after any auth reclassification.
 
 ## Public / Probe Routes
 
@@ -23,19 +23,35 @@ This route list was generated from the FastAPI app during the audit. Production 
 | GET | `/api/jobs/{job_id}` | Authenticated user |
 | GET | `/api/jobs/{job_id}/results` | Authenticated user (paginated: `?limit=&offset=`) |
 | GET | `/api/jobs/{job_id}/events` | Authenticated user (paginated: `?limit=&offset=&level=`) |
+| GET | `/api/jobs/{job_id}/debug` | Authenticated user |
+| GET | `/api/jobs/{job_id}/diff` | Authenticated user |
+| GET | `/api/jobs/{job_id}/quality` | Authenticated user |
+| GET | `/api/jobs/{job_id}/quality/trends` | Authenticated user |
+| GET | `/api/jobs/{job_id}/notification-channels` | Operator or admin |
 | POST | `/api/jobs` | Operator or admin |
+| POST | `/api/jobs/batch` | Operator or admin |
 | POST | `/api/jobs/{job_id}/cancel` | Operator or admin |
+| POST | `/api/jobs/{job_id}/clone` | Operator or admin |
+| POST | `/api/jobs/{job_id}/email` | Operator or admin |
+| POST | `/api/jobs/{job_id}/notification-channels` | Operator or admin |
 | POST | `/api/jobs/{job_id}/reclean` | Operator or admin |
 | POST | `/api/jobs/{job_id}/webhook/redeliver` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/extraction` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/fetch-strategy` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/headers` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/notification-channels/{channel_id}` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/strategy` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/user-agent` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/wait-conditions` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/webhook` | Operator or admin |
 | DELETE | `/api/jobs/{job_id}` | Admin |
 | DELETE | `/api/jobs/cleanup/terminal` | Admin |
+| DELETE | `/api/jobs/{job_id}/notification-channels/{channel_id}` | Operator or admin |
+| DELETE | `/api/jobs/{job_id}/results` | Operator or admin |
 | GET | `/api/jobs/{job_id}/export/csv` | Operator or admin |
 | GET | `/api/jobs/{job_id}/export/json` | Operator or admin |
 | GET | `/api/jobs/{job_id}/export/excel` | Operator or admin |
+| GET | `/api/download/{filename}` | Operator or admin |
 
 ## Recycle Bin Routes
 
@@ -77,6 +93,7 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | POST | `/api/scraper/regressions/generate-all-tests` | Admin |
 | POST | `/api/scraper/regressions/{entry_id}/generate-test` | Admin |
 | POST | `/api/scraper/selectors/cleanup` | Admin |
+| POST | `/api/scraper/screenshot` | Operator or admin |
 
 ## Operator and System Routes
 
@@ -88,8 +105,22 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | GET | `/api/system/status` | Operator or admin |
 | GET | `/api/system/storage/status` | Operator or admin |
 | GET | `/api/system/audit-log` | Admin |
+| GET | `/api/system/extraction-health` | Operator or admin |
+| GET | `/api/system/extraction-rate` | Operator or admin |
 | GET | `/api/system/rate-limit-stats` | Operator or admin |
 | POST | `/api/system/csp-violations` | Unauthenticated (browser-reported; middleware bypasses auth for this path) |
+
+## Extraction Templates and Usage
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/templates` | Operator or admin |
+| POST | `/api/templates` | Operator or admin |
+| GET | `/api/templates/{template_id}` | Operator or admin |
+| PATCH | `/api/templates/{template_id}` | Operator or admin |
+| DELETE | `/api/templates/{template_id}` | Admin |
+| GET | `/api/usage/stats` | Operator or admin |
+| POST | `/api/usage/stats/record` | Operator or admin |
 
 ## Session/Auth Routes
 

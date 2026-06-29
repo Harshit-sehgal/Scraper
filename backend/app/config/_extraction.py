@@ -117,3 +117,28 @@ class ExtractionSettings(BaseSettings):
     """Max characters for context window around fuzzy match."""
     SELECTOR_MIN_SEGMENT_LEN: int = 3
     """Min characters for extracted context segment."""
+
+    # ─── Quality Type Validation & Trend Tracking ──────────────────────
+    QUALITY_TYPE_CONFORMANCE_WEIGHT: float = 0.30
+    """Weight for type-conformance component in per-record quality score."""
+
+    QUALITY_COMPLETENESS_WEIGHT: float = 0.15
+    """Weight for completeness component in per-record quality score."""
+
+    QUALITY_TREND_WINDOW_DAYS: int = 30
+    """Days to retain quality-trend samples per (domain, schema_hash)."""
+
+    QUALITY_TREND_MAX_SAMPLES: int = 500
+    """Cap on trend samples per (domain, schema_hash) key. FIFO eviction."""
+
+    QUALITY_TREND_ALERT_THRESHOLD: float = 0.50
+    """Score below which a newly-completed job triggers a quality-trend alert."""
+
+    QUALITY_TREND_DOMAIN_KEY_DELIMITER: str = "|"
+    """Delimiter in trend-store composite key (domain + schema_hash)."""
+
+    QUALITY_DETAIL_RECORD_LIMIT: int = 200
+    """Max per-record quality entries in one GET /api/jobs/{id}/quality response."""
+
+    QUALITY_TREND_PAGE_LIMIT: int = 100
+    """Page size for the trend-history endpoint."""
