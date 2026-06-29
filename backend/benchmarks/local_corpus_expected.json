@@ -1,5 +1,5 @@
 {
-  "version": "2026-06-29.local-corpus.v2",
+  "version": "2026-06-29.local-corpus.v3",
   "required_categories": [
     "static product pages",
     "listing pages",
@@ -20,7 +20,8 @@
     "wiki / infobox pages",
     "Q&A / forum pages",
     "ecommerce listing grid",
-    "multi-page pagination"
+    "multi-page pagination",
+    "spa-render-wait"
   ],
   "aggregate_thresholds": {
     "min_row_f1": 0.9,
@@ -378,6 +379,25 @@
         {"title": "Heritrix — Extensible, web-scale, archival-quality crawler", "stars": "2.8"},
         {"title": "Portia — Visual data extraction for Scrapy", "stars": "9.1"},
         {"title": "pyspider — Powerful spider system in Python", "stars": "16.4"}
+      ],
+      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+    },
+    {
+      "id": "spa_react_marketplace",
+      "categories": ["spa-render-wait"],
+      "fixture": "spa_react_mock.html",
+      "extractor": "html_regex",
+      "schema": [
+        {"name": "title", "type": "string", "required": true},
+        {"name": "price", "type": "currency", "required": true}
+      ],
+      "required_fields": ["title", "price"],
+      "expected_records": [
+        {"title": "Pioneer Air Purifier", "price": "$129.00"},
+        {"title": "Aurora Smart Lamp", "price": "$42.50"},
+        {"title": "Helix Standing Desk", "price": "$449.00"},
+        {"title": "Mariner Robot Vacuum", "price": "$299.99"},
+        {"title": "Sentinel Doorbell Camera", "price": "$89.00"}
       ],
       "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
     }
