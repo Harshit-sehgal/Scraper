@@ -1,10 +1,11 @@
 """Comp 16: AUP enforcement — test acceptable use policy enforcement."""
+
 from __future__ import annotations
 
 from typing import Any
 
 AUP_VERSION = "2026-06-v1"
-AUP_RULES = {
+AUP_RULES: dict[str, Any] = {
     "max_requests_per_domain_per_hour": 1000,
     "max_records_per_job": 50000,
     "prohibited_content_types": ["adult", "hate_speech", "personal_data_scale"],
@@ -20,10 +21,12 @@ def _check_aup_compliance(
     robots_respected: bool = True,
 ) -> dict[str, Any]:
     """Check if a job complies with the Acceptable Use Policy."""
-    violations = []
+    violations: list[str] = []
 
     if estimated_requests > AUP_RULES["max_requests_per_domain_per_hour"]:
-        violations.append(f"Estimated requests ({estimated_requests}) exceeds per-domain limit ({AUP_RULES['max_requests_per_domain_per_hour']})")
+        violations.append(
+            f"Estimated requests ({estimated_requests}) exceeds per-domain limit ({AUP_RULES['max_requests_per_domain_per_hour']})"
+        )
 
     if content_type in AUP_RULES["prohibited_content_types"]:
         violations.append(f"Content type '{content_type}' is prohibited by AUP")

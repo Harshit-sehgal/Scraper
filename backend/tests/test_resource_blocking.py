@@ -2,6 +2,7 @@
 
 Roadmap: Rel 9 — verify blocking ads/scripts/fonts doesn't break extraction.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

@@ -3,6 +3,7 @@
 Roadmap: Rel 43 — page with unclosed tags, duplicate IDs,
 invalid nesting, verify extraction degrades gracefully.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

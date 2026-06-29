@@ -3,6 +3,7 @@
 Roadmap: Rel 10 — page with JSON-LD, microdata, RDFa simultaneously,
 verify best-scoring source wins.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

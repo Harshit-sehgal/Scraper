@@ -3,6 +3,7 @@
 Roadmap: Rel 35 — page that loads content progressively as user scrolls,
 verify infinite scroll strategy captures all content.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

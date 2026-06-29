@@ -3,6 +3,7 @@
 Roadmap: Rel 21 — 500KB+ HTML with deep DOM, verify
 extraction completes within bounded time and memory.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

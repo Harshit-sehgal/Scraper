@@ -3,6 +3,7 @@
 Roadmap: Rel 19 — URL serving PDF or image instead of HTML,
 verify extraction classifies as unsupported format.
 """
+
 from __future__ import annotations
 
 import pytest

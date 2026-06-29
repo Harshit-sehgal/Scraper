@@ -149,6 +149,7 @@ async def capture_screenshot(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"URL not allowed: {exc}") from exc
     from app.browser_pool import get_browser_pool
+
     pool = get_browser_pool()
     try:
         screenshot_b64 = await pool.capture_screenshot(url, full_page=full_page)

@@ -66,7 +66,7 @@ class TestHeaderVariation:
         headers = self._collect_headers(1)[0]
         assert headers.get("Sec-Fetch-Dest") == "document"
         assert headers.get("Sec-Fetch-Mode") == "navigate"
-        assert headers.get("Sec-Fetch-Site") in ("none",)
+        assert headers.get("Sec-Fetch-Site") == "none"
 
     def test_upgrade_insecure_requests_present(self) -> None:
         headers = self._collect_headers(1)[0]

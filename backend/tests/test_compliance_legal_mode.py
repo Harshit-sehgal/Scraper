@@ -1,4 +1,5 @@
 """Comp 5: Legal-only extraction mode — test legal mode disabling bypass features."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -6,7 +7,7 @@ from typing import Any
 
 class LegalModeConfig:
     """Configuration for legal-only extraction mode.
-    
+
     In legal mode, all bypass features are disabled:
     - No proxy rotation
     - No stealth/anti-bot evasion

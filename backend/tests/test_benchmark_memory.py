@@ -3,6 +3,7 @@
 Tests memory tracking after multiple extractions and ensures no
 unbounded growth pattern.
 """
+
 from __future__ import annotations
 
 import gc
@@ -24,9 +25,7 @@ class TestBenchmarkMemoryTracking:
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=True),
         ]
         gc.collect()
-        _records = extract_with_regex(
-            html, schema, base_url="https://fixtures.local/large_catalog.html"
-        )
+        _records = extract_with_regex(html, schema, base_url="https://fixtures.local/large_catalog.html")
         gc.collect()
         assert len(_records) > 0
 
@@ -36,14 +35,12 @@ class TestBenchmarkMemoryTracking:
             SchemaField(name="title", field_type=FieldType.STRING, required=True),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=True),
         ]
-        ids_before = set(id(obj) for obj in gc.get_objects())
+        ids_before = {id(obj) for obj in gc.get_objects()}
         for _ in range(10):
-            records = extract_with_regex(
-                html, schema, base_url="https://fixtures.local/large_catalog.html"
-            )
+            records = extract_with_regex(html, schema, base_url="https://fixtures.local/large_catalog.html")
             assert len(records) > 0
         gc.collect()
-        ids_after = set(id(obj) for obj in gc.get_objects())
+        ids_after = {id(obj) for obj in gc.get_objects()}
         new_objects = len(ids_after - ids_before)
         persistent = min(new_objects, 10000)
         assert persistent >= 0
@@ -70,9 +67,7 @@ class TestBenchmarkNoUnboundedGrowth:
         ]
         gc.collect()
         before = len(gc.get_objects())
-        records = extract_with_regex(
-            html, schema, base_url="https://fixtures.local/large_catalog.html"
-        )
+        records = extract_with_regex(html, schema, base_url="https://fixtures.local/large_catalog.html")
         gc.collect()
         del records
         gc.collect()

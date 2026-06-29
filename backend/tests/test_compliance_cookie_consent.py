@@ -1,4 +1,5 @@
 """Comp 7: Cookie consent handling — test detection and handling of cookie banners."""
+
 from __future__ import annotations
 
 import re
@@ -45,7 +46,7 @@ def _detect_cookie_consent_banner(html: str) -> dict[str, Any]:
 
 def _handle_cookie_consent(html: str, policy: str = "accept_all") -> dict[str, Any]:
     """Simulate handling cookie consent based on policy.
-    
+
     Policy: accept_all, reject_all, essential_only
     """
     detection = _detect_cookie_consent_banner(html)

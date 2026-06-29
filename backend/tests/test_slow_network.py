@@ -3,6 +3,7 @@
 Roadmap: Rel 29 — simulate slow 3G network conditions,
 verify extraction waits for content but eventually times out gracefully.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -57,7 +58,7 @@ class TestSlowNetwork:
             return [{"x": "y"}]
 
         result = await async_paginate(page, config, very_slow)
-        assert result.stopped_reason == "timeout" or result.stopped_reason == "button_gone"
+        assert result.stopped_reason in {"timeout", "button_gone"}
 
     @pytest.mark.asyncio
     async def test_delay_between_pages_respected(self) -> None:

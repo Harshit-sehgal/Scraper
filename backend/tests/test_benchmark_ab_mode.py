@@ -3,6 +3,7 @@
 Compares two extraction strategies or cascade configurations on the same
 corpus and verifies the results are comparable.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -36,7 +37,7 @@ class TestBenchmarkABMode:
         result_a = await async_paginate(page, config_a)
         result_b = await async_paginate(page, config_b)
 
-        assert type(result_a) == type(result_b)
+        assert type(result_a) is type(result_b)
         assert hasattr(result_a, "records")
         assert hasattr(result_b, "records")
         assert hasattr(result_a, "stopped_reason")
@@ -85,4 +86,5 @@ class TestBenchmarkABMode:
         next_result = paginate(PaginationConfig(strategy="next_button", max_pages=1, delay_between_pages=0))
         inf_result = paginate(PaginationConfig(strategy="infinite_scroll", max_pages=1, delay_between_pages=0))
 
-        assert inf_result.stopped_reason != next_result.stopped_reason or True
+        assert isinstance(next_result.stopped_reason, str)
+        assert isinstance(inf_result.stopped_reason, str)

@@ -1,4 +1,5 @@
 """Obs 1: Extraction-specific Prometheus metrics — test metric counters."""
+
 from __future__ import annotations
 
 import pytest
@@ -63,13 +64,25 @@ class TestExtractionFailedMetrics:
 
     def test_unknown_category_clamped(self) -> None:
         from app.metrics_collector import record_extraction_failure
+
         record_extraction_failure("unknown_thing")
         counts = get_extraction_failure_counts()
         assert counts.get("unknown", 0) == 1
 
     def test_all_categories_in_output(self) -> None:
         counts = get_extraction_failure_counts()
-        for cat in ("timeout", "block", "auth_required", "ssl_error", "network_error", "parse_error", "empty_page", "captcha", "rate_limit", "browser_crash"):
+        for cat in (
+            "timeout",
+            "block",
+            "auth_required",
+            "ssl_error",
+            "network_error",
+            "parse_error",
+            "empty_page",
+            "captcha",
+            "rate_limit",
+            "browser_crash",
+        ):
             assert cat in counts
 
     def test_failure_with_domain(self) -> None:

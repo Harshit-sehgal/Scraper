@@ -3,6 +3,7 @@
 Roadmap: Rel 20 — page whose content never stops growing,
 verify max-pages/max-records/max-timeout ceiling is enforced gracefully.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

@@ -22,8 +22,8 @@ class TestExpiredSSLExtraction:
     async def test_expired_ssl_classified_as_ssl_error(self) -> None:
         from app.failure_classification import FailureCategory, classify_failure
 
-        category = classify_failure("SSL certificate expired")
-        assert category.category in (FailureCategory.SSL_ERROR, FailureCategory.NETWORK_ERROR)
+        category = classify_failure(error_message="SSL certificate expired")
+        assert category.category == FailureCategory.SSL_ERROR
 
     @pytest.mark.asyncio
     async def test_expired_ssl_does_not_crash_or_hang(self) -> None:

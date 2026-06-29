@@ -7,6 +7,7 @@ encoding detection, etc.
 
 Roadmap: Rel 2 (30 unmocked extraction integration tests).
 """
+
 from __future__ import annotations
 
 import http.server

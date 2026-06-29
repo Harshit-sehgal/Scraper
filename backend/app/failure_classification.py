@@ -59,6 +59,15 @@ class FailureCategory(StrEnum):
     HTTP_ERROR = "http_error"
     """Server returned a non-2xx status code (4xx, 5xx)."""
 
+    SSL_ERROR = "ssl_error"
+    """TLS or certificate validation failed before content could be fetched."""
+
+    NETWORK_ERROR = "network_error"
+    """Generic transport-layer failure that is not DNS, timeout, or TLS."""
+
+    AUTH_REQUIRED = "auth_required"
+    """The target requires authentication or an active session."""
+
     # ── Anti-Bot Layer ───────────────────────────────────────────────
     ANTI_BOT_BLOCK = "anti_bot_block"
     """Detected a challenge page (Cloudflare, DataDome, etc.)."""
@@ -177,6 +186,21 @@ RECOVERY_STRATEGIES: dict[FailureCategory, dict] = {
         "strategy": "examine_status",
         "params": {"delay_ms": 5000, "max_retries": 1},
         "description": "Check status code; retry once after delay for 5xx.",
+    },
+    FailureCategory.SSL_ERROR: {
+        "strategy": "abort_with_tls_diagnostics",
+        "params": {"verify_certificate": True},
+        "description": "Do not bypass TLS validation; surface certificate diagnostics.",
+    },
+    FailureCategory.NETWORK_ERROR: {
+        "strategy": "retry_with_network_diagnostics",
+        "params": {"delay_ms": 2000, "max_retries": 2},
+        "description": "Retry after checking network reachability.",
+    },
+    FailureCategory.AUTH_REQUIRED: {
+        "strategy": "require_auth_profile",
+        "params": {"auth_profile_required": True},
+        "description": "Ask the user to supply or refresh an authorized auth profile.",
     },
     FailureCategory.ANTI_BOT_BLOCK: {
         "strategy": "rotate_and_backoff",
@@ -330,6 +354,46 @@ def classify_failure(
     ):
         signals.append({"signal": "connection_error", "source": "error_message"})
         return _build_classification(FailureCategory.CONNECTION_TIMEOUT, 0.90, signals)
+
+    if any(
+        kw in error_text
+        for kw in [
+            "ssl",
+            "tls",
+            "certificate",
+            "cert verify",
+            "self signed",
+            "self-signed",
+            "x509",
+        ]
+    ):
+        signals.append({"signal": "tls_error", "source": "error_message"})
+        return _build_classification(FailureCategory.SSL_ERROR, 0.95, signals)
+
+    if any(
+        kw in error_text
+        for kw in [
+            "network unreachable",
+            "no route to host",
+            "temporary network failure",
+            "network error",
+        ]
+    ):
+        signals.append({"signal": "network_error", "source": "error_message"})
+        return _build_classification(FailureCategory.NETWORK_ERROR, 0.85, signals)
+
+    if any(
+        kw in error_text
+        for kw in [
+            "authentication required",
+            "auth required",
+            "login required",
+            "session expired",
+            "unauthorized",
+        ]
+    ):
+        signals.append({"signal": "auth_required", "source": "error_message"})
+        return _build_classification(FailureCategory.AUTH_REQUIRED, 0.85, signals)
 
     if any(
         kw in error_text

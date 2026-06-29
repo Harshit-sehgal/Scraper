@@ -4,6 +4,7 @@ Validates that extraction results conform to the requested schema types:
 numeric fields are actually numbers, dates are valid, emails match RFC 5322,
 URLs are well-formed, etc.
 """
+
 from __future__ import annotations
 
 import pytest

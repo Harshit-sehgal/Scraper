@@ -4,6 +4,7 @@ Tests benchmark extraction through the cascade using fixture HTML files
 as inputs. Verifies extraction returns expected field types across all
 extraction layers (regex, microdata, json-ld, llm).
 """
+
 from __future__ import annotations
 
 from pathlib import Path

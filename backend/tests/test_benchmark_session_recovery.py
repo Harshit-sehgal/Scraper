@@ -3,6 +3,7 @@
 Tests session-bound extraction, session expiry handling, search form
 recovery, and data preservation across recovery.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

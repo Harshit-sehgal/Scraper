@@ -1,4 +1,5 @@
 """Qual 17: Data completeness scoring — test completeness percentage calculation."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -10,9 +11,9 @@ def _sf(name: str, ftype: FieldType = FieldType.STRING, required: bool = False) 
     return SchemaField(name=name, field_type=ftype, description="", required=required)
 
 
-def _completeness_score(record: dict, schema_fields: list[SchemaField]) -> dict[str, Any]:
+def _completeness_score(record: dict[str, Any], schema_fields: list[SchemaField]) -> dict[str, Any]:
     """Compute completeness percentage for a record.
-    
+
     Returns the percentage of expected fields that have non-null, non-empty values,
     plus per-field breakdown.
     """
@@ -37,7 +38,7 @@ def _completeness_score(record: dict, schema_fields: list[SchemaField]) -> dict[
     }
 
 
-def _overall_completeness(records: list[dict], schema_fields: list[SchemaField]) -> dict[str, Any]:
+def _overall_completeness(records: list[dict[str, Any]], schema_fields: list[SchemaField]) -> dict[str, Any]:
     """Compute overall completeness across multiple records."""
     if not records:
         return {"overall_pct": 0.0, "total_records": 0}
@@ -101,7 +102,7 @@ class TestSingleRecordCompleteness:
 class TestOverallCompleteness:
     def test_multiple_records_completeness(self) -> None:
         fields = [_sf("name"), _sf("price")]
-        records = [
+        records: list[dict[str, Any]] = [
             {"name": "A", "price": "$1"},
             {"name": "B", "price": None},
             {"name": None, "price": "$3"},

@@ -57,7 +57,8 @@ async def test_ready_returns_503_when_repo_fails(monkeypatch, health_app):
     from app.storage_interface import get_job_repository
 
     def failing_health():
-        raise RuntimeError("DB unavailable")
+        msg = "DB unavailable"
+        raise RuntimeError(msg)
 
     repo = get_job_repository()
     monkeypatch.setattr(repo, "health_check", failing_health)

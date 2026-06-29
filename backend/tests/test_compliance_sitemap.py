@@ -1,4 +1,5 @@
 """Comp 3: Robots.txt sitemap discovery — test sitemap discovery from robots.txt."""
+
 from __future__ import annotations
 
 import re
@@ -22,7 +23,7 @@ def _parse_sitemaps_from_robots(robots_txt: str) -> list[str]:
 
 def _discover_sitemaps(robots_txt: str | None) -> dict[str, Any]:
     """Discover sitemaps from robots.txt content.
-    
+
     Returns structured result with sitemap URLs.
     """
     if not robots_txt:
@@ -59,11 +60,7 @@ class TestSitemapParsing:
         assert _parse_sitemaps_from_robots("") == []
 
     def test_sitemap_with_comments(self) -> None:
-        robots = (
-            "# robots.txt for example.com\n"
-            "Sitemap: https://example.com/sitemap.xml\n"
-            "# End of file\n"
-        )
+        robots = "# robots.txt for example.com\nSitemap: https://example.com/sitemap.xml\n# End of file\n"
         sitemaps = _parse_sitemaps_from_robots(robots)
         assert sitemaps == ["https://example.com/sitemap.xml"]
 

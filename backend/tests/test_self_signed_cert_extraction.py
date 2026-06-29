@@ -22,8 +22,8 @@ class TestSelfSignedCertExtraction:
     async def test_self_signed_classified_appropriately(self) -> None:
         from app.failure_classification import FailureCategory, classify_failure
 
-        category = classify_failure("certificate verify failed: self signed certificate")
-        assert category.category in (FailureCategory.SSL_ERROR, FailureCategory.AUTH_REQUIRED)
+        category = classify_failure(error_message="certificate verify failed: self signed certificate")
+        assert category.category == FailureCategory.SSL_ERROR
 
     @pytest.mark.asyncio
     async def test_self_signed_does_not_crash(self) -> None:

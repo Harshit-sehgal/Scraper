@@ -3,6 +3,7 @@
 Roadmap: Rel 18 — HTTP redirect to different domain.
          Rel 22 — 5+ redirect hops.
 """
+
 from __future__ import annotations
 
 import pytest

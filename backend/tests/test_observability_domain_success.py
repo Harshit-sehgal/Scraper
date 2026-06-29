@@ -1,4 +1,5 @@
 """Obs 3: Per-domain success rate tracking — test rolling 24h success/failure rate."""
+
 from __future__ import annotations
 
 from typing import Any

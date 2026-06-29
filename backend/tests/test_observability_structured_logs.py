@@ -1,4 +1,5 @@
 """Obs 13: Structured job logs — test JSON log format with job_id, url, etc."""
+
 from __future__ import annotations
 
 import json
@@ -94,12 +95,16 @@ class TestStructuredLogValidation:
 
 class TestStructuredLogExtraFields:
     def test_extra_fields_allowed(self) -> None:
-        entry = _make_structured_log("job-001", "https://example.com", extra={
-            "duration_ms": 250,
-            "strategy": "playwright",
-            "records_found": 10,
-            "cascade_layer": "regex",
-        })
+        entry = _make_structured_log(
+            "job-001",
+            "https://example.com",
+            extra={
+                "duration_ms": 250,
+                "strategy": "playwright",
+                "records_found": 10,
+                "cascade_layer": "regex",
+            },
+        )
         assert entry["duration_ms"] == 250
         assert entry["strategy"] == "playwright"
         assert entry["records_found"] == 10

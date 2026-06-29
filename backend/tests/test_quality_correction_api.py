@@ -1,4 +1,5 @@
 """Qual 15: Human-in-the-loop correction API — test PATCH /api/jobs/{id}/results/{record_id}."""
+
 from __future__ import annotations
 
 import copy
@@ -7,7 +8,7 @@ from typing import Any
 
 def _apply_correction(record: dict, corrections: dict[str, Any]) -> dict:
     """Apply user corrections to an extracted record.
-    
+
     Returns a corrected copy; original is not mutated.
     """
     corrected = copy.deepcopy(record)

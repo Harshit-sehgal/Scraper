@@ -52,7 +52,7 @@ class TestTLSAvailabilityDetection:
 
     def test_availability_after_mock_import(self) -> None:
         fake_module = type(sys)("curl_cffi")
-        fake_module.Curl = "fake"
+        fake_module.__dict__["Curl"] = "fake"
         with patch.dict(sys.modules, {"curl_cffi": fake_module}):
             assert _check_curl_cffi_available() is True
 

@@ -2,6 +2,7 @@
 
 Roadmap: Rel 24 — navigator.webdriver and other detection vectors.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -33,11 +34,7 @@ class TestAutomationDetection:
         page.expect_navigation = MagicMock(return_value=nav)
 
         # Simulate detection-related evaluation
-        page.evaluate = AsyncMock(
-            side_effect=lambda expr: (
-                True if "webdriver" in str(expr) or "plugins" in str(expr) else 1000
-            )
-        )
+        page.evaluate = AsyncMock(side_effect=lambda expr: True if "webdriver" in str(expr) or "plugins" in str(expr) else 1000)
 
         config = PaginationConfig(strategy="next_button", max_pages=1, delay_between_pages=0)
 

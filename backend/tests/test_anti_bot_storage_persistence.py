@@ -20,9 +20,8 @@ class TestStoragePersistence:
         assert path.name == "anti_bot_cookies.db"
 
     def test_cookie_db_conn_creates_table(self) -> None:
-        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-        tmp.close()
-        tmp_path = Path(tmp.name)
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
         try:
             conn = _cookie_db_conn(db_path=tmp_path)
             try:

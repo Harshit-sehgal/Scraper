@@ -76,6 +76,12 @@ class TestErrorClassification:
         assert result.confidence >= 0.9
         assert result.recovery_strategy == "increase_timeout"
 
+    def test_classify_ssl_certificate_failure(self) -> None:
+        result = classify_failure(error_message="certificate verify failed: self signed certificate")
+        assert result.category == FailureCategory.SSL_ERROR
+        assert result.confidence >= 0.9
+        assert result.recovery_strategy == "abort_with_tls_diagnostics"
+
     def test_classify_timeout_with_low_dom_nodes(self) -> None:
         result = classify_failure(
             error_message="Timed out waiting for page",

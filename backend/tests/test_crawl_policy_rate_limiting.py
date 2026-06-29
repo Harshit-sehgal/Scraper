@@ -6,10 +6,15 @@ exponential cooldown, and page budgets via the public API.
 
 from __future__ import annotations
 
-import time
+import asyncio
+from typing import Any, cast
 
 import pytest
 from app.crawl_policy import CrawlPolicyEngine
+
+
+def _mutable_policy(policy: CrawlPolicyEngine) -> Any:
+    return cast("Any", policy)
 
 
 @pytest.fixture
@@ -21,7 +26,7 @@ def policy() -> CrawlPolicyEngine:
     eng._default_delay = 0.0
     eng._respect_robots = False
     eng._max_retries = 2
-    eng._cooldown_seconds = 1.0
+    _mutable_policy(eng)._cooldown_seconds = 1.0
     eng._max_cooldown_seconds = 8.0
     eng._cooldown_multiplier = 2.0
     eng._max_pages_per_domain = 5
@@ -123,7 +128,7 @@ class TestRequestPacing:
         policy._default_delay = 0.01
         assert await policy.check_domain("https://example.com/1") is None
         policy.record_result("https://example.com/1", success=True)
-        time.sleep(0.02)
+        await asyncio.sleep(0.02)
         result = await policy.check_domain("https://example.com/2")
         assert result is None
 
@@ -159,7 +164,7 @@ class TestRetryCeilingAndCooldown:
 
     @pytest.mark.asyncio
     async def test_cooldown_blocks_check_domain(self, policy: CrawlPolicyEngine) -> None:
-        policy._cooldown_seconds = 60.0
+        _mutable_policy(policy)._cooldown_seconds = 60.0
         assert await policy.check_domain("https://example.com/1") is None
         policy.record_result("https://example.com/1", success=False)
         policy.record_result("https://example.com/1", success=False)
@@ -174,24 +179,28 @@ class TestRetryCeilingAndCooldown:
         policy.record_result("https://example.com/1", success=False)
         policy.record_result("https://example.com/1", success=True)
         state = policy.get_domain_state("example.com")
+        assert state is not None
         assert state["consecutive_failures"] == 0
 
     @pytest.mark.asyncio
     async def test_success_clears_cooldown(self, policy: CrawlPolicyEngine) -> None:
-        policy._cooldown_seconds = 60.0
+        _mutable_policy(policy)._cooldown_seconds = 60.0
         assert await policy.check_domain("https://example.com/1") is None
         policy.record_result("https://example.com/1", success=False)
         policy.record_result("https://example.com/1", success=False)
-        assert policy.get_domain_state("example.com")["cooldown"] > 0.0
+        cooldown_state = policy.get_domain_state("example.com")
+        assert cooldown_state is not None
+        assert cooldown_state["cooldown"] > 0.0
         policy.record_result("https://example.com/1", success=True)
         state = policy.get_domain_state("example.com")
+        assert state is not None
         assert state["cooldown"] == 0.0
 
     @pytest.mark.asyncio
     async def test_exponential_cooldown_growth(self, policy: CrawlPolicyEngine) -> None:
         policy._cooldown_multiplier = 2.0
-        policy._cooldown_seconds = 1.0
-        policy._max_cooldown_seconds = 10.0
+        _mutable_policy(policy)._cooldown_seconds = 1.0
+        _mutable_policy(policy)._max_cooldown_seconds = 10.0
         policy._max_retries = 1
         # Use all failures in a single batch — no check_domain in between
         # because cooldown will block subsequent check_domain calls.
@@ -199,17 +208,19 @@ class TestRetryCeilingAndCooldown:
         policy.record_result("https://example.com/0", success=False)
         policy.record_result("https://example.com/0", success=False)
         state = policy.get_domain_state("example.com")
+        assert state is not None
         assert state["consecutive_failures"] == 2
 
     @pytest.mark.asyncio
     async def test_cooldown_capped_at_max(self, policy: CrawlPolicyEngine) -> None:
-        policy._cooldown_seconds = 10.0
-        policy._max_cooldown_seconds = 30.0
+        _mutable_policy(policy)._cooldown_seconds = 10.0
+        _mutable_policy(policy)._max_cooldown_seconds = 30.0
         policy._cooldown_multiplier = 10.0
         policy._max_retries = 1
         assert await policy.check_domain("https://example.com/0") is None
         policy.record_result("https://example.com/0", success=False)
         state = policy.get_domain_state("example.com")
+        assert state is not None
         assert state["cooldown"] <= 30.0 + 1.0
 
     @pytest.mark.asyncio
@@ -219,6 +230,7 @@ class TestRetryCeilingAndCooldown:
         assert await policy.check_domain("https://example.com/2") is None
         policy.record_result("https://example.com/2", success=True)
         state = policy.get_domain_state("example.com")
+        assert state is not None
         assert state["total_fetches"] == 2
 
     @pytest.mark.asyncio

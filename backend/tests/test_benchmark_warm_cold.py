@@ -3,6 +3,7 @@
 Tests cold start extraction latency, warm/cached extraction latency,
 and cache hit ratio.
 """
+
 from __future__ import annotations
 
 import time

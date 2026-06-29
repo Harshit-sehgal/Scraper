@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -9,11 +10,11 @@ from app.worker_queue import Priority, WorkerQueue
 
 
 @pytest.fixture
-def _queue_db() -> Path:
-    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    tmp.close()
-    yield Path(tmp.name)
-    Path(tmp.name).unlink(missing_ok=True)
+def _queue_db() -> Generator[Path]:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    yield tmp_path
+    tmp_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio

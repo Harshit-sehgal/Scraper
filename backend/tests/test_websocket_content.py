@@ -3,6 +3,7 @@
 Roadmap: Rel 36 — WebSocket-pushed content extraction.
          Rel 37 — EventSource/SSE content extraction.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

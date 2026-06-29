@@ -3,10 +3,21 @@
 Tests that the SDK client produces well-formed API requests
 and handles responses correctly.
 """
+
 from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import pytest
 from sdk import DataForge
+
+RequestCall = tuple[str, str, dict[str, Any]]
+MockRequest = Callable[..., Awaitable[Any]]
+
+
+def _patch_request(monkeypatch: pytest.MonkeyPatch, client: DataForge, request: MockRequest) -> None:
+    monkeypatch.setattr(client, "_request", request)
 
 
 class TestDataForgeSDKClient:
@@ -26,15 +37,15 @@ class TestDataForgeSDKClient:
         assert client.base_url == "http://localhost:8000"
 
     @pytest.mark.asyncio
-    async def test_extract_builds_correct_request(self) -> None:
-        calls = []
+    async def test_extract_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
             calls.append((method, path, kwargs))
             return {"job_id": "test-id", "status": "pending"}
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         result = await client.extract(
             url="https://example.com",
             schema_fields=[{"name": "title", "field_type": "string"}],
@@ -50,15 +61,15 @@ class TestDataForgeSDKClient:
         assert body["headers"] == {"Accept-Language": "en-US"}
 
     @pytest.mark.asyncio
-    async def test_preview_builds_correct_request(self) -> None:
-        calls = []
+    async def test_preview_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
             calls.append((method, path, kwargs))
             return {"url": "https://example.com", "dry_run": True, "preview_records": [], "total_records_found": 0}
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         result = await client.preview(url="https://example.com")
         assert result["dry_run"] is True
         assert len(calls) == 1
@@ -66,72 +77,72 @@ class TestDataForgeSDKClient:
         assert calls[0][1] == "/api/scraper/preview"
 
     @pytest.mark.asyncio
-    async def test_get_job_builds_correct_request(self) -> None:
-        calls = []
+    async def test_get_job_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
             calls.append((method, path, kwargs))
             return {"job_id": "job-123", "status": "completed"}
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         result = await client.get_job("job-123")
         assert result["job_id"] == "job-123"
         assert calls[0][1] == "/api/jobs/job-123"
         assert calls[0][0] == "GET"
 
     @pytest.mark.asyncio
-    async def test_cancel_job_builds_correct_request(self) -> None:
-        calls = []
+    async def test_cancel_job_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
             calls.append((method, path, kwargs))
             return {"cancel_requested": True}
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         result = await client.cancel_job("job-123")
         assert result["cancel_requested"] is True
         assert calls[0][0] == "POST"
         assert calls[0][1] == "/api/jobs/job-123/cancel"
 
     @pytest.mark.asyncio
-    async def test_list_jobs_builds_correct_request(self) -> None:
-        calls = []
+    async def test_list_jobs_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> list[dict[str, Any]]:
             calls.append((method, path, kwargs))
             return []
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         await client.list_jobs(limit=10, offset=0)
         assert calls[0][1] == "/api/jobs?limit=10&offset=0"
 
     @pytest.mark.asyncio
-    async def test_delete_job_builds_correct_request(self) -> None:
-        calls = []
+    async def test_delete_job_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
             calls.append((method, path, kwargs))
             return {"message": "Job moved to recycle bin"}
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         await client.delete_job("job-123")
         assert calls[0][0] == "DELETE"
         assert calls[0][1] == "/api/jobs/job-123"
 
     @pytest.mark.asyncio
-    async def test_get_usage_builds_correct_request(self) -> None:
-        calls = []
+    async def test_get_usage_builds_correct_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[RequestCall] = []
 
-        async def mock_request(method, path, **kwargs):
+        async def mock_request(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
             calls.append((method, path, kwargs))
             return {"extractions_today": 5}
 
         client = DataForge(api_key="test-key")
-        client._request = mock_request
+        _patch_request(monkeypatch, client, mock_request)
         await client.get_usage()
         assert calls[0][0] == "GET"
         assert calls[0][1] == "/api/saas/usage"

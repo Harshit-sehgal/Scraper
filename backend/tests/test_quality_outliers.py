@@ -5,6 +5,7 @@ Covers IQR + z-score methods, non-numeric field handling, missing values,
 small datasets, threshold sensitivity, and the public ``flag_outlier_records``
 contract.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -40,7 +41,26 @@ class TestOutlierZScore:
 
     def test_detects_extreme_outlier(self) -> None:
         vals = [
-            5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 1000, 5,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            5,
+            6,
+            1000,
+            5,
         ]
         outliers = _detect_outliers_zscore(vals)
         assert 18 in outliers

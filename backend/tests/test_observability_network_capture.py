@@ -1,4 +1,5 @@
 """Obs 16: Network request log capture — test network request logging."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -83,15 +84,21 @@ class TestNetworkLogCapture:
 
 class TestNetworkLogHeaders:
     def test_request_headers(self) -> None:
-        entry = _make_network_log_entry("https://example.com", request_headers={
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "text/html",
-        })
+        entry = _make_network_log_entry(
+            "https://example.com",
+            request_headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "text/html",
+            },
+        )
         assert entry["request_headers"]["User-Agent"] == "Mozilla/5.0"
 
     def test_response_headers(self) -> None:
-        entry = _make_network_log_entry("https://example.com", response_headers={
-            "Content-Type": "text/html",
-            "Set-Cookie": "session=abc123",
-        })
+        entry = _make_network_log_entry(
+            "https://example.com",
+            response_headers={
+                "Content-Type": "text/html",
+                "Set-Cookie": "session=abc123",
+            },
+        )
         assert entry["response_headers"]["Content-Type"] == "text/html"

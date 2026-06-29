@@ -3,6 +3,7 @@
 Roadmap: Rel 48 — page with 10,000+ nested DOM elements,
 verify extraction does not stack-overflow or exhaust memory.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

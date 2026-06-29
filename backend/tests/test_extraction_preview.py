@@ -3,6 +3,7 @@
 ``POST /api/scraper/preview`` accepts the same payload as job creation
 but runs extraction on the first URL only without persisting results.
 """
+
 from __future__ import annotations
 
 

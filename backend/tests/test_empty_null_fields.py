@@ -3,6 +3,7 @@
 Roadmap: Rel 16 — pages where some expected fields are missing.
          Rel 17 — page with no extractable records.
 """
+
 from __future__ import annotations
 
 import pytest

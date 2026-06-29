@@ -3,6 +3,7 @@
 Tests storing historical results, detecting regression from baseline,
 and comparing against threshold.
 """
+
 from __future__ import annotations
 
 import json

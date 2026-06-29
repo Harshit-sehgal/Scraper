@@ -1,4 +1,5 @@
 """Qual 14: Export with quality metadata — test that exports include quality metadata."""
+
 from __future__ import annotations
 
 import json
@@ -129,12 +130,30 @@ class TestExportQualityFields:
 
 class TestExportVersioning:
     def test_export_version_present(self) -> None:
-        report = build_quality_report(raw_results=[], post_filter_count=0, post_radius_count=0, radius_report={}, final_results=[], min_record_score=0.35, type_integrity_report={}, source_breakdown={})
+        report = build_quality_report(
+            raw_results=[],
+            post_filter_count=0,
+            post_radius_count=0,
+            radius_report={},
+            final_results=[],
+            min_record_score=0.35,
+            type_integrity_report={},
+            source_breakdown={},
+        )
         export = _build_export_payload([], report)
         assert export["export_version"] == "1.0"
 
     def test_generated_at_timestamp(self) -> None:
-        report = build_quality_report(raw_results=[], post_filter_count=0, post_radius_count=0, radius_report={}, final_results=[], min_record_score=0.35, type_integrity_report={}, source_breakdown={})
+        report = build_quality_report(
+            raw_results=[],
+            post_filter_count=0,
+            post_radius_count=0,
+            radius_report={},
+            final_results=[],
+            min_record_score=0.35,
+            type_integrity_report={},
+            source_breakdown={},
+        )
         export = _build_export_payload([], report)
         assert "generated_at" in export
         assert isinstance(export["generated_at"], str)

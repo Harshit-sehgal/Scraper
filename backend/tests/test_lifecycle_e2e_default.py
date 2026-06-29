@@ -6,6 +6,7 @@ recycle -> restore -> verify lifecycle transitions.
 This test does NOT require Postgres, Playwright, or a running worker.
 The ``client`` fixture (conftest.py) patches out real job execution.
 """
+
 from __future__ import annotations
 
 from app.models import JobStatus

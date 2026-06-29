@@ -6,6 +6,7 @@ deduplication, ordering, completeness of extracted records across pages.
 Strategy-level benchmarks for all 5 pagination strategies, measuring
 completeness and correctness.
 """
+
 from __future__ import annotations
 
 from typing import Any

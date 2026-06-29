@@ -2,6 +2,7 @@
 
 Roadmap: Rel 22 — 5+ HTTP redirect hops.
 """
+
 from __future__ import annotations
 
 import pytest

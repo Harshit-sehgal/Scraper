@@ -75,6 +75,7 @@ def test_failure_categories_are_known_list() -> None:
         "captcha",
         "rate_limit",
         "browser_crash",
+        "unknown",
     }
     assert set(_EXTRACTION_FAILURE_CATEGORIES) == expected_categories
 

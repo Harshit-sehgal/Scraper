@@ -1,4 +1,5 @@
 """Comp 4: ToS violation detection — test ToS violation flagging."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -17,6 +18,7 @@ KNOWN_RESTRICTIVE_DOMAINS: dict[str, str] = {
 def _check_tos_compliance(url: str) -> dict[str, Any]:
     """Check if a URL's domain has known ToS restrictions on scraping."""
     from urllib.parse import urlparse
+
     domain = urlparse(url).netloc.lower()
 
     for restrictive_domain, reason in KNOWN_RESTRICTIVE_DOMAINS.items():

@@ -3,6 +3,7 @@
 Roadmap: Rel 25 — URLs with file://, ftp://, dict://, gopher:// schemes,
 verify SSRF guard rejects them before any network call.
 """
+
 from __future__ import annotations
 
 import pytest

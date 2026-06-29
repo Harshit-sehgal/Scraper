@@ -3,6 +3,7 @@
 Roadmap: Rel 7 — verify recovery after browser crash.
 Mocks the browser pool to simulate crash, verify worker requeues.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

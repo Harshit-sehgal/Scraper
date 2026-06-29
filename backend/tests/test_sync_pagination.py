@@ -3,6 +3,7 @@
 Roadmap: Rel 5 — sync pagination implementations.
 Tests the async-to-sync wrappers that use httpx + BeautifulSoup.
 """
+
 from __future__ import annotations
 
 from app.pagination_executor import (
@@ -109,6 +110,7 @@ class TestSyncPaginationResultShape:
         config = PaginationConfig(strategy="page_number", max_pages=1, delay_between_pages=0)
         result = paginate(config)
         assert result.stopped_reason == "error"
+        assert result.error is not None
         assert "requires" in result.error.lower()
 
     def test_url_pattern_requires_placeholder(self) -> None:

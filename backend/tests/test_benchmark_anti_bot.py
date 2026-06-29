@@ -3,6 +3,7 @@
 Tests block classification, strategy escalation when blocked, proxy
 rotation on block, and CAPTCHA detection.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -83,4 +83,5 @@ def test_diff_to_dict_serializable(client: TestClient) -> None:
     resp = client.get(f"/api/jobs/{job_id}/diff?compare_to={other_id}")
     assert resp.status_code == 200
     import json
+
     json.dumps(resp.json())

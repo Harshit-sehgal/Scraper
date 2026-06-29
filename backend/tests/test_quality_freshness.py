@@ -1,4 +1,5 @@
 """Qual 11: Data freshness monitoring — test freshness/staleness tracking for recurring jobs."""
+
 from __future__ import annotations
 
 import datetime
@@ -27,7 +28,7 @@ def _staleness_status(
     return {"fresh": False, "staleness_days": round(days, 1), "status": "stale"}
 
 
-def _freshness_summary(records: list[dict], url_field: str = "source_url") -> dict[str, Any]:
+def _freshness_summary(records: list[dict[str, Any]], url_field: str = "source_url") -> dict[str, Any]:
     """Compute freshness summary across records."""
     statuses = {}
     for r in records:
@@ -76,7 +77,7 @@ class TestStalenessDetection:
 class TestFreshnessSummary:
     def test_mixed_freshness(self) -> None:
         now = datetime.datetime.now(datetime.UTC)
-        records = [
+        records: list[dict[str, Any]] = [
             {"source_url": "https://a.com/1", "last_refreshed": (now - datetime.timedelta(hours=1)).isoformat()},
             {"source_url": "https://a.com/2", "last_refreshed": (now - datetime.timedelta(days=30)).isoformat()},
             {"source_url": "https://a.com/3", "last_refreshed": None},

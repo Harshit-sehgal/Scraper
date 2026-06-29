@@ -41,6 +41,7 @@ def test_scraper_stats_success_rate_in_range(client: TestClient) -> None:
 def test_scraper_stats_default_success_rate_when_no_data(client: TestClient) -> None:
     """When no telemetry data, success rate defaults to 1.0."""
     from app.scrape_telemetry import get_scrape_telemetry
+
     get_scrape_telemetry().clear()
     resp = client.get("/api/scraper/stats")
     assert resp.json()["recent_success_rate"] == 1.0
@@ -48,6 +49,7 @@ def test_scraper_stats_default_success_rate_when_no_data(client: TestClient) -> 
 
 def test_scraper_stats_default_latency_when_no_data(client: TestClient) -> None:
     from app.scrape_telemetry import get_scrape_telemetry
+
     get_scrape_telemetry().clear()
     resp = client.get("/api/scraper/stats")
     assert resp.json()["recent_latency_avg"] == 0

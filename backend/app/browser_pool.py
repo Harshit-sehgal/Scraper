@@ -453,6 +453,7 @@ class BrowserPool:
         full_page: bool = False,
     ) -> str:
         import base64
+
         async with self.acquire_context() as (_ctx_id, context):
             page = await context.new_page()
             try:

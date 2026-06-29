@@ -3,6 +3,7 @@
 Tests framework initialization wait and client-side rendered content
 extraction from SPA fixture pages.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

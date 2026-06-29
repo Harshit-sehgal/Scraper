@@ -1,4 +1,5 @@
 """Obs 10: Error classification and aggregation — test error categorization."""
+
 from __future__ import annotations
 
 import pytest
@@ -18,7 +19,19 @@ def _reset_metrics():
 
 class TestErrorCategories:
     def test_all_categories_accounted(self) -> None:
-        expected = {"timeout", "block", "auth_required", "ssl_error", "network_error", "parse_error", "empty_page", "captcha", "rate_limit", "browser_crash", "unknown"}
+        expected = {
+            "timeout",
+            "block",
+            "auth_required",
+            "ssl_error",
+            "network_error",
+            "parse_error",
+            "empty_page",
+            "captcha",
+            "rate_limit",
+            "browser_crash",
+            "unknown",
+        }
         assert set(_EXTRACTION_FAILURE_CATEGORIES) == expected
 
     def test_each_category_increments_independently(self) -> None:
@@ -45,6 +58,7 @@ class TestErrorCategories:
 
     def test_unknown_category_clamped(self) -> None:
         from app.metrics_collector import record_extraction_failure as rec_failure
+
         rec_failure("nonexistent_category")
         counts = get_extraction_failure_counts()
         assert counts.get("unknown", 0) == 1

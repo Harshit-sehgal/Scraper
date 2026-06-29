@@ -3,6 +3,7 @@
 Roadmap: Rel 23 — JS continuously modifying DOM after load,
 verify extraction waits for stabilization and captures final state.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

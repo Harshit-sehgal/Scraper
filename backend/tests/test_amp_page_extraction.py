@@ -3,6 +3,7 @@
 Roadmap: Rel 26 — Accelerated Mobile Pages with limited JS,
 verify extraction works in AMP rendering mode.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

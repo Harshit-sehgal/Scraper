@@ -70,20 +70,21 @@ def test_no_sync_lock_held_across_await() -> None:
 
 
 def test_restore_job_await_outside_lock() -> None:
-    """The ``restore_job`` function must have separate lock blocks for the
+    """The ``_restore_job_logic`` function must have separate lock blocks for the
     pre-await check and the post-await update.
     """
     source = JOBS_WRITE.read_text(encoding="utf-8")
     tree = ast.parse(source)
+    # The actual lock logic is in _restore_job_logic, not the thin wrapper restore_job
     for node in ast.walk(tree):
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "restore_job":
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_restore_job_logic":
             await_nodes = [n for n in ast.walk(node) if isinstance(n, ast.Await)]
             lock_with_nodes = [
                 n
                 for n in ast.walk(node)
                 if isinstance(n, ast.With) and any(_LockAwaitVisitor._is_manager_lock(item.context_expr) for item in n.items)
             ]
-            assert await_nodes, "restore_job has no await"
+            assert await_nodes, "_restore_job_logic has no await"
             assert len(lock_with_nodes) >= 2, "need at least 2 lock blocks"
             first_lock_end = lock_with_nodes[0].end_lineno or lock_with_nodes[0].lineno + 1
             first_await_line = min(n.lineno for n in await_nodes)
@@ -91,4 +92,4 @@ def test_restore_job_await_outside_lock() -> None:
                 f"first lock block ends at line {first_lock_end}, but await at line {first_await_line} is inside it"
             )
             return
-    pytest.fail("Could not find restore_job function")
+    pytest.fail("Could not find _restore_job_logic function")

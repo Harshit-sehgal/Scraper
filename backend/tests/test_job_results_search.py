@@ -33,7 +33,8 @@ def test_results_pagination_defaults(client: TestClient) -> None:
 
 def test_results_search_by_keyword(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-keyword",
+        client,
+        "search-keyword",
         results=[
             {"title": "Apple iPhone", "price": 999},
             {"title": "Samsung Galaxy", "price": 899},
@@ -49,7 +50,8 @@ def test_results_search_by_keyword(client: TestClient) -> None:
 
 def test_results_search_no_match(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-nomatch",
+        client,
+        "search-nomatch",
         results=[{"title": "Alpha"}, {"title": "Beta"}],
     )
     resp = client.get(f"/api/jobs/{job_id}/results?q=zzzznonexistent")
@@ -59,7 +61,8 @@ def test_results_search_no_match(client: TestClient) -> None:
 
 def test_results_field_filter(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-field",
+        client,
+        "search-field",
         results=[
             {"name": "A", "price": 10},
             {"name": "B", "rating": 4.5},
@@ -73,7 +76,8 @@ def test_results_field_filter(client: TestClient) -> None:
 
 def test_results_sort_asc(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-sort-asc",
+        client,
+        "search-sort-asc",
         results=[
             {"name": "Charlie", "score": 30},
             {"name": "Alpha", "score": 10},
@@ -88,7 +92,8 @@ def test_results_sort_asc(client: TestClient) -> None:
 
 def test_results_sort_desc(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-sort-desc",
+        client,
+        "search-sort-desc",
         results=[
             {"name": "Charlie", "score": 30},
             {"name": "Alpha", "score": 10},
@@ -103,7 +108,8 @@ def test_results_sort_desc(client: TestClient) -> None:
 
 def test_results_search_and_sort(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-mixed",
+        client,
+        "search-mixed",
         results=[
             {"name": "Delta", "group": "A"},
             {"name": "Charlie", "group": "A"},
@@ -119,7 +125,8 @@ def test_results_search_and_sort(client: TestClient) -> None:
 
 def test_results_search_case_insensitive(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-case",
+        client,
+        "search-case",
         results=[{"title": "Hello World"}, {"title": "Goodbye"}],
     )
     resp = client.get(f"/api/jobs/{job_id}/results?q=hello")
@@ -134,7 +141,8 @@ def test_results_not_found(client: TestClient) -> None:
 
 def test_results_limit_offset(client: TestClient) -> None:
     job_id = _create_job(
-        client, "search-limit",
+        client,
+        "search-limit",
         results=[{"id": str(i)} for i in range(20)],
     )
     resp = client.get(f"/api/jobs/{job_id}/results?limit=5&offset=10")

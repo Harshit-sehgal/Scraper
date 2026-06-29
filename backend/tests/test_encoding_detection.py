@@ -2,6 +2,7 @@
 
 Roadmap: Rel 11 — pages in UTF-8, ISO-8859-1, Shift-JIS.
 """
+
 from __future__ import annotations
 
 import pytest

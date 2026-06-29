@@ -2,6 +2,7 @@
 
 Tests mobile viewport extraction and responsive layout handling.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -3,6 +3,7 @@
 Tests F1 score threshold enforcement, that all benchmark tests can run
 without a browser, and benchmark output format validation.
 """
+
 from __future__ import annotations
 
 import json

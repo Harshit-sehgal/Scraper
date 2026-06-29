@@ -1,4 +1,5 @@
 """Comp 11: Data processing records — test append-only processing log."""
+
 from __future__ import annotations
 
 import copy

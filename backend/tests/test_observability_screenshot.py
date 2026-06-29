@@ -1,4 +1,5 @@
 """Obs 6: Screenshot-per-extraction storage — test screenshot storage with job."""
+
 from __future__ import annotations
 
 import base64
@@ -8,7 +9,7 @@ from typing import Any
 
 def _store_screenshot(job_id: str, screenshot_b64: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     """Simulate storing a screenshot with a job.
-    
+
     Returns a screenshot record.
     """
     size_bytes = len(base64.b64decode(screenshot_b64)) if screenshot_b64 else 0

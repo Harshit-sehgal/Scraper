@@ -1,4 +1,5 @@
 """Qual 12: Cross-job deduplication — test dedup across multiple jobs."""
+
 from __future__ import annotations
 
 import json
@@ -35,7 +36,7 @@ def _cross_job_dedup(jobs_results: list[tuple[str, list[dict]]], key_fields: lis
         "total_input": sum(len(r) for _, r in jobs_results),
         "duplicates_removed": sum(len(r) for _, r in jobs_results) - len(merged),
         "records": merged,
-        "provenance": {fp: jobs for fp, jobs in provenance.items()},
+        "provenance": dict(provenance),
     }
 
 
@@ -98,7 +99,7 @@ class TestCrossJobDedup:
             ("job-2", [{"title": "Shared"}]),
         ]
         result = _cross_job_dedup(jobs)
-        fp = list(result["provenance"].keys())[0]
+        fp = next(iter(result["provenance"].keys()))
         assert "job-1" in result["provenance"][fp]
         assert "job-2" in result["provenance"][fp]
 

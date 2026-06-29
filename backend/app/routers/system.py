@@ -824,12 +824,12 @@ def _authenticate_metrics_request(request: Request) -> JSONResponse | None:
         return None
     auth_header = request.headers.get("Authorization", "")
     api_key_header = request.headers.get("X-API-Key", "")
-    bearer_token = ""
+    bearer_value = ""
     if auth_header:
         scheme, _, _token = auth_header.partition(" ")
         if scheme.lower() == "bearer":
-            bearer_token = _token
-    if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and not secrets.compare_digest(
+            bearer_value = _token
+    if not secrets.compare_digest(bearer_value, settings.METRICS_TOKEN) and not secrets.compare_digest(
         api_key_header,
         settings.METRICS_TOKEN,
     ):

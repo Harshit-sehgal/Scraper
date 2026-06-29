@@ -1,4 +1,5 @@
 """Qual 8: Data enrichment via external APIs — test enrichment pipeline interface."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -8,7 +9,7 @@ import pytest
 
 def _enrich_record(record: dict, enrichment_fn: Any) -> dict:
     """Apply an enrichment function to a record.
-    
+
     The enrichment function receives the record and returns
     a dict of new fields to merge.
     """

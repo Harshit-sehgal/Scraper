@@ -1,4 +1,5 @@
 """Comp 9: CCPA opt-out — test CCPA opt-out endpoint."""
+
 from __future__ import annotations
 
 import datetime
@@ -9,7 +10,7 @@ from typing import Any
 
 def _process_ccpa_opt_out(user_id: str) -> dict[str, Any]:
     """Process a CCPA opt-out request.
-    
+
     Returns confirmation with receipt.
     """
     receipt_id = str(uuid.uuid4())

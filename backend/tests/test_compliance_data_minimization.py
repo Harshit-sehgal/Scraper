@@ -1,4 +1,5 @@
 """Comp 6: Data minimization enforcement — test that only requested fields are extracted."""
+
 from __future__ import annotations
 
 

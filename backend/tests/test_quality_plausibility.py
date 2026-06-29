@@ -1,4 +1,5 @@
 """Qual 16: Value plausibility checks — test per-field validation rules."""
+
 from __future__ import annotations
 
 import re
@@ -7,7 +8,7 @@ from typing import Any
 
 def _check_plausibility(value: Any, field_name: str, rules: dict[str, Any] | None = None) -> tuple[bool, str]:
     """Check if a field value passes plausibility rules.
-    
+
     Returns (is_plausible, reason_if_not).
     """
     if value is None or value == "":
@@ -28,8 +29,10 @@ def _check_plausibility(value: Any, field_name: str, rules: dict[str, Any] | Non
                 return False, f"Value '{value}' does not match pattern {rules['regex']}"
         if rules.get("not_future"):
             import datetime
+
             try:
                 import dateutil.parser
+
                 dt = dateutil.parser.parse(text)
                 if dt > datetime.datetime.now(datetime.UTC):
                     return False, "Date is in the future"

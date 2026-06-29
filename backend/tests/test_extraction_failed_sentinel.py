@@ -13,6 +13,8 @@ The sentinel class + isinstance check eliminates both.
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.pagination_executor import (
     _EXTRACTION_FAILED_MARKER,
     PaginationResult,
@@ -44,7 +46,7 @@ class TestExtractionFailedSentinel:
 class TestExtractMarkerAndCount:
     def test_strips_sentinel_and_increments_failures(self) -> None:
         """Sentinel records are stripped and counted, real records kept."""
-        records = [
+        records: list[dict[str, Any] | _ExtractionFailedSentinel] = [
             {"name": "Product A", "price": "$10"},
             _EXTRACTION_FAILED_MARKER,
             {"name": "Product B", "price": "$20"},
@@ -58,7 +60,11 @@ class TestExtractMarkerAndCount:
 
     def test_multiple_sentinels_counted(self) -> None:
         """Multiple sentinel records each increment the failure counter."""
-        records = [_EXTRACTION_FAILED_MARKER, _EXTRACTION_FAILED_MARKER, {"name": "A"}]
+        records: list[dict[str, Any] | _ExtractionFailedSentinel] = [
+            _EXTRACTION_FAILED_MARKER,
+            _EXTRACTION_FAILED_MARKER,
+            {"name": "A"},
+        ]
         result = PaginationResult()
         clean = _extract_marker_and_count(records, result)
         assert len(clean) == 1

@@ -2,6 +2,7 @@
 
 Tests 1000+ record extraction and completion within reasonable time.
 """
+
 from __future__ import annotations
 
 import time

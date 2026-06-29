@@ -3,6 +3,7 @@
 Tests non-English page extraction, RTL layout handling, and
 multi-byte encoding support.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,7 +48,7 @@ class TestBenchmarkI18nNonEnglish:
 
     def test_i18n_page_has_multiple_currencies(self) -> None:
         html = _load("intl_marketplace.html")
-        currency_symbols = set(c for c in html if c in "$£€¥₹")
+        currency_symbols = {c for c in html if c in "$£€¥₹"}
         assert len(currency_symbols) >= 3, f"Expected multiple currency symbols, found {currency_symbols}"
 
 
@@ -56,11 +57,11 @@ class TestBenchmarkI18nRTLAndEncoding:
 
     def test_i18n_fixture_has_arabic_or_rtl_text(self) -> None:
         html = _load("intl_marketplace.html")
-        has_arabic = any("\u0600" <= c <= "\u06FF" for c in html)
-        has_hebrew = any("\u0590" <= c <= "\u05FF" for c in html)
+        has_arabic = any("\u0600" <= c <= "\u06ff" for c in html)
+        has_hebrew = any("\u0590" <= c <= "\u05ff" for c in html)
         if not (has_arabic or has_hebrew):
-            has_devanagari = any("\u0900" <= c <= "\u097F" for c in html)
-            has_cyrillic = any("\u0400" <= c <= "\u04FF" for c in html)
+            has_devanagari = any("\u0900" <= c <= "\u097f" for c in html)
+            has_cyrillic = any("\u0400" <= c <= "\u04ff" for c in html)
             assert has_devanagari or has_cyrillic, "Expected RTL or non-Latin script in i18n fixture"
 
     def test_i18n_page_encoding_is_utf8(self) -> None:

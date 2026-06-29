@@ -3,6 +3,7 @@
 Roadmap: Rel 8 — page that never finishes loading,
 verify timeout with clean failure.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

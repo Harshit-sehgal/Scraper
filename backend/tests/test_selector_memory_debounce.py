@@ -167,6 +167,5 @@ class TestPendingWritesThreadSafety:
         # threshold 50 → 3 flushes + 11 remaining.
         # If _pending_writes were below 11, that means events were lost.
         assert _mem._pending_writes == 11, (
-            f"expected 11 remainder (161 events, threshold 50), "
-            f"got {_mem._pending_writes} — possible lost increments"
+            f"expected 11 remainder (161 events, threshold 50), got {_mem._pending_writes} — possible lost increments"
         )

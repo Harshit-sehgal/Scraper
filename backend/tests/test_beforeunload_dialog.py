@@ -3,6 +3,7 @@
 Roadmap: Rel 47 — page that triggers "Are you sure you want to leave?" dialog,
 verify Playwright dismisses it and extraction continues.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

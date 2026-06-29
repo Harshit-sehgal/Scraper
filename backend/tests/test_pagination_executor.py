@@ -2,6 +2,7 @@
 
 Roadmap: Rel 1 — extraction reliability, pagination executor tests.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -60,6 +61,7 @@ class TestStrategySelection:
         config = PaginationConfig(strategy="unknown_xyz")
         result = await async_paginate(page, config)
         assert result.stopped_reason == "error"
+        assert result.error is not None
         assert "unknown" in result.error.lower()
 
     @pytest.mark.asyncio
@@ -100,7 +102,8 @@ class TestNextButtonStrategy:
         page = _mock_page()
 
         async def failing_extract(page) -> list[dict]:
-            raise RuntimeError("extraction failed")
+            msg = "extraction failed"
+            raise RuntimeError(msg)
 
         config = PaginationConfig(strategy="next_button", max_pages=2, delay_between_pages=0)
         result = await async_paginate(page, config, failing_extract)

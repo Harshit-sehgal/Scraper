@@ -3,6 +3,7 @@
 Roadmap: Rel 30 — pages where CSS class names are randomized per visit,
 verify extraction uses semantic selectors not fragile class names.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

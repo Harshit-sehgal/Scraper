@@ -125,7 +125,7 @@ class TestRateLimiterMiddleware:
         rl = RateLimiterMiddleware(global_limit="10/minute")
         resp = rl._build_429_response(counter, "192.168.1.1", "/api/jobs")
         assert resp.status_code == 429
-        body = resp.body.decode()
+        body = bytes(resp.body).decode()
         assert "Rate limit exceeded" in body
         assert "retry_after_seconds" in body
         assert resp.headers["X-RateLimit-Limit"] == "10"

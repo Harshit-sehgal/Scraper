@@ -80,7 +80,9 @@ def _mock_ok_response(status_code: int = 200) -> MagicMock:
 def _mock_client_context(post_return: object) -> tuple[MagicMock, MagicMock]:
     """Return (mock_client, mock_ctx) where mock_ctx is a context manager."""
     mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=post_return) if not isinstance(post_return, list) else AsyncMock(side_effect=post_return)
+    mock_client.post = (
+        AsyncMock(return_value=post_return) if not isinstance(post_return, list) else AsyncMock(side_effect=post_return)
+    )
     mock_ctx = MagicMock()
     mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
     mock_ctx.__aexit__ = AsyncMock(return_value=None)

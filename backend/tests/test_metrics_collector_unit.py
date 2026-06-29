@@ -385,6 +385,7 @@ class TestResetForTesting:
                 "captcha",
                 "rate_limit",
                 "browser_crash",
+                "unknown",
             ),
             0,
         )
@@ -415,10 +416,10 @@ class TestExtractionFailureCategories:
         record_extraction_failure("not_a_real_category")
         record_extraction_failure("totally_made_up")
         counts = get_extraction_failure_counts()
-        # The "unknown" bucket is internal — it does NOT pollute the
-        # bounded label set that Prometheus sees.
-        # We assert it does NOT appear in the snapshot.
-        assert "unknown" not in counts
+        # Unknown categories are clamped to the "unknown" bucket which
+        # IS part of the bounded label set that Prometheus sees.
+        assert "unknown" in counts
+        assert counts["unknown"] == 2
 
 
 # ─── Per-domain extraction tracking (Roadmap Obs #1) ───────────────────

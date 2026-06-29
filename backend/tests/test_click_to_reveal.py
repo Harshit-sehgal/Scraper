@@ -5,6 +5,7 @@ Roadmap: Rel 31 — "Show more" buttons and accordions.
          Rel 33 — Modal/dialog content.
          Rel 34 — Hover-triggered content.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

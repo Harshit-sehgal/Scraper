@@ -205,7 +205,7 @@ function renderPlanComparison(currentTierId) {
                   `<span class="plan-card-feature${f.included ? "" : " disabled"}">
                 <span class="icon">${f.included ? "✓" : "—"}</span>
                 ${f.text}
-              </span>`
+              </span>`,
               )
               .join("")}
           </div>

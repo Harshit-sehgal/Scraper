@@ -3,6 +3,7 @@
 Roadmap: Rel 12 — 10+ unique URLs simultaneously, no cross-contamination.
          Rel 13 — 5+ identical URLs together, verify deduplication.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,7 +25,7 @@ class TestConcurrentUniqueUrls:
         )
         assert len(results) == 10
         for r in results:
-            assert isinstance(r, list) or isinstance(r, Exception)
+            assert isinstance(r, (list, Exception))
 
     @pytest.mark.asyncio
     async def test_concurrent_urls_no_cross_contamination(self) -> None:
@@ -58,7 +59,7 @@ class TestConcurrentSameUrl:
         )
         assert len(results) == 5
         for r in results:
-            assert isinstance(r, list) or isinstance(r, Exception)
+            assert isinstance(r, (list, Exception))
 
     @pytest.mark.asyncio
     async def test_identical_urls_return_same_shape(self) -> None:

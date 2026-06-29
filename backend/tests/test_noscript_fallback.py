@@ -2,6 +2,7 @@
 
 Roadmap: Rel 28 — pages that require JS but have <noscript> fallback.
 """
+
 from __future__ import annotations
 
 import pytest
