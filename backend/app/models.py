@@ -434,6 +434,16 @@ class Job(BaseModel):
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
     results_file_path: str | None = Field(default=None, description="Path to the compressed results file", max_length=1024)
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
+    cascade_telemetry: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Per-URL cascade layer telemetry: {url: {layer, score, duration_ms, quality_score}}",
+    )
+    quality_score_summary: float = Field(
+        default=0.0,
+        description="Aggregate quality score across all records (0-1)",
+        ge=0.0,
+        le=1.0,
+    )
     acquisition_mode: str = Field(
         default="standard", description="Acquisition mode: standard, aggressive, or deep_scan", max_length=16
     )
@@ -1070,3 +1080,39 @@ class LowConfidenceSelectorsResponse(BaseModel):
     threshold: float
     count: int
     selectors: list[LowConfidenceSelectorItem]
+
+
+# ─── Session Router Response Models ──────────────────────────────────
+
+
+class SessionCreateResponse(BaseModel):
+    """Response model for POST /api/session."""
+    status: str
+    role: str
+    message: str
+
+
+class SessionDestroyResponse(BaseModel):
+    """Response model for DELETE /api/session."""
+    status: str
+    message: str
+
+
+class SessionAuthenticatedResponse(BaseModel):
+    """Response model for GET /api/session/me when authenticated."""
+    authenticated: bool
+    role: str | None = None
+    user_id: str | None = None
+
+
+class SessionUnauthenticatedResponse(BaseModel):
+    """Response model for GET /api/session/me when not authenticated."""
+    authenticated: bool
+
+
+class AuditLogResponse(BaseModel):
+    """Response model for GET /api/system/audit-log."""
+    total: int
+    limit: int
+    category: str
+    items: list[Any]
