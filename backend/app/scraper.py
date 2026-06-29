@@ -582,6 +582,10 @@ async def _execute_fetch_phase(
             extra_headers=attempt_ctx.extra_headers if attempt_ctx else None,
             usage_context=usage_context,
             cookies=attempt_ctx.cookies if attempt_ctx else None,
+            wait_for_selector=getattr(attempt_ctx, "wait_for_selector", None) if attempt_ctx else None,
+            wait_for_function=getattr(attempt_ctx, "wait_for_function", None) if attempt_ctx else None,
+            wait_for_timeout=getattr(attempt_ctx, "wait_for_timeout", None) if attempt_ctx else None,
+            wait_for_navigation=getattr(attempt_ctx, "wait_for_navigation", None) if attempt_ctx else None,
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True

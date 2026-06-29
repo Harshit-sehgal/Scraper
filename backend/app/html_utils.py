@@ -468,7 +468,7 @@ async def _setup_playwright_page(
             await route.continue_()
 
     await page.route("**/*", _route_filter)
-    network_payloads, console_logs = await setup_network_capture(page)
+    network_payloads, _console_logs = await setup_network_capture(page)
     return context, page, network_payloads
 
 
@@ -481,8 +481,19 @@ async def _playwright_navigate_and_stabilize(
     hydration_wait_ms: int | None,
     scroll_attempts: int | None,
     domain: str,
+    *,
+    wait_for_selector: str | None = None,
+    wait_for_function: str | None = None,
+    wait_for_timeout: int | None = None,
+    wait_for_navigation: bool | None = None,
 ) -> float:
-    """Navigate, wait for stabilization, and scroll; returns js_render_delay_ms."""
+    """Navigate, wait for stabilization, and scroll; returns js_render_delay_ms.
+
+    User-supplied wait-condition overrides (Roadmap Wave 5, Item 3) take
+    precedence over the platform-default ``networkidle``-based settle
+    logic so a caller can wait on a specific selector, a JS function, or
+    a fixed timeout when handling SPAs / lazy content.
+    """
     from app.scrape_telemetry import detect_anti_bot
     from app.strategy_evolution import FetchStrategy
     from app.telemetry_state import get_telemetry_state
@@ -501,6 +512,28 @@ async def _playwright_navigate_and_stabilize(
             logger.warning("[SSRF] Playwright navigated to blocked target %s from %s — aborting", page.url, url)
             await page.close()
             raise
+
+        # Custom navigation wait (Roadmap Wave 5 Item 3)
+        if wait_for_navigation:
+            with suppress(Exception):
+                await page.wait_for_event("framenavigated", timeout=initial_timeout)
+
+        # Custom selector wait (Roadmap Wave 5 Item 3)
+        if wait_for_selector:
+            with suppress(Exception):
+                selector_timeout = wait_for_timeout if wait_for_timeout is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+                await page.wait_for_selector(wait_for_selector, timeout=selector_timeout)
+
+        # Custom function wait (Roadmap Wave 5 Item 3)
+        if wait_for_function:
+            with suppress(Exception):
+                function_timeout = wait_for_timeout if wait_for_timeout is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+                await page.wait_for_function(wait_for_function, timeout=function_timeout)
+
+        # Fixed-timeout wait (Roadmap Wave 5 Item 3)
+        if wait_for_timeout is not None and wait_for_selector is None and wait_for_function is None:
+            with suppress(Exception):
+                await page.wait_for_timeout(int(wait_for_timeout))
 
         intel = get_domain_intelligence().get_intelligence(url)
 
@@ -673,8 +706,21 @@ async def fetch_page_content(
     extra_headers: dict[str, str] | None = None,
     usage_context: dict[str, Any] | None = None,
     cookies: dict[str, str] | None = None,
+    wait_for_selector: str | None = None,
+    wait_for_function: str | None = None,
+    wait_for_timeout: int | None = None,
+    wait_for_navigation: bool | None = None,
 ) -> tuple[str, float, str, int]:
-    """Load a URL in a pooled headless browser context or via plain HTTP."""
+    """Load a URL in a pooled headless browser context or via plain HTTP.
+
+    Wait-condition overrides (Roadmap Wave 5, Item 3):
+
+    * ``wait_for_selector``: a CSS selector to wait for before extraction.
+    * ``wait_for_function``: a JS expression that must evaluate truthy.
+    * ``wait_for_timeout``: explicit timeout (ms) post-navigation.
+    * ``wait_for_navigation``: if True, wait for a navigation event after
+      the initial load (useful for JS-only redirects).
+    """
     from app.strategy_evolution import FetchStrategy
 
     domain = urlparse(url).netloc.lower() or "default"
@@ -713,6 +759,10 @@ async def fetch_page_content(
             hydration_wait_ms,
             scroll_attempts,
             domain,
+            wait_for_selector=wait_for_selector,
+            wait_for_function=wait_for_function,
+            wait_for_timeout=wait_for_timeout,
+            wait_for_navigation=wait_for_navigation,
         )
 
         html = await _collect_playwright_results(page, context, url, domain, network_payloads)

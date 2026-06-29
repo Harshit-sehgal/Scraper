@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import threading
 import uuid
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -83,9 +84,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Module-level stores for secondary features (templates, notification channels)
+# Module-level stores for secondary features (templates, notification channels, usage)
 _extraction_templates_store: dict[str, dict[str, Any]] = {}
 _notification_channels_store: dict[str, list[dict[str, Any]]] = {}
+_usage_stats_store: dict[str, dict[str, int]] = {}
+_usage_stats_lock = threading.Lock()
 
 
 def _auth_tuple(auth) -> tuple:
@@ -944,6 +947,99 @@ def register_jobs_write_routes(
             "status": "queued",
             "message": f"Email with {body.format} results will be sent to {len(body.recipients)} recipient(s)",
         }
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Bulk Result Delete (Feat 26)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.delete("/api/jobs/{job_id}/results", response_model=dict)
+    async def delete_job_results(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ):
+        """Delete results for a job, optionally filtered by date range.
+
+        Roadmap Feat 26 — Bulk result delete with optional date range filter.
+        """
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "delete_job_results")
+
+            before = len(job.results)
+            if date_from or date_to:
+                filtered = []
+                for rec in job.results:
+                    ts = rec.get("scraped_at", rec.get("created_at", ""))
+                    if date_from and ts < date_from:
+                        filtered.append(rec)
+                        continue
+                    if date_to and ts > date_to:
+                        filtered.append(rec)
+                        continue
+                job.results = [r for r in job.results if r not in filtered]
+                removed = before - len(job.results)
+            else:
+                removed = before
+                job.results = []
+                job.total_records = 0
+
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+        log_job_event(actor=user_id or "system", action="job_results_deleted", job_id=job_id, details={"removed": removed})
+        return {"job_id": job_id, "removed": removed, "remaining": len(job.results), "status": "success"}
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Usage Stats (Feat 30 — per-key usage dashboard)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.get("/api/usage/stats", response_model=dict)
+    async def get_usage_stats(
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Return per-key usage statistics for the usage dashboard (Feat 30).
+
+        Shows requests/day, records extracted, failures, average latency.
+        """
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with _usage_stats_lock:
+            key_stats = dict(_usage_stats_store)
+        if not key_stats:
+            key_stats = {user_id or "default": {"requests": 0, "records": 0, "failures": 0, "latency_ms": 0}}
+        return {"keys": key_stats}
+
+    @router.post("/api/usage/stats/record", response_model=dict)
+    async def record_usage(
+        body: dict,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Record a usage event for the dashboard."""
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        key = body.get("api_key", user_id or "default")
+        with _usage_stats_lock:
+            if key not in _usage_stats_store:
+                _usage_stats_store[key] = {"requests": 0, "records": 0, "failures": 0, "latency_ms": 0}
+            _usage_stats_store[key]["requests"] += body.get("requests", 1)
+            _usage_stats_store[key]["records"] += body.get("records", 0)
+            _usage_stats_store[key]["failures"] += body.get("failures", 0)
+            _usage_stats_store[key]["latency_ms"] = max(
+                _usage_stats_store[key]["latency_ms"], body.get("latency_ms", 0)
+            )
+        return {"status": "recorded", "key": key}
 
     # ═══════════════════════════════════════════════════════════════════════
     # Notification Integrations (Feat 36)

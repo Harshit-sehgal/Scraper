@@ -35,7 +35,8 @@ class TestRateLimitHandling:
         config = PaginationConfig(strategy="next_button", max_pages=3, delay_between_pages=0)
 
         async def extract(page) -> list[dict]:
-            raise RuntimeError("429 Too Many Requests")
+            error_msg = "429 Too Many Requests"
+            raise RuntimeError(error_msg)
 
         result = await async_paginate(page, config, extract)
         assert result.stopped_reason in {"error", "button_gone", "no_new_records"}
@@ -57,7 +58,8 @@ class TestRateLimitHandling:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise RuntimeError("rate limited")
+                error_msg = "rate limited"
+                raise RuntimeError(error_msg)
             return [{"data": "success"}]
 
         config = PaginationConfig(strategy="next_button", max_pages=1, delay_between_pages=0)

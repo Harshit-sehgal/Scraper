@@ -98,6 +98,11 @@ class AttemptContext:
     skip_networkidle: bool = False
     scroll_attempts: int | None = None
     anti_bot_stealth: bool = False
+    # Roadmap Wave 5 Item 3: per-job JS wait condition overrides
+    wait_for_selector: str | None = None
+    wait_for_function: str | None = None
+    wait_for_timeout: int | None = None
+    wait_for_navigation: bool | None = None
 
     # Recovery-only flags
     skip_url: bool = False

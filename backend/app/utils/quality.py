@@ -2,7 +2,9 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, field
+import statistics
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from statistics import mean
 from typing import Any, Literal
 
@@ -35,7 +37,7 @@ class DedupConfig:
 
     key: Literal["content_hash", "url_field_hash"] = "content_hash"
     strategy: Literal["keep_first", "keep_last", "union_fields"] = "keep_first"
-    key_fields: list[str] = field(default_factory=lambda: ["title"])
+    key_fields: list[str] = dataclass_field(default_factory=lambda: ["title"])
 
 
 def _record_fingerprint(record: dict, config: DedupConfig) -> str:
@@ -94,14 +96,13 @@ def configurable_deduplicate_records(
         if fp not in seen:
             seen[fp] = dict(record)
             order.append(fp)
-        else:
-            if config.strategy == "keep_first":
-                # already have the first — do nothing
-                pass
-            elif config.strategy == "keep_last":
-                seen[fp] = dict(record)
-            elif config.strategy == "union_fields":
-                seen[fp] = _merge_union(seen[fp], record)
+        elif config.strategy == "keep_first":
+            # already have the first — do nothing
+            pass
+        elif config.strategy == "keep_last":
+            seen[fp] = dict(record)
+        elif config.strategy == "union_fields":
+            seen[fp] = _merge_union(seen[fp], record)
 
     unique = [seen[fp] for fp in order]
     removed = len(records) - len(unique)
@@ -466,3 +467,101 @@ def post_extract_validate_records(
         warnings.append("Airport-code fields failed semantic validation")
 
     return valid_records
+
+
+# ---------------------------------------------------------------------------
+# Outlier detection and flagging — statistical outlier detection in a field's
+# distribution.  Given a list of records and a numeric field name, annotate
+# every record with ``_outlier: bool`` — True for values far outside the
+# inter-quartile range (default) or |z-score| > 3 (alternate method).
+# Records flagged as outliers still pass through; downstream consumers can
+# use the flag for manual review, post-validation, or anomaly reporting.
+# ---------------------------------------------------------------------------
+
+
+def _detect_outliers_iqr(values: list[float]) -> list[int]:
+    """Return indices of values that are outliers via IQR method.
+
+    A value is an outlier when it falls below ``Q1 - 1.5*IQR`` or above
+    ``Q3 + 1.5*IQR``.  Requires at least 4 values (the IQR window).
+    """
+    if len(values) < 4:
+        return []
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    q1 = sorted_vals[n // 4]
+    q3 = sorted_vals[3 * n // 4]
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    return [i for i, v in enumerate(values) if v < lower or v > upper]
+
+
+def _detect_outliers_zscore(values: list[float], threshold: float = 3.0) -> list[int]:
+    """Return indices of values whose ``|z-score| > threshold``.
+
+    Returns an empty list for short samples (<4 values) or zero-stdev
+    distributions (every value identical).
+    """
+    if len(values) < 4:
+        return []
+    mean = statistics.mean(values)
+    stdev = statistics.stdev(values) if len(values) > 1 else 0.0
+    if stdev == 0.0:
+        return []
+    return [i for i, v in enumerate(values) if abs(v - mean) / stdev > threshold]
+
+
+def flag_outlier_records(
+    records: list[dict[str, Any]],
+    field: str,
+    method: str = "iqr",
+) -> list[dict[str, Any]]:
+    """Annotate each record with ``_outlier: bool`` for the given numeric field.
+
+    Args:
+        records: Records to scan. Each record is shallow-copied; the input
+            list is not mutated.
+        field: Field name whose values are tested for outliers. Non-numeric
+            values coerce to 0.0 so outlier detection still runs.
+        method: ``"iqr"`` (default, robust to non-Gaussian distributions)
+            or ``"zscore"`` (assumes near-Gaussian distribution). An
+            unknown method falls back to ``"iqr"``.
+
+    Returns:
+        New list with each record (shallow-copied) annotated with a single
+        ``_outlier`` boolean. Records whose input field is missing or
+        non-numeric get ``_outlier=False`` rather than getting flagged
+        (treated as not an outlier of the distribution).
+
+    Why a separate flag rather than filtering: the job runner wants to
+    surface outliers to the user as warnings, not silently remove them.
+    Manual review is the user's call.
+    """
+    chosen_method = method if method in ("iqr", "zscore") else "iqr"
+
+    values_with_indices: list[tuple[int, float]] = []
+    for i, r in enumerate(records):
+        raw = r.get(field)
+        try:
+            if raw is None:
+                continue  # missing values are not outliers; skip
+            values_with_indices.append((i, float(raw)))
+        except (TypeError, ValueError):
+            continue
+
+    detected: list[float] = [v for _, v in values_with_indices]
+    outlier_indices = set(_detect_outliers_zscore(detected)) if chosen_method == "zscore" else set(_detect_outliers_iqr(detected))
+
+    flagged: list[dict[str, Any]] = []
+    for i, r in enumerate(records):
+        out = dict(r)
+        # row ``i`` is an outlier iff its value index appears in the
+        # detection result and the row was actually scanned (i.e., had a
+        # numeric value).
+        if i in {idx for idx, _ in values_with_indices if idx in outlier_indices}:
+            out["_outlier"] = True
+        else:
+            out["_outlier"] = False
+        flagged.append(out)
+    return flagged
