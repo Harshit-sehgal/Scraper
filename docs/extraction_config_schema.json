@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dataforge.dev/schemas/extraction_config.json",
+  "title": "DataForge Extraction Configuration",
+  "description": "JSON Schema for DataForge extraction job configuration. Defines the structure for creating and configuring extraction jobs via the API.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Human-readable name for the extraction job",
+      "type": "string",
+      "maxLength": 255,
+      "examples": ["Product price monitoring"]
+    },
+    "mode": {
+      "description": "Extraction mode",
+      "type": "string",
+      "enum": ["manual", "scheduled", "discovery"],
+      "default": "manual"
+    },
+    "urls": {
+      "description": "List of target URLs to extract data from",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https?://"
+      },
+      "examples": [["https://example.com/products"]]
+    },
+    "schema_fields": {
+      "description": "List of field definitions specifying what data to extract",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SchemaField"
+      }
+    },
+    "selectors_map": {
+      "description": "Custom CSS selectors for extraction targeting",
+      "type": "object",
+      "properties": {
+        "container": {"type": "string", "description": "CSS selector for item container"},
+        "next_page": {"type": "string", "description": "CSS selector for next-page link"},
+        "title": {"type": "string"},
+        "price": {"type": "string"},
+        "description": {"type": "string"},
+        "image": {"type": "string"}
+      },
+      "additionalProperties": {"type": "string"}
+    },
+    "fetch_strategy": {
+      "description": "Strategy for fetching and rendering the page",
+      "type": "string",
+      "enum": ["httpx_smart", "playwright_full", "hybrid"],
+      "default": "hybrid"
+    },
+    "pagination": {
+      "description": "Pagination configuration for multi-page extraction",
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["next_button", "page_number", "url_pattern", "infinite_scroll", "load_more"]
+        },
+        "selector": {"type": "string", "description": "CSS selector for pagination element"},
+        "pattern": {"type": "string", "description": "URL pattern for page-based pagination"},
+        "start": {"type": "integer", "minimum": 1},
+        "end": {"type": "integer", "minimum": 1},
+        "max_pages": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "max_records": {"type": "integer", "minimum": 1, "maximum": 100000},
+        "scroll_attempts": {"type": "integer", "minimum": 1, "maximum": 500},
+        "scroll_delay_ms": {"type": "integer", "minimum": 100, "maximum": 30000}
+      }
+    },
+    "proxy": {
+      "description": "Proxy configuration for extraction requests",
+      "type": "object",
+      "properties": {
+        "type": {"type": "string", "enum": ["http", "https", "socks5", "direct"]},
+        "url": {"type": "string", "format": "uri"},
+        "rotate": {"type": "boolean", "default": false},
+        "pool": {
+          "type": "array",
+          "items": {"type": "string", "format": "uri"}
+        }
+      }
+    },
+    "headers": {
+      "description": "Custom HTTP headers to send with requests",
+      "type": "object",
+      "additionalProperties": {"type": "string"},
+      "examples": [{"Accept-Language": "en-US", "Referer": "https://google.com"}]
+    },
+    "cookies": {
+      "description": "Custom cookies to inject into the browser session",
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "user_agent": {
+      "description": "Custom User-Agent string",
+      "type": "string",
+      "maxLength": 500
+    },
+    "hydration_wait_ms": {
+      "description": "Milliseconds to wait for page JavaScript to execute before extraction",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 60000,
+      "default": 2000
+    },
+    "scroll_attempts": {
+      "description": "Number of scroll attempts for triggering lazy-loaded content",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500,
+      "default": 5
+    },
+    "cron": {
+      "description": "Cron expression for scheduled extraction (5-field format)",
+      "type": "string",
+      "pattern": "^(\\d+|\\*|\\*/\\d+) (\\d+|\\*|\\*/\\d+) (\\d+|\\*|\\*/\\d+) (\\d+|\\*|\\*/\\d+) (\\d+|\\*|\\*/\\d+)$",
+      "examples": ["0 */6 * * *"]
+    },
+    "webhook": {
+      "description": "Webhook configuration for job completion notifications",
+      "type": "object",
+      "properties": {
+        "url": {"type": "string", "format": "uri"},
+        "events": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["completed", "failed", "cancelled"]}
+        },
+        "format": {"type": "string", "enum": ["json", "summary"], "default": "json"},
+        "headers": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        }
+      },
+      "required": ["url"]
+    },
+    "anti_bot": {
+      "description": "Anti-bot evasion configuration",
+      "type": "object",
+      "properties": {
+        "stealth_mode": {
+          "type": "string",
+          "enum": ["auto", "aggressive", "minimal", "off"],
+          "default": "auto"
+        },
+        "fingerprint_rotation": {"type": "boolean", "default": true},
+        "viewport_rotation": {"type": "boolean", "default": true},
+        "human_timing": {"type": "boolean", "default": true}
+      }
+    },
+    "rate_limit": {
+      "description": "Job-level rate limiting configuration",
+      "type": "object",
+      "properties": {
+        "requests_per_second": {"type": "number", "minimum": 0.1, "maximum": 100},
+        "concurrency": {"type": "integer", "minimum": 1, "maximum": 10},
+        "domain_cooldown_ms": {"type": "integer", "minimum": 0, "maximum": 60000}
+      }
+    }
+  },
+  "required": ["urls"],
+  "definitions": {
+    "SchemaField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Field name (used as key in output)",
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+        },
+        "field_type": {
+          "description": "Expected data type of the extracted value",
+          "type": "string",
+          "enum": ["string", "number", "integer", "boolean", "date", "url", "email", "array", "object"]
+        },
+        "selector": {
+          "description": "CSS selector to locate the element",
+          "type": "string"
+        },
+        "attribute": {
+          "description": "Element attribute to extract (default: text content)",
+          "type": "string",
+          "default": "text"
+        },
+        "required": {
+          "description": "Whether this field is required",
+          "type": "boolean",
+          "default": false
+        },
+        "description": {
+          "description": "Human-readable description of the field",
+          "type": "string"
+        }
+      },
+      "required": ["name", "field_type"]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+# =============================================================================
+# DataForge Scraper — Docker Dev Environment with Hot Reload (Roadmap Dev 8)
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# =============================================================================
+
+services:
+  dataforge:
+    build:
+      target: dev
+    environment:
+      - DATAFORGE_ENV=development
+      - DATAFORGE_ENABLE_RELOAD=1
+      - DATAFORGE_LOG_LEVEL=DEBUG
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./scripts:/app/scripts
+    ports:
+      - "${HOST:-127.0.0.1}:${PORT:-8000}:8000"
+      - "5678:5678"  # Debugpy port for remote debugging
+    command: >
+      sh -c "pip install -e /app/backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/backend --reload-dir /app/frontend"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import http.client,sys; c=http.client.HTTPConnection('localhost',8000,timeout=4); c.request('GET','/ready'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2"
