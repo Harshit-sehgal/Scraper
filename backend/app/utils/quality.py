@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import statistics
+from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from statistics import mean
@@ -479,7 +480,7 @@ def post_extract_validate_records(
 # ---------------------------------------------------------------------------
 
 
-def _detect_outliers_iqr(values: list[float]) -> list[int]:
+def _detect_outliers_iqr(values: Sequence[float]) -> list[int]:
     """Return indices of values that are outliers via IQR method.
 
     A value is an outlier when it falls below ``Q1 - 1.5*IQR`` or above
@@ -497,7 +498,7 @@ def _detect_outliers_iqr(values: list[float]) -> list[int]:
     return [i for i, v in enumerate(values) if v < lower or v > upper]
 
 
-def _detect_outliers_zscore(values: list[float], threshold: float = 3.0) -> list[int]:
+def _detect_outliers_zscore(values: Sequence[float], threshold: float = 3.0) -> list[int]:
     """Return indices of values whose ``|z-score| > threshold``.
 
     Returns an empty list for short samples (<4 values) or zero-stdev
