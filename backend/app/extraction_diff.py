@@ -94,7 +94,9 @@ def _record_signature(record: dict[str, Any], key: str | None) -> str | None:
     payload = "|".join(f"{k}={_normalize_value(v)}" for k, v in sorted(record.items()) if v not in (None, ""))
     if not payload:
         return None
-    return hashlib.sha1(payload.encode("utf-8")).hexdigest()  # noqa: S324  # non-cryptographic, content-addressed
+    # SHA256 used for content addressing (not cryptographic security) so the
+    # SHA1 weakness flag stays quiet without per-site suppression.
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _field_union(records: Iterable[dict[str, Any]]) -> set[str]:
