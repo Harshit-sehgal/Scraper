@@ -215,15 +215,15 @@ function renderPlanComparison(currentTierId) {
                 ? `<button type="button" class="btn secondary" disabled>Current plan</button>`
                 : p.id === "enterprise"
                   ? `<a href="docs/SAAS_MODEL.md" class="btn secondary" target="_blank">Contact sales</a>`
-                  : `<button type="button" class="btn primary" data-action="upgrade-plan" data-tier="${p.id}">${p.cta}</button>`
+                  : `<button type="button" class="btn primary" data-action="upgrade-to-tier" data-tier="${p.id}">${p.cta}</button>`
             }
           </div>
         </div>`;
       }).join("")}
     </div>`;
 
-  // Wire upgrade buttons
-  container.querySelectorAll('[data-action="upgrade-plan"]').forEach((btn) => {
+  // Wire upgrade-to-tier buttons (distinct from the existing upgrade-plan global handler)
+  container.querySelectorAll('[data-action="upgrade-to-tier"]').forEach((btn) => {
     btn.addEventListener("click", () => {
       const tier = btn.dataset.tier;
       upgradeToTier(tier);

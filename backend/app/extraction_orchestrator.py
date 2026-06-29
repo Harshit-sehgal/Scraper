@@ -793,90 +793,21 @@ async def _try_llm_discovery_layer(
     return None
 
 
-async def orchestrate_extraction(
-    url: str,
+async def _try_fallback_layers(
     html: str,
+    url: str,
     schema_fields: list[SchemaField],
-    min_record_score: float,
+    gate_threshold: float,
+    user_intent: str,
+    network_diagnostics: list[str],
+    network_result: Any,
     provenance_builder: ProvenanceBuilder | None = None,
-    world_state=None,
-    user_intent: str = "",
-    provided_selectors: dict | None = None,
-    warnings: list[str] | None = None,
 ) -> ExtractionResult:
-    """Cascade through extraction methods until high-quality data is found.
+    """Layers 4-6: container discovery → visible-text → regex.
 
-    Optionally accepts a ``ProvenanceBuilder`` to track field-level extraction
-    provenance for explainability.
-    Uses multi-pass extraction for complex pages.
-
-    If ``provided_selectors`` is given (from URL analysis), it is tried as
-    the primary extraction method — replacing memory and LLM discovery.
-    The cascade falls back to regex if provided selectors fail.
+    ``container_result`` from layer 4 is also used as a partial-data
+    fallback when all later layers produce nothing.
     """
-    memory = get_selector_memory()
-    force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
-
-    _effective_min_score, gate_threshold = _compute_self_tuning_score(url, min_record_score)
-    network_diagnostics, network_result, _bodies = _gather_network_info(url, schema_fields)
-
-    # ── Layer 0: Network / JSON Extraction ──
-    result = _try_network_layer(html, url, schema_fields, gate_threshold, provenance_builder)
-    if result is not None:
-        return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
-
-    # ── Layer 1: Provided Selectors ──
-    if (
-        not force_container_discovery
-        and provided_selectors
-        and provided_selectors.get("item_container")
-        and provided_selectors.get("fields")
-    ):
-        result = _try_provided_selectors_layer(
-            html,
-            schema_fields,
-            provided_selectors,
-            url,
-            user_intent,
-            gate_threshold,
-            provenance_builder,
-            memory,
-        )
-        if result is not None:
-            return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
-
-    # ── Layer 2: Selector Memory ──
-    result = _try_memory_layer(
-        html,
-        url,
-        schema_fields,
-        provided_selectors,
-        force_container_discovery,
-        user_intent,
-        gate_threshold,
-        provenance_builder,
-        memory,
-        warnings,
-    )
-    if result is not None:
-        return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
-
-    # ── Layer 3: LLM Discovery ──
-    if not force_container_discovery:
-        result = await _try_llm_discovery_layer(
-            html,
-            url,
-            schema_fields,
-            world_state,
-            user_intent,
-            gate_threshold,
-            provenance_builder,
-            memory,
-        )
-        if result is not None:
-            return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
-
-    # ── Layer 4: Container Discovery ──
     logger.info("[Orchestrator] Trying general container discovery for %s", url)
     container_result = await multi_pass_container_extraction(
         html,
@@ -918,7 +849,6 @@ async def orchestrate_extraction(
         if provenance_builder:
             provenance_builder.add_error(f"container_discovery: {failure['failure_class']}")
 
-    # ── Layer 5: Rendered Visible-Text Extraction ──
     logger.info("[Orchestrator] Trying rendered visible-text extraction for %s", url)
     visible_results = extract_from_visible_blocks(html, schema_fields, url=url)
     if visible_results:
@@ -967,7 +897,6 @@ async def orchestrate_extraction(
         if provenance_builder:
             provenance_builder.add_fallback_step("visible_text_empty")
 
-    # ── Layer 6: Regex Fallback ──
     logger.info("[Orchestrator] Falling back to regex extraction for %s", url)
     regex_results = extract_with_regex(html, schema_fields, base_url=url)
     _record_field_provenance(provenance_builder, schema_fields, regex_results, ExtractionMethod.REGEX)
@@ -994,6 +923,99 @@ async def orchestrate_extraction(
         schema_fields,
         provenance_builder,
     )
+
+
+def _should_extract_with_provided_selectors(
+    force_container_discovery: bool,
+    provided_selectors: dict | None,
+) -> bool:
+    if force_container_discovery:
+        return False
+    if not provided_selectors:
+        return False
+    return bool(provided_selectors.get("item_container") and provided_selectors.get("fields"))
+
+
+async def orchestrate_extraction(
+    url: str,
+    html: str,
+    schema_fields: list[SchemaField],
+    min_record_score: float,
+    provenance_builder: ProvenanceBuilder | None = None,
+    world_state=None,
+    user_intent: str = "",
+    provided_selectors: dict | None = None,
+    warnings: list[str] | None = None,
+) -> ExtractionResult:
+    """Cascade through extraction methods until high-quality data is found.
+
+    Optionally accepts a ``ProvenanceBuilder`` to track field-level extraction
+    provenance for explainability.
+    Uses multi-pass extraction for complex pages.
+
+    If ``provided_selectors`` is given (from URL analysis), it is tried as
+    the primary extraction method — replacing memory and LLM discovery.
+    The cascade falls back to regex if provided selectors fail.
+    """
+    memory = get_selector_memory()
+    force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
+
+    _effective_min_score, gate_threshold = _compute_self_tuning_score(url, min_record_score)
+    network_diagnostics, network_result, _bodies = _gather_network_info(url, schema_fields)
+
+    # Layer 0: Network / JSON Extraction
+    result = _try_network_layer(html, url, schema_fields, gate_threshold, provenance_builder)
+    if result is not None:
+        return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
+
+    # Layer 1: Provided Selectors
+    if _should_extract_with_provided_selectors(force_container_discovery, provided_selectors):
+        result = _try_provided_selectors_layer(
+            html,
+            schema_fields,
+            provided_selectors,
+            url,
+            user_intent,
+            gate_threshold,
+            provenance_builder,
+            memory,
+        )
+        if result is not None:
+            return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
+
+    # Layer 2: Selector Memory
+    result = _try_memory_layer(
+        html,
+        url,
+        schema_fields,
+        provided_selectors,
+        force_container_discovery,
+        user_intent,
+        gate_threshold,
+        provenance_builder,
+        memory,
+        warnings,
+    )
+    if result is not None:
+        return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
+
+    # Layer 3: LLM Discovery
+    if not force_container_discovery:
+        result = await _try_llm_discovery_layer(
+            html,
+            url,
+            schema_fields,
+            world_state,
+            user_intent,
+            gate_threshold,
+            provenance_builder,
+            memory,
+        )
+        if result is not None:
+            return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
+
+    # Layers 4-6: Container Discovery → Visible-Text → Regex
+    return await _try_fallback_layers(html, url, schema_fields, gate_threshold, user_intent, network_diagnostics, network_result, provenance_builder)
 
 
 def _detect_field_swaps(

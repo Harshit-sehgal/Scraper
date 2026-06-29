@@ -341,6 +341,7 @@ class JobCreationService:
             scroll_attempts=job_data.scroll_attempts,
             request_delay_ms=job_data.request_delay_ms,
             max_concurrent_urls=job_data.max_concurrent_urls,
+            user_agent=job_data.user_agent,
         )
 
     def _record_usage(

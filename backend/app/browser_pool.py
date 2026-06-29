@@ -447,6 +447,21 @@ class BrowserPool:
             self._active_acquires = max(0, self._active_acquires - 1)
             self._concurrency_semaphore.release()
 
+    async def capture_screenshot(
+        self,
+        url: str,
+        full_page: bool = False,
+    ) -> str:
+        import base64
+        async with self.acquire_context() as (_ctx_id, context):
+            page = await context.new_page()
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                raw_bytes = await page.screenshot(full_page=full_page, type="jpeg", quality=60)
+                return base64.b64encode(raw_bytes).decode("ascii")
+            finally:
+                await page.close()
+
     async def _create_isolated_context(
         self,
         ctx_id: str,
@@ -522,10 +537,21 @@ class BrowserPool:
             cap,
             lru_key,
         )
-        # Best-effort cleanup: any close-time exception is swallowed so a
-        # dying context cannot keep the eviction from succeeding.
-        with contextlib.suppress(Exception):
+        # Best-effort cleanup: a dying context's close() may raise
+        # Playwright/connection errors. Narrowly suppress only the
+        # expected exception types so genuine bugs (KeyboardInterrupt,
+        # MemoryError, asyncio.CancelledError propagating out) are not
+        # hidden. Log at warning level so eviction-time failures are
+        # visible — silent swallowed exceptions can mask browser-leak
+        # pathologies during cap eviction.
+        try:
             await ctx.close()
+        except (Error, OSError, RuntimeError, ValueError, TypeError) as exc:
+            logger.warning(
+                "[BrowserPool] Swallowed close() exception while evicting LRU context %s: %s",
+                lru_key,
+                exc,
+            )
 
     def _try_reserve_process_slot(self) -> bool:
         """Atomically reserve a process slot under ``_process_lock``.

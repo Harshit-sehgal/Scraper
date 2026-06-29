@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-29 16:38:28 UTC
+**Generated:** 2026-06-29 17:50:21 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -28,6 +28,7 @@ For the diff between stable and experimental, see
 | DELETE | `/api/jobs/{job_id}` |
 | GET | `/api/jobs` |
 | GET | `/api/jobs/{job_id}` |
+| GET | `/api/jobs/{job_id}/debug` |
 | GET | `/api/jobs/{job_id}/events` |
 | GET | `/api/jobs/{job_id}/export/csv` |
 | GET | `/api/jobs/{job_id}/export/excel` |
@@ -210,4 +211,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 150
+**Total routes:** 151

@@ -109,6 +109,18 @@ class SelectorMemory:
                 with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
 
+    def _maybe_save(self) -> None:
+        """Debounced save: only flush to disk after ``_save_threshold`` events.
+
+        Destructive operations (``invalidate_domain``, ``force_cleanup_for``,
+        ``_auto_cleanup``) bypass this and call ``_save()`` directly so that
+        user-visible state changes are immediately durable.
+        """
+        self._pending_writes += 1
+        if self._pending_writes >= self._save_threshold:
+            self._pending_writes = 0
+            self._save()
+
     def _compute_confidence(self, entry: dict[str, Any]) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.
 
@@ -333,7 +345,7 @@ class SelectorMemory:
             entry["success_count"] += 1
             entry["last_success"] = now
             self._memory[domain] = entry
-            self._save()
+            self._maybe_save()
 
     def record_failure(self, url: str) -> None:
         """Record a failure of remembered selectors for a domain."""
@@ -349,7 +361,7 @@ class SelectorMemory:
             entry["failure_count"] = entry.get("failure_count", 0) + 1
             entry["last_failure"] = time.time()
             self._memory[domain] = entry
-            self._save()
+            self._maybe_save()
 
     def has_memory_for(self, url: str) -> bool:
         """Public predicate: True if a memory entry exists for the URL's domain."""

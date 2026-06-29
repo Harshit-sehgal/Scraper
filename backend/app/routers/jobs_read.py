@@ -294,7 +294,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
 
         return {
             "job": dumped,
-            "domains": domain_states if domain_states else None,
+            "domains": domain_states or None,
             "all_domain_states": policy.get_all_domain_states(),
         }
 
@@ -307,7 +307,19 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
         ],
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
+        q: Annotated[str | None, Query()] = None,
+        sort_by: Annotated[str | None, Query()] = None,
+        sort_order: Annotated[str, Query()] = "asc",
+        field: Annotated[str | None, Query()] = None,
     ):
+        """Return a paginated slice of job results with search/filter/sort (Feat 25).
+
+        Supports:
+        - **q**: Full-text search across all result field values.
+        - **field**: Filter results to only include records where this field exists.
+        - **sort_by**: Field name to sort results by.
+        - **sort_order**: ``asc`` or ``desc`` (default ``asc``).
+        """
         """Return a paginated slice of job results.
 
         When results live on disk (large jobs), we read the JSONL
@@ -350,6 +362,33 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                 results_list = list(job.results)
                 total = len(results_list)
                 page = results_list[offset : offset + limit]
+
+        if q:
+            q_lower = q.lower()
+            filtered = []
+            for rec in page:
+                if isinstance(rec, dict):
+                    for v in rec.values():
+                        if isinstance(v, str) and q_lower in v.lower():
+                            filtered.append(rec)
+                            break
+            page = filtered
+            total = len(filtered)
+
+        if field:
+            page = [rec for rec in page if isinstance(rec, dict) and field in rec]
+            total = len(page)
+
+        if sort_by:
+            reverse = sort_order.lower() == "desc"
+            try:
+                page = sorted(
+                    page,
+                    key=lambda r: (str(r.get(sort_by, "")) if isinstance(r, dict) else ""),
+                    reverse=reverse,
+                )
+            except (TypeError, KeyError):
+                pass
 
         next_offset = offset + limit if (offset + limit) < total else None
 
@@ -522,3 +561,30 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     },
                 )
             return {"jobs": summaries}
+
+    @router.get("/api/jobs/{job_id}/diff", response_model=dict[str, Any])
+    async def get_job_diff(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        compare_to: str = "",
+        record_key: str | None = Query(default=None),
+        field_threshold: float = Query(default=0.05, ge=0.0, le=1.0),
+    ):
+        if not compare_to:
+            raise HTTPException(status_code=400, detail="compare_to query parameter is required")
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        current_job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(current_job, role, user_id, org_id, "read_job_diff", project_id)
+        baseline_job = await run_in_threadpool(manager.get_job, compare_to)
+        _ensure_job_access(baseline_job, role, user_id, org_id, "read_job_diff", project_id)
+        from app.extraction_diff import compute_extraction_diff
+        diff = compute_extraction_diff(
+            list(baseline_job.results),
+            list(current_job.results),
+            record_key=record_key,
+            field_threshold=field_threshold,
+        )
+        return diff.to_dict()

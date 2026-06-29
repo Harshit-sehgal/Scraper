@@ -254,6 +254,11 @@ class JobCreate(BaseModel):
             "Maximum number of URLs that can be fetched concurrently within this job. Lower values reduce load on target domains."
         ),
     )
+    user_agent: str = Field(
+        default="",
+        description="Custom User-Agent string for this job. Empty means use platform default.",
+        max_length=512,
+    )
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -491,6 +496,11 @@ class Job(BaseModel):
         default="",
         description="User-requested fetch strategy. Empty means auto-select.",
         max_length=32,
+    )
+    user_agent: str = Field(
+        default="",
+        description="Custom User-Agent string for this job. Empty means use platform default.",
+        max_length=512,
     )
 
 
@@ -1011,6 +1021,16 @@ class StatusResponse(BaseModel):
     """Generic status response."""
 
     status: str
+
+
+class JobUserAgentUpdate(BaseModel):
+    """Request body to update a job's custom User-Agent string."""
+
+    user_agent: str = Field(
+        default="",
+        description="Custom User-Agent string. Empty string resets to platform default.",
+        max_length=512,
+    )
 
 
 class JobExtractionUpdateResponse(BaseModel):

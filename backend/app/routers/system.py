@@ -684,23 +684,9 @@ def _render_basic_metrics_text() -> str:
     return "\n".join(lines) + "\n"
 
 
-@router.get("/metrics")
-async def metrics(request: Request):
-    """Prometheus-formatted metrics endpoint for DataForge scraper."""
-    # Auth check
+def _reject_metrics_without_token() -> JSONResponse | None:
+    """Pre-flight check: in production, refuse to serve /metrics if METRICS_TOKEN is unset."""
     if not settings.METRICS_TOKEN:
-        # Fail-secure: in production, an unset METRICS_TOKEN would
-        # expose queue depths, error rates, job counts, and the host's
-        # worker roster to anyone who can reach the port. Reject the
-        # request outright. In development we keep the open behavior
-        # so local scrapers can scrape without a token — but we log a
-        # one-time warning on the first call so the operator knows.
-        #
-        # The check is intentionally case-insensitive on whitespace-
-        # trimmed input. Operators regularly set ``DATAFORGE_ENV`` to
-        # ``Production`` or ``PRODUCTION`` from copy-pasted deployment
-        # docs; an exact-match would silently let the dev open
-        # behavior run in production and expose the metrics.
         if (settings.ENV or "").strip().lower() == "production":
             return JSONResponse(
                 status_code=503,
@@ -714,40 +700,33 @@ async def metrics(request: Request):
                 },
             )
         _warn_metrics_token_unset_once()
-    if settings.METRICS_TOKEN:
-        auth_header = request.headers.get("Authorization", "")
-        api_key_header = request.headers.get("X-API-Key", "")
-        bearer_token = ""  # nosec B105
-        # Case-insensitive scheme match (matches api_key_middleware in
-        # app.middlewares) so ``bearer <token>`` and ``BEARER <token>``
-        # both authenticate consistently.
-        if auth_header:
-            scheme, _, _token = auth_header.partition(" ")
-            if scheme.lower() == "bearer":
-                bearer_token = _token
-        if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and not secrets.compare_digest(
-            api_key_header,
-            settings.METRICS_TOKEN,
-        ):
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "detail": "Invalid or missing metrics token. Provide Authorization: Bearer <token> or X-API-Key header.",
-                },
-            )
+    return None
 
-    from app.metrics_collector import record_metrics_collection_error
 
-    try:
-        from prometheus_client import Gauge, Histogram, generate_latest
-    except ModuleNotFoundError:
-        content = await run_in_threadpool(_render_basic_metrics_text)
-        return Response(content=content, media_type="text/plain")
-    from prometheus_client.core import CollectorRegistry
+def _authenticate_metrics_request(request: Request) -> JSONResponse | None:
+    if not settings.METRICS_TOKEN:
+        return None
+    auth_header = request.headers.get("Authorization", "")
+    api_key_header = request.headers.get("X-API-Key", "")
+    bearer_token = ""
+    if auth_header:
+        scheme, _, _token = auth_header.partition(" ")
+        if scheme.lower() == "bearer":
+            bearer_token = _token
+    if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and not secrets.compare_digest(
+        api_key_header,
+        settings.METRICS_TOKEN,
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "Invalid or missing metrics token. Provide Authorization: Bearer <token> or X-API-Key header.",
+            },
+        )
+    return None
 
-    registry = CollectorRegistry()
 
-    # Job counts by status
+def _add_job_gauges(registry) -> None:
     from app.models import JobStatus
 
     counts = {s.value: 0 for s in JobStatus}
@@ -756,23 +735,24 @@ async def metrics(request: Request):
     for job in snapshot:
         status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
         counts[status_key] = counts.get(status_key, 0) + 1
-
     job_total = Gauge("dataforge_jobs_total", "Total jobs", ["status"], registry=registry)
     for status, count in counts.items():
         job_total.labels(status=status).set(count)
-
-    # Recycle bin count
     recycle_gauge = Gauge("dataforge_recycle_bin_total", "Total jobs in recycle bin", registry=registry)
     with _jobs_store_lock:
         recycle_gauge.set(len(recycle_bin_store))
 
-    # Runtime limits
+
+def _add_config_gauges(registry) -> None:
     for key, val in config_view().items():
         g = Gauge(f"dataforge_config_{key}", f"Config value for {key}", registry=registry)
         with contextlib.suppress(TypeError, ValueError):
             g.set(float(val))
 
-    # Repository backend
+
+def _add_backend_gauges(registry) -> None:
+    from app.metrics_collector import record_metrics_collection_error
+
     backend_ok = 1
     try:
         repo = get_job_repository()
@@ -783,7 +763,6 @@ async def metrics(request: Request):
         backend_ok = 0
         record_metrics_collection_error()
         logger.exception("Metrics: backend collection failed")
-
     backend_ok_gauge = Gauge(
         "dataforge_backend_collection_ok",
         "Whether storage backend metrics collected successfully",
@@ -791,7 +770,10 @@ async def metrics(request: Request):
     )
     backend_ok_gauge.set(backend_ok)
 
-    # Worker queue stats
+
+async def _add_queue_gauges(registry) -> None:
+    from app.metrics_collector import record_metrics_collection_error
+
     queue_ok = 1
     try:
         from app.worker_queue import get_worker_queue
@@ -808,7 +790,6 @@ async def metrics(request: Request):
         queue_ok = 0
         record_metrics_collection_error()
         logger.exception("Metrics: queue collection failed")
-
     queue_ok_gauge = Gauge(
         "dataforge_queue_collection_ok",
         "Whether worker queue metrics collected successfully",
@@ -816,7 +797,8 @@ async def metrics(request: Request):
     )
     queue_ok_gauge.set(queue_ok)
 
-    # Worker failure counters
+
+def _add_worker_gauges(registry) -> None:
     from app.metrics_collector import get_worker_failures
 
     failures = get_worker_failures()
@@ -830,19 +812,16 @@ async def metrics(request: Request):
         for task_type, count in failures.items():
             failure_gauge.labels(task_type=task_type).set(count)
 
-    # Worker heartbeat health gauges
+
+def _add_heartbeat_gauges(registry) -> None:
+    import datetime as _dt
+
+    from app.metrics_collector import record_metrics_collection_error
+
     try:
         repo = get_job_repository()
         worker_healths = repo.get_all_worker_healths(ttl_seconds=60)
         if worker_healths:
-            # ``pid`` is part of the label set so multiple workers
-            # sharing the same ``hostname`` (a common pattern when
-            # scaling up within a single host, or when the same host
-            # name appears under different PIDs in tests) do not
-            # collide on the (worker_id, hostname) tuple. The
-            # ``worker_heartbeats`` row already carries a ``pid``
-            # column (see ``record_worker_heartbeat``) so we just
-            # project it through here.
             hb_alive_gauge = Gauge(
                 "dataforge_worker_heartbeat_alive",
                 "Whether a worker has a recent heartbeat (1=alive, 0=dead)",
@@ -863,8 +842,6 @@ async def metrics(request: Request):
                 last_hb = wh.get("last_heartbeat")
                 if last_hb:
                     try:
-                        import datetime as _dt
-
                         last_hb_dt = parse_datetime(str(last_hb))
                         age = (_dt.datetime.now(_dt.UTC) - last_hb_dt).total_seconds() if last_hb_dt else -1.0
                     except (ValueError, TypeError):
@@ -876,7 +853,8 @@ async def metrics(request: Request):
         record_metrics_collection_error()
         logger.debug("Metrics: worker heartbeat collection failed")
 
-    # Request duration histogram
+
+def _add_histogram_gauges(registry) -> None:
     from app.metrics_collector import (
         get_health_check_latencies,
         get_job_durations,
@@ -884,69 +862,70 @@ async def metrics(request: Request):
         get_request_latencies,
     )
 
-    if settings.METRICS_ENABLE_HISTOGRAMS:
-        req_latencies = get_request_latencies()
-        if req_latencies:
-            buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
-            req_hist = Histogram(
-                "dataforge_request_duration_seconds",
-                "API request duration in seconds",
-                buckets=buckets,
-                registry=registry,
-            )
-            for v in req_latencies:
-                req_hist.observe(v)
+    if not settings.METRICS_ENABLE_HISTOGRAMS:
+        return
+    buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
 
-    # Backend health check latency histogram
-    if settings.METRICS_ENABLE_HISTOGRAMS:
-        health_latencies = get_health_check_latencies()
-        if health_latencies:
-            buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
-            health_hist = Histogram(
-                "dataforge_backend_health_check_duration_seconds",
-                "Backend health check duration in seconds",
-                buckets=buckets,
-                registry=registry,
-            )
-            for v in health_latencies:
-                health_hist.observe(v)
+    req_latencies = get_request_latencies()
+    if req_latencies:
+        req_hist = Histogram(
+            "dataforge_request_duration_seconds",
+            "API request duration in seconds",
+            buckets=buckets,
+            registry=registry,
+        )
+        for v in req_latencies:
+            req_hist.observe(v)
 
-    if settings.METRICS_ENABLE_HISTOGRAMS:
-        buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
-        job_durations = get_job_durations()
-        if job_durations:
-            job_hist = Histogram(
-                "dataforge_job_duration_seconds",
-                "Terminal job duration in seconds",
-                buckets=buckets,
-                registry=registry,
-            )
-            for v in job_durations:
-                job_hist.observe(v)
+    health_latencies = get_health_check_latencies()
+    if health_latencies:
+        health_hist = Histogram(
+            "dataforge_backend_health_check_duration_seconds",
+            "Backend health check duration in seconds",
+            buckets=buckets,
+            registry=registry,
+        )
+        for v in health_latencies:
+            health_hist.observe(v)
 
-        page_fetch_durations = get_page_fetch_durations()
-        if page_fetch_durations:
-            page_fetch_hist = Histogram(
-                "dataforge_page_fetch_duration_seconds",
-                "Page fetch attempt duration in seconds",
-                buckets=buckets,
-                registry=registry,
-            )
-            for v in page_fetch_durations:
-                page_fetch_hist.observe(v)
+    job_durations = get_job_durations()
+    if job_durations:
+        job_hist = Histogram(
+            "dataforge_job_duration_seconds",
+            "Terminal job duration in seconds",
+            buckets=buckets,
+            registry=registry,
+        )
+        for v in job_durations:
+            job_hist.observe(v)
 
-    # Cumulative collection errors
+    page_fetch_durations = get_page_fetch_durations()
+    if page_fetch_durations:
+        page_fetch_hist = Histogram(
+            "dataforge_page_fetch_duration_seconds",
+            "Page fetch attempt duration in seconds",
+            buckets=buckets,
+            registry=registry,
+        )
+        for v in page_fetch_durations:
+            page_fetch_hist.observe(v)
+
+
+def _add_counter_gauges(registry) -> None:
+    from app.metrics_collector import (
+        get_errors,
+        get_llm_calls,
+        get_metrics_collection_errors,
+        get_product_totals,
+        get_requests_total,
+    )
+
     error_total_gauge = Gauge(
         "dataforge_metrics_collection_error_total",
         "Total collection errors encountered",
         registry=registry,
     )
-    from app.metrics_collector import get_metrics_collection_errors
-
     error_total_gauge.set(get_metrics_collection_errors())
-
-    # Cumulative error counts
-    from app.metrics_collector import get_errors, get_llm_calls, get_requests_total
 
     errors_dict = get_errors()
     errors_gauge = Gauge("dataforge_errors_total", "Cumulative error count by type", ["type"], registry=registry)
@@ -955,16 +934,11 @@ async def metrics(request: Request):
     if "database" not in errors_dict:
         errors_gauge.labels(type="database").set(0)
 
-    # Cumulative LLM calls count
     llm_gauge = Gauge("dataforge_llm_calls_total", "Cumulative LLM calls count", registry=registry)
     llm_gauge.set(get_llm_calls())
 
-    # Cumulative requests count
     requests_gauge = Gauge("dataforge_requests_total", "Total requests count", registry=registry)
     requests_gauge.set(get_requests_total())
-
-    # Product-level counters required by docs/OBSERVABILITY.md.
-    from app.metrics_collector import get_product_totals
 
     for counter_name, counter_value in get_product_totals().items():
         product_gauge = Gauge(
@@ -974,24 +948,14 @@ async def metrics(request: Request):
         )
         product_gauge.set(counter_value)
 
-    # Extraction-method distribution. One row per method so a
-    # spike in ``regex`` is visible alongside the structured
-    # methods.
+
+def _add_method_and_classification_gauges(registry) -> None:
     from app.metrics_collector import (
         get_anti_bot_classifications,
-        get_auth_profile_ops,
         get_browser_launch_outcomes,
-        get_csp_violations,
         get_export_outcomes,
         get_extraction_method_counts,
-        get_rate_limit_global_hits,
-        get_rate_limit_per_ip_hits,
-        get_repo_query_latencies,
-        get_retention_ops,
-        get_scheduled_job_ops,
-        get_signup_outcomes,
         get_ssrf_rejects,
-        get_workflow_ops,
     )
 
     method_counts = get_extraction_method_counts()
@@ -1005,7 +969,6 @@ async def metrics(request: Request):
         for method, count in method_counts.items():
             method_gauge.labels(method=method).set(count)
 
-    # Anti-bot classification counts.
     classifications = get_anti_bot_classifications()
     if classifications:
         cls_gauge = Gauge(
@@ -1017,7 +980,6 @@ async def metrics(request: Request):
         for cls, count in classifications.items():
             cls_gauge.labels(classification=cls).set(count)
 
-    # Export generation outcomes by format and outcome.
     export_outcomes = get_export_outcomes()
     if export_outcomes:
         export_gauge = Gauge(
@@ -1030,7 +992,6 @@ async def metrics(request: Request):
             for outcome, count in outcomes.items():
                 export_gauge.labels(format=fmt, outcome=outcome).set(count)
 
-    # Browser launch outcomes.
     browser_outcomes = get_browser_launch_outcomes()
     if browser_outcomes:
         browser_gauge = Gauge(
@@ -1042,7 +1003,6 @@ async def metrics(request: Request):
         for outcome, count in browser_outcomes.items():
             browser_gauge.labels(outcome=outcome).set(count)
 
-    # SSRF validation rejects.
     ssrf_rejects = get_ssrf_rejects()
     if ssrf_rejects:
         ssrf_gauge = Gauge(
@@ -1054,7 +1014,16 @@ async def metrics(request: Request):
         for reason, count in ssrf_rejects.items():
             ssrf_gauge.labels(reason=reason).set(count)
 
-    # Domain failure rate from the runtime policy store.
+
+def _add_domain_latency_csp_rate_gauges(registry) -> None:
+    from app.metrics_collector import (
+        get_csp_violations,
+        get_rate_limit_global_hits,
+        get_rate_limit_per_ip_hits,
+        get_repo_query_latencies,
+        record_metrics_collection_error,
+    )
+
     try:
         from app.domain_runtime_policy import get_domain_runtime_policy
 
@@ -1076,7 +1045,6 @@ async def metrics(request: Request):
         record_metrics_collection_error()
         logger.debug("Metrics: domain failure-rate collection failed")
 
-    # Repository query latencies — p50 / p95 derived from the ring buffer.
     repo_latencies = get_repo_query_latencies()
     if repo_latencies:
         sorted_lat = sorted(repo_latencies)
@@ -1092,7 +1060,6 @@ async def metrics(request: Request):
         repo_gauge.labels(quantile="0.5").set(p50)
         repo_gauge.labels(quantile="0.95").set(p95)
 
-    # CSP violations.
     csp_violations = get_csp_violations()
     if csp_violations:
         csp_gauge = Gauge(
@@ -1104,7 +1071,6 @@ async def metrics(request: Request):
         for directive, count in csp_violations.items():
             csp_gauge.labels(directive=directive).set(count)
 
-    # Rate limit hit counters
     rl_global = Gauge(
         "dataforge_rate_limit_global_hits_total",
         "Cumulative rate limit hits by the aggregate global tier",
@@ -1118,7 +1084,16 @@ async def metrics(request: Request):
     )
     rl_per_ip.set(get_rate_limit_per_ip_hits())
 
-    # Auth profile operations
+
+def _add_ops_gauges(registry) -> None:
+    from app.metrics_collector import (
+        get_auth_profile_ops,
+        get_retention_ops,
+        get_scheduled_job_ops,
+        get_signup_outcomes,
+        get_workflow_ops,
+    )
+
     auth_profile_ops = get_auth_profile_ops()
     if auth_profile_ops:
         apo_gauge = Gauge(
@@ -1130,7 +1105,6 @@ async def metrics(request: Request):
         for action, count in auth_profile_ops.items():
             apo_gauge.labels(action=action).set(count)
 
-    # Workflow operations
     workflow_ops = get_workflow_ops()
     if workflow_ops:
         wo_gauge = Gauge(
@@ -1142,7 +1116,6 @@ async def metrics(request: Request):
         for action, count in workflow_ops.items():
             wo_gauge.labels(action=action).set(count)
 
-    # Signup outcomes
     signup_outcomes = get_signup_outcomes()
     if signup_outcomes:
         so_gauge = Gauge(
@@ -1154,7 +1127,6 @@ async def metrics(request: Request):
         for outcome, count in signup_outcomes.items():
             so_gauge.labels(outcome=outcome).set(count)
 
-    # Scheduled job operations
     scheduled_job_ops = get_scheduled_job_ops()
     if scheduled_job_ops:
         sjo_gauge = Gauge(
@@ -1166,7 +1138,6 @@ async def metrics(request: Request):
         for action, count in scheduled_job_ops.items():
             sjo_gauge.labels(action=action).set(count)
 
-    # Retention operations
     retention_ops = get_retention_ops()
     if retention_ops:
         ro_gauge = Gauge(
@@ -1177,5 +1148,38 @@ async def metrics(request: Request):
         )
         for action, count in retention_ops.items():
             ro_gauge.labels(action=action).set(count)
+
+
+@router.get("/metrics", response_model=None)
+async def metrics(request: Request):
+    """Prometheus-formatted metrics endpoint for DataForge scraper."""
+    rejection = _reject_metrics_without_token()
+    if rejection:
+        return rejection
+    rejection = _authenticate_metrics_request(request)
+    if rejection:
+        return rejection
+
+
+    try:
+        from prometheus_client import Gauge, Histogram, generate_latest
+    except ModuleNotFoundError:
+        content = await run_in_threadpool(_render_basic_metrics_text)
+        return Response(content=content, media_type="text/plain")
+    from prometheus_client.core import CollectorRegistry
+
+    registry = CollectorRegistry()
+
+    _add_job_gauges(registry)
+    _add_config_gauges(registry)
+    _add_backend_gauges(registry)
+    await _add_queue_gauges(registry)
+    _add_worker_gauges(registry)
+    _add_heartbeat_gauges(registry)
+    _add_histogram_gauges(registry)
+    _add_counter_gauges(registry)
+    _add_method_and_classification_gauges(registry)
+    _add_domain_latency_csp_rate_gauges(registry)
+    _add_ops_gauges(registry)
 
     return Response(content=generate_latest(registry), media_type="text/plain")

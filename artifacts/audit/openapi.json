@@ -1258,6 +1258,13 @@
             "title": "Urls",
             "type": "array"
           },
+          "user_agent": {
+            "default": "",
+            "description": "Custom User-Agent string for this job. Empty means use platform default.",
+            "maxLength": 512,
+            "title": "User Agent",
+            "type": "string"
+          },
           "webhook_secret": {
             "anyOf": [
               {
@@ -1620,6 +1627,20 @@
           "fetch_strategy"
         ],
         "title": "JobStrategyUpdate",
+        "type": "object"
+      },
+      "JobUserAgentUpdate": {
+        "description": "Request body to update a job's custom User-Agent string.",
+        "properties": {
+          "user_agent": {
+            "default": "",
+            "description": "Custom User-Agent string. Empty string resets to platform default.",
+            "maxLength": 512,
+            "title": "User Agent",
+            "type": "string"
+          }
+        },
+        "title": "JobUserAgentUpdate",
         "type": "object"
       },
       "JobWebhookUpdate": {
@@ -4508,6 +4529,88 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/diff": {
+      "get": {
+        "operationId": "get_job_diff_api_jobs__job_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "compare_to",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Compare To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "record_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Record Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "field_threshold",
+            "required": false,
+            "schema": {
+              "default": 0.05,
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Field Threshold",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Diff Api Jobs  Job Id  Diff Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Diff",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/events": {
       "get": {
         "description": "Return a paginated, filterable view of a job's lifecycle events.\n\nEvents are read from the dedicated ``job_events`` companion\ntable when the repository supports it (storage split, v4+);\notherwise we fall back to ``Job.logs`` for back-compat. The\nresponse shape is stable for clients that poll a long-running\njob for progress.",
@@ -4854,7 +4957,7 @@
     },
     "/api/jobs/{job_id}/results": {
       "get": {
-        "description": "Return a paginated slice of job results.\n\nWhen results live on disk (large jobs), we read the JSONL\nfile directly via ``load_paginated_job_results_from_disk``.\nOtherwise we prefer the ``job_results`` companion table\n(storage-split v4) and only fall back to ``job.results``\nfor back-compat with v3 deployments.",
+        "description": "Return a paginated slice of job results with search/filter/sort (Feat 25).\n\nSupports:\n- **q**: Full-text search across all result field values.\n- **field**: Filter results to only include records where this field exists.\n- **sort_by**: Field name to sort results by.\n- **sort_order**: ``asc`` or ``desc`` (default ``asc``).",
         "operationId": "get_job_results_api_jobs__job_id__results_get",
         "parameters": [
           {
@@ -4887,6 +4990,64 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "title": "Sort Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "field",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field"
             }
           }
         ],
@@ -4971,6 +5132,57 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/user-agent": {
+      "patch": {
+        "description": "Update the custom User-Agent string for a job (Feat 23).",
+        "operationId": "update_job_user_agent_api_jobs__job_id__user_agent_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobUserAgentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job User Agent",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/webhook": {
       "patch": {
         "description": "Update webhook URL and signing secret for a job.",
@@ -5000,9 +5212,7 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StatusResponse"
-                }
+                "schema": {}
               }
             },
             "description": "Successful Response"
@@ -7216,6 +7426,51 @@
           }
         },
         "summary": "Generate Regression Replay Test",
+        "tags": [
+          "scraper"
+        ]
+      }
+    },
+    "/api/scraper/screenshot": {
+      "post": {
+        "operationId": "capture_screenshot_api_scraper_screenshot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Capture Screenshot Api Scraper Screenshot Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capture Screenshot",
         "tags": [
           "scraper"
         ]

@@ -154,6 +154,7 @@ _EXTRACTION_FAILURE_CATEGORIES = (
     "captcha",
     "rate_limit",
     "browser_crash",
+    "unknown",
 )
 _extraction_failure_counts: dict[str, int] = {}
 _extraction_failure_counts_lock = threading.Lock()

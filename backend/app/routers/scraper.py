@@ -8,7 +8,7 @@ and require ``DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true``.
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
@@ -133,6 +133,29 @@ async def get_scraper_stats(
             else 1.0
         ),
     )
+
+
+@router.post("/screenshot", response_model=dict)
+async def capture_screenshot(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    body: dict[str, Any],
+):
+    url = body.get("url", "")
+    full_page = body.get("full_page", False)
+    if not url:
+        raise HTTPException(status_code=400, detail="url is required")
+    try:
+        validate_public_http_url(url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"URL not allowed: {exc}") from exc
+    from app.browser_pool import get_browser_pool
+    pool = get_browser_pool()
+    try:
+        screenshot_b64 = await pool.capture_screenshot(url, full_page=full_page)
+    except (RuntimeError, OSError, ValueError) as exc:
+        logger.exception("Screenshot capture failed for %s", url)
+        raise HTTPException(status_code=500, detail=f"Screenshot failed: {exc}") from exc
+    return {"url": url, "screenshot": screenshot_b64, "full_page": full_page}
 
 
 @router.delete("/telemetry", response_model=StatusResponse)

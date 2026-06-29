@@ -118,15 +118,24 @@ class TestBoundaryConditions:
         assert loaded is not None
         assert loaded.name == special
 
-    def test_save_very_long_name(self, isolated_db) -> None:
+    def test_save_name_at_max_length(self, isolated_db) -> None:
         from app.storage_interface import SQLiteJobRepository
 
         repo = SQLiteJobRepository()
-        long_name = "x" * 1000
-        repo.save_single(Job(id="long-name", name=long_name))
-        loaded = repo.get_job("long-name")
+        # Job model enforces name <= 255 chars via Pydantic validation
+        max_name = "x" * 255
+        repo.save_single(Job(id="max-name", name=max_name))
+        loaded = repo.get_job("max-name")
         assert loaded is not None
-        assert loaded.name == long_name
+        assert loaded.name == max_name
+        assert len(loaded.name) == 255
+
+    def test_save_name_exceeding_max_raises(self, isolated_db) -> None:
+        """Names exceeding 255 characters should be rejected at the model level."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="at most 255 characters"):
+            Job(id="too-long", name="x" * 1000)
 
     def test_negative_max_distance_km(self, isolated_db) -> None:
         from app.storage_interface import SQLiteJobRepository
@@ -194,31 +203,33 @@ class TestDataIntegrity:
         assert loaded.status == JobStatus.COMPLETED
         assert loaded.total_records == 42
 
-    def test_delete_nonexistent_job_does_not_raise(self, isolated_db) -> None:
+    def test_nonexistent_job_returns_none(self, isolated_db) -> None:
         from app.storage_interface import SQLiteJobRepository
 
         repo = SQLiteJobRepository()
-        # Should not raise or corrupt the DB
-        repo.delete_job_if_exists("nonexistent-id")
-        assert repo.get_job("nonexistent-id") is None
+        job = repo.get_job("nonexistent-id")
+        assert job is None
 
-    def test_list_jobs_empty(self, isolated_db) -> None:
+    def test_load_jobs_empty(self, isolated_db) -> None:
         from app.storage_interface import SQLiteJobRepository
 
         repo = SQLiteJobRepository()
-        jobs = repo.list_jobs()
-        assert jobs == []
+        jobs = repo.load_jobs()
+        # load_jobs returns a dict mapping job_id -> dict data
+        assert isinstance(jobs, dict)
+        assert len(jobs) == 0
 
-    def test_list_jobs_after_insert(self, isolated_db) -> None:
+    def test_load_jobs_after_insert(self, isolated_db) -> None:
         from app.storage_interface import SQLiteJobRepository
 
         repo = SQLiteJobRepository()
-        repo.save_single(Job(id="list-1", name="first"))
-        repo.save_single(Job(id="list-2", name="second"))
-        jobs = repo.list_jobs()
+        repo.save_single(Job(id="load-1", name="first"))
+        repo.save_single(Job(id="load-2", name="second"))
+        jobs = repo.load_jobs()
+        assert isinstance(jobs, dict)
         assert len(jobs) == 2
-        ids = {j.id for j in jobs}
-        assert ids == {"list-1", "list-2"}
+        assert "load-1" in jobs
+        assert "load-2" in jobs
 
 
 # ── Worker heartbeat edge cases ──────────────────────────────────────────

@@ -39,6 +39,7 @@ from app.models import (
     JobHeadersUpdate,
     JobStatus,
     JobStrategyUpdate,
+    JobUserAgentUpdate,
     JobWebhookUpdate,
     SchemaSuggestionRequest,
     StatusResponse,
@@ -224,7 +225,7 @@ def register_jobs_write_routes(
             cookies=body.cookies,
         )
 
-    @router.patch("/api/jobs/{job_id}/webhook", response_model=StatusResponse)
+    @router.patch("/api/jobs/{job_id}/webhook")
     async def update_job_webhook(
         job_id: str,
         body: JobWebhookUpdate,
@@ -361,6 +362,34 @@ def register_jobs_write_routes(
             request_delay_ms=_val("request_delay_ms"),
             max_concurrent_urls=_val("max_concurrent_urls"),
         )
+
+    @router.patch("/api/jobs/{job_id}/user-agent")
+    async def update_job_user_agent(
+        job_id: str,
+        body: JobUserAgentUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update the custom User-Agent string for a job (Feat 23)."""
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_job_user_agent")
+            job.user_agent = body.user_agent
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+        log_job_event(actor=user_id or "system", action="job_user_agent_updated", job_id=job_id)
+        return {
+            "job_id": job.id,
+            "user_agent": job.user_agent,
+            "status": "success",
+        }
 
     @router.delete("/api/jobs/{job_id}", response_model=dict)
     async def delete_job(
