@@ -142,8 +142,13 @@ class ChaosSimulator:
                 return True
             return all(h.get("health_level") not in ["unhealthy", "critical", "blacklisted"] for h in healths)
         except Exception:
-            self.logger.exception("Error checking system health")
-            return True
+            # F-CHAOS-001: when the health monitor is unreachable, the
+            # safe default is to assume NOT healthy and SUPPRESS
+            # failure injection — the chaos simulator must NOT escalate
+            # chaos into an already-broken system.  Returning True here
+            # would invert that invariant during monitor outages.
+            self.logger.exception("Error checking system health; suppressing failure injection")
+            return False
 
     def is_failure_active(self, failure_mode: FailureMode) -> bool:
         """Check if a specific failure mode is currently active."""

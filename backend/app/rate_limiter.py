@@ -71,16 +71,28 @@ _redis_fail_open_count = 0
 _redis_fail_open_lock = None
 _redis_fallback_counters: dict[str, int] = {}
 
+# F-RL-006: import-time guard against the TOCTOU race in
+# ``_get_redis_fail_open_lock``.  Without a module-level init guard,
+# two concurrent threads could both see ``None``, each allocate a fresh
+# ``threading.Lock()``, and the slower writer's Lock instance would
+# overwrite the one other threads already acquired — silently breaking
+# mutual exclusion on ``_redis_fail_open_count``.
+import threading as _rl_threading
+
+_redis_fail_open_lock_init_guard = _rl_threading.Lock()
+
 
 def _get_redis_fail_open_lock() -> Any:
     """Lazily allocate the fail-open tracker lock (avoids module-import
     side-effects for cold-start imports / test rigs that never touch Redis).
     """
     global _redis_fail_open_lock
-    if _redis_fail_open_lock is None:
-        import threading
+    if _redis_fail_open_lock is not None:
+        return _redis_fail_open_lock
 
-        _redis_fail_open_lock = threading.Lock()
+    with _redis_fail_open_lock_init_guard:
+        if _redis_fail_open_lock is None:
+            _redis_fail_open_lock = _rl_threading.Lock()
     return _redis_fail_open_lock
 
 

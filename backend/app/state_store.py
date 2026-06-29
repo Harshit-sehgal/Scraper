@@ -10,12 +10,14 @@ Storage safety features:
 
 import atexit
 import concurrent.futures
+import contextlib
 import datetime
 import errno  # Phase 73-HIGH: recoverable fsync codes
 import json
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -170,7 +172,6 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
 
 def _write_state_to_disk(path: Path, payload: dict[str, Any]) -> None:
     """Atomically write state to disk with retry and backup creation."""
-    temp_path = path.with_suffix(path.suffix + ".tmp")
     backup_path = path.with_suffix(path.suffix + _BACKUP_SUFFIX)
 
     for attempt in range(1, _SAVE_RETRIES + 1):
@@ -186,14 +187,30 @@ def _write_state_to_disk(path: Path, payload: dict[str, Any]) -> None:
                         shutil.move(str(backup_path), str(older_backup))
                     shutil.copy2(path, backup_path)
 
-                temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-                # fsync the temp file so the data hits disk before rename
-                fd = os.open(str(temp_path), os.O_RDONLY)
+                # F-STATE-001: canonical atomic tempfile + fdopen
+                # pattern.  ``write_text`` + re-opening with ``O_RDONLY``
+                # is correct on Linux but fragile (TOCTOU between the
+                # close and the re-open, and the second ``os.open`` is
+                # not atomic with the write).  Use ``mkstemp`` to get an
+                # exclusive fd we own through the fdopen, flush, fsync,
+                # and ``os.replace`` sequence — matching every other
+                # firing-squad module (semantic_persistence,
+                # checkpoint_manager, domain_intelligence, etc.).
+                fd, tmp_path = tempfile.mkstemp(
+                    dir=str(path.parent),
+                    suffix=path.suffix + ".tmp",
+                    prefix=path.stem + ".",
+                )
                 try:
-                    os.fsync(fd)
-                finally:
-                    os.close(fd)
-                temp_path.replace(path)
+                    with os.fdopen(fd, "w", encoding="utf-8") as f:
+                        json.dump(payload, f, ensure_ascii=False, indent=2)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp_path, str(path))
+                except BaseException:
+                    with contextlib.suppress(OSError):
+                        os.unlink(tmp_path)
+                    raise
                 # Phase 73-HIGH: fsync the parent directory so the rename
                 # entry is durable on disk. Without this, a crash between
                 # ``replace`` and a subsequent clean shutdown can leave

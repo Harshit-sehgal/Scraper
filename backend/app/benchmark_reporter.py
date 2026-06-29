@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import tempfile
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -153,45 +154,73 @@ class BenchmarkReporter:
         return runs
 
     def generate_dashboard(self) -> None:
-        """Generate / overwrite the auto-updating markdown dashboard file."""
+        """Generate / overwrite the auto-updating markdown dashboard file.
+
+        Writes atomically via tempfile + os.replace so a crash or power
+        loss mid-write cannot leave a partial / corrupt dashboard file —
+        matching the crash-safety pattern used by state_store,
+        semantic_persistence, checkpoint_manager, domain_intelligence,
+        selector_memory, and regression_capture.
+        """
         history = self.get_history(limit=5)
         if not history:
             return
 
-        Path(DASHBOARD_PATH).parent.mkdir(parents=True, exist_ok=True)
+        dashboard_file = Path(DASHBOARD_PATH)
+        dashboard_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with Path(DASHBOARD_PATH).open("w", encoding="utf-8") as f:
-            f.write("# 📊 DataForge Regression Trends & Benchmarks Dashboard\n\n")
-            f.write("> **Continuous Operational Intelligence**: Auto-updating regression trends tracker.\n\n")
-            f.write("## 1. Recent Execution Runs\n\n")
-            f.write("| Run ID | Date & Time | Precision | Recall | Fallback Rate | Avg Latency | Failed Selectors |\n")
-            f.write("| :--- | :--- | :---: | :---: | :---: | :---: | :--- |\n")
+        fd: int | None = None
+        tmp_path: str | None = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(
+                dir=str(dashboard_file.parent),
+                suffix=".tmp",
+                prefix="dashboard_",
+            )
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                fd = None  # ownership transferred
+                f.write("# 📊 DataForge Regression Trends & Benchmarks Dashboard\n\n")
+                f.write("> **Continuous Operational Intelligence**: Auto-updating regression trends tracker.\n\n")
+                f.write("## 1. Recent Execution Runs\n\n")
+                f.write("| Run ID | Date & Time | Precision | Recall | Fallback Rate | Avg Latency | Failed Selectors |\n")
+                f.write("| :--- | :--- | :---: | :---: | :---: | :---: | :--- |\n")
 
-            for run in history:
-                date_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(run.timestamp))
-                failed_str = ", ".join(run.failed_selectors) if run.failed_selectors else "None"
+                for run in history:
+                    date_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(run.timestamp))
+                    failed_str = ", ".join(run.failed_selectors) if run.failed_selectors else "None"
+                    f.write(
+                        f"| `{run.run_id}` | {date_str} | **{run.precision:.2%}** | **{run.recall:.2%}** | "
+                        f"{run.fallback_rate:.2%} | {run.latency_ms:.0f}ms | {failed_str} |\n",
+                    )
+
+                # Add simple visual progress indicators
+                f.write("\n## 2. Dynamic Performance Indicators\n\n")
+                latest = history[0]
                 f.write(
-                    f"| `{run.run_id}` | {date_str} | **{run.precision:.2%}** | **{run.recall:.2%}** | "
-                    f"{run.fallback_rate:.2%} | {run.latency_ms:.0f}ms | {failed_str} |\n",
+                    f"- **Latest Extraction Success (Precision)**: `{'█' * int(latest.precision * 20)}{
+                        '░' * (20 - int(latest.precision * 20))
+                    }` ({latest.precision:.2%})\n",
                 )
+                f.write(
+                    f"- **Latest Capture Rate (Recall)**: `{'█' * int(latest.recall * 20)}{
+                        '░' * (20 - int(latest.recall * 20))
+                    }` ({latest.recall:.2%})\n",
+                )
+                f.write(f"- **Latest Fallback Rate**: `{latest.fallback_rate:.2%}`\n")
+                f.write(f"- **Latest Average Scrape Latency**: `{latest.latency_ms:.0f}ms`\n\n")
 
-            # Add simple visual progress indicators
-            f.write("\n## 2. Dynamic Performance Indicators\n\n")
-            latest = history[0]
-            f.write(
-                f"- **Latest Extraction Success (Precision)**: `{'█' * int(latest.precision * 20)}{
-                    '░' * (20 - int(latest.precision * 20))
-                }` ({latest.precision:.2%})\n",
-            )
-            f.write(
-                f"- **Latest Capture Rate (Recall)**: `{'█' * int(latest.recall * 20)}{'░' * (20 - int(latest.recall * 20))}` ({
-                    latest.recall:.2%})\n",
-            )
-            f.write(f"- **Latest Fallback Rate**: `{latest.fallback_rate:.2%}`\n")
-            f.write(f"- **Latest Average Scrape Latency**: `{latest.latency_ms:.0f}ms`\n\n")
-
-            f.write("---\n * End of Auto-Generated Dashboard Log.*\n")
-            f.flush()
-            with suppress(OSError):
-                os.fsync(f.fileno())
-        logger.debug("Wrote dashboard to %s", DASHBOARD_PATH)
+                f.write("---\n * End of Auto-Generated Dashboard Log.*\n")
+                f.flush()
+                with suppress(OSError):
+                    os.fsync(f.fileno())
+            os.replace(tmp_path, DASHBOARD_PATH)
+            tmp_path = None  # ownership transferred via rename
+            logger.debug("Wrote dashboard to %s", DASHBOARD_PATH)
+        except (RuntimeError, OSError):
+            logger.exception("Failed to write benchmark dashboard")
+            if fd is not None:
+                with suppress(OSError):
+                    os.close(fd)
+            if tmp_path is not None and os.path.exists(tmp_path):
+                with suppress(OSError):
+                    os.unlink(tmp_path)

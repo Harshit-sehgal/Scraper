@@ -381,30 +381,40 @@ async def _try_form_search_recovery(
                 await resp.aclose()
                 resp = await client.get(redirect_url)
 
-            fresh_url = str(resp.url)
-            validate_public_http_url(fresh_url)
-            fresh_html = resp.text
+            try:
+                fresh_url = str(resp.url)
+                validate_public_http_url(fresh_url)
+                fresh_html = resp.text
 
-            if resp.status_code >= 400:
+                if resp.status_code >= 400:
+                    return {
+                        "success": False,
+                        "fresh_url": fresh_url,
+                        "fresh_html": fresh_html,
+                        "form_detected": True,
+                        "form_info": form_info,
+                        "error": f"Search form submission returned HTTP {resp.status_code}",
+                    }
+
+                logger.info(
+                    "[SearchRecovery] Form submitted successfully → %s (status %d)",
+                    redact_url(fresh_url),
+                    resp.status_code,
+                )
+
                 return {
-                    "success": False,
+                    "success": True,
                     "fresh_url": fresh_url,
                     "fresh_html": fresh_html,
                     "form_detected": True,
                     "form_info": form_info,
-                    "error": f"Search form submission returned HTTP {resp.status_code}",
+                    "error": None,
                 }
-
-            logger.info("[SearchRecovery] Form submitted successfully → %s (status %d)", redact_url(fresh_url), resp.status_code)
-
-            return {
-                "success": True,
-                "fresh_url": fresh_url,
-                "fresh_html": fresh_html,
-                "form_detected": True,
-                "form_info": form_info,
-                "error": None,
-            }
+            finally:
+                # F-SFR-001: explicitly release the final response back
+                # to the pool.  Without this, the dangling Response holds
+                # a connection for the remainder of the ``async with``.
+                await resp.aclose()
 
     except httpx.TimeoutException:
         return {

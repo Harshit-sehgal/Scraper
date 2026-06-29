@@ -44,8 +44,14 @@ async def _trigger_webhook(url: str, payload: dict[str, Any]) -> None:
 
         async with get_safe_async_client(timeout=5.0) as client:
             response = await client.post(url, json=payload)
-            if response.status_code >= 400:
-                logger.warning("Alert webhook returned status code %d", response.status_code)
+            try:
+                if response.status_code >= 400:
+                    logger.warning("Alert webhook returned status code %d", response.status_code)
+            finally:
+                # F-DEV-001: explicitly release the connection back to the
+                # pool so subsequent requests within this ``async with``
+                # block (or any re-entry) don't exhaust the pool.
+                await response.aclose()
     except httpx.HTTPError as e:
         logger.warning("Failed to deliver alert webhook: %s", e)
 
@@ -219,7 +225,19 @@ class DomainEvolutionModel:
 
                         try:
                             with get_safe_client(timeout=5.0) as client:
-                                client.post(webhook_url, json=payload)
+                                resp = client.post(webhook_url, json=payload)
+                                try:
+                                    if resp.status_code >= 400:
+                                        logger.debug(
+                                            "Sync webhook returned status %d",
+                                            resp.status_code,
+                                        )
+                                finally:
+                                    # F-DEV-002: explicitly close the sync
+                                    # Response so the connection is returned
+                                    # to the pool immediately and we don't
+                                    # rely on GC under load.
+                                    resp.close()
                         except httpx.HTTPError as ex:
                             logger.debug("Failed to deliver webhook synchronously: %s", ex)
 

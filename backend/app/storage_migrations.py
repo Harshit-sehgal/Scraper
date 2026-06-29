@@ -565,19 +565,26 @@ def build_create_recycle_bin_sql() -> str:
 
 
 def ensure_required_tables(conn, execute_fn: Callable) -> None:
-    """Create Postgres tables and default columns/indexes if missing."""
+    """Create Postgres tables and default columns/indexes if missing.
+
+    Note: This function narrows the exceptions swallowed from
+    ALTER/CREATE INDEX DDL to connection-level operational errors.
+    F-MIG-001 fixes the previous behaviour where ``except Exception``
+    at debug level silently hid real failures (permission denied, disk
+    full, syntax error, etc.) from operators.
+    """
     execute_fn(conn, build_create_jobs_sql())
     for col_def in columns_sql():
         try:
             execute_fn(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:
-            logger.debug("ALTER TABLE jobs ADD COLUMN %s failed (ignored)", col_def)
+        except sqlite3.OperationalError as op_err:
+            logger.warning("ALTER TABLE jobs ADD COLUMN %s failed: %s", col_def, op_err)
     execute_fn(conn, build_create_recycle_bin_sql())
     for col_def in columns_sql():
         try:
             execute_fn(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
-        except Exception:
-            logger.debug("ALTER TABLE recycle_bin ADD COLUMN %s failed (ignored)", col_def)
+        except sqlite3.OperationalError as op_err:
+            logger.warning("ALTER TABLE recycle_bin ADD COLUMN %s failed: %s", col_def, op_err)
 
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -591,8 +598,8 @@ def ensure_required_tables(conn, execute_fn: Callable) -> None:
     ]:
         try:
             execute_fn(conn, idx_sql)
-        except Exception:
-            logger.debug("CREATE INDEX failed (ignored): %s", idx_sql)
+        except sqlite3.OperationalError as op_err:
+            logger.warning("CREATE INDEX failed: %s — %s", idx_sql, op_err)
 
 
 def migrate_worker_heartbeats_v6(conn, execute_fn: Callable, fetch_one_fn: Callable) -> None:

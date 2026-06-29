@@ -837,19 +837,25 @@ async def _fetch_with_httpx(
                         resp = next_resp
                         break
 
-                resp.raise_for_status()
+                try:
+                    resp.raise_for_status()
 
-                # SSRF: validate the final resolved URL is not private /
-                # internal
-                final_url = str(resp.url)
-                _validate_url_safe(final_url)
+                    # SSRF: validate the final resolved URL is not private /
+                    # internal
+                    final_url = str(resp.url)
+                    _validate_url_safe(final_url)
 
-                # Persist cookies from response for future requests
-                set_cookie = resp.headers.get("set-cookie", "")
-                if set_cookie:
-                    anti_bot.update_cookies(domain, set_cookie)
+                    # Persist cookies from response for future requests
+                    set_cookie = resp.headers.get("set-cookie", "")
+                    if set_cookie:
+                        anti_bot.update_cookies(domain, set_cookie)
 
-                return resp.text, 0.0, method_used, retry_count
+                    # F-HTML-005: capture the body before releasing the
+                    # response so callers don't see ``<Response [200]>``.
+                    body = resp.text
+                    return body, 0.0, method_used, retry_count
+                finally:
+                    await resp.aclose()
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt < settings.MAX_RETRIES - 1:
                     wait = settings.HTTP_BACKOFF_FACTOR * (attempt + 1)

@@ -558,7 +558,29 @@ def {safe_name}(hostile_base_url):
         SchemaField(name={schema_args}, field_type=FieldType.STRING, required=True),
     ]
     url = f"{{hostile_base_url}}/regression/{entry.id}"
-    results = asyncio.run(scrape_url(url, fields, min_record_score=0.2))
+
+    async def _scrape():
+        return await scrape_url(url, fields, min_record_score=0.2)
+
+    # F-REG-001: ``asyncio.run`` raises RuntimeError if called from
+    # within an already-running event loop (e.g. pytest-asyncio's
+    # session scope).  Detect the active loop; if none is running,
+    # call ``asyncio.run`` as before.  If a loop IS running, fall back
+    # to ``asyncio.new_event_loop().run_until_complete`` in a worker
+    # thread — which is robust against both invocation patterns.
+    try:
+        asyncio.get_running_loop()
+        in_running_loop = True
+    except RuntimeError:
+        in_running_loop = False
+
+    if in_running_loop:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(lambda: asyncio.new_event_loop().run_until_complete(_scrape()))
+            results = future.result(timeout=120)
+    else:
+        results = asyncio.run(_scrape())
     # Expected: extraction should handle this failure mode gracefully
     assert len(results) == 0, f"Expected 0 results for regression fixture {entry.id}, got {{len(results)}}"
 """

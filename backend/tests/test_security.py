@@ -41,7 +41,13 @@ class TestInputValidation:
             assert isinstance(jobs, list)
 
     def test_xss_in_job_name(self, client: TestClient, auth_headers: dict):
-        """Test XSS attempts in job name."""
+        """Test XSS attempts in job name.
+
+        F-TEST-SEC-001: previously this only asserted sanitisation
+        when ``status_code == 200`` — a regression that returned 4xx
+        with raw ``<script>`` in the error body would silently slip
+        through. Now we verify sanitisation regardless of status.
+        """
         response = client.post(
             "/api/jobs",
             headers=auth_headers,
@@ -50,9 +56,12 @@ class TestInputValidation:
                 "urls": ["https://example.com"],
             },
         )
+        # The job name must never contain a raw script tag in either
+        # the response body or in any echoed field of an error payload.
+        body_text = response.text
+        assert "<script>" not in body_text, f"Raw <script> tag in response body: {body_text!r}"
         if response.status_code == 200:
             data = response.json()
-            # Verify script tags were removed or escaped
             assert "<script>" not in data.get("name", "")
 
     def test_path_traversal_in_url(self, client: TestClient, auth_headers: dict):
