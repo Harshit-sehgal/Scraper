@@ -108,12 +108,8 @@ async def _enforce_api_auth_and_quota(request: Request) -> None:
     dispatch logic focused on routing decisions while the security/audit
     logic lives in one place.
     """
-    bearer_token = None
     auth_header = request.headers.get("Authorization", "")
-    auth_scheme, _, auth_token = auth_header.partition(" ")
-    if auth_scheme.lower() == "bearer":
-        bearer_token = auth_token.strip()
-    has_api_key_header = bool(request.headers.get("X-API-Key") or request.headers.get("X-Admin-Key"))
+    auth_scheme, _, _auth_token = auth_header.partition(" ")
 
     from app.utils.rbac import resolve_auth_context
 
@@ -131,10 +127,8 @@ async def _enforce_api_auth_and_quota(request: Request) -> None:
         project_id=auth_context.project_id,
     )
     if not allowed:
-        raise ValueError(
-            f"quota exceeded for api_requests: "
-            f"{details['current_usage'] + 1}/{details['limit']}"
-        )
+        _quota_msg = f"quota exceeded for api_requests: {details['current_usage'] + 1}/{details['limit']}"
+        raise ValueError(_quota_msg)
 
     get_usage_ledger().record_usage(
         auth_context.user_id,
