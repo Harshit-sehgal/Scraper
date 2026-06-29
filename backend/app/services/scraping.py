@@ -103,7 +103,16 @@ async def run_scraping_phase(
     except (TypeError, ValueError):
         job_max_concurrent = settings.JOB_MAX_PARALLEL_URLS
     semaphore = asyncio.Semaphore(min(job_max_concurrent, settings.JOB_MAX_PARALLEL_URLS))
+    # N+8: ``domain_semaphores`` is scoped to this ``run_scraping_phase()``
+    # call (one job), not module-level, so the memory footprint per-job
+    # is bounded by the # of unique domains that *this* job scrapes.
+    # Even for a hostile fan-out of O(10K) distinct domains, each
+    # ``asyncio.Semaphore`` is ~256 bytes — well under 3 MB total.  A
+    # soft cap below prevents pathological fan-out from exceeding sane
+    # memory; if hit, the additional domains fall through to the global
+    # ``semaphore`` (still respects the per-job parallelism limit).
     domain_semaphores: dict[str, asyncio.Semaphore] = {}
+    _DOMAIN_SEMAPHORE_SOFT_CAP = 4096
     job_lock = asyncio.Lock()
     completed_count = 0
 
@@ -191,9 +200,21 @@ async def run_scraping_phase(
 
         domain = urlparse(url).netloc.lower()
         if domain not in domain_semaphores:
-            max_parallel = policy.get_or_create(url).max_parallel
-            domain_semaphores[domain] = asyncio.Semaphore(max_parallel)
-        domain_sem = domain_semaphores[domain]
+            # Soft cap: emerging-domain-hostile job fan-out doesn't
+            # blow up ``domain_semaphores``.  When the cap is hit, we
+            # still respect the global ``semaphore`` (per-job
+            # parallelism) — only the *per-domain* throttling caps
+            # collapse for the remainder of the job.  Acceptable
+            # trade-off: a hostile fan-out sees less per-domain
+            # fairness, not unbounded memory growth.
+            if len(domain_semaphores) >= _DOMAIN_SEMAPHORE_SOFT_CAP:
+                domain_sem = semaphore
+            else:
+                max_parallel = policy.get_or_create(url).max_parallel
+                domain_semaphores[domain] = asyncio.Semaphore(max_parallel)
+                domain_sem = domain_semaphores[domain]
+        else:
+            domain_sem = domain_semaphores[domain]
 
         async with semaphore, domain_sem:
             await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")

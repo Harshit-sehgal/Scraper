@@ -105,6 +105,22 @@ _PLAN_ID_CACHE: dict[str, PlanTierId] | None = None
 _PLAN_ID_CACHE_LOCK = threading.Lock()
 
 
+def _redact_id(value: str | None) -> str:
+    """Redact an opaque customer/tenant ID for safe logging.
+
+    Customer IDs are usually PayPal ``subscr_`` IDs or our own UUIDs —
+    not directly PII, but they identify a specific tenant across
+    aggregators / SIEM / long-lived backups.  Truncating to a stable
+    short prefix preserves enough context to correlate log lines
+    without exposing the full identifier.
+    """
+    if not value:
+        return "<none>"
+    if len(value) <= 8:
+        return value[:4] + "***"
+    return value[:8] + "..."
+
+
 def resolve_tier_from_plan_id(plan_id: str) -> PlanTierId:
     """Public plan-id → tier resolver.
 
@@ -326,7 +342,7 @@ class PayPalClient:
                 with suppress(Exception):
                     resp.close()
         except (requests.RequestException, ValueError, KeyError, OSError) as e:
-            logger.warning("Failed to lookup subscription %s: %s", customer_id, e)
+            logger.warning("Failed to lookup subscription %s: %s", _redact_id(customer_id), e)
             return None
 
     def _resolve_tier_from_plan_id(self, plan_id: str) -> PlanTierId:
@@ -368,7 +384,7 @@ class PayPalClient:
             if customer is None:
                 logger.warning(
                     "check_balance FAILED CLOSED: customer=%s not found in PayPal — access denied.",
-                    customer_id,
+                    _redact_id(customer_id),
                 )
                 return False
 
@@ -376,7 +392,7 @@ class PayPalClient:
             if customer.subscription_status not in billable_statuses:
                 logger.warning(
                     "check_balance FAILED CLOSED: customer=%s subscription status=%s is not billable (%s) — access denied.",
-                    customer_id,
+                    _redact_id(customer_id),
                     customer.subscription_status.value,
                     ", ".join(s.value for s in billable_statuses),
                 )
@@ -384,7 +400,7 @@ class PayPalClient:
 
             logger.debug(
                 "check_balance passed: customer=%s tier=%s status=%s",
-                customer_id,
+                _redact_id(customer_id),
                 customer.plan_tier.value,
                 customer.subscription_status.value,
             )
@@ -392,7 +408,7 @@ class PayPalClient:
         except (OSError, ValueError, RuntimeError) as e:
             logger.warning(
                 "check_balance FAILED CLOSED: customer=%s — PayPal API error (%s: %s) — access denied.",
-                customer_id,
+                _redact_id(customer_id),
                 type(e).__name__,
                 e,
             )
