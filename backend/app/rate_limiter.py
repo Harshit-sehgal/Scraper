@@ -22,6 +22,7 @@ import ipaddress
 import logging
 import os
 import sqlite3
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -662,13 +663,17 @@ class DatabaseSlidingWindowCounter:
 class SlidingWindowCounter:
     """Sliding window rate limit counter for a single key."""
 
-    __slots__ = ("_last_access", "_timestamps", "max_requests", "window_seconds")
+    __slots__ = ("_last_access", "_lock", "_timestamps", "max_requests", "window_seconds")
 
     def __init__(self, max_requests: int, window_seconds: float) -> None:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._timestamps: list[float] = []
         self._last_access: float = time.time()
+        # F-RATE-005: thread-safe guard for prune-check-append sequences.
+        # Without this, two concurrent coroutines could both pass the
+        # len<max check and both append, exceeding the limit by 1+.
+        self._lock = threading.Lock()
 
     def allow(self) -> bool:
         """Check if a request is allowed, and record it if so.
@@ -676,38 +681,42 @@ class SlidingWindowCounter:
         Returns True if within limit, False if exceeded.
         """
         now = time.time()
-        self._last_access = now
-        cutoff = now - self.window_seconds
+        with self._lock:
+            self._last_access = now
+            cutoff = now - self.window_seconds
 
-        # Prune expired timestamps
-        self._timestamps = [t for t in self._timestamps if t > cutoff]
+            # Prune expired timestamps
+            self._timestamps = [t for t in self._timestamps if t > cutoff]
 
-        if len(self._timestamps) >= self.max_requests:
-            return False
+            if len(self._timestamps) >= self.max_requests:
+                return False
 
-        self._timestamps.append(now)
-        return True
+            self._timestamps.append(now)
+            return True
 
     def remaining(self) -> int:
         """How many requests remain in the current window."""
         now = time.time()
-        self._last_access = now
-        cutoff = now - self.window_seconds
-        self._timestamps = [t for t in self._timestamps if t > cutoff]
-        return max(0, self.max_requests - len(self._timestamps))
+        with self._lock:
+            self._last_access = now
+            cutoff = now - self.window_seconds
+            self._timestamps = [t for t in self._timestamps if t > cutoff]
+            return max(0, self.max_requests - len(self._timestamps))
 
     def reset_in(self) -> float:
         """Seconds until the window resets."""
-        if not self._timestamps:
-            return 0.0
-        return max(0.0, self.window_seconds - (time.time() - self._timestamps[0]))
+        with self._lock:
+            if not self._timestamps:
+                return 0.0
+            return max(0.0, self.window_seconds - (time.time() - self._timestamps[0]))
 
     def is_expired(self) -> bool:
         """Check if this counter has no recent activity and can be pruned."""
-        if not self._timestamps:
-            return True
-        cutoff = time.time() - self.window_seconds
-        return all(t <= cutoff for t in self._timestamps)
+        with self._lock:
+            if not self._timestamps:
+                return True
+            cutoff = time.time() - self.window_seconds
+            return all(t <= cutoff for t in self._timestamps)
 
 
 class RateLimiterMiddleware:

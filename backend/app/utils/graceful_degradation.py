@@ -24,6 +24,11 @@ class GracefulDegradation:
         self._fallbacks: dict[str, Callable] = {}
         self._cache: dict[str, Any] = {}
         self._cache_ttl: dict[str, float] = {}
+        # F-GD-002: protect cache reads/writes when multiple coroutines
+        # call ``execute_with_fallback`` for the same key concurrently.
+        # Without this guard, parallel calls could both miss the cache
+        # and both fall through to the fallback path.
+        self._cache_lock = asyncio.Lock()
 
     def register_fallback(self, key: str, fallback_fn: Callable) -> None:
         """Register a fallback function for a service."""
@@ -44,21 +49,26 @@ class GracefulDegradation:
         """Execute primary function with fallback on failure."""
         try:
             result = await primary_fn(*args, **kwargs)
-            # Cache successful result
-            self._cache[key] = result
-            # ``time.monotonic`` is loop-independent and avoids the
-            # deprecated ``asyncio.get_event_loop().time()`` pattern.
-            self._cache_ttl[key] = time.monotonic() + cache_ttl
+            # Cache successful result under a lock so concurrent
+            # coroutines cannot interleave the write with the
+            # expiry check below.
+            async with self._cache_lock:
+                self._cache[key] = result
+                # ``time.monotonic`` is loop-independent and avoids the
+                # deprecated ``asyncio.get_event_loop().time()`` pattern.
+                self._cache_ttl[key] = time.monotonic() + cache_ttl
             return result
         except Exception as e:
             logger.warning("Primary function %s failed: %s", key, e)
 
-            # Check cache first
-            if key in self._cache:
-                cache_time = self._cache_ttl.get(key, 0)
-                if time.monotonic() < cache_time:
-                    logger.info("Using cached result for %s", key)
-                    return self._cache[key]
+            # Check cache first (also under the lock to avoid a
+            # ``clear_cache`` racing with our TTL read).
+            async with self._cache_lock:
+                cached = self._cache.get(key)
+                cache_time = self._cache_ttl.get(key, 0.0)
+            if cached is not None and time.monotonic() < cache_time:
+                logger.info("Using cached result for %s", key)
+                return cached
 
             # Use fallback
             fallback = self.get_fallback(key)
@@ -72,7 +82,14 @@ class GracefulDegradation:
             raise
 
     def clear_cache(self, key: str | None = None) -> None:
-        """Clear cache for a specific key or all keys."""
+        """Clear cache for a specific key or all keys.
+
+        Synchronous helper that mutates the same dicts that
+        ``execute_with_fallback`` reads via ``asyncio.Lock``.  Python's
+        GIL makes per-key dict assignment atomic, so worst case is a
+        single stale read inside an in-flight coroutine — acceptable
+        for a cache whose entries expire on their own.
+        """
         if key:
             self._cache.pop(key, None)
             self._cache_ttl.pop(key, None)

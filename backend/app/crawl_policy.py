@@ -409,65 +409,82 @@ class CrawlPolicyEngine:
         state.robots_checked = True
 
         try:
-            from app.url_safety import get_safe_async_client
+            from app.url_safety import get_safe_async_client, validate_public_http_url
 
             url = f"https://{domain}/robots.txt"
+            # F-SSRF-009: validate the assembled URL against the SSRF
+            # defense so a malicious domain value (or one that resolves
+            # to a private/loopback/metadata IP via DNS rebind) cannot
+            # be used as a proxy for internal services.
+            try:
+                validate_public_http_url(url)
+            except ValueError as ssrf_err:
+                logger.warning(
+                    "Refusing robots.txt fetch for unsafe domain %r: %s",
+                    domain,
+                    ssrf_err,
+                )
+                return
             async with get_safe_async_client(
                 timeout=settings.ROBOTS_TIMEOUT,
                 headers={"User-Agent": settings.USER_AGENT},
             ) as client:
                 resp = await client.get(url)
-                if resp.status_code != 200:
-                    return
+                try:
+                    if resp.status_code != 200:
+                        return
 
-                text = resp.text
-                current_agent = None
-                disallowed_paths: set[str] = set()
-                allowed_paths: set[str] = set()
-                crawl_delay = 0.0
+                    text = resp.text
 
-                for line in text.splitlines():
-                    line = line.strip()  # noqa: PLW2901, RUF100
-                    if not line or line.startswith("#"):
-                        continue
+                    current_agent = None
+                    disallowed_paths: set[str] = set()
+                    allowed_paths: set[str] = set()
+                    crawl_delay = 0.0
 
-                    if line.lower().startswith("user-agent:"):
-                        agent = line.split(":", 1)[1].strip().lower()
-                        current_agent = agent if agent == "*" else None
-                        continue
+                    for line in text.splitlines():
+                        line = line.strip()  # noqa: PLW2901, RUF100
+                        if not line or line.startswith("#"):
+                            continue
 
-                    if current_agent != "*":
-                        continue
+                        if line.lower().startswith("user-agent:"):
+                            agent = line.split(":", 1)[1].strip().lower()
+                            current_agent = agent if agent == "*" else None
+                            continue
 
-                    if line.lower().startswith("disallow:"):
-                        path = line.split(":", 1)[1].strip()
-                        if path:
-                            disallowed_paths.add(path)
+                        if current_agent != "*":
+                            continue
 
-                    if line.lower().startswith("allow:"):
-                        path = line.split(":", 1)[1].strip()
-                        if path:
-                            allowed_paths.add(path)
+                        if line.lower().startswith("disallow:"):
+                            path = line.split(":", 1)[1].strip()
+                            if path:
+                                disallowed_paths.add(path)
 
-                    if line.lower().startswith("crawl-delay:"):
-                        with contextlib.suppress(ValueError):
-                            crawl_delay = float(line.split(":", 1)[1].strip())
+                        if line.lower().startswith("allow:"):
+                            path = line.split(":", 1)[1].strip()
+                            if path:
+                                allowed_paths.add(path)
 
-                state.robots_disallowed = disallowed_paths
-                state.crawl_delay = crawl_delay
-                self._robots_allowed[domain] = allowed_paths
+                        if line.lower().startswith("crawl-delay:"):
+                            with contextlib.suppress(ValueError):
+                                crawl_delay = float(line.split(":", 1)[1].strip())
 
-                if disallowed_paths:
-                    logger.debug(
-                        "robots.txt for %s: %d disallowed paths, %d allowed paths, delay=%.1fs",
-                        domain,
-                        len(disallowed_paths),
-                        len(allowed_paths),
-                        crawl_delay,
-                    )
+                    state.robots_disallowed = disallowed_paths
+                    state.crawl_delay = crawl_delay
+                    self._robots_allowed[domain] = allowed_paths
 
-                # Persist robots.txt results so we don't re-fetch on restart
-                self._persist_domain(domain, state)
+                    if disallowed_paths:
+                        logger.debug(
+                            "robots.txt for %s: %d disallowed paths, %d allowed paths, delay=%.1fs",
+                            domain,
+                            len(disallowed_paths),
+                            len(allowed_paths),
+                            crawl_delay,
+                        )
+
+                    # Persist robots.txt results so we don't re-fetch on restart
+                    self._persist_domain(domain, state)
+                finally:
+                    await resp.aclose()
 
         except Exception as e:
             logger.debug("Failed to fetch robots.txt for %s: %s", domain, e)

@@ -34,6 +34,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,11 @@ _PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
 
 # Cache loaded profiles to avoid repeated disk I / O
 _profile_cache: dict[str, dict] | None = None
+# F-LOADER-002: thread-safe guard for the check-then-init global pattern.
+# Without this lock, two concurrent threads could both pass the
+# ``_profile_cache is None`` check and race to populate the cache — the
+# slower writer's profile dict would clobber the faster one.
+_profile_cache_lock = threading.Lock()
 
 USER_AGENT = settings.USER_AGENT
 
@@ -64,28 +70,35 @@ def _load_all_profiles() -> dict[str, dict]:
     if _profile_cache is not None:
         return _profile_cache
 
-    _profile_cache = {}
-    profiles_dir = _PROFILES_DIR
+    with _profile_cache_lock:
+        if _profile_cache is not None:
+            # Another thread populated the cache while we waited.
+            return _profile_cache
 
-    if not profiles_dir.exists():
-        logger.debug("Selector profiles directory not found: %s", profiles_dir)
+        loaded: dict[str, dict] = {}
+        profiles_dir = _PROFILES_DIR
+
+        if not profiles_dir.exists():
+            logger.debug("Selector profiles directory not found: %s", profiles_dir)
+            _profile_cache = loaded
+            return _profile_cache
+
+        for fpath in sorted(profiles_dir.glob("*.json")):
+            try:
+                with open(fpath) as f:
+                    profile = json.load(f)
+                domain = profile.get("domain", "").strip().lower()
+                if not domain:
+                    logger.warning("Profile %s has no 'domain' field, skipping", fpath.name)
+                    continue
+                loaded[domain] = profile
+                logger.debug("Loaded selector profile: %s → %s", domain, fpath.name)
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning("Failed to load profile %s: %s", fpath.name, e)
+
+        logger.info("Loaded %d selector profiles", len(loaded))
+        _profile_cache = loaded
         return _profile_cache
-
-    for fpath in sorted(profiles_dir.glob("*.json")):
-        try:
-            with open(fpath) as f:
-                profile = json.load(f)
-            domain = profile.get("domain", "").strip().lower()
-            if not domain:
-                logger.warning("Profile %s has no 'domain' field, skipping", fpath.name)
-                continue
-            _profile_cache[domain] = profile
-            logger.debug("Loaded selector profile: %s → %s", domain, fpath.name)
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.warning("Failed to load profile %s: %s", fpath.name, e)
-
-    logger.info("Loaded %d selector profiles", len(_profile_cache))
-    return _profile_cache
 
 
 def match_profile_for_url(url: str) -> dict | None:
@@ -113,6 +126,11 @@ def _match_domain(url: str) -> dict | None:
 def reload_profiles() -> None:
     """Force reload profiles from disk. Call when profiles are added / updated at runtime."""
     global _profile_cache
+    # Drop the cache so the next call to ``_load_all_profiles`` rebuilds
+    # it.  We must NOT hold the loader's internal lock here — the loader
+    # re-acquires it during load and holding it from the outside would
+    # deadlock.  The double-checked locking pattern inside
+    # ``_load_all_profiles`` already serialises concurrent readers.
     _profile_cache = None
     _load_all_profiles()
 
