@@ -47,7 +47,7 @@ class ExtractionSettings(BaseSettings):
     # ─── Scraper Heuristics (Grounding abstractions) ───────────────────
     SELECTOR_SNIPPET_MAX_CHARS: int = 16000
     """Max characters of HTML sent to LLM for selector discovery."""
-    REGEX_MAX_CONTAINERS: int = 300
+    REGEX_MAX_CONTAINERS: int = 2000
     """Hard limit on containers scanned by regex fallback."""
     SELECTOR_MIN_TEXT_LEN: int = 5
     """Min text length for a node to be considered a data container."""
