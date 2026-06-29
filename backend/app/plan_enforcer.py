@@ -76,6 +76,7 @@ def _user_tier(user_id: str) -> str:
     """
     try:
         from app.billing.webhooks import get_customer_subscription
+
         local_sub = get_customer_subscription(user_id)
         if local_sub:
             tier_str = local_sub.get("plan_tier")

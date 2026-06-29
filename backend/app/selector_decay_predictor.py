@@ -20,6 +20,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import threading
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
@@ -303,11 +304,15 @@ class SelectorDecayPredictor:
 
 # Global singleton
 _predictor: SelectorDecayPredictor | None = None
+_predictor_lock = threading.Lock()
 
 
 def get_selector_decay_predictor() -> SelectorDecayPredictor:
     """Get the global selector decay predictor."""
     global _predictor
-    if _predictor is None:
-        _predictor = SelectorDecayPredictor()
+    if _predictor is not None:
+        return _predictor
+    with _predictor_lock:
+        if _predictor is None:
+            _predictor = SelectorDecayPredictor()
     return _predictor

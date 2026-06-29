@@ -7,6 +7,7 @@ High-entropy data sources are quarantined before they can affect stable basins.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -112,16 +113,21 @@ class ImmunityLayer:
 
 
 _immune_system: Any = None
+_immune_system_lock = threading.Lock()
 
 
 def get_immune_system(ws: SemanticWorldState | None = None) -> ImmunityLayer:
     global _immune_system
-    if _immune_system is None:
-        _immune_system = ImmunityLayer(ws=ws)
+    if _immune_system is not None:
+        return _immune_system
+    with _immune_system_lock:
+        if _immune_system is None:
+            _immune_system = ImmunityLayer(ws=ws)
     return _immune_system
 
 
 def reset_immune_system() -> None:
     """Reset the global immune system (for testing)."""
     global _immune_system
-    _immune_system = None
+    with _immune_system_lock:
+        _immune_system = None

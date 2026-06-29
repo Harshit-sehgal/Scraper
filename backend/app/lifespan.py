@@ -66,6 +66,7 @@ def _verify_production_startup() -> None:
         )
         raise ValueError(_cors_msg)
     from app.utils.prod_security_validator import validate_production_credentials
+
     validate_production_credentials(settings)
     if getattr(settings, "SMOKE_TEST_MODE", False):
         _smoke_msg = (
@@ -96,6 +97,7 @@ def _validate_startup_config() -> None:
     """Best-effort startup config validation; does not raise in dev/test."""
     try:
         from app.utils.env_validation import validate_startup_config
+
         validate_startup_config()
     except Exception as exc:
         logger.debug("Startup config validation skipped: %s", exc)
@@ -110,6 +112,7 @@ def _init_experimental_subsystems() -> tuple[Any, Any]:
         init_graph_scheduler,
         init_recovery_framework,
     )
+
     if experimental_subsystems_enabled():
         logger.info("Experimental subsystems ENABLED — initializing research shell")
         init_graph_scheduler()
@@ -127,6 +130,7 @@ def _verify_schema_version() -> None:
     """Check that the connected DB schema matches the code's expected version."""
     try:
         from app.storage_migrations import POSTGRES_SCHEMA_VERSION
+
         if job_repo is not None:
             backend = getattr(job_repo, "backend", None) or "unknown"
             fencer = getattr(job_repo, "get_storage_status", None) or getattr(job_repo, "health_check", None)
@@ -163,6 +167,7 @@ def _verify_schema_version() -> None:
 def _verify_ssrf_transport() -> None:
     """Confirm the safe httpx transport factory still works."""
     from app.url_safety import verify_ssrf_self_check
+
     ssrf_check = verify_ssrf_self_check()
     if not ssrf_check.get("ok"):
         msg = (
@@ -187,6 +192,7 @@ def _verify_ssrf_transport() -> None:
 def _load_persisted_state(world_state_data: Any) -> None:
     """Restore job store and semantic world state from persistence."""
     from app.experimental_startup import restore_semantic_world_state
+
     restore_semantic_world_state(world_state_data, str(get_state_file_path()))
 
 
@@ -196,6 +202,7 @@ async def _schedule_all_background_tasks(gossip: Any, heartbeat_mgr: Any) -> lis
 
     # Gossip propagation (experimental)
     from app.experimental_startup import schedule_gossip_propagation
+
     gossip_task = await schedule_gossip_propagation(gossip, heartbeat_mgr, interval=settings.GOSSIP_PROPAGATION_INTERVAL)
     if gossip_task:
         tasks.append(gossip_task)
@@ -231,22 +238,26 @@ async def _shutdown_cleanup() -> None:
     """Shut down all runtime services gracefully."""
     # Persist semantic world state
     from app.experimental_startup import persist_semantic_world_state
+
     persist_semantic_world_state()
 
     # Flush state writes
     try:
         from app.state_store import flush_state_writes
+
         flush_state_writes()
     except (ImportError, OSError) as e:
         logger.warning("Failed to flush state writes during shutdown: %s", e)
 
     # Close Postgres connection pool
     from app.experimental_startup import close_postgres_pool
+
     close_postgres_pool()
 
     # Close browser pool
     try:
         from app.browser_pool import get_browser_pool
+
         await get_browser_pool().close()
         logger.info("Browser pool closed successfully")
     except _SHUTDOWN_EXCEPTIONS as e:
@@ -255,6 +266,7 @@ async def _shutdown_cleanup() -> None:
     # Close Telegram notifier
     try:
         from app.services.notifications import get_telegram_notifier
+
         _notifier = get_telegram_notifier()
         if _notifier is not None:
             await _notifier.close()
@@ -265,6 +277,7 @@ async def _shutdown_cleanup() -> None:
     # Shut down log persistence executor
     try:
         from app.services.job_runner import shutdown_log_persist_executor
+
         shutdown_log_persist_executor()
         logger.info("Log persistence executor shut down")
     except _SHUTDOWN_EXCEPTIONS as e:
@@ -281,11 +294,13 @@ async def lifespan(app: FastAPI):
     _warn_empty_api_keys()
 
     from app.runtime_deps import check_runtime_deps
+
     check_runtime_deps(fail_on_missing=(settings.ENV.lower() == "production"))
 
     gossip, heartbeat_mgr = _init_experimental_subsystems()
 
     from app.globals import rebuild_config_from_settings
+
     rebuild_config_from_settings()
 
     global job_repo
@@ -303,7 +318,7 @@ async def lifespan(app: FastAPI):
 
     _load_persisted_state(world_state_data)
 
-    _background_tasks = _schedule_all_background_tasks(gossip, heartbeat_mgr)
+    _background_tasks = await _schedule_all_background_tasks(gossip, heartbeat_mgr)
 
     yield
 

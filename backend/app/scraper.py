@@ -415,7 +415,7 @@ def _build_fetch_failure_result(
     url: str,
     fetch_method: str,
     classification: Any | None,
-    e: Exception,
+    e: Exception | None,
     start_time: float,
     telemetry: Any,
 ) -> ScrapeAttemptResult:
@@ -546,6 +546,76 @@ async def scrape_url_attempt(
     return result
 
 
+async def _execute_fetch_phase(
+    url: str,
+    attempt_ctx: AttemptContext | None,
+    usage_context: dict[str, Any] | None,
+    intel: Any,
+    strategy_engine: Any,
+    recommended_strategy: Any,
+) -> tuple[str, str, float, int, bool, float, Any]:
+    """Execute the fetch attempt with error handling.
+    Returns (html, fetch_method, js_render_delay, retry_count, success, fetch_ms, classification).
+    """
+    from app.strategy_evolution import FetchStrategy
+
+    fetch_success = False
+    classification = None
+    js_render_delay = 0.0
+    fetch_method = recommended_strategy.value
+    retry_count = 0
+    fetch_start = time.time()
+    try:
+        fetch_strategy = recommended_strategy
+        if attempt_ctx and getattr(attempt_ctx, "fetch_strategy", None):
+            with contextlib.suppress(ValueError):
+                if attempt_ctx.fetch_strategy is not None:
+                    fetch_strategy = FetchStrategy(attempt_ctx.fetch_strategy)
+        html, js_render_delay, fetch_method, retry_count = await fetch_page_content(
+            url,
+            preferred_method=fetch_strategy,
+            timeout_ms=attempt_ctx.timeout_ms if attempt_ctx else None,
+            hydration_wait_ms=attempt_ctx.hydration_wait_ms if attempt_ctx else None,
+            skip_networkidle=attempt_ctx.skip_networkidle if attempt_ctx else False,
+            scroll_attempts=attempt_ctx.scroll_attempts if attempt_ctx else None,
+            anti_bot_stealth=attempt_ctx.anti_bot_stealth if attempt_ctx else False,
+            extra_headers=attempt_ctx.extra_headers if attempt_ctx else None,
+            usage_context=usage_context,
+            cookies=attempt_ctx.cookies if attempt_ctx else None,
+        )
+        fetch_ms = (time.time() - fetch_start) * 1000
+        fetch_success = True
+    except (
+        RuntimeError,
+        OSError,
+        TypeError,
+        ValueError,
+        ImportError,
+        AttributeError,
+        httpx.HTTPError,
+        httpx.TimeoutException,
+    ) as e:
+        fetch_ms = (time.time() - fetch_start) * 1000
+        strategy_engine.record_fetch_attempt(
+            intel.domain,
+            recommended_strategy,
+            success=False,
+            time_ms=fetch_ms,
+            failure_reason=type(e).__name__,
+        )
+        classification = classify_failure(error_message=str(e), fetch_method=fetch_method)
+        get_regression_capture().maybe_capture(
+            url=url,
+            html=None,
+            failure_category=classification.category.value if classification else "unknown",
+            failure_confidence=classification.confidence if classification else 0.0,
+            records_count=0,
+            schema_fields=[],
+        )
+        html = ""
+    return html, fetch_method, js_render_delay, retry_count, fetch_success, fetch_ms, classification
+
+
 async def scrape_url(
     url: str,
     schema_fields: list[SchemaField],
@@ -572,10 +642,7 @@ async def scrape_url(
 
     from app.domain_intelligence import get_domain_intelligence
     from app.recovery_strategies import AttemptContext
-    from app.strategy_evolution import (  # research-shell, lazy
-        FetchStrategy,
-        get_strategy_evolution_engine,
-    )
+    from app.strategy_evolution import get_strategy_evolution_engine
 
     if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContext):
         attempt_ctx = None
@@ -633,13 +700,16 @@ async def scrape_url(
         return profile_result
 
     # ── Step 3: Generic extraction pipeline ───────────────────────
-    html, fetch_method, js_render_delay, retry_count, fetch_success, fetch_ms, classification = (
-        await _execute_fetch_phase(url, attempt_ctx, usage_context)
+    intel = get_domain_intelligence().get_intelligence(url)
+    strategy_engine = get_strategy_evolution_engine()
+    recommended_strategy = strategy_engine.evolve_strategy(intel.domain)
+    provenance_builder = ProvenanceBuilder(url, intel.domain)
+
+    html, fetch_method, js_render_delay, retry_count, fetch_success, fetch_ms, classification = await _execute_fetch_phase(
+        url, attempt_ctx, usage_context, intel, strategy_engine, recommended_strategy
     )
     if not fetch_success:
         return _build_fetch_failure_result(url, fetch_method, classification, None, start_time, telemetry)
-
-    intel = get_domain_intelligence().get_intelligence(url)
 
     get_crawl_policy().record_result(url, success=fetch_success)
 

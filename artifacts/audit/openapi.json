@@ -908,6 +908,449 @@
         "title": "InvitationResponse",
         "type": "object"
       },
+      "Job": {
+        "description": "A scraping job with its current state.",
+        "properties": {
+          "acquisition_mode": {
+            "default": "standard",
+            "description": "Acquisition mode: standard, aggressive, or deep_scan",
+            "maxLength": 16,
+            "title": "Acquisition Mode",
+            "type": "string"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "maxLength": 16384,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis"
+          },
+          "cancel_requested": {
+            "default": false,
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "cascade_telemetry": {
+            "additionalProperties": true,
+            "description": "Per-URL cascade layer telemetry: {url: {layer, score, duration_ms, quality_score}}",
+            "title": "Cascade Telemetry",
+            "type": "object"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom cookies to inject into requests/browser contexts",
+            "title": "Cookies",
+            "type": "object"
+          },
+          "created_at": {
+            "maxLength": 64,
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "default": "",
+            "description": "Owner identity (user ID or API key fingerprint) for data isolation",
+            "maxLength": 128,
+            "title": "Created By",
+            "type": "string"
+          },
+          "deduplicate": {
+            "default": true,
+            "title": "Deduplicate",
+            "type": "boolean"
+          },
+          "deduplicate_field": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Deduplicate Field",
+            "type": "string"
+          },
+          "discovered_urls": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Discovered Urls",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 8192,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "estimated_cost_usd": {
+            "default": 0.0,
+            "title": "Estimated Cost Usd",
+            "type": "number"
+          },
+          "fetch_strategy": {
+            "default": "",
+            "description": "User-requested fetch strategy. Empty means auto-select.",
+            "maxLength": 32,
+            "title": "Fetch Strategy",
+            "type": "string"
+          },
+          "filtered_records": {
+            "default": 0,
+            "title": "Filtered Records",
+            "type": "integer"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterRule"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom HTTP headers to send with requests",
+            "title": "Headers",
+            "type": "object"
+          },
+          "hydration_wait_ms": {
+            "anyOf": [
+              {
+                "maximum": 120000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User-overridable post-navigation hydration wait (milliseconds). None = use platform default.",
+            "title": "Hydration Wait Ms"
+          },
+          "id": {
+            "maxLength": 64,
+            "title": "Id",
+            "type": "string"
+          },
+          "intent": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Intent",
+            "type": "string"
+          },
+          "location": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Location",
+            "type": "string"
+          },
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/LogEntry"
+            },
+            "title": "Logs",
+            "type": "array"
+          },
+          "max_concurrent_urls": {
+            "default": 4,
+            "description": "Maximum number of URLs that can be fetched concurrently within this job.",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Concurrent Urls",
+            "type": "integer"
+          },
+          "max_distance_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Distance Km"
+          },
+          "max_pages": {
+            "default": 10,
+            "title": "Max Pages",
+            "type": "integer"
+          },
+          "max_per_domain": {
+            "default": 4,
+            "title": "Max Per Domain",
+            "type": "integer"
+          },
+          "min_record_score": {
+            "default": 0.35,
+            "title": "Min Record Score",
+            "type": "number"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ScrapeMode",
+            "default": "manual"
+          },
+          "name": {
+            "maxLength": 255,
+            "title": "Name",
+            "type": "string"
+          },
+          "org_id": {
+            "default": "",
+            "description": "Tenant org id; populated for persistent API keys (P0-SAAS-001)",
+            "maxLength": 128,
+            "title": "Org Id",
+            "type": "string"
+          },
+          "origin_location": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Origin Location",
+            "type": "string"
+          },
+          "pagination": {
+            "default": false,
+            "title": "Pagination",
+            "type": "boolean"
+          },
+          "preferred_domain": {
+            "default": "",
+            "maxLength": 253,
+            "title": "Preferred Domain",
+            "type": "string"
+          },
+          "progress_current": {
+            "default": 0,
+            "title": "Progress Current",
+            "type": "integer"
+          },
+          "progress_total": {
+            "default": 0,
+            "title": "Progress Total",
+            "type": "integer"
+          },
+          "project_id": {
+            "default": "",
+            "description": "Project id; populated for persistent API keys (P0-SAAS-001)",
+            "maxLength": 128,
+            "title": "Project Id",
+            "type": "string"
+          },
+          "quality_report": {
+            "additionalProperties": true,
+            "title": "Quality Report",
+            "type": "object"
+          },
+          "quality_score_summary": {
+            "default": 0.0,
+            "description": "Aggregate quality score across all records (0-1)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Quality Score Summary",
+            "type": "number"
+          },
+          "request_delay_ms": {
+            "default": 0,
+            "description": "Per-job delay between consecutive URL fetches (milliseconds). 0 = no delay (use platform throttle).",
+            "maximum": 60000.0,
+            "minimum": 0.0,
+            "title": "Request Delay Ms",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "results_file_path": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Path to the compressed results file",
+            "title": "Results File Path"
+          },
+          "results_on_disk": {
+            "default": false,
+            "description": "Whether results are stored in a compressed disk file",
+            "title": "Results On Disk",
+            "type": "boolean"
+          },
+          "schema_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SchemaField"
+            },
+            "title": "Schema Fields",
+            "type": "array"
+          },
+          "scroll_attempts": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User-overridable number of scroll attempts before content extraction. None = use platform default.",
+            "title": "Scroll Attempts"
+          },
+          "search_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Search parameters for session-bound URL recovery",
+            "title": "Search Params"
+          },
+          "selectors_map": {
+            "additionalProperties": true,
+            "description": "Pre-discovered CSS selectors map from URL analysis",
+            "title": "Selectors Map",
+            "type": "object"
+          },
+          "source_policy": {
+            "$ref": "#/components/schemas/SourcePolicy",
+            "default": "all_sources"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "default": "pending"
+          },
+          "topic": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Topic",
+            "type": "string"
+          },
+          "total_llm_calls": {
+            "default": 0,
+            "title": "Total Llm Calls",
+            "type": "integer"
+          },
+          "total_records": {
+            "default": 0,
+            "title": "Total Records",
+            "type": "integer"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Urls",
+            "type": "array"
+          },
+          "warnings": {
+            "description": "Job warning logs and anomaly reports",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "webhook_delivered": {
+            "default": false,
+            "description": "Whether the job-completion webhook was delivered",
+            "title": "Webhook Delivered",
+            "type": "boolean"
+          },
+          "webhook_delivered_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO timestamp when webhook was last delivered",
+            "title": "Webhook Delivered At"
+          },
+          "webhook_secret": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "HMAC-SHA256 secret for signing webhook payloads",
+            "title": "Webhook Secret"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL to POST job-completion webhook to",
+            "title": "Webhook Url"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
       "JobCreate": {
         "description": "Request body to create a new scraping job.",
         "properties": {
@@ -1291,6 +1734,20 @@
         "title": "JobHeadersUpdate",
         "type": "object"
       },
+      "JobStatus": {
+        "enum": [
+          "pending",
+          "discovering",
+          "running",
+          "completed",
+          "degraded",
+          "empty_result",
+          "canceled",
+          "failed"
+        ],
+        "title": "JobStatus",
+        "type": "string"
+      },
       "JobStrategyUpdate": {
         "description": "Request body to update a job's fetch strategy.",
         "properties": {
@@ -1338,6 +1795,32 @@
           }
         },
         "title": "JobWebhookUpdate",
+        "type": "object"
+      },
+      "LogEntry": {
+        "description": "A single log entry for a job.",
+        "properties": {
+          "level": {
+            "default": "info",
+            "maxLength": 16,
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 8192,
+            "title": "Message",
+            "type": "string"
+          },
+          "timestamp": {
+            "maxLength": 64,
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "LogEntry",
         "type": "object"
       },
       "LowConfidenceSelectorItem": {
@@ -3663,7 +4146,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Jobs Api Jobs Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3832,7 +4319,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
               }
             },
             "description": "Successful Response"
@@ -4115,7 +4604,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4166,7 +4657,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4322,7 +4815,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4373,7 +4868,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -4598,7 +5095,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Recycle Bin Api Recycle Bin Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"

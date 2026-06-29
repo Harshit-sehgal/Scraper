@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -864,14 +865,19 @@ _BUILTIN_HANDLERS: dict[RecoveryAction, Callable] = {
 # Global singleton executor
 _executor: RecoveryExecutor | None = None
 _strategist: RecoveryStrategist | None = None
+_executor_lock = threading.Lock()
+_strategist_lock = threading.Lock()
 
 
 def get_recovery_executor() -> RecoveryExecutor:
     """Get the global recovery executor with built-in handlers registered."""
     global _executor
-    if _executor is None:
-        _executor = RecoveryExecutor()
-        _register_builtin_handlers(_executor)
+    if _executor is not None:
+        return _executor
+    with _executor_lock:
+        if _executor is None:
+            _executor = RecoveryExecutor()
+            _register_builtin_handlers(_executor)
     return _executor
 
 
@@ -884,6 +890,9 @@ def _register_builtin_handlers(executor: RecoveryExecutor) -> None:
 def get_recovery_strategist() -> RecoveryStrategist:
     """Get the global recovery strategist."""
     global _strategist
-    if _strategist is None:
-        _strategist = RecoveryStrategist()
+    if _strategist is not None:
+        return _strategist
+    with _strategist_lock:
+        if _strategist is None:
+            _strategist = RecoveryStrategist()
     return _strategist

@@ -21,6 +21,7 @@ Alerts:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
@@ -386,11 +387,15 @@ class DomainHealthMonitor:
 
 # Global singleton
 _monitor: DomainHealthMonitor | None = None
+_monitor_lock = threading.Lock()
 
 
 def get_domain_health_monitor() -> DomainHealthMonitor:
     """Get the global domain health monitor."""
     global _monitor
-    if _monitor is None:
-        _monitor = DomainHealthMonitor()
+    if _monitor is not None:
+        return _monitor
+    with _monitor_lock:
+        if _monitor is None:
+            _monitor = DomainHealthMonitor()
     return _monitor

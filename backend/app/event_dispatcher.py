@@ -75,18 +75,21 @@ class EventDispatcher:
 # Global Dispatcher
 _dispatcher = EventDispatcher()
 _bootstrap_done = False
+_bootstrap_lock = threading.Lock()
 
 
 def get_dispatcher() -> EventDispatcher:
     global _bootstrap_done
     if not _bootstrap_done:
-        # Safe: graph_update_scheduler uses lazy singleton creation,
-        # so importing the module does NOT trigger __init__ or event_dispatcher
-        # import.
-        from app.graph_update_scheduler import get_scheduler
+        with _bootstrap_lock:
+            if not _bootstrap_done:
+                # Safe: graph_update_scheduler uses lazy singleton creation,
+                # so importing the module does NOT trigger __init__ or
+                # event_dispatcher import.
+                from app.graph_update_scheduler import get_scheduler
 
-        get_scheduler()
-        _bootstrap_done = True
+                get_scheduler()
+                _bootstrap_done = True
     return _dispatcher
 
 

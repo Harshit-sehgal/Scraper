@@ -376,11 +376,15 @@ class DomainEvolutionModel:
 
 # Global singleton
 _evolution_model: DomainEvolutionModel | None = None
+_evolution_model_lock = threading.Lock()
 
 
 def get_domain_evolution_model() -> DomainEvolutionModel:
     """Get the global domain evolution model."""
     global _evolution_model
-    if _evolution_model is None:
-        _evolution_model = DomainEvolutionModel()
+    if _evolution_model is not None:
+        return _evolution_model
+    with _evolution_model_lock:
+        if _evolution_model is None:
+            _evolution_model = DomainEvolutionModel()
     return _evolution_model

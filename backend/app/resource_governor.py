@@ -10,6 +10,7 @@ Provides:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -153,11 +154,15 @@ class ResourceGovernor:
 
 # Global singleton
 _resource_governor: ResourceGovernor | None = None
+_resource_governor_lock = threading.Lock()
 
 
 def get_resource_governor() -> ResourceGovernor:
     """Get the global resource governor context."""
     global _resource_governor
-    if _resource_governor is None:
-        _resource_governor = ResourceGovernor()
+    if _resource_governor is not None:
+        return _resource_governor
+    with _resource_governor_lock:
+        if _resource_governor is None:
+            _resource_governor = ResourceGovernor()
     return _resource_governor

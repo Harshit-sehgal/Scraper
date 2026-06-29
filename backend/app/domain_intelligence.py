@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -162,10 +163,14 @@ class DomainIntelligenceRegistry:
 
 # Global Singleton
 _registry: DomainIntelligenceRegistry | None = None
+_registry_lock = threading.Lock()
 
 
 def get_domain_intelligence() -> DomainIntelligenceRegistry:
     global _registry
-    if _registry is None:
-        _registry = DomainIntelligenceRegistry()
+    if _registry is not None:
+        return _registry
+    with _registry_lock:
+        if _registry is None:
+            _registry = DomainIntelligenceRegistry()
     return _registry

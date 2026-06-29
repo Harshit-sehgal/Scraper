@@ -1212,6 +1212,7 @@ class SubstratePluginManager:
 
 
 _manager: SubstratePluginManager | None = None
+_manager_lock = __import__("threading").Lock()
 _call_count = 0
 _call_count_lock = __import__("threading").Lock()
 
@@ -1234,12 +1235,16 @@ def _record_call() -> None:
 
 def get_plugin_manager(ws: Any = None) -> SubstratePluginManager:
     global _manager
-    if _manager is None:
-        _manager = SubstratePluginManager(ws=ws)
+    if _manager is not None:
+        return _manager
+    with _manager_lock:
+        if _manager is None:
+            _manager = SubstratePluginManager(ws=ws)
     return _manager
 
 
 def reset_plugin_manager() -> None:
     """Reset the global plugin manager (for testing)."""
     global _manager
-    _manager = None
+    with _manager_lock:
+        _manager = None

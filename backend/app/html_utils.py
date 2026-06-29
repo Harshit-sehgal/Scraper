@@ -416,7 +416,11 @@ async def _try_httpx_strategies(
 
     try:
         html, delay, method, retries = await _fetch_with_httpx(
-            url, strategy=strategy, extra_headers=extra_headers, timeout_ms=timeout_ms, cookies=cookies,
+            url,
+            strategy=strategy,
+            extra_headers=extra_headers,
+            timeout_ms=timeout_ms,
+            cookies=cookies,
         )
         if html and detect_anti_bot(html) < 0.7:
             return html, delay, method, retries
@@ -604,6 +608,7 @@ async def _collect_playwright_results(
         cookie_header = build_cookie_header(raw_cookies)
         if cookie_header:
             from app.anti_bot_engine import get_anti_bot_engine
+
             get_anti_bot_engine().update_cookies(domain, cookie_header)
     except Exception as cookie_err:
         logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
@@ -635,23 +640,25 @@ async def _detect_anti_bot_and_fallback(
     anti_bot_keywords = {"captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"}
     is_antibot = False
     try:
-        if (html_content and detect_anti_bot(html_content) > 0.5) or any(
-            marker in err_msg for marker in anti_bot_keywords
-        ):
+        if (html_content and detect_anti_bot(html_content) > 0.5) or any(marker in err_msg for marker in anti_bot_keywords):
             is_antibot = True
     except Exception:
         is_antibot = any(marker in err_msg for marker in anti_bot_keywords)
 
     if is_antibot:
         logger.exception(
-            "[Scraper] Anti-bot challenge detected for %s. Refusing naive HTTP fallback to prevent IP ban.", url,
+            "[Scraper] Anti-bot challenge detected for %s. Refusing naive HTTP fallback to prevent IP ban.",
+            url,
         )
         _ab_msg = f"Anti-bot challenge detected: {e}"
         raise ValueError(_ab_msg) from e
 
     logger.exception("[Scraper] Playwright failed for %s. Final fallback to httpx_basic", url)
     return await _fetch_with_httpx(
-        url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=extra_headers, timeout_ms=timeout_ms,
+        url,
+        strategy=FetchStrategy.HTTPX_BASIC,
+        extra_headers=extra_headers,
+        timeout_ms=timeout_ms,
     )
 
 
@@ -689,14 +696,23 @@ async def fetch_page_content(
         browser_meter_started_at = time.monotonic()
         if not _record_browser_minutes(usage_context=usage_context, url=url, method=method_used, quantity=1, phase="initial"):
             logger.warning("[Scraper] Browser-minute quota exhausted for %s. Falling back to httpx_basic", url)
-            return await _fetch_with_httpx(url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=extra_headers, timeout_ms=timeout_ms)
+            return await _fetch_with_httpx(
+                url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=extra_headers, timeout_ms=timeout_ms
+            )
         browser_metered_initial = True
 
         pool = get_browser_pool()
         context, page, network_payloads = await _setup_playwright_page(pool, domain, strategy, url, cookies, extra_headers)
 
         js_render_delay_ms = await _playwright_navigate_and_stabilize(
-            page, url, strategy, timeout_ms, skip_networkidle, hydration_wait_ms, scroll_attempts, domain,
+            page,
+            url,
+            strategy,
+            timeout_ms,
+            skip_networkidle,
+            hydration_wait_ms,
+            scroll_attempts,
+            domain,
         )
 
         html = await _collect_playwright_results(page, context, url, domain, network_payloads)
@@ -713,8 +729,12 @@ async def fetch_page_content(
             extra_minutes = billable_minutes - 1
             if extra_minutes > 0:
                 _record_browser_minutes(
-                    usage_context=usage_context, url=url, method=method_used,
-                    quantity=extra_minutes, phase="additional", duration_ms=elapsed_seconds * 1000,
+                    usage_context=usage_context,
+                    url=url,
+                    method=method_used,
+                    quantity=extra_minutes,
+                    phase="additional",
+                    duration_ms=elapsed_seconds * 1000,
                 )
         if page:
             with suppress(Exception):
@@ -771,6 +791,7 @@ async def _follow_httpx_redirects(client: httpx.AsyncClient, url: str, strategy:
                 return next_resp
 
             from urllib.parse import urljoin
+
             redirect_url = urljoin(str(next_resp.url), redirect_target)
             _validate_url_safe(redirect_url)
             await next_resp.aclose()
@@ -838,13 +859,20 @@ async def _fetch_with_httpx(
                     wait = settings.HTTP_BACKOFF_FACTOR * (attempt + 1)
                     logger.warning(
                         "[Scraper] %s attempt %d/%d failed for %s: %s. Retrying in %.1fs",
-                        strategy.value, attempt + 1, settings.MAX_RETRIES, url, e, wait,
+                        strategy.value,
+                        attempt + 1,
+                        settings.MAX_RETRIES,
+                        url,
+                        e,
+                        wait,
                     )
                     await asyncio.sleep(wait)
                 else:
                     logger.exception(
                         "[Scraper] %s failed after %d attempts for %s. Final fallback to httpx_basic",
-                        strategy.value, settings.MAX_RETRIES, url,
+                        strategy.value,
+                        settings.MAX_RETRIES,
+                        url,
                     )
                     raise
     return "", 0.0, method_used, 0

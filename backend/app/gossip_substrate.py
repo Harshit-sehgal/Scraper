@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
@@ -402,17 +403,22 @@ class GossipSubstrate:
 
 # Global singleton - will be initialized with node ID
 _substrate: GossipSubstrate | None = None
+_substrate_lock = threading.Lock()
 
 
 def get_gossip_substrate(node_id: str = "default") -> GossipSubstrate:
     """Get or create the global gossip substrate."""
     global _substrate
-    if _substrate is None:
-        _substrate = GossipSubstrate(node_id)
+    if _substrate is not None:
+        return _substrate
+    with _substrate_lock:
+        if _substrate is None:
+            _substrate = GossipSubstrate(node_id)
     return _substrate
 
 
 def reset_gossip_substrate(node_id: str = "default") -> None:
     """Reset the global gossip substrate (useful for testing)."""
     global _substrate
-    _substrate = GossipSubstrate(node_id)
+    with _substrate_lock:
+        _substrate = GossipSubstrate(node_id)

@@ -63,20 +63,22 @@ MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 # Each entry includes the rationale inline so the exemption list is auditable.
 # These endpoints are still covered by body-size caps, rate limiting, and
 # other security middlewares.
-_PUBLIC_API_PATHS: frozenset[str] = frozenset({
-    # CSP violation reports are sent by browsers, which cannot carry API keys.
-    "/api/system/csp-violations",
-    # Session management endpoints use their own auth (exchanging key for cookie).
-    "/api/session",
-    "/api/session/me",
-    # Password reset endpoints are called by unauthenticated users in reset flows.
-    "/api/saas/password-reset/request",
-    "/api/saas/password-reset/reset",
-    # Self-service signup is intentionally public.
-    "/api/saas/signup",
-    # Billing webhooks are called by PayPal/Stripe, which do not carry DataForge keys.
-    "/api/billing/webhook",
-})
+_PUBLIC_API_PATHS: frozenset[str] = frozenset(
+    {
+        # CSP violation reports are sent by browsers, which cannot carry API keys.
+        "/api/system/csp-violations",
+        # Session management endpoints use their own auth (exchanging key for cookie).
+        "/api/session",
+        "/api/session/me",
+        # Password reset endpoints are called by unauthenticated users in reset flows.
+        "/api/saas/password-reset/request",
+        "/api/saas/password-reset/reset",
+        # Self-service signup is intentionally public.
+        "/api/saas/signup",
+        # Billing webhooks are called by PayPal/Stripe, which do not carry DataForge keys.
+        "/api/billing/webhook",
+    }
+)
 
 _PUBLIC_API_PREFIXES: tuple[str, ...] = (
     # Stub-return page is a browser redirect URL (dev-only, displays confirmation only).
@@ -93,10 +95,8 @@ def _is_public_api_path(path: str) -> bool:
 
 def _is_cors_preflight(request: Request) -> bool:
     """Return True if this is a CORS preflight OPTIONS request."""
-    return (
-        request.method == "OPTIONS"
-        and request.headers.get("Origin")
-        and request.headers.get("Access-Control-Request-Method")
+    return bool(
+        request.method == "OPTIONS" and request.headers.get("Origin") and request.headers.get("Access-Control-Request-Method")
     )
 
 

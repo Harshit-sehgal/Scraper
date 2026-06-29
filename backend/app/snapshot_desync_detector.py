@@ -396,17 +396,22 @@ class SnapshotDesyncDetector:
 
 # Global singleton
 _detector: SnapshotDesyncDetector | None = None
+_detector_lock = threading.Lock()
 
 
 def get_desync_detector() -> SnapshotDesyncDetector:
     """Get or create the global SnapshotDesyncDetector instance."""
     global _detector
-    if _detector is None:
-        _detector = SnapshotDesyncDetector()
+    if _detector is not None:
+        return _detector
+    with _detector_lock:
+        if _detector is None:
+            _detector = SnapshotDesyncDetector()
     return _detector
 
 
 def reset_desync_detector() -> None:
     """Reset the global detector (for testing)."""
     global _detector
-    _detector = None
+    with _detector_lock:
+        _detector = None

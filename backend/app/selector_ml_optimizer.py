@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -440,11 +441,15 @@ class SelectorOptimizationEngine:
 
 # Global singleton
 _optimizer: SelectorOptimizationEngine | None = None
+_optimizer_lock = threading.Lock()
 
 
 def get_selector_optimizer() -> SelectorOptimizationEngine:
     """Get the global selector optimization engine."""
     global _optimizer
-    if _optimizer is None:
-        _optimizer = SelectorOptimizationEngine()
+    if _optimizer is not None:
+        return _optimizer
+    with _optimizer_lock:
+        if _optimizer is None:
+            _optimizer = SelectorOptimizationEngine()
     return _optimizer

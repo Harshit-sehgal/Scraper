@@ -38,6 +38,7 @@ from app.models import (
     JobStrategyUpdate,
     JobWebhookUpdate,
     SchemaSuggestionRequest,
+    StatusResponse,
 )
 from app.plan_enforcer import require_plan_limit
 from app.routers.jobs_state import (
@@ -198,7 +199,7 @@ def register_jobs_write_routes(
         service = JobRecleanerService(manager)
         return await service.reclean_job(job_id, role, user_id, org_id, project_id)
 
-    @router.patch("/api/jobs/{job_id}/headers")
+    @router.patch("/api/jobs/{job_id}/headers", response_model=StatusResponse)
     async def update_job_headers(
         job_id: str,
         body: JobHeadersUpdate,
@@ -220,7 +221,7 @@ def register_jobs_write_routes(
             cookies=body.cookies,
         )
 
-    @router.patch("/api/jobs/{job_id}/webhook")
+    @router.patch("/api/jobs/{job_id}/webhook", response_model=StatusResponse)
     async def update_job_webhook(
         job_id: str,
         body: JobWebhookUpdate,
@@ -278,7 +279,7 @@ def register_jobs_write_routes(
             await run_in_threadpool(repo.save_single, job)
         return {"job_id": job_id, "delivered": success}
 
-    @router.patch("/api/jobs/{job_id}/strategy")
+    @router.patch("/api/jobs/{job_id}/strategy", response_model=StatusResponse)
     async def update_job_strategy(
         job_id: str,
         body: JobStrategyUpdate,
@@ -306,7 +307,7 @@ def register_jobs_write_routes(
             "status": "success",
         }
 
-    @router.patch("/api/jobs/{job_id}/extraction")
+    @router.patch("/api/jobs/{job_id}/extraction", response_model=StatusResponse)
     async def update_job_extraction(
         job_id: str,
         body: JobExtractionUpdate,

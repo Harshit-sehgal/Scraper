@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_rbac_event
-from app.models import JobStatus
+from app.models import Job, JobStatus
 from app.routers.jobs_state import JobStoreManager, is_worker_mode
 from app.services.job_state_machine import sync_from_db
 from app.storage_interface import get_job_repository
@@ -137,7 +137,7 @@ def _auth_tuple(auth) -> tuple:
 def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> None:
     """Register all read-only job endpoints on the given router."""
 
-    @router.get("/api/jobs")
+    @router.get("/api/jobs", response_model=dict)
     async def list_jobs(
         auth: Annotated[
             tuple[UserRole, str, str, str],
@@ -225,7 +225,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
             return {"jobs": summaries, "next_cursor": next_cursor}
 
-    @router.get("/api/jobs/{job_id}")
+    @router.get("/api/jobs/{job_id}", response_model=Job)
     async def get_job(
         job_id: str,
         auth: Annotated[
@@ -414,7 +414,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             "next_offset": next_offset,
         }
 
-    @router.get("/api/recycle_bin")
+    @router.get("/api/recycle_bin", response_model=dict)
     async def list_recycle_bin(
         auth: Annotated[
             tuple[UserRole, str, str, str],

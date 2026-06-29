@@ -6,6 +6,7 @@ field pressure, task priority, and real-time urgency.
 
 import heapq
 import logging
+import threading
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -213,23 +214,25 @@ class GraphUpdateScheduler:
 
 
 _scheduler: Any = None
-_initializing = False
+_scheduler_lock = threading.Lock()
 
 
 def get_scheduler() -> GraphUpdateScheduler | None:
-    global _scheduler, _initializing
-    if _scheduler is None:
-        if _initializing:
-            return None
-        _initializing = True
-        try:
-            _scheduler = GraphUpdateScheduler()
-        finally:
-            _initializing = False
+    global _scheduler
+    if _scheduler is not None:
+        return _scheduler
+    with _scheduler_lock:
+        if _scheduler is None:
+            try:
+                _scheduler = GraphUpdateScheduler()
+            except Exception:
+                logger.exception("GraphUpdateScheduler init failed")
+                return None
     return _scheduler
 
 
 def reset_scheduler() -> None:
     """Reset the global scheduler (for testing)."""
     global _scheduler
-    _scheduler = None
+    with _scheduler_lock:
+        _scheduler = None

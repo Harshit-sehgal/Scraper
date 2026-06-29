@@ -6,6 +6,7 @@ Provides high-level orchestration, state governance, and topological search.
 """
 
 import logging
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -240,16 +241,21 @@ class SemanticOS:
 
 
 _os_instance: SemanticOS | None = None
+_os_instance_lock = threading.Lock()
 
 
 def get_semantic_os() -> SemanticOS:
     global _os_instance
-    if _os_instance is None:
-        _os_instance = SemanticOS()
+    if _os_instance is not None:
+        return _os_instance
+    with _os_instance_lock:
+        if _os_instance is None:
+            _os_instance = SemanticOS()
     return _os_instance
 
 
 def reset_semantic_os() -> None:
     """Reset the global Semantic OS instance (for testing)."""
     global _os_instance
-    _os_instance = None
+    with _os_instance_lock:
+        _os_instance = None

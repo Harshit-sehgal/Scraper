@@ -16,6 +16,7 @@ Governance constraints
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -248,15 +249,20 @@ class DomainRuntimePolicy:
 # ── Global singleton ──────────────────────────────────────────────────────
 
 _policy: DomainRuntimePolicy | None = None
+_policy_lock = threading.Lock()
 
 
 def get_domain_runtime_policy() -> DomainRuntimePolicy:
     global _policy
-    if _policy is None:
-        _policy = DomainRuntimePolicy()
+    if _policy is not None:
+        return _policy
+    with _policy_lock:
+        if _policy is None:
+            _policy = DomainRuntimePolicy()
     return _policy
 
 
 def reset_domain_runtime_policy() -> None:
     global _policy
-    _policy = None
+    with _policy_lock:
+        _policy = None
