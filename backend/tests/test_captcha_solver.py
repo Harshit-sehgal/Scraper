@@ -64,6 +64,47 @@ class TestTwoCaptchaSolver:
         assert _TwoCaptchaSolver._map_method("turnstile") == "turnstile"
         assert _TwoCaptchaSolver._map_method("unknown") == "userrecaptcha"
 
+    @pytest.mark.asyncio
+    async def test_solve_returns_none_on_timeout(self) -> None:
+        """Timeout should return None gracefully."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        def _mock_resp(status: int, json_data: dict) -> MagicMock:
+            resp = MagicMock()
+            resp.status_code = status
+            resp.json.return_value = json_data
+            resp.raise_for_status.return_value = None
+            resp.aclose = AsyncMock()
+            return resp
+
+        solver = _TwoCaptchaSolver("fake-key", timeout_s=1)
+        mock_client = MagicMock(spec=["post", "get"])
+        mock_client.post.return_value = _mock_resp(200, {"status": 1, "request": "12345"})
+        mock_client.get.return_value = _mock_resp(200, {"status": 0, "request": "CAPCHA_NOT_READY"})
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = mock_client
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_context):
+            result = await solver.solve(site_key="abc", page_url="https://x.com")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_solve_returns_none_on_http_error(self) -> None:
+        """Service-unavailable (HTTP error) should return None gracefully."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        import httpx
+
+        solver = _TwoCaptchaSolver("fake-key", timeout_s=30)
+        mock_client = MagicMock(spec=["post", "get"])
+        mock_client.post.side_effect = httpx.HTTPError("Service unavailable")
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = mock_client
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_context):
+            result = await solver.solve(site_key="abc", page_url="https://x.com")
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # _AntiCaptchaSolver
@@ -81,6 +122,49 @@ class TestAntiCaptchaSolver:
         assert _AntiCaptchaSolver._map_task_type("hcaptcha") == "HCaptchaTaskProxyless"
         assert _AntiCaptchaSolver._map_task_type("turnstile") == "TurnstileTaskProxyless"
         assert _AntiCaptchaSolver._map_task_type("unknown") == "NoCaptchaTaskProxyless"
+
+    @pytest.mark.asyncio
+    async def test_solve_returns_none_on_timeout(self) -> None:
+        """Anti-Captcha poll loop timeout should return None gracefully."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        def _mock_resp(status: int, json_data: dict) -> MagicMock:
+            resp = MagicMock()
+            resp.status_code = status
+            resp.json.return_value = json_data
+            resp.raise_for_status.return_value = None
+            resp.aclose = AsyncMock()
+            return resp
+
+        solver = _AntiCaptchaSolver("fake-key", timeout_s=1)
+        mock_client = MagicMock(spec=["post"])
+        mock_client.post.side_effect = [
+            _mock_resp(200, {"errorId": 0, "taskId": 999}),
+            _mock_resp(200, {"errorId": 0, "status": "processing"}),
+        ]
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = mock_client
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_context):
+            result = await solver.solve(site_key="abc", page_url="https://x.com")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_solve_returns_none_on_http_error(self) -> None:
+        """Anti-Captcha service unavailable (HTTP error) should return None."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        import httpx
+
+        solver = _AntiCaptchaSolver("fake-key", timeout_s=30)
+        mock_client = MagicMock(spec=["post"])
+        mock_client.post.side_effect = httpx.HTTPError("Service unavailable")
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = mock_client
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_context):
+            result = await solver.solve(site_key="abc", page_url="https://x.com")
+        assert result is None
 
 
 # ---------------------------------------------------------------------------

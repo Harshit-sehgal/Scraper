@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-29 08:09:35 UTC
+**Generated:** 2026-06-29 08:34:05 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
@@ -34,13 +34,13 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `POST` | `/api/jobs` | `app.routers.jobs_write` | `create_job` | stable | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role |  | JobCreateResponse | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/cleanup/terminal` | `app.routers.jobs_write` | `clear_terminal_jobs` | stable | protected | admin | require_role |  | ClearTerminalResponse | require_role/admin-only dependency |
 | `DELETE` | `/api/jobs/{job_id}` | `app.routers.jobs_write` | `delete_job` | stable | protected | admin | require_role |  | dict | require_role/admin-only dependency |
-| `GET` | `/api/jobs/{job_id}` | `app.routers.jobs_read` | `get_job` | stable | protected | authenticated-user | require_principal |  | Job | route dependency accepts admin/operator/user |
+| `GET` | `/api/jobs/{job_id}` | `app.routers.jobs_read` | `get_job` | stable | protected | authenticated-user | require_principal |  | dict | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs/{job_id}/cancel` | `app.routers.jobs_write` | `cancel_job` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/events` | `app.routers.jobs_read` | `get_job_events` | stable | protected | authenticated-user | require_principal |  | JobEventsResponse | route dependency accepts admin/operator/user |
 | `GET` | `/api/jobs/{job_id}/export/csv` | `app.routers.exports` | `export_csv` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/excel` | `app.routers.exports` | `export_excel` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/export/json` | `app.routers.exports` | `export_json` | stable | protected | operator-or-admin | require_principal |  |  | route dependency accepts admin/operator |
-| `PATCH` | `/api/jobs/{job_id}/extraction` | `app.routers.jobs_write` | `update_job_extraction` | stable | protected | operator-or-admin | require_principal |  | StatusResponse | route dependency accepts admin/operator |
+| `PATCH` | `/api/jobs/{job_id}/extraction` | `app.routers.jobs_write` | `update_job_extraction` | stable | protected | operator-or-admin | require_principal |  | JobExtractionUpdateResponse | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/headers` | `app.routers.jobs_write` | `update_job_headers` | stable | protected | operator-or-admin | require_principal |  | StatusResponse | route dependency accepts admin/operator |
 | `POST` | `/api/jobs/{job_id}/reclean` | `app.routers.jobs_write` | `reclean_job` | stable | protected | operator-or-admin | require_principal |  | dict | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/results` | `app.routers.jobs_read` | `get_job_results` | stable | protected | authenticated-user | require_principal |  | JobResultsResponse | route dependency accepts admin/operator/user |

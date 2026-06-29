@@ -165,6 +165,4 @@ def test_classification_matrix(html: str, has_schema: bool, expected_type: PageT
     """Each canonical input maps to its expected type."""
     record_count = 10 if expected_type == PageType.SEARCH_RESULTS else 1
     result = classify_page_type(html, has_schema_org=has_schema, record_count=record_count)
-    assert result.page_type == expected_type, (
-        f"HTML hint '{html[:60]}' expected {expected_type} got {result.page_type}"
-    )
+    assert result.page_type == expected_type, f"HTML hint '{html[:60]}' expected {expected_type} got {result.page_type}"

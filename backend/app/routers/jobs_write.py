@@ -35,6 +35,7 @@ from app.models import (
     JobCreate,
     JobCreateResponse,
     JobExtractionUpdate,
+    JobExtractionUpdateResponse,
     JobHeadersUpdate,
     JobStatus,
     JobStrategyUpdate,
@@ -309,7 +310,7 @@ def register_jobs_write_routes(
             "status": "success",
         }
 
-    @router.patch("/api/jobs/{job_id}/extraction", response_model=StatusResponse)
+    @router.patch("/api/jobs/{job_id}/extraction", response_model=JobExtractionUpdateResponse)
     async def update_job_extraction(
         job_id: str,
         body: JobExtractionUpdate,

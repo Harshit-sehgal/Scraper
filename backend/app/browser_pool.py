@@ -100,12 +100,19 @@ class BrowserPool:
         browser_args = []
         if settings.BROWSER_SECURITY_HARDENING:
             browser_args.extend(
-                ["--disable-dev-shm-usage", "--disable-extensions", "--disable-background-networking",
-                 "--disable-default-apps", "--disable-gpu", "--no-first-run"],
+                [
+                    "--disable-dev-shm-usage",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    "--disable-default-apps",
+                    "--disable-gpu",
+                    "--no-first-run",
+                ],
             )
         try:
             self._browser = await self._playwright.chromium.launch(
-                headless=settings.PLAYWRIGHT_HEADLESS, args=browser_args or None,
+                headless=settings.PLAYWRIGHT_HEADLESS,
+                args=browser_args or None,
             )
         except (Error, OSError, RuntimeError):
             self.crash_count += 1
@@ -113,12 +120,14 @@ class BrowserPool:
             self._release_process_slot()
             try:
                 from app.metrics_collector import record_browser_launch
+
                 record_browser_launch(success=False)
             except (ImportError, RuntimeError, ValueError):
                 logger.debug("[BrowserPool] Failed to record browser launch failure metric")
             raise
         try:
             from app.metrics_collector import record_browser_launch
+
             record_browser_launch(success=True)
         except (ImportError, RuntimeError, ValueError):
             logger.debug("[BrowserPool] Failed to record browser launch success metric")
@@ -148,12 +157,16 @@ class BrowserPool:
     def _build_stealth_context_options(self, domain: str) -> dict[str, Any]:
         """Build context options from anti-bot stealth profile."""
         from app.anti_bot_engine import get_anti_bot_engine
+
         sp = get_anti_bot_engine().get_stealth_profile(domain)
         return {
-            "user_agent": sp["user_agent"], "viewport": sp["viewport"],
+            "user_agent": sp["user_agent"],
+            "viewport": sp["viewport"],
             "device_scale_factor": sp["device_scale_factor"],
-            "is_mobile": False, "has_touch": False,
-            "locale": sp["locale"], "timezone_id": sp["timezone"],
+            "is_mobile": False,
+            "has_touch": False,
+            "locale": sp["locale"],
+            "timezone_id": sp["timezone"],
         }
 
     def _build_default_context_options(self) -> dict[str, Any]:
@@ -161,7 +174,9 @@ class BrowserPool:
         return {
             "user_agent": settings.USER_AGENT,
             "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
-            "device_scale_factor": 1.0, "is_mobile": False, "has_touch": False,
+            "device_scale_factor": 1.0,
+            "is_mobile": False,
+            "has_touch": False,
             "locale": settings.STEALTH_DEFAULT_LOCALE,
             "timezone_id": settings.STEALTH_TIMEZONE_POOL.split(",")[0],
         }
@@ -176,12 +191,14 @@ class BrowserPool:
         except (Error, OSError, RuntimeError):
             try:
                 from app.metrics_collector import record_browser_context_failed
+
                 record_browser_context_failed()
             except (ImportError, RuntimeError, ValueError):
                 logger.debug("[BrowserPool] Failed to record browser context failure metric")
             raise
         try:
             from app.metrics_collector import record_browser_context_created
+
             record_browser_context_created()
         except (ImportError, RuntimeError, ValueError):
             logger.debug("[BrowserPool] Failed to record browser context creation metric")
@@ -191,6 +208,7 @@ class BrowserPool:
         """Inject anti-bot engine cookies into a Playwright context."""
         try:
             from app.anti_bot_engine import get_anti_bot_engine
+
             cookie_string = get_anti_bot_engine().get_cookies(domain)
             if cookie_string:
                 parsed_cookies = _parse_cookie_string_for_playwright(cookie_string, domain)
@@ -202,6 +220,7 @@ class BrowserPool:
 
     def _register_page_tracking(self, context: BrowserContext) -> None:
         """Register page creation/close event handlers for the context."""
+
         def on_page(page) -> None:
             with self._counter_lock:
                 self._active_fetches += 1
@@ -252,6 +271,7 @@ class BrowserPool:
             return
 
         import random
+
         _webgl_vendors = [
             ("Intel Open Source Technology Center", "Intel(R) HD Graphics 630"),
             ("Intel Open Source Technology Center", "Mesa DRI Intel(R) UHD Graphics 630"),
@@ -262,7 +282,7 @@ class BrowserPool:
             ("AMD", "Radeon(TM) RX 470 Graphics"),
             ("Intel Open Source Technology Center", "Mesa Intel(R) UHD Graphics 770"),
         ]
-        gl_vendor, gl_renderer = random.choice(_webgl_vendors)
+        gl_vendor, gl_renderer = random.choice(_webgl_vendors)  # nosec B311 - fingerprint pool selection, not crypto
         hw_concurrency = settings.STEALTH_HARDWARE_CONCURRENCY
         advanced_js = f"""
         const getParameter = WebGLRenderingContext.prototype.getParameter;
@@ -300,6 +320,7 @@ class BrowserPool:
         if not settings.PROXY_ROTATION_ENABLED:
             return
         from app.proxy_manager import get_proxy_manager
+
         proxy_mgr = get_proxy_manager()
         if not proxy_mgr.enabled:
             return

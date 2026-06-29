@@ -3,11 +3,11 @@
 For each scalar type, asserts that the corpus achieves a floor accuracy
 on extracted values that match the expected type:
 
-  * price / currency: ≥ 0.99
-  * phone: ≥ 0.90
+  * price / currency: >= 0.99
+  * phone: >= 0.90
   * url: = 1.00 (HTTP/HTTPS only)
-  * number / float: ≥ 0.95
-  * date / string: ≥ 0.95 (only counted when field type is non-trivial)
+  * number / float: >= 0.95
+  * date / string: >= 0.95 (only counted when field type is non-trivial)
 
 This catches silent regressions where a fixture tweak changes the
 field-type assignment but not the F1 score.
@@ -33,7 +33,14 @@ def _aggregate_field_type_accuracy(manifest: dict[str, Any]) -> dict[str, list[f
         if case["extractor"] != "html_regex":
             continue
         result = _run_case(case)
-        per_field = result.metrics.get("field_type_accuracy", {})
+        raw_per_field: Any = result.metrics.get("field_type_accuracy", {})
+        if not isinstance(raw_per_field, dict):
+            continue
+        per_field: dict[str, float] = {
+            str(field_name): float(accuracy)
+            for field_name, accuracy in raw_per_field.items()
+            if isinstance(accuracy, (int, float))
+        }
         if not per_field:
             continue
         # Group by FieldType from the schema.
@@ -47,7 +54,7 @@ def _aggregate_field_type_accuracy(manifest: dict[str, Any]) -> dict[str, list[f
 
 
 def test_currency_field_extraction_accuracy() -> None:
-    """All currency/extracted fields across the corpus must hold ≥ 0.99 accuracy."""
+    """All currency/extracted fields across the corpus must hold >= 0.99 accuracy."""
     manifest = load_manifest()
     accuracies = _aggregate_field_type_accuracy(manifest)["currency"]
     assert accuracies, "No currency fields exercised by the corpus"
@@ -56,11 +63,11 @@ def test_currency_field_extraction_accuracy() -> None:
 
 
 def test_phone_field_extraction_accuracy() -> None:
-    """Phone fields across the corpus must hold ≥ 0.90 accuracy."""
+    """Phone fields across the corpus must hold >= 0.90 accuracy."""
     manifest = load_manifest()
     accuracies = _aggregate_field_type_accuracy(manifest).get("phone", [])
     if not accuracies:
-        # No phone cases currently — document the floor that's exercised.
+        # No phone cases currently; document the floor that's exercised.
         return
     avg = sum(accuracies) / len(accuracies)
     assert avg >= 0.90, f"Avg phone field accuracy {avg:.3f} below 0.90"

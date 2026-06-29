@@ -10,13 +10,13 @@ which is called from ``app.routers.jobs.create_jobs_router``.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_rbac_event
-from app.models import Job, JobEventsResponse, JobResultsResponse, JobStatus
+from app.models import JobEventsResponse, JobResultsResponse, JobStatus
 from app.routers.jobs_state import JobStoreManager, is_worker_mode
 from app.services.job_state_machine import sync_from_db
 from app.storage_interface import get_job_repository
@@ -225,7 +225,7 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
             return {"jobs": summaries, "next_cursor": next_cursor}
 
-    @router.get("/api/jobs/{job_id}", response_model=Job)
+    @router.get("/api/jobs/{job_id}", response_model=dict[str, Any])
     async def get_job(
         job_id: str,
         auth: Annotated[

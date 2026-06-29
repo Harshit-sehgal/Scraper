@@ -5,6 +5,49 @@
 
 The repository includes production deployment files. A local Compose smoke passed on 2026-06-01 with a temporary ignored `.env`. A bounded local `/health` load test passed on 2026-06-24. Production readiness still requires validation in the target environment with real secrets, TLS, monitoring operations, alert delivery, staging load tests, failover checks, and incident procedures.
 
+## CI/CD Pipeline
+
+The repository includes a GitHub Actions workflow (`.github/workflows/ci.yml`) with three parallel jobs:
+
+| Job | What it runs |
+|-----|-------------|
+| `quick-validation` | Compile check, architecture validator, research boundary, dependency bounds, URL safety + research boundary tests, P0 regression tests, OpenAPI spec check |
+| `lint` | Ruff lint, Ruff format check, mypy |
+| `unit-tests` | All pytest unit tests excluding Postgres/browser/golden-dataset/hostile-smoke markers |
+
+Before public deployment, add a `build` job that:
+1. Builds the Docker image
+2. Pushes it to a registry
+3. Tags it with the commit SHA and `latest`
+
+## Running Full Test Suite
+
+### Postgres-backed tests (by default, skipped)
+
+Requires a running Postgres instance reachable at `DATAFORGE_DATABASE_URL` (default: `postgresql://dataforge:dataforge@localhost:5432/dataforge_test`). To run:
+
+```bash
+# Start Postgres (e.g., via Docker):
+docker run -d --name dataforge-pg -e POSTGRES_USER=dataforge -e POSTGRES_PASSWORD=dataforge -e POSTGRES_DB=dataforge_test -p 5432:5432 postgres:16
+
+# Run with Postgres tests:
+python3 -m pytest backend/tests/ --run-postgres
+```
+
+### Browser-based tests (by default, skipped)
+
+Playwright must be installed (`python3 -m playwright install chromium`), and tests need `--run-browser`:
+
+```bash
+python3 -m pytest backend/tests/ --run-browser
+```
+
+### Golden dataset / live extraction tests (by default, skipped)
+
+```bash
+python3 -m pytest backend/tests/ --run-golden-dataset
+```
+
 ## Files Present
 
 - `Dockerfile`

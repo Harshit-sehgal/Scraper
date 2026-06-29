@@ -645,6 +645,7 @@ async def test_ai_structuring_records_usage_when_phase_runs(monkeypatch) -> None
     )
     monkeypatch.setattr("app.scraper.ai_clean_and_align_records", ai_clean)
     import app.services.ai_structuring as _ai_s
+
     monkeypatch.setattr(_ai_s, "_run_semantic_pipeline", lambda records, field_names: records)
 
     mock_ws = MagicMock()

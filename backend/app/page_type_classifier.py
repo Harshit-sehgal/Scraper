@@ -66,16 +66,34 @@ class PageTypeClassification:
 # Patterns probed from the raw HTML. Each tuple is (compiled regex,
 # signal weight). Order is irrelevant — all matches accumulate.
 _SIGNAL_PATTERNS: tuple[tuple[re.Pattern[str], tuple[str, PageType, float]], ...] = (
-    (re.compile(r"itemtype=\"https?://schema\.org/Product\"|@type\"\s*:\s*\"Product\"|@type\":\"Product\""), ("schema_org", PageType.PRODUCT, 0.8)),
-    (re.compile(r"itemtype=\"https?://schema\.org/JobPosting\"|@type\":\"JobPosting\""), ("schema_org", PageType.JOB_POSTING, 0.8)),
+    (
+        re.compile(r"itemtype=\"https?://schema\.org/Product\"|@type\"\s*:\s*\"Product\"|@type\":\"Product\""),
+        ("schema_org", PageType.PRODUCT, 0.8),
+    ),
+    (
+        re.compile(r"itemtype=\"https?://schema\.org/JobPosting\"|@type\":\"JobPosting\""),
+        ("schema_org", PageType.JOB_POSTING, 0.8),
+    ),
     (re.compile(r"itemtype=\"https?://schema\.org/Event\"|@type\":\"Event\""), ("schema_org", PageType.EVENT, 0.7)),
-    (re.compile(r"itemtype=\"https?://schema\.org/Article\|NewsArticle\|BlogPosting\"|@type\":\"Article\""), ("schema_org", PageType.ARTICLE, 0.6)),
+    (
+        re.compile(r"itemtype=\"https?://schema\.org/Article\|NewsArticle\|BlogPosting\"|@type\":\"Article\""),
+        ("schema_org", PageType.ARTICLE, 0.6),
+    ),
     (re.compile(r"itemtype=\"https?://schema\.org/Review\"|@type\":\"Review\""), ("schema_org", PageType.REVIEW, 0.6)),
     (re.compile(r"add\s+to\s+cart|add\s+to\s+basket|buy\s+now", re.IGNORECASE), ("button_text", PageType.PRODUCT, 0.6)),
-    (re.compile(r"apply\s+now|apply\s+for\s+this\s+job|submit\s+application", re.IGNORECASE), ("button_text", PageType.JOB_POSTING, 0.6)),
-    (re.compile(r"tweet|twitter-post|social-tweet|fb-post|linkedin-post", re.IGNORECASE), ("class_hint", PageType.SOCIAL_MEDIA, 0.5)),
+    (
+        re.compile(r"apply\s+now|apply\s+for\s+this\s+job|submit\s+application", re.IGNORECASE),
+        ("button_text", PageType.JOB_POSTING, 0.6),
+    ),
+    (
+        re.compile(r"tweet|twitter-post|social-tweet|fb-post|linkedin-post", re.IGNORECASE),
+        ("class_hint", PageType.SOCIAL_MEDIA, 0.5),
+    ),
     (re.compile(r"comment-thread|discussion-thread|forum-thread|reply-list", re.IGNORECASE), ("class_hint", PageType.FORUM, 0.5)),
-    (re.compile(r"class=\"[^\"]*(?:result|results)-count|resultCount|search-results", re.IGNORECASE), ("class_hint", PageType.SEARCH_RESULTS, 0.4)),
+    (
+        re.compile(r"class=\"[^\"]*(?:result|results)-count|resultCount|search-results", re.IGNORECASE),
+        ("class_hint", PageType.SEARCH_RESULTS, 0.4),
+    ),
     (re.compile(r"<article\b|class=\"[^\"]*article[^\"]*\"", re.IGNORECASE), ("tag", PageType.ARTICLE, 0.3)),
     (re.compile(r"\$\d|\£\d|\€\d|\¥\d|\₹\d", re.IGNORECASE), ("price_visible", PageType.PRODUCT, 0.3)),
 )
@@ -187,4 +205,3 @@ def classify_page_type(
         signals=contributions,
         alternatives=alternatives,
     )
-

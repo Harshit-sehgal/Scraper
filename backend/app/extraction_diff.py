@@ -145,10 +145,9 @@ def compute_extraction_diff(
         record_key: Field name used as the stable record identifier.
             When ``None``, common keys (``id`` / ``url`` / ``sku`` / ...)
             are tried in order, falling back to a content hash.
-        field_threshold: Fraction of schema fields that must be
-            added/removed to set ``schema_changed``. Currently only
-            used as a binary threshold (any drift → True) — kept as
-            a parameter so future versions can tighten it.
+        field_threshold: Fraction of schema fields (added + removed
+            over the union size) that must change to set
+            ``schema_changed=True``. Defaults to 0.05 (5%).
 
     Returns:
         :class:`ExtractionDiff` summarising the change.
@@ -160,7 +159,9 @@ def compute_extraction_diff(
     current_fields = _field_union(current_records)
     added_fields = sorted(current_fields - baseline_fields)
     removed_fields = sorted(baseline_fields - current_fields)
-    schema_changed = bool(added_fields or removed_fields)
+    schema_drift_count = len(added_fields) + len(removed_fields)
+    baseline_field_count = max(len(baseline_fields | current_fields), 1)
+    schema_changed = schema_drift_count > 0 and (schema_drift_count / baseline_field_count) >= field_threshold
 
     baseline_by_sig: dict[str, dict[str, Any]] = {}
     for record in baseline_records:

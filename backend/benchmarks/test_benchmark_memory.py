@@ -2,7 +2,7 @@
 
 Runs a single extraction loop N times against loopback HTTP endpoints
 and asserts that memory consumption stays bounded. Memory growth beyond
-a 1.5× baseline or any iteration exceeding 512 MB fails the benchmark.
+a 1.5x baseline or any iteration exceeding 512 MB fails the benchmark.
 
 Marked ``@pytest.mark.slow`` and ``@pytest.mark.resource`` so it can
 be skipped in fast CI runs.
@@ -23,7 +23,7 @@ import pytest
 pytestmark = [pytest.mark.slow, pytest.mark.resource]
 
 
-# ─── Mock Server ─────────────────────────────────────────────────────────────
+# Mock server
 
 
 class _MemoryBenchHandler(http.server.BaseHTTPRequestHandler):
@@ -66,7 +66,8 @@ def _loopback_server() -> Iterator[str]:
     thread.start()
     try:
         host, port = server.server_address[:2]
-        yield f"http://{host}:{port}/products"
+        host_text = host.decode() if isinstance(host, bytes) else host
+        yield f"http://{host_text}:{port}/products"
     finally:
         server.shutdown()
         server.server_close()
@@ -96,12 +97,12 @@ def urllib_parse(url: str):
     return urlparse(url)
 
 
-# ─── Memory Benchmark ────────────────────────────────────────────────────────
+# Memory benchmark
 
 
 @pytest.mark.timeout(120)
 def test_memory_stability_over_100_extractions() -> None:
-    """100 sequential extractions must not leak memory beyond 1.5× baseline.
+    """100 sequential extractions must not leak memory beyond 1.5x baseline.
 
     Reads HTML from a loopback HTTP server, runs the regex extractor 100
     times, and asserts that tracemalloc-tracked memory growth stays bounded.
@@ -122,7 +123,7 @@ def test_memory_stability_over_100_extractions() -> None:
         html = _http_get(url)
         extract_with_regex(html.decode(), schema)
 
-        baseline_current, baseline_peak = tracemalloc.get_traced_memory()
+        baseline_current, _baseline_peak = tracemalloc.get_traced_memory()
         samples: list[tuple[int, int]] = []
         max_peak_mb = 0.0
 
@@ -137,7 +138,7 @@ def test_memory_stability_over_100_extractions() -> None:
                 gc.collect()
 
         gc.collect()
-        final_current, final_peak = tracemalloc.get_traced_memory()
+        final_current, _final_peak = tracemalloc.get_traced_memory()
 
     tracemalloc.stop()
 
@@ -148,7 +149,7 @@ def test_memory_stability_over_100_extractions() -> None:
     # Assertions
     assert max_peak_mb < 512.0, f"Peak memory {max_peak_mb:.1f} MB exceeded 512 MB ceiling during 100 extraction iterations"
     assert final_growth_ratio < 1.5, (
-        f"Memory growth ratio {final_growth_ratio:.3f} exceeded 1.5× baseline "
+        f"Memory growth ratio {final_growth_ratio:.3f} exceeded 1.5x baseline "
         f"(baseline={baseline_current / 1024:.1f} KB, "
         f"final={final_current / 1024:.1f} KB, "
         f"mid_iteration={mid_current / 1024:.1f} KB)"

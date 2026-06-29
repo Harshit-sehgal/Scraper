@@ -104,6 +104,16 @@ def test_removed_field_detected_as_schema_change() -> None:
     assert diff.severity == "moderate"
 
 
+def test_schema_change_respects_field_threshold() -> None:
+    """Small field drift remains visible without tripping schema_changed."""
+    baseline = [_record(id="a", title="Alpha", price=10, sku="A1", brand="Acme")]
+    current = [_record(id="a", title="Alpha", price=10, sku="A1", brand="Acme", rating=4.5)]
+    diff = compute_extraction_diff(baseline, current, field_threshold=0.5)
+
+    assert diff.added_fields == ["rating"]
+    assert diff.schema_changed is False
+
+
 # --- severity: major ---
 
 

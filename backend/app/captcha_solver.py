@@ -8,6 +8,14 @@ off by default — when ``CAPTCHA_SOLVER_ENABLED`` is ``False``
 every ``solve()`` call returns ``None`` so the recovery path
 gracefully falls through to proxy rotation + backoff.
 
+Design constraint
+-----------------
+This module implements a paid third-party solving integration
+ONLY.  There is NO CAPTCHA bypass, anti-bot bypass, paywall
+bypass, or automatic recognition.  The solver is always off
+by default and requires explicit opt-in via env var.  See
+P0 safety rules in AGENTS.md for the product boundary.
+
 Protocol
 --------
 

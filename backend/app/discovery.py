@@ -104,7 +104,7 @@ def _domain_matches(domain: str, allowed_domains: set[str]) -> bool:
     return _root_domain(domain) in allowed_domains
 
 
-def _canonicalize_url(url: str) -> str:
+def _canonicalize_url(url: str | None) -> str:
     try:
         p = urlparse((url or "").strip())
         if not p.scheme or not p.netloc:

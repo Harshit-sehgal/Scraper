@@ -179,10 +179,14 @@ class TestApiKeyManagement:
         user1_id = data1["user_id"]
 
         from app.saas.identity_store import get_identity_store
-        org1_id = get_identity_store().get_project(project1_id).org_id
+
+        project1 = get_identity_store().get_project(project1_id)
+        assert project1 is not None
+        org1_id = project1.org_id
         _accept_aup_for(user1_id)
 
         from app.auth.session import SESSION_COOKIE, create_session_cookie
+
         cookies1 = {SESSION_COOKIE: create_session_cookie(role="admin", user_id=user1_id)}
 
         # Create API key for user 1 scoped to project1_id
@@ -204,7 +208,9 @@ class TestApiKeyManagement:
         )
         assert signup2.status_code == 201
         project2_id = signup2.json()["project_id"]
-        org2_id = get_identity_store().get_project(project2_id).org_id
+        project2 = get_identity_store().get_project(project2_id)
+        assert project2 is not None
+        org2_id = project2.org_id
 
         # 3. Request Org 1 details using Key 1 -> should succeed (200)
         get_org1 = client.get(f"/api/saas/orgs/{org1_id}", headers={"X-API-Key": raw_key_1})

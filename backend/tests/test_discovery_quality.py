@@ -2,12 +2,15 @@ from app.discovery import (
     _build_search_query,
     _canonicalize_url,
     _contact_fields_requested,
+    _domain_matches,
     _extract_domain,
     _has_query_signal,
     _looks_noisy_url,
+    _root_domain,
     _score_result,
     _source_allowed,
     _source_bonus,
+    infer_source_metadata,
 )
 from app.models import SourcePolicy
 
@@ -107,27 +110,31 @@ def test_score_result_penalizes_social_sharer_urls() -> None:
 
 
 def test_build_search_query_basic() -> None:
-    result = _build_search_query(query="interior designers", location="Chennai",
-                                  domain="", data_fields=[], origin_location="", max_distance_km=None)
+    result = _build_search_query(
+        query="interior designers", location="Chennai", domain="", data_fields=[], origin_location="", max_distance_km=None
+    )
     assert "interior designers" in result
     assert "Chennai" in result
 
 
 def test_build_search_query_with_domain() -> None:
-    result = _build_search_query(query="plumbers", location="",
-                                  domain="example.com", data_fields=[], origin_location="", max_distance_km=None)
+    result = _build_search_query(
+        query="plumbers", location="", domain="example.com", data_fields=[], origin_location="", max_distance_km=None
+    )
     assert "site:example.com" in result
 
 
 def test_build_search_query_with_data_fields() -> None:
-    result = _build_search_query(query="dentists", location="",
-                                  domain="", data_fields=["phone", "email"], origin_location="", max_distance_km=None)
+    result = _build_search_query(
+        query="dentists", location="", domain="", data_fields=["phone", "email"], origin_location="", max_distance_km=None
+    )
     assert "dentists" in result
 
 
 def test_build_search_query_with_location_distance() -> None:
-    result = _build_search_query(query="hotels", location="Paris",
-                                  domain="", data_fields=[], origin_location="London", max_distance_km=100)
+    result = _build_search_query(
+        query="hotels", location="Paris", domain="", data_fields=[], origin_location="London", max_distance_km=100
+    )
     assert "hotels" in result
     assert "Paris" in result
 
@@ -162,6 +169,58 @@ def test_source_policy_accepts_enum_values() -> None:
     assert _source_allowed("search_result", SourcePolicy.ALL_SOURCES) is True
 
 
+def test_infer_source_metadata_classifies_social() -> None:
+    metadata = infer_source_metadata("https://facebook.com/SomeBusiness")
+    assert metadata["source_type"] == "social"
+    assert metadata["source_domain"] == "facebook.com"
+
+
+def test_infer_source_metadata_classifies_directory() -> None:
+    metadata = infer_source_metadata("https://yelp.com/biz/some-place")
+    assert metadata["source_type"] == "directory"
+    assert metadata["source_domain"] == "yelp.com"
+
+
+def test_infer_source_metadata_empty_url_returns_empty_domain() -> None:
+    metadata = infer_source_metadata("")
+    assert metadata["source_domain"] == ""
+
+
+def test_root_domain_empty_returns_empty() -> None:
+    assert _root_domain("") == ""
+
+
+def test_domain_matches_empty_domain_returns_false() -> None:
+    assert _domain_matches("", {"example.com"}) is False
+
+
+def test_canonicalize_url_no_scheme_returns_empty() -> None:
+    assert _canonicalize_url("example.com/path") == ""
+
+
+def test_canonicalize_url_international_does_not_crash() -> None:
+    result = _canonicalize_url("https://例子.测试/path")
+    assert isinstance(result, str)
+
+
+def test_has_query_signal_empty_query_returns_true() -> None:
+    assert _has_query_signal("", "some blob text") is True
+
+
+def test_has_query_signal_short_terms_returns_true() -> None:
+    assert _has_query_signal("a b c", "no matching content") is True
+
+
+def test_extract_domain_with_port() -> None:
+    # urlparse includes port in netloc, so port is preserved
+    domain = _extract_domain("https://example.com:8080/path")
+    assert "example.com" in domain
+
+
+def test_looks_noisy_url_non_http_scheme() -> None:
+    assert _looks_noisy_url("ftp://example.com/file") is True
+
+
 def test_contact_field_bias_prefers_directory_sources() -> None:
     item = {
         "title": "Top Interior Designers Chennai",
@@ -170,12 +229,17 @@ def test_contact_field_bias_prefers_directory_sources() -> None:
     }
     data_fields = ["company_name", "phone", "email", "website", "address"]
     directory_score = _score_result(
-        item=item, query="interior designers chennai", location="Chennai, India",
-        data_fields=data_fields, source_type="directory",
+        item=item,
+        query="interior designers chennai",
+        location="Chennai, India",
+        data_fields=data_fields,
+        source_type="directory",
     )
     official_score = _score_result(
-        item=item, query="interior designers chennai", location="Chennai, India",
-        data_fields=data_fields, source_type="official",
+        item=item,
+        query="interior designers chennai",
+        location="Chennai, India",
+        data_fields=data_fields,
+        source_type="official",
     )
     assert directory_score > official_score
-

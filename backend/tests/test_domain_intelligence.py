@@ -222,6 +222,27 @@ class TestDomainIntelligenceToDict:
         assert d["hydration_delay_ms"] == 0.0
         assert d["preferred_strategy"] == "none"
 
+    def test_all_field_defaults_via_attributes(self) -> None:
+        intel = DomainIntelligence("test.example", data=None)
+        assert intel.hydration_delay_ms == 0.0
+        assert intel.infinite_scroll_required is False
+        assert intel.anti_bot_risk == 0.0
+        assert intel.preferred_strategy == "none"
+        assert intel.selector_decay_rate == 0.0
+        assert intel.success_count == 0
+        assert intel.total_fetches == 0
+        assert intel.failure_history == {}
+
+    def test_get_intelligence_case_insensitive(self, registry: DomainIntelligenceRegistry) -> None:
+        a = registry.get_intelligence("https://Example.COM/page")
+        b = registry.get_intelligence("https://example.com/path")
+        assert a is b
+        assert a.domain == "example.com"
+
+    def test_get_intelligence_empty_url_returns_unknown(self, registry: DomainIntelligenceRegistry) -> None:
+        intel = registry.get_intelligence("")
+        assert intel.domain == "unknown"
+
 
 class TestGlobalSingleton:
     """get_domain_intelligence singleton behaviour."""

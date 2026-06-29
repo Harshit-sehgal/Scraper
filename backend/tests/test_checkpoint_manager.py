@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -13,7 +14,7 @@ from app.checkpoint_manager import CheckpointManager, get_checkpoint_manager
 
 
 @pytest.fixture
-def tmp_base() -> Path:
+def tmp_base() -> Iterator[Path]:
     with tempfile.TemporaryDirectory() as td:
         yield Path(td)
 

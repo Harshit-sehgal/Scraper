@@ -416,6 +416,21 @@ class TestLlmJson:
             mock_json.assert_not_called()
             mock_thread.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_all_providers_fail_raises_exhausted_when_raise_on_failure(self) -> None:
+        from app.llm_bridge import LLMCascadeExhausted
+
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("app.llm_bridge._call_openai_compatible_json", side_effect=httpx.HTTPError("fail")),
+            patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
+            patch("app.llm_bridge.asyncio.to_thread", side_effect=RuntimeError("g4f error")),
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
+        ):
+            with pytest.raises(LLMCascadeExhausted) as exc_info:
+                await llm_json([{"role": "user", "content": "hi"}], raise_on_failure=True)
+            assert "llm_json" in str(exc_info.value)
+
 
 class TestLlmJsonFast:
     @pytest.mark.asyncio

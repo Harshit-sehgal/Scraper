@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,7 +10,7 @@ from app.models import SchemaField
 
 
 @pytest.fixture(autouse=True)
-def _mock_dependencies() -> dict[str, MagicMock]:
+def _mock_dependencies() -> Iterator[dict[str, MagicMock]]:
     """Mock all heavyweight external dependencies to avoid real IO."""
     deps: dict[str, MagicMock] = {}
     with (

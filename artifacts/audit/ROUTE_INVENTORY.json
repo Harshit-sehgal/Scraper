@@ -348,7 +348,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "authenticated-user",
-      "response_model_if_known": "Job",
+      "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_read",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"
@@ -444,7 +444,7 @@
       "public_or_protected": "protected",
       "request_model_if_known": "",
       "required_role_if_known": "operator-or-admin",
-      "response_model_if_known": "StatusResponse",
+      "response_model_if_known": "JobExtractionUpdateResponse",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes"

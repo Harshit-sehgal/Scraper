@@ -808,6 +808,8 @@ _cf_harvest_attempts_total_lock = threading.Lock()
 
 _proxy_provider_refresh_total: int = 0
 _proxy_provider_refresh_total_lock = threading.Lock()
+_proxy_provider_last_count: int = 0
+_proxy_provider_last_count_lock = threading.Lock()
 
 
 def record_captcha_solve_attempt(*, success: bool) -> None:
@@ -826,9 +828,11 @@ def record_cf_harvest_attempt(*, success: bool) -> None:
 
 def record_proxy_provider_refresh(*, proxy_count: int) -> None:
     """Record a proxy provider refresh with resulting proxy count."""
-    global _proxy_provider_refresh_total
+    global _proxy_provider_refresh_total, _proxy_provider_last_count
     with _proxy_provider_refresh_total_lock:
         _proxy_provider_refresh_total += 1
+    with _proxy_provider_last_count_lock:
+        _proxy_provider_last_count = proxy_count
 
 
 def get_captcha_solve_attempts_total() -> int:
@@ -846,10 +850,16 @@ def get_proxy_provider_refresh_total() -> int:
         return _proxy_provider_refresh_total
 
 
+def get_proxy_provider_last_count() -> int:
+    """Return the most recent proxy count reported by a refresh."""
+    with _proxy_provider_last_count_lock:
+        return _proxy_provider_last_count
+
+
 def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
     global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits, _metrics_collection_errors
-    global _captcha_solve_attempts_total, _cf_harvest_attempts_total, _proxy_provider_refresh_total
+    global _captcha_solve_attempts_total, _cf_harvest_attempts_total, _proxy_provider_refresh_total, _proxy_provider_last_count
     with _request_latencies_lock:
         _request_latencies.clear()
     with _worker_failures_lock:
@@ -908,3 +918,5 @@ def reset_for_testing() -> None:
         _cf_harvest_attempts_total = 0
     with _proxy_provider_refresh_total_lock:
         _proxy_provider_refresh_total = 0
+    with _proxy_provider_last_count_lock:
+        _proxy_provider_last_count = 0

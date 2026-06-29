@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.policy_engine import SubstratePolicy, get_policy_engine
 
 
 @pytest.fixture(autouse=True)
-def _mock_world_state() -> None:
+def _mock_world_state() -> Iterator[None]:
     """Prevent SubstratePolicy from initializing a real SemanticWorldState."""
     with patch("app.policy_engine.get_world_state") as mock_gws:
         mock_ws = MagicMock()
@@ -41,9 +42,11 @@ class TestSubstratePolicy:
 
     def test_validate_substrate_health_returns_dict(self) -> None:
         policy = SubstratePolicy()
-        policy.ws._observability.get_semantic_health_index.return_value = {
+        observability = MagicMock()
+        observability.get_semantic_health_index.return_value = {
             "metrics": {"diversity": 0.9},
         }
+        cast("Any", policy.ws)._observability = observability
         health = policy.validate_substrate_health()
         assert "valid" in health
         assert "issues" in health

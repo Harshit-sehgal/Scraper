@@ -81,7 +81,7 @@ def test_required_categories_stable() -> None:
         )
         return
 
-    baseline = set(line.strip() for line in BASELINE_CATEGORIES_PATH.read_text(encoding="utf-8").splitlines() if line.strip())
+    baseline = {line.strip() for line in BASELINE_CATEGORIES_PATH.read_text(encoding="utf-8").splitlines() if line.strip()}
 
     missing = baseline - current
     assert not missing, (

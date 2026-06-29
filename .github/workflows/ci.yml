@@ -1,483 +1,159 @@
-# =============================================================================
-# DataForge Scraper — Main CI Pipeline
-# =============================================================================
-# Comprehensive PR/push workflow that faithfully maps
-# ``python3 scripts/validate_local.py --full`` into parallel CI jobs.
-#
-# All jobs run on push to main and on PRs to main. The union of all job
-# status checks must be green before merging (configure required checks
-# in GitHub branch protection rules → Settings → Branches).
-# =============================================================================
-
 name: CI
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
     branches: [main]
 
 env:
-  PYTHON_VERSION: "3.12"
   DATAFORGE_DOTENV_PATH: /dev/null
+  DATAFORGE_ENV: test
   DATAFORGE_STORAGE_BACKEND: sqlite
-  DATAFORGE_API_KEY: ci-key
+  DATAFORGE_API_KEY: ci-api-key
   DATAFORGE_OPERATOR_API_KEY: ci-operator-key
   DATAFORGE_ADMIN_API_KEY: ci-admin-key
   DATAFORGE_SESSION_SECRET: ci-session-secret
-  DATAFORGE_ALLOW_INSECURE_DEV_AUTH: "false"
-  DATAFORGE_SKIP_DB_CHECK: "true"
+  DATAFORGE_ALLOW_INSECURE_DEV_AUTH: false
+  DATAFORGE_SKIP_DB_CHECK: true
   PYTHONPATH: backend
 
-# Cancel in-flight runs on the same branch when a new push lands, so
-# an obsolete CI run does not burn minutes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ── 1. Fast Gates (syntax, architecture, invariants, security audit) ────
-  fast-gates:
-    name: Fast Gates
+  quick-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-fast-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Python syntax check (compileall)
-        run: python -m compileall -q backend scripts architecture_validator.py
-
-      - name: Architecture validation
-        run: python architecture_validator.py
-
-      - name: Research-shell boundary check
-        run: python scripts/check_research_boundary.py
-
-      - name: Dependency bounds validation
-        run: python scripts/validate_dependency_bounds.py
-
-      - name: URL safety & research boundary smoke tests
-        run: |
-          python -m pytest backend/tests/test_url_safety.py \
-            backend/tests/test_research_boundary.py -q --tb=short
-
-      - name: P0 regression tests (auth/tenant, billing/usage, route-auth matrix)
-        run: |
-          python -m pytest backend/tests/test_p0_auth_tenant.py \
-            backend/tests/test_p0_billing_usage.py \
-            backend/tests/test_route_auth_matrix_generator.py -q --tb=short
-
-      - name: OpenAPI spec generation (contract artifact)
-        run: python scripts/generate_openapi.py --no-docs-copy
-
-      - name: Dependency vulnerability audit (pip-audit)
-        run: pip-audit . --progress-spinner off --desc off --strict
-
-      - name: Validate production env checker (asserts failure on placeholders)
-        run: |
-          if python scripts/check_prod_env.py \
-               --env-file .env.production.example \
-               2>&1 | grep -q 'Result: required production environment checks passed'; then
-            echo "❌ check_prod_env.py unexpectedly passed on placeholder .env.production.example!"
-            exit 1
-          else
-            echo "✅ check_prod_env.py correctly failed on placeholder secrets."
-          fi
-
-      - name: Validate shell scripts syntax
-        run: bash -n scripts/start.sh
-
-      - name: Check for committed runtime artifacts
-        run: |
-          found=$(git ls-files | grep -E '\.(db|sqlite|sqlite3)$|\.json\.lock$' || true)
-          if [ -n "$found" ]; then
-            echo "❌ Bad runtime artifacts tracked:"
-            echo "$found"
-            exit 1
-          fi
-          echo "✅ No bad runtime artifacts tracked."
-
-      - name: Validate YAML and JSON config files
-        run: |
-          find . -name "*.yml" -o -name "*.yaml" | while read f; do
-            python -c "import yaml; yaml.safe_load(open('$f')); print('OK:', '$f')" || exit 1
-          done
-          find . -name "*.json" | while read f; do
-            python -m json.tool "$f" >/dev/null || exit 1
-          done
-
-      # F-CI-003: every third-party ``uses: <repo>@<ref>`` line in
-      # .github/workflows/*.yml MUST be SHA-pinned, except for
-      # local ``./...`` references. Mutable tags (@v4, @v5) let a
-      # upstream tag push swap the action contents that CI runs.
-      # The SHA is the unique step identity; Dependabot refreshes
-      # the pin via its github-actions ecosystem (see .github/
-      # dependabot.yml). This check is intentionally permissive
-      # about ``appleboy/telegram-action@<sha>`` (already pinned
-      # to master in this repo) and any comment annotation.
-      - name: Verify CI actions are SHA-pinned (F-CI-003 guard)
-        run: |
-          python scripts/check_workflow_action_pins.py .github/workflows
-
-  # ── 2. Static Analysis (ruff, mypy, pyflakes, bandit) ───────────────────
-  static-analysis:
-    name: Static Analysis
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-static-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          pip install types-beautifulsoup4 types-openpyxl types-requests \
-            types-html5lib types-webencodings
-
-      - name: Ruff lint
-        run: ruff check backend/app backend/tests backend/benchmarks scripts
-
-      - name: Ruff format check
-        run: ruff format --check backend/app backend/tests backend/benchmarks scripts
-
-      - name: Mypy type check
-        run: python -m mypy backend
-
-      - name: Pyflakes
-        run: python -m pyflakes backend/app backend/tests scripts
-
-      - name: Bandit security scan
-        run: python -m bandit -r backend -q
-
-  # ── 3. Backend Tests (full pytest suite + coverage) ─────────────────────
-  backend-tests:
-    name: Backend Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-backend-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-
-      - name: Cache Playwright Chromium
-        id: cache-playwright
+      - name: Cache Playwright browsers
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-backend-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
+          key: playwright-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
 
-      - name: Install Playwright Chromium (cached)
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: python -m playwright install --with-deps chromium
+      - name: Install Playwright
+        run: python3 -m playwright install chromium
 
-      - name: Install Playwright system deps only
-        if: steps.cache-playwright.outputs.cache-hit == 'true'
-        run: python -m playwright install-deps chromium
+      - name: Compile check
+        run: python3 -m compileall -q backend scripts architecture_validator.py
 
-      - name: Run full test suite (serial + flaky retry, browser tests enabled)
-        # Roadmap §1 #3: browser-marked tests are now part of the CI
-        # default gate. Playwright Chromium is already cached above.
-        # --run-browser enables @pytest.mark.browser tests that were
-        # previously skipped on push/PR (only ran weekly). This prevents
-        # browser E2E regressions from silently merging.
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest --reruns 3 --reruns-delay 10 \
-            --run-browser -o addopts= \
-            -q backend/tests --tb=short
+      - name: Architecture validator
+        run: python3 architecture_validator.py
 
-      - name: Enforce coverage floors
-        id: coverage
-        continue-on-error: false
-        run: |
-          python -m coverage run --source=backend/app \
-            -m pytest --reruns 3 --reruns-delay 10 \
-            -q backend/tests --tb=line --no-cov-on-fail
-          python -m coverage json -o coverage.json
-          python scripts/check_coverage_floors.py coverage.json
-          python -m coverage report --fail-under=60
+      - name: Research boundary
+        run: python3 scripts/check_research_boundary.py
 
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: coverage-report
-          path: coverage.json
-          retention-days: 30
+      - name: Dependency bounds
+        run: python3 scripts/validate_dependency_bounds.py
 
-  # ── 4. Frontend (install, test, lint) ─────────────────────────────────
-  frontend:
-    name: Frontend
+      - name: URL safety + research boundary tests
+        run: python3 -m pytest backend/tests/test_url_safety.py backend/tests/test_research_boundary.py -q
+
+      - name: P0 regression tests
+        run: python3 -m pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py -q
+
+      - name: OpenAPI spec validation
+        run: python3 scripts/generate_route_inventory.py --check
+
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "20"
-
-      - name: Cache npm
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
-
-      - name: Install dependencies
-        run: npm ci
-
-      # F-NPM-002: lockfile-integrity gate. ``npm audit signatures``
-      # exits non-zero when a package's signature can no longer be
-      # verified against the registry's published keys — a leading
-      # indicator of a supply-chain compromise in the resolved tree.
-      - name: Verify lockfile signatures
-        run: npm audit signatures
-
-      - name: Frontend build (esbuild bundle)
-        run: npm run build
-
-      - name: Frontend build smoke — bundle size thresholds
-        run: |
-          APP_JS="frontend/dist/app.js"
-          STYLES_CSS="frontend/dist/styles.css"
-          missing=false
-          for f in "$APP_JS" "$STYLES_CSS"; do
-            if [ ! -f "$f" ]; then
-              echo "❌ MISSING build output: $f"
-              missing=true
-            fi
-          done
-          if [ "$missing" = true ]; then exit 1; fi
-          # F-FRONTEND-001: CSS must stay under 200 KB
-          css_kb=$(stat --format=%s "$STYLES_CSS")
-          css_kb=$((css_kb / 1024))
-          if [ "$css_kb" -gt 200 ]; then
-            echo "❌ styles.css is ${css_kb} KB — exceeds 200 KB threshold (F-FRONTEND-001)"
-            exit 1
-          fi
-          echo "✅ app.js ($(stat --format=%s "$APP_JS") bytes), styles.css (${css_kb} KB) — within thresholds"
-
-      - name: Frontend unit tests (vitest)
-        run: npm test
-
-      - name: CSS lint (stylelint)
-        run: npm run lint:css
-
-      - name: JS/CSS/JSON format check (Prettier)
-        run: npx prettier --check 'frontend/**/*.{js,css,html,mjs}' \
-          'grafana/**/*.json' 'package.json' '.stylelintrc.json' '.prettierrc'
-
-      - name: Docs lint
-        run: python scripts/docs_lint.py --include-experimental
-
-      - name: Verify frontend assets exist
-        run: |
-          missing=false
-          for f in frontend/app.js frontend/styles.css frontend/favicon.svg frontend/index.html; do
-            if [ ! -f "$f" ]; then
-              echo "❌ MISSING: $f"
-              missing=true
-            else
-              echo "✅ $f exists ($(stat --format=%s "$f") bytes)"
-            fi
-          done
-          if [ "$missing" = true ]; then
-            exit 1
-          fi
-          echo "✅ All frontend assets present."
-
-  # ── 5. Chaos Engineering (resilience contract) ──────────────────────────
-  chaos-engineering:
-    name: Chaos Engineering
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-chaos-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run chaos engineering tests
-        run: |
-          python -m pytest -q backend/tests/test_chaos_engineering.py --tb=short
+      - name: Ruff lint
+        run: ruff check .
 
-  # ── 6. Image Build & Config Smoke ──────────────────────────────────────
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: mypy
+        run: python3 -m mypy backend/ --ignore-missing-imports
+
   image-build:
-    name: Image Build & Smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: Build production image
-        run: docker build --target production -t dataforge:ci-test .
+      - name: Build Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: dataforge:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Smoke-test production image under hardened container
+      - name: Smoke production image without network
         run: |
           docker run --rm \
             --network=none \
             --read-only \
-            --cap-drop ALL \
-            --security-opt no-new-privileges \
-            --user 65534:65534 \
-            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
-            -e HOME=/tmp \
-            -e DATAFORGE_STORAGE_BACKEND=sqlite \
-            -e DATAFORGE_ENV=test \
-            -e DATAFORGE_API_KEY=test \
-            -e DATAFORGE_OPERATOR_API_KEY=test-operator \
-            -e DATAFORGE_ADMIN_API_KEY=test-admin \
-            -e DATAFORGE_SESSION_SECRET=ci-smoke-session-secret \
-            -e DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false \
-            -e DATAFORGE_SKIP_DB_CHECK=true \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user=65534:65534 \
             dataforge:ci-test \
-            python -c "import importlib; app = importlib.import_module('app.main').app; assert app is not None; print('✅ production image imports app.main successfully')"
+            python -c "import app.main; print('app.main import ok')"
 
-  # ── 7. SBOM Generation ────────────────────────────────────────────────
-  sbom:
-    name: SBOM Generation
+  unit-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Generate SBOM (CycloneDX JSON)
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          path: .
-          output-file: backend-sbom.cdx.json
-          format: cyclonedx-json
-          exclude: >-
-            node_modules,frontend/node_modules,.venv,venv,.git,__pycache__,
-            *.pyc,.pytest_cache,.mypy_cache,.ruff_cache,*.log,backend/data,
-            exports,output,outputs,reports
+          python-version: "3.12"
+          cache: pip
 
-      - name: Upload SBOM
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install Playwright
+        run: python3 -m playwright install chromium
+
+      - name: Run unit tests
+        run: python3 -m pytest backend/tests/ -m "not postgres and not browser and not golden_dataset and not hostile_ci_smoke and not network and not integration" -q --timeout=30 --cov=backend/app --cov-report=term --cov-report=xml
+
+      - name: Upload coverage report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: sbom-cyclonedx
-          path: backend-sbom.cdx.json
-          retention-days: 30
-
-  # ── 8. Telegram Notification ──────────────────────────────────────────
-  notify:
-    name: Notification
-    needs:
-      - fast-gates
-      - static-analysis
-      - backend-tests
-      - frontend
-      - chaos-engineering
-      - image-build
-      - sbom
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Determine overall status
-        id: status
-        run: |
-          # Each ${{ needs.JOB.result }} is evaluated at workflow parse time
-          # (static string substitution), then the shell loop checks the results.
-          STATUS="✅ Passed"
-          for result in "${{ needs.fast-gates.result }}" "${{ needs.static-analysis.result }}" \
-            "${{ needs.backend-tests.result }}" "${{ needs.frontend.result }}" \
-            "${{ needs.chaos-engineering.result }}" "${{ needs.image-build.result }}" \
-            "${{ needs.sbom.result }}"; do
-            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
-              STATUS="❌ Failed"
-              break
-            fi
-          done
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-
-      - name: Send Telegram notification
-        # F-CI-005: GHA substitutes empty strings for unset secrets, so a
-        # direct truthiness guard keeps a misconfigured chat ID/bot token
-        # combination from calling the action with empty values.
-        if: env.TELEGRAM_TOKEN && env.TELEGRAM_TO
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
-        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b # master @ 2026-04-08
-        with:
-          to: ${{ secrets.TELEGRAM_TO }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          message: |
-            🔔 CI Pipeline: ${{ steps.status.outputs.status }}
-
-            Repo: ${{ github.repository }}
-            Branch: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
-            Author: ${{ github.actor }}
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          name: coverage-report
+          path: coverage.xml

@@ -1013,6 +1013,19 @@ class StatusResponse(BaseModel):
     status: str
 
 
+class JobExtractionUpdateResponse(BaseModel):
+    """Response model for PATCH /api/jobs/{job_id}/extraction."""
+
+    status: str
+    job_id: str
+    hydration_wait_ms: int | None
+    scroll_attempts: int | None
+    max_pages: int | None
+    selectors_map: dict[str, Any]
+    request_delay_ms: int
+    max_concurrent_urls: int
+
+
 class RegressionTestGenerateResponse(BaseModel):
     """Response model for POST /api/scraper/regressions/{entry_id}/generate-test."""
 
@@ -1087,6 +1100,7 @@ class LowConfidenceSelectorsResponse(BaseModel):
 
 class SessionCreateResponse(BaseModel):
     """Response model for POST /api/session."""
+
     status: str
     role: str
     message: str
@@ -1094,12 +1108,14 @@ class SessionCreateResponse(BaseModel):
 
 class SessionDestroyResponse(BaseModel):
     """Response model for DELETE /api/session."""
+
     status: str
     message: str
 
 
 class SessionMeResponse(BaseModel):
     """Response model for GET /api/session/me."""
+
     authenticated: bool
     role: str | None = None
     user_id: str | None = None
@@ -1107,6 +1123,7 @@ class SessionMeResponse(BaseModel):
 
 class AuditLogResponse(BaseModel):
     """Response model for GET /api/system/audit-log."""
+
     total: int
     limit: int
     category: str
@@ -1118,6 +1135,7 @@ class AuditLogResponse(BaseModel):
 
 class ScheduledJobChangesResponse(BaseModel):
     """Response model for GET /api/scheduled/{job_id}/changes."""
+
     job_id: str
     job_name: str
     target_url: str
@@ -1140,6 +1158,7 @@ class ScheduledJobChangesResponse(BaseModel):
 
 class WorkflowRunQueuedResponse(BaseModel):
     """Response model for POST /api/workflows/{workflow_id}/run."""
+
     workflow_id: str
     job_id: str
     run_id: str
@@ -1152,6 +1171,7 @@ class WorkflowRunQueuedResponse(BaseModel):
 
 class JobCreateResponse(BaseModel):
     """Response model for POST /api/jobs."""
+
     id: str
     job_id: str
     status: str
@@ -1160,6 +1180,7 @@ class JobCreateResponse(BaseModel):
 
 class ClearTerminalResponse(BaseModel):
     """Response model for DELETE /api/jobs/cleanup/terminal."""
+
     message: str
     cleared: int
     kept_recent: int
@@ -1169,6 +1190,7 @@ class ClearTerminalResponse(BaseModel):
 
 class JobResultsResponse(BaseModel):
     """Response model for GET /api/jobs/{job_id}/results."""
+
     job_id: str
     results: list[Any]
     total: int
@@ -1180,6 +1202,7 @@ class JobResultsResponse(BaseModel):
 
 class JobEventsResponse(BaseModel):
     """Response model for GET /api/jobs/{job_id}/events."""
+
     job_id: str
     status: str
     events: list[Any]
@@ -1194,6 +1217,7 @@ class JobEventsResponse(BaseModel):
 
 class DeleteMyDataResponse(BaseModel):
     """Response model for DELETE /api/user/data."""
+
     status: str
     user_id: str
     summary: dict[str, int]
@@ -1206,6 +1230,7 @@ class DeleteMyDataResponse(BaseModel):
 
 class RemoveDenylistResponse(BaseModel):
     """Response model for DELETE /api/operator/denylist."""
+
     message: str
     domain: str
     path_prefix: str

@@ -1,5 +1,6 @@
 """Tests for DomainRuntimePolicy — per-domain concurrency, cooldown, and failure tracking."""
 
+import pytest
 from app.domain_runtime_policy import (
     DomainRuntimePolicy,
     get_domain_runtime_policy,
@@ -227,3 +228,87 @@ class TestDomainCooldownIntegration:
         domain_key = "cooling-summary.com"
         assert domain_key in summary
         assert summary[domain_key]["cooldown_remaining"] > 0.0
+
+    def test_reduce_concurrency_on_new_domain(self) -> None:
+        """set_reduce_concurrency creates entry if needed and reduces max_parallel."""
+        policy = DomainRuntimePolicy()
+        policy.set_reduce_concurrency("https://new-domain.com/page")
+        entry = policy.get_or_create("https://new-domain.com/page")
+        assert entry.max_parallel == 1
+        assert entry.domain == "new-domain.com"
+
+    def test_weak_failures_do_not_trigger_cooldown(self) -> None:
+        """5 selector_mismatch failures (5 * 0.2 = 1.0) should not trigger cooldown."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("weak-fails.com")
+        for _ in range(5):
+            policy.record_failure(url, failure_type="selector_mismatch")
+        assert policy.can_fetch(url) is True
+
+    def test_record_success_clears_cooldown_below_threshold(self) -> None:
+        """record_success only clears cooldown when pressure drops below threshold."""
+        import time as time_module
+
+        policy = DomainRuntimePolicy()
+        url = _make_url("boundary.com")
+        policy.record_failure(url, failure_type="timeout")  # +1.0
+        policy.record_failure(url, failure_type="timeout")  # +1.0 → 2.0, cooldown
+        entry = policy.get_or_create(url)
+        assert entry.cooldown_until > time_module.monotonic()
+        # One success reduces pressure to 1.5 (< 2.0) → cooldown clears
+        policy.record_success(url)
+        assert entry.cooldown_until == 0.0
+
+
+class TestFailureWeight:
+    """Parametrized tests for _get_failure_weight."""
+
+    @pytest.mark.parametrize(
+        "failure_type, expected_weight",
+        [
+            ("429", 1.0),
+            ("rate_limit", 1.0),
+            ("anti_bot", 1.0),
+            ("captcha", 1.0),
+            ("blocked", 1.0),
+            ("timeout", 1.0),
+            ("access_denied", 1.0),
+            ("robots_denied", 1.0),
+            ("empty_shell", 0.5),
+            ("session_expired", 0.5),
+            ("browser_crash", 0.5),
+            ("render_starvation", 0.5),
+            ("zero_records_extracted", 0.2),
+            ("selector_mismatch", 0.2),
+            ("low_quality_records", 0.2),
+            ("unknown_error", 0.5),
+            ("", 0.5),
+        ],
+    )
+    def test_get_failure_weight(self, failure_type: str, expected_weight: float) -> None:
+        policy = DomainRuntimePolicy()
+        assert policy._get_failure_weight(failure_type) == expected_weight
+
+
+class TestRecommendedActionBranches:
+    """Tests for recommended_action edge cases."""
+
+    def test_antibot_blocks_without_cooldown(self) -> None:
+        policy = DomainRuntimePolicy()
+        url = _make_url("antibot-nocooldown.com")
+        entry = policy.get_or_create(url)
+        entry.recent_antibot_blocks = 3
+        entry.recent_rate_limits = 0
+        entry.cooldown_until = 0.0
+        action = policy.recommended_action(url)
+        assert "use_authorized_access" in action, f"Expected authorized_access hint, got: {action}"
+
+    def test_rate_limits_without_cooldown(self) -> None:
+        policy = DomainRuntimePolicy()
+        url = _make_url("ratelimit-nocooldown.com")
+        entry = policy.get_or_create(url)
+        entry.recent_antibot_blocks = 0
+        entry.recent_rate_limits = 3
+        entry.cooldown_until = 0.0
+        action = policy.recommended_action(url)
+        assert "retry_later_or_reduce_request_rate" in action, f"Expected rate-limit hint, got: {action}"
