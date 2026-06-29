@@ -12,6 +12,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
+from prometheus_client import Gauge, Histogram
+from prometheus_client.core import CollectorRegistry
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -313,7 +315,7 @@ async def extraction_health(
         get_request_latencies,
     )
 
-    now = _dt.datetime.now(_dt.timezone.utc)
+    now = _dt.datetime.now(_dt.UTC)
 
     # ── Success rate ───────────────────────────────────────────────────
     domain_counts = get_domain_extraction_counts()
@@ -348,7 +350,7 @@ async def extraction_health(
 
     for _key, counts in domain_counts.items():
         if _key.startswith("layer:"):
-            layer_name = _key[len("layer:"):]
+            layer_name = _key[len("layer:") :]
             layer_latencies[layer_name] = {"p95_latency_seconds": global_p95}
 
     # ── Top 10 failing domains ─────────────────────────────────────────
@@ -392,7 +394,7 @@ async def extraction_rate(
 
     from app.metrics_collector import get_request_rate, get_requests_total
 
-    now = _dt.datetime.now(_dt.timezone.utc)
+    now = _dt.datetime.now(_dt.UTC)
     total = get_requests_total()
     rates: dict[str, float] = {}
     for label, window_secs in [("1m", 60), ("5m", 300), ("15m", 900)]:
@@ -1274,13 +1276,11 @@ async def metrics(request: Request):
     if rejection:
         return rejection
 
-
     try:
-        from prometheus_client import Gauge, Histogram, generate_latest
+        from prometheus_client import generate_latest
     except ModuleNotFoundError:
         content = await run_in_threadpool(_render_basic_metrics_text)
         return Response(content=content, media_type="text/plain")
-    from prometheus_client.core import CollectorRegistry
 
     registry = CollectorRegistry()
 

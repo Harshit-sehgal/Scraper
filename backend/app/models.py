@@ -502,6 +502,32 @@ class Job(BaseModel):
         description="Custom User-Agent string for this job. Empty means use platform default.",
         max_length=512,
     )
+    # JS wait condition overrides (Roadmap Wave 5, Item 3)
+    wait_for_selector: str | None = Field(
+        default=None,
+        description="CSS selector to wait for before extraction. None = no custom selector wait.",
+        max_length=500,
+    )
+    wait_for_function: str | None = Field(
+        default=None,
+        description=("JavaScript expression that must evaluate to truthy before extraction. None = no custom function wait."),
+        max_length=2048,
+    )
+    wait_for_timeout: int | None = Field(
+        default=None,
+        ge=0,
+        le=120_000,
+        description=(
+            "Explicit timeout (ms) to wait after navigation before extraction. None = use platform default hydration logic."
+        ),
+    )
+    wait_for_navigation: bool | None = Field(
+        default=None,
+        description=(
+            "If true, wait for a page navigation event after the initial load "
+            "(useful for JS redirects). None = platform default (no extra wait)."
+        ),
+    )
 
 
 class JobHeadersUpdate(BaseModel):
@@ -571,6 +597,40 @@ class JobWebhookUpdate(BaseModel):
         return self
 
 
+class JobWaitConditionsUpdate(BaseModel):
+    """Request body to update per-job JS wait condition configuration.
+
+    All fields are optional; absent fields leave existing values unchanged.
+    Set a field to ``null`` to clear it (restore platform default behaviour).
+    """
+
+    wait_for_selector: str | None = Field(
+        default=None,
+        description="CSS selector to wait for before extraction. None = no custom selector wait.",
+        max_length=500,
+    )
+    wait_for_function: str | None = Field(
+        default=None,
+        description=("JavaScript expression that must evaluate to truthy before extraction. None = no custom function wait."),
+        max_length=2048,
+    )
+    wait_for_timeout: int | None = Field(
+        default=None,
+        ge=0,
+        le=120_000,
+        description=(
+            "Explicit timeout (ms) to wait after navigation before extraction. None = use platform default hydration logic."
+        ),
+    )
+    wait_for_navigation: bool | None = Field(
+        default=None,
+        description=(
+            "If true, wait for a page navigation event after the initial load "
+            "(useful for JS redirects). None = platform default (no extra wait)."
+        ),
+    )
+
+
 class JobStrategyUpdate(BaseModel):
     """Request body to update a job's fetch strategy."""
 
@@ -589,6 +649,33 @@ class JobStrategyUpdate(BaseModel):
                 msg = f"fetch_strategy must be one of {sorted(FETCH_STRATEGY_VALUES)}, got {self.fetch_strategy!r}"
                 raise ValueError(msg)
         return self
+
+
+class FetchStrategyUpdate(BaseModel):
+    """Request body to update a job's fetch strategy (Literal-strained variant).
+
+    Accepts the same values as ``JobStrategyUpdate`` but uses a
+    ``Literal`` type so OpenAPI documentation and client code generators
+    can enumerate the valid strategies without inspecting the
+    ``strategy_evolution`` module at runtime.
+    """
+
+    strategy: Literal[
+        "playwright_full",
+        "playwright_lightweight",
+        "playwright_stealth",
+        "httpx_basic",
+        "httpx_with_ua",
+        "httpx_smart",
+        "hybrid",
+        "cached",
+    ] = Field(
+        ...,
+        description="Fetch strategy to use. The empty-string reset supported by "
+        "JobStrategyUpdate is not available via this model — callers that "
+        "need auto-select should use ``PATCH /api/jobs/{id}/strategy`` with "
+        '``fetch_strategy: ""``.',
+    )
 
 
 class JobExtractionUpdate(BaseModel):
@@ -1254,3 +1341,102 @@ class RemoveDenylistResponse(BaseModel):
     message: str
     domain: str
     path_prefix: str
+
+
+# ─── Extraction Templates ──────────────────────────────────────────────────
+
+
+class ExtractionTemplateCreate(BaseModel):
+    """Request body to create a new extraction template."""
+
+    name: str = Field(..., max_length=255, description="Template name")
+    config: dict[str, Any] = Field(default_factory=dict, description="Extraction configuration overrides")
+    schema_fields: list[SchemaField] = Field(default_factory=list, max_length=50)
+    selectors_map: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExtractionTemplateUpdate(BaseModel):
+    """Request body to update an extraction template."""
+
+    name: str | None = Field(default=None, max_length=255)
+    config: dict[str, Any] | None = None
+    schema_fields: list[SchemaField] | None = None
+    selectors_map: dict[str, Any] | None = None
+
+
+class ExtractionTemplate(BaseModel):
+    """A reusable extraction template."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    name: str = Field("", max_length=255)
+    config: dict[str, Any] = Field(default_factory=dict)
+    schema_fields: list[SchemaField] = Field(default_factory=list)
+    selectors_map: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+
+
+# ─── Batch Submission ─────────────────────────────────────────────────────
+
+
+class BatchSubmitRequest(BaseModel):
+    """Request body to submit multiple URLs as a single batch."""
+
+    urls: list[str] = Field(..., max_length=1000, description="List of URLs to scrape")
+    name: str = Field("batch", max_length=255)
+    schema_fields: list[SchemaField] = Field(default_factory=list, max_length=50)
+    headers: dict[str, str] = Field(default_factory=dict)
+    cookies: dict[str, str] = Field(default_factory=dict)
+
+
+class BatchSubmitResponse(BaseModel):
+    """Response for batch URL submission."""
+
+    jobs: list[dict[str, Any]]
+    batch_id: str
+    total_urls: int
+    message: str
+
+
+class JobCloneRequest(BaseModel):
+    """Request body to clone a job."""
+
+    name: str | None = Field(default=None, max_length=255, description="Name for the cloned job")
+    urls: list[str] | None = Field(default=None, description="Override URLs for the cloned job")
+
+
+class EmailDeliveryRequest(BaseModel):
+    """Request body to email job results."""
+
+    recipients: list[str] = Field(..., max_length=10, description="Email recipients")
+    format: str = Field("csv", max_length=16, description="Export format (csv, json)")
+    subject: str | None = Field(default=None, max_length=255)
+
+
+class NotificationChannelCreate(BaseModel):
+    """Request body to create a notification channel."""
+
+    type: str = Field(..., max_length=32, description="Channel type: slack, teams, discord, email")
+    webhook_url: str = Field(..., max_length=2048, description="Webhook URL for the channel")
+    events: list[str] = Field(default_factory=lambda: ["completed"], description="Events to notify on")
+
+
+class NotificationChannelUpdate(BaseModel):
+    """Request body to update a notification channel."""
+
+    webhook_url: str | None = Field(default=None, max_length=2048)
+    events: list[str] | None = None
+    enabled: bool | None = None
+
+
+class NotificationChannel(BaseModel):
+    """A notification channel for a job."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    job_id: str = Field("", max_length=64)
+    type: str = Field("", max_length=32)
+    webhook_url: str = Field("", max_length=2048)
+    events: list[str] = Field(default_factory=list)
+    enabled: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)

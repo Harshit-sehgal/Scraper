@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 from app.config import settings
 from app.container_discovery import (
@@ -973,7 +973,7 @@ async def orchestrate_extraction(
         result = _try_provided_selectors_layer(
             html,
             schema_fields,
-            provided_selectors,
+            cast("dict", provided_selectors),
             url,
             user_intent,
             gate_threshold,
@@ -1015,7 +1015,9 @@ async def orchestrate_extraction(
             return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
 
     # Layers 4-6: Container Discovery → Visible-Text → Regex
-    return await _try_fallback_layers(html, url, schema_fields, gate_threshold, user_intent, network_diagnostics, network_result, provenance_builder)
+    return await _try_fallback_layers(
+        html, url, schema_fields, gate_threshold, user_intent, network_diagnostics, network_result, provenance_builder
+    )
 
 
 def _detect_field_swaps(

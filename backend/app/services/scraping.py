@@ -288,6 +288,10 @@ async def run_scraping_phase(
                         hydration_wait_ms=getattr(job, "hydration_wait_ms", None),
                         scroll_attempts=getattr(job, "scroll_attempts", None),
                         fetch_strategy=getattr(job, "fetch_strategy", None) or None,
+                        wait_for_selector=getattr(job, "wait_for_selector", None),
+                        wait_for_function=getattr(job, "wait_for_function", None),
+                        wait_for_timeout=getattr(job, "wait_for_timeout", None),
+                        wait_for_navigation=getattr(job, "wait_for_navigation", None),
                     ),
                     timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                 )

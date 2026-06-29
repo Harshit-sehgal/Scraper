@@ -143,6 +143,10 @@ async def scrape_url_with_recovery(
     hydration_wait_ms: int | None = None,
     scroll_attempts: int | None = None,
     fetch_strategy: str | None = None,
+    wait_for_selector: str | None = None,
+    wait_for_function: str | None = None,
+    wait_for_timeout: int | None = None,
+    wait_for_navigation: bool | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.
 
@@ -160,7 +164,11 @@ async def scrape_url_with_recovery(
         cookies: Custom cookies for the fetch request.
         hydration_wait_ms: User-override hydration wait (ms); None = platform default
         scroll_attempts: User-override scroll attempt count; None = platform default
-        fetch_strategy: User-requested fetch strategy; None / "" = auto-select
+        fetch_strategy: User-requested fetch strategy; Empty / None = auto-select
+        wait_for_selector: Optional CSS selector to wait for before extraction
+        wait_for_function: Optional JS expression that must evaluate truthy before extraction
+        wait_for_timeout: Optional explicit timeout (ms) to wait after navigation
+        wait_for_navigation: If True, wait for a page navigation event after initial load
 
     Returns:
         Tuple of (results, recovery_stats) where:
@@ -184,6 +192,8 @@ async def scrape_url_with_recovery(
         "recovery_actions_taken": [],
         "failure_classifications": [],
         "total_time_ms": 0.0,
+        "cascade_layers": [],  # Roadmap Wave 5 Item 18
+        "cascade_stop_reason": None,
     }
 
     start_time = time.time()
@@ -200,6 +210,14 @@ async def scrape_url_with_recovery(
         attempt_ctx.scroll_attempts = scroll_attempts
     if fetch_strategy:
         attempt_ctx.fetch_strategy = fetch_strategy
+    if wait_for_selector:
+        attempt_ctx.wait_for_selector = wait_for_selector
+    if wait_for_function:
+        attempt_ctx.wait_for_function = wait_for_function
+    if wait_for_timeout is not None:
+        attempt_ctx.wait_for_timeout = wait_for_timeout
+    if wait_for_navigation is not None:
+        attempt_ctx.wait_for_navigation = wait_for_navigation
     result: Any = None
 
     while attempt < max_recovery_attempts:

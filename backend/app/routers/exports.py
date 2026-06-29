@@ -20,7 +20,10 @@ service module without touching FastAPI machinery.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import os
 import threading
 from typing import Annotated, Any
 
@@ -36,6 +39,54 @@ from app.utils.export import safe_export_filename
 from app.utils.rbac import UserRole, can_access_scoped_resource, require_principal
 
 logger = logging.getLogger(__name__)
+
+# ════════════════════════════════════════════════════════════════════
+# Export HMAC signing (Roadmap Prod Item 19)
+# ════════════════════════════════════════════════════════════════════
+
+_EXPORT_HMAC_KEY_ENV = "DATAFORGE_EXPORT_HMAC_KEY"
+
+
+_HMAC_KEY_CACHE: bytes | None = None
+_HMAC_KEY_LOCK = threading.Lock()
+
+
+def _get_export_hmac_key() -> bytes:
+    """Return the HMAC key for export signing.
+
+    Uses ``DATAFORGE_EXPORT_HMAC_KEY`` env var if set, otherwise
+    derives a stable key from the process's API secret or a host
+    identifier. The key is cached for the lifetime of the process
+    to guarantee deterministic signatures within a deployment.
+    """
+    global _HMAC_KEY_CACHE
+    if _HMAC_KEY_CACHE is not None:
+        return _HMAC_KEY_CACHE
+    with _HMAC_KEY_LOCK:
+        if _HMAC_KEY_CACHE is not None:
+            return _HMAC_KEY_CACHE
+        key = os.environ.get(_EXPORT_HMAC_KEY_ENV, "").strip()
+        if key:
+            _HMAC_KEY_CACHE = key.encode()
+        else:
+            # Derive from process identity for dev / single-server deploys
+            source = getattr(settings, "API_SECRET", os.uname().nodename)
+            if not isinstance(source, str) or not source:
+                source = os.urandom(32).hex()
+            _HMAC_KEY_CACHE = hashlib.sha256(source.encode()).digest()
+    return _HMAC_KEY_CACHE
+
+
+def sign_export_payload(job_id: str, fmt: str, content: bytes) -> str:
+    """Return an HMAC-SHA256 hex digest for export content verification.
+
+    Consumers can verify the export hasn't been tampered with since
+    generation by recomputing the HMAC over the same (job_id, format, body)
+    triple.
+    """
+    key = _get_export_hmac_key()
+    msg = f"{job_id}:{fmt}:".encode() + content
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -284,20 +335,30 @@ def create_exports_router(jobs_store: dict[str, Any]):
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
+            # Compute content signature for integrity verification
+            body_bytes = b"".join(export_service.stream_csv_from_disk(job, load_paginated_job_results_from_disk))
+            sig = sign_export_payload(job_id, "csv", body_bytes)
             return StreamingResponse(
-                export_service.stream_csv_from_disk(job, load_paginated_job_results_from_disk),
+                iter([body_bytes]),
                 media_type="text/csv",
-                headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"'},
+                headers={
+                    "Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"',
+                    "X-Export-Signature": sig,
+                },
             )
 
         try:
             body = export_service.build_csv_bytes(job)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        sig = sign_export_payload(job_id, "csv", body)
         return StreamingResponse(
             iter([body]),
             media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"',
+                "X-Export-Signature": sig,
+            },
         )
 
     @router.get("/api/jobs/{job_id}/export/json")
@@ -330,20 +391,29 @@ def create_exports_router(jobs_store: dict[str, Any]):
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
 
+            body_bytes = b"".join(export_service.stream_json_from_disk(job, load_paginated_job_results_from_disk))
+            sig = sign_export_payload(job_id, "json", body_bytes)
             return StreamingResponse(
-                export_service.stream_json_from_disk(job, load_paginated_job_results_from_disk),
+                iter([body_bytes]),
                 media_type="application/json",
-                headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"'},
+                headers={
+                    "Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"',
+                    "X-Export-Signature": sig,
+                },
             )
 
         try:
             body = export_service.build_json_bytes(job)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        sig = sign_export_payload(job_id, "json", body)
         return StreamingResponse(
             iter([body]),
             media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"',
+                "X-Export-Signature": sig,
+            },
         )
 
     @router.get("/api/jobs/{job_id}/export/excel")
@@ -389,10 +459,14 @@ def create_exports_router(jobs_store: dict[str, Any]):
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        sig = sign_export_payload(job_id, "excel", content_bytes)
         return StreamingResponse(
             iter([content_bytes]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"',
+                "X-Export-Signature": sig,
+            },
         )
 
     # ─── Batch export ────────────────────────────────────────────

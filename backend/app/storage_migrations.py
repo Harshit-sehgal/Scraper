@@ -93,6 +93,428 @@ def maybe_migrate_from_json(conn: sqlite3.Connection, db_path: Path) -> None:
         logger.warning("JSON-to-SQLite migration skipped: %s", e)
 
 
+def _run_migration_v1(conn: sqlite3.Connection) -> int:
+    """Version 1 — create initial jobs and recycle_bin tables."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            mode TEXT NOT NULL DEFAULT 'manual',
+            topic TEXT DEFAULT '',
+            intent TEXT DEFAULT '',
+            urls TEXT NOT NULL DEFAULT '[]',
+            schema_fields TEXT NOT NULL DEFAULT '[]',
+            filters TEXT DEFAULT '[]',
+            results TEXT DEFAULT '[]',
+            logs TEXT DEFAULT '[]',
+            total_records INTEGER DEFAULT 0,
+            filtered_records INTEGER DEFAULT 0,
+            total_llm_calls INTEGER DEFAULT 0,
+            error TEXT DEFAULT '',
+            warnings TEXT DEFAULT '',
+            quality_report TEXT DEFAULT '{}',
+            analysis TEXT DEFAULT '',
+            discovered_urls TEXT DEFAULT '[]',
+            selectors_map TEXT DEFAULT '{}',
+            search_params TEXT DEFAULT '{}',
+            max_pages INTEGER DEFAULT 0,
+            progress_current INTEGER DEFAULT 0,
+            progress_total INTEGER DEFAULT 0,
+            estimated_cost_usd REAL DEFAULT 0,
+            cancel_requested INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT '',
+            completed_at TEXT DEFAULT '',
+            min_record_score REAL DEFAULT 0.35,
+            acquisition_mode TEXT DEFAULT 'standard',
+            search_params_json TEXT DEFAULT '{}',
+            location TEXT DEFAULT '',
+            preferred_domain TEXT DEFAULT '',
+            source_policy TEXT DEFAULT 'all_sources',
+            max_per_domain INTEGER DEFAULT 4,
+            origin_location TEXT DEFAULT '',
+            max_distance_km REAL DEFAULT NULL,
+            pagination INTEGER DEFAULT 0,
+            deduplicate INTEGER DEFAULT 1,
+            deduplicate_field TEXT DEFAULT '',
+            started_at TEXT DEFAULT '',
+            results_on_disk INTEGER DEFAULT 0,
+            results_file_path TEXT DEFAULT '',
+            headers TEXT DEFAULT '{}',
+            cookies TEXT DEFAULT '{}'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recycle_bin (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'manual',
+            topic TEXT DEFAULT '',
+            intent TEXT DEFAULT '',
+            urls TEXT NOT NULL DEFAULT '[]',
+            schema_fields TEXT NOT NULL DEFAULT '[]',
+            filters TEXT DEFAULT '[]',
+            results TEXT DEFAULT '[]',
+            logs TEXT DEFAULT '[]',
+            total_records INTEGER DEFAULT 0,
+            filtered_records INTEGER DEFAULT 0,
+            total_llm_calls INTEGER DEFAULT 0,
+            error TEXT DEFAULT '',
+            warnings TEXT DEFAULT '',
+            quality_report TEXT DEFAULT '{}',
+            analysis TEXT DEFAULT '',
+            discovered_urls TEXT DEFAULT '[]',
+            selectors_map TEXT DEFAULT '{}',
+            search_params TEXT DEFAULT '{}',
+            max_pages INTEGER DEFAULT 0,
+            progress_current INTEGER DEFAULT 0,
+            progress_total INTEGER DEFAULT 0,
+            estimated_cost_usd REAL DEFAULT 0,
+            cancel_requested INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT '',
+            completed_at TEXT DEFAULT '',
+            deleted_at TEXT DEFAULT '',
+            min_record_score REAL DEFAULT 0.35,
+            acquisition_mode TEXT DEFAULT 'standard',
+            search_params_json TEXT DEFAULT '{}',
+            location TEXT DEFAULT '',
+            preferred_domain TEXT DEFAULT '',
+            source_policy TEXT DEFAULT 'all_sources',
+            max_per_domain INTEGER DEFAULT 4,
+            origin_location TEXT DEFAULT '',
+            max_distance_km REAL DEFAULT NULL,
+            pagination INTEGER DEFAULT 0,
+            deduplicate INTEGER DEFAULT 1,
+            deduplicate_field TEXT DEFAULT '',
+            started_at TEXT DEFAULT '',
+            results_on_disk INTEGER DEFAULT 0,
+            results_file_path TEXT DEFAULT ''
+        )
+    """)
+    return 1
+
+
+def _run_migration_v2(conn: sqlite3.Connection) -> int:
+    """Version 2 — recreate recycle_bin table with headers/cookies columns."""
+    try:
+        cursor = conn.execute("PRAGMA table_info(recycle_bin)")
+        existing_cols = [r["name"] for r in cursor.fetchall()]
+        existing = [dict(row) for row in conn.execute("SELECT * FROM recycle_bin").fetchall()]
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        existing_cols = []
+        existing = []
+
+    conn.execute("DROP TABLE IF EXISTS recycle_bin")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recycle_bin (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'manual',
+            topic TEXT DEFAULT '',
+            intent TEXT DEFAULT '',
+            urls TEXT NOT NULL DEFAULT '[]',
+            schema_fields TEXT NOT NULL DEFAULT '[]',
+            filters TEXT DEFAULT '[]',
+            results TEXT DEFAULT '[]',
+            logs TEXT DEFAULT '[]',
+            total_records INTEGER DEFAULT 0,
+            filtered_records INTEGER DEFAULT 0,
+            total_llm_calls INTEGER DEFAULT 0,
+            error TEXT DEFAULT '',
+            warnings TEXT DEFAULT '',
+            quality_report TEXT DEFAULT '{}',
+            analysis TEXT DEFAULT '',
+            discovered_urls TEXT DEFAULT '[]',
+            selectors_map TEXT DEFAULT '{}',
+            search_params TEXT DEFAULT '{}',
+            max_pages INTEGER DEFAULT 0,
+            progress_current INTEGER DEFAULT 0,
+            progress_total INTEGER DEFAULT 0,
+            estimated_cost_usd REAL DEFAULT 0,
+            cancel_requested INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT '',
+            completed_at TEXT DEFAULT '',
+            deleted_at TEXT DEFAULT '',
+            min_record_score REAL DEFAULT 0.35,
+            acquisition_mode TEXT DEFAULT 'standard',
+            search_params_json TEXT DEFAULT '{}',
+            location TEXT DEFAULT '',
+            preferred_domain TEXT DEFAULT '',
+            source_policy TEXT DEFAULT 'all_sources',
+            max_per_domain INTEGER DEFAULT 4,
+            origin_location TEXT DEFAULT '',
+            max_distance_km REAL DEFAULT NULL,
+            pagination INTEGER DEFAULT 0,
+            deduplicate INTEGER DEFAULT 1,
+            deduplicate_field TEXT DEFAULT '',
+            started_at TEXT DEFAULT '',
+            results_on_disk INTEGER DEFAULT 0,
+            results_file_path TEXT DEFAULT '',
+            headers TEXT DEFAULT '{}',
+            cookies TEXT DEFAULT '{}'
+        )
+    """)
+
+    if existing and existing_cols:
+        cursor = conn.execute("PRAGMA table_info(recycle_bin)")
+        new_cols = [r["name"] for r in cursor.fetchall()]
+        overlapping_cols = [col for col in existing_cols if col in new_cols]
+        if overlapping_cols:
+            cols_str = ", ".join(overlapping_cols)
+            placeholders = ", ".join("?" for _ in overlapping_cols)
+            for r in existing:
+                vals = [r.get(col) for col in overlapping_cols]
+                conn.execute(
+                    f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})",
+                    vals,
+                )
+    return 2
+
+
+def _run_migration_v3(conn: sqlite3.Connection) -> int:
+    """Version 3 — add discovery/display columns to jobs and recycle_bin."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        v3_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        new_fields = {
+            "location": "TEXT DEFAULT ''",
+            "preferred_domain": "TEXT DEFAULT ''",
+            "source_policy": "TEXT DEFAULT 'all_sources'",
+            "max_per_domain": "INTEGER DEFAULT 4",
+            "origin_location": "TEXT DEFAULT ''",
+            "max_distance_km": "REAL DEFAULT NULL",
+            "pagination": "INTEGER DEFAULT 0",
+            "deduplicate": "INTEGER DEFAULT 1",
+            "deduplicate_field": "TEXT DEFAULT ''",
+            "started_at": "TEXT DEFAULT ''",
+            "results_on_disk": "INTEGER DEFAULT 0",
+            "results_file_path": "TEXT DEFAULT ''",
+        }
+        for col_name, col_def in new_fields.items():
+            if col_name not in v3_cols:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
+    return 3
+
+
+def _run_migration_v4(conn: sqlite3.Connection) -> int:
+    """Version 4 — create job_results, job_events, idempotency_keys tables."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS job_results (
+            job_id TEXT NOT NULL,
+            result_index INTEGER NOT NULL,
+            payload TEXT NOT NULL,
+            PRIMARY KEY (job_id, result_index)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS job_events (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL,
+            timestamp TEXT NOT NULL DEFAULT '',
+            level TEXT NOT NULL DEFAULT 'info',
+            message TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_job_events_job_id ON job_events(job_id, event_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_job_results_job_id ON job_results(job_id)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS idempotency_keys (
+            idem_key TEXT PRIMARY KEY,
+            job_id TEXT NOT NULL,
+            request_fingerprint TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)")
+    return 4
+
+
+def _run_migration_v5(conn: sqlite3.Connection) -> int:
+    """Version 5 — create worker_heartbeats table."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS worker_heartbeats (
+            worker_id TEXT PRIMARY KEY,
+            last_heartbeat TEXT NOT NULL,
+            hostname TEXT NOT NULL DEFAULT '',
+            pid INTEGER NOT NULL DEFAULT 0,
+            started_at TEXT NOT NULL DEFAULT ''
+        )
+    """)
+    return 5
+
+
+def _run_migration_v6(conn: sqlite3.Connection) -> int:
+    """Version 6 — migrate worker_heartbeats to composite PK (worker_id, pid)."""
+    backup_dropped = False
+    try:
+        conn.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
+        conn.execute("""
+            CREATE TABLE worker_heartbeats (
+                worker_id TEXT NOT NULL,
+                last_heartbeat TEXT NOT NULL,
+                hostname TEXT NOT NULL DEFAULT '',
+                pid INTEGER NOT NULL DEFAULT 0,
+                started_at TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (worker_id, pid)
+            )
+        """)
+        try:
+            conn.execute(
+                """
+                INSERT INTO worker_heartbeats
+                    (worker_id, last_heartbeat, hostname, pid, started_at)
+                SELECT worker_id, last_heartbeat, hostname, pid, started_at
+                FROM (
+                    SELECT
+                        worker_id, last_heartbeat, hostname, pid, started_at,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY worker_id, pid
+                            ORDER BY last_heartbeat DESC
+                        ) AS rn
+                    FROM worker_heartbeats_v5_backup
+                ) latest
+                WHERE rn = 1
+                """,
+            )
+        except Exception:
+            conn.execute("DROP TABLE worker_heartbeats")
+            conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
+            raise
+    finally:
+        if not backup_dropped:
+            try:
+                conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
+                backup_dropped = True
+            except Exception:
+                logger.debug(
+                    "L4: deferred DROP of worker_heartbeats_v5_backup failed; will retry on next migration run",
+                    exc_info=True,
+                )
+    try:
+        conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
+        backup_dropped = True
+    except Exception:
+        logger.debug("L4: explicit DROP of worker_heartbeats_v5_backup failed", exc_info=True)
+    return 6
+
+
+def _run_migration_v7(conn: sqlite3.Connection) -> int:
+    """Version 7 — add created_by column to jobs and recycle_bin."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        v7_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        if "created_by" not in v7_cols:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN created_by TEXT DEFAULT ''")
+    return 7
+
+
+def _run_migration_v8(conn: sqlite3.Connection) -> int:
+    """Version 8 — add org_id and project_id columns."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        v8_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        if "org_id" not in v8_cols:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN org_id TEXT DEFAULT ''")
+        if "project_id" not in v8_cols:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN project_id TEXT DEFAULT ''")
+    return 8
+
+
+def _run_migration_v9(conn: sqlite3.Connection) -> int:
+    """Version 9 — create workflows table."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workflows (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL DEFAULT '',
+            description TEXT DEFAULT '',
+            user_id TEXT DEFAULT '',
+            org_id TEXT DEFAULT '',
+            project_id TEXT DEFAULT '',
+            mode TEXT DEFAULT 'workflow_replay',
+            domain TEXT DEFAULT '',
+            start_url TEXT DEFAULT '',
+            original_url TEXT DEFAULT '',
+            search_params TEXT DEFAULT '{}',
+            steps TEXT DEFAULT '[]',
+            extraction_schema TEXT DEFAULT '[]',
+            pagination_config TEXT DEFAULT '{}',
+            auth_profile_id TEXT DEFAULT NULL,
+            status TEXT DEFAULT 'draft',
+            version INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT '',
+            updated_at TEXT DEFAULT '',
+            last_run_at TEXT DEFAULT '',
+            last_success_at TEXT DEFAULT '',
+            last_failure_reason TEXT DEFAULT '',
+            last_run_job_id TEXT DEFAULT '',
+            total_runs INTEGER DEFAULT 0
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_org_id ON workflows(org_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_project_id ON workflows(project_id)")
+    return 9
+
+
+def _run_migration_v10(conn: sqlite3.Connection) -> int:
+    """Version 10 — add headers and cookies columns."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        v10_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        if "headers" not in v10_cols:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN headers TEXT DEFAULT '{{}}'")
+        if "cookies" not in v10_cols:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN cookies TEXT DEFAULT '{{}}'")
+    return 10
+
+
+def _run_migration_v11(conn: sqlite3.Connection) -> int:
+    """Version 11 — add webhook + fetch_strategy columns."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        v11_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        additions = [
+            ("webhook_url", "TEXT DEFAULT ''"),
+            ("webhook_secret", "TEXT DEFAULT ''"),
+            ("webhook_delivered", "BOOLEAN DEFAULT FALSE"),
+            ("webhook_delivered_at", "TEXT DEFAULT ''"),
+            ("fetch_strategy", "TEXT DEFAULT ''"),
+        ]
+        for col_name, col_ddl in additions:
+            if col_name not in v11_cols:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}")
+    return 11
+
+
+def _run_migration_v12(conn: sqlite3.Connection) -> int:
+    """Version 12 — add extraction-config columns."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        v12_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        for col_name, col_ddl in [
+            ("hydration_wait_ms", "INTEGER DEFAULT 0"),
+            ("scroll_attempts", "INTEGER DEFAULT 0"),
+            ("request_delay_ms", "INTEGER DEFAULT 0"),
+            ("max_concurrent_urls", "INTEGER DEFAULT 4"),
+        ]:
+            if col_name not in v12_cols:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}")
+    return 12
+
+
+def _add_hot_path_indexes(conn: sqlite3.Connection) -> None:
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_org_id ON jobs(org_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at)")
+
+
 def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
     """Run SQLite database migrations."""
     conn.execute("""
@@ -103,429 +525,33 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
     row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
     current = row[0] if row and row[0] is not None else 0
 
+    _MIGRATION_STEPS: list[tuple[int, Callable[[sqlite3.Connection], int]]] = [
+        (1, _run_migration_v1),
+        (2, _run_migration_v2),
+        (3, _run_migration_v3),
+        (4, _run_migration_v4),
+        (5, _run_migration_v5),
+        (6, _run_migration_v6),
+        (7, _run_migration_v7),
+        (8, _run_migration_v8),
+        (9, _run_migration_v9),
+        (10, _run_migration_v10),
+        (11, _run_migration_v11),
+        (12, _run_migration_v12),
+    ]
+
     if current < SQLITE_SCHEMA_VERSION:
-        if current < 1:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS jobs (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    mode TEXT NOT NULL DEFAULT 'manual',
-                    topic TEXT DEFAULT '',
-                    intent TEXT DEFAULT '',
-                    urls TEXT NOT NULL DEFAULT '[]',
-                    schema_fields TEXT NOT NULL DEFAULT '[]',
-                    filters TEXT DEFAULT '[]',
-                    results TEXT DEFAULT '[]',
-                    logs TEXT DEFAULT '[]',
-                    total_records INTEGER DEFAULT 0,
-                    filtered_records INTEGER DEFAULT 0,
-                    total_llm_calls INTEGER DEFAULT 0,
-                    error TEXT DEFAULT '',
-                    warnings TEXT DEFAULT '',
-                    quality_report TEXT DEFAULT '{}',
-                    analysis TEXT DEFAULT '',
-                    discovered_urls TEXT DEFAULT '[]',
-                    selectors_map TEXT DEFAULT '{}',
-                    search_params TEXT DEFAULT '{}',
-                    max_pages INTEGER DEFAULT 0,
-                    progress_current INTEGER DEFAULT 0,
-                    progress_total INTEGER DEFAULT 0,
-                    estimated_cost_usd REAL DEFAULT 0,
-                    cancel_requested INTEGER DEFAULT 0,
-                    created_at TEXT DEFAULT '',
-                    completed_at TEXT DEFAULT '',
-                    min_record_score REAL DEFAULT 0.35,
-                    acquisition_mode TEXT DEFAULT 'standard',
-                    search_params_json TEXT DEFAULT '{}',
-                    location TEXT DEFAULT '',
-                    preferred_domain TEXT DEFAULT '',
-                    source_policy TEXT DEFAULT 'all_sources',
-                    max_per_domain INTEGER DEFAULT 4,
-                    origin_location TEXT DEFAULT '',
-                    max_distance_km REAL DEFAULT NULL,
-                    pagination INTEGER DEFAULT 0,
-                    deduplicate INTEGER DEFAULT 1,
-                    deduplicate_field TEXT DEFAULT '',
-                    started_at TEXT DEFAULT '',
-                    results_on_disk INTEGER DEFAULT 0,
-                    results_file_path TEXT DEFAULT '',
-                    headers TEXT DEFAULT '{}',
-                    cookies TEXT DEFAULT '{}'
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS recycle_bin (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    mode TEXT NOT NULL DEFAULT 'manual',
-                    topic TEXT DEFAULT '',
-                    intent TEXT DEFAULT '',
-                    urls TEXT NOT NULL DEFAULT '[]',
-                    schema_fields TEXT NOT NULL DEFAULT '[]',
-                    filters TEXT DEFAULT '[]',
-                    results TEXT DEFAULT '[]',
-                    logs TEXT DEFAULT '[]',
-                    total_records INTEGER DEFAULT 0,
-                    filtered_records INTEGER DEFAULT 0,
-                    total_llm_calls INTEGER DEFAULT 0,
-                    error TEXT DEFAULT '',
-                    warnings TEXT DEFAULT '',
-                    quality_report TEXT DEFAULT '{}',
-                    analysis TEXT DEFAULT '',
-                    discovered_urls TEXT DEFAULT '[]',
-                    selectors_map TEXT DEFAULT '{}',
-                    search_params TEXT DEFAULT '{}',
-                    max_pages INTEGER DEFAULT 0,
-                    progress_current INTEGER DEFAULT 0,
-                    progress_total INTEGER DEFAULT 0,
-                    estimated_cost_usd REAL DEFAULT 0,
-                    cancel_requested INTEGER DEFAULT 0,
-                    created_at TEXT DEFAULT '',
-                    completed_at TEXT DEFAULT '',
-                    deleted_at TEXT DEFAULT '',
-                    min_record_score REAL DEFAULT 0.35,
-                    acquisition_mode TEXT DEFAULT 'standard',
-                    search_params_json TEXT DEFAULT '{}',
-                    location TEXT DEFAULT '',
-                    preferred_domain TEXT DEFAULT '',
-                    source_policy TEXT DEFAULT 'all_sources',
-                    max_per_domain INTEGER DEFAULT 4,
-                    origin_location TEXT DEFAULT '',
-                    max_distance_km REAL DEFAULT NULL,
-                    pagination INTEGER DEFAULT 0,
-                    deduplicate INTEGER DEFAULT 1,
-                    deduplicate_field TEXT DEFAULT '',
-                    started_at TEXT DEFAULT '',
-                    results_on_disk INTEGER DEFAULT 0,
-                    results_file_path TEXT DEFAULT ''
-                )
-            """)
-            current = 1
-
-        if current < 2:
-            try:
-                cursor = conn.execute("PRAGMA table_info(recycle_bin)")
-                existing_cols = [r["name"] for r in cursor.fetchall()]
-                existing = [dict(row) for row in conn.execute("SELECT * FROM recycle_bin").fetchall()]
-            except (sqlite3.OperationalError, sqlite3.DatabaseError):
-                existing_cols = []
-                existing = []
-
-            conn.execute("DROP TABLE IF EXISTS recycle_bin")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS recycle_bin (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    mode TEXT NOT NULL DEFAULT 'manual',
-                    topic TEXT DEFAULT '',
-                    intent TEXT DEFAULT '',
-                    urls TEXT NOT NULL DEFAULT '[]',
-                    schema_fields TEXT NOT NULL DEFAULT '[]',
-                    filters TEXT DEFAULT '[]',
-                    results TEXT DEFAULT '[]',
-                    logs TEXT DEFAULT '[]',
-                    total_records INTEGER DEFAULT 0,
-                    filtered_records INTEGER DEFAULT 0,
-                    total_llm_calls INTEGER DEFAULT 0,
-                    error TEXT DEFAULT '',
-                    warnings TEXT DEFAULT '',
-                    quality_report TEXT DEFAULT '{}',
-                    analysis TEXT DEFAULT '',
-                    discovered_urls TEXT DEFAULT '[]',
-                    selectors_map TEXT DEFAULT '{}',
-                    search_params TEXT DEFAULT '{}',
-                    max_pages INTEGER DEFAULT 0,
-                    progress_current INTEGER DEFAULT 0,
-                    progress_total INTEGER DEFAULT 0,
-                    estimated_cost_usd REAL DEFAULT 0,
-                    cancel_requested INTEGER DEFAULT 0,
-                    created_at TEXT DEFAULT '',
-                    completed_at TEXT DEFAULT '',
-                    deleted_at TEXT DEFAULT '',
-                    min_record_score REAL DEFAULT 0.35,
-                    acquisition_mode TEXT DEFAULT 'standard',
-                    search_params_json TEXT DEFAULT '{}',
-                    location TEXT DEFAULT '',
-                    preferred_domain TEXT DEFAULT '',
-                    source_policy TEXT DEFAULT 'all_sources',
-                    max_per_domain INTEGER DEFAULT 4,
-                    origin_location TEXT DEFAULT '',
-                    max_distance_km REAL DEFAULT NULL,
-                    pagination INTEGER DEFAULT 0,
-                    deduplicate INTEGER DEFAULT 1,
-                    deduplicate_field TEXT DEFAULT '',
-                    started_at TEXT DEFAULT '',
-                    results_on_disk INTEGER DEFAULT 0,
-                    results_file_path TEXT DEFAULT '',
-                    headers TEXT DEFAULT '{}',
-                    cookies TEXT DEFAULT '{}'
-                )
-            """)
-
-            if existing and existing_cols:
-                cursor = conn.execute("PRAGMA table_info(recycle_bin)")
-                new_cols = [r["name"] for r in cursor.fetchall()]
-                overlapping_cols = [col for col in existing_cols if col in new_cols]
-                if overlapping_cols:
-                    cols_str = ", ".join(overlapping_cols)
-                    placeholders = ", ".join("?" for _ in overlapping_cols)
-                    for r in existing:
-                        vals = [r.get(col) for col in overlapping_cols]
-                        conn.execute(
-                            f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})",
-                            vals,
-                        )
-            current = 2
-
-        if current < 3:
-            for table_name in ["jobs", "recycle_bin"]:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                v3_cols: set[str] = {r["name"] for r in cursor.fetchall()}
-                new_fields = {
-                    "location": "TEXT DEFAULT ''",
-                    "preferred_domain": "TEXT DEFAULT ''",
-                    "source_policy": "TEXT DEFAULT 'all_sources'",
-                    "max_per_domain": "INTEGER DEFAULT 4",
-                    "origin_location": "TEXT DEFAULT ''",
-                    "max_distance_km": "REAL DEFAULT NULL",
-                    "pagination": "INTEGER DEFAULT 0",
-                    "deduplicate": "INTEGER DEFAULT 1",
-                    "deduplicate_field": "TEXT DEFAULT ''",
-                    "started_at": "TEXT DEFAULT ''",
-                    "results_on_disk": "INTEGER DEFAULT 0",
-                    "results_file_path": "TEXT DEFAULT ''",
-                }
-                for col_name, col_def in new_fields.items():
-                    if col_name not in v3_cols:
-                        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
-            current = 3
-
-        if current < 4:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS job_results (
-                    job_id TEXT NOT NULL,
-                    result_index INTEGER NOT NULL,
-                    payload TEXT NOT NULL,
-                    PRIMARY KEY (job_id, result_index)
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS job_events (
-                    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    job_id TEXT NOT NULL,
-                    timestamp TEXT NOT NULL DEFAULT '',
-                    level TEXT NOT NULL DEFAULT 'info',
-                    message TEXT NOT NULL
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_job_events_job_id ON job_events(job_id, event_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_job_results_job_id ON job_results(job_id)")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS idempotency_keys (
-                    idem_key TEXT PRIMARY KEY,
-                    job_id TEXT NOT NULL,
-                    request_fingerprint TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)")
-            current = 4
-
-        if current < 5:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS worker_heartbeats (
-                    worker_id TEXT PRIMARY KEY,
-                    last_heartbeat TEXT NOT NULL,
-                    hostname TEXT NOT NULL DEFAULT '',
-                    pid INTEGER NOT NULL DEFAULT 0,
-                    started_at TEXT NOT NULL DEFAULT ''
-                )
-            """)
-            current = 5
-
-        if current < 6:
-            backup_dropped = False
-            try:
-                conn.execute("ALTER TABLE worker_heartbeats RENAME TO worker_heartbeats_v5_backup")
-                conn.execute("""
-                    CREATE TABLE worker_heartbeats (
-                        worker_id TEXT NOT NULL,
-                        last_heartbeat TEXT NOT NULL,
-                        hostname TEXT NOT NULL DEFAULT '',
-                        pid INTEGER NOT NULL DEFAULT 0,
-                        started_at TEXT NOT NULL DEFAULT '',
-                        PRIMARY KEY (worker_id, pid)
-                    )
-                """)
-                try:
-                    conn.execute(
-                        """
-                        INSERT INTO worker_heartbeats
-                            (worker_id, last_heartbeat, hostname, pid, started_at)
-                        SELECT worker_id, last_heartbeat, hostname, pid, started_at
-                        FROM (
-                            SELECT
-                                worker_id, last_heartbeat, hostname, pid, started_at,
-                                ROW_NUMBER() OVER (
-                                    PARTITION BY worker_id, pid
-                                    ORDER BY last_heartbeat DESC
-                                ) AS rn
-                            FROM worker_heartbeats_v5_backup
-                        ) latest
-                        WHERE rn = 1
-                        """,
-                    )
-                except Exception:
-                    conn.execute("DROP TABLE worker_heartbeats")
-                    conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
-                    raise
-            finally:
-                # L4: ensure the backup table is always removed even if
-                # the migration is interrupted after the ALTER RENAME
-                # succeeded but before the explicit DROP — leaving the
-                # backup orphan would confuse the next migration run's
-                # version check and silently consume disk. We swallow
-                # any error here so a failure to drop doesn't mask the
-                # original exception (if any).
-                if not backup_dropped:
-                    try:
-                        conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
-                        backup_dropped = True
-                    except Exception:
-                        logger.debug(
-                            "L4: deferred DROP of worker_heartbeats_v5_backup failed; will retry on next migration run",
-                            exc_info=True,
-                        )
-            # Explicit drop after the successful path — idempotent with
-            # the ``finally`` above (the ``IF EXISTS`` makes the second
-            # call a no-op). Kept for clarity + immediate success log.
-            try:
-                conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
-                backup_dropped = True
-            except Exception:
-                logger.debug("L4: explicit DROP of worker_heartbeats_v5_backup failed", exc_info=True)
-            current = 6
-
-        if current < 7:
-            for table_name in ["jobs", "recycle_bin"]:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                v7_cols: set[str] = {r["name"] for r in cursor.fetchall()}
-                if "created_by" not in v7_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN created_by TEXT DEFAULT ''")
-            current = 7
-
-        if current < 8:
-            for table_name in ["jobs", "recycle_bin"]:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                v8_cols: set[str] = {r["name"] for r in cursor.fetchall()}
-                if "org_id" not in v8_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN org_id TEXT DEFAULT ''")
-                if "project_id" not in v8_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN project_id TEXT DEFAULT ''")
-            current = 8
-
-        if current < 9:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS workflows (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL DEFAULT '',
-                    description TEXT DEFAULT '',
-                    user_id TEXT DEFAULT '',
-                    org_id TEXT DEFAULT '',
-                    project_id TEXT DEFAULT '',
-                    mode TEXT DEFAULT 'workflow_replay',
-                    domain TEXT DEFAULT '',
-                    start_url TEXT DEFAULT '',
-                    original_url TEXT DEFAULT '',
-                    search_params TEXT DEFAULT '{}',
-                    steps TEXT DEFAULT '[]',
-                    extraction_schema TEXT DEFAULT '[]',
-                    pagination_config TEXT DEFAULT '{}',
-                    auth_profile_id TEXT DEFAULT NULL,
-                    status TEXT DEFAULT 'draft',
-                    version INTEGER DEFAULT 1,
-                    created_at TEXT DEFAULT '',
-                    updated_at TEXT DEFAULT '',
-                    last_run_at TEXT DEFAULT '',
-                    last_success_at TEXT DEFAULT '',
-                    last_failure_reason TEXT DEFAULT '',
-                    last_run_job_id TEXT DEFAULT '',
-                    total_runs INTEGER DEFAULT 0
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_org_id ON workflows(org_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_workflows_project_id ON workflows(project_id)")
-            current = 9
-
-        if current < 10:
-            for table_name in ["jobs", "recycle_bin"]:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                v10_cols: set[str] = {r["name"] for r in cursor.fetchall()}
-                if "headers" not in v10_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN headers TEXT DEFAULT '{{}}'")
-                if "cookies" not in v10_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN cookies TEXT DEFAULT '{{}}'")
-            current = 10
-
-        if current < 11:
-            # v11 — proficiency preservation for the 6 Job fields that
-            # were added to storage_mapper.py but never persisted (the
-            # CRITICAL data-loss gap). Adding them as separate ALTERs so
-            # existing rows survive; new rows default to empty/false.
-            for table_name in ["jobs", "recycle_bin"]:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                v11_cols: set[str] = {r["name"] for r in cursor.fetchall()}
-                additions = [
-                    ("webhook_url", "TEXT DEFAULT ''"),
-                    ("webhook_secret", "TEXT DEFAULT ''"),
-                    ("webhook_delivered", "BOOLEAN DEFAULT FALSE"),
-                    ("webhook_delivered_at", "TEXT DEFAULT ''"),
-                    ("fetch_strategy", "TEXT DEFAULT ''"),
-                ]
-                for col_name, col_ddl in additions:
-                    if col_name not in v11_cols:
-                        conn.execute(
-                            f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}",
-                        )
-            current = 11
-
-        if current < 12:
-            # v12 — Feat 4 user-configurable extraction params + Feat 9
-            # job-level rate limiting. Integer columns for per-job overrides.
-            # hydration_wait_ms / scroll_attempts: 0 = use platform default.
-            # request_delay_ms: 0 = no extra delay.
-            # max_concurrent_urls: 4 = platform default.
-            for table_name in ["jobs", "recycle_bin"]:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                v12_cols: set[str] = {r["name"] for r in cursor.fetchall()}
-                for col_name, col_ddl in [
-                    ("hydration_wait_ms", "INTEGER DEFAULT 0"),
-                    ("scroll_attempts", "INTEGER DEFAULT 0"),
-                    ("request_delay_ms", "INTEGER DEFAULT 0"),
-                    ("max_concurrent_urls", "INTEGER DEFAULT 4"),
-                ]:
-                    if col_name not in v12_cols:
-                        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}")
-            current = 12
+        for version, migrate_fn in _MIGRATION_STEPS:
+            if current >= version:
+                continue
+            current = max(current, migrate_fn(conn))
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
         conn.commit()
         logger.info("SQLite schema migrated to version %d", current)
 
-    # Hot-path indexes
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_org_id ON jobs(org_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at)")
+    _add_hot_path_indexes(conn)
 
 
 # ───────────────────────────────────────────────────────────────────────

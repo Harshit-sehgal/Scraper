@@ -307,6 +307,53 @@
         "title": "BatchExportRequest",
         "type": "object"
       },
+      "BatchSubmitRequest": {
+        "description": "Request body to submit multiple URLs as a single batch.",
+        "properties": {
+          "cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Cookies",
+            "type": "object"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "object"
+          },
+          "name": {
+            "default": "batch",
+            "maxLength": 255,
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SchemaField"
+            },
+            "maxItems": 50,
+            "title": "Schema Fields",
+            "type": "array"
+          },
+          "urls": {
+            "description": "List of URLs to scrape",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "urls"
+        ],
+        "title": "BatchSubmitRequest",
+        "type": "object"
+      },
       "CheckoutRequest": {
         "description": "Request body for POST /api/billing/checkout.",
         "properties": {
@@ -678,6 +725,44 @@
         "title": "DomainConfidenceResponse",
         "type": "object"
       },
+      "EmailDeliveryRequest": {
+        "description": "Request body to email job results.",
+        "properties": {
+          "format": {
+            "default": "csv",
+            "description": "Export format (csv, json)",
+            "maxLength": 16,
+            "title": "Format",
+            "type": "string"
+          },
+          "recipients": {
+            "description": "Email recipients",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Recipients",
+            "type": "array"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          }
+        },
+        "required": [
+          "recipients"
+        ],
+        "title": "EmailDeliveryRequest",
+        "type": "object"
+      },
       "EmailVerificationSendResponse": {
         "description": "Response for requesting email verification.",
         "properties": {
@@ -765,6 +850,133 @@
           "message"
         ],
         "title": "EmailVerifyResponse",
+        "type": "object"
+      },
+      "ExtractionTemplate": {
+        "description": "A reusable extraction template.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "created_at": {
+            "maxLength": 64,
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SchemaField"
+            },
+            "title": "Schema Fields",
+            "type": "array"
+          },
+          "selectors_map": {
+            "additionalProperties": true,
+            "title": "Selectors Map",
+            "type": "object"
+          },
+          "updated_at": {
+            "maxLength": 64,
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "title": "ExtractionTemplate",
+        "type": "object"
+      },
+      "ExtractionTemplateUpdate": {
+        "description": "Request body to update an extraction template.",
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "schema_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SchemaField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Fields"
+          },
+          "selectors_map": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors Map"
+          }
+        },
+        "title": "ExtractionTemplateUpdate",
+        "type": "object"
+      },
+      "FetchStrategyUpdate": {
+        "description": "Request body to update a job's fetch strategy (Literal-strained variant).\n\nAccepts the same values as ``JobStrategyUpdate`` but uses a\n``Literal`` type so OpenAPI documentation and client code generators\ncan enumerate the valid strategies without inspecting the\n``strategy_evolution`` module at runtime.",
+        "properties": {
+          "strategy": {
+            "description": "Fetch strategy to use. The empty-string reset supported by JobStrategyUpdate is not available via this model \u2014 callers that need auto-select should use ``PATCH /api/jobs/{id}/strategy`` with ``fetch_strategy: \"\"``.",
+            "enum": [
+              "playwright_full",
+              "playwright_lightweight",
+              "playwright_stealth",
+              "httpx_basic",
+              "httpx_with_ua",
+              "httpx_smart",
+              "hybrid",
+              "cached"
+            ],
+            "title": "Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy"
+        ],
+        "title": "FetchStrategyUpdate",
         "type": "object"
       },
       "FieldType": {
@@ -1019,6 +1231,41 @@
           "expires_at"
         ],
         "title": "InvitationResponse",
+        "type": "object"
+      },
+      "JobCloneRequest": {
+        "description": "Request body to clone a job.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Name for the cloned job",
+            "title": "Name"
+          },
+          "urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override URLs for the cloned job",
+            "title": "Urls"
+          }
+        },
+        "title": "JobCloneRequest",
         "type": "object"
       },
       "JobCreate": {
@@ -1643,6 +1890,65 @@
         "title": "JobUserAgentUpdate",
         "type": "object"
       },
+      "JobWaitConditionsUpdate": {
+        "description": "Request body to update per-job JS wait condition configuration.\n\nAll fields are optional; absent fields leave existing values unchanged.\nSet a field to ``null`` to clear it (restore platform default behaviour).",
+        "properties": {
+          "wait_for_function": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JavaScript expression that must evaluate to truthy before extraction. None = no custom function wait.",
+            "title": "Wait For Function"
+          },
+          "wait_for_navigation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "If true, wait for a page navigation event after the initial load (useful for JS redirects). None = platform default (no extra wait).",
+            "title": "Wait For Navigation"
+          },
+          "wait_for_selector": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "CSS selector to wait for before extraction. None = no custom selector wait.",
+            "title": "Wait For Selector"
+          },
+          "wait_for_timeout": {
+            "anyOf": [
+              {
+                "maximum": 120000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explicit timeout (ms) to wait after navigation before extraction. None = use platform default hydration logic.",
+            "title": "Wait For Timeout"
+          }
+        },
+        "title": "JobWaitConditionsUpdate",
+        "type": "object"
+      },
       "JobWebhookUpdate": {
         "description": "Request body to update job webhook configuration.",
         "properties": {
@@ -1789,6 +2095,81 @@
           "created_at"
         ],
         "title": "MembershipResponse",
+        "type": "object"
+      },
+      "NotificationChannelCreate": {
+        "description": "Request body to create a notification channel.",
+        "properties": {
+          "events": {
+            "description": "Events to notify on",
+            "items": {
+              "type": "string"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "type": {
+            "description": "Channel type: slack, teams, discord, email",
+            "maxLength": 32,
+            "title": "Type",
+            "type": "string"
+          },
+          "webhook_url": {
+            "description": "Webhook URL for the channel",
+            "maxLength": 2048,
+            "title": "Webhook Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "webhook_url"
+        ],
+        "title": "NotificationChannelCreate",
+        "type": "object"
+      },
+      "NotificationChannelUpdate": {
+        "description": "Request body to update a notification channel.",
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Url"
+          }
+        },
+        "title": "NotificationChannelUpdate",
         "type": "object"
       },
       "OrgCreateRequest": {
@@ -4298,6 +4679,49 @@
         ]
       }
     },
+    "/api/jobs/batch": {
+      "post": {
+        "operationId": "batch_submit_api_jobs_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Batch Submit Api Jobs Batch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Batch Submit",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/cleanup/terminal": {
       "delete": {
         "operationId": "clear_terminal_jobs_api_jobs_cleanup_terminal_delete",
@@ -4484,6 +4908,60 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/clone": {
+      "post": {
+        "operationId": "clone_job_api_jobs__job_id__clone_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCloneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clone Job Api Jobs  Job Id  Clone Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clone Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/debug": {
       "get": {
         "description": "Return diagnostic information for a job and its crawl domains.\n\nCombines job metadata, per-domain crawl-policy state, and\nquality/cascade telemetry into a single debug payload.",
@@ -4606,6 +5084,60 @@
           }
         },
         "summary": "Get Job Diff",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/email": {
+      "post": {
+        "operationId": "email_job_results_api_jobs__job_id__email_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDeliveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Email Job Results Api Jobs  Job Id  Email Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Email Job Results",
         "tags": [
           "jobs"
         ]
@@ -4857,6 +5389,59 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/fetch-strategy": {
+      "patch": {
+        "description": "Update the fetch strategy for a job using the ``FetchStrategyUpdate`` body.\n\nCompanion to ``PATCH /api/jobs/{job_id}/strategy``. This variant\nis constrained to the enumerated ``Literal`` set so OpenAPI\nclients can discover the valid strategies without inspecting the\n``strategy_evolution`` module.  Empty-string (auto-select) reset\nis not supported here \u2014 use ``PATCH /api/jobs/{job_id}/strategy``\nwith ``fetch_strategy: \"\"`` for that.",
+        "operationId": "update_fetch_strategy_literal_api_jobs__job_id__fetch_strategy_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FetchStrategyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Fetch Strategy Literal",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/headers": {
       "patch": {
         "description": "Update custom request headers and cookies for a job.",
@@ -4905,6 +5490,210 @@
           }
         },
         "summary": "Update Job Headers",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/notification-channels": {
+      "get": {
+        "operationId": "list_notification_channels_api_jobs__job_id__notification_channels_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Notification Channels Api Jobs  Job Id  Notification Channels Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notification Channels",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "operationId": "create_notification_channel_api_jobs__job_id__notification_channels_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationChannelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Notification Channel Api Jobs  Job Id  Notification Channels Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Notification Channel",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/notification-channels/{channel_id}": {
+      "delete": {
+        "operationId": "delete_notification_channel_api_jobs__job_id__notification_channels__channel_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Notification Channel",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "operationId": "update_notification_channel_api_jobs__job_id__notification_channels__channel_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationChannelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Notification Channel Api Jobs  Job Id  Notification Channels  Channel Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Notification Channel",
         "tags": [
           "jobs"
         ]
@@ -5178,6 +5967,59 @@
           }
         },
         "summary": "Update Job User Agent",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/wait-conditions": {
+      "patch": {
+        "description": "Update per-job JavaScript wait conditions (Roadmap Wave 5, Item 3).\n\nAccepts any subset of ``wait_for_selector``, ``wait_for_function``,\n``wait_for_timeout``, ``wait_for_navigation``.  Absent keys leave\nexisting values unchanged; explicit ``null`` clears the value.",
+        "operationId": "update_job_wait_conditions_api_jobs__job_id__wait_conditions_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobWaitConditionsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job Wait Conditions",
         "tags": [
           "jobs"
         ]
@@ -7993,6 +8835,202 @@
         "summary": "Storage Status",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/templates": {
+      "get": {
+        "operationId": "list_templates_api_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Templates Api Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "operationId": "create_template_api_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionTemplate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Template Api Templates Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Template",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/templates/{template_id}": {
+      "delete": {
+        "operationId": "delete_template_api_templates__template_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Template",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "get": {
+        "operationId": "get_template_api_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Template Api Templates  Template Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "operationId": "update_template_api_templates__template_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Template Api Templates  Template Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Template",
+        "tags": [
+          "jobs"
         ]
       }
     },

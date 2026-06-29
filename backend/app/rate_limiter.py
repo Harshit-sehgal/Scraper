@@ -8,6 +8,9 @@ Supports:
 - Route-specific stricter limits for expensive endpoints
 - Safe IP extraction (behind nginx reverse proxy only)
 - TTL-based cleanup to prevent unbounded counter map growth
+- RFC 6585 X-RateLimit-* headers on every API response
+- Per-user job concurrency caps (JobRateLimiter)
+- Per-job domain request delays with cooldown integration
 
 Usage:
     from app.rate_limiter import RateLimiterMiddleware
@@ -984,6 +987,27 @@ class RateLimiterMiddleware:
         except (AttributeError, TypeError, ValueError) as exc:
             logger.debug("Could not attach rate-limit headers: %s", exc)
 
+    @staticmethod
+    def _add_disabled_rate_limit_headers(response: Response, global_max: int = 0, global_window: float = 0.0) -> None:
+        """Attach RFC 6585 rate-limit headers when rate limiting is disabled.
+
+        When no limits are configured, synthesises headers so API clients
+        always see a consistent contract.  ``X-RateLimit-Limit`` is set to
+        ``0`` (semantics: unlimited / not enforced), Remaining is ``0``
+        (no quota tracking), and Reset is the current epoch (no window).
+        """
+        try:
+            if global_max > 0:
+                response.headers["X-RateLimit-Limit"] = str(global_max)
+                response.headers["X-RateLimit-Remaining"] = str(global_max)
+                response.headers["X-RateLimit-Reset"] = str(int(time.time() + global_window))
+            else:
+                response.headers["X-RateLimit-Limit"] = "0"
+                response.headers["X-RateLimit-Remaining"] = "0"
+                response.headers["X-RateLimit-Reset"] = str(int(time.time()))
+        except (AttributeError, TypeError, ValueError) as exc:
+            logger.debug("Could not attach disabled rate-limit headers: %s", exc)
+
     # ── Main middleware dispatch ───────────────────────────────────────
 
     async def middleware(self, request: Request, call_next: Callable) -> Response:
@@ -992,16 +1016,31 @@ class RateLimiterMiddleware:
         A request must pass **both** the aggregate global counter and
         the per-IP counter (if enabled) to proceed. If either is
         exceeded, a 429 response is returned immediately.
+
+        RFC 6585 compliance: X-RateLimit-Limit, X-RateLimit-Remaining,
+        and X-RateLimit-Reset are attached to **every** /api/ response
+        so clients can always discover their quota status.
         """
-        if self._global_max <= 0 and not (self._per_ip and self._per_ip_max > 0):
-            return await call_next(request)  # type: ignore[no-any-return]
-
         path = request.url.path
-        if not path.startswith("/api/"):
-            return await call_next(request)  # type: ignore[no-any-return]
+        is_api = path.startswith("/api/")
+        is_docs = "/docs" in path or "/openapi" in path
 
-        if "/docs" in path or "/openapi" in path:
-            return await call_next(request)  # type: ignore[no-any-return]
+        if not is_api or is_docs:
+            response = await call_next(request)
+            # Non-API / docs paths: still attach headers for observability,
+            # but with a lightweight "not rate-limited" marker so clients
+            # never have to guess whether a missing header means "no limit"
+            # vs "middleware was skipped".
+            if is_api and is_docs:
+                self._add_disabled_rate_limit_headers(response)
+            return response  # type: ignore[no-any-return]
+
+        if self._global_max <= 0 and not (self._per_ip and self._per_ip_max > 0):
+            # Rate limiter is fully disabled — still pass through and
+            # attach stub headers so the contract is consistent.
+            response = await call_next(request)
+            self._add_disabled_rate_limit_headers(response)
+            return response  # type: ignore[no-any-return]
 
         self._prune_expired_counters()
 
@@ -1009,6 +1048,7 @@ class RateLimiterMiddleware:
         method = request.method
 
         # ── Tier 1: Aggregate global counter ───────────────────────
+        agg_counter: SlidingWindowCounter | DatabaseSlidingWindowCounter | None = None
         if self._global_max > 0:
             agg_key = self._get_aggregate_key(path, method)
             agg_limit = self._get_limits_for_path(path, method)
@@ -1045,12 +1085,11 @@ class RateLimiterMiddleware:
         # Add rate limit headers from the per-IP counter (most relevant to clients)
         if active_per_ip_counter is not None:
             self._add_rate_limit_headers(response, active_per_ip_counter)
-        elif self._global_max > 0:
-            agg_counter = self._get_or_create_counter(
-                self._get_aggregate_key(path, method),
-                *self._get_limits_for_path(path, method),
-            )
+        elif agg_counter is not None:
             self._add_rate_limit_headers(response, agg_counter)
+        else:
+            # Should not normally reach here (both tiers are zero above)
+            self._add_disabled_rate_limit_headers(response)
 
         return response  # type: ignore[no-any-return]
 
@@ -1070,3 +1109,314 @@ class RateLimiterMiddleware:
     def reset(self) -> None:
         """Clear all counters (for testing)."""
         self._counters.clear()
+
+
+# ─── Item 9: Job-Level Rate Limiting ──────────────────────────────────────
+# Per-user concurrency cap, per-job domain request delay, and
+# domain cooldown integration.  This is a separate class from
+# ``RateLimiterMiddleware`` because it operates at the job-execution
+# layer (worker / task runner), not the HTTP request layer.
+
+
+class DomainCooldownTracker:
+    """Track when a domain was last hit and enforce a minimum interval.
+
+    Thread-safe. Intended for use inside the job runner to ensure a
+    configurable delay between requests to the same domain, integrated
+    with :class:`CrawlPolicyEngine` cooldown state.
+    """
+
+    def __init__(self, default_cooldown_seconds: float = 2.0) -> None:
+        self._last_hit: dict[str, float] = {}
+        self._lock = threading.Lock()
+        self._default_cooldown = default_cooldown_seconds
+
+    def check(self, domain: str, cooldown_seconds: float | None = None) -> tuple[bool, float]:
+        """Check whether *domain* can be hit now.
+
+        Returns ``(allowed, wait_seconds)``. When ``allowed`` is False,
+        ``wait_seconds`` indicates how long to wait before retrying.
+        """
+        cooldown = cooldown_seconds if cooldown_seconds is not None else self._default_cooldown
+        now = time.time()
+        with self._lock:
+            last = self._last_hit.get(domain, 0.0)
+            elapsed = now - last
+            if elapsed < cooldown:
+                return False, cooldown - elapsed
+            return True, 0.0
+
+    def record_hit(self, domain: str) -> None:
+        """Record that a request to *domain* was just made."""
+        with self._lock:
+            self._last_hit[domain] = time.time()
+
+    def wait_if_needed(self, domain: str, cooldown_seconds: float | None = None) -> float:
+        """Block until the domain cooldown has elapsed, then record the hit.
+
+        Returns the actual time slept (0.0 if no wait was needed).
+        """
+        _allowed, wait = self.check(domain, cooldown_seconds)
+        if wait > 0:
+            time.sleep(wait)
+        self.record_hit(domain)
+        return wait
+
+    async def async_wait_if_needed(self, domain: str, cooldown_seconds: float | None = None) -> float:
+        """Async version: yield to the event loop while waiting for cooldown.
+
+        Returns the actual time waited (0.0 if no wait was needed).
+        """
+        import asyncio
+
+        _allowed, wait = self.check(domain, cooldown_seconds)
+        if wait > 0:
+            await asyncio.sleep(wait)
+        self.record_hit(domain)
+        return wait
+
+    def get_domain_last_hit(self, domain: str) -> float:
+        """Return the epoch timestamp of the last hit to *domain*, or 0.0."""
+        with self._lock:
+            return self._last_hit.get(domain, 0.0)
+
+    def reset(self, domain: str | None = None) -> None:
+        """Clear cooldown state for a specific domain or all domains."""
+        with self._lock:
+            if domain is None:
+                self._last_hit.clear()
+            else:
+                self._last_hit.pop(domain, None)
+
+    @property
+    def tracked_domains(self) -> int:
+        """Number of domains with a recorded last-hit timestamp."""
+        with self._lock:
+            return len(self._last_hit)
+
+
+class JobRateLimiter:
+    """Per-user job concurrency cap and per-job domain request pacing.
+
+    Enforces:
+    - Per-user concurrency cap (default 5 concurrent jobs per user).
+    - Per-domain cooldown between requests within a single job.
+    - Integration with :class:`~app.crawl_policy.CrawlPolicyEngine`
+      for cross-job domain cooldown.
+
+    Usage::
+
+        limiter = JobRateLimiter(max_concurrent_per_user=5)
+        limiter.acquire_job_slot("user-abc")
+        try:
+            # ... run job ...
+            limiter.check_domain_before_fetch("user-abc", "example.com")
+            # ... fetch ...
+        finally:
+            limiter.release_job_slot("user-abc")
+    """
+
+    def __init__(
+        self,
+        max_concurrent_per_user: int = 5,
+        default_domain_cooldown_seconds: float = 2.0,
+    ) -> None:
+        self._max_concurrent = max_concurrent_per_user
+        self._user_active_jobs: dict[str, int] = {}
+        self._lock = threading.Lock()
+        self._domain_tracker = DomainCooldownTracker(default_domain_cooldown_seconds)
+        # Per-job domain delays: {(user_id, job_id, domain): last_hit_time}
+        self._job_domain_last_hit: dict[tuple[str, str, str], float] = {}
+        self._job_domain_lock = threading.Lock()
+
+    # ── Per-user concurrency cap ────────────────────────────────────────
+
+    def acquire_job_slot(self, user_id: str) -> bool:
+        """Attempt to acquire a concurrent job slot for *user_id*.
+
+        Returns True if the slot was acquired (user is below the cap),
+        False if the user has already reached the maximum concurrent jobs.
+        Thread-safe.
+        """
+        from app.utils.log_redaction import redact_pii
+
+        with self._lock:
+            current = self._user_active_jobs.get(user_id, 0)
+            if current >= self._max_concurrent:
+                logger.info(
+                    "Job rate limit: user %s at concurrency cap (%d/%d)",
+                    redact_pii(user_id),
+                    current,
+                    self._max_concurrent,
+                )
+                return False
+            self._user_active_jobs[user_id] = current + 1
+            logger.debug(
+                "Job rate limit: user %s acquired slot (%d/%d)",
+                redact_pii(user_id),
+                current + 1,
+                self._max_concurrent,
+            )
+            return True
+
+    def release_job_slot(self, user_id: str) -> None:
+        """Release a concurrent job slot for *user_id*.
+
+        Should be called in a ``finally`` block after :meth:`acquire_job_slot`.
+        """
+        with self._lock:
+            current = self._user_active_jobs.get(user_id, 0)
+            if current > 0:
+                self._user_active_jobs[user_id] = current - 1
+            if current <= 1:
+                self._user_active_jobs.pop(user_id, None)
+
+    def get_user_active_jobs(self, user_id: str) -> int:
+        """Return the number of currently active jobs for *user_id*."""
+        with self._lock:
+            return self._user_active_jobs.get(user_id, 0)
+
+    # ── Per-job domain request pacing ──────────────────────────────────
+
+    def check_domain_before_fetch(
+        self,
+        user_id: str,
+        domain: str,
+        job_id: str = "",
+        cooldown_seconds: float | None = None,
+    ) -> tuple[bool, float]:
+        """Check whether a domain can be fetched now for a specific job.
+
+        Uses both the per-job domain delay tracker and the shared
+        :class:`DomainCooldownTracker`.  Returns ``(allowed, wait_seconds)``.
+        When ``allowed`` is False, ``wait_seconds`` indicates the cooldown
+        remaining.  Also consults the CrawlPolicyEngine if available.
+        """
+        wait = 0.0
+
+        # Check the per-job domain delay
+        if job_id:
+            with self._job_domain_lock:
+                key = (user_id, job_id, domain)
+                last_hit = self._job_domain_last_hit.get(key, 0.0)
+            effective_cooldown = cooldown_seconds if cooldown_seconds is not None else self._domain_tracker._default_cooldown
+            elapsed = time.time() - last_hit
+            if elapsed < effective_cooldown:
+                wait = max(wait, effective_cooldown - elapsed)
+
+        # Check the shared domain cooldown tracker
+        domain_allowed, domain_wait = self._domain_tracker.check(domain, cooldown_seconds)
+        if not domain_allowed:
+            wait = max(wait, domain_wait)
+
+        # Check CrawlPolicyEngine for cross-job domain cooldown
+        try:
+            from app.crawl_policy import get_crawl_policy
+
+            policy = get_crawl_policy()
+            state = policy.get_domain_state(domain)
+            if state and state.get("cooldown", 0) > 0:
+                wait = max(wait, state["cooldown"])
+        except (ImportError, RuntimeError, ValueError) as exc:
+            logger.debug("CrawlPolicyEngine unavailable for domain cooldown check: %s", exc)
+
+        return (wait == 0.0, wait)
+
+    def record_domain_fetch(self, user_id: str, domain: str, job_id: str = "") -> None:
+        """Record that a fetch to *domain* was just performed.
+
+        Updates both the per-job tracker and the shared domain tracker.
+        """
+        self._domain_tracker.record_hit(domain)
+        now = time.time()
+        if job_id:
+            with self._job_domain_lock:
+                self._job_domain_last_hit[(user_id, job_id, domain)] = now
+
+    def wait_for_domain(
+        self,
+        user_id: str,
+        domain: str,
+        job_id: str = "",
+        cooldown_seconds: float | None = None,
+    ) -> float:
+        """Block until domain cooldown elapses, then record the fetch.
+
+        Returns the total time waited (0.0 if no wait needed).
+        """
+        _, wait = self.check_domain_before_fetch(user_id, domain, job_id, cooldown_seconds)
+        if wait > 0:
+            time.sleep(wait)
+        self.record_domain_fetch(user_id, domain, job_id)
+        return wait
+
+    async def async_wait_for_domain(
+        self,
+        user_id: str,
+        domain: str,
+        job_id: str = "",
+        cooldown_seconds: float | None = None,
+    ) -> float:
+        """Async version: yield to the event loop while waiting for cooldown.
+
+        Returns the total time waited (0.0 if no wait needed).
+        """
+        import asyncio
+
+        _, wait = self.check_domain_before_fetch(user_id, domain, job_id, cooldown_seconds)
+        if wait > 0:
+            await asyncio.sleep(wait)
+        self.record_domain_fetch(user_id, domain, job_id)
+        return wait
+
+    # ── Observability / management ─────────────────────────────────────
+
+    def get_stats(self) -> dict[str, Any]:
+        """Return current job rate limiter stats."""
+        with self._lock:
+            return {
+                "max_concurrent_per_user": self._max_concurrent,
+                "active_users": len(self._user_active_jobs),
+                "user_active_jobs": dict(self._user_active_jobs),
+                "tracked_domains": self._domain_tracker.tracked_domains,
+            }
+
+    def get_domain_cooldown_remaining(self, domain: str, cooldown_seconds: float | None = None) -> float:
+        """Seconds remaining until *domain* can be hit again."""
+        allowed, wait = self._domain_tracker.check(domain, cooldown_seconds)
+        return 0.0 if allowed else wait
+
+    def reset(self) -> None:
+        """Clear all state (for testing)."""
+        with self._lock:
+            self._user_active_jobs.clear()
+        self._domain_tracker.reset()
+        with self._job_domain_lock:
+            self._job_domain_last_hit.clear()
+
+
+# ─── Module-level singleton ─────────────────────────────────────────────
+
+_job_rate_limiter: JobRateLimiter | None = None
+_job_rate_limiter_lock = threading.Lock()
+
+
+def get_job_rate_limiter() -> JobRateLimiter:
+    """Return the module-level :class:`JobRateLimiter` singleton.
+
+    Lazily created on first access so that config values are resolved
+    at runtime, not at import time.
+    """
+    global _job_rate_limiter
+    if _job_rate_limiter is None:
+        with _job_rate_limiter_lock:
+            if _job_rate_limiter is None:
+                from app.config import settings
+
+                max_concurrent = getattr(settings, "JOB_MAX_CONCURRENT_PER_USER", 5)
+                cooldown = getattr(settings, "CRAWL_DEFAULT_DELAY_SECONDS", 2.0)
+                _job_rate_limiter = JobRateLimiter(
+                    max_concurrent_per_user=max_concurrent,
+                    default_domain_cooldown_seconds=cooldown,
+                )
+    return _job_rate_limiter

@@ -67,3 +67,5 @@ class SecuritySettings(BaseSettings):
     """Rate limit for discovery endpoint."""
     RATE_LIMIT_DB_BACKED: bool = False
     """Enable shared, database-backed rate limiting for multi-process environments."""
+    JOB_MAX_CONCURRENT_PER_USER: int = 5
+    """Maximum concurrent running jobs per user (Item 9: job-level rate limiting)."""

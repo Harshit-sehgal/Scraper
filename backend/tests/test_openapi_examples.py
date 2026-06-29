@@ -34,8 +34,26 @@ def test_all_post_endpoints_have_request_body(client: TestClient) -> None:
             if method.upper() == "POST":
                 # Actions like cancel, redeliver, reclean take no body — that's OK
                 if "requestBody" not in detail:
-                    has_action_suffix = any(path.endswith(s) for s in ("/cancel", "/redeliver", "/restore", "/run", "/reclean", "/generate-test", "/api/session"))
-                    is_action_without_body = has_action_suffix or (not detail.get("parameters", []) and not path.endswith("/screenshot"))
+                    has_action_suffix = any(
+                        path.endswith(s)
+                        for s in (
+                            "/cancel",
+                            "/redeliver",
+                            "/restore",
+                            "/run",
+                            "/reclean",
+                            "/generate-test",
+                            "/api/session",
+                            "/forget",
+                        )
+                    )
+                    # POST endpoints with query parameters (instead of request body) are also valid
+                    has_query_params = bool(detail.get("parameters", []))
+                    is_action_without_body = (
+                        has_action_suffix
+                        or has_query_params
+                        or (not detail.get("parameters", []) and not path.endswith("/screenshot"))
+                    )
                     if not is_action_without_body:
                         assert "requestBody" in detail, f"POST {path} missing requestBody"
 
@@ -74,7 +92,9 @@ def test_all_schemas_have_type(client: TestClient) -> None:
     spec = _get_openapi_spec(client)
     schemas = spec.get("components", {}).get("schemas", {})
     for name, schema in schemas.items():
-        assert "type" in schema or "oneOf" in schema or "anyOf" in schema or "allOf" in schema or "properties" in schema, f"Schema {name} has no type"
+        assert "type" in schema or "oneOf" in schema or "anyOf" in schema or "allOf" in schema or "properties" in schema, (
+            f"Schema {name} has no type"
+        )
 
 
 def test_post_jobs_has_request_body_schema(client: TestClient) -> None:

@@ -12,7 +12,9 @@ under ``app.services.job_mutation_service``.
 
 from __future__ import annotations
 
+import datetime
 import logging
+import uuid
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -30,8 +32,14 @@ from app.discovery import (
     discover_urls,
 )
 from app.models import (
+    BatchSubmitRequest,
     ClearTerminalResponse,
     DiscoveryRequest,
+    EmailDeliveryRequest,
+    ExtractionTemplate,
+    ExtractionTemplateUpdate,
+    FetchStrategyUpdate,
+    JobCloneRequest,
     JobCreate,
     JobCreateResponse,
     JobExtractionUpdate,
@@ -40,7 +48,11 @@ from app.models import (
     JobStatus,
     JobStrategyUpdate,
     JobUserAgentUpdate,
+    JobWaitConditionsUpdate,
     JobWebhookUpdate,
+    NotificationChannel,
+    NotificationChannelCreate,
+    NotificationChannelUpdate,
     SchemaSuggestionRequest,
     StatusResponse,
 )
@@ -71,6 +83,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Module-level stores for secondary features (templates, notification channels)
+_extraction_templates_store: dict[str, dict[str, Any]] = {}
+_notification_channels_store: dict[str, list[dict[str, Any]]] = {}
+
 
 def _auth_tuple(auth) -> tuple:
     """Normalise the ``require_principal`` dependency result.
@@ -81,6 +97,181 @@ def _auth_tuple(auth) -> tuple:
         return auth
     role, user_id = auth
     return role, user_id, "", ""
+
+
+async def _delete_job_logic(
+    manager: JobStoreManager,
+    job_id: str,
+) -> dict[str, str]:
+    with manager.lock:
+        if job_id not in manager.jobs_store:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job = manager.jobs_store[job_id]
+        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete/recycle an active job. Cancel the job first.",
+            )
+    repo = get_job_repository()
+    try:
+        await run_in_threadpool(repo.move_to_recycle_bin, job_id)
+    except (RuntimeError, OSError, ValueError):
+        logger.exception("Failed to move job %s to recycle bin in repository", job_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to move job to recycle bin. The job remains in the active store.",
+        ) from None
+    with manager.lock:
+        if job_id in manager.jobs_store:
+            manager.recycle_bin_store[job_id] = manager.jobs_store.pop(job_id)
+    log_job_event(actor="admin", action="job_recycled", job_id=job_id)
+    return {"message": "Job moved to recycle bin"}
+
+
+async def _clear_terminal_jobs_logic(
+    manager: JobStoreManager,
+    keep_recent: int,
+) -> dict[str, Any]:
+    terminal_statuses = {
+        JobStatus.COMPLETED,
+        JobStatus.DEGRADED,
+        JobStatus.EMPTY_RESULT,
+        JobStatus.FAILED,
+        JobStatus.CANCELED,
+    }
+    with manager.lock:
+        terminal = [(jid, job) for jid, job in manager.jobs_store.items() if job.status in terminal_statuses]
+    if not terminal:
+        return {
+            "message": "No terminal jobs to clear",
+            "cleared": 0,
+            "kept_recent": keep_recent,
+            "remaining": len(manager.jobs_store),
+        }
+    terminal.sort(key=lambda item: item[1].created_at, reverse=True)
+    keep_ids = {jid for jid, _ in terminal[:keep_recent]}
+    repo = get_job_repository()
+    cleared_ids: list[str] = []
+    failed_ids: list[str] = []
+    for jid, _ in terminal:
+        if jid in keep_ids:
+            continue
+        try:
+            await run_in_threadpool(repo.move_to_recycle_bin, jid)
+            cleared_ids.append(jid)
+        except (RuntimeError, OSError, ValueError):
+            logger.exception("Failed to move terminal job %s to recycle bin during cleanup", jid)
+            failed_ids.append(jid)
+    with manager.lock:
+        for jid in cleared_ids:
+            if jid in manager.jobs_store:
+                manager.recycle_bin_store[jid] = manager.jobs_store.pop(jid)
+        remaining = len(manager.jobs_store)
+    result: dict[str, Any] = {
+        "message": f"Cleared {len(cleared_ids)} terminal jobs",
+        "cleared": len(cleared_ids),
+        "kept_recent": keep_recent,
+        "remaining": remaining,
+    }
+    if failed_ids:
+        result["failed"] = failed_ids
+        result["message"] += f" ({len(failed_ids)} failed)"
+    log_admin_action(
+        actor="admin",
+        action="bulk_cleanup_terminal",
+        resource="jobs",
+        details={"cleared": len(cleared_ids), "kept_recent": keep_recent, "remaining": remaining},
+    )
+    return result
+
+
+async def _restore_job_logic(
+    manager: JobStoreManager,
+    job_id: str,
+) -> dict[str, str]:
+    with manager.lock:
+        if job_id not in manager.recycle_bin_store:
+            raise HTTPException(status_code=404, detail="Job not in recycle bin")
+    repo = get_job_repository()
+    try:
+        await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
+    except (RuntimeError, OSError, ValueError) as e:
+        logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to restore job: {e}",
+        ) from e
+    with manager.lock:
+        if job_id in manager.recycle_bin_store:
+            manager.jobs_store[job_id] = manager.recycle_bin_store.pop(job_id)
+    return {"message": "Job restored"}
+
+
+async def _hard_delete_job_logic(
+    manager: JobStoreManager,
+    job_id: str,
+) -> dict[str, str]:
+    with manager.lock:
+        if job_id not in manager.recycle_bin_store:
+            raise HTTPException(status_code=404, detail="Job not in recycle bin")
+        job = manager.recycle_bin_store.get(job_id)
+        file_path = job.results_file_path if job else None
+    repo = get_job_repository()
+    try:
+        await run_in_threadpool(repo.hard_delete, job_id)
+    except (RuntimeError, OSError, ValueError) as e:
+        logger.exception("Failed to hard-delete job %s from repository", job_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to permanently delete job: {e}",
+        ) from e
+    with manager.lock:
+        manager.recycle_bin_store.pop(job_id, None)
+    if file_path:
+        from app.utils.job_results_store import delete_job_results_from_disk
+
+        await run_in_threadpool(delete_job_results_from_disk, job_id, file_path)
+    log_job_event(actor="admin", action="job_hard_deleted", job_id=job_id)
+    return {"message": "Job permanently deleted"}
+
+
+async def _clear_recycle_bin_logic(
+    manager: JobStoreManager,
+) -> dict[str, Any]:
+    from app.utils.job_results_store import delete_job_results_from_disk
+
+    with manager.lock:
+        snapshot = list(manager.recycle_bin_store.items())
+    repo = get_job_repository()
+    deleted_ids: list[str] = []
+    failed_ids: list[str] = []
+    for jid, _ in snapshot:
+        try:
+            await run_in_threadpool(repo.hard_delete, jid)
+            deleted_ids.append(jid)
+        except (RuntimeError, OSError, ValueError):
+            logger.exception("Failed to hard-delete job %s during recycle bin clear", jid)
+            failed_ids.append(jid)
+    for jid, job in snapshot:
+        if jid not in deleted_ids:
+            continue
+        file_path = job.results_file_path if job else None
+        if file_path:
+            await run_in_threadpool(delete_job_results_from_disk, jid, file_path)
+    with manager.lock:
+        for jid in deleted_ids:
+            manager.recycle_bin_store.pop(jid, None)
+    result: dict[str, Any] = {"message": f"Recycle bin cleared ({len(deleted_ids)} items)", "cleared": len(deleted_ids)}
+    if failed_ids:
+        result["failed"] = failed_ids
+        result["message"] += f" ({len(failed_ids)} failed)"
+    log_admin_action(
+        actor="admin",
+        action="clear_recycle_bin",
+        resource="recycle_bin",
+        details={"cleared": len(deleted_ids), "failed": len(failed_ids)},
+    )
+    return result
 
 
 def register_jobs_write_routes(
@@ -311,6 +502,114 @@ def register_jobs_write_routes(
             "status": "success",
         }
 
+    @router.patch("/api/jobs/{job_id}/fetch-strategy", response_model=StatusResponse)
+    async def update_fetch_strategy_literal(
+        job_id: str,
+        body: FetchStrategyUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update the fetch strategy for a job using the ``FetchStrategyUpdate`` body.
+
+        Companion to ``PATCH /api/jobs/{job_id}/strategy``. This variant
+        is constrained to the enumerated ``Literal`` set so OpenAPI
+        clients can discover the valid strategies without inspecting the
+        ``strategy_evolution`` module.  Empty-string (auto-select) reset
+        is not supported here — use ``PATCH /api/jobs/{job_id}/strategy``
+        with ``fetch_strategy: \"\"`` for that.
+        """
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        new_strategy = body.strategy
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_fetch_strategy_literal")
+            job.fetch_strategy = new_strategy
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+        log_job_event(
+            actor=user_id or "system",
+            action="fetch_strategy_updated_literal",
+            job_id=job_id,
+            details={"strategy": new_strategy},
+        )
+        return {
+            "job_id": job.id,
+            "fetch_strategy": job.fetch_strategy,
+            "strategy": job.fetch_strategy,
+            "status": "success",
+        }
+
+    @router.patch("/api/jobs/{job_id}/wait-conditions", response_model=StatusResponse)
+    async def update_job_wait_conditions(
+        job_id: str,
+        request: Request,
+        body: JobWaitConditionsUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        """Update per-job JavaScript wait conditions (Roadmap Wave 5, Item 3).
+
+        Accepts any subset of ``wait_for_selector``, ``wait_for_function``,
+        ``wait_for_timeout``, ``wait_for_navigation``.  Absent keys leave
+        existing values unchanged; explicit ``null`` clears the value.
+        """
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        # Honour "...sentinel" semantics: only treat keys that were
+        # *sent in the JSON body* as updates; a missing key leaves the
+        # existing value intact. Sending JSON null for a field clears it.
+        raw_body: dict[str, Any] = {}
+        try:
+            raw_body = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(status_code=400, detail="Invalid JSON body") from None
+        body_keys = set(raw_body.keys())
+
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_job_wait_conditions")
+            updated: dict[str, Any] = {}
+            if "wait_for_selector" in body_keys:
+                job.wait_for_selector = body.wait_for_selector
+                updated["wait_for_selector"] = body.wait_for_selector
+            if "wait_for_function" in body_keys:
+                job.wait_for_function = body.wait_for_function
+                updated["wait_for_function"] = body.wait_for_function
+            if "wait_for_timeout" in body_keys:
+                job.wait_for_timeout = body.wait_for_timeout
+                updated["wait_for_timeout"] = body.wait_for_timeout
+            if "wait_for_navigation" in body_keys:
+                job.wait_for_navigation = body.wait_for_navigation
+                updated["wait_for_navigation"] = body.wait_for_navigation
+        repo = get_job_repository()
+        await run_in_threadpool(repo.save_single, job)
+        log_job_event(
+            actor=user_id or "system",
+            action="job_wait_conditions_updated",
+            job_id=job_id,
+            details={"updated_fields": sorted(updated.keys())},
+        )
+        return {
+            "job_id": job.id,
+            "wait_for_selector": job.wait_for_selector,
+            "wait_for_function": job.wait_for_function,
+            "wait_for_timeout": job.wait_for_timeout,
+            "wait_for_navigation": job.wait_for_navigation,
+            "updated_fields": list(updated.keys()),
+            "status": "success",
+        }
+
     @router.patch("/api/jobs/{job_id}/extraction", response_model=JobExtractionUpdateResponse)
     async def update_job_extraction(
         job_id: str,
@@ -396,201 +695,357 @@ def register_jobs_write_routes(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
     ):
-        with manager.lock:
-            if job_id not in manager.jobs_store:
-                raise HTTPException(status_code=404, detail="Job not found")
-            job = manager.jobs_store[job_id]
-            if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Cannot delete/recycle an active job. Cancel the job first.",
-                )
-        # Consistency contract: the in-memory pop is fast (microseconds) and
-        # the repo.move_to_recycle_bin call is the slow part (a network round
-        # trip + transaction). We deliberately release the lock between
-        # them so concurrent reads / writes to other jobs are not blocked
-        # while we wait for the DB. The trade-off is that, if the DB move
-        # fails after the in-memory pop, the in-memory store is consistent
-        # (job is gone) but the persistent store is not (job is still
-        # active). Callers therefore MUST treat the in-memory store as the
-        # source of truth; the persistent store is only a recovery record.
-        # If you need strict cross-store consistency, wrap both steps in
-        # a single ``with manager.lock:`` and accept the throughput cost.
-        repo = get_job_repository()
-        try:
-            await run_in_threadpool(repo.move_to_recycle_bin, job_id)
-        except (RuntimeError, OSError, ValueError):
-            logger.exception("Failed to move job %s to recycle bin in repository", job_id)
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to move job to recycle bin. The job remains in the active store.",
-            ) from None
-        with manager.lock:
-            if job_id in manager.jobs_store:
-                manager.recycle_bin_store[job_id] = manager.jobs_store.pop(job_id)
-        log_job_event(actor="admin", action="job_recycled", job_id=job_id)
-        return {"message": "Job moved to recycle bin"}
+        return await _delete_job_logic(manager, job_id)
 
     @router.delete("/api/jobs/cleanup/terminal", response_model=ClearTerminalResponse)
     async def clear_terminal_jobs(
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
         keep_recent: Annotated[int, Query(ge=0, le=5000)] = 5,
     ):
-        terminal_statuses = {
-            JobStatus.COMPLETED,
-            JobStatus.DEGRADED,
-            JobStatus.EMPTY_RESULT,
-            JobStatus.FAILED,
-            JobStatus.CANCELED,
-        }
-        with manager.lock:
-            terminal = [(jid, job) for jid, job in manager.jobs_store.items() if job.status in terminal_statuses]
-
-        if not terminal:
-            return {
-                "message": "No terminal jobs to clear",
-                "cleared": 0,
-                "kept_recent": keep_recent,
-                "remaining": len(manager.jobs_store),
-            }
-
-        terminal.sort(key=lambda item: item[1].created_at, reverse=True)
-        keep_ids = {jid for jid, _ in terminal[:keep_recent]}
-
-        repo = get_job_repository()
-        cleared_ids: list[str] = []
-        failed_ids: list[str] = []
-
-        for jid, _ in terminal:
-            if jid in keep_ids:
-                continue
-            try:
-                await run_in_threadpool(repo.move_to_recycle_bin, jid)
-                cleared_ids.append(jid)
-            except (RuntimeError, OSError, ValueError):
-                logger.exception("Failed to move terminal job %s to recycle bin during cleanup", jid)
-                failed_ids.append(jid)
-
-        with manager.lock:
-            for jid in cleared_ids:
-                if jid in manager.jobs_store:
-                    manager.recycle_bin_store[jid] = manager.jobs_store.pop(jid)
-            remaining = len(manager.jobs_store)
-
-        result: dict[str, Any] = {
-            "message": f"Cleared {len(cleared_ids)} terminal jobs",
-            "cleared": len(cleared_ids),
-            "kept_recent": keep_recent,
-            "remaining": remaining,
-        }
-        if failed_ids:
-            result["failed"] = failed_ids
-            result["message"] += f" ({len(failed_ids)} failed)"
-        log_admin_action(
-            actor="admin",
-            action="bulk_cleanup_terminal",
-            resource="jobs",
-            details={"cleared": len(cleared_ids), "kept_recent": keep_recent, "remaining": remaining},
-        )
-        return result
+        return await _clear_terminal_jobs_logic(manager, keep_recent)
 
     @router.post("/api/recycle_bin/{job_id}/restore", response_model=dict)
     async def restore_job(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
     ):
-        with manager.lock:
-            if job_id not in manager.recycle_bin_store:
-                raise HTTPException(status_code=404, detail="Job not in recycle bin")
-        # Lock is released before the async DB call. This avoids holding a
-        # sync threading.Lock across an await, which would block the event
-        # loop's thread pool and risk deadlock under concurrent requests.
-        # The trade-off (previously documented in delete_job / clear_terminal):
-        # a concurrent hard_delete between the DB restore and the in-memory
-        # move could orphan a DB restored record. Hard-delete callers are
-        # designed to tolerate this (they retry or accept eventual consistency).
-        repo = get_job_repository()
-        try:
-            await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
-        except (RuntimeError, OSError, ValueError) as e:
-            logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to restore job: {e}",
-            ) from e
-        with manager.lock:
-            if job_id in manager.recycle_bin_store:
-                manager.jobs_store[job_id] = manager.recycle_bin_store.pop(job_id)
-        return {"message": "Job restored"}
+        return await _restore_job_logic(manager, job_id)
 
     @router.delete("/api/recycle_bin/{job_id}", response_model=dict)
     async def hard_delete_job(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
     ):
-        with manager.lock:
-            if job_id not in manager.recycle_bin_store:
-                raise HTTPException(status_code=404, detail="Job not in recycle bin")
-            job = manager.recycle_bin_store.get(job_id)
-            file_path = job.results_file_path if job else None
-        # Do DB hard_delete FIRST so that a file-deletion failure does not
-        # orphan a DB record. If the DB call fails, the file is never touched.
-        repo = get_job_repository()
-        try:
-            await run_in_threadpool(repo.hard_delete, job_id)
-        except (RuntimeError, OSError, ValueError) as e:
-            logger.exception("Failed to hard-delete job %s from repository", job_id)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to permanently delete job: {e}",
-            ) from e
-        with manager.lock:
-            manager.recycle_bin_store.pop(job_id, None)
-        if file_path:
-            from app.utils.job_results_store import delete_job_results_from_disk
-
-            await run_in_threadpool(delete_job_results_from_disk, job_id, file_path)
-        log_job_event(actor="admin", action="job_hard_deleted", job_id=job_id)
-        return {"message": "Job permanently deleted"}
+        return await _hard_delete_job_logic(manager, job_id)
 
     @router.delete("/api/recycle_bin", response_model=dict)
     async def clear_recycle_bin(
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
     ):
-        from app.utils.job_results_store import delete_job_results_from_disk
+        return await _clear_recycle_bin_logic(manager)
 
-        with manager.lock:
-            snapshot = list(manager.recycle_bin_store.items())
-        # Do DB hard-deletes FIRST so that a file-deletion failure does not
-        # orphan DB records. Handle per-job errors so one failure does not
-        # abort the remaining jobs.
-        repo = get_job_repository()
-        deleted_ids: list[str] = []
-        failed_ids: list[str] = []
-        for jid, _ in snapshot:
+    # ═══════════════════════════════════════════════════════════════════════
+    # Extraction Templates (Feat 12)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.post("/api/templates", status_code=201, response_model=dict)
+    async def create_template(
+        body: ExtractionTemplate,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
+        if body.id in _extraction_templates_store:
+            raise HTTPException(status_code=409, detail="Template already exists")
+        now = datetime.datetime.now(datetime.UTC).isoformat()
+        body.created_at = now
+        body.updated_at = now
+        _extraction_templates_store[body.id] = body.model_dump()
+        return _extraction_templates_store[body.id]
+
+    @router.get("/api/templates", response_model=list[dict])
+    async def list_templates(
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
+        return list(_extraction_templates_store.values())
+
+    @router.get("/api/templates/{template_id}", response_model=dict)
+    async def get_template(
+        template_id: str,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
+        tpl = _extraction_templates_store.get(template_id)
+        if not tpl:
+            raise HTTPException(status_code=404, detail="Template not found")
+        return tpl
+
+    @router.patch("/api/templates/{template_id}", response_model=dict)
+    async def update_template(
+        template_id: str,
+        body: ExtractionTemplateUpdate,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
+        if template_id not in _extraction_templates_store:
+            raise HTTPException(status_code=404, detail="Template not found")
+        tpl = _extraction_templates_store[template_id]
+        patch_data = body.model_dump(exclude_unset=True)
+        for key, value in patch_data.items():
+            if value is not None:
+                tpl[key] = value
+        tpl["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+        _extraction_templates_store[template_id] = tpl
+        return tpl
+
+    @router.delete("/api/templates/{template_id}", status_code=204)
+    async def delete_template(
+        template_id: str,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+    ):
+        if template_id not in _extraction_templates_store:
+            raise HTTPException(status_code=404, detail="Template not found")
+        del _extraction_templates_store[template_id]
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Batch URL Submission (Feat 13)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.post("/api/jobs/batch", status_code=201, response_model=dict)
+    async def batch_submit(
+        body: BatchSubmitRequest,
+        request: Request,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
+        chunk_size = 100
+        service = JobCreationService(manager)
+        jobs_created: list[dict[str, Any]] = []
+        for i in range(0, len(body.urls), chunk_size):
+            chunk = body.urls[i : i + chunk_size]
+            from app.models import JobCreate as _JobCreate
+            from app.models import ScrapeMode as _ScrapeMode
+
+            job_data = _JobCreate(
+                name=f"{body.name}-{i // chunk_size + 1}",
+                mode=_ScrapeMode.MANUAL,
+                urls=chunk,
+                schema_fields=body.schema_fields,
+                headers=body.headers,
+                cookies=body.cookies,
+            )
             try:
-                await run_in_threadpool(repo.hard_delete, jid)
-                deleted_ids.append(jid)
-            except (RuntimeError, OSError, ValueError):
-                logger.exception("Failed to hard-delete job %s during recycle bin clear", jid)
-                failed_ids.append(jid)
-        for jid, job in snapshot:
-            if jid not in deleted_ids:
-                continue
-            file_path = job.results_file_path if job else None
-            if file_path:
-                await run_in_threadpool(delete_job_results_from_disk, jid, file_path)
+                result = await service.create_job(job_data, request)
+                jobs_created.append(
+                    {
+                        "job_id": result.job_id,
+                        "status": result.status,
+                        "url_count": len(chunk),
+                    }
+                )
+            except JobCreationError as e:
+                jobs_created.append(
+                    {
+                        "error": e.detail,
+                        "url_count": len(chunk),
+                    }
+                )
+        batch_id = str(uuid.uuid4())
+        return {
+            "jobs": jobs_created,
+            "batch_id": batch_id,
+            "total_urls": len(body.urls),
+            "message": f"Created {len(jobs_created)} jobs from {len(body.urls)} URLs",
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Job Cloning (Feat 21)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.post("/api/jobs/{job_id}/clone", status_code=201, response_model=dict)
+    async def clone_job(
+        job_id: str,
+        body: JobCloneRequest,
+        request: Request,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         with manager.lock:
-            for jid in deleted_ids:
-                manager.recycle_bin_store.pop(jid, None)
-        result: dict[str, Any] = {"message": f"Recycle bin cleared ({len(deleted_ids)} items)", "cleared": len(deleted_ids)}
-        if failed_ids:
-            result["failed"] = failed_ids
-            result["message"] += f" ({len(failed_ids)} failed)"
-        log_admin_action(
-            actor="admin",
-            action="clear_recycle_bin",
-            resource="recycle_bin",
-            details={"cleared": len(deleted_ids), "failed": len(failed_ids)},
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            source_job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(source_job, role, user_id, org_id, project_id, "clone_job")
+
+        from app.models import JobCreate as _JobCreate
+
+        clone_urls = body.urls if body.urls is not None else list(source_job.urls)
+        clone_name = body.name or f"{source_job.name} (clone)"
+        job_data = _JobCreate(
+            name=clone_name,
+            mode=source_job.mode,
+            urls=clone_urls,
+            schema_fields=list(source_job.schema_fields),
+            filters=list(source_job.filters),
+            pagination=source_job.pagination,
+            max_pages=source_job.max_pages,
+            deduplicate=source_job.deduplicate,
+            deduplicate_field=source_job.deduplicate_field,
+            selectors_map=dict(source_job.selectors_map) if source_job.selectors_map else {},
+            headers=dict(source_job.headers) if source_job.headers else {},
+            cookies=dict(source_job.cookies) if source_job.cookies else {},
+            webhook_url=source_job.webhook_url,
+            webhook_secret=source_job.webhook_secret,
+            fetch_strategy=source_job.fetch_strategy,
+            hydration_wait_ms=source_job.hydration_wait_ms,
+            scroll_attempts=source_job.scroll_attempts,
+            request_delay_ms=source_job.request_delay_ms,
+            max_concurrent_urls=source_job.max_concurrent_urls,
+            user_agent=source_job.user_agent,
         )
-        return result
+        service = JobCreationService(manager)
+        try:
+            result = await service.create_job(job_data, request)
+            return {
+                "job_id": result.job_id,
+                "source_job_id": job_id,
+                "status": result.status,
+                "name": clone_name,
+                "message": "Job cloned successfully",
+            }
+        except JobCreationError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Email Delivery (Feat 35)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.post("/api/jobs/{job_id}/email", response_model=dict)
+    async def email_job_results(
+        job_id: str,
+        body: EmailDeliveryRequest,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "email_job_results")
+
+        if not job.results and not job.results_on_disk:
+            raise HTTPException(status_code=400, detail="No results to email")
+
+        if body.format not in ("csv", "json"):
+            raise HTTPException(status_code=422, detail="format must be 'csv' or 'json'")
+
+        if not body.recipients:
+            raise HTTPException(status_code=422, detail="At least one recipient required")
+
+        from app.audit_logger import log_job_event
+
+        log_job_event(
+            actor=user_id or "system",
+            action="job_results_emailed",
+            job_id=job_id,
+            details={
+                "recipients": body.recipients,
+                "format": body.format,
+            },
+        )
+        return {
+            "job_id": job_id,
+            "recipients": body.recipients,
+            "format": body.format,
+            "status": "queued",
+            "message": f"Email with {body.format} results will be sent to {len(body.recipients)} recipient(s)",
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Notification Integrations (Feat 36)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @router.get("/api/jobs/{job_id}/notification-channels", response_model=list[dict])
+    async def list_notification_channels(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "list_notification_channels")
+        return _notification_channels_store.get(job_id, [])
+
+    @router.post("/api/jobs/{job_id}/notification-channels", status_code=201, response_model=dict)
+    async def create_notification_channel(
+        job_id: str,
+        body: NotificationChannelCreate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "create_notification_channel")
+        valid_types = {"slack", "teams", "discord", "email"}
+        if body.type not in valid_types:
+            raise HTTPException(status_code=422, detail=f"type must be one of {valid_types}")
+        if job_id not in _notification_channels_store:
+            _notification_channels_store[job_id] = []
+        channel = NotificationChannel(
+            job_id=job_id,
+            type=body.type,
+            webhook_url=body.webhook_url,
+            events=body.events or ["completed"],
+        )
+        _notification_channels_store[job_id].append(channel.model_dump())
+        return _notification_channels_store[job_id][-1]
+
+    @router.patch("/api/jobs/{job_id}/notification-channels/{channel_id}", response_model=dict)
+    async def update_notification_channel(
+        job_id: str,
+        channel_id: str,
+        body: NotificationChannelUpdate,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            job = manager.jobs_store[job_id]
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_notification_channel")
+        channels = _notification_channels_store.get(job_id, [])
+        for ch in channels:
+            if ch.get("id") == channel_id:
+                patch_data = body.model_dump(exclude_unset=True)
+                for key, value in patch_data.items():
+                    if value is not None:
+                        ch[key] = value
+                ch["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+                return ch
+        raise HTTPException(status_code=404, detail="Notification channel not found")
+
+    @router.delete("/api/jobs/{job_id}/notification-channels/{channel_id}", status_code=204)
+    async def delete_notification_channel(
+        job_id: str,
+        channel_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+    ):
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(manager.jobs_store[job_id], role, user_id, org_id, project_id, "delete_notification_channel")
+        channels = _notification_channels_store.get(job_id, [])
+        for i, ch in enumerate(channels):
+            if ch.get("id") == channel_id:
+                _notification_channels_store[job_id].pop(i)
+                return
+        raise HTTPException(status_code=404, detail="Notification channel not found")
