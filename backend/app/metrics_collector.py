@@ -7,6 +7,7 @@ when worker_queue.py or other modules need to record metrics.
 
 import re
 import threading
+import time as _time
 
 _MAX_METRIC_SAMPLES = 1000
 
@@ -179,6 +180,12 @@ _rate_limit_global_hits_lock = threading.Lock()
 _rate_limit_per_ip_hits: int = 0
 _rate_limit_per_ip_hits_lock = threading.Lock()
 
+# Timestamped request log: monotonic seconds at the time of each request.
+# Enables per-interval rate calculation (1m, 5m, 15m) for the extraction
+# health dashboard without needing external time-series storage.
+_request_timestamps: list[float] = []
+_request_timestamps_lock = threading.Lock()
+
 
 def _normalise_ssrf_reject_reason(reason: str | None) -> str:
     """Collapse SSRF reject reasons into a bounded label set.
@@ -222,11 +229,16 @@ def _increment_ssrf_reject(reason: str | None) -> None:
 
 def record_request_latency(duration_seconds: float) -> None:
     """Record an API request duration for metrics export."""
-    global _request_latencies, _requests_total
+    global _request_latencies, _requests_total, _request_timestamps
+    now = _time.monotonic()
     with _request_latencies_lock:
         _request_latencies.append(duration_seconds)
         if len(_request_latencies) > _MAX_METRIC_SAMPLES:
             _request_latencies = _request_latencies[-_MAX_METRIC_SAMPLES:]
+    with _request_timestamps_lock:
+        _request_timestamps.append(now)
+        if len(_request_timestamps) > _MAX_METRIC_SAMPLES:
+            _request_timestamps = _request_timestamps[-_MAX_METRIC_SAMPLES:]
     with _requests_total_lock:
         _requests_total += 1
 
@@ -778,6 +790,21 @@ def get_rate_limit_per_ip_hits() -> int:
         return _rate_limit_per_ip_hits
 
 
+def get_request_rate(interval_seconds: float) -> float:
+    """Return requests-per-second over the given interval.
+
+    Uses the monotonic timestamp ring buffer to count requests within
+    the most recent *interval_seconds* and divides by the interval.
+    Returns 0.0 if the interval is zero or negative.
+    """
+    if interval_seconds <= 0:
+        return 0.0
+    cutoff = _time.monotonic() - interval_seconds
+    with _request_timestamps_lock:
+        count = sum(1 for t in _request_timestamps if t >= cutoff)
+    return count / interval_seconds
+
+
 def record_metrics_collection_error() -> None:
     """Increment the cumulative count of /metrics collection failures.
 
@@ -861,6 +888,7 @@ def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
     global _llm_calls_total, _requests_total, _rate_limit_global_hits, _rate_limit_per_ip_hits, _metrics_collection_errors
     global _captcha_solve_attempts_total, _cf_harvest_attempts_total, _proxy_provider_refresh_total, _proxy_provider_last_count
+    global _request_timestamps
     with _request_latencies_lock:
         _request_latencies.clear()
     with _worker_failures_lock:
@@ -921,3 +949,5 @@ def reset_for_testing() -> None:
         _proxy_provider_refresh_total = 0
     with _proxy_provider_last_count_lock:
         _proxy_provider_last_count = 0
+    with _request_timestamps_lock:
+        _request_timestamps.clear()

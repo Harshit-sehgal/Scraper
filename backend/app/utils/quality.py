@@ -1,12 +1,111 @@
+import hashlib
+import json
 import logging
 import re
+from dataclasses import dataclass, field
 from statistics import mean
-from typing import Any
+from typing import Any, Literal
 
 from app.config import settings
 from app.models import FieldType, SchemaField
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Configurable deduplication
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class DedupConfig:
+    """Configuration for content-hash based deduplication.
+
+    Attributes:
+        key: How duplicate records are identified.
+            - "content_hash": full JSON fingerprint of the record (default).
+            - "url_field_hash": hash of the source URL plus specified key fields.
+        strategy: How to resolve duplicates once identified.
+            - "keep_first": retain the first occurrence (default).
+            - "keep_last": retain the last occurrence.
+            - "union_fields": merge all occurrences by unioning field values.
+        key_fields: field names used when key="url_field_hash" to build
+            the fingerprint alongside the source URL.
+    """
+
+    key: Literal["content_hash", "url_field_hash"] = "content_hash"
+    strategy: Literal["keep_first", "keep_last", "union_fields"] = "keep_first"
+    key_fields: list[str] = field(default_factory=lambda: ["title"])
+
+
+def _record_fingerprint(record: dict, config: DedupConfig) -> str:
+    """Compute a dedup fingerprint for *record* according to *config*."""
+    if config.key == "url_field_hash":
+        # Build the fingerprint from the source URL plus the configured key fields.
+        url = record.get("_source_url") or record.get("source_url") or ""
+        parts = {"_url": str(url)}
+        for kf in config.key_fields:
+            parts[kf] = str(record.get(kf, ""))
+        payload = json.dumps(parts, sort_keys=True, default=str)
+    else:
+        # content_hash: full record fingerprint, excluding system metadata.
+        excluded = {"_job_id", "_record_id", "source_url", "scraped_at", "_source_url"}
+        parts = {k: v for k, v in sorted(record.items()) if k not in excluded}
+        payload = json.dumps(parts, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _merge_union(existing: dict, incoming: dict) -> dict:
+    """Merge two records by unioning field values.
+
+    For list fields the two lists are concatenated and deduplicated.
+    For scalar fields the *incoming* value overwrites *existing* only
+    when the existing value is empty/None.
+    """
+    merged: dict[str, Any] = dict(existing)
+    for k, v in incoming.items():
+        ev = merged.get(k)
+        if isinstance(ev, list) and isinstance(v, list):
+            seen = {json.dumps(x, sort_keys=True, default=str) for x in ev}
+            for item in v:
+                if json.dumps(item, sort_keys=True, default=str) not in seen:
+                    ev.append(item)
+        elif ev is None or ev == "":
+            merged[k] = v
+    return merged
+
+
+def configurable_deduplicate_records(
+    records: list[dict],
+    config: DedupConfig | None = None,
+) -> tuple[list[dict], int]:
+    """Remove duplicate records using a configurable key and merge strategy.
+
+    Returns (unique_records, removed_count).
+    """
+    if config is None:
+        config = DedupConfig()
+
+    seen: dict[str, dict] = {}  # fingerprint -> record
+    order: list[str] = []  # maintain insertion order
+
+    for record in records:
+        fp = _record_fingerprint(record, config)
+        if fp not in seen:
+            seen[fp] = dict(record)
+            order.append(fp)
+        else:
+            if config.strategy == "keep_first":
+                # already have the first — do nothing
+                pass
+            elif config.strategy == "keep_last":
+                seen[fp] = dict(record)
+            elif config.strategy == "union_fields":
+                seen[fp] = _merge_union(seen[fp], record)
+
+    unique = [seen[fp] for fp in order]
+    removed = len(records) - len(unique)
+    return unique, removed
 
 
 def clamp01(value: float) -> float:

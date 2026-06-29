@@ -140,7 +140,6 @@ class TestDeliverWebhook:
     @pytest.mark.asyncio
     async def test_failed_delivery_retries_then_returns_false(self) -> None:
         """A 500 response on every attempt should exhaust retries and return False."""
-        import asyncio
         from unittest.mock import AsyncMock, MagicMock, patch
 
         mock_response = MagicMock()
@@ -152,17 +151,12 @@ class TestDeliverWebhook:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
         mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
-        with patch(
-            "app.url_safety.get_safe_async_client",
-            return_value=mock_ctx,
+        with (
+            patch("app.url_safety.get_safe_async_client", return_value=mock_ctx),
+            patch("asyncio.sleep", AsyncMock()),
         ):
-            original_sleep = asyncio.sleep
-            asyncio.sleep = AsyncMock()  # type: ignore[assignment]
-            try:
-                job = _FakeJob(webhook_url="https://example.com/hook")
-                success = await deliver_webhook(job)
-            finally:
-                asyncio.sleep = original_sleep  # type: ignore[assignment]
+            job = _FakeJob(webhook_url="https://example.com/hook")
+            success = await deliver_webhook(job)
 
         assert success is False
         assert job.webhook_delivered is False

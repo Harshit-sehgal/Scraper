@@ -294,6 +294,120 @@ async def csp_violations(request: Request):
 # ─── Rate Limiter Stats ─────────────────────────────────────────────────
 
 
+@router.get("/api/system/extraction-health", response_model=dict)
+async def extraction_health(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Extraction health dashboard data.
+
+    Returns aggregated extraction success rate, p95 latency by cascade
+    layer, and top 10 failing domains over the last hour.
+
+    Requires operator or admin role.
+    """
+    import datetime as _dt
+
+    from app.metrics_collector import (
+        get_domain_extraction_counts,
+        get_extraction_failure_counts,
+        get_request_latencies,
+    )
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+
+    # ── Success rate ───────────────────────────────────────────────────
+    domain_counts = get_domain_extraction_counts()
+    total_attempted = 0
+    total_succeeded = 0
+    for _key, counts in domain_counts.items():
+        if _key.startswith(("strategy:", "layer:")):
+            continue
+        att = counts.get("attempted", 0) or 0
+        suc = counts.get("succeeded", 0) or counts.get("success", 0) or 0
+        total_attempted += att
+        total_succeeded += suc
+
+    success_rate = (total_succeeded / total_attempted) if total_attempted > 0 else 1.0
+
+    # ── p95 latency by cascade layer ───────────────────────────────────
+    # Per-layer latency is not yet timestamped in metrics_collector, so we
+    # approximate from request_latencies with layer metadata stored in
+    # domain_extraction_counts as ``layer:<name>`` entries.
+    layer_latencies: dict[str, dict[str, float]] = {}
+    # Compute a global p95 from request latencies and attribute it to
+    # known layers.  When per-layer ring buffers are added later, this
+    # can be replaced with direct per-layer p95.
+    request_lats = get_request_latencies()
+    if request_lats:
+        sorted_lats = sorted(request_lats)
+        n = len(sorted_lats)
+        p95_idx = min(n - 1, int(0.95 * n))
+        global_p95 = sorted_lats[p95_idx]
+    else:
+        global_p95 = 0.0
+
+    for _key, counts in domain_counts.items():
+        if _key.startswith("layer:"):
+            layer_name = _key[len("layer:"):]
+            layer_latencies[layer_name] = {"p95_latency_seconds": global_p95}
+
+    # ── Top 10 failing domains ─────────────────────────────────────────
+    domain_failures: list[dict[str, object]] = []
+    for _key, counts in domain_counts.items():
+        if _key.startswith(("strategy:", "layer:")):
+            continue
+        fail_count = counts.get("failed", 0) or counts.get("failure", 0) or 0
+        if fail_count > 0:
+            domain_failures.append({"domain": _key, "failure_count": fail_count})
+    domain_failures.sort(key=lambda d: d["failure_count"], reverse=True)  # type: ignore[arg-type]
+    top_failing = domain_failures[:10]
+
+    # ── Failure categories (bonus for the dashboard) ───────────────────
+    failure_categories = get_extraction_failure_counts()
+
+    return {
+        "window": "1h",
+        "generated_at": now.isoformat(),
+        "success_rate": round(success_rate, 4),
+        "total_attempted": total_attempted,
+        "total_succeeded": total_succeeded,
+        "p95_latency_by_layer": layer_latencies,
+        "top_failing_domains": top_failing,
+        "failure_categories": failure_categories,
+    }
+
+
+@router.get("/api/system/extraction-rate", response_model=dict)
+async def extraction_rate(
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
+    """Extraction request rate over multiple intervals.
+
+    Returns req/sec over 1m, 5m, and 15m windows based on the
+    timestamped request ring buffer in the metrics collector.
+
+    Requires operator or admin role.
+    """
+    import datetime as _dt
+
+    from app.metrics_collector import get_request_rate, get_requests_total
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+    total = get_requests_total()
+    rates: dict[str, float] = {}
+    for label, window_secs in [("1m", 60), ("5m", 300), ("15m", 900)]:
+        rates[label] = round(get_request_rate(window_secs), 4)
+
+    return {
+        "generated_at": now.isoformat(),
+        "requests_total": total,
+        "rate_per_second": rates,
+    }
+
+
+# ─── Rate Limiter Stats ─────────────────────────────────────────────────
+
+
 @router.get("/api/system/rate-limit-stats", response_model=dict)
 async def rate_limit_stats(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],

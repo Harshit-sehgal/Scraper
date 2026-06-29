@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Coverage reporting with pytest-cov
 - Flaky test detection script
 - Documentation verification script
+- **Feat 10**: Webhook delivery retry with exponential backoff (3 attempts, 1s/5s/25s delays) and optional tenant isolation guard in `backend/app/services/webhook_delivery.py`
 
 ### Changed
 
