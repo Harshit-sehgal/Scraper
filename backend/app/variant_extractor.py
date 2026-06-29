@@ -24,7 +24,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 _VARIANT_CONTAINER_RE = re.compile(
     r"(?:variant|option|size|color|material|style|finish|pattern)",
@@ -116,7 +116,7 @@ def _classify_availability(option: Tag) -> str:
 
 def _extract_price(container: Tag) -> float | None:
     """Find the nearest price within the same container."""
-    price_tag: Tag | None = None
+    price_tag: Tag | NavigableString | None = None
     # Check the container itself first
     classes = container.get("class", "")
     class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
@@ -129,6 +129,8 @@ def _extract_price(container: Tag) -> float | None:
     if price_tag is None:
         price_tag = container.find(attrs={"data-price": True})
     if price_tag is None:
+        return None
+    if not isinstance(price_tag, Tag):
         return None
     text = price_tag.get("data-price") or price_tag.get_text(strip=True)
     try:

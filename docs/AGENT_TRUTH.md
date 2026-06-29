@@ -1,14 +1,61 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-28 local time from the working tree.
-Last verified: Session 82 quality improvement pass.
-Full validation is green (`20260628T171753Z_quick`, 12/12 passed),
-including backend tests, compiling, ruff, mypy, architecture check, and openapi spec validation.
-Current route inventory has been updated and auth matrix now reports `unknown_tenant=0`._
+_Truth source current as of 2026-06-29 local time from the working tree.
+Last full validation before this evidence-log edit: `20260629T092611Z_full`
+on HEAD `ea717d63`; 24 command rows passed, 0 failed. The numbered
+harness output showed 23/23 passed because the internal required-paths
+check is logged as command `00_required_paths.md`._
+
+This file is an index to fresh command evidence, not proof by itself.
+Reproduce commands or inspect the cited logs before relying on any claim.
 
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## 2026-06-29 - Extraction Orchestrator Validation Fix
+
+Scope: fix a current checkout regression where the extraction cascade's
+LLM discovery helper used `user_intent` without accepting it as an
+argument. The fix passes `user_intent` from `orchestrate_extraction()`
+into `_try_llm_discovery_layer()`, marks the unused self-tuning return
+with an underscore, and applies formatter-only wrapping in the same
+function.
+
+### Issue Fixed
+
+- `F-EXTRACTION-ORCH-USER-INTENT-001`: full validation run
+  `20260629T091314Z_full` failed because
+  `backend/app/extraction_orchestrator.py` referenced undefined
+  `user_intent` in the LLM discovery layer. The same defect was caught
+  by backend tests, ruff, pyflakes, and mypy.
+
+### Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 1 | RED before fix; run id `20260629T091314Z_full`. Backend failed `test_memory_downgraded_and_arbitration` with `NameError: name 'user_intent' is not defined`; ruff/pyflakes/mypy also reported undefined `user_intent` in `backend/app/extraction_orchestrator.py`. |
+| `python3 -m pytest backend/tests/test_network_payload_extractor.py::TestSourceArbitration::test_memory_downgraded_and_arbitration backend/tests/test_pyflakes_fixes.py::test_pyflakes_clean -q -o addopts=` | 0 | PASS after fix; 2 passed. |
+| `python3 -m pytest backend/tests/test_network_payload_extractor.py backend/tests/test_extraction_orchestrator.py -q -o addopts=` | 0 | PASS after fix; 72 passed. |
+| `python3 -m ruff check backend scripts && python3 -m ruff format --check backend scripts` | 0 | PASS; all checks passed, 720 files already formatted. |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | PASS; no output. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m mypy backend` | 0 | PASS; no issues found in 687 source files. |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 quick validation steps passed. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS; run id `20260629T092611Z_full`, 24 command rows passed and 0 failed. Backend full tests passed in 451.48s; frontend tests reported 36 files and 458 tests passed. |
+| `python3 scripts/verify_docs_match_code.py` | 0 | PASS; routes and environment variable docs match code. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; routes=161, stable=126, experimental=35. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; routes=150, unknown_auth=0, unknown_tenant=0. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; file ledger regenerated. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+
+### Remaining Observations
+
+- Backend full tests passed, but the pytest log still contains
+  non-failing `PytestUnraisableExceptionWarning` / asyncio pending-task
+  warnings around Playwright/browser cleanup. This pass did not resolve
+  those warnings.
+- Generated API and route docs changed only their `Generated:` timestamps
+  after the validation and inventory commands.
 
 ## Session 82 Quality Improvement Pass - 2026-06-28
 

@@ -267,7 +267,7 @@ def _record_field_provenance(
                 value=val,
                 method=method,
                 selector=selector,
-                    confidence=record.get("record_score", 0.5),
+                confidence=record.get("record_score", 0.5),
             )
 
 
@@ -694,6 +694,7 @@ async def _try_llm_discovery_layer(
     url: str,
     schema_fields: list[SchemaField],
     world_state,
+    user_intent: str,
     gate_threshold: float,
     provenance_builder: ProvenanceBuilder | None = None,
     memory=None,
@@ -810,7 +811,7 @@ async def orchestrate_extraction(
     memory = get_selector_memory()
     force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
 
-    effective_min_score, gate_threshold = _compute_self_tuning_score(url, min_record_score)
+    _effective_min_score, gate_threshold = _compute_self_tuning_score(url, min_record_score)
     network_diagnostics, network_result, _bodies = _gather_network_info(url, schema_fields)
 
     # ── Layer 0: Network / JSON Extraction ──
@@ -826,22 +827,46 @@ async def orchestrate_extraction(
         and provided_selectors.get("fields")
     ):
         result = _try_provided_selectors_layer(
-            html, schema_fields, provided_selectors, url, user_intent,
-            gate_threshold, provenance_builder, memory,
+            html,
+            schema_fields,
+            provided_selectors,
+            url,
+            user_intent,
+            gate_threshold,
+            provenance_builder,
+            memory,
         )
         if result is not None:
             return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
 
     # ── Layer 2: Selector Memory ──
-    result = _try_memory_layer(html, url, schema_fields, provided_selectors, force_container_discovery,
-                               user_intent, gate_threshold, provenance_builder, memory, warnings)
+    result = _try_memory_layer(
+        html,
+        url,
+        schema_fields,
+        provided_selectors,
+        force_container_discovery,
+        user_intent,
+        gate_threshold,
+        provenance_builder,
+        memory,
+        warnings,
+    )
     if result is not None:
         return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
 
     # ── Layer 3: LLM Discovery ──
     if not force_container_discovery:
-        result = await _try_llm_discovery_layer(html, url, schema_fields, world_state,
-                                                gate_threshold, provenance_builder, memory)
+        result = await _try_llm_discovery_layer(
+            html,
+            url,
+            schema_fields,
+            world_state,
+            user_intent,
+            gate_threshold,
+            provenance_builder,
+            memory,
+        )
         if result is not None:
             return _arbitrate_extraction(result, url, network_diagnostics, network_result, schema_fields, provenance_builder)
 
@@ -867,7 +892,11 @@ async def orchestrate_extraction(
                 selector_success=True,
                 selectors={"item_container": container_result.best_selector},
             ),
-            url, network_diagnostics, network_result, schema_fields, provenance_builder,
+            url,
+            network_diagnostics,
+            network_result,
+            schema_fields,
+            provenance_builder,
         )
     if container_result.final_records:
         logger.info(
@@ -901,7 +930,11 @@ async def orchestrate_extraction(
                     provenance_builder.add_fallback_step("visible_text_superseded_by_regex")
                 return _arbitrate_extraction(
                     ExtractionResult(regex_candidate, "regex", selector_success=False),
-                    url, network_diagnostics, network_result, schema_fields, provenance_builder,
+                    url,
+                    network_diagnostics,
+                    network_result,
+                    schema_fields,
+                    provenance_builder,
                 )
             logger.info(
                 "[Orchestrator] Visible-text extraction SUCCESS (%d records, avg score: %.2f)",
@@ -911,7 +944,11 @@ async def orchestrate_extraction(
             _record_field_provenance(provenance_builder, schema_fields, visible_results, ExtractionMethod.REGEX)
             return _arbitrate_extraction(
                 ExtractionResult(visible_results, "visible_text", selector_success=False),
-                url, network_diagnostics, network_result, schema_fields, provenance_builder,
+                url,
+                network_diagnostics,
+                network_result,
+                schema_fields,
+                provenance_builder,
             )
         logger.info(
             "[Orchestrator] Visible-text extraction LOW QUALITY (avg score: %.2f)",
@@ -934,14 +971,22 @@ async def orchestrate_extraction(
             provenance_builder.add_fallback_step("container_discovery_partial_result")
         return _arbitrate_extraction(
             ExtractionResult(container_result.final_records, "container_discovery"),
-            url, network_diagnostics, network_result, schema_fields, provenance_builder,
+            url,
+            network_diagnostics,
+            network_result,
+            schema_fields,
+            provenance_builder,
         )
 
     if provenance_builder:
         provenance_builder.add_fallback_step("regex_fallback")
     return _arbitrate_extraction(
         ExtractionResult(regex_results, "regex"),
-        url, network_diagnostics, network_result, schema_fields, provenance_builder,
+        url,
+        network_diagnostics,
+        network_result,
+        schema_fields,
+        provenance_builder,
     )
 
 
