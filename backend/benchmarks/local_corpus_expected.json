@@ -1,5 +1,5 @@
 {
-  "version": "2026-06-29.local-corpus.v5",
+  "version": "2026-06-29.local-corpus.v6",
   "required_categories": [
     "static product pages",
     "listing pages",
@@ -23,7 +23,8 @@
     "multi-page pagination",
     "spa-render-wait",
     "i18n scripts",
-    "large result sets"
+    "large result sets",
+    "session expiry / replay"
   ],
   "aggregate_thresholds": {
     "min_row_f1": 0.95,
@@ -5105,6 +5106,82 @@
         {
           "title": "Bronze Bushing Model 1005",
           "price": "$7334.65"
+        }
+      ],
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
+    },
+    {
+      "id": "session_search_form_needs_replay",
+      "categories": [
+        "session expiry / replay"
+      ],
+      "fixture": "session_search_form.html",
+      "extractor": "negative_html",
+      "schema": [
+        {
+          "name": "supplier",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "required_fields": [
+        "supplier"
+      ],
+      "expected_records": [],
+      "expected_failure_classes": [
+        "empty_response",
+        "session_bound_url",
+        "search_replay_required"
+      ],
+      "thresholds": {
+        "max_false_positive_records": 0
+      }
+    },
+    {
+      "id": "session_search_recovered",
+      "categories": [
+        "session expiry / replay"
+      ],
+      "fixture": "session_search_recovered.html",
+      "extractor": "html_regex",
+      "schema": [
+        {
+          "name": "supplier",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "required_fields": [
+        "supplier"
+      ],
+      "expected_records": [
+        {
+          "supplier": "Apex Components Inc."
+        },
+        {
+          "supplier": "Northstar Parts Co."
+        },
+        {
+          "supplier": "Continental Valve Distributors"
+        },
+        {
+          "supplier": "Sunbelt Industrial Supply"
+        },
+        {
+          "supplier": "Great Lakes Hardware Co-op"
+        },
+        {
+          "supplier": "Mountain West Components"
+        },
+        {
+          "supplier": "Atlantic Seaboard Trading"
+        },
+        {
+          "supplier": "Pacific Rim Sourcing"
         }
       ],
       "thresholds": {
