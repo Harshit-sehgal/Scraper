@@ -699,8 +699,20 @@ async def handle_skip_domain(
 ) -> bool:
     """Skip the entire domain."""
     url = context.get("url", "")
-    attempt_ctx.skip_domain = url
-    logger.warning("Recovery: skipping domain for %s", url)
+    domain = ""
+    if url:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower() if parsed.hostname else ""
+    if domain:
+        attempt_ctx.skip_domain = domain
+        logger.warning("Recovery: skipping domain %s", domain)
+    else:
+        # Fall back to the URL if it can't be parsed (best-effort signal;
+        # consumers treat this as truthy → will trigger the skip path).
+        attempt_ctx.skip_domain = url
+        logger.warning("Recovery: skipping url (no netloc) %s", url)
     return True
 
 

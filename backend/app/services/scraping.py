@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import time
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -310,6 +311,17 @@ async def run_scraping_phase(
 
     scrape_tasks = [asyncio.create_task(_scrape_single_url(idx, url)) for idx, url in enumerate(job.urls, start=1)]
 
+    # Safety net: if every _scrape_single_url task hangs such that
+    # ``done()`` is never true AND neither ``cancel_requested`` nor
+    # ``cancel_check`` ever fires (e.g. a missing cancel signal hook),
+    # the bare ``while True`` loop would never exit.  Bound the polling
+    # phase to ``_CANCEL_POLL_TIMEOUT`` so the worker can't wedge the
+    # job indefinitely.  Individual scrape tasks have their own
+    # timeouts inside ``_scrape_single_url`` so this is *only* a
+    # belt-and-braces ceiling on the cancellation loop itself.
+    poll_started_at = time.monotonic()
+    _CANCEL_POLL_DEADLINE_S = float(os.environ.get("DATAFORGE_CANCEL_POLL_DEADLINE", "300"))
+
     while True:
         if all(task.done() for task in scrape_tasks):
             break
@@ -335,6 +347,24 @@ async def run_scraping_phase(
 
             # Now that status is updated via transition_to, cleanup is final
             return all_raw_results, urls_with_records, warnings, []
+
+        if (time.monotonic() - poll_started_at) > _CANCEL_POLL_DEADLINE_S:
+            # Cancel everything: at least one task is wedged past the
+            # per-URL timeout, and no cancel signal is propagating.  We
+            # return whatever completed cleanly rather than block the
+            # worker indefinitely.
+            logger.error(
+                "Cancel-poll deadline exceeded (%ds) on job %s with %d/%d tasks complete — force-cancelling",
+                int(_CANCEL_POLL_DEADLINE_S),
+                getattr(job, "id", "?"),
+                sum(1 for t in scrape_tasks if t.done()),
+                len(scrape_tasks),
+            )
+            for task in scrape_tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*scrape_tasks, return_exceptions=True)
+            break
 
         await asyncio.sleep(0.25)
 

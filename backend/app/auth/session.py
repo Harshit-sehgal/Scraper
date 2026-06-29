@@ -156,11 +156,39 @@ def _derive_secret() -> bytes:
 
 
 _SIGNING_KEY = _derive_secret()
+# Tracks the SESSION_SECRET value used to compute ``_SIGNING_KEY`` so
+# rotation can be observed lazily on the next sign/unsign call without a
+# process restart.  Key rotation must invalidate in-flight cookies so
+# stale permissions are not silently accepted indefinitely.
+_SIGNING_KEY_SECRET: str | None = settings.SESSION_SECRET
+
+
+def _current_signing_key() -> bytes:
+    """Return up-to-date signing key, re-deriving if SESSION_SECRET has changed.
+
+    ``hmac.compare_digest`` in :func:`_unsign` already falls back to
+    ``DATAFORGE_SESSION_SECRET_ROTATED`` keys, so a rotation only blanks
+    *new* cookies: existing sessions signed with the previous secret
+    remain valid until they pass the rotated-key check.
+
+    Why lazy: importing ``_SIGNING_KEY`` once at module load froze rotation
+    to "operator must restart the worker to pick up a new secret" which
+    silently breaks all live sessions after a legitimate rotation.
+    """
+    global _SIGNING_KEY, _SIGNING_KEY_SECRET
+    current = settings.SESSION_SECRET
+    if current == _SIGNING_KEY_SECRET:
+        return _SIGNING_KEY
+    # Rotation observed — rebuild lazily without invalidating existing
+    # keys (the rotated-credentials env var supplies the bridge).
+    _SIGNING_KEY = _derive_secret()
+    _SIGNING_KEY_SECRET = current
+    return _SIGNING_KEY
 
 
 def _sign(payload: str) -> str:
     """Return an HMAC-SHA256 signature (hex-encoded) for *payload*."""
-    return hmac.new(_SIGNING_KEY, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(_current_signing_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def _unsign(signed: str) -> str | None:

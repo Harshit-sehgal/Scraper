@@ -348,7 +348,7 @@ async def scrape_url_with_recovery(
 
             if classification.category == FailureCategory.SELECTOR_DECAY:
                 logger.info("Selector decay detected, cleaning up selector memory for %s", url)
-                selector_memory.force_cleanup()
+                selector_memory.force_cleanup_for(url)
 
             if attempt >= max_recovery_attempts:
                 break
@@ -390,7 +390,7 @@ async def scrape_url_with_recovery(
                 break
 
             if attempt_ctx.bypass_selector_memory:
-                selector_memory.force_cleanup()
+                selector_memory.force_cleanup_for(url)
             if attempt_ctx.force_llm_discovery and selectors_map:
                 selectors_map = None
 

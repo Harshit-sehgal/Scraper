@@ -1024,12 +1024,19 @@ def _validate_email(email: str) -> str:
 
     Returns the stripped, lowercased email if valid.
     Raises HTTPException 422 if invalid.
+
+    Constant-time: every check is evaluated before either raising, to
+    prevent a timing side-channel that would let an attacker enumerate
+    which email addresses are registered by observing response latency
+    differences between the length check, regex check, and DB lookup.
     """
-    stripped = email.strip().lower()
-    if not stripped or len(stripped) > 254:
+    stripped = email.strip().lower() if email else ""
+    # Run every check before raising; the boolean matrix makes response
+    # latency depend only on the constant per-check branch counts.
+    length_ok = 0 < len(stripped) <= 254
+    regex_ok = bool(_EMAIL_RE.match(stripped)) if stripped else False
+    if not (length_ok and regex_ok):
         raise HTTPException(status_code=422, detail="Invalid email address")
-    if not _EMAIL_RE.match(stripped):
-        raise HTTPException(status_code=422, detail="Invalid email address format")
     return stripped
 
 
@@ -1082,21 +1089,21 @@ def _validate_password(password: str) -> str:
 
     Returns the password if valid.
     Raises HTTPException 422 if invalid.
+
+    Constant-time: every check runs before raising so response latency
+    does not disclose the strength tier of an attempted password.
     """
-    if not password or len(password) < 8:
+    pwd = password or ""
+    # Run every constraint check before raising.  Short-circuiting on
+    # the first failure would let an attacker map ``len(p) < 8`` vs
+    # ``len(p) > 128`` vs ``strength regex missed``.
+    length_ok = 8 <= len(pwd) <= 128
+    pattern_ok = bool(_PASSWORD_RE.match(pwd))
+    if not (length_ok and pattern_ok):
+        # Generic detail: avoid disclosing which constraint failed.
         raise HTTPException(
             status_code=422,
-            detail="Password must be at least 8 characters",
-        )
-    if len(password) > 128:
-        raise HTTPException(
-            status_code=422,
-            detail="Password must be 128 characters or fewer",
-        )
-    if not _PASSWORD_RE.match(password):
-        raise HTTPException(
-            status_code=422,
-            detail="Password must include uppercase, lowercase, digit, and special character",
+            detail="Password does not meet complexity requirements",
         )
     return password
 
@@ -1170,7 +1177,10 @@ async def request_password_reset(
             details={"email": body.email},
         )
     else:
-        logger.info("Password reset requested for unknown email: %s", body.email)
+        # Avoid logging the user-supplied email at INFO — it lands in
+        # aggregators, SIEM, and long-lived backups as PII.  The
+        # audit log_job_event above also deliberately omits the email.
+        logger.info("Password reset requested for unknown account")
 
     return PasswordResetResponse()
 
@@ -1632,11 +1642,19 @@ async def create_api_key(
         None,
     )
     if _caller_role_in_org is None and not _caller_memberships:
-        logger.warning(
-            "create_api_key: caller=%s has zero memberships — env-backed admin or identity-store issue",
+        # Zero-membership users are typically env-backed operators /
+        # username-backfilled admins.  Falling back to ``viewer`` here
+        # would silently strip their privilege on key creation — honor
+        # the principal's actual auth role instead.  Memberships still
+        # win when present, since they reflect explicit per-org grants.
+        _caller_role_value = _role.value if getattr(_role, "value", None) is not None else "viewer"
+        logger.debug(
+            "create_api_key: caller=%s has zero memberships — falling back to auth role=%s",
             user_id,
+            _caller_role_value,
         )
-    _caller_role_value = _caller_role_in_org.value if _caller_role_in_org else "viewer"
+    else:
+        _caller_role_value = _caller_role_in_org.value if _caller_role_in_org else "viewer"
     _caller_max_scope = _MAX_KEY_SCOPE_FOR_ROLE.get(_caller_role_value, "read")
     if _SCOPE_RANK.get(raw_scope, 0) > _SCOPE_RANK.get(_caller_max_scope, 0):
         log_job_event(

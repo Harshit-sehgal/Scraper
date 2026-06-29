@@ -223,40 +223,14 @@ async def body_size_middleware(request: Request, call_next):
 
 async def api_key_middleware(request: Request, call_next):
     if request.url.path.startswith("/api/"):
-        if request.method == "OPTIONS" and request.headers.get("Origin") and request.headers.get("Access-Control-Request-Method"):
+        if _is_cors_preflight(request):
             return await call_next(request)
-        # CSP violation reports are sent by browsers, which cannot carry API keys.
-        # This endpoint must remain unauthenticated but is still rate-limited
-        # and body-size-capped by the other middlewares.
-        if request.url.path == "/api/system/csp-violations":
-            return await call_next(request)
-        # Session management endpoints are exempt from API key middleware.
-        # They use their own auth logic (exchanging key for cookie, or
-        # returning session state from the cookie itself).
-        if request.url.path in ("/api/session", "/api/session/me"):
-            return await call_next(request)
-        # Password reset endpoints are exempt from API key middleware.
-        # They are called by unauthenticated users reset flows.
-        if request.url.path in (
-            "/api/saas/password-reset/request",
-            "/api/saas/password-reset/reset",
-        ):
-            return await call_next(request)
-        # Self-service account signup is intentionally public. It remains
-        # covered by body-size limits and the global rate limiter.
-        if request.url.path == "/api/saas/signup":
-            return await call_next(request)
-        # Billing webhooks are called by Autumn/Stripe, which do not carry
-        # DataForge API keys. The endpoint is rate-limited and body-size
-        # capped by other middlewares.
-        if request.url.path == "/api/billing/webhook":
-            return await call_next(request)
-        # Stub-return page is rendered in a browser after the operator
-        # clicks the stub approval URL (PayPal credentials not configured).
-        # Browsers do not carry API keys to this redirect URL, but the page
-        # is dev-only — it shows a confirmation message and never commits
-        # state — so it is allowed through unauthenticated.
-        if request.url.path.startswith("/api/billing/stub-return/"):
+        # Public-API exemptions (CSP reports, session, password-reset,
+        # signup, billing webhooks, stub-return) are tracked centrally
+        # in ``_PUBLIC_API_PATHS`` / ``_PUBLIC_API_PREFIXES`` so that the
+        # two middleware layers (this one and api_auth_dependency) cannot
+        # drift apart.  Adding a new public endpoint is one edit there.
+        if _is_public_api_path(request.url.path):
             return await call_next(request)
         bearer_token = None
         auth_header = request.headers.get("Authorization", "")

@@ -427,6 +427,52 @@ class SelectorMemory:
         """Force cleanup of low-confidence selectors (ignore interval check)."""
         return self._auto_cleanup(force=True)
 
+    def force_cleanup_for(self, url: str) -> dict[str, Any]:
+        """Scoped cleanup: drop low-confidence selectors for *url*'s domain only.
+
+        Avoids the cross-tenant / cross-domain collateral damage of
+        ``force_cleanup()`` when a recovery loop triggers cleanup based on
+        a single URL's decay signal — only the targeted domain+path-prefix
+        entry is evicted, leaving healthy selectors for unrelated domains
+        untouched.
+        """
+        domain = self._extract_domain(url)
+        if not domain:
+            return {
+                "domains_checked": 0,
+                "selectors_deleted": 0,
+                "deleted_domains": [],
+                "low_confidence_selectors": [],
+            }
+        stats: dict[str, Any] = {
+            "domains_checked": 0,
+            "selectors_deleted": 0,
+            "deleted_domains": [],
+            "low_confidence_selectors": [],
+        }
+        needs_persist = False
+        threshold: float = (
+            getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD)
+            or DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD
+        )
+        with self._lock:
+            entry = self._memory.get(domain)
+            if entry is None:
+                return stats
+            stats["domains_checked"] = 1
+            confidence = self._compute_confidence(entry)
+            if confidence.final_score < threshold:
+                stats["selectors_deleted"] = 1
+                stats["deleted_domains"].append(domain)
+                stats["low_confidence_selectors"].append(
+                    {"domain": domain, "score": confidence.final_score, "reason": confidence.reason},
+                )
+                del self._memory[domain]
+                needs_persist = True
+        if needs_persist:
+            self._save()
+        return stats
+
     @staticmethod
     def _extract_domain(url: str) -> str | None:
         """Extract a domain+path-prefix key from *url*.

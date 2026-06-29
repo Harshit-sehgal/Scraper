@@ -162,3 +162,87 @@ class TestSelectorMemoryBackwardCompat:
         assert not mem.has_memory_for("https://example.com/products")
         # /blog must be untouched
         assert mem.has_memory_for("https://example.com/blog")
+
+
+class TestForceCleanupFor:
+    """Tests for force_cleanup_for(url) scoped cleanup."""
+
+    def test_cleans_up_low_confidence_domain(self, tmp_path) -> None:
+        """force_cleanup_for removes a low-confidence domain entry."""
+        mem = SelectorMemory(storage_path=str(tmp_path / "cleanup_test.json"))
+        mem._memory["example.com/products"] = {
+            "selectors": {"fields": {"title": "h1"}},
+            "success_count": 0,
+            "failure_count": 10,
+            "first_seen": 0,
+            "last_success": 0,
+        }
+        stats = mem.force_cleanup_for("https://example.com/products/42")
+        assert stats["domains_checked"] == 1
+        assert stats["selectors_deleted"] == 1
+        assert "example.com/products" in stats["deleted_domains"]
+        assert "example.com/products" not in mem._memory
+
+    def test_does_not_clean_high_confidence_domain(self, tmp_path) -> None:
+        """force_cleanup_for leaves high-confidence domains untouched."""
+        mem = SelectorMemory(storage_path=str(tmp_path / "high_conf.json"))
+        mem._memory["example.com/products"] = {
+            "selectors": {"fields": {"title": "h1"}},
+            "success_count": 100,
+            "failure_count": 0,
+            "first_seen": 9999999999,
+            "last_success": 9999999999,
+        }
+        stats = mem.force_cleanup_for("https://example.com/products")
+        assert stats["selectors_deleted"] == 0
+        assert "example.com/products" in mem._memory
+
+    def test_unknown_domain_returns_empty_stats(self, tmp_path) -> None:
+        """force_cleanup_for returns zero stats for a domain not in memory."""
+        mem = SelectorMemory(storage_path=str(tmp_path / "unknown.json"))
+        stats = mem.force_cleanup_for("https://unknown.com/foo")
+        assert stats["domains_checked"] == 0
+        assert stats["selectors_deleted"] == 0
+
+    def test_unparseable_url_returns_empty_stats(self, tmp_path) -> None:
+        """force_cleanup_for handles unparseable URLs gracefully."""
+        mem = SelectorMemory(storage_path=str(tmp_path / "bad_url.json"))
+        stats = mem.force_cleanup_for("not-a-url")
+        assert stats["domains_checked"] == 0
+        assert stats["selectors_deleted"] == 0
+
+    def test_leaves_unrelated_domains_untouched(self, tmp_path) -> None:
+        """force_cleanup_for only cleans the targeted domain, not others."""
+        mem = SelectorMemory(storage_path=str(tmp_path / "multi_domain.json"))
+        mem._memory["example.com/products"] = {
+            "selectors": {"fields": {"title": "h1"}},
+            "success_count": 0,
+            "failure_count": 10,
+            "first_seen": 0,
+            "last_success": 0,
+        }
+        mem._memory["other.com/blog"] = {
+            "selectors": {"fields": {"title": "h2"}},
+            "success_count": 50,
+            "failure_count": 0,
+            "first_seen": 9999999999,
+            "last_success": 9999999999,
+        }
+        stats = mem.force_cleanup_for("https://example.com/products")
+        assert stats["selectors_deleted"] == 1
+        assert "example.com/products" not in mem._memory
+        assert "other.com/blog" in mem._memory
+
+    def test_persists_after_cleanup(self, tmp_path) -> None:
+        """force_cleanup_for persists changes to disk after removing an entry."""
+        mem = SelectorMemory(storage_path=str(tmp_path / "persist.json"))
+        mem._memory["example.com/products"] = {
+            "selectors": {"fields": {"title": "h1"}},
+            "success_count": 0,
+            "failure_count": 10,
+            "first_seen": 0,
+            "last_success": 0,
+        }
+        mem.force_cleanup_for("https://example.com/products")
+        mem2 = SelectorMemory(storage_path=str(tmp_path / "persist.json"))
+        assert "example.com/products" not in mem2._memory

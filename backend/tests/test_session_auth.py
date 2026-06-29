@@ -179,3 +179,95 @@ def test_session_admin_role(client, monkeypatch) -> None:
     cookie = r.cookies.get("dataforge_session")
     r2 = client.get("/api/session/me", cookies={"dataforge_session": cookie})
     assert r2.json()["role"] == "admin"
+
+
+class TestLazySigningKeyRotation:
+    """Tests for _current_signing_key lazy rotation on SESSION_SECRET change."""
+
+    def test_cached_key_returned_when_secret_unchanged(self, monkeypatch) -> None:
+        """_current_signing_key returns the cached key when SESSION_SECRET hasn't changed."""
+        import app.auth.session as session_mod
+        from app.auth.session import _current_signing_key, _derive_secret
+
+        monkeypatch.setattr(settings, "SESSION_SECRET", "original-secret")
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY_SECRET", "original-secret")
+        expected = _derive_secret()
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY", expected)
+
+        result = _current_signing_key()
+        assert result == expected
+
+    def test_re_derives_when_secret_rotated(self, monkeypatch) -> None:
+        """_current_signing_key re-derives the key when SESSION_SECRET changes."""
+        import app.auth.session as session_mod
+        from app.auth.session import _current_signing_key, _derive_secret
+
+        monkeypatch.setattr(settings, "SESSION_SECRET", "original-secret")
+        old_key = _derive_secret()
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY", old_key)
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY_SECRET", "original-secret")
+
+        monkeypatch.setattr(settings, "SESSION_SECRET", "new-secret")
+        result = _current_signing_key()
+        new_expected = _derive_secret()
+        assert result == new_expected
+        assert result != old_key
+
+    def test_cached_key_updates_after_rotation(self, monkeypatch) -> None:
+        """After rotation, subsequent calls return the new cached key without re-deriving."""
+        import app.auth.session as session_mod
+        from app.auth.session import _current_signing_key, _derive_secret
+
+        monkeypatch.setattr(settings, "SESSION_SECRET", "original-secret")
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY_SECRET", "original-secret")
+        expected = _derive_secret()
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY", expected)
+
+        key1 = _current_signing_key()
+        monkeypatch.setattr(settings, "SESSION_SECRET", "rotated-secret")
+        key2 = _current_signing_key()
+        assert key2 != key1
+
+        key3 = _current_signing_key()
+        assert key3 == key2
+
+    def test_sign_uses_lazy_key_after_rotation(self, monkeypatch) -> None:
+        """_sign() produces a different signature after a rotation mid-process."""
+        import app.auth.session as session_mod
+        from app.auth.session import _derive_secret, _sign
+
+        monkeypatch.setattr(settings, "SESSION_SECRET", "secret-a")
+        key_a = _derive_secret()
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY_SECRET", "secret-a")
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY", key_a)
+
+        sig_a = _sign("test-payload")
+        key_b = _derive_secret()
+        monkeypatch.setattr(settings, "SESSION_SECRET", "secret-b")
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY_SECRET", "secret-a")
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY", key_b)
+
+        sig_b = _sign("test-payload")
+
+        assert sig_a != sig_b, "Rotated secret must produce a different signature"
+
+    def test_create_session_cookie_signs_with_current_key(self, monkeypatch) -> None:
+        """create_session_cookie produces a cookie that verify_session_payload accepts."""
+        import app.auth.session as session_mod
+        from app.auth.session import (
+            _derive_secret,
+            create_session_cookie,
+            verify_session_payload,
+        )
+
+        monkeypatch.setattr(settings, "SESSION_SECRET", "test-secret-for-cookie")
+        key = _derive_secret()
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY_SECRET", "test-secret-for-cookie")
+        monkeypatch.setattr(session_mod, "_SIGNING_KEY", key)
+        monkeypatch.setattr(session_mod, "SESSION_MAX_AGE", 3600)
+
+        cookie = create_session_cookie("user", user_id="test_user")
+        payload = verify_session_payload(cookie)
+        assert payload is not None
+        assert payload["role"] == "user"
+        assert payload["user_id"] == "test_user"

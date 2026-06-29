@@ -218,7 +218,7 @@ class TestRecoveryExecutor:
         result = await handler({}, {"url": "http://blocked.example.com"}, ctx)
 
         assert result is True
-        assert ctx.skip_domain == "http://blocked.example.com"
+        assert ctx.skip_domain == "blocked.example.com"
 
     @pytest.mark.asyncio
     async def test_abort_domain_handler(self) -> None:
@@ -611,6 +611,61 @@ class TestRecoveryPlan:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestScopedSelectorCleanup:
+    """Verify that scrape_url_with_recovery calls force_cleanup_for (scoped) instead of force_cleanup()."""
+
+    @pytest.mark.asyncio
+    async def test_selector_decay_triggers_scoped_cleanup(self) -> None:
+        """SELECTOR_DECAY classification must call force_cleanup_for with the failing URL."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.scraper_recovery_integration import scrape_url_with_recovery
+
+        mock_selector_memory = MagicMock()
+        mock_selector_memory.force_cleanup_for = MagicMock(
+            return_value={"selectors_deleted": 1, "deleted_domains": ["example.com"]}
+        )
+
+        mock_strategist = MagicMock()
+        mock_plan = MagicMock()
+        mock_plan.primary_action.value = "backoff_and_slow"
+        mock_plan.max_retry_attempts = 1
+        mock_strategist.generate_recovery_plan.return_value = mock_plan
+
+        mock_classifier = MagicMock()
+        mock_classifier.return_value = MagicMock(
+            category=FailureCategory.SELECTOR_DECAY,
+            confidence=0.85,
+            to_dict=lambda: {"category": "selector_decay", "confidence": 0.85},
+        )
+
+        mock_executor = MagicMock()
+        mock_executor.execute = AsyncMock(return_value=True)
+
+        mock_domain_intel = MagicMock()
+        mock_domain_intel.get_intelligence.return_value = MagicMock(to_dict=dict)
+
+        with (
+            patch("app.scraper_recovery_integration.get_selector_memory", return_value=mock_selector_memory),
+            patch("app.scraper_recovery_integration.get_recovery_strategist", return_value=mock_strategist),
+            patch("app.scraper_recovery_integration.classify_failure", mock_classifier),
+            patch("app.scraper_recovery_integration.get_recovery_executor", return_value=mock_executor),
+            patch("app.scraper_recovery_integration.get_domain_intelligence", return_value=mock_domain_intel),
+            patch("app.scrape_telemetry.get_scrape_telemetry"),
+            patch("app.crawl_state.get_crawl_state"),
+            patch("app.acquisition_telemetry.get_acquisition_telemetry"),
+            patch("app.scraper_recovery_integration.AcquisitionLineage"),
+        ):
+            results, stats = await scrape_url_with_recovery(
+                url="https://example.com/products/42",
+                schema_fields=[],
+                min_record_score=0.5,
+                max_recovery_attempts=2,
+            )
+
+        mock_selector_memory.force_cleanup_for.assert_any_call("https://example.com/products/42")
 
 
 def _make_classification(category: FailureCategory, confidence: float = 0.8) -> FailureClassification:
