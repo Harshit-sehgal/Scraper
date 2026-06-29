@@ -91,13 +91,12 @@ def _score_signals(html: str) -> dict[PageType, tuple[float, dict[str, float]]]:
         return {pt: (0.0, {}) for pt in PageType}
 
     for pattern, (signal_name, page_type, weight) in _SIGNAL_PATTERNS:
-        if pattern.search(html):
+        if pattern.search(html) and signal_name not in fired[page_type]:
             # Idempotent per-signal: only adds weight the first time the
             # signal fires for that page_type so duplicate matches don't
             # stack runaway weights.
-            if signal_name not in fired[page_type]:
-                scores[page_type] += weight
-                fired[page_type][signal_name] = weight
+            scores[page_type] += weight
+            fired[page_type][signal_name] = weight
     return {pt: (scores[pt], fired[pt]) for pt in PageType}
 
 
@@ -188,3 +187,4 @@ def classify_page_type(
         signals=contributions,
         alternatives=alternatives,
     )
+
