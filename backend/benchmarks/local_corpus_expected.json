@@ -1,5 +1,5 @@
 {
-  "version": "2026-06-29.local-corpus.v3",
+  "version": "2026-06-29.local-corpus.v4",
   "required_categories": [
     "static product pages",
     "listing pages",
@@ -21,7 +21,8 @@
     "Q&A / forum pages",
     "ecommerce listing grid",
     "multi-page pagination",
-    "spa-render-wait"
+    "spa-render-wait",
+    "i18n scripts"
   ],
   "aggregate_thresholds": {
     "min_row_f1": 0.9,
@@ -32,374 +33,1033 @@
   "cases": [
     {
       "id": "travel_site_flights",
-      "categories": ["static product pages"],
+      "categories": [
+        "static product pages"
+      ],
       "fixture": "travel_site.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "airline", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "airline",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["airline", "price"],
+      "required_fields": [
+        "airline",
+        "price"
+      ],
       "expected_records": [
-        {"airline": "British Airways", "price": "£245.50"},
-        {"airline": "Air France", "price": "£199.00"}
+        {
+          "airline": "British Airways",
+          "price": "£245.50"
+        },
+        {
+          "airline": "Air France",
+          "price": "£199.00"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "legacy_directory_listing",
-      "categories": ["listing pages"],
+      "categories": [
+        "listing pages"
+      ],
       "fixture": "legacy_directory.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "company", "type": "string", "required": true},
-        {"name": "phone", "type": "phone", "required": true},
-        {"name": "website", "type": "url", "required": true}
+        {
+          "name": "company",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "phone",
+          "type": "phone",
+          "required": true
+        },
+        {
+          "name": "website",
+          "type": "url",
+          "required": true
+        }
       ],
-      "required_fields": ["company", "phone", "website"],
+      "required_fields": [
+        "company",
+        "phone",
+        "website"
+      ],
       "expected_records": [
-        {"company": "Acme Corp", "phone": "+1-555-0101", "website": "http://acme.example.com"},
-        {"company": "Globex Inc", "phone": "+1-555-0202", "website": "http://globex.example.com"},
-        {"company": "Soylent Green Co", "phone": "+1-555-0303", "website": "http://soylent.example.com"}
+        {
+          "company": "Acme Corp",
+          "phone": "+1-555-0101",
+          "website": "http://acme.example.com"
+        },
+        {
+          "company": "Globex Inc",
+          "phone": "+1-555-0202",
+          "website": "http://globex.example.com"
+        },
+        {
+          "company": "Soylent Green Co",
+          "phone": "+1-555-0303",
+          "website": "http://soylent.example.com"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "table_catalog_prices",
-      "categories": ["tables"],
+      "categories": [
+        "tables"
+      ],
       "fixture": "table_catalog.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "name", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["name", "price"],
+      "required_fields": [
+        "name",
+        "price"
+      ],
       "expected_records": [
-        {"name": "Brass Fitting", "price": "$4.20"},
-        {"name": "Steel Clamp", "price": "$2.85"}
+        {
+          "name": "Brass Fitting",
+          "price": "$4.20"
+        },
+        {
+          "name": "Steel Clamp",
+          "price": "$2.85"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "messy_blog_articles",
-      "categories": ["articles"],
+      "categories": [
+        "articles"
+      ],
       "fixture": "messy_blog.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "author", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "author",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "author"],
+      "required_fields": [
+        "title",
+        "author"
+      ],
       "expected_records": [
-        {"title": "Quantum Computing is Here", "author": "John Doe"},
-        {"title": "The Future of AI Agents", "author": "Jane Smith"}
+        {
+          "title": "Quantum Computing is Here",
+          "author": "John Doe"
+        },
+        {
+          "title": "The Future of AI Agents",
+          "author": "Jane Smith"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "search_results_widgets",
-      "categories": ["search result pages", "pagination"],
+      "categories": [
+        "search result pages",
+        "pagination"
+      ],
       "fixture": "search_results.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "price"],
+      "required_fields": [
+        "title",
+        "price"
+      ],
       "expected_records": [
-        {"title": "Red Widget — Durable & Affordable", "price": "$15.99"},
-        {"title": "Blue Widget — Premium Edition", "price": "$24.99"},
-        {"title": "Green Widget — Eco Friendly", "price": "$19.99"},
-        {"title": "Black Widget Pro", "price": "$49.99"}
+        {
+          "title": "Red Widget — Durable & Affordable",
+          "price": "$15.99"
+        },
+        {
+          "title": "Blue Widget — Premium Edition",
+          "price": "$24.99"
+        },
+        {
+          "title": "Green Widget — Eco Friendly",
+          "price": "$19.99"
+        },
+        {
+          "title": "Black Widget Pro",
+          "price": "$49.99"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "infinite_scroll_items",
-      "categories": ["infinite scroll"],
+      "categories": [
+        "infinite scroll"
+      ],
       "fixture": "infinite_scroll_mock.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "price"],
+      "required_fields": [
+        "title",
+        "price"
+      ],
       "expected_records": [
-        {"title": "Item Alpha", "price": "$12.99"},
-        {"title": "Item Bravo", "price": "$24.99"},
-        {"title": "Item Charlie", "price": "$39.99"},
-        {"title": "Item Delta", "price": "$49.99"},
-        {"title": "Item Echo", "price": "$59.99"}
+        {
+          "title": "Item Alpha",
+          "price": "$12.99"
+        },
+        {
+          "title": "Item Bravo",
+          "price": "$24.99"
+        },
+        {
+          "title": "Item Charlie",
+          "price": "$39.99"
+        },
+        {
+          "title": "Item Delta",
+          "price": "$49.99"
+        },
+        {
+          "title": "Item Echo",
+          "price": "$59.99"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "load_more_products",
-      "categories": ["load-more"],
+      "categories": [
+        "load-more"
+      ],
       "fixture": "load_more_mock.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "price"],
+      "required_fields": [
+        "title",
+        "price"
+      ],
       "expected_records": [
-        {"title": "Product Alpha", "price": "$29.99"},
-        {"title": "Product Beta", "price": "$49.99"},
-        {"title": "Product Gamma", "price": "$99.99"},
-        {"title": "Product Delta", "price": "$19.99"},
-        {"title": "Product Epsilon", "price": "$199.99"}
+        {
+          "title": "Product Alpha",
+          "price": "$29.99"
+        },
+        {
+          "title": "Product Beta",
+          "price": "$49.99"
+        },
+        {
+          "title": "Product Gamma",
+          "price": "$99.99"
+        },
+        {
+          "title": "Product Delta",
+          "price": "$19.99"
+        },
+        {
+          "title": "Product Epsilon",
+          "price": "$199.99"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "workflow_supplier_results",
-      "categories": ["session/workflow mock pages"],
+      "categories": [
+        "session/workflow mock pages"
+      ],
       "fixture": "workflow_search_mock.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "supplier", "type": "string", "required": true},
-        {"name": "url", "type": "url", "required": true}
+        {
+          "name": "supplier",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "url",
+          "type": "url",
+          "required": true
+        }
       ],
-      "required_fields": ["supplier", "url"],
+      "required_fields": [
+        "supplier",
+        "url"
+      ],
       "expected_records": [
-        {"supplier": "Apex Components", "url": "https://fixtures.local/suppliers/apex-components"},
-        {"supplier": "Northstar Parts", "url": "https://fixtures.local/suppliers/northstar-parts"}
+        {
+          "supplier": "Apex Components",
+          "url": "https://fixtures.local/suppliers/apex-components"
+        },
+        {
+          "supplier": "Northstar Parts",
+          "url": "https://fixtures.local/suppliers/northstar-parts"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "network_catalog_payload",
-      "categories": ["network JSON-backed pages"],
+      "categories": [
+        "network JSON-backed pages"
+      ],
       "fixture": "network_catalog_payload.json",
       "extractor": "json_items",
       "schema": [
-        {"name": "id", "type": "code", "required": true},
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "number", "required": true},
-        {"name": "availability", "type": "string", "required": true}
+        {
+          "name": "id",
+          "type": "code",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "availability",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["id", "title", "price", "availability"],
+      "required_fields": [
+        "id",
+        "title",
+        "price",
+        "availability"
+      ],
       "expected_records": [
-        {"id": "sku-100", "title": "Portable Pump", "price": 29.99, "availability": "in_stock"},
-        {"id": "sku-101", "title": "Carbon Filter", "price": 44.5, "availability": "low_stock"},
-        {"id": "sku-102", "title": "Valve Kit", "price": 18.75, "availability": "in_stock"}
+        {
+          "id": "sku-100",
+          "title": "Portable Pump",
+          "price": 29.99,
+          "availability": "in_stock"
+        },
+        {
+          "id": "sku-101",
+          "title": "Carbon Filter",
+          "price": 44.5,
+          "availability": "low_stock"
+        },
+        {
+          "id": "sku-102",
+          "title": "Valve Kit",
+          "price": 18.75,
+          "availability": "in_stock"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "malformed_listing_recovery",
-      "categories": ["malformed HTML"],
+      "categories": [
+        "malformed HTML"
+      ],
       "fixture": "malformed_listing.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [
-        {"title": "Loose Card Alpha"},
-        {"title": "Loose Card Bravo"}
+        {
+          "title": "Loose Card Alpha"
+        },
+        {
+          "title": "Loose Card Bravo"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "empty_results_page",
-      "categories": ["empty/no-result pages"],
+      "categories": [
+        "empty/no-result pages"
+      ],
       "fixture": "empty_results.html",
       "extractor": "negative_html",
       "schema": [
-        {"name": "title", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [],
-      "expected_failure_classes": ["empty_response", "genuinely_empty"],
-      "thresholds": {"max_false_positive_records": 0}
+      "expected_failure_classes": [
+        "empty_response",
+        "genuinely_empty"
+      ],
+      "thresholds": {
+        "max_false_positive_records": 0
+      }
     },
     {
       "id": "login_wall_page",
-      "categories": ["login-required mock pages"],
+      "categories": [
+        "login-required mock pages"
+      ],
       "fixture": "login_wall_mock.html",
       "extractor": "negative_html",
       "schema": [
-        {"name": "title", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [],
-      "expected_failure_classes": ["auth_required"],
-      "thresholds": {"max_false_positive_records": 0}
+      "expected_failure_classes": [
+        "auth_required"
+      ],
+      "thresholds": {
+        "max_false_positive_records": 0
+      }
     },
     {
       "id": "challenge_block_page",
-      "categories": ["blocked/challenge mock pages"],
+      "categories": [
+        "blocked/challenge mock pages"
+      ],
       "fixture": "challenge_mock.html",
       "extractor": "negative_html",
       "schema": [
-        {"name": "title", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [],
-      "expected_failure_classes": ["anti_bot_block"],
-      "thresholds": {"max_false_positive_records": 0}
+      "expected_failure_classes": [
+        "anti_bot_block"
+      ],
+      "thresholds": {
+        "max_false_positive_records": 0
+      }
     },
     {
       "id": "session_expired_page",
-      "categories": ["session/workflow mock pages"],
+      "categories": [
+        "session/workflow mock pages"
+      ],
       "fixture": "session_expired.html",
       "extractor": "negative_html",
       "schema": [
-        {"name": "title", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [],
-      "expected_failure_classes": ["session_bound_url", "search_replay_required"],
-      "thresholds": {"max_false_positive_records": 0}
+      "expected_failure_classes": [
+        "session_bound_url",
+        "search_replay_required"
+      ],
+      "thresholds": {
+        "max_false_positive_records": 0
+      }
     },
     {
       "id": "affiliate_hdmi_cable_product",
-      "categories": ["affiliate product pages"],
+      "categories": [
+        "affiliate product pages"
+      ],
       "fixture": "affiliate_product.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true},
-        {"name": "rating", "type": "string", "required": false}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        },
+        {
+          "name": "rating",
+          "type": "string",
+          "required": false
+        }
       ],
-      "required_fields": ["title", "price"],
+      "required_fields": [
+        "title",
+        "price"
+      ],
       "expected_records": [
-        {"title": "Works perfectly with PS5 at 4K 120Hz", "price": null, "rating": null},
-        {"title": "Good cable, slightly stiff", "price": null, "rating": null},
-        {"title": "Decent for the price", "price": null, "rating": null},
-        {"title": "Articulating TV Wall Mount", "price": "$34.99", "rating": null},
-        {"title": "Reusable Cable Ties (50-pack)", "price": "$7.99", "rating": null},
-        {"title": "12-Outlet Surge Protector", "price": "$24.99", "rating": null}
+        {
+          "title": "Works perfectly with PS5 at 4K 120Hz",
+          "price": null,
+          "rating": null
+        },
+        {
+          "title": "Good cable, slightly stiff",
+          "price": null,
+          "rating": null
+        },
+        {
+          "title": "Decent for the price",
+          "price": null,
+          "rating": null
+        },
+        {
+          "title": "Articulating TV Wall Mount",
+          "price": "$34.99",
+          "rating": null
+        },
+        {
+          "title": "Reusable Cable Ties (50-pack)",
+          "price": "$7.99",
+          "rating": null
+        },
+        {
+          "title": "12-Outlet Surge Protector",
+          "price": "$24.99",
+          "rating": null
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "social_profile_samcodes",
-      "categories": ["social media profiles"],
+      "categories": [
+        "social media profiles"
+      ],
       "fixture": "social_profile.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "display_name", "type": "string", "required": true},
-        {"name": "username", "type": "string", "required": true}
+        {
+          "name": "display_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["display_name", "username"],
+      "required_fields": [
+        "display_name",
+        "username"
+      ],
       "expected_records": [
-        {"display_name": "Samantha Rivera", "username": "@samcodes"},
-        {"display_name": "Samantha Rivera", "username": "@samcodes"},
-        {"display_name": "Samantha Rivera", "username": "@samcodes"}
+        {
+          "display_name": "Samantha Rivera",
+          "username": "@samcodes"
+        },
+        {
+          "display_name": "Samantha Rivera",
+          "username": "@samcodes"
+        },
+        {
+          "display_name": "Samantha Rivera",
+          "username": "@samcodes"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 2}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 2
+      }
     },
     {
       "id": "wikipedia_web_scraping_article",
-      "categories": ["wiki / infobox pages"],
+      "categories": [
+        "wiki / infobox pages"
+      ],
       "fixture": "wikipedia_article.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [
-        {"title": "History"},
-        {"title": "Techniques"},
-        {"title": "Legal issues"},
-        {"title": "Defensive techniques"},
-        {"title": "See also"},
-        {"title": "References"}
+        {
+          "title": "History"
+        },
+        {
+          "title": "Techniques"
+        },
+        {
+          "title": "Legal issues"
+        },
+        {
+          "title": "Defensive techniques"
+        },
+        {
+          "title": "See also"
+        },
+        {
+          "title": "References"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "stackoverflow_empty_results_qa",
-      "categories": ["Q&A / forum pages"],
+      "categories": [
+        "Q&A / forum pages"
+      ],
       "fixture": "stackoverflow_qa.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "username", "type": "string", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "username"],
+      "required_fields": [
+        "title",
+        "username"
+      ],
       "expected_records": [
-        {"title": "Why does my web scraper return empty results when using BeautifulSoup?", "username": "scraping_noob_42"},
-        {"title": "Use Playwright to handle the JS rendering challenge", "username": "ml_engineer_dev"},
-        {"title": "Try sending proper browser headers with httpx first", "username": "proxy_master"},
-        {"title": "Consider headless Chromium with stealth flags", "username": "reliable_scraper"}
+        {
+          "title": "Why does my web scraper return empty results when using BeautifulSoup?",
+          "username": "scraping_noob_42"
+        },
+        {
+          "title": "Use Playwright to handle the JS rendering challenge",
+          "username": "ml_engineer_dev"
+        },
+        {
+          "title": "Try sending proper browser headers with httpx first",
+          "username": "proxy_master"
+        },
+        {
+          "title": "Consider headless Chromium with stealth flags",
+          "username": "reliable_scraper"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "ebay_vintage_watches_listing",
-      "categories": ["ecommerce listing grid"],
+      "categories": [
+        "ecommerce listing grid"
+      ],
       "fixture": "ecommerce_listing.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "price"],
+      "required_fields": [
+        "title",
+        "price"
+      ],
       "expected_records": [
-        {"title": "Omega Speedmaster Professional Moonwatch 42mm — 1971 Vintage", "price": "$4,299.00"},
-        {"title": "Rolex Datejust 1601 — Steel/Gold — Sigma Dial — 1972", "price": "$3,850.00"},
-        {"title": "Seiko Pogue 6139-6002 — Yellow Dial — Space Chronograph — 1976", "price": "$875.00"},
-        {"title": "Cartier Tank Française — 18k Gold — Manual Wind — 1968", "price": "$6,200.00"},
-        {"title": "Heuer Autavia 2446C — Valjoux 72 — PVD Case — 1969", "price": "$7,800.00"}
+        {
+          "title": "Omega Speedmaster Professional Moonwatch 42mm — 1971 Vintage",
+          "price": "$4,299.00"
+        },
+        {
+          "title": "Rolex Datejust 1601 — Steel/Gold — Sigma Dial — 1972",
+          "price": "$3,850.00"
+        },
+        {
+          "title": "Seiko Pogue 6139-6002 — Yellow Dial — Space Chronograph — 1976",
+          "price": "$875.00"
+        },
+        {
+          "title": "Cartier Tank Française — 18k Gold — Manual Wind — 1968",
+          "price": "$6,200.00"
+        },
+        {
+          "title": "Heuer Autavia 2446C — Valjoux 72 — PVD Case — 1969",
+          "price": "$7,800.00"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "multi_page_search_pagination",
-      "categories": ["multi-page pagination"],
+      "categories": [
+        "multi-page pagination"
+      ],
       "fixture": "multi_page_pagination.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "stars", "type": "number", "required": false}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stars",
+          "type": "number",
+          "required": false
+        }
       ],
-      "required_fields": ["title"],
+      "required_fields": [
+        "title"
+      ],
       "expected_records": [
-        {"title": "Scrapy — Fast High-level Web Crawling Framework", "stars": "54.2"},
-        {"title": "Playwright — Reliable end-to-end testing for modern web apps", "stars": "69.8"},
-        {"title": "Beautiful Soup — Python library for pulling data out of HTML", "stars": "3.0"},
-        {"title": "Selenium WebDriver — Browser automation framework", "stars": "30.9"},
-        {"title": "Colly — Elegant Scraper and Crawler Framework for Golang", "stars": "23.8"},
-        {"title": "Crawlee — Web data extraction and browser automation library", "stars": "16.5"},
-        {"title": "HTTPX — A next-generation HTTP client for Python", "stars": "7.3"},
-        {"title": "Puppeteer — Headless Chrome Node.js API", "stars": "89.1"},
-        {"title": "Apache Nutch — Extensible and scalable web crawler", "stars": "2.8"},
-        {"title": "Cheerio — Fast, flexible, and lean implementation of jQuery for the server", "stars": "28.9"},
-        {"title": "Goutte — PHP web scraper based on Symfony components", "stars": "9.3"},
-        {"title": "MechanicalSoup — Python library for automating website interaction", "stars": "4.7"},
-        {"title": "GNU Wget — Non-interactive network downloader", "stars": "5.2"},
-        {"title": "Ferret — Declarative web data extraction for Go", "stars": "5.8"},
-        {"title": "Apify SDK — Scalable web data extraction and crawling platform", "stars": "2.9"},
-        {"title": "AutoScraper — Smart, automatic, fast, and lightweight web data extractor for Python", "stars": "5.9"},
-        {"title": "Splash — Lightweight browser rendering service with HTTP API", "stars": "4.1"},
-        {"title": "Heritrix — Extensible, web-scale, archival-quality crawler", "stars": "2.8"},
-        {"title": "Portia — Visual data extraction for Scrapy", "stars": "9.1"},
-        {"title": "pyspider — Powerful spider system in Python", "stars": "16.4"}
+        {
+          "title": "Scrapy — Fast High-level Web Crawling Framework",
+          "stars": "54.2"
+        },
+        {
+          "title": "Playwright — Reliable end-to-end testing for modern web apps",
+          "stars": "69.8"
+        },
+        {
+          "title": "Beautiful Soup — Python library for pulling data out of HTML",
+          "stars": "3.0"
+        },
+        {
+          "title": "Selenium WebDriver — Browser automation framework",
+          "stars": "30.9"
+        },
+        {
+          "title": "Colly — Elegant Scraper and Crawler Framework for Golang",
+          "stars": "23.8"
+        },
+        {
+          "title": "Crawlee — Web data extraction and browser automation library",
+          "stars": "16.5"
+        },
+        {
+          "title": "HTTPX — A next-generation HTTP client for Python",
+          "stars": "7.3"
+        },
+        {
+          "title": "Puppeteer — Headless Chrome Node.js API",
+          "stars": "89.1"
+        },
+        {
+          "title": "Apache Nutch — Extensible and scalable web crawler",
+          "stars": "2.8"
+        },
+        {
+          "title": "Cheerio — Fast, flexible, and lean implementation of jQuery for the server",
+          "stars": "28.9"
+        },
+        {
+          "title": "Goutte — PHP web scraper based on Symfony components",
+          "stars": "9.3"
+        },
+        {
+          "title": "MechanicalSoup — Python library for automating website interaction",
+          "stars": "4.7"
+        },
+        {
+          "title": "GNU Wget — Non-interactive network downloader",
+          "stars": "5.2"
+        },
+        {
+          "title": "Ferret — Declarative web data extraction for Go",
+          "stars": "5.8"
+        },
+        {
+          "title": "Apify SDK — Scalable web data extraction and crawling platform",
+          "stars": "2.9"
+        },
+        {
+          "title": "AutoScraper — Smart, automatic, fast, and lightweight web data extractor for Python",
+          "stars": "5.9"
+        },
+        {
+          "title": "Splash — Lightweight browser rendering service with HTTP API",
+          "stars": "4.1"
+        },
+        {
+          "title": "Heritrix — Extensible, web-scale, archival-quality crawler",
+          "stars": "2.8"
+        },
+        {
+          "title": "Portia — Visual data extraction for Scrapy",
+          "stars": "9.1"
+        },
+        {
+          "title": "pyspider — Powerful spider system in Python",
+          "stars": "16.4"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     },
     {
       "id": "spa_react_marketplace",
-      "categories": ["spa-render-wait"],
+      "categories": [
+        "spa-render-wait"
+      ],
       "fixture": "spa_react_mock.html",
       "extractor": "html_regex",
       "schema": [
-        {"name": "title", "type": "string", "required": true},
-        {"name": "price", "type": "currency", "required": true}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
       ],
-      "required_fields": ["title", "price"],
+      "required_fields": [
+        "title",
+        "price"
+      ],
       "expected_records": [
-        {"title": "Pioneer Air Purifier", "price": "$129.00"},
-        {"title": "Aurora Smart Lamp", "price": "$42.50"},
-        {"title": "Helix Standing Desk", "price": "$449.00"},
-        {"title": "Mariner Robot Vacuum", "price": "$299.99"},
-        {"title": "Sentinel Doorbell Camera", "price": "$89.00"}
+        {
+          "title": "Pioneer Air Purifier",
+          "price": "$129.00"
+        },
+        {
+          "title": "Aurora Smart Lamp",
+          "price": "$42.50"
+        },
+        {
+          "title": "Helix Standing Desk",
+          "price": "$449.00"
+        },
+        {
+          "title": "Mariner Robot Vacuum",
+          "price": "$299.99"
+        },
+        {
+          "title": "Sentinel Doorbell Camera",
+          "price": "$89.00"
+        }
       ],
-      "thresholds": {"min_row_f1": 1.0, "min_field_f1": 1.0, "max_duplicates": 0}
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
+    },
+    {
+      "id": "intl_marketplace_bazaar",
+      "categories": [
+        "i18n scripts"
+      ],
+      "fixture": "intl_marketplace.html",
+      "extractor": "html_regex",
+      "schema": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "currency",
+          "required": true
+        }
+      ],
+      "required_fields": [
+        "title",
+        "price"
+      ],
+      "expected_records": [
+        {
+          "title": "Jingdezhen Porcelain Tea Set 景德镇青花瓷",
+          "price": "¥1,280.00"
+        },
+        {
+          "title": "Yunnan Pu-erh Tea Cake 2005 云南普洱熟茶",
+          "price": "¥388.00"
+        },
+        {
+          "title": "Suzhou Double-sided Embroidery 苏州刺绣屏风",
+          "price": "¥4,580.00"
+        },
+        {
+          "title": "Ajman Hand-knotted Wool Rug سجادة عجمان يدوية",
+          "price": "£2,450.00"
+        },
+        {
+          "title": "Specialty Arabic Coffee 250g قهوة عربية مختصرة",
+          "price": "£85.50"
+        },
+        {
+          "title": "Khokhloma Spoon Set 6pcs Хохломская ложка",
+          "price": "€42.50"
+        },
+        {
+          "title": "Palekh Lacquer Miniature Box Палехская шкатулка",
+          "price": "€76.00"
+        },
+        {
+          "title": "Banarasi Pure Silk Saree काशी की बनारसी साड़ी",
+          "price": "₹12,499.00"
+        },
+        {
+          "title": "Terracotta Diya Set 12-piece दीये संग्रह",
+          "price": "₹650.00"
+        }
+      ],
+      "thresholds": {
+        "min_row_f1": 1.0,
+        "min_field_f1": 1.0,
+        "max_duplicates": 0
+      }
     }
   ]
 }
