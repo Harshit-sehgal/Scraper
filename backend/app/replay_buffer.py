@@ -598,19 +598,24 @@ class ReplayBuffer:
 
 # Global singleton
 _buffer: ReplayBuffer | None = None
+_buffer_lock = threading.Lock()
 
 
 def get_replay_buffer(base_dir: str | None = None) -> ReplayBuffer:
     """Get or create the global ReplayBuffer instance."""
     global _buffer
-    if _buffer is None:
-        _buffer = ReplayBuffer(base_dir=base_dir or str(Path(__file__).parent.parent / "data" / "replay_buffer"))
+    if _buffer is not None:
+        return _buffer
+    with _buffer_lock:
+        if _buffer is None:
+            _buffer = ReplayBuffer(base_dir=base_dir or str(Path(__file__).parent.parent / "data" / "replay_buffer"))
     return _buffer
 
 
 def reset_replay_buffer() -> None:
     """Reset the global replay buffer (for testing)."""
     global _buffer
-    if _buffer is not None:
-        _buffer.close()
-    _buffer = None
+    with _buffer_lock:
+        if _buffer is not None:
+            _buffer.close()
+        _buffer = None

@@ -8,6 +8,7 @@ Phase 47: Distributed Resilience — detecting divergent state in multi-node clu
 """
 
 import logging
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)

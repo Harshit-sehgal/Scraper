@@ -80,16 +80,25 @@ _bootstrap_lock = threading.Lock()
 
 def get_dispatcher() -> EventDispatcher:
     global _bootstrap_done
-    if not _bootstrap_done:
-        with _bootstrap_lock:
-            if not _bootstrap_done:
-                # Safe: graph_update_scheduler uses lazy singleton creation,
-                # so importing the module does NOT trigger __init__ or
-                # event_dispatcher import.
-                from app.graph_update_scheduler import get_scheduler
+    if _bootstrap_done:
+        return _dispatcher
+    with _bootstrap_lock:
+        if _bootstrap_done:
+            return _dispatcher
+        # Mark bootstrap done BEFORE the inner call to break the
+        # re-entrant cycle: get_dispatcher -> get_scheduler ->
+        # GraphUpdateScheduler.__init__ -> get_dispatcher again.
+        # Without this, the inner call would block on the same
+        # non-reentrant lock that the outer call already holds.
+        _bootstrap_done = True
+        # Safe: graph_update_scheduler uses lazy singleton creation,
+        # so importing the module does NOT trigger __init__ or
+        # event_dispatcher import.
+        from app.graph_update_scheduler import get_scheduler, is_scheduler_initializing
 
-                get_scheduler()
-                _bootstrap_done = True
+        scheduler = get_scheduler()
+        if scheduler is None and not is_scheduler_initializing():
+            _bootstrap_done = False
     return _dispatcher
 
 

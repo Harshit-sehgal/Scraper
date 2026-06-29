@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from app.crawl_frontier import get_crawl_frontier
@@ -48,10 +49,14 @@ class CrawlStateAdapter:
 
 
 _crawl_state: CrawlStateAdapter | None = None
+_crawl_state_lock = threading.Lock()
 
 
 def get_crawl_state() -> CrawlStateAdapter:
     global _crawl_state
-    if _crawl_state is None:
-        _crawl_state = CrawlStateAdapter()
+    if _crawl_state is not None:
+        return _crawl_state
+    with _crawl_state_lock:
+        if _crawl_state is None:
+            _crawl_state = CrawlStateAdapter()
     return _crawl_state

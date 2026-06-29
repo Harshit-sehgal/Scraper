@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from typing import Any
 
@@ -60,10 +61,14 @@ class RegressionStateAdapter:
 
 
 _regression_state: RegressionStateAdapter | None = None
+_regression_state_lock = threading.Lock()
 
 
 def get_regression_state() -> RegressionStateAdapter:
     global _regression_state
-    if _regression_state is None:
-        _regression_state = RegressionStateAdapter()
+    if _regression_state is not None:
+        return _regression_state
+    with _regression_state_lock:
+        if _regression_state is None:
+            _regression_state = RegressionStateAdapter()
     return _regression_state

@@ -2,6 +2,7 @@ import contextlib
 import json
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -32,7 +33,7 @@ class CheckpointManager:
         ws = get_world_state()
         state_dict = ws.to_dict()
 
-        timestamp = int(time.time())
+        timestamp = time.time_ns()
         filename = f"checkpoint_{label}_{timestamp}.json"
         filepath = self.base_dir / filename
 
@@ -87,8 +88,16 @@ class CheckpointManager:
         """List all available checkpoints."""
         checkpoints = []
         for f in self.base_dir.glob("checkpoint_*.json"):
-            checkpoints.append({"filename": f.name, "path": str(f), "mtime": f.stat().st_mtime})
-        return sorted(checkpoints, key=lambda x: x["mtime"], reverse=True)
+            stat = f.stat()
+            checkpoints.append(
+                {
+                    "filename": f.name,
+                    "path": str(f),
+                    "mtime": stat.st_mtime,
+                    "mtime_ns": stat.st_mtime_ns,
+                }
+            )
+        return sorted(checkpoints, key=lambda x: (x["mtime_ns"], x["filename"]), reverse=True)
 
     def get_latest_checkpoint(self) -> str | None:
         """Return the path to the most recent checkpoint."""
@@ -97,11 +106,15 @@ class CheckpointManager:
 
 
 _manager: CheckpointManager | None = None
+_manager_lock = threading.Lock()
 
 
 def get_checkpoint_manager() -> CheckpointManager:
     global _manager
-    if _manager is None:
-        base = Path(settings.DATA_DIR) / "checkpoints"
-        _manager = CheckpointManager(str(base))
+    if _manager is not None:
+        return _manager
+    with _manager_lock:
+        if _manager is None:
+            base = Path(settings.DATA_DIR) / "checkpoints"
+            _manager = CheckpointManager(str(base))
     return _manager

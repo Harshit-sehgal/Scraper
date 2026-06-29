@@ -7,6 +7,7 @@ Replaces hardcoded suffix lists and merge patterns with scored
 boundary decisions based on structural signals and learned history.
 """
 
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -472,19 +473,24 @@ def group_adjacent_entities(records: list[Any]) -> list[Any]:
 
 
 _boundary_engine: SemanticBoundaryEngine | None = None
+_boundary_engine_lock = threading.Lock()
 
 
 def get_boundary_engine() -> SemanticBoundaryEngine:
     global _boundary_engine
-    if _boundary_engine is None:
-        _boundary_engine = SemanticBoundaryEngine()
+    if _boundary_engine is not None:
+        return _boundary_engine
+    with _boundary_engine_lock:
+        if _boundary_engine is None:
+            _boundary_engine = SemanticBoundaryEngine()
     return _boundary_engine
 
 
 def reset_boundary_engine() -> None:
     """Reset the global boundary engine (for testing)."""
     global _boundary_engine
-    _boundary_engine = None
+    with _boundary_engine_lock:
+        _boundary_engine = None
 
 
 def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str, pos_a: int = 0, pos_b: int = 0) -> bool:

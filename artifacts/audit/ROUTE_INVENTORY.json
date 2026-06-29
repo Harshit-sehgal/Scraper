@@ -1852,7 +1852,7 @@
       "public_or_protected": "public",
       "request_model_if_known": "",
       "required_role_if_known": "",
-      "response_model_if_known": "app.models.SessionAuthenticatedResponse \\| app.models.SessionUnauthenticatedResponse",
+      "response_model_if_known": "SessionMeResponse",
       "router_module": "app.routers.session",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no"

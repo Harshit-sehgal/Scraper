@@ -1,4 +1,4 @@
-"""Global Cognitive Scheduler — orchestrates field tasks across shards.
+"""Global Cognitive Scheduler - orchestrates field tasks across shards.
 
 LAW 13: Cognitive resources are finite. Tasks must be scheduled based on
 field pressure, task priority, and real-time urgency.
@@ -133,7 +133,7 @@ class GlobalCognitiveScheduler:
         self._task_queue.clear()
 
 
-# Legacy scheduler — kept for backward compatibility
+# Legacy scheduler - kept for backward compatibility
 
 
 class GraphUpdateScheduler:
@@ -214,25 +214,40 @@ class GraphUpdateScheduler:
 
 
 _scheduler: Any = None
+_scheduler_initializing = False
 _scheduler_lock = threading.Lock()
 
 
+def is_scheduler_initializing() -> bool:
+    return _scheduler_initializing
+
+
 def get_scheduler() -> GraphUpdateScheduler | None:
-    global _scheduler
+    global _scheduler, _scheduler_initializing
     if _scheduler is not None:
         return _scheduler
+    if _scheduler_initializing:
+        return None
     with _scheduler_lock:
-        if _scheduler is None:
-            try:
-                _scheduler = GraphUpdateScheduler()
-            except Exception:
-                logger.exception("GraphUpdateScheduler init failed")
-                return None
+        if _scheduler is not None:
+            return _scheduler
+        if _scheduler_initializing:
+            return None
+        _scheduler_initializing = True
+        try:
+            scheduler = GraphUpdateScheduler()
+        except Exception:
+            logger.exception("GraphUpdateScheduler init failed")
+            return None
+        finally:
+            _scheduler_initializing = False
+        _scheduler = scheduler
     return _scheduler
 
 
 def reset_scheduler() -> None:
     """Reset the global scheduler (for testing)."""
-    global _scheduler
+    global _scheduler, _scheduler_initializing
     with _scheduler_lock:
         _scheduler = None
+        _scheduler_initializing = False

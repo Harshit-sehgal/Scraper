@@ -501,10 +501,14 @@ class AntiBotEngine:
 
 # Global Singleton
 _engine: AntiBotEngine | None = None
+_engine_lock = Lock()
 
 
 def get_anti_bot_engine() -> AntiBotEngine:
     global _engine
-    if _engine is None:
-        _engine = AntiBotEngine()
+    if _engine is not None:
+        return _engine
+    with _engine_lock:
+        if _engine is None:
+            _engine = AntiBotEngine()
     return _engine

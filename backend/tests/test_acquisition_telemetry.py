@@ -1,7 +1,11 @@
 """Tests for acquisition telemetry collector."""
 
 from app.acquisition_state import AcquisitionState
-from app.acquisition_telemetry import AcquisitionTelemetryCollector
+from app.acquisition_telemetry import (
+    AcquisitionTelemetryCollector,
+    get_acquisition_telemetry,
+    reset_acquisition_telemetry_collector,
+)
 
 
 class TestAcquisitionTelemetryCollector:
@@ -150,3 +154,28 @@ class TestAcquisitionTelemetryCollector:
         assert summary["recovery_attempts"] == 3
         assert summary["recovery_successes"] == 2
         assert summary["recovery_success_rate"] == round(2 / 3, 3)
+
+
+class TestAcquisitionTelemetrySingleton:
+    """Tests for the module-level thread-safe singleton."""
+
+    def test_singleton_returns_same_instance(self) -> None:
+        c1 = get_acquisition_telemetry()
+        c2 = get_acquisition_telemetry()
+        assert c1 is c2
+
+    def test_singleton_is_collector_instance(self) -> None:
+        c = get_acquisition_telemetry()
+        assert isinstance(c, AcquisitionTelemetryCollector)
+
+    def test_reset_and_recreate(self) -> None:
+        c1 = get_acquisition_telemetry()
+        reset_acquisition_telemetry_collector()
+        c2 = get_acquisition_telemetry()
+        assert c2 is not c1
+
+    def test_singleton_works_after_reset(self) -> None:
+        reset_acquisition_telemetry_collector()
+        c1 = get_acquisition_telemetry()
+        c2 = get_acquisition_telemetry()
+        assert c1 is c2

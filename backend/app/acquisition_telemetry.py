@@ -7,6 +7,7 @@ and exposes aggregate statistics for the /api / system / telemetry endpoint.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -127,16 +128,21 @@ class AcquisitionTelemetryCollector:
 
 # Module-level singleton
 _collector: AcquisitionTelemetryCollector | None = None
+_collector_lock = threading.Lock()
 
 
 def get_acquisition_telemetry() -> AcquisitionTelemetryCollector:
     global _collector
-    if _collector is None:
-        _collector = AcquisitionTelemetryCollector()
+    if _collector is not None:
+        return _collector
+    with _collector_lock:
+        if _collector is None:
+            _collector = AcquisitionTelemetryCollector()
     return _collector
 
 
 def reset_acquisition_telemetry_collector() -> None:
     """Reset the module-level singleton (for testing)."""
     global _collector
-    _collector = None
+    with _collector_lock:
+        _collector = None

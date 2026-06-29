@@ -6,15 +6,15 @@ availability when detected.
 
 Detection heuristics:
   * ``<select>`` with ``<option>`` inside a container whose class
-    contains ``variant|option|size|color|material`` → VariantGroup
+    contains ``variant|option|size|color|material`` -> VariantGroup
   * ``<input type="radio">`` groups with ``name=...Size...|...Color...``
-    → VariantGroup
+    -> VariantGroup
   * ``<button>`` elements inside ``[data-variant]`` containers
   * Per-variant price: nearest ``.price`` / ``[data-price]`` within
     the same container
   * Availability: ``<span class="in-stock|out-of-stock">`` per option
 
-No remote calls, no LLM, no Playwright — pure HTML parsing via
+No remote calls, no LLM, no Playwright - pure HTML parsing via
 BeautifulSoup.
 """
 
@@ -85,12 +85,6 @@ def _infer_variant_type(class_attr: str, name_attr: str) -> str | None:
 
 def _classify_availability(option: Tag) -> str:
     """Return 'in_stock' | 'out_of_stock' | 'unknown' for an option element."""
-    parent_text = ""
-    parent = option.find_parent()
-    if parent is not None:
-        parent_text = parent.get_text(" ", strip=True)
-    option_text = option.get_text(" ", strip=True)
-    all_text = f"{parent_text} {option_text}"
     # Check attribute first: aria-label, data-availability, etc.
     for attr in ("aria-label", "data-availability", "data-stock", "title"):
         raw = option.get(attr, "")
@@ -99,10 +93,20 @@ def _classify_availability(option: Tag) -> str:
         val = raw.lower() if isinstance(raw, str) else str(raw).lower()
         if not val:
             continue
-        if _IN_STOCK_RE.search(val):
-            return "in_stock"
         if _OUT_OF_STOCK_RE.search(val):
             return "out_of_stock"
+        if _IN_STOCK_RE.search(val):
+            return "in_stock"
+
+    if option.has_attr("disabled") or option.get("aria-disabled") == "true":
+        return "out_of_stock"
+
+    text_parts = [option.get_text(" ", strip=True)]
+    if option.name != "option":
+        parent = option.find_parent()
+        if parent is not None:
+            text_parts.append(parent.get_text(" ", strip=True))
+    all_text = " ".join(part for part in text_parts if part)
     if _OUT_OF_STOCK_RE.search(all_text):
         return "out_of_stock"
     if _IN_STOCK_RE.search(all_text):
@@ -141,13 +145,17 @@ def _extract_select_variants(soup: BeautifulSoup) -> tuple[list[VariantGroup], l
     for select in soup.find_all("select"):
         class_attr = select.get("class", "")
         class_str = " ".join(class_attr) if isinstance(class_attr, list) else str(class_attr)
+        name_str = str(select.get("name", ""))
+        parent = select.find_parent()
+        parent_classes = parent.get("class", "") if parent else ""
+        parent_class_str = " ".join(parent_classes) if isinstance(parent_classes, list) else str(parent_classes)
+        selector_context = f"{class_str} {name_str} {parent_class_str}"
         all_opt_text = " ".join(opt.get_text(strip=True) for opt in select.find_all("option"))
 
-        if not _VARIANT_CONTAINER_RE.search(class_str) and not _VARIANT_CONTAINER_RE.search(all_opt_text):
+        if not _VARIANT_CONTAINER_RE.search(selector_context) and not _VARIANT_CONTAINER_RE.search(all_opt_text):
             continue
-        parent = select.find_parent()
         price = _extract_price(parent) if parent else None
-        variant_type = _infer_variant_type(class_str, select.get("name", "")) or "unknown"
+        variant_type = _infer_variant_type(f"{class_str} {parent_class_str}", name_str) or "unknown"
         options: list[str] = []
         selected: str | None = None
         for opt in select.find_all("option"):
@@ -213,9 +221,7 @@ def _extract_button_variants(soup: BeautifulSoup) -> tuple[list[VariantGroup], l
     groups: list[VariantGroup] = []
     variants: list[dict[str, Any]] = []
     for container in soup.find_all(attrs={"data-variant": True}):
-        variant_type = _infer_variant_type(
-            " ".join(container.get("class", [])), container.get("data-variant", "")
-        ) or "unknown"
+        variant_type = _infer_variant_type(" ".join(container.get("class", [])), container.get("data-variant", "")) or "unknown"
         buttons = container.find_all("button")
         if not buttons:
             continue
@@ -227,8 +233,10 @@ def _extract_button_variants(soup: BeautifulSoup) -> tuple[list[VariantGroup], l
             options.append(label)
             availability = _classify_availability(btn)
             vr: dict[str, Any] = {"variant_type": variant_type, "option": label, "availability": availability}
-            variant_container = btn.find_parent() or container
-            price = _extract_price(variant_container)
+            price = _extract_price(btn)
+            variant_container = btn.find_parent()
+            if price is None and variant_container is not None and variant_container is not container:
+                price = _extract_price(variant_container)
             if price is not None:
                 vr["price"] = price
             variants.append(vr)
@@ -252,7 +260,7 @@ def extract_variants(
             supplied, each variant record copies these fields.
 
     Returns:
-        :class:`VariantExtractionResult` — base_record + flat
+        :class:`VariantExtractionResult` - base_record + flat
         variant list + typed variant groups.
     """
     soup = BeautifulSoup(html, "html.parser")

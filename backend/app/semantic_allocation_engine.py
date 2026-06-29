@@ -16,6 +16,7 @@ Role-type compatibility is derived geometrically from the Role Manifold.
 """
 
 import random
+import threading
 from copy import deepcopy
 from typing import Any, Protocol
 
@@ -32,21 +33,26 @@ from app.semantic_roots import UNIVERSAL_ROOTS as _UNIVERSAL_ROOTS
 # SHARED role embedding engine instance (learned, not hardcoded)
 # Imported lazily to avoid circular deps
 _role_engine = None
+_role_engine_lock = threading.Lock()
 
 
 def _get_role_engine():
     global _role_engine
-    if _role_engine is None:
-        from app.semantic_inference_engine import RoleEmbeddingEngine
+    if _role_engine is not None:
+        return _role_engine
+    with _role_engine_lock:
+        if _role_engine is None:
+            from app.semantic_inference_engine import RoleEmbeddingEngine
 
-        _role_engine = RoleEmbeddingEngine()
+            _role_engine = RoleEmbeddingEngine()
     return _role_engine
 
 
 def reset_role_engine() -> None:
     """Reset the global role engine (for testing)."""
     global _role_engine
-    _role_engine = None
+    with _role_engine_lock:
+        _role_engine = None
 
 
 # Exclusivity constraints — now defined in field_laws.py to prevent

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from app.scrape_telemetry import (
@@ -87,10 +88,14 @@ class TelemetryStateAdapter:
 
 
 _telemetry_state: TelemetryStateAdapter | None = None
+_telemetry_state_lock = threading.Lock()
 
 
 def get_telemetry_state() -> TelemetryStateAdapter:
     global _telemetry_state
-    if _telemetry_state is None:
-        _telemetry_state = TelemetryStateAdapter()
+    if _telemetry_state is not None:
+        return _telemetry_state
+    with _telemetry_state_lock:
+        if _telemetry_state is None:
+            _telemetry_state = TelemetryStateAdapter()
     return _telemetry_state

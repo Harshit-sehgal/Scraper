@@ -20,6 +20,7 @@ The system must self-tune without human intervention.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import asdict, dataclass
 from statistics import mean
@@ -235,11 +236,15 @@ class SelfTuningController:
 
 # Global singleton
 _tuning_controller: SelfTuningController | None = None
+_tuning_controller_lock = threading.Lock()
 
 
 def get_self_tuning_controller() -> SelfTuningController:
     """Get the global self-tuning controller."""
     global _tuning_controller
-    if _tuning_controller is None:
-        _tuning_controller = SelfTuningController()
+    if _tuning_controller is not None:
+        return _tuning_controller
+    with _tuning_controller_lock:
+        if _tuning_controller is None:
+            _tuning_controller = SelfTuningController()
     return _tuning_controller

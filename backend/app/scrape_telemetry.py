@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
@@ -178,12 +179,16 @@ class ScrapeTelemetryCollector:
 
 # Module-level singleton
 _collector: ScrapeTelemetryCollector | None = None
+_collector_lock = threading.Lock()
 
 
 def get_scrape_telemetry() -> ScrapeTelemetryCollector:
     global _collector
-    if _collector is None:
-        _collector = ScrapeTelemetryCollector()
+    if _collector is not None:
+        return _collector
+    with _collector_lock:
+        if _collector is None:
+            _collector = ScrapeTelemetryCollector()
     return _collector
 
 

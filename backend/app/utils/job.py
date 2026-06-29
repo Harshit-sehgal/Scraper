@@ -28,7 +28,8 @@ def deduplicate_results(records: list[dict], schema_fields: list[Any], deduplica
             dedup_value = normalized_dedup_text(r.get(deduplicate_field, ""))
         else:
             # Use ALL schema fields as a composite dedup key
-            dedup_value = "|".join(normalized_dedup_text(r.get(f.name)) for f in schema_fields)
+            dedup_parts = [normalized_dedup_text(r.get(f.name)) for f in schema_fields]
+            dedup_value = "|".join(dedup_parts) if any(dedup_parts) else ""
 
         if dedup_value and dedup_value not in seen:
             seen.add(dedup_value)

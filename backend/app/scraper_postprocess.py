@@ -1,4 +1,4 @@
-"""Post-extraction processing — cleaning, scoring, provenance, and telemetry.
+"""Post-extraction processing - cleaning, scoring, provenance, and telemetry.
 
 Extracted from ``scraper.py`` during the Phase C refactoring.
 
@@ -108,18 +108,36 @@ async def run_post_extraction_processing(
     if results:
         from app.scraper import _boost_contacts_with_page_html, process_raw_records
 
-        # ── Compound Record Assembly ────────────────────────────────────
+        # Compound record assembly
         assembled = assemble_compound_records(results, full_texts=None)
         if assembled != results:
             logger.info("[Scraper] Assembled %d compound records from %d raw records", len(assembled), len(results))
             results = assembled
 
-        # ── Contact Boosting ────────────────────────────────────────────
+        # Contact boosting
         contact_counts = sum(1 for r in results if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone")))
         if len(results) > settings.CONTACT_BOOST_MIN_RECORDS and contact_counts / len(results) < settings.CONTACT_BOOST_THRESHOLD:
             results = _boost_contacts_with_page_html(results, html, schema_fields)
 
-        # ── Scoring / Dedup ─────────────────────────────────────────────
+        # E-commerce variant expansion
+        from app.variant_extractor import extract_variants
+
+        expanded: list[dict] = []
+        for rec in results:
+            vr = extract_variants(html, base_record=rec)
+            if vr.variants:
+                expanded.extend(vr.variants)
+            else:
+                expanded.append(rec)
+        if len(expanded) != len(results):
+            logger.info(
+                "[Scraper] Expanded %d records into %d e-commerce variants",
+                len(results),
+                len(expanded),
+            )
+            results = expanded
+
+        # Scoring / dedup
         selector_meta = build_selector_field_metadata(
             (ext_result.selectors or {}).get("fields", {}),
             schema_fields,
@@ -131,7 +149,7 @@ async def run_post_extraction_processing(
             profile_fields=selector_meta,
         )
 
-    # ── Selector hit rate ───────────────────────────────────────────────
+    # Selector hit rate
     selector_hit_rate = 0.0
     confidence_map: dict[str, Any] = {}
     if results:
@@ -145,7 +163,7 @@ async def run_post_extraction_processing(
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
         confidence_map = {"overall_avg": round(avg_score, 3)}
 
-    # ── Provenance Finalization ────────────────────────────────────────
+    # Provenance finalization
     provenance_builder.set_records_count(len(results))
     provenance = provenance_builder.build()
     results = enrich_records_with_provenance(results, provenance)
@@ -154,7 +172,7 @@ async def run_post_extraction_processing(
         r["_extraction_confidence"] = r.get("record_score", 0.8)
         r["_extraction_provenance"] = ext_result.selectors
 
-    # ── Telemetry Recording ────────────────────────────────────────────
+    # Telemetry recording
     from app.llm_bridge import get_llm_call_count
     from app.scrape_telemetry import get_scrape_telemetry
 
@@ -187,13 +205,13 @@ async def run_post_extraction_processing(
         motifs_used=solidified_motifs_count,
     )
 
-    # ── Crawl Frontier Link Discovery ───────────────────────────────────
+    # Crawl frontier link discovery
     if html:
         from app.scraper_adapt import _run_crawl_frontier_link_discovery
 
         await _run_crawl_frontier_link_discovery(url, html, domain)
 
-    # ── Network Capture Cleanup ─────────────────────────────────────────
+    # Network capture cleanup
     from app.browser_network_capture import clear as clear_network_captures
 
     clear_network_captures(url)

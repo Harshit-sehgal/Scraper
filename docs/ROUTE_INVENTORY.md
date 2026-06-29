@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-06-29 07:32:30 UTC
+**Generated:** 2026-06-29 08:09:35 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
@@ -173,7 +173,7 @@ development docs/static routes, health/readiness routes, and session/auth routes
 | `POST` | `/api/saas/signup` | `app.saas.router` | `signup` | stable | public |  |  |  | SignupResponse | explicit API middleware exemption |
 | `DELETE` | `/api/session` | `app.routers.session` | `destroy_session` | stable | public |  |  |  | SessionDestroyResponse | explicit API middleware exemption |
 | `POST` | `/api/session` | `app.routers.session` | `create_session` | stable | public |  |  |  | SessionCreateResponse | explicit API middleware exemption |
-| `GET` | `/api/session/me` | `app.routers.session` | `get_session` | stable | public |  |  |  | app.models.SessionAuthenticatedResponse \| app.models.SessionUnauthenticatedResponse | explicit API middleware exemption |
+| `GET` | `/api/session/me` | `app.routers.session` | `get_session` | stable | public |  |  |  | SessionMeResponse | explicit API middleware exemption |
 
 ## Health/Readiness Routes
 

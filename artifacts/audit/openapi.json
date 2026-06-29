@@ -3020,42 +3020,6 @@
         "title": "SelectorMemoryStatsResponse",
         "type": "object"
       },
-      "SessionAuthenticatedResponse": {
-        "description": "Response model for GET /api/session/me when authenticated.",
-        "properties": {
-          "authenticated": {
-            "title": "Authenticated",
-            "type": "boolean"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Id"
-          }
-        },
-        "required": [
-          "authenticated"
-        ],
-        "title": "SessionAuthenticatedResponse",
-        "type": "object"
-      },
       "SessionCreateResponse": {
         "description": "Response model for POST /api/session.",
         "properties": {
@@ -3099,18 +3063,40 @@
         "title": "SessionDestroyResponse",
         "type": "object"
       },
-      "SessionUnauthenticatedResponse": {
-        "description": "Response model for GET /api/session/me when not authenticated.",
+      "SessionMeResponse": {
+        "description": "Response model for GET /api/session/me.",
         "properties": {
           "authenticated": {
             "title": "Authenticated",
             "type": "boolean"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           }
         },
         "required": [
           "authenticated"
         ],
-        "title": "SessionUnauthenticatedResponse",
+        "title": "SessionMeResponse",
         "type": "object"
       },
       "SignupRequest": {
@@ -7903,15 +7889,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/SessionAuthenticatedResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionUnauthenticatedResponse"
-                    }
-                  ],
-                  "title": "Response Get Session Api Session Me Get"
+                  "$ref": "#/components/schemas/SessionMeResponse"
                 }
               }
             },

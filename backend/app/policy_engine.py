@@ -6,6 +6,7 @@ No action may be triggered if it violates system thermodynamic stability.
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Any
 from weakref import WeakKeyDictionary
 
@@ -109,13 +110,16 @@ class SubstratePolicy:
 
 
 _policy_instances: WeakKeyDictionary | None = None
+_policy_instances_lock = threading.Lock()
 
 
 def get_policy_engine(ws: SemanticWorldState | None = None) -> SubstratePolicy:
     target_ws = ws or get_world_state()
     global _policy_instances
     if _policy_instances is None:
-        _policy_instances = WeakKeyDictionary()
+        with _policy_instances_lock:
+            if _policy_instances is None:
+                _policy_instances = WeakKeyDictionary()
     instances = _policy_instances
     if target_ws not in instances:
         instances[target_ws] = SubstratePolicy(ws=target_ws)

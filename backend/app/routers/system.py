@@ -17,8 +17,8 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.globals import _jobs_store_lock, config_view, jobs_store, recycle_bin_store
-from app.models import AuditLogResponse
 from app.middlewares import rate_limiter as _rate_limiter
+from app.models import AuditLogResponse
 from app.selector_discovery import analyze_url_for_fields
 from app.storage_interface import get_job_repository
 from app.url_analyzer import analyze_url as _url_analyze

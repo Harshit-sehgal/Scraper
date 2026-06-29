@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from contextlib import suppress
 from enum import StrEnum
@@ -149,11 +150,15 @@ class SystemGovernorDashboard:
 
 # Global singleton
 _governance_dashboard: SystemGovernorDashboard | None = None
+_governance_dashboard_lock = threading.Lock()
 
 
 def get_governance_dashboard() -> SystemGovernorDashboard:
     """Access the global governance dashboard singleton."""
     global _governance_dashboard
-    if _governance_dashboard is None:
-        _governance_dashboard = SystemGovernorDashboard()
+    if _governance_dashboard is not None:
+        return _governance_dashboard
+    with _governance_dashboard_lock:
+        if _governance_dashboard is None:
+            _governance_dashboard = SystemGovernorDashboard()
     return _governance_dashboard
