@@ -225,7 +225,7 @@ def _score_records(
         "timeout_rate": 0.0,
         "runtime_seconds": runtime_seconds,
         "browser_failures": 0,
-        "field_type_accuracy": _per_field_type_accuracy(extracted, schema),
+        "field_type_accuracy": _per_field_type_accuracy(extracted, schema),  # type: ignore[dict-item]
     }
 
 
