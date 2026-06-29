@@ -59,6 +59,108 @@ logger = logging.getLogger(__name__)
 
 MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 
+# API paths that are intentionally public and do not require authentication.
+# Each entry includes the rationale inline so the exemption list is auditable.
+# These endpoints are still covered by body-size caps, rate limiting, and
+# other security middlewares.
+_PUBLIC_API_PATHS: frozenset[str] = frozenset({
+    # CSP violation reports are sent by browsers, which cannot carry API keys.
+    "/api/system/csp-violations",
+    # Session management endpoints use their own auth (exchanging key for cookie).
+    "/api/session",
+    "/api/session/me",
+    # Password reset endpoints are called by unauthenticated users in reset flows.
+    "/api/saas/password-reset/request",
+    "/api/saas/password-reset/reset",
+    # Self-service signup is intentionally public.
+    "/api/saas/signup",
+    # Billing webhooks are called by PayPal/Stripe, which do not carry DataForge keys.
+    "/api/billing/webhook",
+})
+
+_PUBLIC_API_PREFIXES: tuple[str, ...] = (
+    # Stub-return page is a browser redirect URL (dev-only, displays confirmation only).
+    "/api/billing/stub-return/",
+)
+
+
+def _is_public_api_path(path: str) -> bool:
+    """Return True if *path* is a public API endpoint (no API key required)."""
+    if path in _PUBLIC_API_PATHS:
+        return True
+    return any(path.startswith(p) for p in _PUBLIC_API_PREFIXES)
+
+
+def _is_cors_preflight(request: Request) -> bool:
+    """Return True if this is a CORS preflight OPTIONS request."""
+    return (
+        request.method == "OPTIONS"
+        and request.headers.get("Origin")
+        and request.headers.get("Access-Control-Request-Method")
+    )
+
+
+async def _enforce_api_auth_and_quota(request: Request) -> None:
+    """Authenticate the request and enforce usage quota.
+
+    Raises HTTPException (caught by the caller) if authentication fails or
+    the quota is exceeded. This extracted function keeps the middleware
+    dispatch logic focused on routing decisions while the security/audit
+    logic lives in one place.
+    """
+    bearer_token = None
+    auth_header = request.headers.get("Authorization", "")
+    auth_scheme, _, auth_token = auth_header.partition(" ")
+    if auth_scheme.lower() == "bearer":
+        bearer_token = auth_token.strip()
+    has_api_key_header = bool(request.headers.get("X-API-Key") or request.headers.get("X-Admin-Key"))
+
+    from app.utils.rbac import resolve_auth_context
+
+    auth_context = resolve_auth_context(request)
+
+    from app.plan_enforcer import check_usage_limit
+    from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+    quota_owner = auth_context.org_id or auth_context.project_id or auth_context.user_id
+    allowed, details = check_usage_limit(
+        quota_owner,
+        UsageType.API_REQUEST,
+        1,
+        org_id=auth_context.org_id,
+        project_id=auth_context.project_id,
+    )
+    if not allowed:
+        raise ValueError(
+            f"quota exceeded for api_requests: "
+            f"{details['current_usage'] + 1}/{details['limit']}"
+        )
+
+    get_usage_ledger().record_usage(
+        auth_context.user_id,
+        UsageType.API_REQUEST,
+        quantity=1,
+        metadata={
+            "path": request.url.path,
+            "method": request.method,
+            "role": auth_context.role.value,
+            "source": auth_context.source,
+        },
+        org_id=auth_context.org_id,
+        project_id=auth_context.project_id,
+    )
+
+    if request.method != "GET":
+        log_auth_event(
+            actor=f"{auth_context.role.value}:{auth_context.user_id}:{_get_client_ip(request)}",
+            action="api_auth",
+            resource=request.url.path,
+            outcome="success",
+            details={"role": auth_context.role.value, "method": request.method, "source": auth_context.source},
+            org_id=auth_context.org_id,
+            project_id=auth_context.project_id,
+        )
+
 
 def _extract_principal_attr(request: Request, attr: str) -> str:
     """Best-effort extraction of a P0-SAAS-001 principal attribute for audit logs.
