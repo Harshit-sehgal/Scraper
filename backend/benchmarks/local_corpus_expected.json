@@ -26,8 +26,8 @@
     "large result sets"
   ],
   "aggregate_thresholds": {
-    "min_row_f1": 0.9,
-    "min_field_f1": 0.9,
+    "min_row_f1": 0.95,
+    "min_field_f1": 0.95,
     "max_timeout_rate": 0.0,
     "max_browser_failures": 0
   },
