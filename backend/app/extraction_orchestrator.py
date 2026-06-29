@@ -28,7 +28,7 @@ from app.page_evidence_collector import collect_page_evidence
 from app.rendered_visible_text_extractor import extract_from_visible_blocks
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
-from app.selector_memory import get_selector_memory
+from app.selector_memory import SelectorMemory, get_selector_memory
 
 logger = logging.getLogger(__name__)
 
@@ -537,9 +537,11 @@ def _try_provided_selectors_layer(
     user_intent: str,
     gate_threshold: float,
     provenance_builder: ProvenanceBuilder | None = None,
-    memory=None,
+    memory: SelectorMemory | None = None,
 ) -> ExtractionResult | None:
     """Layer 1: Apply selectors from URL analysis (pre-discovered by the user)."""
+    if memory is None:
+        return None
     logger.info("[Orchestrator] Trying provided selectors from URL analysis for %s", url)
     provided_results = _multi_pass_extraction(
         html,
@@ -581,7 +583,7 @@ def _try_memory_layer(
     user_intent: str,
     gate_threshold: float,
     provenance_builder: ProvenanceBuilder | None = None,
-    memory=None,
+    memory: SelectorMemory | None = None,
     warnings: list[str] | None = None,
 ) -> ExtractionResult | None:
     """Layer 2: Apply previously-successful selectors from selector memory.
@@ -590,6 +592,8 @@ def _try_memory_layer(
     ``force_container_discovery`` flags in ``provided_selectors``.
     Returns ``None`` when memory is skipped or fails quality gate.
     """
+    if memory is None:
+        return None
     skip_memory = bool(
         provided_selectors
         and (
@@ -697,7 +701,7 @@ async def _try_llm_discovery_layer(
     user_intent: str,
     gate_threshold: float,
     provenance_builder: ProvenanceBuilder | None = None,
-    memory=None,
+    memory: SelectorMemory | None = None,
 ) -> ExtractionResult | None:
     """Layer 3: Use LLM to discover CSS selectors.
 
@@ -705,6 +709,8 @@ async def _try_llm_discovery_layer(
     stall the extraction cascade. Returns ``None`` on timeout, error, or
     low-quality results.
     """
+    if memory is None:
+        return None
     logger.info("[Orchestrator] Initiating LLM discovery for %s", url)
 
     solidified_motifs = None
