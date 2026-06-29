@@ -225,6 +225,7 @@ def _score_records(
         "timeout_rate": 0.0,
         "runtime_seconds": runtime_seconds,
         "browser_failures": 0,
+        "field_type_accuracy": _per_field_type_accuracy(extracted, schema),
     }
 
 
@@ -291,6 +292,32 @@ def _invalid_type_count(records: list[dict[str, Any]], schema: list[dict[str, An
             if _has_value(value) and not _value_matches_type(value, field_type):
                 invalid += 1
     return invalid
+
+
+def _per_field_type_accuracy(
+    records: list[dict[str, Any]],
+    schema: list[dict[str, Any]],
+) -> dict[str, float]:
+    """Compute accuracy per field: fraction of non-empty values matching expected type.
+
+    Returns a mapping ``{field_name: accuracy}`` where each accuracy is
+    between 0 and 1 (1.0 means every observed value for that field type
+    matched). Fields with zero observed values are excluded from the output.
+    """
+    schema_by_name = {field["name"]: FieldType(field["type"]) for field in schema}
+    observed: dict[str, int] = dict.fromkeys(schema_by_name, 0)
+    matched: dict[str, int] = dict.fromkeys(schema_by_name, 0)
+
+    for record in records:
+        for field_name, field_type in schema_by_name.items():
+            value = record.get(field_name)
+            if not _has_value(value):
+                continue
+            observed[field_name] += 1
+            if _value_matches_type(value, field_type):
+                matched[field_name] += 1
+
+    return {name: round(matched[name] / total, 6) for name, total in observed.items() if total > 0}
 
 
 def _value_matches_type(value: Any, field_type: FieldType) -> bool:
