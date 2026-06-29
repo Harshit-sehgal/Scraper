@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from app.models import FieldType, SchemaField
 from app.selector_engine import extract_with_regex
 

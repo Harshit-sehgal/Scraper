@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-29 17:50:21 UTC
+**Generated:** 2026-06-29 18:41:41 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -25,6 +25,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | GET | `/api/jobs` |
 | GET | `/api/jobs/{job_id}` |
 | GET | `/api/jobs/{job_id}/debug` |
+| GET | `/api/jobs/{job_id}/diff` |
 | GET | `/api/jobs/{job_id}/events` |
 | GET | `/api/jobs/{job_id}/export/csv` |
 | GET | `/api/jobs/{job_id}/export/excel` |
@@ -33,6 +34,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PATCH | `/api/jobs/{job_id}/extraction` |
 | PATCH | `/api/jobs/{job_id}/headers` |
 | PATCH | `/api/jobs/{job_id}/strategy` |
+| PATCH | `/api/jobs/{job_id}/user-agent` |
 | PATCH | `/api/jobs/{job_id}/webhook` |
 | POST | `/api/jobs` |
 | POST | `/api/jobs/{job_id}/cancel` |
@@ -76,6 +78,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | POST | `/api/scraper/preview` |
 | POST | `/api/scraper/regressions/generate-all-tests` |
 | POST | `/api/scraper/regressions/{entry_id}/generate-test` |
+| POST | `/api/scraper/screenshot` |
 | POST | `/api/scraper/selectors/cleanup` |
 
 ## Operator and System Routes
@@ -85,6 +88,8 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | DELETE | `/api/operator/denylist` |
 | GET | `/api/operator/denylist` |
 | GET | `/api/system/audit-log` |
+| GET | `/api/system/extraction-health` |
+| GET | `/api/system/extraction-rate` |
 | GET | `/api/system/rate-limit-stats` |
 | GET | `/api/system/status` |
 | GET | `/api/system/storage/status` |
@@ -172,4 +177,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 116
+**Total routes:** 121

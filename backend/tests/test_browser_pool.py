@@ -1038,18 +1038,30 @@ class TestReusableContextCap:
 
     @pytest.mark.asyncio
     async def test_evict_handles_disconnect(self) -> None:
-        """If ctx.close() raises an unhandled type, eviction still clears dict."""
+        """If ctx.close() raises an unhandled type, exception propagates after dict cleanup.
+
+        Pins the fix for the deep-scan finding that ``contextlib.suppress(Exception)``
+        in the eviction path was hiding genuine bugs (KeyboardInterrupt, MemoryError,
+        asyncio.CancelledError). Now only Playwright/connection-style errors
+        (Error / OSError / RuntimeError / ValueError / TypeError) are swallowed —
+        ``AttributeError`` propagates so the caller can see the real failure. The
+        dict is still cleared BEFORE close() is awaited, so the pool state is
+        consistent even when the exception escapes.
+        """
         pool = BrowserPool()
 
         bad_ctx = _sync_mock_context()
-        bad_ctx.close.side_effect = AttributeError("unexpected")  # Not in suppress list
+        bad_ctx.close.side_effect = AttributeError("unexpected")  # Not in narrow suppress list
         pool._contexts["d0:default"] = bad_ctx
         pool._context_use_count["d0:default"] = 1
         pool._context_last_used["d0:default"] = time.time()
 
         with patch("app.browser_pool.settings.BROWSER_MAX_REUSABLE_CONTEXTS", 1):
-            await pool._evict_lru_if_needed()
-        # dict still cleaned up
+            with pytest.raises(AttributeError, match="unexpected"):
+                await pool._evict_lru_if_needed()
+        # dict IS cleared: ``_contexts.pop`` runs BEFORE ``await ctx.close()``,
+        # so even when close() raises an unhandled type the pool bookkeeping
+        # remains consistent.
         assert "d0:default" not in pool._contexts
 
     @pytest.mark.asyncio

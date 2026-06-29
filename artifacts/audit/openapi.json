@@ -7876,6 +7876,54 @@
         ]
       }
     },
+    "/api/system/extraction-health": {
+      "get": {
+        "description": "Extraction health dashboard data.\n\nReturns aggregated extraction success rate, p95 latency by cascade\nlayer, and top 10 failing domains over the last hour.\n\nRequires operator or admin role.",
+        "operationId": "extraction_health_api_system_extraction_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Extraction Health Api System Extraction Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Extraction Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/extraction-rate": {
+      "get": {
+        "description": "Extraction request rate over multiple intervals.\n\nReturns req/sec over 1m, 5m, and 15m windows based on the\ntimestamped request ring buffer in the metrics collector.\n\nRequires operator or admin role.",
+        "operationId": "extraction_rate_api_system_extraction_rate_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Extraction Rate Api System Extraction Rate Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Extraction Rate",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/system/rate-limit-stats": {
       "get": {
         "description": "Return current rate limiter configuration and active counter stats.\n\nExposes the rate limiter's internal state for operational debugging:\n- ``enabled`` \u2014 whether any tier (global or per-IP) is active\n- ``global_limit_per_window`` / ``global_window_seconds`` \u2014 aggregate cap\n- ``per_ip_enabled`` / ``per_ip_limit_per_window`` / ``per_ip_window_seconds`` \u2014 fair-share cap\n- ``active_keys`` \u2014 how many distinct counter keys are currently tracked\n- ``route_limits`` \u2014 per-route override limits (max + window per prefix)\n\nRequires operator or admin role.",
