@@ -45,10 +45,6 @@
     _dashboardApiKey = (key || "").trim();
   }
 
-  function _clearDashboardApiKey() {
-    _dashboardApiKey = "";
-  }
-
   async function checkDashboardSession() {
     if (_dashboardSessionChecked) return _dashboardSessionOk;
     _dashboardSessionChecked = true;

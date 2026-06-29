@@ -374,6 +374,287 @@ def _boost_contacts_with_page_html(
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
 
+def _normalize_fetch_strategy(
+    preferred_method: str | None,
+    anti_bot_stealth: bool,
+) -> FetchStrategy:
+    """Convert preferred_method string to a FetchStrategy enum."""
+    from app.strategy_evolution import FetchStrategy
+
+    if preferred_method is None or preferred_method == "":
+        strategy = FetchStrategy.PLAYWRIGHT_FULL
+    elif isinstance(preferred_method, str):
+        try:
+            strategy = FetchStrategy(preferred_method)
+        except ValueError:
+            strategy = FetchStrategy.PLAYWRIGHT_FULL
+    else:
+        strategy = preferred_method
+    if anti_bot_stealth and strategy in (FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT):
+        strategy = FetchStrategy.PLAYWRIGHT_STEALTH
+    return strategy
+
+
+async def _try_httpx_strategies(
+    url: str,
+    strategy: FetchStrategy,
+    extra_headers: dict[str, str] | None = None,
+    timeout_ms: int | None = None,
+    cookies: dict[str, str] | None = None,
+) -> tuple[str, float, str, int] | None:
+    """Try HTTPX-based strategies; return result tuple or None to fall through."""
+    from app.scrape_telemetry import detect_anti_bot
+    from app.strategy_evolution import FetchStrategy
+
+    if strategy not in [
+        FetchStrategy.HTTPX_BASIC,
+        FetchStrategy.HTTPX_WITH_UA,
+        FetchStrategy.HTTPX_SMART,
+        FetchStrategy.HYBRID,
+    ]:
+        return None
+
+    try:
+        html, delay, method, retries = await _fetch_with_httpx(
+            url, strategy=strategy, extra_headers=extra_headers, timeout_ms=timeout_ms, cookies=cookies,
+        )
+        if html and detect_anti_bot(html) < 0.7:
+            return html, delay, method, retries
+        logger.info("[Scraper] HTTPX result looks like a block, falling through")
+    except (httpx.HTTPError, httpx.TimeoutException, ValueError) as e:
+        if strategy != FetchStrategy.HYBRID:
+            logger.warning("[Scraper] %s failed for %s: %s. Falling back to Playwright", strategy.value, url, e)
+    return None
+
+
+async def _setup_playwright_page(
+    pool: Any,
+    domain: str,
+    strategy: FetchStrategy,
+    url: str,
+    cookies: dict[str, str] | None,
+    extra_headers: dict[str, str] | None,
+) -> tuple[Any, Any, list]:
+    """Set up Playwright browser context and page with route filtering and network capture."""
+    from app.strategy_evolution import FetchStrategy
+
+    context = await pool.get_context(domain, strategy=strategy)
+    if cookies:
+        cookie_list = [{"name": name, "value": value, "url": url} for name, value in cookies.items()]
+        await context.add_cookies(list(cookie_list))
+    page = await context.new_page()
+    if extra_headers:
+        await page.set_extra_http_headers(extra_headers)
+
+    async def _route_filter(route) -> None:
+        req_url = route.request.url
+        if isinstance(req_url, str):
+            try:
+                _validate_url_safe(req_url)
+            except ValueError as e:
+                logger.warning("[SSRF] Playwright request to %s rejected: %s", req_url, e)
+                await route.abort()
+                return
+        abort_types = {"image", "media", "font"}
+        if strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
+            abort_types.update({"stylesheet", "other"})
+        if route.request.resource_type in abort_types:
+            await route.abort()
+        else:
+            await route.continue_()
+
+    await page.route("**/*", _route_filter)
+    network_payloads = await setup_network_capture(page)
+    return context, page, network_payloads
+
+
+async def _playwright_navigate_and_stabilize(
+    page: Any,
+    url: str,
+    strategy: FetchStrategy,
+    timeout_ms: int | None,
+    skip_networkidle: bool,
+    hydration_wait_ms: int | None,
+    scroll_attempts: int | None,
+    domain: str,
+) -> float:
+    """Navigate, wait for stabilization, and scroll; returns js_render_delay_ms."""
+    from app.scrape_telemetry import detect_anti_bot
+    from app.strategy_evolution import FetchStrategy
+    from app.telemetry_state import get_telemetry_state
+
+    try:
+        wait_until: Literal["domcontentloaded", "networkidle"] = (
+            "domcontentloaded" if skip_networkidle or strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT else "networkidle"
+        )
+        initial_timeout = timeout_ms if timeout_ms is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+        await page.goto(url, wait_until=wait_until, timeout=initial_timeout)
+
+        try:
+            final_url = page.url
+            _validate_url_safe(final_url)
+        except ValueError:
+            logger.warning("[SSRF] Playwright navigated to blocked target %s from %s — aborting", page.url, url)
+            await page.close()
+            raise
+
+        intel = get_domain_intelligence().get_intelligence(url)
+
+        if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
+            loading_selectors = [".loading", ".spinner", ".loader", "[class*='Loading']", "[class*='Spinner']"]
+            for sel in loading_selectors:
+                with suppress(Exception):
+                    await page.wait_for_selector(sel, state="hidden", timeout=2000)
+
+        telemetry = get_telemetry_state()
+        avg_stabilization = telemetry.get_avg_stabilization(domain)
+        stabilization_start = time.time()
+        if hydration_wait_ms is not None:
+            settle_timeout = hydration_wait_ms / 1000.0
+        else:
+            settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
+        settle_timeout = max(settle_timeout, 3.0)
+
+        min_wait_ms = 2500
+        with suppress(Exception):
+            await page.wait_for_function(
+                f"""() => {{
+                     const body = document.body;
+                     if (!body) return true;
+                     const start = Date.now();
+                     let lastHtml = body.innerHTML;
+                     let stableSince = Date.now();
+                     return new Promise(resolve => {{
+                         const interval = setInterval(() => {{
+                             const currentHtml = document.body ? document.body.innerHTML : lastHtml;
+                             const now = Date.now();
+                             if (currentHtml !== lastHtml) {{
+                                 lastHtml = currentHtml;
+                                 stableSince = now;
+                             }}
+                             const stableFor = now - stableSince;
+                             const totalWait = now - start;
+                             if (stableFor >= {avg_stabilization} && totalWait >= {min_wait_ms}) {{
+                                 clearInterval(interval);
+                                 resolve(true);
+                             }}
+                         }}, {settings.DOM_STABILIZATION_INTERVAL});
+                     }});
+                 }}""",
+                timeout=settle_timeout * 1000,
+            )
+        js_render_delay_ms = (time.time() - stabilization_start) * 1000
+        telemetry.record_stabilization(domain, js_render_delay_ms)
+
+        if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
+            _scroll_attempts_val = 0
+            max_scrolls = scroll_attempts if scroll_attempts is not None else 3
+            last_height = await page.evaluate("document.body.scrollHeight")
+            while _scroll_attempts_val < max_scrolls:
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
+                new_height = await page.evaluate("document.body.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+                _scroll_attempts_val += 1
+            if _scroll_attempts_val > 0:
+                intel.infinite_scroll_required = True
+            await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
+
+        return js_render_delay_ms
+    except Exception as e:
+        try:
+            partial_html = await page.content()
+            if detect_anti_bot(partial_html) > 0.5:
+                logger.warning("[Scraper] Anti-bot detected during initial %s for %s — aborting early", e, url)
+                _ab_msg = f"Anti-bot challenge detected: {e}"
+                raise ValueError(_ab_msg)
+        except ValueError:
+            raise
+        except Exception:
+            logger.debug("Secondary load state wait failed for %s", url, exc_info=True)
+
+        logger.warning("[Scraper] %s slow load for %s: %s. Falling to domcontentloaded", strategy.value, url, e)
+        await page.wait_for_load_state("domcontentloaded")
+        await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
+        return 0.0
+
+
+async def _collect_playwright_results(
+    page: Any,
+    context: Any,
+    url: str,
+    domain: str,
+    network_payloads: list,
+) -> str:
+    """Collect browser state, cookies, and HTML after navigation."""
+    browser_state = await collect_browser_state(page)
+    if browser_state:
+        store_browser_state(url, browser_state)
+        logger.info(
+            "[BrowserState] Captured %d session candidate(s) from browser storage for %s",
+            browser_state.get("session_candidate_count", 0),
+            url,
+        )
+
+    try:
+        raw_cookies = await context.cookies()
+        cookie_header = build_cookie_header(raw_cookies)
+        if cookie_header:
+            from app.anti_bot_engine import get_anti_bot_engine
+            get_anti_bot_engine().update_cookies(domain, cookie_header)
+    except Exception as cookie_err:
+        logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
+
+    html = await page.content()
+    if network_payloads:
+        store_captures(url, network_payloads)
+        logger.info("[BrowserNetwork] Captured %d network payloads from %s", len(network_payloads), url)
+    return html
+
+
+async def _detect_anti_bot_and_fallback(
+    page: Any,
+    e: Exception,
+    url: str,
+    extra_headers: dict[str, str] | None = None,
+    timeout_ms: int | None = None,
+) -> tuple[str, float, str, int]:
+    """Check if an error is anti-bot related; if so raise ValueError, otherwise fallback to httpx."""
+    from app.scrape_telemetry import detect_anti_bot
+    from app.strategy_evolution import FetchStrategy
+
+    html_content = ""
+    if page:
+        with suppress(Exception):
+            html_content = await page.content()
+
+    err_msg = str(e).lower()
+    anti_bot_keywords = {"captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"}
+    is_antibot = False
+    try:
+        if (html_content and detect_anti_bot(html_content) > 0.5) or any(
+            marker in err_msg for marker in anti_bot_keywords
+        ):
+            is_antibot = True
+    except Exception:
+        is_antibot = any(marker in err_msg for marker in anti_bot_keywords)
+
+    if is_antibot:
+        logger.exception(
+            "[Scraper] Anti-bot challenge detected for %s. Refusing naive HTTP fallback to prevent IP ban.", url,
+        )
+        _ab_msg = f"Anti-bot challenge detected: {e}"
+        raise ValueError(_ab_msg) from e
+
+    logger.exception("[Scraper] Playwright failed for %s. Final fallback to httpx_basic", url)
+    return await _fetch_with_httpx(
+        url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=extra_headers, timeout_ms=timeout_ms,
+    )
+
+
 async def fetch_page_content(
     url: str,
     preferred_method: str | None = None,
@@ -386,74 +667,19 @@ async def fetch_page_content(
     usage_context: dict[str, Any] | None = None,
     cookies: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
-    """Load a URL in a pooled headless browser context or via plain HTTP.
-
-    Args:
-        url: The URL to fetch.
-        preferred_method: The preferred fetch strategy as a string key
-            (e.g. "playwright_full", "httpx_basic"). Defaults to
-            "playwright_full" if None.
-        timeout_ms: Override the Playwright navigation timeout (ms).
-        hydration_wait_ms: Override the hydration wait / delay after load (ms).
-        skip_networkidle: If True, use domcontentloaded instead of networkidle.
-        scroll_attempts: Override the number of scroll attempts.
-        anti_bot_stealth: If True, enable extra fingerprint randomization.
-        extra_headers: Extra HTTP headers to inject.
-
-    Returns:
-        tuple of (html_content, js_render_delay_ms, method_used, retry_count)
-
-    """
-    from app.strategy_evolution import FetchStrategy  # research-shell, lazy
+    """Load a URL in a pooled headless browser context or via plain HTTP."""
+    from app.strategy_evolution import FetchStrategy
 
     domain = urlparse(url).netloc.lower() or "default"
+    strategy = _normalize_fetch_strategy(preferred_method, anti_bot_stealth)
 
-    # Normalize method to Enum
-    if preferred_method is None or preferred_method == "":
-        strategy = FetchStrategy.PLAYWRIGHT_FULL
-    elif isinstance(preferred_method, str):
-        try:
-            strategy = FetchStrategy(preferred_method)
-        except ValueError:
-            strategy = FetchStrategy.PLAYWRIGHT_FULL
-    else:
-        strategy = preferred_method
+    httpx_result = await _try_httpx_strategies(url, strategy, extra_headers, timeout_ms, cookies)
+    if httpx_result is not None:
+        return httpx_result
 
-    if anti_bot_stealth and strategy in (FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT):
-        strategy = FetchStrategy.PLAYWRIGHT_STEALTH
-
-    # ── Phase 80: Granular Strategy Execution ──
-
-    # 1. HTTPX-based strategies
-    if strategy in [
-        FetchStrategy.HTTPX_BASIC,
-        FetchStrategy.HTTPX_WITH_UA,
-        FetchStrategy.HTTPX_SMART,
-        FetchStrategy.HYBRID,
-    ]:
-        try:
-            html, delay, method, retries = await _fetch_with_httpx(
-                url,
-                strategy=strategy,
-                extra_headers=extra_headers,
-                timeout_ms=timeout_ms,
-                cookies=cookies,
-            )
-            if html:
-                # Basic anti-bot check on httpx result
-                from app.scrape_telemetry import detect_anti_bot
-
-                if detect_anti_bot(html) < 0.7:
-                    return html, delay, method, retries
-                logger.info("[Scraper] HTTPX result looks like a block, falling through")
-        except (httpx.HTTPError, httpx.TimeoutException, ValueError) as e:
-            if strategy != FetchStrategy.HYBRID:
-                logger.warning("[Scraper] %s failed for %s: %s. Falling back to Playwright", strategy.value, url, e)
-            # HYBRID continues to Playwright anyway if it fails
-
-    # 2. Playwright-based strategies
-    page = None
-    network_payloads = []  # Pre-initialize for safety
+    page: Any = None
+    context: Any = None
+    network_payloads: list = []
     js_render_delay_ms = 0.0
     method_used = strategy.value
     browser_meter_started_at: float | None = None
@@ -461,270 +687,25 @@ async def fetch_page_content(
 
     try:
         browser_meter_started_at = time.monotonic()
-        if not _record_browser_minutes(
-            usage_context=usage_context,
-            url=url,
-            method=method_used,
-            quantity=1,
-            phase="initial",
-        ):
+        if not _record_browser_minutes(usage_context=usage_context, url=url, method=method_used, quantity=1, phase="initial"):
             logger.warning("[Scraper] Browser-minute quota exhausted for %s. Falling back to httpx_basic", url)
-            return await _fetch_with_httpx(
-                url,
-                strategy=FetchStrategy.HTTPX_BASIC,
-                extra_headers=extra_headers,
-                timeout_ms=timeout_ms,
-            )
+            return await _fetch_with_httpx(url, strategy=FetchStrategy.HTTPX_BASIC, extra_headers=extra_headers, timeout_ms=timeout_ms)
         browser_metered_initial = True
+
         pool = get_browser_pool()
-        # Pass strategy to get_context for specialized setup
-        context = await pool.get_context(domain, strategy=strategy)
-        if cookies:
-            cookie_list = []
-            for name, value in cookies.items():
-                cookie_list.append(
-                    {
-                        "name": name,
-                        "value": value,
-                        "url": url,
-                    }
-                )
-            # The cookies dict shape maps directly to Playwright's
-            # SetCookieParam TypedDict — the cast is purely for the type
-            # checker since the runtime shape matches.
-            cookies_payload = list(cookie_list)
-            await context.add_cookies(cookies_payload)  # type: ignore[arg-type]
-        page = await context.new_page()
-        if extra_headers:
-            await page.set_extra_http_headers(extra_headers)
+        context, page, network_payloads = await _setup_playwright_page(pool, domain, strategy, url, cookies, extra_headers)
 
-        # Phase 80: Lightweight mode filters more resources
-        async def _route_filter(route) -> None:
-            req_url = route.request.url
-            if isinstance(req_url, str):
-                try:
-                    _validate_url_safe(req_url)
-                except ValueError as e:
-                    logger.warning("[SSRF] Playwright request to %s rejected: %s", req_url, e)
-                    await route.abort()
-                    return
-
-            abort_types = {"image", "media", "font"}
-            if strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
-                abort_types.update({"stylesheet", "other"})
-
-            if route.request.resource_type in abort_types:
-                await route.abort()
-            else:
-                await route.continue_()
-
-        await page.route("**/*", _route_filter)
-
-        # Set up network response interception for API / XHR JSON capture
-        network_payloads = await setup_network_capture(page)
-
-        # Phase 1: Try networkidle with quick timeout for faster failure
-        # detection
-        try:
-            # Bind unconditionally so the except branch can safely reference
-            # ``wait_until`` even if ``page.goto`` (line 521) raises before
-            # mutually exclusive branches below would have assigned it.
-            wait_until: Literal["domcontentloaded", "networkidle"] = (
-                "domcontentloaded" if skip_networkidle or strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT else "networkidle"
-            )
-            # Use recovery timeout if provided, otherwise use a short initial
-            # timeout (15s) for networkidle
-            initial_timeout = timeout_ms if timeout_ms is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
-            await page.goto(url, wait_until=wait_until, timeout=initial_timeout)
-
-            # SSRF: validate the final page URL is not private / internal after
-            # Playwright navigation
-            try:
-                final_url = page.url
-                _validate_url_safe(final_url)
-            except ValueError:
-                logger.warning(
-                    "[SSRF] Playwright navigated to blocked target %s from %s — aborting",
-                    page.url,
-                    url,
-                )
-                await page.close()
-                raise
-
-            # Phase 79: Adaptive hydration and scroll from domain intelligence
-            intel = get_domain_intelligence().get_intelligence(url)
-
-            # Wait for common loading indicators
-            if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
-                loading_selectors = [".loading", ".spinner", ".loader", "[class*='Loading']", "[class*='Spinner']"]
-                for sel in loading_selectors:
-                    with suppress(Exception):
-                        await page.wait_for_selector(sel, state="hidden", timeout=2000)
-
-            # Adaptive post-network buffer: check DOM stabilization
-            from app.telemetry_state import get_telemetry_state
-
-            telemetry = get_telemetry_state()
-            avg_stabilization = telemetry.get_avg_stabilization(domain)
-            stabilization_start = time.time()
-            # Use recovery hydration wait if provided, otherwise domain
-            # intelligence or default
-            if hydration_wait_ms is not None:
-                settle_timeout = hydration_wait_ms / 1000.0
-            else:
-                settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
-            settle_timeout = max(settle_timeout, 3.0)
-
-            min_wait_ms = 2500
-            with suppress(Exception):
-                await page.wait_for_function(
-                    f"""() => {{
-                         const body = document.body;
-                         if (!body) return true;
-                         const start = Date.now();
-                         let lastHtml = body.innerHTML;
-                         let stableSince = Date.now();
-
-                         return new Promise(resolve => {{
-                             const interval = setInterval(() => {{
-                                 const currentHtml = document.body ? document.body.innerHTML : lastHtml;
-                                 const now = Date.now();
-                                 if (currentHtml !== lastHtml) {{
-                                     lastHtml = currentHtml;
-                                     stableSince = now;
-                                 }}
-                                 const stableFor = now - stableSince;
-                                 const totalWait = now - start;
-                                 if (stableFor >= {avg_stabilization} && totalWait >= {min_wait_ms}) {{
-                                     clearInterval(interval);
-                                     resolve(true);
-                                 }}
-                             }}, {settings.DOM_STABILIZATION_INTERVAL});
-                         }});
-                     }}""",
-                    timeout=settle_timeout * 1000,
-                )
-            js_render_delay_ms = (time.time() - stabilization_start) * 1000
-            telemetry.record_stabilization(domain, js_render_delay_ms)
-
-            # Scroll handling — use recovery scroll_attempts if provided
-            if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
-                _scroll_attempts = 0
-                max_scrolls = scroll_attempts if scroll_attempts is not None else 3
-                last_height = await page.evaluate("document.body.scrollHeight")
-                while _scroll_attempts < max_scrolls:
-                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
-                    new_height = await page.evaluate("document.body.scrollHeight")
-                    if new_height == last_height:
-                        break
-                    last_height = new_height
-                    _scroll_attempts += 1
-                if _scroll_attempts > 0:
-                    intel.infinite_scroll_required = True
-                await page.evaluate("window.scrollTo(0, 0)")
-                await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
-
-        except Exception as e:
-            # Before falling back, check partial HTML for anti-bot signals
-            try:
-                partial_html = await page.content()
-                from app.scrape_telemetry import detect_anti_bot
-
-                if detect_anti_bot(partial_html) > 0.5:
-                    logger.warning(
-                        "[Scraper] Anti-bot detected during initial %s for %s — aborting early",
-                        e,
-                        url,
-                    )
-                    msg = f"Anti-bot challenge detected: {e}"
-                    raise ValueError(msg)
-            except ValueError:
-                raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:
-                logger.debug("Secondary load state wait failed for %s", url, exc_info=True)
-
-            logger.warning(
-                "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
-                strategy.value,
-                url,
-                e,
-            )
-            await page.wait_for_load_state("domcontentloaded")
-            # Reduced fallback wait: 2s instead of 5s — JS has already had time
-            # to start
-            await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
-
-        browser_state = await collect_browser_state(page)
-        if browser_state:
-            store_browser_state(url, browser_state)
-            logger.info(
-                "[BrowserState] Captured %d session candidate(s) from browser storage for %s",
-                browser_state.get("session_candidate_count", 0),
-                url,
-            )
-
-        try:
-            raw_cookies = await context.cookies()
-            cookie_header = build_cookie_header(raw_cookies)
-            if cookie_header:
-                from app.anti_bot_engine import get_anti_bot_engine
-
-                get_anti_bot_engine().update_cookies(domain, cookie_header)
-        except Exception as cookie_err:
-            logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
-
-        html = await page.content()
-
-        # Store captured network payloads for later extraction
-        if network_payloads:
-            store_captures(url, network_payloads)
-            logger.info(
-                "[BrowserNetwork] Captured %d network payloads from %s",
-                len(network_payloads),
-                url,
-            )
-
-        return html, js_render_delay_ms, method_used, 0
-    except Exception as e:
-        html_content = ""
-        if page:
-            with suppress(Exception):
-                html_content = await page.content()
-
-        err_msg = str(e).lower()
-        is_antibot = False
-        try:
-            from app.scrape_telemetry import detect_anti_bot
-
-            if (html_content and detect_anti_bot(html_content) > 0.5) or any(
-                marker in err_msg
-                for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
-            ):
-                is_antibot = True
-        except Exception:
-            # If detect_anti_bot itself fails, rely on keyword matching only
-            is_antibot = any(
-                marker in err_msg
-                for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
-            )
-
-        if is_antibot:
-            logger.exception(
-                "[Scraper] Anti-bot challenge detected during %s for %s. Refusing naive HTTP fallback to prevent IP ban.",
-                strategy.value,
-                url,
-            )
-            msg = f"Anti-bot challenge detected: {e}"
-            raise ValueError(msg) from e
-
-        logger.exception("[Scraper] %s failed for %s. Final fallback to httpx_basic", strategy.value, url)
-        return await _fetch_with_httpx(
-            url,
-            strategy=FetchStrategy.HTTPX_BASIC,
-            extra_headers=extra_headers,
-            timeout_ms=timeout_ms,
+        js_render_delay_ms = await _playwright_navigate_and_stabilize(
+            page, url, strategy, timeout_ms, skip_networkidle, hydration_wait_ms, scroll_attempts, domain,
         )
+
+        html = await _collect_playwright_results(page, context, url, domain, network_payloads)
+        return html, js_render_delay_ms, method_used, 0
+
+    except ValueError:
+        raise
+    except Exception as e:
+        return await _detect_anti_bot_and_fallback(page, e, url, extra_headers, timeout_ms)
     finally:
         if browser_metered_initial and browser_meter_started_at is not None:
             elapsed_seconds = max(0.0, time.monotonic() - browser_meter_started_at)
@@ -732,16 +713,84 @@ async def fetch_page_content(
             extra_minutes = billable_minutes - 1
             if extra_minutes > 0:
                 _record_browser_minutes(
-                    usage_context=usage_context,
-                    url=url,
-                    method=method_used,
-                    quantity=extra_minutes,
-                    phase="additional",
-                    duration_ms=elapsed_seconds * 1000,
+                    usage_context=usage_context, url=url, method=method_used,
+                    quantity=extra_minutes, phase="additional", duration_ms=elapsed_seconds * 1000,
                 )
         if page:
             with suppress(Exception):
                 await page.close()
+
+
+def _build_httpx_headers(strategy: FetchStrategy, domain: str, extra_headers: dict[str, str] | None) -> dict[str, str]:
+    """Build HTTP headers for the given fetch strategy and domain."""
+    from app.anti_bot_engine import get_anti_bot_engine
+    from app.strategy_evolution import FetchStrategy
+
+    anti_bot = get_anti_bot_engine()
+    if strategy in [FetchStrategy.HTTPX_SMART, FetchStrategy.HTTPX_WITH_UA]:
+        stealth = anti_bot.get_stealth_profile(domain)
+        headers = dict(stealth.get("extra_headers", {}))
+        headers["User-Agent"] = stealth["user_agent"]
+    else:
+        headers = {"User-Agent": settings.USER_AGENT}
+        if strategy == FetchStrategy.HTTPX_BASIC:
+            headers = {"User-Agent": settings.HTTPX_BASIC_USER_AGENT}
+    if extra_headers:
+        headers.update(extra_headers)
+    cookie_string = anti_bot.get_cookies(domain)
+    if cookie_string and "Cookie" not in headers and "cookie" not in {k.lower() for k in headers}:
+        headers["Cookie"] = cookie_string
+    return headers
+
+
+async def _follow_httpx_redirects(client: httpx.AsyncClient, url: str, strategy: FetchStrategy) -> httpx.Response:
+    """Follow HTTP redirects with SSRF validation at each hop."""
+    from app.strategy_evolution import FetchStrategy
+
+    current_url = url
+    max_redirects = 10
+    redirects_followed = 0
+
+    if strategy == FetchStrategy.HTTPX_SMART:
+        initial_host = urlparse(url).scheme + "://" + urlparse(url).netloc
+        _validate_url_safe(initial_host)
+        warmup_resp = await client.get(initial_host)
+        await warmup_resp.aclose()
+
+    while True:
+        next_resp = await client.get(current_url)
+        if next_resp.is_redirect:
+            redirects_followed += 1
+            if redirects_followed > max_redirects:
+                await next_resp.aclose()
+                msg = f"Too many redirects (max {max_redirects})"
+                raise ValueError(msg)
+
+            redirect_target = next_resp.headers.get("location", "")
+            if not redirect_target:
+                return next_resp
+
+            from urllib.parse import urljoin
+            redirect_url = urljoin(str(next_resp.url), redirect_target)
+            _validate_url_safe(redirect_url)
+            await next_resp.aclose()
+            current_url = redirect_url
+        else:
+            return next_resp
+
+
+async def _extract_httpx_body(resp: httpx.Response, domain: str, anti_bot: Any) -> str:
+    """Extract body from HTTP response with SSRF validation and cookie persistence."""
+    try:
+        resp.raise_for_status()
+        final_url = str(resp.url)
+        _validate_url_safe(final_url)
+        set_cookie = resp.headers.get("set-cookie", "")
+        if set_cookie:
+            anti_bot.update_cookies(domain, set_cookie)
+        return resp.text
+    finally:
+        await resp.aclose()
 
 
 async def _fetch_with_httpx(
@@ -752,7 +801,9 @@ async def _fetch_with_httpx(
     cookies: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
     """Internal helper for httpx fetching with retries."""
-    from app.strategy_evolution import FetchStrategy  # research-shell, lazy
+    from app.anti_bot_engine import get_anti_bot_engine
+    from app.strategy_evolution import FetchStrategy
+    from app.url_safety import get_safe_async_client
 
     if strategy is None:
         strategy = FetchStrategy.HTTPX_BASIC
@@ -763,30 +814,11 @@ async def _fetch_with_httpx(
             strategy = FetchStrategy.HTTPX_BASIC
     method_used = strategy.value
 
-    # Use anti-bot stealth headers for smart / stealth strategies
-    from app.anti_bot_engine import get_anti_bot_engine
-
     domain = urlparse(url).netloc.lower() or "default"
     anti_bot = get_anti_bot_engine()
-
-    if strategy in [FetchStrategy.HTTPX_SMART, FetchStrategy.HTTPX_WITH_UA]:
-        stealth = anti_bot.get_stealth_profile(domain)
-        headers = dict(stealth.get("extra_headers", {}))
-        headers["User-Agent"] = stealth["user_agent"]
-    else:
-        headers = {"User-Agent": settings.USER_AGENT}
-        if strategy == FetchStrategy.HTTPX_BASIC:
-            # Minimal headers for basic fetch
-            headers = {"User-Agent": settings.HTTPX_BASIC_USER_AGENT}
-
-    if extra_headers:
-        headers.update(extra_headers)
-    cookie_string = anti_bot.get_cookies(domain)
-    if cookie_string and "Cookie" not in headers and "cookie" not in {k.lower() for k in headers}:
-        headers["Cookie"] = cookie_string
+    headers = _build_httpx_headers(strategy, domain, extra_headers)
 
     timeout_seconds = (timeout_ms / 1000.0) if timeout_ms is not None else settings.REQUEST_TIMEOUT
-    from app.url_safety import get_safe_async_client
 
     async with get_safe_async_client(
         timeout=httpx.Timeout(timeout_seconds),
@@ -797,84 +829,22 @@ async def _fetch_with_httpx(
         for attempt in range(max(1, settings.MAX_RETRIES)):
             retry_count = attempt
             try:
-                # Validate the initial URL before fetching
                 _validate_url_safe(url)
-
-                # Phase 80: Smart mode simulates basic session
-                if strategy == FetchStrategy.HTTPX_SMART:
-                    initial_host = urlparse(url).scheme + "://" + urlparse(url).netloc
-                    _validate_url_safe(initial_host)
-                    warmup_resp = await client.get(initial_host)
-                    await warmup_resp.aclose()
-
-                current_url = url
-                max_redirects = 10
-                redirects_followed = 0
-
-                while True:
-                    next_resp = await client.get(current_url)
-                    if next_resp.is_redirect:
-                        redirects_followed += 1
-                        if redirects_followed > max_redirects:
-                            await next_resp.aclose()
-                            msg = f"Too many redirects (max {max_redirects})"
-                            raise ValueError(msg)
-
-                        redirect_target = next_resp.headers.get("location", "")
-                        if not redirect_target:
-                            resp = next_resp
-                            break
-
-                        from urllib.parse import urljoin
-
-                        redirect_url = urljoin(str(next_resp.url), redirect_target)
-
-                        # Validate the target redirect URL before fetching it!
-                        _validate_url_safe(redirect_url)
-                        await next_resp.aclose()
-                        current_url = redirect_url
-                    else:
-                        resp = next_resp
-                        break
-
-                try:
-                    resp.raise_for_status()
-
-                    # SSRF: validate the final resolved URL is not private /
-                    # internal
-                    final_url = str(resp.url)
-                    _validate_url_safe(final_url)
-
-                    # Persist cookies from response for future requests
-                    set_cookie = resp.headers.get("set-cookie", "")
-                    if set_cookie:
-                        anti_bot.update_cookies(domain, set_cookie)
-
-                    # F-HTML-005: capture the body before releasing the
-                    # response so callers don't see ``<Response [200]>``.
-                    body = resp.text
-                    return body, 0.0, method_used, retry_count
-                finally:
-                    await resp.aclose()
+                resp = await _follow_httpx_redirects(client, url, strategy)
+                body = await _extract_httpx_body(resp, domain, anti_bot)
+                return body, 0.0, method_used, retry_count
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt < settings.MAX_RETRIES - 1:
                     wait = settings.HTTP_BACKOFF_FACTOR * (attempt + 1)
                     logger.warning(
                         "[Scraper] %s attempt %d/%d failed for %s: %s. Retrying in %.1fs",
-                        strategy.value,
-                        attempt + 1,
-                        settings.MAX_RETRIES,
-                        url,
-                        e,
-                        wait,
+                        strategy.value, attempt + 1, settings.MAX_RETRIES, url, e, wait,
                     )
                     await asyncio.sleep(wait)
                 else:
                     logger.exception(
                         "[Scraper] %s failed after %d attempts for %s. Final fallback to httpx_basic",
-                        strategy.value,
-                        settings.MAX_RETRIES,
-                        url,
+                        strategy.value, settings.MAX_RETRIES, url,
                     )
                     raise
     return "", 0.0, method_used, 0

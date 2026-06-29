@@ -419,7 +419,7 @@ async def get_organization(
     ],
 ) -> OrgResponse:
     """Get a single organization by ID."""
-    role, user_id, auth_org_id, _project_id = auth
+    _role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
@@ -590,7 +590,7 @@ async def list_org_projects(
     ],
 ) -> ProjectListResponse:
     """List all projects within an organization."""
-    role, user_id, auth_org_id, _project_id = auth
+    _role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
@@ -745,7 +745,7 @@ async def list_org_members(
     ],
 ) -> list[MembershipResponse]:
     """List all active members of an organization."""
-    role, user_id, auth_org_id, _project_id = auth
+    _role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
@@ -1289,7 +1289,7 @@ async def create_invitation(
     Requires admin/operator role in the org.
     Rate-limited to 10 invitations per 5 minutes per user to prevent spam.
     """
-    role, user_id, auth_org_id, _project_id = auth
+    _role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
@@ -1341,7 +1341,7 @@ async def list_org_invitations(
     status: str | None = None,
 ) -> InvitationListResponse:
     """List invitations for an organization."""
-    role, user_id, auth_org_id, _project_id = auth
+    _role, user_id, auth_org_id, _project_id = auth
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 

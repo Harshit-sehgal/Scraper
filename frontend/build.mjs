@@ -18,7 +18,7 @@
 
 import { build, context } from "esbuild";
 import { writeFileSync, mkdirSync } from "fs";
-import { resolve, relative, basename } from "path";
+import { resolve, relative } from "path";
 
 const FRONTEND_DIR = resolve(import.meta.dirname);
 const DIST_DIR = resolve(FRONTEND_DIR, "dist");

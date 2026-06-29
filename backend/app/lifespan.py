@@ -55,55 +55,30 @@ def reset_lifespan_state() -> None:
     _background_tasks = []
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF100
-    """Lifespan event handler for FastAPI startup / shutdown.
+def _verify_production_startup() -> None:
+    """Strict production security checks — fail fast with clear messages."""
+    if settings.ENV.lower() != "production":
+        return
+    if not settings.CORS_ORIGINS or "*" in settings.CORS_ORIGINS:
+        _cors_msg = (
+            "CORS_ORIGINS contains wildcard '*' or is empty. In production environment, "
+            "CORS_ORIGINS must be locked down to trusted domains for safety."
+        )
+        raise ValueError(_cors_msg)
+    from app.utils.prod_security_validator import validate_production_credentials
+    validate_production_credentials(settings)
+    if getattr(settings, "SMOKE_TEST_MODE", False):
+        _smoke_msg = (
+            "SMOKE_TEST_MODE is ENABLED in production — this bypasses "
+            "SSRF host-allowlist checks and allows internal-network "
+            "access.  Set DATAFORGE_SMOKE_TEST_MODE=false before "
+            "deploying to production."
+        )
+        raise ValueError(_smoke_msg)
 
-    Handles all initialization: recovery framework, domain health,
-    distributed readiness (gossip / heartbeat), state loading,
-    and background task scheduling.
-    """
-    global gossip, heartbeat_mgr
 
-    # Strict Production Security Check
-    if settings.ENV.lower() == "production":
-        if not settings.CORS_ORIGINS or "*" in settings.CORS_ORIGINS:
-            msg = (
-                "CORS_ORIGINS contains wildcard '*' or is empty. In production environment, "
-                "CORS_ORIGINS must be locked down to trusted domains for safety."
-            )
-            raise ValueError(
-                msg,
-            )
-        from app.utils.prod_security_validator import validate_production_credentials
-
-        validate_production_credentials(settings)
-
-        # SMOKE_TEST_MODE bypasses SSRF host-allowlist checks; if it
-        # leaks to production (via a stray .env or compose env block),
-        # any caller can reach internal hosts through the API.
-        if getattr(settings, "SMOKE_TEST_MODE", False):
-            msg = (
-                "SMOKE_TEST_MODE is ENABLED in production — this bypasses "
-                "SSRF host-allowlist checks and allows internal-network "
-                "access.  Set DATAFORGE_SMOKE_TEST_MODE=false before "
-                "deploying to production."
-            )
-            raise ValueError(msg)
-
-    # Startup configuration validation — logs warnings for missing secrets
-    # in production-like envs, malformed integers/booleans, and suspect
-    # storage backends.  Best-effort; does not raise (mock environments
-    # are legitimate).
-    try:
-        from app.utils.env_validation import validate_startup_config
-
-        validate_startup_config()
-    except Exception as exc:
-        # Never let validator noise take the app down.
-        logger.debug("Startup config validation skipped: %s", exc)
-
-    # Warn if API keys are empty (dev/test only — production validates above)
+def _warn_empty_api_keys() -> None:
+    """Log a warning if all API keys are empty in non-production environments."""
     if (
         settings.ENV.lower() != "production"
         and not settings.API_KEY
@@ -116,18 +91,18 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
             "to enable authentication.",
         )
 
-    # Runtime dependency check — fail fast if required packages are missing.
-    # In production this raises RuntimeError; in dev/test we log warnings only
-    # so that incomplete environments can still start (e.g. for partial testing).
-    from app.runtime_deps import check_runtime_deps
 
-    check_runtime_deps(fail_on_missing=(settings.ENV.lower() == "production"))
+def _validate_startup_config() -> None:
+    """Best-effort startup config validation; does not raise in dev/test."""
+    try:
+        from app.utils.env_validation import validate_startup_config
+        validate_startup_config()
+    except Exception as exc:
+        logger.debug("Startup config validation skipped: %s", exc)
 
-    # Initialize experimental subsystems (research-only).
-    # The functions in `experimental_startup` self-gate on
-    # `settings.ENABLE_EXPERIMENTAL_ROUTES`, but we still skip the
-    # imports / calls entirely when the flag is off to keep the
-    # import graph free of research modules at startup.
+
+def _init_experimental_subsystems() -> tuple[Any, Any]:
+    """Initialize research-only subsystems if the experimental flag is set."""
     from app.experimental_startup import (
         experimental_subsystems_enabled,
         init_domain_health_monitor,
@@ -135,41 +110,23 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
         init_graph_scheduler,
         init_recovery_framework,
     )
-
     if experimental_subsystems_enabled():
         logger.info("Experimental subsystems ENABLED — initializing research shell")
         init_graph_scheduler()
         init_recovery_framework()
         init_domain_health_monitor()
-        gossip, heartbeat_mgr = init_gossip_and_heartbeat()
-    else:
-        logger.info(
-            "Experimental subsystems DISABLED — research shell will not initialize "
-            "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)",
-        )
-        gossip, heartbeat_mgr = None, None
+        return init_gossip_and_heartbeat()
+    logger.info(
+        "Experimental subsystems DISABLED — research shell will not initialize "
+        "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)",
+    )
+    return None, None
 
-    # Runtime safety rails — driven by centralized config.
-    # The legacy ``CONFIG`` mapping is re-synced here so any back-compat
-    # reader (e.g. ``run_job_wrapper`` reading ``CONFIG["..."]``) sees
-    # the current settings values.
-    from app.globals import rebuild_config_from_settings
 
-    rebuild_config_from_settings()
-
-    # Resolve the repository lazily
-    global job_repo
-    job_repo = get_job_repository()
-
-    # DB schema version fence — fail fast if the connected schema
-    # does not match the version this build of the code expects.
-    # Without this check a mid-week migration could leave jobs
-    # silently broken (the "schema drift" hazard noted in the
-    # audit). In production/staging we hard-fail; in dev we
-    # warn so a developer with a stale DB can still boot.
+def _verify_schema_version() -> None:
+    """Check that the connected DB schema matches the code's expected version."""
     try:
         from app.storage_migrations import POSTGRES_SCHEMA_VERSION
-
         if job_repo is not None:
             backend = getattr(job_repo, "backend", None) or "unknown"
             fencer = getattr(job_repo, "get_storage_status", None) or getattr(job_repo, "health_check", None)
@@ -200,16 +157,12 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
     except RuntimeError:
         raise
     except Exception as exc:
-        # Never let a fence failure (other than a hard mismatch) take
-        # the app down — log and move on.
         logger.debug("Schema version fence skipped: %s", exc)
 
-    # SSRF transport self-check: confirm the safe-transport factory still
-    # injects a SafeAsyncNetworkBackend into the httpx connection pool.
-    # The check is non-fatal at import time but hard-fails in production
-    # so a silent upgrade of httpx/httpcore cannot degrade SSRF posture.
-    from app.url_safety import verify_ssrf_self_check
 
+def _verify_ssrf_transport() -> None:
+    """Confirm the safe httpx transport factory still works."""
+    from app.url_safety import verify_ssrf_self_check
     ssrf_check = verify_ssrf_self_check()
     if not ssrf_check.get("ok"):
         msg = (
@@ -230,90 +183,78 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
             ssrf_check.get("has_sync_backend"),
         )
 
-    # Durable job store & semantic field state — single DB read on startup.
-    # Acquire the store lock so the bulk clear+update is atomic with
-    # respect to any concurrent router-driven mutation.
-    loaded_jobs, loaded_recycle, world_state_data = job_repo.load_all()
-    with _jobs_store_lock:
-        jobs_store.clear()
-        jobs_store.update(loaded_jobs)
-        recycle_bin_store.clear()
-        recycle_bin_store.update(loaded_recycle)
 
-    # Restore semantic world state
+def _load_persisted_state(world_state_data: Any) -> None:
+    """Restore job store and semantic world state from persistence."""
     from app.experimental_startup import restore_semantic_world_state
-
     restore_semantic_world_state(world_state_data, str(get_state_file_path()))
 
-    # Schedule periodic gossip propagation
-    from app.experimental_startup import schedule_gossip_propagation
 
+async def _schedule_all_background_tasks(gossip: Any, heartbeat_mgr: Any) -> list[asyncio.Task]:
+    """Schedule all periodic background tasks."""
+    tasks: list[asyncio.Task] = []
+
+    # Gossip propagation (experimental)
+    from app.experimental_startup import schedule_gossip_propagation
     gossip_task = await schedule_gossip_propagation(gossip, heartbeat_mgr, interval=settings.GOSSIP_PROPAGATION_INTERVAL)
     if gossip_task:
-        _background_tasks.append(gossip_task)
+        tasks.append(gossip_task)
 
-    # Schedule periodic rate_limits table pruning (DB-backed counters).
-    # Independently of the middleware's per-request pruning (every 300s),
-    # this background task ensures stale rows are cleaned up even when
-    # there is no API traffic.
+    # Rate limits table pruning
     if settings.RATE_LIMIT_PRUNE_INTERVAL > 0:
-        prune_task = schedule_background_task(_rate_limit_prune_loop())
-        _background_tasks.append(prune_task)
+        tasks.append(schedule_background_task(_rate_limit_prune_loop()))
 
-    # Schedule background processing of due scheduled jobs.
-    scheduled_task = schedule_background_task(_scheduled_job_processor_loop())
-    _background_tasks.append(scheduled_task)
+    # Scheduled job processing
+    tasks.append(schedule_background_task(_scheduled_job_processor_loop()))
 
-    # Schedule periodic data retention enforcement.
-    retention_task = schedule_background_task(_data_retention_loop())
-    _background_tasks.append(retention_task)
+    # Data retention enforcement
+    tasks.append(schedule_background_task(_data_retention_loop()))
 
-    yield
-    # ─── SHUTDOWN ─────────────────────────────────────────────────────
+    return tasks
 
-    # Cancel all background tasks
-    for t in _background_tasks:
+
+async def _cancel_all_background_tasks(tasks: list[asyncio.Task]) -> None:
+    """Cancel all background tasks with a 10s timeout."""
+    for t in tasks:
         t.cancel()
-    if _background_tasks:
-        _done, pending = await asyncio.wait(_background_tasks, timeout=10)
+    if tasks:
+        _done, pending = await asyncio.wait(tasks, timeout=10)
         for t in pending:
             t.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
-    _background_tasks.clear()
+    tasks.clear()
     logger.info("Background tasks cleaned up")
 
+
+async def _shutdown_cleanup() -> None:
+    """Shut down all runtime services gracefully."""
     # Persist semantic world state
     from app.experimental_startup import persist_semantic_world_state
-
     persist_semantic_world_state()
 
-    # Flush any pending background state writes
+    # Flush state writes
     try:
         from app.state_store import flush_state_writes
-
         flush_state_writes()
     except (ImportError, OSError) as e:
         logger.warning("Failed to flush state writes during shutdown: %s", e)
 
     # Close Postgres connection pool
     from app.experimental_startup import close_postgres_pool
-
     close_postgres_pool()
 
-    # Close browser pool to prevent zombie chromium processes
+    # Close browser pool
     try:
         from app.browser_pool import get_browser_pool
-
         await get_browser_pool().close()
         logger.info("Browser pool closed successfully")
     except _SHUTDOWN_EXCEPTIONS as e:
         logger.warning("Failed to close browser pool during shutdown: %s", e)
 
-    # Close Telegram notifier HTTP client to prevent leaked sockets
+    # Close Telegram notifier
     try:
         from app.services.notifications import get_telegram_notifier
-
         _notifier = get_telegram_notifier()
         if _notifier is not None:
             await _notifier.close()
@@ -321,14 +262,53 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, C901, PLR0912, PLR0915, RUF10
     except _SHUTDOWN_EXCEPTIONS as e:
         logger.warning("Failed to close Telegram notifier during shutdown: %s", e)
 
-    # Shut down background log-persistence executor
+    # Shut down log persistence executor
     try:
         from app.services.job_runner import shutdown_log_persist_executor
-
         shutdown_log_persist_executor()
         logger.info("Log persistence executor shut down")
     except _SHUTDOWN_EXCEPTIONS as e:
         logger.warning("Failed to shut down log persistence executor: %s", e)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for FastAPI startup / shutdown."""
+    global gossip, heartbeat_mgr
+
+    _verify_production_startup()
+    _validate_startup_config()
+    _warn_empty_api_keys()
+
+    from app.runtime_deps import check_runtime_deps
+    check_runtime_deps(fail_on_missing=(settings.ENV.lower() == "production"))
+
+    gossip, heartbeat_mgr = _init_experimental_subsystems()
+
+    from app.globals import rebuild_config_from_settings
+    rebuild_config_from_settings()
+
+    global job_repo
+    job_repo = get_job_repository()
+
+    _verify_schema_version()
+    _verify_ssrf_transport()
+
+    loaded_jobs, loaded_recycle, world_state_data = job_repo.load_all()
+    with _jobs_store_lock:
+        jobs_store.clear()
+        jobs_store.update(loaded_jobs)
+        recycle_bin_store.clear()
+        recycle_bin_store.update(loaded_recycle)
+
+    _load_persisted_state(world_state_data)
+
+    _background_tasks = _schedule_all_background_tasks(gossip, heartbeat_mgr)
+
+    yield
+
+    await _cancel_all_background_tasks(_background_tasks)
+    await _shutdown_cleanup()
 
 
 def schedule_background_task(coro):

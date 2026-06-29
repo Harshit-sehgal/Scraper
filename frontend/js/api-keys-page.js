@@ -30,11 +30,6 @@ function _maskKey(key) {
   return `${prefix}${"•".repeat(Math.min(key.length - 12, 20))}${suffix}`;
 }
 
-function _prefixKey(key) {
-  if (!key) return "—";
-  return key.slice(0, 12) + "…";
-}
-
 // ─── Page refresh ───
 
 export async function refreshApiKeysPage() {

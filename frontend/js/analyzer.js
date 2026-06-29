@@ -828,6 +828,3 @@ export function getSelectorsMap() {
 export function getAnalyzedFields() {
   return _analyzedFields;
 }
-function _getWorkflowDraft() {
-  return _lastWorkflowDraft;
-}

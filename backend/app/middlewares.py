@@ -109,7 +109,7 @@ async def _enforce_api_auth_and_quota(request: Request) -> None:
     logic lives in one place.
     """
     auth_header = request.headers.get("Authorization", "")
-    auth_scheme, _, _auth_token = auth_header.partition(" ")
+    _auth_scheme, _, _auth_token = auth_header.partition(" ")
 
     from app.utils.rbac import resolve_auth_context
 

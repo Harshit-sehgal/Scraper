@@ -95,25 +95,6 @@ function _render() {
   }
 }
 
-function _updateBatchBar() {
-  const bar = document.getElementById("recycle-batch-bar");
-  const actionEls = document.getElementById("recycle-batch-actions");
-  const countEl = document.getElementById("recycle-selected-count");
-  if (!bar) return;
-  if (_cachedJobs.length === 0) {
-    bar.style.display = "none";
-    return;
-  }
-  bar.style.display = "flex";
-  if (countEl) countEl.textContent = `${_selected.size} selected`;
-  if (actionEls) {
-    const btns = actionEls.querySelectorAll("button");
-    btns.forEach((btn) => {
-      btn.disabled = _selected.size === 0;
-    });
-  }
-}
-
 // ─── Selection handlers ───
 
 export function handleRecycleSelectAll(checked) {
