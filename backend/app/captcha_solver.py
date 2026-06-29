@@ -152,8 +152,11 @@ class _TwoCaptchaSolver(CaptchaSolver):
             async with get_safe_async_client(timeout=30.0) as client:
                 # Submit
                 resp = await client.post(self._SUBMIT_URL, data=submit_params)
-                resp.raise_for_status()
-                body = resp.json()
+                try:
+                    resp.raise_for_status()
+                    body = resp.json()
+                finally:
+                    await resp.aclose()
                 if body.get("status") != 1:
                     logger.warning("2Captcha submit error: %s", body.get("request", "unknown"))
                     return None
@@ -173,8 +176,11 @@ class _TwoCaptchaSolver(CaptchaSolver):
                             "json": "1",
                         },
                     )
-                    result_resp.raise_for_status()
-                    result_body = result_resp.json()
+                    try:
+                        result_resp.raise_for_status()
+                        result_body = result_resp.json()
+                    finally:
+                        await result_resp.aclose()
                     if result_body.get("status") == 1:
                         return result_body["request"]
                     if result_body.get("request") != "CAPCHA_NOT_READY":
@@ -201,7 +207,10 @@ class _TwoCaptchaSolver(CaptchaSolver):
                     self._RESULT_URL,
                     params={"key": self._api_key, "action": "get", "id": "0", "json": "1"},
                 )
-                return resp.status_code == 200
+                try:
+                    return resp.status_code == 200
+                finally:
+                    await resp.aclose()
         except (httpx.HTTPError, OSError):
             return False
 
@@ -254,8 +263,11 @@ class _AntiCaptchaSolver(CaptchaSolver):
 
             async with get_safe_async_client(timeout=30.0) as client:
                 resp = await client.post(self._CREATE_URL, json=create_payload)
-                resp.raise_for_status()
-                body = resp.json()
+                try:
+                    resp.raise_for_status()
+                    body = resp.json()
+                finally:
+                    await resp.aclose()
                 if body.get("errorId", 0) != 0:
                     logger.warning("Anti-Captcha createTask error: %s", body.get("errorDescription", "unknown"))
                     return None
@@ -270,8 +282,11 @@ class _AntiCaptchaSolver(CaptchaSolver):
                         self._RESULT_URL,
                         json={"clientKey": self._api_key, "taskId": task_id},
                     )
-                    result_resp.raise_for_status()
-                    result_body = result_resp.json()
+                    try:
+                        result_resp.raise_for_status()
+                        result_body = result_resp.json()
+                    finally:
+                        await result_resp.aclose()
                     if result_body.get("status") == "ready":
                         return result_body.get("solution", {}).get("gRecaptchaResponse") or result_body.get("solution", {}).get(
                             "token"
@@ -303,7 +318,10 @@ class _AntiCaptchaSolver(CaptchaSolver):
                     "https://api.anti-captcha.com/getBalance",
                     json={"clientKey": self._api_key},
                 )
-                return resp.status_code == 200
+                try:
+                    return resp.status_code == 200
+                finally:
+                    await resp.aclose()
         except (httpx.HTTPError, OSError):
             return False
 
