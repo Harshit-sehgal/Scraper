@@ -257,6 +257,7 @@ These are acceptable direct environment reads outside the config module:
 | `DATAFORGE_CRAWL_RESPECT_ROBOTS` | `true` | Whether to check robots.txt before fetching |
 | `DATAFORGE_CRAWL_MAX_PAGES_PER_DOMAIN` | `50` | Max pages scraped from a single domain per job |
 | `DATAFORGE_MAX_RECOVERY_ATTEMPTS` | `3` | Max recovery attempts per URL |
+| `DATAFORGE_CANCEL_POLL_DEADLINE` | `300` | Seconds to wait for a cancel-poll task to complete before force-cancelling (safety net for wedged tasks) |
 | `DATAFORGE_RECOVERY_TIMEOUT_MULTIPLIER` | `4` | Multiplier for per_url_timeout during recovery |
 | `DATAFORGE_COST_PER_LLM_CALL` | `0.01` | Cost model: dollars per LLM call |
 | `DATAFORGE_COST_PER_FETCH_MS` | `0.005` | Cost model: dollars per 1000ms of fetch time |
