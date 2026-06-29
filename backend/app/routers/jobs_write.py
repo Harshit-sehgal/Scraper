@@ -56,6 +56,7 @@ from app.models import (
     NotificationChannelUpdate,
     SchemaSuggestionRequest,
     StatusResponse,
+    UsageRecord,
 )
 from app.plan_enforcer import require_plan_limit
 from app.routers.jobs_state import (
@@ -976,16 +977,16 @@ def register_jobs_write_routes(
 
             before = len(job.results)
             if date_from or date_to:
-                filtered = []
+                to_remove = []
                 for rec in job.results:
                     ts = rec.get("scraped_at", rec.get("created_at", ""))
                     if date_from and ts < date_from:
-                        filtered.append(rec)
+                        to_remove.append(rec)
                         continue
                     if date_to and ts > date_to:
-                        filtered.append(rec)
+                        to_remove.append(rec)
                         continue
-                job.results = [r for r in job.results if r not in filtered]
+                job.results = [r for r in job.results if r not in to_remove]
                 removed = before - len(job.results)
             else:
                 removed = before
@@ -1012,7 +1013,7 @@ def register_jobs_write_routes(
 
         Shows requests/day, records extracted, failures, average latency.
         """
-        role, user_id, org_id, project_id = _auth_tuple(auth)
+        _role, user_id, _org_id, _project_id = _auth_tuple(auth)
         with _usage_stats_lock:
             key_stats = dict(_usage_stats_store)
         if not key_stats:
@@ -1021,23 +1022,23 @@ def register_jobs_write_routes(
 
     @router.post("/api/usage/stats/record", response_model=dict)
     async def record_usage(
-        body: dict,
+        body: UsageRecord,
         auth: Annotated[
             tuple[UserRole, str, str, str],
             Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
         ],
     ):
         """Record a usage event for the dashboard."""
-        role, user_id, org_id, project_id = _auth_tuple(auth)
-        key = body.get("api_key", user_id or "default")
+        _role, user_id, _org_id, _project_id = _auth_tuple(auth)
+        key = body.api_key or user_id or "default"
         with _usage_stats_lock:
             if key not in _usage_stats_store:
                 _usage_stats_store[key] = {"requests": 0, "records": 0, "failures": 0, "latency_ms": 0}
-            _usage_stats_store[key]["requests"] += body.get("requests", 1)
-            _usage_stats_store[key]["records"] += body.get("records", 0)
-            _usage_stats_store[key]["failures"] += body.get("failures", 0)
+            _usage_stats_store[key]["requests"] += body.requests or 1
+            _usage_stats_store[key]["records"] += body.records or 0
+            _usage_stats_store[key]["failures"] += body.failures or 0
             _usage_stats_store[key]["latency_ms"] = max(
-                _usage_stats_store[key]["latency_ms"], body.get("latency_ms", 0)
+                _usage_stats_store[key]["latency_ms"], body.latency_ms or 0
             )
         return {"status": "recorded", "key": key}
 

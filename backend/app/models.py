@@ -1429,6 +1429,16 @@ class NotificationChannelUpdate(BaseModel):
     enabled: bool | None = None
 
 
+class UsageRecord(BaseModel):
+    """Request body for recording usage events (Feat 30)."""
+
+    api_key: str = Field(default="", max_length=128, description="API key identifier")
+    requests: int = Field(default=1, ge=0, description="Number of requests to record")
+    records: int = Field(default=0, ge=0, description="Number of records extracted")
+    failures: int = Field(default=0, ge=0, description="Number of failures")
+    latency_ms: int = Field(default=0, ge=0, description="Maximum latency in milliseconds")
+
+
 class NotificationChannel(BaseModel):
     """A notification channel for a job."""
 
