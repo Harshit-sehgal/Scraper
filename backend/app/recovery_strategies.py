@@ -480,8 +480,10 @@ class RecoveryExecutor:
         """
         if attempt_ctx is None:
             attempt_ctx = AttemptContext()
-        # Apply backoff if specified
-        if plan.backoff_seconds > 0:
+        # Apply backoff if specified.  The BACKOFF_AND_SLOW handler owns
+        # its own delay (delay_ms → seconds) and would otherwise stack
+        # back-to-back, giving double the planned latency.
+        if plan.backoff_seconds > 0 and plan.primary_action is not RecoveryAction.BACKOFF_AND_SLOW:
             logger.info("Backoff %.1f seconds before %s recovery", plan.backoff_seconds, plan.primary_action.value)
             await asyncio.sleep(plan.backoff_seconds)
 

@@ -67,6 +67,7 @@ except ImportError as exc:
 # counter so a single process at least bounds its own load, and emit a
 # metric so operators can observe the degraded mode.
 _REDIS_FAIL_OPEN_FALLBACK_LIMIT = 10_000  # degraded-mode global ceiling per process
+_REDIS_FALLBACK_COUNTERS_MAX = 50_000  # OOM guard: evict oldest entries above this size
 _redis_fail_open_count = 0
 _redis_fail_open_lock = None
 _redis_fallback_counters: dict[str, int] = {}
@@ -159,6 +160,15 @@ def _redis_fallback_check(key: str, limit: int, window: int, primary_unavailable
         rate_key = f"redis-fallback:{key}"
         current = _redis_fallback_counters.get(rate_key, 0) + 1
         _redis_fallback_counters[rate_key] = current
+        # Evict oldest entries when the dict exceeds the cap, preventing
+        # an attacker from OOM-ing the process by spraying unique IPs
+        # during a Redis outage.  Arbitrary but stable eviction: drop
+        # the first 25% of keys (ordered by insertion).
+        if len(_redis_fallback_counters) > _REDIS_FALLBACK_COUNTERS_MAX:
+            evict_count = len(_redis_fallback_counters) // 4
+            keys_to_evict = list(_redis_fallback_counters.keys())[:evict_count]
+            for k in keys_to_evict:
+                del _redis_fallback_counters[k]
         # Reset the per-key counter every ``window`` seconds by
         # computing against a stored deadline — kept simple here
         # because this fallback is itself a degraded mode; the global

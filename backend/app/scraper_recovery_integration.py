@@ -85,6 +85,12 @@ logger = logging.getLogger(__name__)
 # Anything outside this set is treated as a genuine programming fault and is
 # re-raised into the caller's ``asyncio.wait_for`` boundary rather than being
 # silently misclassified as a scrape failure.
+# ``scrape_url_with_recovery``.  Programming errors (TypeError,
+# AttributeError, ImportError, KeyError) are deliberately excluded:
+# catching them turns latent bugs into silent recovery attempts that mask
+# the real defect and exhaust the retry budget before the bug can be
+# observed.  They are re-raised into the caller's ``asyncio.wait_for``
+# boundary instead.
 _RECOVERY_CAUGHT_EXCEPTIONS: tuple[type[BaseException], ...] = (
     TimeoutError,
     ConnectionError,
@@ -92,10 +98,6 @@ _RECOVERY_CAUGHT_EXCEPTIONS: tuple[type[BaseException], ...] = (
     RuntimeError,
     ValueError,
     OSError,
-    TypeError,
-    AttributeError,
-    ImportError,
-    KeyError,
 )
 
 

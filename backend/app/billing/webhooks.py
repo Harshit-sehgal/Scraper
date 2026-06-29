@@ -621,8 +621,17 @@ async def list_subscriptions(
     """
     _role, _user_id, org_id, project_id = principal
     if org_id or project_id:
+        # Match subscriptions whose customer_id equals EITHER the caller's
+        # org OR the caller's project. Previously only org_id OR _user_id
+        # was checked, which silently dropped project-scoped operators
+        # (they saw zero subscriptions) and could let an env-backed
+        # operator's user-fingerprint leak as a customer_id match.
         subs = [
-            sub for sub in _subscription_store.values() if sub.get("customer_id") == org_id or sub.get("customer_id") == _user_id
+            sub
+            for sub in _subscription_store.values()
+            if (org_id and sub.get("customer_id") == org_id)
+            or (project_id and sub.get("customer_id") == project_id)
+            or (org_id == "" and project_id == "" and sub.get("customer_id") == _user_id)
         ]
         return {
             "total": len(subs),
