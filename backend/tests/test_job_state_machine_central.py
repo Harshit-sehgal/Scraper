@@ -15,6 +15,7 @@ from app.services.job_state_machine import (
     is_terminal,
     mark_canceled,
     mark_recovered_failed,
+    sync_from_db,
     transition_to,
     valid_transitions_from,
 )
@@ -239,3 +240,191 @@ def test_transition_records_timestamp() -> None:
     job.started_at = datetime.datetime.now(datetime.UTC).isoformat()
     assert job.started_at is not None
     assert job.status == JobStatus.RUNNING
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Additional Coverage — Exhaustive transitions, double-cancel, sync_from_db
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_double_cancel_pending_is_idempotent() -> None:
+    job = _mock_job(JobStatus.PENDING)
+    mark_canceled(job)
+    assert job.status == JobStatus.CANCELED
+    mark_canceled(job)
+    assert job.status == JobStatus.CANCELED
+
+
+def test_double_cancel_running_is_idempotent() -> None:
+    job = _mock_job(JobStatus.RUNNING)
+    mark_canceled(job)
+    assert job.status == JobStatus.CANCELED
+    mark_canceled(job)
+    assert job.status == JobStatus.CANCELED
+
+
+def test_double_cancel_discovering_is_idempotent() -> None:
+    job = _mock_job(JobStatus.DISCOVERING)
+    mark_canceled(job)
+    assert job.status == JobStatus.CANCELED
+    mark_canceled(job)
+    assert job.status == JobStatus.CANCELED
+
+
+def test_cancel_from_completed_is_noop() -> None:
+    job = _mock_job(JobStatus.COMPLETED)
+    mark_canceled(job)
+    assert job.status == JobStatus.COMPLETED
+
+
+def test_cancel_from_failed_is_noop() -> None:
+    job = _mock_job(JobStatus.FAILED)
+    mark_canceled(job)
+    assert job.status == JobStatus.FAILED
+
+
+def test_cancel_from_degrated_is_noop() -> None:
+    job = _mock_job(JobStatus.DEGRADED)
+    mark_canceled(job)
+    assert job.status == JobStatus.DEGRADED
+
+
+def test_cancel_from_empty_result_is_noop() -> None:
+    job = _mock_job(JobStatus.EMPTY_RESULT)
+    mark_canceled(job)
+    assert job.status == JobStatus.EMPTY_RESULT
+
+
+def test_exhaustive_valid_transitions_from_pending() -> None:
+    """PENDING should allow DISCOVERING, RUNNING, CANCELED, FAILED."""
+    for dst in [JobStatus.DISCOVERING, JobStatus.RUNNING, JobStatus.CANCELED, JobStatus.FAILED]:
+        job = _mock_job(JobStatus.PENDING)
+        transition_to(job, dst)
+        assert job.status == dst
+
+
+def test_exhaustive_valid_transitions_from_discovering() -> None:
+    """DISCOVERING should allow RUNNING, CANCELED, FAILED."""
+    for dst in [JobStatus.RUNNING, JobStatus.CANCELED, JobStatus.FAILED]:
+        job = _mock_job(JobStatus.DISCOVERING)
+        transition_to(job, dst)
+        assert job.status == dst
+
+
+def test_exhaustive_valid_transitions_from_running() -> None:
+    """RUNNING should allow COMPLETED, DEGRADED, EMPTY_RESULT, CANCELED, FAILED."""
+    for dst in [JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.CANCELED, JobStatus.FAILED]:
+        job = _mock_job(JobStatus.RUNNING)
+        transition_to(job, dst)
+        assert job.status == dst
+
+
+def test_exhaustive_valid_transitions_from_completed() -> None:
+    """COMPLETED should only allow RUNNING."""
+    job = _mock_job(JobStatus.COMPLETED)
+    transition_to(job, JobStatus.RUNNING)
+    assert job.status == JobStatus.RUNNING
+
+
+def test_exhaustive_invalid_transitions_from_every_state() -> None:
+    """Every transition that is NOT in the valid table must raise ValueError."""
+    all_statuses = list(JobStatus)
+    for src in all_statuses:
+        for dst in all_statuses:
+            if src == dst:
+                continue
+            allowed = can_transition(_mock_job(src), dst)
+            if not allowed:
+                job = _mock_job(src)
+                with pytest.raises(ValueError, match="H7"):
+                    transition_to(job, dst)
+
+
+def test_sync_from_db_noop_same_status() -> None:
+    job = _mock_job(JobStatus.PENDING)
+    sync_from_db(job, JobStatus.PENDING)
+    assert job.status == JobStatus.PENDING
+
+
+def test_sync_from_db_valid_transition() -> None:
+    job = _mock_job(JobStatus.PENDING)
+    sync_from_db(job, JobStatus.RUNNING)
+    assert job.status == JobStatus.RUNNING
+
+
+def test_sync_from_db_invalid_transition_raises() -> None:
+    job = _mock_job(JobStatus.FAILED)
+    with pytest.raises(ValueError, match="H7"):
+        sync_from_db(job, JobStatus.RUNNING)
+
+
+def test_sync_from_db_non_jobstatus_raises_type_error() -> None:
+    job = _mock_job(JobStatus.PENDING)
+    with pytest.raises(TypeError, match="must be a JobStatus"):
+        sync_from_db(job, "PENDING")  # type: ignore[arg-type]
+
+
+def test_sync_from_db_job_non_jobstatus_raises_type_error() -> None:
+    class FakeJob:
+        status = "PENDING"
+
+    with pytest.raises(TypeError, match="must be a JobStatus"):
+        sync_from_db(FakeJob(), JobStatus.PENDING)
+
+
+def test_mark_recovered_failed_from_discovering() -> None:
+    job = _mock_job(JobStatus.DISCOVERING)
+    mark_recovered_failed(job)
+    assert job.status == JobStatus.FAILED
+    assert "Recovered after restart" in job.error
+
+
+def test_mark_recovered_failed_from_canceled_is_noop() -> None:
+    job = _mock_job(JobStatus.CANCELED)
+    mark_recovered_failed(job)
+    assert job.status == JobStatus.CANCELED
+
+
+def test_mark_recovered_failed_from_degrated_is_noop() -> None:
+    job = _mock_job(JobStatus.DEGRADED)
+    mark_recovered_failed(job)
+    assert job.status == JobStatus.DEGRADED
+
+
+def test_mark_recovered_failed_from_empty_result_is_noop() -> None:
+    job = _mock_job(JobStatus.EMPTY_RESULT)
+    mark_recovered_failed(job)
+    assert job.status == JobStatus.EMPTY_RESULT
+
+
+def test_terminal_statuses_cannot_transition_to_anything() -> None:
+    for status in _TERMINAL_STATUSES:
+        for dst in list(JobStatus):
+            if status == dst:
+                continue
+            assert not can_transition(_mock_job(status), dst), f"Terminal {status} should not allow → {dst}"
+
+
+def test_completed_auto_sets_completed_at_with_explicit_completed_at() -> None:
+    job = _mock_job(JobStatus.RUNNING)
+    explicit_ts = "2026-07-01T00:00:00"
+    transition_to(job, JobStatus.COMPLETED, completed_at=explicit_ts)
+    assert job.completed_at == explicit_ts
+
+
+def test_failed_auto_sets_completed_at() -> None:
+    job = _mock_job(JobStatus.RUNNING)
+    transition_to(job, JobStatus.FAILED, error="crashed")
+    assert job.completed_at is not None
+
+
+def test_degrated_auto_sets_completed_at() -> None:
+    job = _mock_job(JobStatus.RUNNING)
+    transition_to(job, JobStatus.DEGRADED)
+    assert job.completed_at is not None
+
+
+def test_empty_result_auto_sets_completed_at() -> None:
+    job = _mock_job(JobStatus.RUNNING)
+    transition_to(job, JobStatus.EMPTY_RESULT)
+    assert job.completed_at is not None

@@ -5,9 +5,12 @@ This module is deliberately separate from main.py to avoid circular imports
 when worker_queue.py or other modules need to record metrics.
 """
 
+import logging
 import re
 import threading
 import time as _time
+
+logger = logging.getLogger(__name__)
 
 _MAX_METRIC_SAMPLES = 1000
 
@@ -199,10 +202,14 @@ def _normalise_ssrf_reject_reason(reason: str | None) -> str:
         return "unspecified"
     if raw in _ALLOWED_SSRF_REJECT_REASONS:
         return raw
-    if "metadata" in raw or "cloud_metadata" in raw or "restricted_ip" in raw or _PRIVATE_IP_RE.search(raw):
-        return "private_ip"
-    if "loopback" in raw or "localhost" in raw or _LOOPBACK_RE.search(raw):
-        return "loopback"
+    try:
+        if "metadata" in raw or "cloud_metadata" in raw or "restricted_ip" in raw or _PRIVATE_IP_RE.search(raw):
+            return "private_ip"
+        if "loopback" in raw or "localhost" in raw or _LOOPBACK_RE.search(raw):
+            return "loopback"
+    except Exception as e:
+        logger.warning("[Metrics] SSRF regex matching failed on reason %r: %s", raw, e)
+        return "other"
     if "disallowed_port" in raw or " port" in raw or raw.startswith("port"):
         return "port"
     if "bad_scheme" in raw or "scheme" in raw or ("://" in raw and not raw.startswith(("http://", "https://"))):
@@ -264,7 +271,11 @@ def record_health_check_latency(duration_seconds: float) -> None:
 def record_job_duration(duration_seconds: float) -> None:
     """Record a terminal job runtime duration for metrics export."""
     global _job_durations
-    duration = max(0.0, float(duration_seconds))
+    try:
+        duration = max(0.0, float(duration_seconds))
+    except (TypeError, ValueError) as e:
+        logger.warning("[Metrics] Invalid job duration %r: %s", duration_seconds, e)
+        return
     with _job_durations_lock:
         _job_durations.append(duration)
         if len(_job_durations) > _MAX_METRIC_SAMPLES:
@@ -274,7 +285,11 @@ def record_job_duration(duration_seconds: float) -> None:
 def record_page_fetch_duration(duration_seconds: float) -> None:
     """Record a single page-fetch attempt duration for metrics export."""
     global _page_fetch_durations
-    duration = max(0.0, float(duration_seconds))
+    try:
+        duration = max(0.0, float(duration_seconds))
+    except (TypeError, ValueError) as e:
+        logger.warning("[Metrics] Invalid page fetch duration %r: %s", duration_seconds, e)
+        return
     with _page_fetch_durations_lock:
         _page_fetch_durations.append(duration)
         if len(_page_fetch_durations) > _MAX_METRIC_SAMPLES:

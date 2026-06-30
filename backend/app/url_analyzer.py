@@ -22,9 +22,12 @@ Design goals
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Classification taxonomy (matches the product plan)
@@ -257,42 +260,59 @@ _API_HOST_PREFIXES = frozenset(
 
 def _detect_session_signals(url: str) -> dict:
     """Return a dict of session-signal heuristics for a URL."""
-    parsed = urlparse(url)
-    pairs = parse_qsl(parsed.query, keep_blank_values=True)
-    params = {k.lower(): v for k, v in pairs}
-    matched_original = {name: value for name, value in pairs if name.lower() in _SESSION_PARAM_NAMES}
-    matched = {name.lower() for name in matched_original}
-    return {
-        "has_session_param": bool(matched),
-        "matched_session_params": matched,
-        "matched_session_param_names": list(matched_original),
-        "matched_session_param_values": {name: _redact_sensitive_value(value) for name, value in matched_original.items()},
-        "param_count": len(params),
-    }
+    try:
+        parsed = urlparse(url)
+        pairs = parse_qsl(parsed.query, keep_blank_values=True)
+        params = {k.lower(): v for k, v in pairs}
+        matched_original = {name: value for name, value in pairs if name.lower() in _SESSION_PARAM_NAMES}
+        matched = {name.lower() for name in matched_original}
+        return {
+            "has_session_param": bool(matched),
+            "matched_session_params": matched,
+            "matched_session_param_names": list(matched_original),
+            "matched_session_param_values": {name: _redact_sensitive_value(value) for name, value in matched_original.items()},
+            "param_count": len(params),
+        }
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] Session signal detection failed: %s", e)
+        return {
+            "has_session_param": False,
+            "matched_session_params": set(),
+            "matched_session_param_names": [],
+            "matched_session_param_values": {},
+            "param_count": 0,
+        }
 
 
 def _detect_pagination_signals(url: str) -> dict:
     """Return pagination heuristic signals."""
-    parsed = urlparse(url)
-    query_params = parse_qs(parsed.query)
-    params = {k.lower(): v for k, v in query_params.items()}
+    try:
+        parsed = urlparse(url)
+        query_params = parse_qs(parsed.query)
+        params = {k.lower(): v for k, v in query_params.items()}
 
-    matched = {name for name in params if name in _PAGINATION_PARAM_NAMES}
+        matched = {name for name in params if name in _PAGINATION_PARAM_NAMES}
 
-    path_pagination = any(seg in _PAGINATION_PATH_SEQS for seg in parsed.path.lower().split("/") if seg)
+        path_pagination = any(seg in _PAGINATION_PATH_SEQS for seg in parsed.path.lower().split("/") if seg)
 
-    return {
-        "has_pagination_param": bool(matched),
-        "matched_pagination_params": matched,
-        "path_suggests_pagination": path_pagination,
-    }
+        return {
+            "has_pagination_param": bool(matched),
+            "matched_pagination_params": matched,
+            "path_suggests_pagination": path_pagination,
+        }
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] Pagination signal detection failed: %s", e)
+        return {"has_pagination_param": False, "matched_pagination_params": set(), "path_suggests_pagination": False}
 
 
 def _detect_login_path(url: str) -> bool:
     """Return True if the URL path contains a known login fragment."""
-    parsed = urlparse(url)
-    path = parsed.path.lower()
-    # Normalize trailing slash so `/app/login/` matches `/login`
+    try:
+        parsed = urlparse(url)
+        path = parsed.path.lower()
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] Login path detection failed: %s", e)
+        return False
     if not path.endswith("/"):
         path = path + "/"
     return any(path.startswith(fragment) for fragment in _LOGIN_PATH_FRAGMENTS) or any(
@@ -302,26 +322,38 @@ def _detect_login_path(url: str) -> bool:
 
 def _detect_file_download(url: str) -> bool:
     """Return True if the URL path ends with a known download extension."""
-    parsed = urlparse(url)
-    path = parsed.path.lower()
-    return any(path.endswith(ext) for ext in _DOWNLOAD_EXTENSIONS)
+    try:
+        parsed = urlparse(url)
+        path = parsed.path.lower()
+        return any(path.endswith(ext) for ext in _DOWNLOAD_EXTENSIONS)
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] File download detection failed: %s", e)
+        return False
 
 
 def _detect_api_endpoint(url: str) -> bool:
     """Return True if the URL path or hostname matches a known API pattern."""
-    parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
-    if any(host.startswith(prefix) for prefix in _API_HOST_PREFIXES):
-        return True
-    path = parsed.path.lower()
-    if not path.endswith("/"):
-        path = path + "/"
-    return any(path.startswith(prefix.lower()) for prefix in _API_PATH_PREFIXES)
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if any(host.startswith(prefix) for prefix in _API_HOST_PREFIXES):
+            return True
+        path = parsed.path.lower()
+        if not path.endswith("/"):
+            path = path + "/"
+        return any(path.startswith(prefix.lower()) for prefix in _API_PATH_PREFIXES)
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] API endpoint detection failed: %s", e)
+        return False
 
 
 def _has_infinite_scroll_keywords(url: str) -> bool:
     """Keyword-only heuristic for infinite-scroll or load-more patterns."""
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] Infinite scroll detection failed: %s", e)
+        return False
     combined = f"{parsed.path} {parsed.query}".lower()
     keywords = (
         "infinite",
@@ -342,12 +374,16 @@ def _has_infinite_scroll_keywords(url: str) -> bool:
 
 def _detect_search_result_url(url: str) -> bool:
     """Return True when URL-only signals suggest a search results page."""
-    parsed = urlparse(url)
-    params = {k.lower() for k, _v in parse_qsl(parsed.query, keep_blank_values=True)}
-    if params & _SEARCH_QUERY_PARAM_NAMES:
-        return True
-    segments = {seg for seg in parsed.path.lower().split("/") if seg}
-    return bool(segments & _SEARCH_PATH_SEQS)
+    try:
+        parsed = urlparse(url)
+        params = {k.lower() for k, _v in parse_qsl(parsed.query, keep_blank_values=True)}
+        if params & _SEARCH_QUERY_PARAM_NAMES:
+            return True
+        segments = {seg for seg in parsed.path.lower().split("/") if seg}
+        return bool(segments & _SEARCH_PATH_SEQS)
+    except (ValueError, UnicodeDecodeError) as e:
+        logger.warning("[URLAnalyzer] Search result URL detection failed: %s", e)
+        return False
 
 
 def _redact_sensitive_value(value: str) -> str:

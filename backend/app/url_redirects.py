@@ -8,7 +8,10 @@ lineage construction. Content analysis lives in content_quality.py.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ─── Imports boundary ──────────────────────────────────────────────────────
 #
@@ -171,20 +174,24 @@ def build_redirect_info(
     """
     redirect_info = existing_redirect_info or _detect_redirect(original_url, final_url)
 
-    # Lazy import: AcquisitionLineage is part of the research shell
-    # (see backend/app/research/__init__.py). We import it inside the
-    # function so that the product kernel does not pull in the research
-    # shell at startup when ENABLE_EXPERIMENTAL_ROUTES=False.
-    from app.acquisition_state import AcquisitionLineage
+    try:
+        # Lazy import: AcquisitionLineage is part of the research shell
+        # (see backend/app/research/__init__.py). We import it inside the
+        # function so that the product kernel does not pull in the research
+        # shell at startup when ENABLE_EXPERIMENTAL_ROUTES=False.
+        from app.acquisition_state import AcquisitionLineage
 
-    lineage = AcquisitionLineage.from_redirect_info(
-        redirect_info=redirect_info,
-        original_url=original_url,
-        final_url=final_url,
-        fetch_method=fetch_method,
-        search_recovery=search_recovery,
-        search_form=search_form,
-        search_params=search_params,
-    )
+        lineage = AcquisitionLineage.from_redirect_info(
+            redirect_info=redirect_info,
+            original_url=original_url,
+            final_url=final_url,
+            fetch_method=fetch_method,
+            search_recovery=search_recovery,
+            search_form=search_form,
+            search_params=search_params,
+        )
 
-    return lineage.to_dict()
+        return lineage.to_dict()
+    except Exception:
+        logger.warning("[URLRedirects] Could not build acquisition lineage; falling back to raw redirect info")
+        return dict(redirect_info)

@@ -589,97 +589,104 @@ def _collect_all_pattern_matches(
         "organization": [],
     }
 
-    # ── Email ─────────────────────────────────────────────────
-    for m in re.finditer(r"[\w.+-]+@[\w-]+\.[\w.-]+", full_text):
-        validated = _valid_email(m.group(0))
-        if validated:
-            matches["email"].append((validated, m.start(), m.end()))
+    if not full_text:
+        return matches
 
-    # ── Phone ─────────────────────────────────────────────────
-    phone_pattern = re.compile(r"\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}")
-    for m in phone_pattern.finditer(full_text):
-        validated = _valid_phone(m.group(0))
-        if validated:
-            matches["phone"].append((validated, m.start(), m.end()))
+    try:
+        # ── Email ─────────────────────────────────────────────────
+        for m in re.finditer(r"[\w.+-]+@[\w-]+\.[\w.-]+", full_text):
+            validated = _valid_email(m.group(0))
+            if validated:
+                matches["email"].append((validated, m.start(), m.end()))
 
-    # ── URL ───────────────────────────────────────────────────
-    url_pattern = re.compile(r'https?://[^\s<>"\'\]\)]+')
-    for m in url_pattern.finditer(full_text):
-        matches["url"].append((m.group(0), m.start(), m.end()))
+        # ── Phone ─────────────────────────────────────────────────
+        phone_pattern = re.compile(r"\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}")
+        for m in phone_pattern.finditer(full_text):
+            validated = _valid_phone(m.group(0))
+            if validated:
+                matches["phone"].append((validated, m.start(), m.end()))
 
-    # ── Currency / Price ──────────────────────────────────────
-    currency_pattern = re.compile(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*")
-    for m in currency_pattern.finditer(full_text):
-        matches["currency"].append((m.group(0).replace(" ", ""), m.start(), m.end()))
+        # ── URL ───────────────────────────────────────────────────
+        url_pattern = re.compile(r'https?://[^\s<>"\'\]\)]+')
+        for m in url_pattern.finditer(full_text):
+            matches["url"].append((m.group(0), m.start(), m.end()))
 
-    # ── Date ──────────────────────────────────────────────────
-    date_patterns = [
-        re.compile(r"\d{4}-\d{2}-\d{2}"),
-        re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}"),
-        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.IGNORECASE),
-    ]
-    for dp in date_patterns:
-        for m in dp.finditer(full_text):
-            matches["date"].append((m.group(0), m.start(), m.end()))
+        # ── Currency / Price ──────────────────────────────────────
+        currency_pattern = re.compile(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*")
+        for m in currency_pattern.finditer(full_text):
+            matches["currency"].append((m.group(0).replace(" ", ""), m.start(), m.end()))
 
-    # ── Time ──────────────────────────────────────────────────
-    time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.IGNORECASE)
-    for m in time_pattern.finditer(full_text):
-        matches["time"].append((m.group(0), m.start(), m.end()))
+        # ── Date ──────────────────────────────────────────────────
+        date_patterns = [
+            re.compile(r"\d{4}-\d{2}-\d{2}"),
+            re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}"),
+            re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.IGNORECASE),
+        ]
+        for dp in date_patterns:
+            for m in dp.finditer(full_text):
+                matches["date"].append((m.group(0), m.start(), m.end()))
 
-    # ── Location codes (3-letter uppercase codes) ────────────────
-    skip_codes = {
-        "THE",
-        "AND",
-        "FOR",
-        "ALL",
-        "ANY",
-        "NEW",
-        "OLD",
-        "OUT",
-        "TOP",
-        "BIG",
-        "GET",
-        "HOW",
-        "ARE",
-        "NOT",
-        "CAN",
-        "WAS",
-        "OFF",
-        "YOU",
-        "HAS",
-        "ITS",
-        "BUT",
-        "NOW",
-        "MAY",
-        "JAN",
-        "FEB",
-        "MAR",
-        "APR",
-        "JUN",
-        "JUL",
-        "AUG",
-        "SEP",
-        "OCT",
-        "NOV",
-        "DEC",
-    }
-    for m in re.finditer(r"\b[A-Z]{3}\b", full_text):
-        if m.group(0) not in skip_codes:
-            matches["code"].append((m.group(0), m.start(), m.end()))
+        # ── Time ──────────────────────────────────────────────────
+        time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.IGNORECASE)
+        for m in time_pattern.finditer(full_text):
+            matches["time"].append((m.group(0), m.start(), m.end()))
 
-    # ── Organization / Brand (capitalized multi-word names) ──────
-    # Scan full_text (not snippets) so positions are in full_text coordinate
-    # system
-    org_pattern = re.compile(r"\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b")
-    for m in org_pattern.finditer(full_text):
-        val = m.group(1).strip()
-        # Skip common non-org patterns
-        # Skip common non-org patterns (time / location labels, navigation
-        # text)
-        skip_org_words = {"departure", "return", "arrival", "duration", "total", "details"}
-        if val.lower() not in skip_org_words:
-            matches["organization"].append((val, m.start(), m.end()))
+        # ── Location codes (3-letter uppercase codes) ────────────────
+        skip_codes = {
+            "THE",
+            "AND",
+            "FOR",
+            "ALL",
+            "ANY",
+            "NEW",
+            "OLD",
+            "OUT",
+            "TOP",
+            "BIG",
+            "GET",
+            "HOW",
+            "ARE",
+            "NOT",
+            "CAN",
+            "WAS",
+            "OFF",
+            "YOU",
+            "HAS",
+            "ITS",
+            "BUT",
+            "NOW",
+            "MAY",
+            "JAN",
+            "FEB",
+            "MAR",
+            "APR",
+            "JUN",
+            "JUL",
+            "AUG",
+            "SEP",
+            "OCT",
+            "NOV",
+            "DEC",
+        }
+        for m in re.finditer(r"\b[A-Z]{3}\b", full_text):
+            if m.group(0) not in skip_codes:
+                matches["code"].append((m.group(0), m.start(), m.end()))
+
+        # ── Organization / Brand (capitalized multi-word names) ──────
+        # Scan full_text (not snippets) so positions are in full_text coordinate
+        # system
+        org_pattern = re.compile(r"\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b")
+        for m in org_pattern.finditer(full_text):
+            val = m.group(1).strip()
+            # Skip common non-org patterns (time / location labels, navigation
+            # text)
+            skip_org_words = {"departure", "return", "arrival", "duration", "total", "details"}
+            if val.lower() not in skip_org_words:
+                matches["organization"].append((val, m.start(), m.end()))
+
+    except (re.error, ValueError, TypeError, AttributeError):
+        logger.warning("[ContainerDiscovery] Pattern matching error on text length %d", len(full_text))
+        return {k: [] for k in matches}
 
     # Deduplicate each list (same value, keep first occurrence)
     for key, match_list in matches.items():
@@ -878,6 +885,8 @@ def classify_container_failure(
     # Check evidence-based signals
     if evidence:
         patterns = evidence.patterns
+        if not isinstance(patterns, dict):
+            patterns = {}
         has_data_signals = len(patterns.get("price", [])) > 0 or len(patterns.get("email", [])) > 0
         has_containers = len(evidence.candidate_containers) > 0
 

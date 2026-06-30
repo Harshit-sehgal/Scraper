@@ -240,16 +240,19 @@ def _build_llm_fields(result: dict | None, patterns: ValuePatterns) -> list[dict
                 raw_type = str(f.get("type", "string")).lower().strip()
                 mapped_type = FIELD_TYPE_MAP.get(raw_type, "string")
 
-                suggested_fields.append(
-                    {
-                        "name": name,
-                        "type": mapped_type,
-                        "selector": "",
-                        "example_value": f.get("example_value", ""),
-                        "confidence": min(float(f.get("confidence", 0.5)), 1.0),
-                        "description": str(f.get("description", "")),
-                    },
-                )
+                try:
+                    suggested_fields.append(
+                        {
+                            "name": name,
+                            "type": mapped_type,
+                            "selector": "",
+                            "example_value": f.get("example_value", ""),
+                            "confidence": min(float(f.get("confidence", 0.5)), 1.0),
+                            "description": str(f.get("description", "")),
+                        },
+                    )
+                except (TypeError, ValueError) as e:
+                    logger.warning("[SelectorDiscovery] Skipping invalid field entry: %s", e)
 
     # If LLM returned no fields, use pattern analysis as fallback
     if not suggested_fields:

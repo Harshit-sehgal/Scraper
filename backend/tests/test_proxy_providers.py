@@ -248,3 +248,123 @@ class TestProxyManagerWithProvider:
         count = mgr.refresh_from_provider()
         assert count == 1
         assert mgr._proxy_list == ["http://mocked:1234"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Additional Coverage — Rotation, failure modes, auth, timeout
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestProviderRotation:
+    def test_static_list_rotation(self) -> None:
+        provider = StaticListProvider(["http://a:8080", "http://b:8080", "http://c:8080"])
+        proxies = provider.fetch_proxies()
+        assert len(proxies) == 3
+
+    def test_json_provider_reflects_file_rotation(self, tmp_path: Path) -> None:
+        f = tmp_path / "rotate.json"
+        f.write_text(json.dumps(["http://p1:8080"]))
+        provider = JsonFileProvider(f)
+        assert provider.fetch_proxies() == ["http://p1:8080"]
+        f.write_text(json.dumps(["http://p2:9090", "http://p3:7070"]))
+        assert provider.refresh() == ["http://p2:9090", "http://p3:7070"]
+
+    def test_http_url_provider_missing_httpx_fallback_empty(self) -> None:
+        provider = HttpUrlProvider("https://example.com/proxies")
+        with pytest.MonkeyPatch.context() as mp:
+            import builtins
+
+            original_import = builtins.__import__
+
+            def _fake_import(name, *args, **kwargs):
+                if name == "httpx":
+                    _msg = "no httpx"
+                    raise ImportError(_msg)
+                return original_import(name, *args, **kwargs)
+
+            mp.setattr(builtins, "__import__", _fake_import)
+            result = provider.fetch_proxies()
+        assert result == []
+
+
+class TestProviderFailure:
+    def test_json_file_missing_returns_empty(self, tmp_path: Path) -> None:
+        provider = JsonFileProvider(tmp_path / "nonexistent.json")
+        assert provider.fetch_proxies() == []
+
+    def test_json_file_invalid_json_returns_empty(self, tmp_path: Path) -> None:
+        f = tmp_path / "bad.json"
+        f.write_text("not json")
+        provider = JsonFileProvider(f)
+        assert provider.fetch_proxies() == []
+
+    def test_json_file_non_array_json_returns_empty(self, tmp_path: Path) -> None:
+        f = tmp_path / "obj.json"
+        f.write_text(json.dumps({"key": "val"}))
+        provider = JsonFileProvider(f)
+        assert provider.fetch_proxies() == []
+
+    def test_http_url_ssrf_block_returns_empty(self) -> None:
+        provider = HttpUrlProvider("http://169.254.169.254/latest/meta-data/")
+        assert provider.fetch_proxies() == []
+
+    def test_brightdata_missing_api_key_still_constructs(self) -> None:
+        provider = BrightDataProvider("https://brightdata.com/api", api_key="")
+        assert provider._auth_header == ""
+
+    def test_oxylabs_with_api_key_sets_token(self) -> None:
+        provider = OxylabsProvider("https://oxylabs.io/api", api_key="mykey123")
+        assert provider._auth_header == "Token mykey123"
+
+    def test_smartproxy_basic_auth_encoding(self) -> None:
+        provider = SmartproxyProvider("https://smartproxy.com/api", api_key="user1:pass1")
+        assert provider._auth_header.startswith("Basic ")
+
+    def test_smartproxy_missing_colon_no_auth(self) -> None:
+        provider = SmartproxyProvider("https://smartproxy.com/api", api_key="justauser")
+        assert provider._auth_header == ""
+
+
+class TestProviderCreateEdgeCases:
+    def test_create_provider_brightdata_via_factory(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_TYPE", "brightdata")
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_URL", "https://brightdata.com/proxies")
+        monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "bd-key")
+        provider = create_provider()
+        assert isinstance(provider, BrightDataProvider)
+
+    def test_create_provider_oxylabs_via_factory(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_TYPE", "oxylabs")
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_URL", "https://oxylabs.io/proxies")
+        monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "ox-key")
+        provider = create_provider()
+        assert isinstance(provider, OxylabsProvider)
+
+    def test_create_provider_smartproxy_via_factory(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_TYPE", "smartproxy")
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_URL", "https://smartproxy.com/proxies")
+        monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "user:pass")
+        provider = create_provider()
+        assert isinstance(provider, SmartproxyProvider)
+
+    def test_create_provider_file_type_no_path_falls_back_to_static(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_TYPE", "file")
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_FILE", "")
+        provider = create_provider()
+        assert isinstance(provider, StaticListProvider)
+
+    def test_create_provider_url_type_no_url_falls_back_to_static(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_TYPE", "url")
+        monkeypatch.setattr(settings, "PROXY_PROVIDER_URL", "")
+        provider = create_provider()
+        assert isinstance(provider, StaticListProvider)

@@ -804,7 +804,8 @@ class WorkerQueue:
         with _DB_LOCK:
             conn = self._conn()
             try:
-                stuck = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()[0]
+                stuck_row = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()
+                stuck = stuck_row[0] if stuck_row else 0
                 if stuck:
                     # Do NOT increment attempts here — attempts are incremented
                     # only when _dequeue_one() hands the task to a worker.
@@ -1166,14 +1167,19 @@ class WorkerQueue:
             # API stability, and we compute the "effectively retrying"
             # count (pending + future scheduled_at) so dashboards have a
             # meaningful metric.
-            pending = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'pending'").fetchone()[0]
-            running = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()[0]
-            retrying = conn.execute("""SELECT COUNT(*) FROM tasks
+            pending_row = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'pending'").fetchone()
+            pending = pending_row[0] if pending_row else 0
+            running_row = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()
+            running = running_row[0] if running_row else 0
+            retrying_row = conn.execute("""SELECT COUNT(*) FROM tasks
                    WHERE status = 'pending'
-                     AND scheduled_at > strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')""").fetchone()[0]
-            dead_letter = conn.execute("SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'").fetchone()[0]
-            completed_24h = conn.execute("""SELECT COUNT(*) FROM task_history
-                   WHERE finished_at >= datetime('now', '-1 day')""").fetchone()[0]
+                     AND scheduled_at > strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')""").fetchone()
+            retrying = retrying_row[0] if retrying_row else 0
+            dead_row = conn.execute("SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'").fetchone()
+            dead_letter = dead_row[0] if dead_row else 0
+            completed_row = conn.execute("""SELECT COUNT(*) FROM task_history
+                   WHERE finished_at >= datetime('now', '-1 day')""").fetchone()
+            completed_24h = completed_row[0] if completed_row else 0
 
             # Top pending by priority
             top_pending = conn.execute("""SELECT id, type, priority, created_at, attempts

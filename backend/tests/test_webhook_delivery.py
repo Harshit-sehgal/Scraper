@@ -190,3 +190,232 @@ class TestDeliverWebhook:
     @pytest.mark.asyncio
     async def test_max_retries_constant_is_positive(self) -> None:
         assert MAX_RETRIES > 0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Additional Coverage — Timeout, malformed payload, concurrent, auth
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestExtendedWebhookDelivery:
+    @pytest.mark.asyncio
+    async def test_timeout_on_single_attempt_triggers_retry(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        import httpx
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("connect timed out"))
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.url_safety.get_safe_async_client", return_value=mock_ctx),
+            patch("asyncio.sleep", AsyncMock()),
+        ):
+            job = _FakeJob(webhook_url="https://example.com/hook")
+            result = await deliver_webhook(job)
+
+        assert result is False
+        assert job.webhook_delivered is False
+        assert mock_client.post.call_count == MAX_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_malformed_payload_does_not_crash(self) -> None:
+        """Ensure deliver_webhook handles jobs with missing attributes gracefully."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_ctx):
+            job = MagicMock()
+            job.webhook_url = "https://example.com/hook"
+            job.webhook_secret = None
+            job.id = "minimal-job"
+            job.status = "completed"
+            job.name = None
+            job.total_records = 0
+            job.filtered_records = None
+            job.error = None
+            job.created_at = None
+            job.completed_at = None
+            job.estimated_cost_usd = None
+            job.webhook_delivered = False
+            job.webhook_delivered_at = None
+
+            result = await deliver_webhook(job)
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_timeout_then_success(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        import httpx
+
+        ok_response = MagicMock()
+        ok_response.status_code = 200
+        call_count = 0
+
+        async def _side(*args: object, **kwargs: object) -> MagicMock:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                _msg = "first timeout"
+                raise httpx.TimeoutException(_msg)
+            return ok_response
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(side_effect=_side)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.url_safety.get_safe_async_client", return_value=mock_ctx),
+            patch("asyncio.sleep", AsyncMock()),
+        ):
+            job = _FakeJob(webhook_url="https://example.com/hook")
+            result = await deliver_webhook(job)
+
+        assert result is True
+        assert job.webhook_delivered is True
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_concurrent_deliveries_isolated(self) -> None:
+        """Two webhook deliveries running concurrently should not interfere."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+
+        async def _make_delivery(job_id: str, url: str) -> bool:
+            mclient = MagicMock()
+            mclient.post = AsyncMock(return_value=mock_response)
+            mctx = MagicMock()
+            mctx.__aenter__ = AsyncMock(return_value=mclient)
+            mctx.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("app.url_safety.get_safe_async_client", return_value=mctx):
+                job = _FakeJob(webhook_url=url, job_id=job_id, webhook_secret="sec")
+                return await deliver_webhook(job)
+
+        results = await asyncio.gather(
+            _make_delivery("job-a", "https://hook-a.example.com"),
+            _make_delivery("job-b", "https://hook-b.example.com"),
+            _make_delivery("job-c", "https://hook-c.example.com"),
+        )
+        assert results == [True, True, True]
+
+    @pytest.mark.asyncio
+    async def test_no_secret_still_sends_content_type(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_ctx):
+            job = _FakeJob(webhook_url="https://example.com/hook", webhook_secret=None)
+            await deliver_webhook(job)
+
+        headers = mock_client.post.call_args.kwargs["headers"]
+        assert headers["Content-Type"] == "application/json"
+        assert "X-DataForge-Signature" not in headers
+
+    @pytest.mark.asyncio
+    async def test_success_with_auth_header_via_secret(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_ctx):
+            job = _FakeJob(webhook_url="https://example.com/hook", webhook_secret="my-secret-key")
+            result = await deliver_webhook(job)
+
+        assert result is True
+        call_kwargs = mock_client.post.call_args.kwargs
+        headers = call_kwargs["headers"]
+        assert "X-DataForge-Signature" in headers
+        assert headers["X-DataForge-Signature"].startswith("sha256=")
+
+    @pytest.mark.asyncio
+    async def test_delivery_sends_user_agent(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.url_safety.get_safe_async_client", return_value=mock_ctx):
+            job = _FakeJob(webhook_url="https://example.com/hook")
+            await deliver_webhook(job)
+
+        headers = mock_client.post.call_args.kwargs["headers"]
+        assert headers["User-Agent"] == "DataForge-Webhook/1.0"
+
+    @pytest.mark.asyncio
+    async def test_3xx_response_treated_as_success(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 302
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.url_safety.get_safe_async_client", return_value=mock_ctx),
+            patch("asyncio.sleep", AsyncMock()),
+        ):
+            job = _FakeJob(webhook_url="https://example.com/hook")
+            result = await deliver_webhook(job)
+
+        assert result is True  # < 400 is treated as success
+        assert mock_client.post.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_4xx_response_retried(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.url_safety.get_safe_async_client", return_value=mock_ctx),
+            patch("asyncio.sleep", AsyncMock()),
+        ):
+            job = _FakeJob(webhook_url="https://example.com/hook")
+            result = await deliver_webhook(job)
+
+        assert result is False
+        assert mock_client.post.call_count == MAX_RETRIES

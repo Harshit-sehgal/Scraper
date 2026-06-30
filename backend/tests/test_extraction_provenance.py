@@ -362,3 +362,139 @@ class TestSummarizeProvenance:
 
         summary = summarize_provenance(provenance)
         assert summary["fallback_path"] == ["memory", "discovery"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Additional Coverage — Empty/Edge/Malformed/Concurrent
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestProvenanceEdgeCases:
+    def test_builder_empty_records_count_defaults_to_zero(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        ep = builder.build()
+        assert ep.records_count == 0
+
+    def test_builder_no_fields_produces_empty_fields(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        ep = builder.build()
+        assert ep.fields == {}
+
+    def test_malformed_url_produces_unknown_domain(self) -> None:
+        builder = ProvenanceBuilder("")
+        ep = builder.build()
+        assert ep.domain == "unknown"
+
+    def test_builder_add_error_multiple(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_error("err1")
+        builder.add_error("err2")
+        builder.add_error("err3")
+        ep = builder.build()
+        assert ep.errors == ["err1", "err2", "err3"]
+
+    def test_builder_fallback_path_preserves_order_and_deduplicates(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_fallback_step("memory")
+        builder.add_fallback_step("regex")
+        builder.add_fallback_step("memory")
+        builder.add_fallback_step("discovery")
+        builder.add_fallback_step("discovery")
+        ep = builder.build()
+        assert ep.fallback_path == ["memory", "regex", "discovery"]
+
+    def test_negative_confidence_stored_as_is(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_field_provenance(0, "score", 100, "regex", confidence=-0.5)
+        ep = builder.build()
+        assert ep.fields["record_0.score"].confidence == -0.5
+
+    def test_confidence_above_one_stored_as_is(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_field_provenance(0, "score", 100, "regex", confidence=1.5)
+        ep = builder.build()
+        assert ep.fields["record_0.score"].confidence == 1.5
+
+    def test_add_field_provenance_with_missing_fields_defaults(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_field_provenance(0, "name", "Acme")
+        ep = builder.build()
+        fp = ep.fields["record_0.name"]
+        assert fp.field_name == "name"
+        assert fp.value == "Acme"
+        assert fp.method == "unknown"
+        assert fp.confidence == 0.0
+        assert fp.selector is None
+        assert fp.transformed is False
+
+    def test_enrich_records_with_provenance_no_errors_for_missing_field(self) -> None:
+        records = [{"company_name": "Acme"}]
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_field_provenance(0, "company_name", "Acme", "discovery", confidence=0.9)
+        provenance = builder.build()
+        enriched = enrich_records_with_provenance(records, provenance)
+        assert len(enriched) == 1
+        assert enriched[0]["_provenance"]["fields"]["company_name"]["method"] == "discovery"
+
+    def test_enrich_records_empty_input(self) -> None:
+        provenance = ExtractionProvenance(url="https://example.com")
+        enriched = enrich_records_with_provenance([], provenance)
+        assert enriched == []
+
+    def test_enrich_records_with_unknown_fields_in_provenance(self) -> None:
+        records = [{"name": "Acme"}]
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_field_provenance(0, "name", "Acme", "discovery", confidence=0.9)
+        builder.add_field_provenance(0, "extra", "val", "regex", confidence=0.5)
+        provenance = builder.build()
+        enriched = enrich_records_with_provenance(records, provenance)
+        assert len(enriched) == 1
+        assert "extra" not in enriched[0]
+
+    def test_summarize_provenance_with_errors(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_error("Timeout")
+        builder.add_error("Memory miss")
+        provenance = builder.build()
+        summary = summarize_provenance(provenance)
+        assert summary["error_count"] == 2
+
+    def test_summarize_provenance_with_multiple_methods(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        builder.add_field_provenance(0, "a", "1", "memory", confidence=0.9)
+        builder.add_field_provenance(0, "b", "2", "regex", confidence=0.7)
+        builder.add_field_provenance(0, "c", "3", "discovery", confidence=0.8)
+        builder.add_field_provenance(1, "d", "4", "memory", confidence=0.6)
+        summary = summarize_provenance(builder.build())
+        assert summary["method_breakdown"] == {"memory": 2, "regex": 1, "discovery": 1}
+        assert summary["avg_confidence_by_method"]["memory"] == pytest.approx(0.75, 0.01)
+
+    def test_summarize_provenance_low_confidence_capped_at_5(self) -> None:
+        builder = ProvenanceBuilder("https://example.com")
+        for i in range(10):
+            builder.add_field_provenance(i, "x", str(i), "regex", confidence=0.1)
+        summary = summarize_provenance(builder.build())
+        assert len(summary["low_confidence_fields"]) <= 5
+
+    def test_builder_build_returns_valid_timestamp(self) -> None:
+        import time
+
+        builder = ProvenanceBuilder("https://example.com")
+        before = time.time()
+        ep = builder.build()
+        after = time.time()
+        assert before - 0.01 <= ep.timestamp <= after + 0.01
+
+    def test_field_provenance_to_dict_omits_none_fields(self) -> None:
+        fp = FieldProvenance(field_name="name", value="Acme", method="discovery")
+        d = fp.to_dict()
+        assert d["source_snippet"] is None
+        assert d["llm_hint"] is None
+        assert d["selector"] is None
+
+    def test_extraction_provenance_to_dict_nested_field_serialization(self) -> None:
+        fp = FieldProvenance(field_name="price", value=99.99, method="regex", confidence=0.5)
+        ep = ExtractionProvenance(url="https://x.com", fields={"r0.price": fp})
+        d = ep.to_dict()
+        assert d["fields"]["r0.price"]["field_name"] == "price"
+        assert d["fields"]["r0.price"]["confidence"] == 0.5

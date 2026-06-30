@@ -625,3 +625,141 @@ class TestBatchExportIntegration:
         )
         assert xlsx_bytes[:2] == b"PK"
         assert len(xlsx_bytes) > 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# Additional Coverage — Empty results, large records, CSV injection, Excel pagination, JSON interruption
+# ════════════════════════════════════════════════════════════════════
+
+
+class TestBatchExportEdgeCases:
+    @pytest.mark.asyncio
+    async def test_csv_with_empty_results_yields_header_only(self) -> None:
+        pages = _async_pages([("job-1", "Empty Job", [])])
+        fieldnames: list[str] = []
+        stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
+        result = await _async_collect(stream)
+        text = result.decode("utf-8")
+        assert export_service.SOURCE_JOB_FIELD in text
+
+    @pytest.mark.asyncio
+    async def test_csv_all_injection_prefixes_escaped(self) -> None:
+        pages = _async_pages(
+            [
+                (
+                    "job-1",
+                    "Inject",
+                    [
+                        {
+                            "eq": "=SUM(A1:A10)",
+                            "plus": "+CMD",
+                            "minus": "-DANGER",
+                            "at": "@EVIL",
+                            "tab": "\tMALICIOUS",
+                            "cr": "\rHARMFUL",
+                        }
+                    ],
+                ),
+            ]
+        )
+        fieldnames = ["eq", "plus", "minus", "at", "tab", "cr"]
+        stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
+        result = await _async_collect(stream)
+        text = result.decode("utf-8")
+        assert "'=SUM(A1:A10)" in text
+        assert "'+CMD" in text
+        assert "'-DANGER" in text
+        assert "'@EVIL" in text
+        assert "'\tMALICIOUS" in text
+        assert "'\rHARMFUL" in text
+
+    @pytest.mark.asyncio
+    async def test_csv_non_string_value_not_escaped(self) -> None:
+        pages = _async_pages([("job-1", "J1", [{"num": 123, "flag": True, "none": None}])])
+        fieldnames = ["num", "flag", "none"]
+        stream = export_service.batch_csv_stream(pages, fieldnames, flatten=True)
+        result = await _async_collect(stream)
+        text = result.decode("utf-8")
+        assert "123" in text
+        assert "True" in text
+
+    @pytest.mark.asyncio
+    async def test_json_stream_with_large_records(self) -> None:
+        large_val = "x" * 50000
+        pages = _async_pages(
+            [
+                ("job-1", "Large", [{"id": "1", "data": large_val}]),
+            ]
+        )
+        stream = export_service.batch_json_stream(pages, flatten=True)
+        result = await _async_collect(stream)
+        data = json.loads(result)
+        assert len(data) == 1
+        assert data[0]["data"] == large_val
+
+    @pytest.mark.asyncio
+    async def test_json_stream_empty_pages_flattened(self) -> None:
+        pages = _async_pages([])
+        stream = export_service.batch_json_stream(pages, flatten=True)
+        result = await _async_collect(stream)
+        data = json.loads(result)
+        assert data == []
+
+    @pytest.mark.asyncio
+    async def test_json_stream_non_flattened_without_manifest(self) -> None:
+        pages = _async_pages([("job-1", "Job One", [{"x": "1"}])])
+        stream = export_service.batch_json_stream(pages, flatten=False)
+        result = await _async_collect(stream)
+        data = json.loads(result)
+        assert "manifest" in data
+        assert data["manifest"] == []
+
+    def test_build_csv_bytes_empty_results_raises(self) -> None:
+        from unittest.mock import MagicMock
+
+        job = MagicMock()
+        job.results = []
+        with pytest.raises(ValueError, match="No results"):
+            export_service.build_csv_bytes(job)
+
+    def test_build_json_bytes_empty_results_raises(self) -> None:
+        from unittest.mock import MagicMock
+
+        job = MagicMock()
+        job.results = []
+        with pytest.raises(ValueError, match="No results"):
+            export_service.build_json_bytes(job)
+
+    def test_build_excel_bytes_empty_results_raises(self) -> None:
+        from unittest.mock import MagicMock
+
+        job = MagicMock()
+        job.results = []
+        with pytest.raises(ValueError, match="No results"):
+            export_service.build_excel_bytes(job)
+
+    def test_flat_row_with_list_values(self) -> None:
+        row = {"tags": ["a", "b", "c"], "name": "test"}
+        fieldnames = ["tags", "name"]
+        flat = export_service.flat_row(row, fieldnames)
+        assert flat["tags"] == "a, b, c"
+        assert flat["name"] == "test"
+
+    def test_flat_row_with_injection_in_list(self) -> None:
+        row = {"formulas": ["=1+1", "+DANGER"]}
+        fieldnames = ["formulas"]
+        flat = export_service.flat_row(row, fieldnames)
+        # safe_cell escapes the final joined string starting with '='
+        assert flat["formulas"] == "'=1+1, +DANGER"
+
+    def test_strip_system_fields_removes_underscore_prefix(self) -> None:
+        records = [{"_id": "1", "name": "Alice", "_score": 0.9}]
+        cleaned = export_service.strip_system_fields(records)
+        assert cleaned == [{"name": "Alice"}]
+
+    def test_user_fieldnames_from_empty_list(self) -> None:
+        assert export_service.user_fieldnames([]) == []
+
+    def test_user_fieldnames_skips_system(self) -> None:
+        records = [{"_id": "1", "name": "Alice"}]
+        assert export_service.user_fieldnames(records) == ["name"]

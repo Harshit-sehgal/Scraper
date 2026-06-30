@@ -168,102 +168,104 @@ class FederationManager:
             "replayed_transactions": 0,
         }
 
-        # Rule 1: LWW (Last-Write-Wins) for Domain Reputation State
-        from app.crawl_policy import get_crawl_policy
-
-        policy = get_crawl_policy()
-        for domain, rep in remote.domain_reputation.items():
-            local_state = policy._get_state(domain)
-            remote_timestamp = rep.get("last_update", 0.0)
-
-            # Only merge if remote was updated more recently
-            if remote_timestamp > local_state.last_fetch_time:
-                local_state.consecutive_failures = rep["consecutive_failures"]
-                local_state.total_fetches = rep["total_fetches"]
-                local_state.cooldown_until = rep["cooldown_until"]
-                local_state.last_fetch_time = remote_timestamp
-                merge_report["merged_domains"] += 1
-
-        # Rule 2: Structural Union for Learned Motifs
-        for motif_fields in remote.motifs:
-            motif_hash = _encode_motif_fields(motif_fields)
-            if not _schema_contains_motif(self.ws._evolved_schema, motif_fields):
-                self.ws._evolved_schema.add(motif_hash)
-                merge_report["merged_motifs"] += 1
-
-        # Rule 3: Topological Affinity Merging via Deterministic Epoch &
-        # Version Consensus
-        if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
-            if not hasattr(self.ws._topology, "_cohesion_metadata"):
-                self.ws._topology._cohesion_metadata = {}
-
-            remote_meta_dict = getattr(remote, "topology_metadata", {})
-
-            for key, remote_cohesion in remote.topology.items():
-                parts = key.split(":")
-                if len(parts) == 2:
-                    k = (parts[0], parts[1])
-
-                    # 1. Fetch remote version metadata, or default to standard
-                    # LWW
-                    r_meta = remote_meta_dict.get(
-                        key,
-                        {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0},
-                    )
-                    r_epoch = r_meta.get("epoch", 0)
-                    r_ver = r_meta.get("version", 1)
-                    r_ts = r_meta.get("timestamp", remote.timestamp)
-                    r_node = r_meta.get("node_id", remote.node_id)
-
-                    # 2. Fetch local version metadata, or initialize standard
-                    # local info if absent
-                    l_meta = self.ws._topology._cohesion_metadata.get(
-                        k,
-                        {
-                            "node_id": self.node_id,
-                            "timestamp": 0.0,
-                            "version": 0,
-                            "epoch": getattr(self.ws._topology, "topology_epoch", 0),
-                        },
-                    )
-                    l_epoch = l_meta.get("epoch", getattr(self.ws._topology, "topology_epoch", 0))
-                    l_ver = l_meta.get("version", 0)
-                    l_ts = l_meta.get("timestamp", 0.0)
-                    l_node = l_meta.get("node_id", self.node_id)
-
-                    # If remote metadata was not explicitly provided, fall back
-                    # to cooperative averaging
-                    if not remote_meta_dict or key not in remote_meta_dict:
-                        if k in self.ws._topology._neighborhood_cohesion:
-                            local_cohesion = self.ws._topology._neighborhood_cohesion[k]
-                            self.ws._topology._neighborhood_cohesion[k] = (local_cohesion + remote_cohesion) / 2.0
-                        else:
-                            self.ws._topology._neighborhood_cohesion[k] = remote_cohesion
-                        self.ws._topology._cohesion_metadata[k] = {
-                            "node_id": self.node_id,
-                            "timestamp": time.time(),
-                            "version": l_ver + 1,
-                            "epoch": l_epoch,
-                        }
-                        merge_report["reconciled_topologies"] += 1
-                        continue
-
-                    # 3. Apply Deterministic Multi-Shard Consensus Policies
-                    remote_wins = False
-                    if r_epoch > l_epoch or (
-                        r_epoch == l_epoch
-                        and (r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))))
-                    ):
-                        remote_wins = True
-
-                    # 4. If remote wins, write remote cohesion and metadata
-                    # Otherwise, remote is discarded (local retains authority)
-                    if remote_wins or k not in self.ws._topology._neighborhood_cohesion:
-                        self.ws._topology._neighborhood_cohesion[k] = remote_cohesion
-                        self.ws._topology._cohesion_metadata[k] = r_meta
-                        merge_report["reconciled_topologies"] += 1
-
+        # Serialize the entire merge so overlapping gossip/merge cycles
+        # cannot race on shared world state mutations (self.ws.*).
         with self._metrics_lock:
+            # Rule 1: LWW (Last-Write-Wins) for Domain Reputation State
+            from app.crawl_policy import get_crawl_policy
+
+            policy = get_crawl_policy()
+            for domain, rep in remote.domain_reputation.items():
+                local_state = policy._get_state(domain)
+                remote_timestamp = rep.get("last_update", 0.0)
+
+                # Only merge if remote was updated more recently
+                if remote_timestamp > local_state.last_fetch_time:
+                    local_state.consecutive_failures = rep["consecutive_failures"]
+                    local_state.total_fetches = rep["total_fetches"]
+                    local_state.cooldown_until = rep["cooldown_until"]
+                    local_state.last_fetch_time = remote_timestamp
+                    merge_report["merged_domains"] += 1
+
+            # Rule 2: Structural Union for Learned Motifs
+            for motif_fields in remote.motifs:
+                motif_hash = _encode_motif_fields(motif_fields)
+                if not _schema_contains_motif(self.ws._evolved_schema, motif_fields):
+                    self.ws._evolved_schema.add(motif_hash)
+                    merge_report["merged_motifs"] += 1
+
+            # Rule 3: Topological Affinity Merging via Deterministic Epoch &
+            # Version Consensus
+            if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
+                if not hasattr(self.ws._topology, "_cohesion_metadata"):
+                    self.ws._topology._cohesion_metadata = {}
+
+                remote_meta_dict = getattr(remote, "topology_metadata", {})
+
+                for key, remote_cohesion in remote.topology.items():
+                    parts = key.split(":")
+                    if len(parts) == 2:
+                        k = (parts[0], parts[1])
+
+                        # 1. Fetch remote version metadata, or default to standard
+                        # LWW
+                        r_meta = remote_meta_dict.get(
+                            key,
+                            {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0},
+                        )
+                        r_epoch = r_meta.get("epoch", 0)
+                        r_ver = r_meta.get("version", 1)
+                        r_ts = r_meta.get("timestamp", remote.timestamp)
+                        r_node = r_meta.get("node_id", remote.node_id)
+
+                        # 2. Fetch local version metadata, or initialize standard
+                        # local info if absent
+                        l_meta = self.ws._topology._cohesion_metadata.get(
+                            k,
+                            {
+                                "node_id": self.node_id,
+                                "timestamp": 0.0,
+                                "version": 0,
+                                "epoch": getattr(self.ws._topology, "topology_epoch", 0),
+                            },
+                        )
+                        l_epoch = l_meta.get("epoch", getattr(self.ws._topology, "topology_epoch", 0))
+                        l_ver = l_meta.get("version", 0)
+                        l_ts = l_meta.get("timestamp", 0.0)
+                        l_node = l_meta.get("node_id", self.node_id)
+
+                        # If remote metadata was not explicitly provided, fall back
+                        # to cooperative averaging
+                        if not remote_meta_dict or key not in remote_meta_dict:
+                            if k in self.ws._topology._neighborhood_cohesion:
+                                local_cohesion = self.ws._topology._neighborhood_cohesion[k]
+                                self.ws._topology._neighborhood_cohesion[k] = (local_cohesion + remote_cohesion) / 2.0
+                            else:
+                                self.ws._topology._neighborhood_cohesion[k] = remote_cohesion
+                            self.ws._topology._cohesion_metadata[k] = {
+                                "node_id": self.node_id,
+                                "timestamp": time.time(),
+                                "version": l_ver + 1,
+                                "epoch": l_epoch,
+                            }
+                            merge_report["reconciled_topologies"] += 1
+                            continue
+
+                        # 3. Apply Deterministic Multi-Shard Consensus Policies
+                        remote_wins = False
+                        if r_epoch > l_epoch or (
+                            r_epoch == l_epoch
+                            and (r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))))
+                        ):
+                            remote_wins = True
+
+                        # 4. If remote wins, write remote cohesion and metadata
+                        # Otherwise, remote is discarded (local retains authority)
+                        if remote_wins or k not in self.ws._topology._neighborhood_cohesion:
+                            self.ws._topology._neighborhood_cohesion[k] = remote_cohesion
+                            self.ws._topology._cohesion_metadata[k] = r_meta
+                            merge_report["reconciled_topologies"] += 1
+
             self.divergence_metrics["reconciled_merges"] += 1
         logger.info("[Federation] Successfully merged remote state from node %s: %s", remote.node_id, merge_report)
         return merge_report
@@ -282,25 +284,26 @@ class FederationManager:
                 return replay_report
             self.ws._replaying = True
         try:
-            for delta in sorted(deltas, key=lambda d: d.get("timestamp", 0.0)):
-                try:
-                    action = delta.get("action")
-                    if action == "add_motif":
-                        motif = delta.get("payload", {}).get("motif")
-                        if motif:
-                            self.ws._evolved_schema.add(motif)
-                            replay_report["replayed"] += 1
-                    elif action == "record_failure":
-                        domain = delta.get("payload", {}).get("domain")
-                        fail_type = delta.get("payload", {}).get("fail_type")
-                        if domain and fail_type:
-                            self.ws.regression.record_failure(domain, fail_type)
-                            replay_report["replayed"] += 1
-                except Exception as e:
-                    replay_report["failed"] += 1
-                    with self._metrics_lock:
+            # Serialize world-state mutations alongside merge_remote_state.
+            with self._metrics_lock:
+                for delta in sorted(deltas, key=lambda d: d.get("timestamp", 0.0)):
+                    try:
+                        action = delta.get("action")
+                        if action == "add_motif":
+                            motif = delta.get("payload", {}).get("motif")
+                            if motif:
+                                self.ws._evolved_schema.add(motif)
+                                replay_report["replayed"] += 1
+                        elif action == "record_failure":
+                            domain = delta.get("payload", {}).get("domain")
+                            fail_type = delta.get("payload", {}).get("fail_type")
+                            if domain and fail_type:
+                                self.ws.regression.record_failure(domain, fail_type)
+                                replay_report["replayed"] += 1
+                    except Exception as e:
+                        replay_report["failed"] += 1
                         self.divergence_metrics["failed_replays"] += 1
-                    logger.warning("[Federation] Replay delta action failed: %s", e)
+                        logger.warning("[Federation] Replay delta action failed: %s", e)
         finally:
             self.ws._replaying = False
 

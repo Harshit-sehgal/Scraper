@@ -7,9 +7,12 @@ events/quotas to SQLite for billing-ready metering.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 import uuid
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -316,10 +319,13 @@ class UsageLedger:
                 quota.current_usage += quantity
 
             if self._storage_path is not None:
-                with self._connect() as conn:
-                    self._persist_record(conn, record)
-                    if quota is not None:
-                        self._persist_quota(conn, quota)
+                try:
+                    with self._connect() as conn:
+                        self._persist_record(conn, record)
+                        if quota is not None:
+                            self._persist_quota(conn, quota)
+                except (sqlite3.Error, OSError):
+                    logger.exception("[UsageLedger] Failed to persist usage record")
 
             return record
 
@@ -419,8 +425,11 @@ class UsageLedger:
             key = self._quota_key(user_id, usage_type, org_id=org_id, project_id=project_id)
             self._quotas[key] = quota
             if self._storage_path is not None:
-                with self._connect() as conn:
-                    self._persist_quota(conn, quota)
+                try:
+                    with self._connect() as conn:
+                        self._persist_quota(conn, quota)
+                except (sqlite3.Error, OSError):
+                    logger.exception("[UsageLedger] Failed to persist quota")
             return quota
 
     def get_quota(
@@ -447,9 +456,12 @@ class UsageLedger:
                     reset_count += 1
                     changed.append(quota)
             if self._storage_path is not None and changed:
-                with self._connect() as conn:
-                    for quota in changed:
-                        self._persist_quota(conn, quota)
+                try:
+                    with self._connect() as conn:
+                        for quota in changed:
+                            self._persist_quota(conn, quota)
+                except (sqlite3.Error, OSError):
+                    logger.exception("[UsageLedger] Failed to persist quota reset")
             return reset_count
 
 
