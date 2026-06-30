@@ -26,12 +26,25 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Browser, BrowserContext, Error, async_playwright
 
 from app.config import settings
+from app.utils.circuit_breaker import CircuitBreaker, CircuitBreakerError, CircuitState
 from app.utils.log_redaction import mask_proxy_url
 
 if TYPE_CHECKING:
     from app.strategy_evolution import FetchStrategy
 
 logger = logging.getLogger(__name__)
+
+# ── Module-level circuit breaker for browser pool ────────────────────────
+# Opens after 3 consecutive RuntimeError failures (browser crash, pool
+# exhaustion, process cap reached, etc.) so callers get a fast-reject
+# instead of waiting for repeated timeouts.  After 30 s the breaker
+# transitions to HALF_OPEN and allows a single probe request through.
+browser_pool_circuit_breaker = CircuitBreaker(
+    name="browser_pool",
+    failure_threshold=3,
+    recovery_timeout=30.0,
+    expected_exception=RuntimeError,
+)
 
 
 class BrowserPool:
@@ -330,37 +343,61 @@ class BrowserPool:
             logger.debug("[BrowserPool] Creating context for %s with proxy: %s", domain, mask_proxy_url(proxy_config["server"]))
 
     async def get_context(self, domain: str, strategy: FetchStrategy | None = None) -> BrowserContext:
-        """Get or create a browser context for a specific domain."""
+        """Get or create a browser context for a specific domain.
+
+        Circuit-breaker integration: if the pool has experienced 3
+        consecutive ``RuntimeError`` failures (browser crash, pool
+        exhaustion, process cap), the breaker opens and subsequent
+        calls raise ``CircuitBreakerError`` immediately instead of
+        retrying.  After ``recovery_timeout`` the breaker transitions
+        to HALF_OPEN and allows a single probe; success closes the
+        circuit, failure reopens it.
+        """
         from app.strategy_evolution import FetchStrategy
 
+        # Check circuit breaker before attempting context acquisition.
+        if browser_pool_circuit_breaker.state == CircuitState.OPEN:
+            msg = (
+                f"Browser pool circuit breaker is OPEN — pool exhausted. "
+                f"Retry after {browser_pool_circuit_breaker.config.recovery_timeout}s. "
+                f"Breaker stats: {browser_pool_circuit_breaker.get_stats()}"
+            )
+            raise CircuitBreakerError(msg)
+
         await self._await_recycle_if_needed()
-        async with self._lock:
-            self._last_activity = time.time()
-            self.total_fetches += 1
-            await self._ensure_browser_launched_locked()
+        try:
+            async with self._lock:
+                self._last_activity = time.time()
+                self.total_fetches += 1
+                await self._ensure_browser_launched_locked()
 
-            context_key = f"{domain}:{strategy.value if strategy else 'default'}"
-            cached = await self._get_existing_context(context_key)
-            if cached is not None:
-                return cached
+                context_key = f"{domain}:{strategy.value if strategy else 'default'}"
+                cached = await self._get_existing_context(context_key)
+                if cached is not None:
+                    await browser_pool_circuit_breaker._on_success()
+                    return cached
 
-            await self._evict_lru_if_needed()
+                await self._evict_lru_if_needed()
 
-            is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
-            context_options = self._build_stealth_context_options(domain) if is_stealth else self._build_default_context_options()
-            self._add_proxy_to_options(context_options, domain)
+                is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
+                context_options = self._build_stealth_context_options(domain) if is_stealth else self._build_default_context_options()
+                self._add_proxy_to_options(context_options, domain)
 
-            context = await self._create_browser_context(context_options)
+                context = await self._create_browser_context(context_options)
 
-            await self._inject_persisted_cookies(context, domain)
-            self._register_page_tracking(context)
-            await self._apply_stealth_evasion(context, is_stealth)
+                await self._inject_persisted_cookies(context, domain)
+                self._register_page_tracking(context)
+                await self._apply_stealth_evasion(context, is_stealth)
 
-            self._contexts[context_key] = context
-            self._context_use_count[context_key] = 1
-            self._context_last_used[context_key] = time.time()
-            self.active_contexts = len(self._contexts)
-            return context
+                self._contexts[context_key] = context
+                self._context_use_count[context_key] = 1
+                self._context_last_used[context_key] = time.time()
+                self.active_contexts = len(self._contexts)
+                await browser_pool_circuit_breaker._on_success()
+                return context
+        except RuntimeError:
+            await browser_pool_circuit_breaker._on_failure()
+            raise
 
     # ── Per-request isolated context acquisition ────────────────────────
 
@@ -849,6 +886,45 @@ def reset_global_browser_pool() -> None:
                     task.cancel()
             _pool._background_tasks.clear()
         _pool = None
+
+
+def reset_browser_pool_circuit_breaker() -> None:
+    """Reset the module-level browser pool circuit breaker (for testing)."""
+    global browser_pool_circuit_breaker
+    browser_pool_circuit_breaker = CircuitBreaker(
+        name="browser_pool",
+        failure_threshold=3,
+        recovery_timeout=30.0,
+        expected_exception=RuntimeError,
+    )
+
+
+def get_browser_pool_health() -> dict[str, Any]:
+    """Return combined circuit-breaker and pool statistics.
+
+    Merges the pool singleton's operational metrics with the circuit
+    breaker state so monitoring dashboards get a single health summary.
+    """
+    cb_stats = browser_pool_circuit_breaker.get_stats()
+    try:
+        pool_metrics = get_browser_pool().get_metrics()
+    except Exception:
+        pool_metrics = {
+            "startup_latency_ms": 0.0,
+            "active_contexts": 0,
+            "reusable_contexts": 0,
+            "isolated_contexts": 0,
+            "active_acquires": 0,
+            "context_reuse_rate": 0.0,
+            "total_fetches": 0,
+            "crash_count": 0,
+            "connected": False,
+        }
+    return {
+        "circuit_breaker": cb_stats,
+        "pool": pool_metrics,
+        "healthy": cb_stats["state"] == "closed",
+    }
 
 
 # ── Cookie Parsing ──────────────────────────────────────────────────────

@@ -28,10 +28,13 @@ import uuid
 from collections.abc import Callable
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.utils.datetime_normalization import format_datetime, parse_datetime
+
+if TYPE_CHECKING:
+    from app.distributed import JobClaimService
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +346,12 @@ class WorkerQueue:
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
         self._start_lock = asyncio.Lock()
+        # Horizontal scaling: job claim service prevents duplicate
+        # processing across nodes.  Lazily initialised on first use
+        # so the module can be imported without requiring the
+        # distributed module at import time.
+        self._job_claim_service: JobClaimService | None = None
+        self._claim_db_path = db_path
         # Semaphore gives us atomic acquire/release for the concurrency
         # budget, independent of the bookkeeping dict. The worker loop
         # acquires a permit before dequeue and releases it when the
@@ -353,6 +362,20 @@ class WorkerQueue:
     def _conn(self) -> sqlite3.Connection:
         """Get a connection to this instance's database."""
         return _get_connection(db_path=self._db_path)
+
+    def _get_job_claim_service(self):
+        """Lazily create the JobClaimService for horizontal scaling.
+
+        Deferred import avoids a hard dependency on ``app.distributed``
+        at module load time and allows the worker to run in single-node
+        mode (where claim checks are a no-op) without requiring the
+        claim DB tables.
+        """
+        if self._job_claim_service is None:
+            from app.distributed import JobClaimService
+
+            self._job_claim_service = JobClaimService(db_path=self._claim_db_path)
+        return self._job_claim_service
 
     # ─── Task registration ─────────────────────────────────────────────
 
@@ -862,7 +885,9 @@ class WorkerQueue:
     async def _worker_loop(self) -> None:
         """Main worker loop: dequeue and dispatch tasks."""
         last_stuck_check = time.monotonic()
+        last_heartbeat = time.monotonic()
         STUCK_CHECK_INTERVAL = 60.0  # Check for stuck tasks every 60 seconds
+        HEARTBEAT_INTERVAL = 30.0  # Emit heartbeat every 30 seconds
         # Sentinel re-bound each iteration. Declared at loop scope so the
         # outer except below can reference it without Pyright flagging
         # ``possibly unbound`` when control can take the TimeoutError /
@@ -875,6 +900,18 @@ class WorkerQueue:
                 if now - last_stuck_check >= STUCK_CHECK_INTERVAL:
                     last_stuck_check = now
                     await self._check_and_recover_stuck_tasks()
+
+                # Periodic heartbeat for horizontal scaling — lets other
+                # nodes know this one is still alive.
+                if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+                    last_heartbeat = now
+                    try:
+                        claim_svc = self._get_job_claim_service()
+                        await asyncio.to_thread(claim_svc.heartbeat)
+                    except (ImportError, OSError, sqlite3.OperationalError):
+                        logger.debug("[WorkerQueue] Heartbeat skipped (distributed module / DB unavailable)")
+                    except Exception:
+                        logger.debug("[WorkerQueue] Heartbeat failed", exc_info=True)
 
                 # Acquire a concurrency permit *before* dequeue so the
                 # budget is reserved atomically. If the permit is not
@@ -905,6 +942,30 @@ class WorkerQueue:
                     if acquired_sem:
                         acquired_sem.release()
                     continue
+
+                # ── Horizontal scaling: claim check ────────────────────
+                # In multi-node deployments, only one node should process
+                # a given task.  Attempt an atomic claim; skip if another
+                # node already owns it.
+                try:
+                    claim_svc = self._get_job_claim_service()
+                    claimed = await asyncio.to_thread(claim_svc.claim_job, task.id)
+                    if not claimed:
+                        logger.debug(
+                            "[WorkerQueue] Task %s already claimed by another node, skipping",
+                            task.id,
+                        )
+                        # Re-queue is unnecessary — the claiming node will
+                        # process it.  Skip and release the concurrency
+                        # permit.
+                        if acquired_sem:
+                            acquired_sem.release()
+                        continue
+                except (ImportError, OSError, sqlite3.OperationalError):
+                    # Single-node mode or DB unavailable — proceed without claiming.
+                    logger.debug("[WorkerQueue] Job claim check skipped (distributed module / DB unavailable)")
+                except Exception:
+                    logger.debug("[WorkerQueue] Job claim check failed, proceeding without claim", exc_info=True)
 
                 # Dispatch
                 t = asyncio.create_task(self._execute_task(task))
@@ -963,6 +1024,15 @@ class WorkerQueue:
                         # Permit already released — should not happen,
                         # but never let a callback raise.
                         logger.debug("Semaphore release failed for task %s", tid)
+                    # Horizontal scaling: release the job claim so another
+                    # node can process this job if it's re-queued.
+                    try:
+                        claim_svc = self._get_job_claim_service()
+                        claim_svc.release_claim(tid)
+                    except (ImportError, OSError, sqlite3.OperationalError):
+                        pass
+                    except Exception:
+                        logger.debug("[WorkerQueue] Claim release for task %s failed", tid, exc_info=True)
 
                 t.add_done_callback(_on_task_done)
                 t.add_done_callback(_release)
