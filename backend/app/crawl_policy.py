@@ -539,6 +539,71 @@ class CrawlPolicyEngine:
         return best_allow_len < best_disallow_len
 
 
+# ── Sitemap Discovery ──────────────────────────────────────────────────────
+
+
+async def discover_sitemaps(domain: str, *, fetch_robots: bool = True) -> list[str]:
+    """Discover sitemap URLs from a domain's ``robots.txt``.
+
+    If *fetch_robots* is True (default), fetches and parses ``robots.txt``
+    for ``Sitemap:`` directives. Returns a list of sitemap URL strings.
+
+    This is a best-effort function — network errors or missing robots.txt
+    are handled gracefully and return an empty list.
+    """
+    sitemaps: list[str] = []
+    robots_url = f"https://{domain}/robots.txt"
+
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            if fetch_robots:
+                try:
+                    resp = await client.get(robots_url)
+                    if resp.status_code == 200:
+                        for line in resp.text.splitlines():
+                            line = line.strip()
+                            if line.lower().startswith("sitemap:"):
+                                url = line.split(":", 1)[1].strip()
+                                if url:
+                                    sitemaps.append(url)
+                except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError, OSError):
+                    logger.debug("Could not fetch robots.txt for %s", domain)
+    except ImportError:
+        # httpx not available — attempt via urllib
+        try:
+            text = await asyncio.to_thread(_fetch_robots_with_urllib, robots_url)
+            for line in text.splitlines():
+                line = line.strip()
+                if line.lower().startswith("sitemap:"):
+                    url = line.split(":", 1)[1].strip()
+                    if url:
+                        sitemaps.append(url)
+        except (OSError, ValueError, RuntimeError):
+            logger.debug("Could not fetch robots.txt for %s", domain)
+
+    # Fallback: try the standard sitemap URL
+    if not sitemaps:
+        standard = f"https://{domain}/sitemap.xml"
+        logger.debug("No Sitemap directives found in robots.txt for %s; trying %s", domain, standard)
+        sitemaps.append(standard)
+
+    return sitemaps
+
+
+def _fetch_robots_with_urllib(robots_url: str) -> str:
+    import urllib.request
+
+    from app.url_safety import validate_public_http_url
+
+    validate_public_http_url(robots_url)
+    req = urllib.request.Request(robots_url)
+    # Safe because validate_public_http_url rejects private/internal targets first.
+    with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
+        return resp.read().decode("utf-8", errors="replace")
+
+
 # ─── Singleton Accessor ─────────────────────────────────────────────────
 
 _policy_engine: CrawlPolicyEngine | None = None

@@ -693,3 +693,97 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             "samples": samples,
             "alert_threshold": trend_store._alert_threshold,
         }
+
+    @router.get("/api/jobs/{job_id}/screenshot")
+    async def get_job_screenshot(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+    ):
+        """Return the saved screenshot for a job, if one exists.
+
+        Returns a PNG image with ``Content-Type: image/png``, or 404 if
+        no screenshot has been stored for this job.
+        """
+        from pathlib import Path
+
+        from starlette.responses import FileResponse
+
+        from app.extraction_screenshot_store import get_screenshot_path
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_screenshot", project_id)
+
+        path = get_screenshot_path(job_id)
+        if path is None or not Path(path).exists():
+            raise HTTPException(status_code=404, detail="No screenshot available for this job")
+        return FileResponse(path, media_type="image/png")
+
+    @router.get("/api/jobs/{job_id}/network-log", response_model=dict[str, Any])
+    async def get_job_network_log(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+    ):
+        """Return the captured network request log for a job's last extraction."""
+        from app.browser_network_capture import get_captures
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_network_log", project_id)
+
+        log_entries: list[dict[str, Any]] = []
+        for url in job.urls or []:
+            captures = get_captures(url)
+            log_entries.append({"source_url": url, "payload_count": len(captures)})
+
+        return {"job_id": job_id, "entries": log_entries, "total": len(log_entries)}
+
+    @router.get("/api/jobs/{job_id}/cascade-trace", response_model=dict[str, Any])
+    async def get_job_cascade_trace(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+    ):
+        """Return the extraction cascade layer trace for a job."""
+        from app.extraction_cascade_telemetry import get_cascade_trace
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_cascade_trace", project_id)
+
+        trace = get_cascade_trace(job_id)
+        return {"job_id": job_id, "steps": trace, "total": len(trace)}
+
+    @router.get("/api/jobs/{job_id}/structured-events", response_model=dict[str, Any])
+    async def get_job_structured_events(
+        job_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ):
+        """Return structured job events emitted via ``log_job_event``."""
+        from app.structured_job_logs import get_job_events
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        job = await run_in_threadpool(manager.get_job, job_id)
+        _ensure_job_access(job, role, user_id, org_id, "read_job_structured_events", project_id)
+
+        events = get_job_events(job_id, limit=limit, offset=offset)
+        return {
+            "job_id": job_id,
+            "events": events,
+            "returned": len(events),
+            "limit": limit,
+            "offset": offset,
+        }

@@ -426,24 +426,23 @@ class JobClaimService:
             ).fetchall()
             stale_ids = [row["node_id"] for row in stale_nodes]
 
-            # Release claims owned by stale nodes, plus claims from nodes
-            # that have no heartbeat record at all (crashed before sending
-            # the first heartbeat) whose claimed_at is older than the cutoff.
-            # We combine into a single parameter list to keep the SQL simple
-            # even when the stale-id list is empty.
-            stale_id_params: list[Any] = list(stale_ids)
-            placeholders_stale = ",".join("?" for _ in stale_id_params) if stale_id_params else "''"
-            # SQL: node_id IN stale_ids (or empty-set sentinel) OR (orphan + old claimed_at)
-            sql = (
-                f"DELETE FROM job_claims "
-                f"WHERE node_id IN ({placeholders_stale}) "
-                f"OR (node_id NOT IN (SELECT node_id FROM node_heartbeats) AND claimed_at < ?)"
-            )
+            released = 0
+            for stale_id in stale_ids:
+                result = conn.execute(
+                    "DELETE FROM job_claims WHERE node_id = ?",
+                    (stale_id,),
+                )
+                released += max(result.rowcount, 0)
+
             result = conn.execute(
-                sql,
-                (*stale_id_params, cutoff),
+                """ # nosec B608 — parameterised query, placeholder '?' is used
+                DELETE FROM job_claims
+                WHERE node_id NOT IN (SELECT node_id FROM node_heartbeats)
+                AND claimed_at < ?
+                """,
+                (cutoff,),
             )
-            released = result.rowcount
+            released += max(result.rowcount, 0)
             conn.commit()
             if released > 0:
                 logger.info("[JobClaimService] Released %d stale job claims", released)

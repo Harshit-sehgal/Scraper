@@ -18,7 +18,7 @@ import threading
 import uuid
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
 
 from app.audit_logger import log_admin_action, log_job_event
@@ -100,6 +100,8 @@ def _auth_tuple(auth) -> tuple:
 
     Returns ``(role, user_id, org_id, project_id)``.
     """
+    if auth is None:
+        return UserRole.USER, "", "", ""
     if len(auth) == 4:
         return auth
     role, user_id = auth
@@ -1316,3 +1318,118 @@ def register_jobs_write_routes(
                 _notification_channels_store[job_id].pop(i)
                 return
         raise HTTPException(status_code=404, detail="Notification channel not found")
+
+    # ---- Review Queue (Qual 9, Qual 15) ----
+
+    @router.get("/api/reviews", response_model=dict)
+    async def list_reviews(
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ):
+        """List pending review items from the manual review queue."""
+        from app.review_queue import get_pending_reviews
+
+        return {
+            "reviews": get_pending_reviews(limit=limit, offset=offset),
+            "limit": limit,
+            "offset": offset,
+        }
+
+    @router.get("/api/reviews/{review_id}", response_model=dict)
+    async def get_review(
+        review_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+    ):
+        """Get a single review item by ID."""
+        from app.review_queue import get_review as _get_review
+
+        review = _get_review(review_id)
+        if review is None:
+            raise HTTPException(status_code=404, detail="Review item not found")
+        return review
+
+    @router.patch("/api/reviews/{review_id}", response_model=dict)
+    async def update_review(
+        review_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
+        action: Annotated[str, Query()] = "approve",
+        corrected_fields: Annotated[dict[str, Any] | None, Body()] = None,
+    ):
+        """Approve or reject a review item (Qual 9)."""
+        from app.review_queue import (
+            approve_review,
+            reject_review,
+        )
+        from app.review_queue import (
+            get_review as _get_review,
+        )
+
+        _role, user_id, _org_id, _project_id = _auth_tuple(auth)
+        if action == "approve":
+            ok = approve_review(review_id, corrected_fields=corrected_fields or {}, reviewer=user_id)
+        elif action == "reject":
+            ok = reject_review(review_id, reviewer=user_id)
+        else:
+            raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
+        if not ok:
+            raise HTTPException(status_code=404, detail="Review not found or not pending")
+        return _get_review(review_id)
+
+    @router.patch("/api/jobs/{job_id}/results/{record_id}", response_model=dict)
+    async def correct_record(
+        job_id: str,
+        record_id: str,
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        field_name: Annotated[str, Query()] = "",
+        corrected_value: Annotated[str, Query()] = "",
+    ):
+        """Human-in-the-loop field correction (Qual 15).
+
+        Corrects a single field value on an extracted record and
+        creates a review entry for auditability.
+        """
+        from app.review_queue import correct_record_field
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(manager.jobs_store[job_id], role, user_id, org_id, project_id, "correct_record")
+
+        result = correct_record_field(job_id, record_id, field_name, corrected_value, reviewer=user_id)
+        if result is None:
+            raise HTTPException(status_code=500, detail="Failed to create correction")
+        return result
+
+    # ---- Sitemap Discovery (Comp 3) ----
+
+    @router.post("/api/discover/sitemap", response_model=dict)
+    async def discover_sitemap(
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        domain: Annotated[str, Query()] = "",
+    ):
+        """Discover sitemap URLs from a domain's robots.txt (Comp 3)."""
+        from app.crawl_policy import discover_sitemaps
+
+        if not domain:
+            raise HTTPException(status_code=400, detail="domain is required")
+        sitemaps = await discover_sitemaps(domain)
+        return {"domain": domain, "sitemaps": sitemaps, "count": len(sitemaps)}
