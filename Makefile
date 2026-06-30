@@ -43,6 +43,36 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+# ─── Setup (first-time) ──────────────────────────────────────────────────────
+
+setup: ## Fresh clone → running dev stack (pip, npm, migrate, build, up)
+	@echo "==> Installing Python dependencies..."
+	pip install -e ".[dev]"
+	@echo "==> Installing Node dependencies..."
+	npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund
+	@echo "==> Building frontend..."
+	npm run build
+	@echo "==> Preparing .env..."
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "    Created .env from .env.example — edit it before deploying to production."; \
+	else \
+		echo "    .env already exists, skipping."; \
+	fi
+	@echo "==> Starting development stack..."
+	$(DC) up -d
+	@echo ""
+	@echo "✅ Setup complete!"
+	@echo "   API:       http://localhost:${PORT:-8000}"
+	@echo "   Dashboard: http://localhost:${PORT:-8000}/app"
+	@echo "   Docs:      http://localhost:${PORT:-8000}/docs"
+
+build-frontend: ## Build the frontend bundle locally (esbuild, no Docker)
+	npm run build
+
+test-frontend: ## Run frontend unit tests (vitest, no Docker)
+	npm run test
+
 # ─── Build ──────────────────────────────────────────────────────────────────
 
 build: ## Build Docker image (dev target)

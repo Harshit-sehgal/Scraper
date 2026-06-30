@@ -593,7 +593,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
         request: Request,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
         ],
     ):
         fmt = body.format.lower()
