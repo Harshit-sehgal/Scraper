@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 11
+_CURRENT_SCHEMA_VERSION = 12
 
 _JOB_COLUMNS: frozenset[str] = frozenset(
     {

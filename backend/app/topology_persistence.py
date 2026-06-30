@@ -3,7 +3,7 @@
 These functions operate on a TopologyState instance for all topology-level
 serialization and lifecycle operations.
 
-Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
+Extracted from topology_state.py for modularity.
 """
 
 import contextlib

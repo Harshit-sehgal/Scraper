@@ -3,7 +3,7 @@
 Contains the failure mode taxonomy, severity levels, scenario data models,
 and the predefined collection of chaos test scenarios.
 
-Extracted from chaos_simulator.py for modularity (see REFACTOR_PLAN.md).
+Extracted from chaos_simulator.py for modularity.
 """
 
 from dataclasses import dataclass

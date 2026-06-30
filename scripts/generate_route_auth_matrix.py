@@ -8,14 +8,13 @@ import re
 import sys
 from pathlib import Path
 
-from generate_route_inventory import REPO, collect_route_rows
-
-# Make ``scripts/_fsync_helper`` importable regardless of CWD.
+# Make ``scripts/_fsync_helper`` and sibling scripts importable regardless of CWD.
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from _fsync_helper import write_text_sync
+from generate_route_inventory import REPO, collect_route_rows
 
 DOC_OUT = REPO / "docs" / "ROUTE_AUTH_MATRIX.md"
 JSON_OUT = REPO / "artifacts" / "audit" / "ROUTE_AUTH_MATRIX.json"

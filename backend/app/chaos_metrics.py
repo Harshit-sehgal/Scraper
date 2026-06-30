@@ -4,7 +4,7 @@ Contains the ChaosTestSuite runner that executes scenarios and generates
 reports, the OperationalPlaybooks with recovery procedures, and top-level
 helper functions for running chaos tests.
 
-Extracted from chaos_simulator.py for modularity (see REFACTOR_PLAN.md).
+Extracted from chaos_simulator.py for modularity.
 """
 
 import logging

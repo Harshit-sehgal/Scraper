@@ -168,11 +168,19 @@ class TestAlertDeliveryDrillSlackChannel:
 
 
 def test_postgres_schema_version_tracking_is_current_checkout_reality() -> None:
-    """F-DB-002 is stale in this checkout; lock the current schema-version path."""
+    """F-DB-002 is stale in this checkout; lock the current schema-version path.
+
+    Uses ``_format_version_assignment`` (from the live module) so the
+    assertion stays in sync with whichever version the migrations
+    document — past integer-only assertions rotted whenever the
+    schema version was bumped.
+    """
     migrations = STORAGE_MIGRATIONS.read_text(encoding="utf-8")
     exported_sql = POSTGRES_MIGRATION.read_text(encoding="utf-8")
 
-    assert "POSTGRES_SCHEMA_VERSION = 11" in migrations
+    from app.storage_migrations import POSTGRES_SCHEMA_VERSION as pg_version
+
+    assert f"POSTGRES_SCHEMA_VERSION = {pg_version}" in migrations
     assert "CREATE TABLE IF NOT EXISTS schema_version" in migrations
     assert "SELECT MAX(version) AS version FROM schema_version" in migrations
     assert "INSERT INTO schema_version (version) VALUES (%s)" in migrations

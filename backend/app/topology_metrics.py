@@ -4,7 +4,7 @@ These functions operate on a TopologyState instance and return computed
 metrics. They do not mutate state directly — mutation is done by the
 caller through TopologyState APIs.
 
-Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
+Extracted from topology_state.py for modularity.
 """
 
 from typing import TYPE_CHECKING, Any

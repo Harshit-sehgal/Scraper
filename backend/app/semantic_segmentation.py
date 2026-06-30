@@ -1066,7 +1066,7 @@ def expand_composite_records(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ─────────────────────────────────────────────────────────────
-# Overlap Resolution (merged from overlap_resolution.py)
+# Overlap Resolution
 # ─────────────────────────────────────────────────────────────
 
 # Hierarchical dominance: broader types dominate narrower ones

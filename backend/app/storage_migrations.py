@@ -19,7 +19,7 @@ from app.storage_mapper import job_to_row, row_to_job
 logger = logging.getLogger(__name__)
 
 SQLITE_SCHEMA_VERSION = 14
-POSTGRES_SCHEMA_VERSION = 11
+POSTGRES_SCHEMA_VERSION = 12
 
 # ───────────────────────────────────────────────────────────────────────
 # SQLite migrations
@@ -892,6 +892,33 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                             col_name,
                         )
             current = 11
+
+        if current < 12:
+            # v12 — user-agent, wait-for-*, cascade_telemetry,
+            # quality_score_summary columns that were added to the
+            # storage mapper after v11 shipped.
+            for table_name in ["jobs", "recycle_bin"]:
+                for col_name, col_ddl in (
+                    ("user_agent", "TEXT DEFAULT ''"),
+                    ("wait_for_selector", "TEXT DEFAULT ''"),
+                    ("wait_for_function", "TEXT DEFAULT ''"),
+                    ("wait_for_timeout", "INTEGER DEFAULT NULL"),
+                    ("wait_for_navigation", "BOOLEAN DEFAULT NULL"),
+                    ("cascade_telemetry", "TEXT DEFAULT '{}'"),
+                    ("quality_score_summary", "REAL DEFAULT 0.0"),
+                ):
+                    try:
+                        execute_fn(
+                            conn,
+                            f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_ddl}",
+                        )
+                    except Exception:
+                        logger.debug(
+                            "ALTER TABLE %s ADD COLUMN %s failed",
+                            table_name,
+                            col_name,
+                        )
+            current = 12
 
         execute_fn(conn, "DELETE FROM schema_version")
         execute_fn(conn, "INSERT INTO schema_version (version) VALUES (%s)", (POSTGRES_SCHEMA_VERSION,))

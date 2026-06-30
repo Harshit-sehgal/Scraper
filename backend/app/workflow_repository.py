@@ -262,8 +262,8 @@ class SQLiteWorkflowRepository(WorkflowRepository):
     def _maybe_backfill_from_json(self) -> None:
         """One-shot import from workflows.json to SQLite.
 
-        Reuses the deserialization logic from
-        ``scripts/migrate_workflows_to_json_store.py`` but runs
+        Reuses the deserialization logic from the
+        JSON-to-SQLite migration but runs
         in-process so the router can switch backends without a
         separate migration step.
 

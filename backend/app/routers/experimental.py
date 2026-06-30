@@ -143,7 +143,7 @@ def _require_admin_key(request: Request) -> None:
     When ``settings.ADMIN_API_KEY`` is empty we emit a loud warning and
     fall back to the regular API key check. The end-to-end fail-closed
     guard (refusing to start at all without an admin key) lives in
-    ``scripts/verify_production_deployment.py`` and in the startup
+    ``scripts/check_prod_env.py`` and in the startup
     sequence — see ``app.lifespan``. Do not silence the warning: an
     unset ``ADMIN_API_KEY`` in production is a misconfiguration that
     must be flagged, not hidden.

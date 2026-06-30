@@ -2,8 +2,8 @@
 """Multi-endpoint load profile runner for DataForge ops readiness.
 
 P1-OPS-LOAD-ALERT-001: extends the load test coverage beyond /health
-to include /ready and /healthz so operators can verify multiple
-critical paths survive concurrent load.
+to include /ready so operators can verify multiple critical paths
+survive concurrent load.
 
 This is a thin wrapper over ``scripts/run_load_test.py`` logic — it
 reuses the same worker/percentile/build_result primitives but runs

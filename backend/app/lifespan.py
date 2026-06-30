@@ -129,7 +129,7 @@ def _init_experimental_subsystems() -> tuple[Any, Any]:
 def _verify_schema_version() -> None:
     """Check that the connected DB schema matches the code's expected version."""
     try:
-        from app.storage_migrations import POSTGRES_SCHEMA_VERSION
+        from app.storage_migrations import POSTGRES_SCHEMA_VERSION, SQLITE_SCHEMA_VERSION
 
         if job_repo is not None:
             backend = getattr(job_repo, "backend", None) or "unknown"
@@ -138,7 +138,10 @@ def _verify_schema_version() -> None:
                 status = fencer()
                 actual_version = status.get("schema_version") if isinstance(status, dict) else None
                 expected_version = status.get("expected_version") if isinstance(status, dict) else None
-                expected_version = expected_version or POSTGRES_SCHEMA_VERSION
+                # Use expected_version from storage status if available;
+                # fall back to backend-appropriate constant.
+                if expected_version is None:
+                    expected_version = SQLITE_SCHEMA_VERSION if backend == "sqlite" else POSTGRES_SCHEMA_VERSION
                 if actual_version is not None and int(actual_version) != int(expected_version):
                     msg = (
                         f"DB schema version mismatch on backend={backend}: "

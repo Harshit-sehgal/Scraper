@@ -3,7 +3,7 @@
 These functions operate on a TopologyState instance for all community-level
 management and topological pattern discovery.
 
-Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
+Extracted from topology_state.py for modularity.
 """
 
 from typing import TYPE_CHECKING
