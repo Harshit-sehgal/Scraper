@@ -943,7 +943,9 @@ def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
 
     cleaned = soup.prettify()
     if isinstance(cleaned, bytes):
-        text: str = cleaned.decode("utf-8", errors="replace")
+        from app.encoding_detection import decode_content
+
+        text: str = decode_content(cleaned)
     else:
         text = cleaned
     return text[:max_chars]

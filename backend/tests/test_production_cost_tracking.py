@@ -16,7 +16,7 @@ def _reset_usage():
 class TestCostTracking:
     @pytest.mark.asyncio
     async def test_finalization_calculates_cost(self) -> None:
-        async def fake_persist_fn():
+        def fake_persist_fn():
             pass
 
         job = Job(
