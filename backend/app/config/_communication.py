@@ -176,3 +176,19 @@ class CommunicationSettings(BaseSettings):
     """Send notification on critical application errors."""
     TELEGRAM_API_BASE: str = "https://api.telegram.org"
     """Telegram Bot API base URL. Override for local Bot API server."""
+
+    # ─── SMTP Email Settings (Feat 35 / Feat 36) ────────────────────────
+    SMTP_HOST: str = ""
+    """SMTP server hostname for sending notification emails."""
+    SMTP_PORT: int = 587
+    """SMTP server port. 587 = STARTTLS, 465 = implicit SSL."""
+    SMTP_USER: str = ""
+    """SMTP authentication username."""
+    SMTP_PASS: str = ""
+    """SMTP authentication password."""
+    SMTP_FROM: str = ""
+    """Sender email address for notification emails."""
+    SMTP_USE_SSL: bool = False
+    """Use implicit SSL (port 465). When False, use STARTTLS (port 587)."""
+    NOTIFICATION_TIMEOUT_SECONDS: float = 10.0
+    """Default HTTP timeout for Slack/Teams/Discord webhook delivery."""
