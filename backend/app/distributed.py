@@ -250,7 +250,10 @@ class DistributedLock:
                 remaining = deadline - time.time()
                 if remaining > 0:
                     time.sleep(min(0.5, remaining))
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
+                # psycopg2 errors derive from BaseException → RuntimeError via
+                # the operational adapter, or raise OSError for connection
+                # failures; ValueError covers bad DSN / params.
                 logger.debug("[DistributedLock] Postgres lock error", exc_info=True)
                 return False
         return False

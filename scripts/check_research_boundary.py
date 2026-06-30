@@ -173,7 +173,7 @@ def main() -> int:
         for rel, lineno, mod, names in violations:
             print(f"  [VIOLATION] {rel}:{lineno}  top-level import of research module '{mod}' ({names})")
         print(
-            "\nSee docs/REFACTOR_PLAN.md (Phase R5) and app/research/__init__.py "
+            "\nSee app/research/__init__.py "
             "for the boundary definition. Kernel files must load research modules "
             "lazily (inside function bodies) so they remain absent from the import "
             "graph when ENABLE_EXPERIMENTAL_ROUTES is False.",

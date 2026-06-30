@@ -65,6 +65,7 @@ class GlobalCognitiveScheduler:
             "total_execution_time": 0.0,
             "priority_counts": Counter(),
         }
+        self._stats_lock = threading.Lock()
 
     def schedule(self, task_id: str, priority: TaskPriority, handler: Callable, *args: Any, **kwargs: Any) -> None:
         task = CognitiveTask(task_id, priority, handler, args, kwargs)
@@ -108,8 +109,9 @@ class GlobalCognitiveScheduler:
             t0 = time.time()
             try:
                 task.handler(*task.args, **task.kwargs)
-                self._execution_stats["tasks_completed"] += 1
-                self._execution_stats["priority_counts"][task.priority.name] += 1
+                with self._stats_lock:
+                    self._execution_stats["tasks_completed"] += 1
+                    self._execution_stats["priority_counts"][task.priority.name] += 1
             except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
                 logger.exception("TASK FAILED: [%s]", task.task_id)
                 # Record degradation telemetry (best-effort)
@@ -124,7 +126,8 @@ class GlobalCognitiveScheduler:
                     logger.debug("Failed to record degradation for task failure", exc_info=True)
 
             duration = time.time() - t0
-            self._execution_stats["total_execution_time"] += duration
+            with self._stats_lock:
+                self._execution_stats["total_execution_time"] += duration
             completed += 1
 
         return completed

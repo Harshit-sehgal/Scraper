@@ -107,9 +107,12 @@ def get_sqlite_status(
         conn = conn_factory()
         row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         schema_version = row[0] if row and row[0] is not None else 0
-        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-        recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
-        wal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        job_row = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()
+        job_count = job_row[0] if job_row else 0
+        recycle_row = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()
+        recycle_count = recycle_row[0] if recycle_row else 0
+        wal_row = conn.execute("PRAGMA journal_mode").fetchone()
+        wal_mode = wal_row[0] if wal_row else "unknown"
         return {
             "ok": True,
             "backend": "sqlite",

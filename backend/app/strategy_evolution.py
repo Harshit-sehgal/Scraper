@@ -195,6 +195,7 @@ class StrategyEvolutionEngine:
     def __init__(self) -> None:
         """Initialize strategy evolution engine."""
         self.domain_states: dict[str, DomainStrategyState] = {}
+        self._state_lock = threading.Lock()
 
         # Evolution parameters
         self.min_samples_for_recommendation = 3
@@ -250,7 +251,8 @@ class StrategyEvolutionEngine:
                     strategy = FetchStrategy.PLAYWRIGHT_FULL
 
         state = self._get_or_create_state(domain)
-        state.record_attempt(strategy, success, time_ms, quality, failure_reason)
+        with self._state_lock:
+            state.record_attempt(strategy, success, time_ms, quality, failure_reason)
 
     def recommend_strategy(self, domain: str) -> StrategyRecommendation:
         """Recommend a fetch strategy for a domain."""

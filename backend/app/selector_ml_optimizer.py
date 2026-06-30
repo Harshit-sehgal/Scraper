@@ -351,6 +351,7 @@ class SelectorOptimizationEngine:
         self.predictor = SelectorQualityPredictor()
         self.feature_extractor = SelectorFeatureExtractor()
         self.optimization_history: dict[str, list[dict[str, Any]]] = {}
+        self._history_lock = threading.Lock()
 
     def optimize_selectors(
         self,
@@ -404,17 +405,19 @@ class SelectorOptimizationEngine:
             report["summary"]["total_quality"] /= len(selectors)
 
         # Track optimization
-        if domain not in self.optimization_history:
-            self.optimization_history[domain] = []
-        self.optimization_history[domain].append(report)
-        if len(self.optimization_history[domain]) > MAX_HISTORY_LENGTH:
-            self.optimization_history[domain] = self.optimization_history[domain][-MAX_HISTORY_LENGTH // 2 :]
+        with self._history_lock:
+            if domain not in self.optimization_history:
+                self.optimization_history[domain] = []
+            self.optimization_history[domain].append(report)
+            if len(self.optimization_history[domain]) > MAX_HISTORY_LENGTH:
+                self.optimization_history[domain] = self.optimization_history[domain][-MAX_HISTORY_LENGTH // 2 :]
 
         return report
 
     def get_optimization_history(self, domain: str, limit: int = 10) -> list[dict]:
         """Get recent optimization reports for a domain."""
-        hist: list[Any] = self.optimization_history.get(domain, [])
+        with self._history_lock:
+            hist: list[Any] = list(self.optimization_history.get(domain, []))
         return hist[-limit:]
 
     def learn_from_results(

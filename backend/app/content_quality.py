@@ -111,7 +111,10 @@ def _assess_content_quality(html: str, profile) -> dict[str, Any]:
         try:
             containers = soup.select(container_selector)
             data_container_count = sum(1 for c in containers if len(c.get_text(strip=True)) > 20)
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
+            # soup.select() with an invalid selector raises
+            # ValueError/SelectorError; get_text may raise AttributeError
+            # on malformed elements.
             logger.debug("Container selector '%s' evaluation failed", container_selector, exc_info=True)
 
     # ── Generic Data Container Discovery (fallback) ─────────────────

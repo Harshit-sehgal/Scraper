@@ -531,7 +531,7 @@ class RecoveryExecutor:
                 if result:
                     logger.info("Recovery successful: %s", plan.primary_action.value)
                     return True
-            except Exception:
+            except (OSError, RuntimeError, ValueError, TypeError, ConnectionError, TimeoutError):
                 logger.exception("Recovery action failed: %s", plan.primary_action.value)
         else:
             logger.warning("No handler registered for action: %s", plan.primary_action.value)
@@ -547,7 +547,7 @@ class RecoveryExecutor:
                         if result:
                             logger.info("Recovery successful via escalation: %s", secondary_action.value)
                             return True
-                    except Exception:
+                    except (OSError, RuntimeError, ValueError, TypeError, ConnectionError, TimeoutError):
                         logger.exception("Escalated recovery action failed: %s", secondary_action.value)
 
         logger.warning("All recovery actions failed for %s", plan.failure_category.value)
