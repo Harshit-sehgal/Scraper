@@ -104,6 +104,13 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "scroll_attempts": job.scroll_attempts if getattr(job, "scroll_attempts", None) is not None else 0,
         "request_delay_ms": job.request_delay_ms if getattr(job, "request_delay_ms", None) is not None else 0,
         "max_concurrent_urls": job.max_concurrent_urls if getattr(job, "max_concurrent_urls", None) is not None else 4,
+        "user_agent": job.user_agent if hasattr(job, "user_agent") and job.user_agent is not None else "",
+        "wait_for_selector": job.wait_for_selector if getattr(job, "wait_for_selector", None) is not None else "",
+        "wait_for_function": job.wait_for_function if getattr(job, "wait_for_function", None) is not None else "",
+        "wait_for_timeout": job.wait_for_timeout if getattr(job, "wait_for_timeout", None) is not None else None,
+        "wait_for_navigation": job.wait_for_navigation if getattr(job, "wait_for_navigation", None) is not None else None,
+        "cascade_telemetry": json.dumps(job.cascade_telemetry if hasattr(job, "cascade_telemetry") and job.cascade_telemetry is not None else {}),
+        "quality_score_summary": job.quality_score_summary if hasattr(job, "quality_score_summary") and job.quality_score_summary is not None else 0.0,
     }
 
 
@@ -183,6 +190,13 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "scroll_attempts": row.get("scroll_attempts") or None,
                 "request_delay_ms": row.get("request_delay_ms", 0),
                 "max_concurrent_urls": row.get("max_concurrent_urls") or 4,
+                "user_agent": row.get("user_agent", ""),
+                "wait_for_selector": row.get("wait_for_selector") or None,
+                "wait_for_function": row.get("wait_for_function") or None,
+                "wait_for_timeout": row.get("wait_for_timeout") or None,
+                "wait_for_navigation": bool(row.get("wait_for_navigation")) if row.get("wait_for_navigation") is not None else None,
+                "cascade_telemetry": json.loads(row.get("cascade_telemetry", "{}")),
+                "quality_score_summary": row.get("quality_score_summary", 0.0),
             },
         )
     except (json.JSONDecodeError, KeyError, ValueError) as e:

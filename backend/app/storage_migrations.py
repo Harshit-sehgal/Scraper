@@ -18,7 +18,7 @@ from app.storage_mapper import job_to_row, row_to_job
 
 logger = logging.getLogger(__name__)
 
-SQLITE_SCHEMA_VERSION = 12
+SQLITE_SCHEMA_VERSION = 13
 POSTGRES_SCHEMA_VERSION = 11
 
 # ───────────────────────────────────────────────────────────────────────
@@ -505,6 +505,18 @@ def _run_migration_v12(conn: sqlite3.Connection) -> int:
     return 12
 
 
+def _run_migration_v13(conn: sqlite3.Connection) -> int:
+    """Version 13 — reconcile job tables with canonical storage columns."""
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        existing_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        for col_def in _JOBS_COLUMNS_SQL:
+            col_name = col_def.strip().split(" ", 1)[0]
+            if col_name not in existing_cols:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_def}")
+    return 13
+
+
 def _add_hot_path_indexes(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)")
@@ -538,6 +550,7 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
         (10, _run_migration_v10),
         (11, _run_migration_v11),
         (12, _run_migration_v12),
+        (13, _run_migration_v13),
     ]
 
     if current < SQLITE_SCHEMA_VERSION:

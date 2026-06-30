@@ -106,7 +106,8 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     progress_current integer DEFAULT 0,
     progress_total integer DEFAULT 0,
     estimated_cost_usd real DEFAULT 0,
-    cancel_requested boolean DEFAULT false,
+    cost_breakdown text DEFAULT '{}'::text,
+    cancel_requested boolean DEFAULT false NOT NULL,
     created_by text DEFAULT ''::text,
     org_id text DEFAULT ''::text,
     project_id text DEFAULT ''::text,
@@ -120,11 +121,11 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     max_per_domain integer DEFAULT 4,
     origin_location text DEFAULT ''::text,
     max_distance_km real,
-    pagination boolean DEFAULT false,
-    deduplicate boolean DEFAULT true,
+    pagination boolean DEFAULT false NOT NULL,
+    deduplicate boolean DEFAULT true NOT NULL,
     deduplicate_field text DEFAULT ''::text,
     started_at text DEFAULT ''::text,
-    results_on_disk boolean DEFAULT false,
+    results_on_disk boolean DEFAULT false NOT NULL,
     results_file_path text DEFAULT ''::text,
     updated_at text DEFAULT ''::text,
     deleted_at text,
@@ -136,7 +137,7 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     cookies text DEFAULT '{}'::text,
     webhook_url text DEFAULT ''::text,
     webhook_secret text DEFAULT ''::text,
-    webhook_delivered boolean DEFAULT false,
+    webhook_delivered boolean DEFAULT false NOT NULL,
     webhook_delivered_at text DEFAULT ''::text,
     fetch_strategy text DEFAULT ''::text,
     hydration_wait_ms integer DEFAULT 0,
@@ -263,7 +264,8 @@ CREATE TABLE IF NOT EXISTS public.recycle_bin (
     progress_current integer DEFAULT 0,
     progress_total integer DEFAULT 0,
     estimated_cost_usd real DEFAULT 0,
-    cancel_requested boolean DEFAULT false,
+    cost_breakdown text DEFAULT '{}'::text,
+    cancel_requested boolean DEFAULT false NOT NULL,
     created_by text DEFAULT ''::text,
     org_id text DEFAULT ''::text,
     project_id text DEFAULT ''::text,
@@ -277,11 +279,11 @@ CREATE TABLE IF NOT EXISTS public.recycle_bin (
     max_per_domain integer DEFAULT 4,
     origin_location text DEFAULT ''::text,
     max_distance_km real,
-    pagination boolean DEFAULT false,
-    deduplicate boolean DEFAULT true,
+    pagination boolean DEFAULT false NOT NULL,
+    deduplicate boolean DEFAULT true NOT NULL,
     deduplicate_field text DEFAULT ''::text,
     started_at text DEFAULT ''::text,
-    results_on_disk boolean DEFAULT false,
+    results_on_disk boolean DEFAULT false NOT NULL,
     results_file_path text DEFAULT ''::text,
     updated_at text DEFAULT ''::text,
     deleted_at text,
@@ -293,7 +295,7 @@ CREATE TABLE IF NOT EXISTS public.recycle_bin (
     cookies text DEFAULT '{}'::text,
     webhook_url text DEFAULT ''::text,
     webhook_secret text DEFAULT ''::text,
-    webhook_delivered boolean DEFAULT false,
+    webhook_delivered boolean DEFAULT false NOT NULL,
     webhook_delivered_at text DEFAULT ''::text,
     fetch_strategy text DEFAULT ''::text,
     hydration_wait_ms integer DEFAULT 0,
@@ -318,7 +320,9 @@ BEGIN
 END $$;
 -- Name: schema_version; Type: TABLE; Schema: public; Owner: dataforge
 CREATE TABLE IF NOT EXISTS public.schema_version (
-    version integer NOT NULL
+    version integer PRIMARY KEY,
+    applied_at timestamp without time zone DEFAULT now() NOT NULL,
+    comment text
 );
 
 
@@ -385,8 +389,7 @@ ALTER TABLE ONLY public.queue_tasks
 ALTER TABLE ONLY public.recycle_bin
     ADD CONSTRAINT recycle_bin_pkey PRIMARY KEY (id);
 -- Name: schema_version schema_version_pkey; Type: CONSTRAINT; Schema: public; Owner: dataforge
-ALTER TABLE ONLY public.schema_version
-    ADD CONSTRAINT schema_version_pkey PRIMARY KEY (version);
+-- (PK is already defined inline in CREATE TABLE above; no separate ALTER needed.)
 -- Name: worker_heartbeats worker_heartbeats_pkey1; Type: CONSTRAINT; Schema: public; Owner: dataforge
 ALTER TABLE ONLY public.worker_heartbeats
     ADD CONSTRAINT worker_heartbeats_pkey1 PRIMARY KEY (worker_id, pid);
@@ -436,11 +439,8 @@ ALTER TABLE ONLY public.job_results
 -- =============================================================================
 -- Schema version stamp — INSERT idempotent guard.
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS public.schema_version (
-    version integer PRIMARY KEY,
-    applied_at timestamp without time zone DEFAULT now() NOT NULL,
-    comment text
-);
+-- (schema_version table created above with full schema including
+--  applied_at and comment columns.)
 INSERT INTO public.schema_version (version, comment)
 VALUES (8, '008_postgres_storage_v8 idempotent')
 ON CONFLICT (version) DO NOTHING;

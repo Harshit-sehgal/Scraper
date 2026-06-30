@@ -71,6 +71,7 @@ _JOB_COLUMNS: frozenset[str] = frozenset(
         "discovered_urls",
         "quality_report",
         "estimated_cost_usd",
+        "cost_breakdown",
         "total_llm_calls",
         "logs",
         "progress_current",

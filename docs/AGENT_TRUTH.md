@@ -4242,3 +4242,54 @@ The repo now has reproducible local load-test tooling and reproducible
 synthetic Alertmanager drill tooling. `P1-OPS-LOAD-ALERT-001` remains
 open/deferred because the drill still must be run in staging with a real
 on-call channel and recorded notification evidence.
+
+## 2026-06-30 - Full Validation Repair Pass
+
+Scope: repair the current checkout until the full local validation gate
+reproduces green from current code and artifacts.
+
+### Fixes
+
+- Added pytest-native warning filters for Playwright/asyncio teardown
+  noise and removed the ineffective top-level warning suppression from
+  `backend/tests/conftest.py`.
+- Fixed static failures in cookie consent, crawl-policy sitemap fetch,
+  cascade telemetry, screenshot store exports, and review queue slots.
+- Tightened new review/sitemap route signatures so auth dependencies are
+  required and mutation routes are admin/operator-only. The field
+  correction PATCH route now exposes request-body metadata in OpenAPI.
+- Validated sitemap discovery URLs before both `httpx` and `urllib`
+  fetches, using the same public URL safety boundary as other fetchers.
+- Added SQLite schema migration v13 to reconcile `jobs` and
+  `recycle_bin` with canonical storage columns, including
+  `cost_breakdown`, and added `cost_breakdown` to the Postgres known
+  column set.
+- Regenerated route auth matrix and OpenAPI artifacts after route/schema
+  changes.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline before edits: PASS; 12/12 quick checks passed. |
+| `PYTHONPATH=backend ... python3 -m pytest backend/tests/test_browser_workflow_runner.py::TestBrowserWorkflowRunner::test_screenshot_included_on_success -q -o addopts= -W 'ignore:Exception ignored in:pytest.PytestUnraisableExceptionWarning'` | 0 | PASS; 1 passed, no unraisable warning summary. |
+| `PYTHONPATH=backend ... python3 -m pytest backend/tests/test_browser_workflow_runner.py -q -o addopts=` | 0 | PASS after pytest warning-filter move; 10 passed in 62.85s. |
+| `python3 scripts/validate_local.py --full` | 1 | Run `20260630T042517Z_full`; failed backend full tests and static gates on ruff/pyflakes/bandit findings (`cookie_consent.py`, `crawl_policy.py`, `extraction_*`, `review_queue.py`). |
+| `python3 -m ruff check backend/app/routers/jobs_write.py backend/app/routers/jobs_read.py backend/app/cookie_consent.py backend/app/crawl_policy.py backend/app/extraction_cascade_telemetry.py backend/app/extraction_screenshot_store.py backend/app/review_queue.py backend/tests/conftest.py pyproject.toml` | 0 | PASS after route/static fixes. |
+| `python3 -m pyflakes backend/app/routers/jobs_write.py backend/app/routers/jobs_read.py backend/app/extraction_screenshot_store.py backend/tests/conftest.py` | 0 | PASS after removing unused imports and fixing route syntax. |
+| `python3 -m mypy backend` | 0 | PASS after route signature and test type-annotation fixes; 870+ source files checked. |
+| `python3 -m bandit -r backend/app --ini backend/.bandit -q` | 0 | PASS after moving the `urllib` fetch into a validated helper and suppressing B310 only on the validated call. |
+| `PYTHONPATH=backend ... python3 -m pytest backend/tests/test_compliance_cookie_consent.py backend/tests/test_crawl_policy_rate_limiting.py backend/tests/test_crawl_policy_allow_directive.py backend/tests/test_crawl_policy_persistence.py backend/tests/test_quality_review.py backend/tests/test_pyflakes_fixes.py::test_pyflakes_clean backend/tests/test_browser_workflow_runner.py -q -o addopts=` | 0 | PASS; 88 passed in 68.59s. |
+| `PYTHONPATH=backend ... python3 -m pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py backend/tests/test_openapi_examples.py::test_all_patch_endpoints_have_request_body backend/tests/test_cookie_consent.py backend/tests/test_extraction_screenshot_store.py backend/tests/test_review_queue.py -q -o addopts=` | 0 | PASS after auth/OpenAPI/test typing fixes; 118 passed in 19.76s. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; wrote `docs/ROUTE_AUTH_MATRIX.md` and `artifacts/audit/ROUTE_AUTH_MATRIX.json`; routes=185, unknown_auth=0, unknown_tenant=3. |
+| `python3 scripts/generate_openapi.py --no-docs-copy` | 0 | PASS; wrote `artifacts/audit/openapi.json`; path_count=126, operation_count=154. |
+| `PYTHONPATH=backend ... python3 -m pytest backend/tests/test_jobs_store_cross_process.py::test_subprocess_writes_visible_to_main_process backend/tests/test_jobs_store_cross_process.py::test_concurrent_subprocess_writers_persist_every_row backend/tests/test_pyflakes_fixes.py::test_pyflakes_clean backend/tests/test_scrape_attempt_result.py::test_scrape_url_attempt_returns_rich_result backend/tests/test_scrape_attempt_result.py::test_scrape_url_attempt_zero_result_with_html backend/tests/test_scraper_recovery.py::TestScopedSelectorCleanup::test_selector_decay_triggers_scoped_cleanup backend/tests/test_storage_migrations.py::test_sqlite_schema_has_all_expected_columns backend/tests/test_storage_schema_parity.py::test_sqlite_columns_present_in_postgres_columns -q` | 0 | PASS after storage v13 migration; 8 passed. |
+| `PYTHONPATH=backend ... python3 -m pytest backend/tests/test_storage_migrations.py backend/tests/test_storage_schema_parity.py backend/tests/test_jobs_store_cross_process.py backend/tests/test_job_store_persistence.py backend/tests/test_migration_regression.py -q` | 0 | PASS; 55 passed. |
+| `python3 scripts/validate_local.py --full` | 0 | Final PASS; run `20260630T060444Z_full`, 24 passed, 0 failed, 0 skipped, 0 timed out. |
+| `git diff --check` | 0 | PASS after the truth-log update; no whitespace errors. |
+
+### Current Status
+
+Latest validation artifact is
+`artifacts/validation/runs/20260630T060444Z_full`; `artifacts/validation/latest_summary.md`
+reports `overall_status: passed`.
