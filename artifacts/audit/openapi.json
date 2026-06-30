@@ -2371,7 +2371,7 @@
         "type": "object"
       },
       "PlanInfoResponse": {
-        "description": "Current plan information for the user.",
+        "description": "Current plan information for the user.\n\nIncludes both subscription limits (max_*) and current consumption\ncounters (used_*) so the billing UI can show \"3 / 10 jobs used\"\nwithout a second round-trip.",
         "properties": {
           "features": {
             "items": {
@@ -2405,6 +2405,16 @@
             "maxLength": 32,
             "title": "Tier",
             "type": "string"
+          },
+          "used_jobs": {
+            "default": 0,
+            "title": "Used Jobs",
+            "type": "integer"
+          },
+          "used_scrapes": {
+            "default": 0,
+            "title": "Used Scrapes",
+            "type": "integer"
           }
         },
         "required": [
@@ -3028,6 +3038,11 @@
       "SessionCreateResponse": {
         "description": "Response model for POST /api/session.",
         "properties": {
+          "authenticated": {
+            "default": true,
+            "title": "Authenticated",
+            "type": "boolean"
+          },
           "message": {
             "title": "Message",
             "type": "string"
@@ -3074,6 +3089,28 @@
           "authenticated": {
             "title": "Authenticated",
             "type": "boolean"
+          },
+          "org_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
           },
           "role": {
             "anyOf": [
@@ -7905,7 +7942,7 @@
     },
     "/api/saas/plan": {
       "get": {
-        "description": "Return the current user's plan and limits.\n\nLooks up the caller's tier via the billing service (falling back to\n``free`` when billing is unconfigured) and derives the usage limits\nfrom the same ``app.plan_enforcer`` source of truth that enforces\nthem at job-creation time, so the informational view and the\nenforcement gate can never drift.",
+        "description": "Return the current user's plan and limits.\n\nLooks up the caller's tier via the billing service (falling back to\n``free`` when billing is unconfigured) and derives the usage limits\nfrom the same ``app.plan_enforcer`` source of truth that enforces\nthem at job-creation time, so the informational view and the\nenforcement gate can never drift.\n\nAlso reads the user's current consumption from the usage ledger so\nthe frontend billing meter (\"3 / 10 jobs used\") renders without an\nextra ``/usage`` round-trip.",
         "operationId": "get_plan_info_api_saas_plan_get",
         "responses": {
           "200": {
@@ -9408,7 +9445,7 @@
     },
     "/api/session/me": {
       "get": {
-        "description": "Return the current session role if authenticated via cookie.",
+        "description": "Return the current session role if authenticated via cookie.\n\nExposes the tenant scope (org_id, project_id) embedded in the\nsession cookie so the frontend can render tenant-aware UI without\nan extra API call.",
         "operationId": "get_session_api_session_me_get",
         "responses": {
           "200": {

@@ -50,12 +50,19 @@ async def create_session(
     from app.utils.rbac import resolve_auth_context
 
     context = resolve_auth_context(request, allow_cookie=False)
-    set_session_cookie(response, context.role.value, context.user_id)
+    set_session_cookie(
+        response,
+        context.role.value,
+        context.user_id,
+        org_id=context.org_id,
+        project_id=context.project_id,
+    )
 
     return {
         "status": "ok",
         "role": context.role.value,
         "message": "Session cookie set. Future requests will use the cookie automatically.",
+        "authenticated": True,
     }
 
 
@@ -71,11 +78,22 @@ async def destroy_session(request: Request, response: Response):
 
 @router.get("/api/session/me", response_model=SessionMeResponse)
 async def get_session(request: Request):
-    """Return the current session role if authenticated via cookie."""
+    """Return the current session role if authenticated via cookie.
+
+    Exposes the tenant scope (org_id, project_id) embedded in the
+    session cookie so the frontend can render tenant-aware UI without
+    an extra API call.
+    """
     role = get_session_role(request)
     if role is None:
         return {"authenticated": False}
     from app.auth.session import get_session_payload
 
     payload = get_session_payload(request) or {}
-    return {"authenticated": True, "role": role, "user_id": str(payload.get("user_id") or "")}
+    return {
+        "authenticated": True,
+        "role": role,
+        "user_id": str(payload.get("user_id") or ""),
+        "org_id": str(payload.get("org_id") or "") or None,
+        "project_id": str(payload.get("project_id") or "") or None,
+    }

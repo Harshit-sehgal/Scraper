@@ -182,9 +182,13 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     stale_ids = [jid for jid in manager.jobs_store if jid not in summary_ids]
                     for jid in stale_ids:
                         manager.jobs_store.pop(jid, None)
+                    items = [_public_summary(s) for s in summaries]
                     return {
                         "total": len(summaries),
-                        "items": [_public_summary(s) for s in summaries],
+                        "items": items,
+                        # DEPRECATED: ``jobs`` kept for backward compat with older
+                        # clients; new consumers should read ``items``.
+                        "jobs": items,
                         "next_cursor": next_cursor,
                     }
             except (AttributeError, ImportError, RuntimeError):
@@ -233,6 +237,9 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
             return {
                 "total": len(summaries),
                 "items": summaries,
+                # DEPRECATED: ``jobs`` kept for backward compat (older
+                # clients).  New consumers should read ``items``.
+                "jobs": summaries,
                 "next_cursor": next_cursor,
             }
 
@@ -542,9 +549,11 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     cursor=cursor,
                 )
                 summaries = [s for s in summaries if _summary_visible(s, role, user_id, org_id, project_id)]
+                items = [_public_summary(s) for s in summaries]
                 return {
                     "total": len(summaries),
-                    "items": [_public_summary(s) for s in summaries],
+                    "items": items,
+                    "jobs": items,
                 }
             except (AttributeError, ImportError, RuntimeError):
                 # Repo lacks ``list_recycle_summaries`` or DB errored —
@@ -587,7 +596,11 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                         "warnings": dumped.get("warnings"),
                     },
                 )
-            return {"total": len(summaries), "items": summaries}
+            return {
+                "total": len(summaries),
+                "items": summaries,
+                "jobs": summaries,
+            }
 
     @router.get("/api/jobs/{job_id}/diff", response_model=dict[str, Any])
     async def get_job_diff(

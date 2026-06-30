@@ -235,7 +235,9 @@ def _resolve_session_context(request: Request) -> AuthContext | None:
     user_id = str(payload.get("user_id") or "") or _configured_user_id_for_role(role)
     if not user_id:
         raise HTTPException(status_code=403, detail="Invalid or expired session")
-    return AuthContext(role=role, user_id=user_id, source="session")
+    org_id = str(payload.get("org_id") or "")
+    project_id = str(payload.get("project_id") or "")
+    return AuthContext(role=role, user_id=user_id, source="session", org_id=org_id, project_id=project_id)
 
 
 def _resolve_dev_context() -> AuthContext | None:

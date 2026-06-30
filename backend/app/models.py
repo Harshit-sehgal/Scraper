@@ -1214,6 +1214,7 @@ class SessionCreateResponse(BaseModel):
     status: str
     role: str
     message: str
+    authenticated: bool = True
 
 
 class SessionDestroyResponse(BaseModel):
@@ -1229,6 +1230,8 @@ class SessionMeResponse(BaseModel):
     authenticated: bool
     role: str | None = None
     user_id: str | None = None
+    org_id: str | None = None
+    project_id: str | None = None
 
 
 class AuditLogResponse(BaseModel):

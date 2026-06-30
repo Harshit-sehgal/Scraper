@@ -316,9 +316,26 @@ def _session_cookie_secure() -> bool:
     return (settings.ENV or "").strip().lower() in {"production", "staging"}
 
 
-def set_session_cookie(response: Response, role: str, user_id: str = "") -> None:
-    """Set the session cookie on *response* for the authenticated principal."""
-    cookie_value = create_session_cookie(role, user_id=user_id)
+def set_session_cookie(
+    response: Response,
+    role: str,
+    user_id: str = "",
+    *,
+    org_id: str = "",
+    project_id: str = "",
+) -> None:
+    """Set the session cookie on *response* for the authenticated principal.
+
+    ``org_id`` and ``project_id`` are embedded into the signed cookie
+    so subsequent session-authenticated requests can be tenant-scoped
+    without needing to re-validate the original API key.
+    """
+    cookie_value = create_session_cookie(
+        role,
+        user_id=user_id,
+        org_id=org_id,
+        project_id=project_id,
+    )
     response.set_cookie(
         key=SESSION_COOKIE,
         value=cookie_value,
