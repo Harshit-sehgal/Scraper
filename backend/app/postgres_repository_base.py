@@ -92,6 +92,13 @@ _JOB_COLUMNS: frozenset[str] = frozenset(
         "scroll_attempts",
         "request_delay_ms",
         "max_concurrent_urls",
+        "user_agent",
+        "wait_for_selector",
+        "wait_for_function",
+        "wait_for_timeout",
+        "wait_for_navigation",
+        "cascade_telemetry",
+        "quality_score_summary",
     }
 )
 

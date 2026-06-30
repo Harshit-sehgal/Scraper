@@ -315,7 +315,7 @@ services:
     restart: unless-stopped
     # F-NGINX-HEALTHCHECK-001: pin to HTTPS responding, not just process alive.
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 5s
       retries: 3

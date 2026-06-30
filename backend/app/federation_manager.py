@@ -72,6 +72,7 @@ class FederationManager:
 
         self.node_id = settings.NODE_ID
         self.shard_id = settings.SHARD_ID
+        self._metrics_lock = threading.Lock()
         self.registered_nodes: dict[str, dict[str, Any]] = {}
         self.last_sync_timestamps: dict[str, float] = {}
         self.divergence_metrics: dict[str, Any] = {
@@ -262,7 +263,8 @@ class FederationManager:
                         self.ws._topology._cohesion_metadata[k] = r_meta
                         merge_report["reconciled_topologies"] += 1
 
-        self.divergence_metrics["reconciled_merges"] += 1
+        with self._metrics_lock:
+            self.divergence_metrics["reconciled_merges"] += 1
         logger.info("[Federation] Successfully merged remote state from node %s: %s", remote.node_id, merge_report)
         return merge_report
 
@@ -296,7 +298,8 @@ class FederationManager:
                             replay_report["replayed"] += 1
                 except Exception as e:
                     replay_report["failed"] += 1
-                    self.divergence_metrics["failed_replays"] += 1
+                    with self._metrics_lock:
+                        self.divergence_metrics["failed_replays"] += 1
                     logger.warning("[Federation] Replay delta action failed: %s", e)
         finally:
             self.ws._replaying = False
@@ -320,9 +323,11 @@ class FederationManager:
         total_distance = sum(abs(local_coords[k] - remote.topology[k]) for k in shared_keys)
         avg_drift = total_distance / len(shared_keys)
 
-        self.divergence_metrics["last_drift_score"] = round(avg_drift, 4)
+        with self._metrics_lock:
+            self.divergence_metrics["last_drift_score"] = round(avg_drift, 4)
         if avg_drift > 0.5:
-            self.divergence_metrics["drift_warnings"] += 1
+            with self._metrics_lock:
+                self.divergence_metrics["drift_warnings"] += 1
             logger.warning("[Federation] Significant drift divergence detected: %.4f", avg_drift)
 
         return avg_drift  # type: ignore[no-any-return]

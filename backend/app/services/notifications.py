@@ -440,7 +440,7 @@ class TelegramNotifier:
                 # before the function exits — the previous pattern let
                 # undetermined responses pile up under failure paths.
                 await response.aclose()
-        except Exception:
+        except (httpx.HTTPError, ConnectionError, TimeoutError, ValueError, TypeError):
             logger.exception("Failed to send Telegram notification")
 
     async def close(self) -> None:

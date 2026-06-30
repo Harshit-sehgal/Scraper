@@ -18,7 +18,7 @@ from app.storage_mapper import job_to_row, row_to_job
 
 logger = logging.getLogger(__name__)
 
-SQLITE_SCHEMA_VERSION = 13
+SQLITE_SCHEMA_VERSION = 14
 POSTGRES_SCHEMA_VERSION = 11
 
 # ───────────────────────────────────────────────────────────────────────
@@ -42,6 +42,8 @@ def _job_from_raw(raw: dict[str, Any]) -> dict[str, Any]:
         "search_params",
         "headers",
         "cookies",
+        "cost_breakdown",
+        "cascade_telemetry",
     ]:
         if field in out and not isinstance(out[field], str):
             out[field] = json.dumps(out[field])
@@ -517,6 +519,33 @@ def _run_migration_v13(conn: sqlite3.Connection) -> int:
     return 13
 
 
+def _run_migration_v14(conn: sqlite3.Connection) -> int:
+    """Version 14 — add user_agent, wait_for_*, cascade_telemetry, quality_score_summary.
+
+    These columns were added to ``_JOBS_COLUMNS_SQL`` after v13 shipped, so
+    existing databases that already ran v13 are missing them.  The v13
+    reconciliation only runs when the schema version is *below* 13, so
+    databases sitting at v13 need a dedicated step.
+    """
+    _V14_NEW_COLUMNS = [
+        "user_agent TEXT DEFAULT ''",
+        "wait_for_selector TEXT DEFAULT ''",
+        "wait_for_function TEXT DEFAULT ''",
+        "wait_for_timeout INTEGER DEFAULT NULL",
+        "wait_for_navigation BOOLEAN DEFAULT NULL",
+        "cascade_telemetry TEXT DEFAULT '{}'",
+        "quality_score_summary REAL DEFAULT 0.0",
+    ]
+    for table_name in ["jobs", "recycle_bin"]:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        existing_cols: set[str] = {r["name"] for r in cursor.fetchall()}
+        for col_def in _V14_NEW_COLUMNS:
+            col_name = col_def.strip().split(" ", 1)[0]
+            if col_name not in existing_cols:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_def}")
+    return 14
+
+
 def _add_hot_path_indexes(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)")
@@ -551,6 +580,7 @@ def run_sqlite_migrations(conn: sqlite3.Connection) -> None:
         (11, _run_migration_v11),
         (12, _run_migration_v12),
         (13, _run_migration_v13),
+        (14, _run_migration_v14),
     ]
 
     if current < SQLITE_SCHEMA_VERSION:

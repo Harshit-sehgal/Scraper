@@ -21,6 +21,20 @@ from app.models import Job
 logger = logging.getLogger(__name__)
 
 
+def _json_loads(val: Any, default: str = "{}") -> Any:
+    """Parse JSON from *val*, but accept already-parsed dicts/lists as-is.
+
+    The JSON migration path (``_job_from_raw``) may leave some fields as
+    native Python dicts/lists rather than JSON strings.  This helper
+    avoids ``json.loads(dict)`` crashes in those cases.
+    """
+    if isinstance(val, (dict, list)):
+        return val
+    if val is None:
+        return json.loads(default)
+    return json.loads(val)
+
+
 def job_to_row(job: Job) -> dict[str, Any]:
     """Convert a Job model to a flat row dict.
 
@@ -109,8 +123,12 @@ def job_to_row(job: Job) -> dict[str, Any]:
         "wait_for_function": job.wait_for_function if getattr(job, "wait_for_function", None) is not None else "",
         "wait_for_timeout": job.wait_for_timeout if getattr(job, "wait_for_timeout", None) is not None else None,
         "wait_for_navigation": job.wait_for_navigation if getattr(job, "wait_for_navigation", None) is not None else None,
-        "cascade_telemetry": json.dumps(job.cascade_telemetry if hasattr(job, "cascade_telemetry") and job.cascade_telemetry is not None else {}),
-        "quality_score_summary": job.quality_score_summary if hasattr(job, "quality_score_summary") and job.quality_score_summary is not None else 0.0,
+        "cascade_telemetry": json.dumps(
+            job.cascade_telemetry if hasattr(job, "cascade_telemetry") and job.cascade_telemetry is not None else {}
+        ),
+        "quality_score_summary": job.quality_score_summary
+        if hasattr(job, "quality_score_summary") and job.quality_score_summary is not None
+        else 0.0,
     }
 
 
@@ -137,25 +155,25 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "mode": row.get("mode", "manual"),
                 "topic": row.get("topic", ""),
                 "intent": row.get("intent", ""),
-                "urls": json.loads(row.get("urls", "[]")),
-                "schema_fields": json.loads(row.get("schema_fields", "[]")),
-                "filters": json.loads(row.get("filters", "[]")),
-                "results": json.loads(row.get("results", "[]")),
-                "logs": json.loads(row.get("logs", "[]")),
+                "urls": _json_loads(row.get("urls", "[]"), "[]"),
+                "schema_fields": _json_loads(row.get("schema_fields", "[]"), "[]"),
+                "filters": _json_loads(row.get("filters", "[]"), "[]"),
+                "results": _json_loads(row.get("results", "[]"), "[]"),
+                "logs": _json_loads(row.get("logs", "[]"), "[]"),
                 "total_records": row.get("total_records", 0),
                 "filtered_records": row.get("filtered_records", 0),
                 "total_llm_calls": row.get("total_llm_calls", 0),
                 "error": row.get("error") or None,
-                "quality_report": json.loads(row.get("quality_report", "{}")),
+                "quality_report": _json_loads(row.get("quality_report", "{}")),
                 "analysis": row.get("analysis") or None,
-                "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
-                "selectors_map": json.loads(row.get("selectors_map", "{}")),
-                "search_params": json.loads(row.get("search_params", "{}")) or None,
+                "discovered_urls": _json_loads(row.get("discovered_urls", "[]"), "[]"),
+                "selectors_map": _json_loads(row.get("selectors_map", "{}")),
+                "search_params": _json_loads(row.get("search_params", "{}")) or None,
                 "max_pages": row.get("max_pages", 0),
                 "progress_current": row.get("progress_current", 0),
                 "progress_total": row.get("progress_total", 0),
                 "estimated_cost_usd": row.get("estimated_cost_usd", 0),
-                "cost_breakdown": json.loads(row.get("cost_breakdown", "{}")),
+                "cost_breakdown": _json_loads(row.get("cost_breakdown", "{}")),
                 "cancel_requested": bool(row.get("cancel_requested", False)),
                 "created_by": row.get("created_by", "") or "",
                 "org_id": row.get("org_id", "") or "",
@@ -175,10 +193,10 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "started_at": row.get("started_at") or None,
                 "results_on_disk": bool(row.get("results_on_disk", False)),
                 "results_file_path": row.get("results_file_path") or None,
-                "warnings": json.loads(row.get("warnings", "[]")),
+                "warnings": _json_loads(row.get("warnings", "[]"), "[]"),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
-                "headers": json.loads(row.get("headers", "{}")),
-                "cookies": json.loads(row.get("cookies", "{}")),
+                "headers": _json_loads(row.get("headers", "{}")),
+                "cookies": _json_loads(row.get("cookies", "{}")),
                 "webhook_url": row.get("webhook_url") or None,
                 "webhook_secret": row.get("webhook_secret") or None,
                 "webhook_delivered": bool(row.get("webhook_delivered", False)),
@@ -194,8 +212,10 @@ def row_to_job(row: dict[str, Any]) -> Job | None:
                 "wait_for_selector": row.get("wait_for_selector") or None,
                 "wait_for_function": row.get("wait_for_function") or None,
                 "wait_for_timeout": row.get("wait_for_timeout") or None,
-                "wait_for_navigation": bool(row.get("wait_for_navigation")) if row.get("wait_for_navigation") is not None else None,
-                "cascade_telemetry": json.loads(row.get("cascade_telemetry", "{}")),
+                "wait_for_navigation": bool(row.get("wait_for_navigation"))
+                if row.get("wait_for_navigation") is not None
+                else None,
+                "cascade_telemetry": _json_loads(row.get("cascade_telemetry", "{}")),
                 "quality_score_summary": row.get("quality_score_summary", 0.0),
             },
         )

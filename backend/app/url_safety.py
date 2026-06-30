@@ -223,7 +223,7 @@ def validate_public_http_url(url: str) -> None:
     except ValueError:
         _record_ssrf_reject("admin_denylisted")
         raise
-    except Exception as e:
+    except (OSError, RuntimeError, AttributeError) as e:
         logger.debug("Admin denylist check failed (non-fatal): %s", e)
 
     # Design note: DNS-based SSRF protection is handled by the transport
@@ -266,7 +266,7 @@ def _record_ssrf_reject(reason: str) -> None:
         from app.metrics_collector import record_ssrf_reject
 
         record_ssrf_reject(reason)
-    except Exception:
+    except (ImportError, AttributeError, OSError):
         logger.debug("Failed to record SSRF reject reason: %s", reason)
 
     try:
@@ -276,7 +276,7 @@ def _record_ssrf_reject(reason: str) -> None:
             outcome="denied",
             details={"reason": reason},
         )
-    except Exception:
+    except (ImportError, AttributeError, OSError, ValueError):
         logger.debug("Failed to log SSRF reject audit event for reason: %s", reason)
 
 

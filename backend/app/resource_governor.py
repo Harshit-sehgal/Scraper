@@ -37,6 +37,7 @@ class ResourceGovernor:
         self.budgets = budgets or ResourceBudgets()
         self.accumulated_tokens = 0
         self.token_spend = 0.0
+        self._metrics_lock = threading.Lock()
         self.metrics = {
             "browser_prunes": 0,
             "queue_sheds": 0,
@@ -75,7 +76,8 @@ class ResourceGovernor:
                             logger.debug("Failed to close context during prune: %s", e)
                         pruned += 1
 
-                self.metrics["browser_prunes"] += pruned
+                with self._metrics_lock:
+                    self.metrics["browser_prunes"] += pruned
                 estimated_memory_mb = len(pool._contexts) * 150.0
 
         return {
@@ -95,7 +97,8 @@ class ResourceGovernor:
             excess = len(queue) - self.budgets.max_queue_size
             # Retain only the highest-priority seeds (assumes queue is sorted)
             trimmed = queue[: self.budgets.max_queue_size]
-            self.metrics["queue_sheds"] += excess
+            with self._metrics_lock:
+                self.metrics["queue_sheds"] += excess
             return trimmed
         return queue
 
@@ -122,7 +125,8 @@ class ResourceGovernor:
                 url = data.pop("url", "unknown")
                 telemetry.record(url, **data)
             pruned = num_records - self.budgets.max_telemetry_records
-            self.metrics["telemetry_prunes"] += pruned
+            with self._metrics_lock:
+                self.metrics["telemetry_prunes"] += pruned
 
         return pruned
 
@@ -133,7 +137,8 @@ class ResourceGovernor:
         self.token_spend += cost
 
         if self.token_spend > self.budgets.max_token_spend:
-            self.metrics["throttled_cycles"] += 1
+            with self._metrics_lock:
+                self.metrics["throttled_cycles"] += 1
             logger.warning(
                 "[Governor] LLM token dollar budget exhausted: $%.4f > $%.2f. Triggering throttle.",
                 self.token_spend,
