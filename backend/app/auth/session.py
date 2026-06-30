@@ -233,16 +233,31 @@ def _unsign(signed: str) -> str | None:
     return None
 
 
-def create_session_cookie(role: str, user_id: str = "") -> str:
-    """Create a signed session cookie value embedding role and identity."""
+def create_session_cookie(role: str, user_id: str = "", *, org_id: str = "", project_id: str = "") -> str:
+    """Create a signed session cookie value embedding role and identity.
+
+    ``org_id`` and ``project_id`` are included in the cookie payload so
+    that session-authenticated requests can enforce tenant scoping without
+    re-resolving the original API key.  For env-backed keys (legacy mode)
+    these fields are empty and the ``_resolve_session_context`` falls back
+    to ``created_by``-based ownership checks.
+    """
     issued_at = int(time.time())
     max_age = SESSION_MAX_AGE
-    sid = _create_server_session(role, user_id, issued_at=issued_at, max_age=max_age)
+    sid = _create_server_session(role, user_id, issued_at=issued_at, max_age=max_age, org_id=org_id, project_id=project_id)
     if not sid:
         msg = "failed to create server-side session"
         raise RuntimeError(msg)
     data = json.dumps(
-        {"role": role, "user_id": user_id, "iat": issued_at, "max_age": max_age, "sid": sid},
+        {
+            "role": role,
+            "user_id": user_id,
+            "org_id": org_id,
+            "project_id": project_id,
+            "iat": issued_at,
+            "max_age": max_age,
+            "sid": sid,
+        },
         separators=(",", ":"),
     )
     payload = base64.urlsafe_b64encode(data.encode("utf-8")).decode("ascii").rstrip("=")
@@ -268,6 +283,8 @@ def verify_session_payload(cookie_value: str) -> dict[str, object] | None:
 
     role = str(data.get("role", ""))
     user_id = str(data.get("user_id", ""))
+    org_id = str(data.get("org_id", ""))
+    project_id = str(data.get("project_id", ""))
     sid = str(data.get("sid", ""))
 
     now = int(time.time())
@@ -275,7 +292,15 @@ def verify_session_payload(cookie_value: str) -> dict[str, object] | None:
         return None
     if not _server_session_is_active(sid, role, user_id, now=now):
         return None
-    return {"role": role, "user_id": user_id, "iat": iat, "max_age": max_age, "sid": sid}
+    return {
+        "role": role,
+        "user_id": user_id,
+        "org_id": org_id,
+        "project_id": project_id,
+        "iat": iat,
+        "max_age": max_age,
+        "sid": sid,
+    }
 
 
 def verify_session_cookie(cookie_value: str) -> str | None:
