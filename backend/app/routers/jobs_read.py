@@ -182,7 +182,11 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     stale_ids = [jid for jid in manager.jobs_store if jid not in summary_ids]
                     for jid in stale_ids:
                         manager.jobs_store.pop(jid, None)
-                    return {"jobs": [_public_summary(s) for s in summaries], "next_cursor": next_cursor}
+                    return {
+                        "total": len(summaries),
+                        "items": [_public_summary(s) for s in summaries],
+                        "next_cursor": next_cursor,
+                    }
             except (AttributeError, ImportError, RuntimeError):
                 logger.debug("Failed to refresh jobs list from repo")
 
@@ -222,10 +226,15 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                         "progress_current": dumped.get("progress_current", 0),
                         "progress_total": dumped.get("progress_total", 0),
                         "error": dumped.get("error"),
+                        "warnings": dumped.get("warnings"),
                     },
                 )
             next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
-            return {"jobs": summaries, "next_cursor": next_cursor}
+            return {
+                "total": len(summaries),
+                "items": summaries,
+                "next_cursor": next_cursor,
+            }
 
     @router.get("/api/jobs/{job_id}", response_model=dict[str, Any])
     async def get_job(
@@ -533,7 +542,10 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                     cursor=cursor,
                 )
                 summaries = [s for s in summaries if _summary_visible(s, role, user_id, org_id, project_id)]
-                return {"jobs": [_public_summary(s) for s in summaries]}
+                return {
+                    "total": len(summaries),
+                    "items": [_public_summary(s) for s in summaries],
+                }
             except (AttributeError, ImportError, RuntimeError):
                 # Repo lacks ``list_recycle_summaries`` or DB errored —
                 # fall back to the in-memory snapshot (matching ``list_jobs``).
@@ -572,9 +584,10 @@ def register_jobs_read_routes(router: APIRouter, manager: JobStoreManager) -> No
                         "progress_current": dumped.get("progress_current", 0),
                         "progress_total": dumped.get("progress_total", 0),
                         "error": dumped.get("error"),
+                        "warnings": dumped.get("warnings"),
                     },
                 )
-            return {"jobs": summaries}
+            return {"total": len(summaries), "items": summaries}
 
     @router.get("/api/jobs/{job_id}/diff", response_model=dict[str, Any])
     async def get_job_diff(

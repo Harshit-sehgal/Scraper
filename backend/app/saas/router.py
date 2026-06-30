@@ -26,7 +26,6 @@ from app.saas.routes.projects import router as projects_router
 from app.saas.routes.signup import router as signup_router
 from app.utils.log_redaction import redact_pii
 from app.utils.rbac import UserRole, require_role_with_user
-from app.utils.usage_ledger import UsageType
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +111,12 @@ _TIER_PROJECTS: dict[str, int] = {
 
 
 class PlanInfoResponse(BaseModel):
-    """Current plan information for the user."""
+    """Current plan information for the user.
+
+    Includes both subscription limits (max_*) and current consumption
+    counters (used_*) so the billing UI can show "3 / 10 jobs used"
+    without a second round-trip.
+    """
 
     tier: str = Field(default="free", max_length=32)
     max_jobs: int = 10
@@ -120,10 +124,13 @@ class PlanInfoResponse(BaseModel):
     max_teammates: int = 2
     max_projects: int = 2
     features: list[str]
+    used_jobs: int = 0
+    used_scrapes: int = 0
 
 
 @router.get("/plan", response_model=PlanInfoResponse)
 async def get_plan_info(
+    request: Request,
     auth: Annotated[
         tuple[UserRole, str],
         Depends(require_role_with_user([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
@@ -136,10 +143,35 @@ async def get_plan_info(
     from the same ``app.plan_enforcer`` source of truth that enforces
     them at job-creation time, so the informational view and the
     enforcement gate can never drift.
+
+    Also reads the user's current consumption from the usage ledger so
+    the frontend billing meter ("3 / 10 jobs used") renders without an
+    extra ``/usage`` round-trip.
     """
     _role, user_id = auth
     tier = get_user_tier(user_id) if user_id else "free"
     limits = get_plan_limits(tier)
+
+    used_jobs = 0
+    used_scrapes = 0
+    if user_id:
+        try:
+            from app.utils.rbac import resolve_auth_context
+            from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+            quota_owner = user_id
+            try:
+                ctx = resolve_auth_context(request)
+                quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
+            except Exception:
+                logger.debug("Quota context resolution failed; falling back to user_id")
+
+            ledger = get_usage_ledger()
+            used_jobs = sum(r.quantity for r in ledger.get_usage(quota_owner, UsageType.JOB_CREATED))
+            used_scrapes = sum(r.quantity for r in ledger.get_usage(quota_owner, UsageType.PAGE_FETCHED))
+        except (ImportError, RuntimeError, ValueError, OSError) as exc:
+            logger.debug("Failed to read plan usage counters: %s", exc)
+
     return PlanInfoResponse(
         tier=tier,
         max_jobs=limits.get(UsageType.JOB_CREATED.value, 10),
@@ -147,6 +179,8 @@ async def get_plan_info(
         max_teammates=_TIER_TEAMMATES.get(tier, 2),
         max_projects=_TIER_PROJECTS.get(tier, 2),
         features=_TIER_FEATURES.get(tier, _TIER_FEATURES["free"]),
+        used_jobs=used_jobs,
+        used_scrapes=used_scrapes,
     )
 
 

@@ -15,8 +15,9 @@ from typing import TYPE_CHECKING, Any
 from app.compound_record_assembler import assemble_compound_records
 from app.config import settings
 from app.data_utils import _limit_source_records as _base_limit_source_records
+from app.data_utils import process_raw_records
 from app.extraction_provenance import ProvenanceBuilder, enrich_records_with_provenance
-from app.html_utils import _is_empty_value
+from app.html_utils import _boost_contacts_with_page_html, _is_empty_value
 from app.metrics_collector import record_extraction_method
 from app.selector_engine import build_selector_field_metadata
 
@@ -108,8 +109,6 @@ async def run_post_extraction_processing(
     quality_report: dict[str, Any] = {}
 
     if results:
-        from app.scraper import _boost_contacts_with_page_html, process_raw_records
-
         # Compound record assembly
         assembled = assemble_compound_records(results, full_texts=None)
         if assembled != results:

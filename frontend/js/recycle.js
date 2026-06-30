@@ -18,7 +18,7 @@ export async function refreshRecycleBin() {
     const r = await apiFetch(`${API}/api/recycle_bin`);
     if (!r.ok) throw new Error("Failed to load recycle bin");
     const data = await r.json();
-    _cachedJobs = Array.isArray(data.jobs) ? data.jobs : [];
+    _cachedJobs = Array.isArray(data?.items) ? data.items : Array.isArray(data?.jobs) ? data.jobs : [];
     _selected = new Set();
     _render();
   } catch (e) {

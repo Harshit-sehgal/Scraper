@@ -635,7 +635,7 @@ async def list_subscriptions(
         ]
         return {
             "total": len(subs),
-            "subscriptions": subs,
+            "items": subs,
         }
     # Env-backed (no org or project scope): require explicit opt-in.
     from app.utils.rbac import _record_operator_cross_tenant, is_env_backed_operator_cross_tenant
@@ -644,7 +644,7 @@ async def list_subscriptions(
         _record_operator_cross_tenant(f"billing: list_subscriptions all-access — role={_role.value} user={_user_id}")
         return {
             "total": len(_subscription_store),
-            "subscriptions": _subscription_store.values(),
+            "items": list(_subscription_store.values()),
         }
     raise HTTPException(
         status_code=403,

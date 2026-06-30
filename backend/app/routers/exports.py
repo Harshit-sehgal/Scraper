@@ -311,6 +311,26 @@ def create_exports_router(jobs_store: dict[str, Any]):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         _ensure_export_job_access(job, auth, action)
+
+        # Only allow exports for jobs in a terminal or completing state.
+        from app.services.job_state_machine import is_terminal
+
+        job_status = getattr(job, "status", None)
+        if (
+            job_status
+            and not is_terminal(job_status)
+            and job_status
+            not in {
+                "completed",
+                "degraded",
+                "empty_result",
+            }
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot export job in '{job_status}' state. Wait for completion or cancel first.",
+            )
+
         return job
 
     def _ensure_binary_download_access(
@@ -355,7 +375,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
         request: Request,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
     ):
         try:
@@ -413,7 +433,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
         request: Request,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
     ):
         try:
@@ -470,7 +490,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
         request: Request,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
     ):
         try:
@@ -524,7 +544,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
         filename: str,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
     ):
         """Serve a previously-downloaded binary file (PDF, image, ZIP, etc.).
@@ -573,7 +593,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
         request: Request,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
     ):
         fmt = body.format.lower()

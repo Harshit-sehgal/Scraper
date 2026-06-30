@@ -119,7 +119,7 @@ export async function refreshJobs() {
     const res = await apiFetch(endpoints.jobs);
     if (!res.ok) throw new Error("jobs unavailable");
     const data = await res.json();
-    jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
+    jobsCache = Array.isArray(data?.items) ? data.items : Array.isArray(data?.jobs) ? data.jobs : [];
     renderJobs(applyJobFilters(jobsCache));
     updateKPIs(jobsCache);
     syncPollers(jobsCache);

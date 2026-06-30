@@ -67,7 +67,15 @@ def _ensure_session_schema() -> None:
         conn.commit()
 
 
-def _create_server_session(role: str, user_id: str, *, issued_at: int, max_age: int) -> str:
+def _create_server_session(
+    role: str,
+    user_id: str,
+    *,
+    issued_at: int,
+    max_age: int,
+    org_id: str = "",
+    project_id: str = "",
+) -> str:
     """Persist a revocable server-side session and return its opaque ID."""
     sid = str(uuid.uuid4())
     try:

@@ -228,7 +228,7 @@ class FederationManager:
                             {
                                 "node_id": self.node_id,
                                 "timestamp": time.time(),
-                                "version": l_ver + 1,
+                                "version": (l_ver if isinstance(l_ver, int) else 0) + 1,
                                 "epoch": l_epoch,
                             },
                         )

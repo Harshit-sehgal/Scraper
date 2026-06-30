@@ -94,6 +94,36 @@ jobs:
       - name: mypy
         run: python3 -m mypy backend/ --ignore-missing-imports
 
+  frontend:
+    name: Frontend (Node 22, vitest, esbuild)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@1d0ff469b7ec7b37248b4554cffa4fc52b042cf4 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Frontend unit tests (vitest)
+        run: npm run test -- --reporter=verbose
+
+      - name: Frontend build (esbuild)
+        run: npm run build
+
+      - name: Frontend lint (eslint + stylelint + prettier)
+        run: npm run lint
+
+      - name: Verify dist output
+        run: |
+          test -f frontend/dist/app.js || (echo "ERROR: frontend/dist/app.js missing" && exit 1)
+          test -f frontend/dist/styles.css || (echo "ERROR: frontend/dist/styles.css missing" && exit 1)
+          test -f frontend/dist/manifest.json || (echo "ERROR: frontend/dist/manifest.json missing" && exit 1)
+
   image-build:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
