@@ -201,7 +201,9 @@ external_api_circuit_breaker = CircuitBreaker(
 
 def get_all_circuit_breakers() -> list[CircuitBreaker]:
     """Get all registered circuit breakers."""
-    return [llm_circuit_breaker, database_circuit_breaker, external_api_circuit_breaker]
+    from app.browser_pool import browser_pool_circuit_breaker
+
+    return [llm_circuit_breaker, database_circuit_breaker, external_api_circuit_breaker, browser_pool_circuit_breaker]
 
 
 def get_circuit_breaker_stats() -> dict[str, dict]:

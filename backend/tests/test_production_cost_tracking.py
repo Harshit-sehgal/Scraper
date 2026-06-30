@@ -44,7 +44,7 @@ class TestCostTracking:
 
     @pytest.mark.asyncio
     async def test_cost_scales_with_llm_calls(self) -> None:
-        async def fake_persist_fn():
+        def fake_persist_fn():
             pass
 
         job1 = Job(name="j1", mode="manual", urls=["https://a.com"])
