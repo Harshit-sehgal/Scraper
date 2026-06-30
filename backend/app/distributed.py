@@ -434,8 +434,10 @@ class JobClaimService:
                 )
                 released += max(result.rowcount, 0)
 
+            # Orphan claims: nodes with no heartbeat record at all
+            # nosec B608 — parameterised query, placeholder '?' is used
             result = conn.execute(
-                """ # nosec B608 — parameterised query, placeholder '?' is used
+                """
                 DELETE FROM job_claims
                 WHERE node_id NOT IN (SELECT node_id FROM node_heartbeats)
                 AND claimed_at < ?
