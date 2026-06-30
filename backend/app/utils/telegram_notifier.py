@@ -156,7 +156,7 @@ class TelegramNotifier:
                     return False
                 return True
             finally:
-                with suppress(Exception):
+                with suppress(OSError, RuntimeError):
                     response.close()
         except requests.RequestException:
             logger.exception("Telegram send_message network error")

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Circuit breaker pattern for fault tolerance (`backend/app/utils/circuit_breaker.py`)
-- Retry logic with exponential backoff (`backend/app/utils/retry.py`)
+- Retry logic with exponential backoff (inline across `backend/app/llm_bridge.py` and webhook delivery)
 - Usage ledger and quota system (`backend/app/utils/usage_ledger.py`)
 - Extraction quality metrics tracker (`backend/app/utils/extraction_metrics.py`)
 - Error boundary and loading states utility (`frontend/js/error-boundary.js`)

@@ -169,6 +169,14 @@ asyncio_default_fixture_loop_scope = "module"
 # of stalling CI. Tests that legitimately need longer must declare
 # ``@pytest.mark.timeout(N)`` (overrides this default) or be marked ``slow``.
 addopts = "-q --timeout=30"
+filterwarnings = [
+    # Playwright subprocess transports can be finalized after pytest-asyncio
+    # closes a per-test loop. BrowserPool functional shutdown is tested
+    # separately; suppress this CPython/asyncio teardown warning noise.
+    "ignore:Exception ignored in.*BaseSubprocessTransport.*__del__:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored in.*_ProactorBasePipeTransport.*__del__:pytest.PytestUnraisableExceptionWarning",
+    "ignore:coroutine.*was never awaited:pytest.PytestUnraisableExceptionWarning",
+]
 markers = [
     "integration: marks tests as integration/optional (live API calls). Skipped by default.",
     "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",

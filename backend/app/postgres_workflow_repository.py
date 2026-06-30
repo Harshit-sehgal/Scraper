@@ -258,7 +258,9 @@ class PostgresWorkflowRepository(_PostgresWorkflowRepositoryBase):
             yield conn
             conn.commit()
         except Exception:
-            with contextlib.suppress(Exception):
+            import psycopg2
+
+            with contextlib.suppress(psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.ProgrammingError):
                 conn.rollback()
             raise
         finally:

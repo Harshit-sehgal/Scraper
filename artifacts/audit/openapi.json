@@ -354,6 +354,21 @@
         "title": "BatchSubmitRequest",
         "type": "object"
       },
+      "Body_correct_record_api_jobs__job_id__results__record_id__patch": {
+        "properties": {
+          "corrected_value": {
+            "default": "",
+            "title": "Corrected Value"
+          },
+          "field_name": {
+            "default": "",
+            "title": "Field Name",
+            "type": "string"
+          }
+        },
+        "title": "Body_correct_record_api_jobs__job_id__results__record_id__patch",
+        "type": "object"
+      },
       "CheckoutRequest": {
         "description": "Request body for POST /api/billing/checkout.",
         "properties": {
@@ -4581,6 +4596,52 @@
         ]
       }
     },
+    "/api/discover/sitemap": {
+      "post": {
+        "description": "Discover sitemap URLs from a domain's robots.txt (Comp 3).",
+        "operationId": "discover_sitemap_api_discover_sitemap_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Domain",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Discover Sitemap Api Discover Sitemap Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discover Sitemap",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/download/{filename}": {
       "get": {
         "description": "Serve a previously-downloaded binary file (PDF, image, ZIP, etc.).\n\nFiles are stored by ``scrape_url(extract_binary=True)`` in the\nconfigured ``DATA_DIR/binaries/`` directory. The endpoint streams\nthe file with the correct Content-Type and Content-Disposition so\nbrowsers download it natively.\n\nReturns 404 if the file does not exist or has been cleaned up.",
@@ -4983,6 +5044,51 @@
           }
         },
         "summary": "Cancel Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/cascade-trace": {
+      "get": {
+        "description": "Return the extraction cascade layer trace for a job.",
+        "operationId": "get_job_cascade_trace_api_jobs__job_id__cascade_trace_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Cascade Trace Api Jobs  Job Id  Cascade Trace Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Cascade Trace",
         "tags": [
           "jobs"
         ]
@@ -5570,6 +5676,51 @@
           }
         },
         "summary": "Update Job Headers",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/network-log": {
+      "get": {
+        "description": "Return the captured network request log for a job's last extraction.",
+        "operationId": "get_job_network_log_api_jobs__job_id__network_log_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Network Log Api Jobs  Job Id  Network Log Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Network Log",
         "tags": [
           "jobs"
         ]
@@ -6164,6 +6315,110 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/results/{record_id}": {
+      "patch": {
+        "description": "Human-in-the-loop field correction (Qual 15).\n\nCorrects a single field value on an extracted record and\ncreates a review entry for auditability.",
+        "operationId": "correct_record_api_jobs__job_id__results__record_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_correct_record_api_jobs__job_id__results__record_id__patch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Correct Record Api Jobs  Job Id  Results  Record Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Record",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/screenshot": {
+      "get": {
+        "description": "Return the saved screenshot for a job, if one exists.\n\nReturns a PNG image with ``Content-Type: image/png``, or 404 if\nno screenshot has been stored for this job.",
+        "operationId": "get_job_screenshot_api_jobs__job_id__screenshot_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Screenshot",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/strategy": {
       "patch": {
         "description": "Update the fetch strategy for a job.",
@@ -6212,6 +6467,74 @@
           }
         },
         "summary": "Update Job Strategy",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/structured-events": {
+      "get": {
+        "description": "Return structured job events emitted via ``log_job_event``.",
+        "operationId": "get_job_structured_events_api_jobs__job_id__structured_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Structured Events Api Jobs  Job Id  Structured Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Structured Events",
         "tags": [
           "jobs"
         ]
@@ -6690,6 +7013,181 @@
           }
         },
         "summary": "Restore Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/reviews": {
+      "get": {
+        "description": "List pending review items from the manual review queue.",
+        "operationId": "list_reviews_api_reviews_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Reviews Api Reviews Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reviews",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/reviews/{review_id}": {
+      "get": {
+        "description": "Get a single review item by ID.",
+        "operationId": "get_review_api_reviews__review_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Review Api Reviews  Review Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Review",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "description": "Approve or reject a review item (Qual 9).",
+        "operationId": "update_review_api_reviews__review_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "title": "Review Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "default": "approve",
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Corrected Fields"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Review Api Reviews  Review Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Review",
         "tags": [
           "jobs"
         ]
@@ -10189,6 +10687,78 @@
           }
         },
         "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/browser": {
+      "get": {
+        "description": "Browser pool health \u2014 live browser count, context availability, circuit breaker state.\n\nReturns 503 if the circuit breaker is OPEN (browser pool unavailable)\nor if the browser reports disconnected with active contexts.",
+        "operationId": "health_browser_health_browser_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Browser Health Browser Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Browser",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/db": {
+      "get": {
+        "description": "Database health \u2014 connection status, migrations, schema version.\n\nReturns 503 if the database backend reports unhealthy.",
+        "operationId": "health_db_health_db_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Db Health Db Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Db",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/worker": {
+      "get": {
+        "description": "Worker queue health \u2014 pending jobs, running tasks, idle capacity.\n\nReturns 503 if the worker queue reports zero idle capacity while\ntasks are pending (queue saturation).",
+        "operationId": "health_worker_health_worker_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Worker Health Worker Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Worker",
         "tags": [
           "system"
         ]

@@ -11,7 +11,7 @@ def env_int(name: str, default: int, minimum: int | None = None, maximum: int | 
     else:
         try:
             value = int(raw)
-        except Exception:
+        except (ValueError, TypeError):
             logger.exception("Failed to parse env var %s", name)
             value = default
 

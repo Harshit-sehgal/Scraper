@@ -121,7 +121,7 @@ def _db_conn():
         conn.rollback()
         from contextlib import suppress
 
-        with suppress(Exception):
+        with suppress(KeyError, TypeError, RuntimeError):
             record_error("database")
         raise
     finally:

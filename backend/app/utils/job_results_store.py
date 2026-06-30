@@ -99,7 +99,7 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
         if temp_path.exists():
             from contextlib import suppress
 
-            with suppress(Exception):
+            with suppress(FileNotFoundError, OSError):
                 temp_path.unlink()
         raise
 

@@ -7,6 +7,7 @@ short-circuit, and click-failure resilience.
 
 from __future__ import annotations
 
+from collections.abc import Coroutine
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -58,13 +59,13 @@ def _make_page(visible_selectors: list[str] | None = None) -> AsyncMock:
             self._selector = selector
             self.first = self
 
-        def is_visible(self, **kw: Any) -> AsyncMock:
+        def is_visible(self, **kw: Any) -> Coroutine[Any, Any, bool]:
             async def _vis(**_kw: Any) -> bool:
                 return self._selector in visible_set
 
             return _vis()
 
-        def click(self, **kw: Any) -> AsyncMock:
+        def click(self, **kw: Any) -> Coroutine[Any, Any, None]:
             async def _clk(**_kw: Any) -> None:
                 _NOT_VISIBLE = "not visible"
                 if self._selector not in visible_set:
@@ -111,7 +112,7 @@ class TestDetectCookieBanner:
             first = property(lambda self: self)  # type: ignore[assignment]
 
             @staticmethod
-            def is_visible() -> AsyncMock:
+            def is_visible() -> Coroutine[Any, Any, None]:
                 async def _raise(**_kw: Any) -> None:
                     raise RuntimeError(_DETACHED)
 
@@ -171,13 +172,13 @@ class TestHandleCookieConsent:
                 self._selector = selector
                 self.first = self
 
-            def is_visible(self, **kw: Any) -> AsyncMock:
+            def is_visible(self, **kw: Any) -> Coroutine[Any, Any, bool]:
                 async def _vis(**_kw: Any) -> bool:
                     return "Accept" in self._selector or "CybotCookiebotDialogBody" in self._selector
 
                 return _vis()
 
-            def click(self, **kw: Any) -> AsyncMock:
+            def click(self, **kw: Any) -> Coroutine[Any, Any, None]:
                 async def _clk(**_kw: Any) -> None:
                     raise RuntimeError(_CLICK_FAILED)
 

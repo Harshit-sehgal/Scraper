@@ -1218,7 +1218,8 @@ _call_count_lock = __import__("threading").Lock()
 
 
 def get_llm_call_count() -> int:
-    return _call_count
+    with _call_count_lock:
+        return _call_count
 
 
 def reset_llm_call_count() -> None:

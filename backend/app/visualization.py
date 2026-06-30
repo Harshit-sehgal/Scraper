@@ -89,7 +89,9 @@ class SystemGovernorDashboard:
 
         Path(MAP_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(MAP_PATH, "w", encoding="utf-8") as f:
+        # Atomic write pattern: write to temp, fsync, then replace.
+        tmp_path = Path(MAP_PATH + ".tmp")
+        with tmp_path.open("w", encoding="utf-8") as f:
             f.write("# 🗺️ DataForge Visual System & Distributed Topology Map\n\n")
             f.write(
                 f"> **Governance Layer**: Live architectural status. Last refreshed: {
@@ -131,6 +133,9 @@ class SystemGovernorDashboard:
             f.flush()
             with suppress(OSError):
                 os.fsync(f.fileno())
+
+        # Atomic rename: the target file is never in a partial state.
+        os.replace(str(tmp_path), MAP_PATH)
 
         self.last_map_update = time.time()
 

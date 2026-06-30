@@ -114,6 +114,10 @@ The full path adds:
 - Production example environment placeholder check.
 - Frontend install, tests, and formatting/lint check.
 
+The full backend pytest gate has a 20-minute subprocess timeout. Use
+`--quick` as the bounded first gate during normal edit loops, then run
+`--full` when you need complete local evidence.
+
 ## Experimental And Opt-In Checks
 
 The default runner does not claim coverage for opt-in environments:

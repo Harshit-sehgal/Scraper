@@ -306,7 +306,7 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                 if current < 2:
                     # Add result column to task_history (used for storing
                     # successful task results)
-                    with contextlib.suppress(Exception):
+                    with contextlib.suppress(sqlite3.OperationalError):
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
                     current = 2
 
@@ -314,7 +314,7 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                     # Add execution_time_ms column for tracking task latencies
                     # (mirrors the Postgres queue migration so both backends
                     # share the same ``_CURRENT_QUEUE_SCHEMA_VERSION``).
-                    with contextlib.suppress(Exception):
+                    with contextlib.suppress(sqlite3.OperationalError):
                         conn.execute("ALTER TABLE task_history ADD COLUMN execution_time_ms INTEGER")
                     current = 3
 

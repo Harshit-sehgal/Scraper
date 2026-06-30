@@ -161,8 +161,8 @@ def _write_binary_file_atomic(save_path: Path, raw_content: bytes) -> None:
             f.write(raw_content)
             f.flush()
             os.fsync(f.fileno())
-        temp_path.rename(save_path)
-    except Exception:
+        os.replace(temp_path, save_path)
+    except (OSError, ValueError):
         if temp_path.exists():
             temp_path.unlink(missing_ok=True)
         raise

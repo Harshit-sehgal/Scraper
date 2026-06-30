@@ -17,7 +17,12 @@ Run with:  python3 -m pytest backend/tests/test_browser_workflow_runner.py -v
 
 from __future__ import annotations
 
+import base64
+from typing import Any
+from unittest.mock import AsyncMock
+
 import pytest
+import pytest_asyncio
 from app.models import (
     SchemaField,
     Workflow,
@@ -108,6 +113,16 @@ def _workflow(
 
 class TestBrowserWorkflowRunner:
     """Core browser runner tests — require Playwright + browsers."""
+
+    @pytest_asyncio.fixture(autouse=True)
+    async def _close_browser_pool_after_test(self, _reset_browser_pool_fixture):
+        yield
+        import app.browser_pool as browser_pool_module
+
+        pool = browser_pool_module._pool
+        if pool is not None:
+            await pool.close()
+            browser_pool_module.reset_global_browser_pool()
 
     @pytest.mark.asyncio
     async def test_goto_fixture_page_and_extract_rows(self):
@@ -213,6 +228,21 @@ class TestBrowserWorkflowRunner:
 
 class TestBrowserWorkflowRunnerEdgeCases:
     """Edge case tests that don't require a running browser."""
+
+    @pytest.mark.asyncio
+    async def test_screenshot_capture_retries_transient_protocol_error(self):
+        from app.services.browser_workflow_runner import _capture_screenshot_b64
+
+        page = AsyncMock()
+        page.screenshot.side_effect = [RuntimeError("transient protocol error"), b"jpeg-bytes"]
+        timeline: list[dict[str, Any]] = []
+
+        result = await _capture_screenshot_b64(page, timeline)
+
+        assert result == base64.b64encode(b"jpeg-bytes").decode("ascii")
+        assert page.screenshot.await_count == 2
+        page.wait_for_timeout.assert_awaited_once_with(100)
+        assert timeline == []
 
     def test_browser_failure_helper_produces_valid_dict(self):
         """_browser_failure returns a correctly shaped failure dict."""

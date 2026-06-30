@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-06-29 22:04:09 UTC
+**Generated:** 2026-06-30 05:55:45 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -30,20 +30,25 @@ For the diff between stable and experimental, see
 | DELETE | `/api/jobs/{job_id}/results` |
 | GET | `/api/jobs` |
 | GET | `/api/jobs/{job_id}` |
+| GET | `/api/jobs/{job_id}/cascade-trace` |
 | GET | `/api/jobs/{job_id}/debug` |
 | GET | `/api/jobs/{job_id}/diff` |
 | GET | `/api/jobs/{job_id}/events` |
 | GET | `/api/jobs/{job_id}/export/csv` |
 | GET | `/api/jobs/{job_id}/export/excel` |
 | GET | `/api/jobs/{job_id}/export/json` |
+| GET | `/api/jobs/{job_id}/network-log` |
 | GET | `/api/jobs/{job_id}/notification-channels` |
 | GET | `/api/jobs/{job_id}/quality` |
 | GET | `/api/jobs/{job_id}/quality/trends` |
 | GET | `/api/jobs/{job_id}/results` |
+| GET | `/api/jobs/{job_id}/screenshot` |
+| GET | `/api/jobs/{job_id}/structured-events` |
 | PATCH | `/api/jobs/{job_id}/extraction` |
 | PATCH | `/api/jobs/{job_id}/fetch-strategy` |
 | PATCH | `/api/jobs/{job_id}/headers` |
 | PATCH | `/api/jobs/{job_id}/notification-channels/{channel_id}` |
+| PATCH | `/api/jobs/{job_id}/results/{record_id}` |
 | PATCH | `/api/jobs/{job_id}/strategy` |
 | PATCH | `/api/jobs/{job_id}/user-agent` |
 | PATCH | `/api/jobs/{job_id}/wait-conditions` |
@@ -71,6 +76,7 @@ For the diff between stable and experimental, see
 | Method | Path |
 | --- | --- |
 | POST | `/api/discover` |
+| POST | `/api/discover/sitemap` |
 | POST | `/api/schema/suggest` |
 | POST | `/api/url/analyze` |
 
@@ -180,6 +186,8 @@ For the diff between stable and experimental, see
 | GET | `/api/billing/subscriptions` |
 | GET | `/api/billing/subscriptions/{customer_id}` |
 | GET | `/api/download/{filename}` |
+| GET | `/api/reviews` |
+| GET | `/api/reviews/{review_id}` |
 | GET | `/api/saas/aup/status` |
 | GET | `/api/saas/email-verification/status` |
 | GET | `/api/saas/invitations/pending` |
@@ -203,6 +211,7 @@ For the diff between stable and experimental, see
 | GET | `/api/workflows/{workflow_id}` |
 | GET | `/api/workflows/{workflow_id}/runs` |
 | GET | `/api/workflows/{workflow_id}/runs/{run_id}` |
+| PATCH | `/api/reviews/{review_id}` |
 | PATCH | `/api/templates/{template_id}` |
 | PATCH | `/api/workflows/{workflow_id}` |
 | POST | `/api/auth-profiles` |
@@ -236,4 +245,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 176
+**Total routes:** 185

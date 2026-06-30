@@ -516,18 +516,33 @@ class RegressionCapture:
         }
         payload = json.dumps(data, indent=2, default=str)
         self._registry_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self._registry_path.with_suffix(self._registry_path.suffix + ".tmp")
-        # Write to the tmp file first, then replace. ``os.replace`` is
-        # atomic on POSIX and on Windows when the target exists, so the
-        # rename either happens in full or not at all.
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            f.write(payload)
-            f.flush()
-            from contextlib import suppress
+        # Use mkstemp for crash-safety (consistent with _save_fixture).
+        fd: int | None = None
+        tmp_path: str | None = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(
+                dir=self._registry_path.parent,
+                prefix=self._registry_path.stem + ".",
+                suffix=".tmp",
+            )
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                fd = None  # ownership transferred to fdopen context manager
+                f.write(payload)
+                f.flush()
+                from contextlib import suppress
 
+                with suppress(OSError):
+                    os.fsync(f.fileno())
+            os.replace(tmp_path, self._registry_path)
+            tmp_path = None  # ownership transferred via rename
+        except OSError:
+            logger.exception("Failed to persist registry %s", self._registry_path)
             with suppress(OSError):
-                os.fsync(f.fileno())
-        os.replace(tmp_path, self._registry_path)
+                if fd is not None:
+                    os.close(fd)
+            if tmp_path is not None and os.path.exists(tmp_path):
+                with suppress(OSError):
+                    os.unlink(tmp_path)
 
     def _get_entry(self, entry_id: str) -> RegressionEntry | None:
         """Look up an entry by ID."""

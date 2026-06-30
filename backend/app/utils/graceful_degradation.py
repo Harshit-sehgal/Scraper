@@ -28,7 +28,14 @@ class GracefulDegradation:
         # call ``execute_with_fallback`` for the same key concurrently.
         # Without this guard, parallel calls could both miss the cache
         # and both fall through to the fallback path.
-        self._cache_lock = asyncio.Lock()
+        # Lazily initialized to avoid binding to a dead event loop.
+        self._cache_lock: asyncio.Lock | None = None
+
+    def _get_cache_lock(self) -> asyncio.Lock:
+        """Lazily create the asyncio.Lock so it's bound to the running loop."""
+        if self._cache_lock is None:
+            self._cache_lock = asyncio.Lock()
+        return self._cache_lock
 
     def register_fallback(self, key: str, fallback_fn: Callable) -> None:
         """Register a fallback function for a service."""
@@ -52,7 +59,7 @@ class GracefulDegradation:
             # Cache successful result under a lock so concurrent
             # coroutines cannot interleave the write with the
             # expiry check below.
-            async with self._cache_lock:
+            async with self._get_cache_lock():
                 self._cache[key] = result
                 # ``time.monotonic`` is loop-independent and avoids the
                 # deprecated ``asyncio.get_event_loop().time()`` pattern.
@@ -63,7 +70,7 @@ class GracefulDegradation:
 
             # Check cache first (also under the lock to avoid a
             # ``clear_cache`` racing with our TTL read).
-            async with self._cache_lock:
+            async with self._get_cache_lock():
                 cached = self._cache.get(key)
                 cache_time = self._cache_ttl.get(key, 0.0)
             if cached is not None and time.monotonic() < cache_time:

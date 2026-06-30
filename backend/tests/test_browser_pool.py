@@ -204,6 +204,29 @@ class TestClose:
         mock_browser.close.assert_awaited_once()
         assert pool._browser is None
 
+    @pytest.mark.asyncio
+    async def test_close_times_out_hanging_browser_close(self) -> None:
+        pool = BrowserPool()
+
+        class HangingBrowser:
+            def __init__(self) -> None:
+                self.close_called = False
+
+            async def close(self) -> None:
+                self.close_called = True
+                await asyncio.Event().wait()
+
+        browser = HangingBrowser()
+        pool._browser = browser  # type: ignore[assignment]
+        pool._process_count = 1
+
+        with patch("app.browser_pool.BROWSER_SHUTDOWN_TIMEOUT_SECONDS", 0.01):
+            await pool.close()
+
+        assert browser.close_called is True
+        assert pool._browser is None
+        assert pool._process_count == 0
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Get Context (with mocked Playwright)
@@ -585,6 +608,35 @@ class TestGetRssMemory:
 
 
 class TestCloseWithCleanup:
+    @pytest.mark.asyncio
+    async def test_cancels_cleanup_task_before_taking_lock(self) -> None:
+        pool = BrowserPool()
+
+        class LockAwaitingTask:
+            def __init__(self) -> None:
+                self.cancelled = False
+
+            def done(self) -> bool:
+                return False
+
+            def cancel(self) -> None:
+                self.cancelled = True
+
+            def __await__(self):
+                async def _wait_for_pool_lock() -> None:
+                    async with pool._lock:
+                        pass
+
+                return _wait_for_pool_lock().__await__()
+
+        cleanup_task = LockAwaitingTask()
+        pool._cleanup_task = cleanup_task  # type: ignore[assignment]
+
+        await asyncio.wait_for(pool.close(), timeout=1)
+
+        assert cleanup_task.cancelled is True
+        assert pool._cleanup_task is None
+
     @pytest.mark.asyncio
     async def test_cancels_cleanup_task(self) -> None:
         pool = BrowserPool()

@@ -110,7 +110,7 @@ class ScrapeTelemetryCollector:
             from app.domain_intelligence import get_domain_intelligence
 
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
-        except Exception:
+        except (AttributeError, ValueError, RuntimeError):
             logger.debug("Failed to update domain intelligence from telemetry", exc_info=True)
 
         # Emit to semantic world state observability if available
@@ -141,7 +141,7 @@ class ScrapeTelemetryCollector:
                     "retries": telemetry.retry_count,
                 },
             )
-        except Exception:
+        except (AttributeError, ValueError, RuntimeError):
             logger.debug("Failed to emit telemetry to semantic world state", exc_info=True)
 
         return telemetry

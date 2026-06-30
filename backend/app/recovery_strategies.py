@@ -186,6 +186,30 @@ class RecoveryStrategist:
             "backoff_seconds": 5.0,
             "params": {"delay_ms": 10000, "slow_factor": 0.5},
         },
+        FailureCategory.SSL_ERROR: {
+            "primary": RecoveryAction.SKIP_URL,
+            "escalation": [],
+            "max_retries": 1,
+            "backoff_seconds": 0.0,
+            "params": {"reason": "tls_certificate_validation_failed"},
+        },
+        FailureCategory.NETWORK_ERROR: {
+            "primary": RecoveryAction.RETRY_WITH_DNS_FLUSH,
+            "escalation": [
+                RecoveryAction.BACKOFF_AND_SLOW,
+                RecoveryAction.SKIP_DOMAIN,
+            ],
+            "max_retries": 2,
+            "backoff_seconds": 3.0,
+            "params": {"delay_ms": 3000},
+        },
+        FailureCategory.AUTH_REQUIRED: {
+            "primary": RecoveryAction.SKIP_URL,
+            "escalation": [],
+            "max_retries": 1,
+            "backoff_seconds": 0.0,
+            "params": {"reason": "authorized_auth_profile_required"},
+        },
         # ── Anti-Bot failures ────────────────────────────────────────
         FailureCategory.ANTI_BOT_BLOCK: {
             "primary": RecoveryAction.ROTATE_PROXY,

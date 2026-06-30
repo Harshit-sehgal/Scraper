@@ -91,7 +91,7 @@ def _get_pool():
                 except Exception:
                     # Reset the cached pool so the next call retries
                     # instead of holding a half-initialised singleton.
-                    with suppress(Exception):
+                    with suppress(RuntimeError, OSError):
                         _pool.close()
                     _pool = None
                     raise

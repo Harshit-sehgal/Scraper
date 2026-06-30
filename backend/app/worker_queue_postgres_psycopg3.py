@@ -81,7 +81,7 @@ def _get_pool():
                     # partially-initialised pool and reset the module
                     # global — otherwise the next caller reuses a dead
                     # pool and the original connection state leaks.
-                    with suppress(Exception):
+                    with suppress(RuntimeError, OSError):
                         _pool.close()
                     _pool = None
                     raise

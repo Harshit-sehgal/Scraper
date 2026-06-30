@@ -420,6 +420,8 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
 
     page = None
     context = None
+    pool = None
+    domain = None
 
     try:
         from app.browser_pool import get_browser_pool
@@ -435,7 +437,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
             workflow.start_url,
             source=f"workflow {workflow.id!r} start_url (fallback path)",
         )
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(TimeoutError, RuntimeError):
             await page.wait_for_load_state("networkidle", timeout=5000)
         await asyncio.sleep(PAGE_SETTLE_SECONDS)
 
@@ -447,7 +449,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
         sample_records = sample_records[:5]  # Limit to 5 for preview
 
         page_title = ""
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RuntimeError, OSError):
             page_title = await page.title()
 
         return {

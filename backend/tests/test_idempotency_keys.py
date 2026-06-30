@@ -9,6 +9,24 @@ carry ``idempotent_replay=True``.
 
 from __future__ import annotations
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolated_idempotency_store(tmp_path, monkeypatch):
+    from app.config import settings
+    from app.job_store import reset_job_store_for_tests
+    from app.storage_interface import reset_repository
+
+    state_file = tmp_path / "idempotency_state.json"
+    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(state_file))
+    monkeypatch.setattr(settings, "STATE_FILE_PATH", str(state_file))
+    reset_repository()
+    reset_job_store_for_tests()
+    yield
+    reset_repository()
+    reset_job_store_for_tests()
+
 
 def _create_payload(suffix: str = "1") -> dict:
     return {

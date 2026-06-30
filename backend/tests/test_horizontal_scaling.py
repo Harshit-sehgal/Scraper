@@ -117,7 +117,7 @@ class TestNodeIdentity:
         with patch("app.distributed._generate_node_id", return_value="test-node-id"):
             node = get_node_identity()
         after = time.time()
-        assert before <= node.last_heartbeat <= after+1
+        assert before <= node.last_heartbeat <= after + 1
 
     def test_singleton_returns_same_instance(self) -> None:
         """Repeated calls return the same singleton (within one process)."""
@@ -210,59 +210,99 @@ class TestJobClaimService:
     def test_claim_succeeds_on_first_attempt(self, tmp_db: Path) -> None:
         """First node to claim a job succeeds."""
         svc = JobClaimService(db_path=tmp_db)
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             assert svc.claim_job("job-1") is True
 
     def test_claim_fails_when_already_claimed(self, tmp_db: Path) -> None:
         """A second node cannot claim a job already claimed by the first."""
         svc = JobClaimService(db_path=tmp_db)
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             assert svc.claim_job("job-1") is True
 
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-B", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-B",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             assert svc.claim_job("job-1") is False
 
     def test_release_allows_reclaim(self, tmp_db: Path) -> None:
         """After releasing a claim, another node can claim the job."""
         svc = JobClaimService(db_path=tmp_db)
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             assert svc.claim_job("job-1") is True
             svc.release_claim("job-1")
 
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-B", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-B",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             assert svc.claim_job("job-1") is True
 
     def test_same_job_different_ids(self, tmp_db: Path) -> None:
         """Different jobs can be claimed independently."""
         svc = JobClaimService(db_path=tmp_db)
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             assert svc.claim_job("job-1") is True
             assert svc.claim_job("job-2") is True
 
     def test_release_only_affects_own_claims(self, tmp_db: Path) -> None:
         """Node A cannot release Node B's claim."""
         svc = JobClaimService(db_path=tmp_db)
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             svc.claim_job("job-1")
 
         # Node B tries to release node-A's claim
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-B", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-B",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             svc.release_claim("job-1")
             # The claim should still exist
             assert svc.is_claimed("job-1") is True
@@ -271,9 +311,14 @@ class TestJobClaimService:
         """is_claimed returns True when a claim exists, False otherwise."""
         svc = JobClaimService(db_path=tmp_db)
         assert svc.is_claimed("job-1") is False
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             svc.claim_job("job-1")
         assert svc.is_claimed("job-1") is True
 
@@ -283,9 +328,14 @@ class TestJobClaimHeartbeat:
         """heartbeat() writes a node_heartbeats row."""
         svc = JobClaimService(db_path=tmp_db)
         before = time.time()
-        with patch("app.distributed.get_node_identity", return_value=NodeIdentity(
-            node_id="node-A", node_start_time="2026-01-01T00:00:00+00:00", node_role="worker",
-        )):
+        with patch(
+            "app.distributed.get_node_identity",
+            return_value=NodeIdentity(
+                node_id="node-A",
+                node_start_time="2026-01-01T00:00:00+00:00",
+                node_role="worker",
+            ),
+        ):
             svc.heartbeat()
 
         # Verify the heartbeat row exists

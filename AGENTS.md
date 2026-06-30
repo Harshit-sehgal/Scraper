@@ -195,7 +195,7 @@ are proven in the current checkout and target environment.
 
 ## Active Risks
 
-- `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see SaaS_MODEL.md for what is live).
+- `CAND-P2-FRONTEND-SAAS-001`: SaaS pages (billing, audit, retention) — partially addressed (UI shipped but the project remains in pre-production; see `docs/SAAS_MODEL.md` for what is live).
 
 ## Open Verified Issues (0 remaining)
 

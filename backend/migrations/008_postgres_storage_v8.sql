@@ -1,11 +1,10 @@
 -- =============================================================================
 -- Postgres storage v8 — idempotent application
 -- =============================================================================
--- This file is generated from the raw pg_dump output by
--- scripts/normalize_migration_008.py and is expected to be replayable
--- against any state (empty, partial, fully applied). It does NOT use the
--- pg_dump paste-blocker ``\restrict`` macro and strips session-level SET
--- statements so psql -f and CI replay tooling both work.
+-- This file is expected to be replayable against any state (empty, partial,
+-- fully applied). It does NOT use the pg_dump paste-blocker ``\restrict``
+-- macro and strips session-level SET statements so psql -f and CI replay
+-- tooling both work.
 --
 -- Original raw dump preserved alongside as
 -- 008_postgres_storage_v8.sql.original for forensic purposes.
@@ -128,7 +127,29 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     results_on_disk boolean DEFAULT false,
     results_file_path text DEFAULT ''::text,
     updated_at text DEFAULT ''::text,
-    deleted_at text
+    deleted_at text,
+    -- Job fields added after the original v8 schema.
+    -- The storage mapper writes every column in every Job instance to
+    -- ``jobs`` via ``jobs_storage_job_to_row``; missing columns here
+    -- cause Postgres INSERT/UPDATE errors at runtime (BUG-3).
+    headers text DEFAULT '{}'::text,
+    cookies text DEFAULT '{}'::text,
+    webhook_url text DEFAULT ''::text,
+    webhook_secret text DEFAULT ''::text,
+    webhook_delivered boolean DEFAULT false,
+    webhook_delivered_at text DEFAULT ''::text,
+    fetch_strategy text DEFAULT ''::text,
+    hydration_wait_ms integer DEFAULT 0,
+    scroll_attempts integer DEFAULT 0,
+    request_delay_ms integer DEFAULT 0,
+    max_concurrent_urls integer DEFAULT 4,
+    user_agent text DEFAULT ''::text,
+    wait_for_selector text DEFAULT ''::text,
+    wait_for_function text DEFAULT ''::text,
+    wait_for_timeout integer,
+    wait_for_navigation boolean,
+    cascade_telemetry text DEFAULT '{}'::text,
+    quality_score_summary real DEFAULT 0.0
 );
 
 
@@ -263,7 +284,29 @@ CREATE TABLE IF NOT EXISTS public.recycle_bin (
     results_on_disk boolean DEFAULT false,
     results_file_path text DEFAULT ''::text,
     updated_at text DEFAULT ''::text,
-    deleted_at text
+    deleted_at text,
+    -- Job fields added after the original v8 schema.
+    -- The storage mapper writes every column in every Job instance to
+    -- ``jobs`` via ``jobs_storage_job_to_row``; missing columns here
+    -- cause Postgres INSERT/UPDATE errors at runtime (BUG-3).
+    headers text DEFAULT '{}'::text,
+    cookies text DEFAULT '{}'::text,
+    webhook_url text DEFAULT ''::text,
+    webhook_secret text DEFAULT ''::text,
+    webhook_delivered boolean DEFAULT false,
+    webhook_delivered_at text DEFAULT ''::text,
+    fetch_strategy text DEFAULT ''::text,
+    hydration_wait_ms integer DEFAULT 0,
+    scroll_attempts integer DEFAULT 0,
+    request_delay_ms integer DEFAULT 0,
+    max_concurrent_urls integer DEFAULT 4,
+    user_agent text DEFAULT ''::text,
+    wait_for_selector text DEFAULT ''::text,
+    wait_for_function text DEFAULT ''::text,
+    wait_for_timeout integer,
+    wait_for_navigation boolean,
+    cascade_telemetry text DEFAULT '{}'::text,
+    quality_score_summary real DEFAULT 0.0
 );
 
 

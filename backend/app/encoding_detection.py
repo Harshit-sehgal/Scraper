@@ -123,10 +123,10 @@ def _detect_via_library(content: bytes) -> str | None:
         import chardet  # type: ignore[import-untyped]
 
         result = chardet.detect(content)
-        if result and result.get("encoding"):
+        if result and (encoding := result.get("encoding")):
             confidence = result.get("confidence", 0.0)
             if confidence >= _CONFIDENCE_THRESHOLD:
-                normalised = _normalise_charset(result["encoding"])
+                normalised = _normalise_charset(encoding)
                 if normalised is not None:
                     return normalised
     except (ImportError, ModuleNotFoundError):

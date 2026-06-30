@@ -43,7 +43,7 @@ def check_sqlite_health(
                 companion_ok = False
                 companion_missing = companion
                 break
-    except Exception as e:
+    except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError) as e:
         return {
             "ok": False,
             "error": f"Connection check failed: {e}",
@@ -120,7 +120,7 @@ def get_sqlite_status(
             "recycle_bin_count": recycle_count,
             "wal_mode": wal_mode,
         }
-    except Exception as e:
+    except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError) as e:
         return {
             "ok": False,
             "backend": "sqlite",
@@ -187,7 +187,7 @@ def get_postgres_status(
             "recycle_bin_count": recycle_count or 0,
             "wal_mode": "n/a",
         }
-    except Exception as e:
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError) as e:
         return {
             "ok": False,
             "backend": backend_name,

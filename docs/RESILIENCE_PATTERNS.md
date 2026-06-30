@@ -51,7 +51,7 @@ stats = get_circuit_breaker_stats()
 Handles transient failures by retrying with increasing delays.
 
 ### Implementation
-- **File:** `backend/app/utils/retry.py`
+- **File:** Retry logic is inline across the codebase (e.g. `backend/app/utils/rate_limit.py` parses `Retry-After` headers; webhook retries in `backend/app/routers/`). A standalone `backend/app/utils/retry.py` module does not yet exist.
 - **Strategy:** Exponential backoff with jitter
 
 ### Configuration

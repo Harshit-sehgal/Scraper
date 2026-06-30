@@ -117,13 +117,14 @@ if [ "$MYPY_OK" -eq 1 ]; then
     # configured with ``--no-error-summary``, when output is
     # truncated, or when running against a single file. Exit 0
     # from mypy is the canonical "0 errors" signal.
-    if python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports > /tmp/mypy.out 2>&1; then
+    MY_TMP=$(mktemp)
+    if python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports > "$MY_TMP" 2>&1; then
         pass_check "mypy — 0 errors"
     else
         fail_check "mypy — errors found"
-        grep "error:" /tmp/mypy.out | head -5
+        grep "error:" "$MY_TMP" | head -5
     fi
-    rm -f /tmp/mypy.out
+    rm -f "$MY_TMP"
 else
     skip_check "mypy — not installed"
 fi

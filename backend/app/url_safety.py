@@ -680,7 +680,7 @@ def open_safe_client(**kwargs: Any):
         try:
             yield client
         finally:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError, RuntimeError):
                 client.close()
 
     return _cm()

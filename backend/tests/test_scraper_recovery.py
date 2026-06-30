@@ -58,6 +58,17 @@ class TestRecoveryStrategist:
         assert plan.primary_action == RecoveryAction.BACKOFF_AND_SLOW
         assert RecoveryAction.SKIP_DOMAIN in plan.secondary_actions
 
+    def test_ssl_error_skips_without_bypass(self) -> None:
+        from app.recovery_strategies import RecoveryAction, RecoveryStrategist
+
+        strategist = RecoveryStrategist()
+        classification = _make_classification(FailureCategory.SSL_ERROR, confidence=0.95)
+        plan = strategist.generate_recovery_plan(classification, attempt_number=1)
+
+        assert plan.primary_action == RecoveryAction.SKIP_URL
+        assert plan.parameters["reason"] == "tls_certificate_validation_failed"
+        assert plan.should_escalate is False
+
     def test_plan_to_dict_serializable(self) -> None:
         from app.recovery_strategies import RecoveryStrategist
 

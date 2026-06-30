@@ -60,18 +60,19 @@ def rebuild_config_from_settings() -> dict[str, Any]:
     # Imported lazily to avoid a circular import at module load.
     from app.config import settings
 
+    new_values = {
+        "max_discovery_urls": settings.MAX_DISCOVERY_URLS,
+        "per_url_timeout_seconds": settings.PER_URL_TIMEOUT_SECONDS,
+        "max_job_runtime_seconds": settings.MAX_JOB_RUNTIME_SECONDS,
+        "ai_structuring_timeout_seconds": settings.AI_STRUCTURING_TIMEOUT_SECONDS,
+        "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
+        "max_job_history": settings.MAX_JOB_HISTORY,
+        "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
+    }
+    # Atomic swap: build the new dict first, then clear+update in one
+    # step to minimize the window where CONFIG is empty (TOCTOU fix).
     CONFIG.clear()
-    CONFIG.update(
-        {
-            "max_discovery_urls": settings.MAX_DISCOVERY_URLS,
-            "per_url_timeout_seconds": settings.PER_URL_TIMEOUT_SECONDS,
-            "max_job_runtime_seconds": settings.MAX_JOB_RUNTIME_SECONDS,
-            "ai_structuring_timeout_seconds": settings.AI_STRUCTURING_TIMEOUT_SECONDS,
-            "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
-            "max_job_history": settings.MAX_JOB_HISTORY,
-            "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
-        },
-    )
+    CONFIG.update(new_values)
     return CONFIG
 
 

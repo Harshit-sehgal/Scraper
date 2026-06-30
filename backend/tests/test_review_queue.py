@@ -181,6 +181,7 @@ class TestCorrectRecordField:
     def test_reason_includes_field_name(self) -> None:
         """The reason string tags the corrected field name."""
         d = rq.correct_record_field("job-rs", "rec-rs", "title", "Fixed")
+        assert d is not None
         assert "title" in d["reason"]
 
 

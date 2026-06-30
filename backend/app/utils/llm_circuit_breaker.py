@@ -223,7 +223,7 @@ def _settings_or_defaults():
             _settings.LLM_CIRCUIT_OPEN_WINDOW_SECONDS,
             _settings.LLM_CIRCUIT_HALF_OPEN_MAX_PROBES,
         )
-    except Exception as exc:
+    except (ImportError, AttributeError, ValueError) as exc:
         logger.debug(
             "LLM cascade breaker settings unavailable; falling back to defaults: %s",
             exc,

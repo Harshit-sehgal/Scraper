@@ -111,7 +111,7 @@ def _canonicalize_url(url: str | None) -> str:
             return ""
         path = (p.path or "/").rstrip("/") or "/"
         return urlunparse((p.scheme.lower(), p.netloc.lower(), path, "", "", ""))
-    except Exception:
+    except (ValueError, TypeError):
         logger.exception("Failed to canonicalize URL: %s", url)
         return ""
 
@@ -196,7 +196,7 @@ def _build_search_query(
 def _extract_domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
-    except Exception:
+    except (ValueError, TypeError):
         logger.exception("Failed to extract domain from URL: %s", url)
         return ""
 
@@ -396,7 +396,7 @@ async def discover_urls(
         return results
     except DiscoveryDependencyError:
         raise
-    except Exception:
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError):
         logger.exception("URL discovery failed for query: %s", query)
         return []
 

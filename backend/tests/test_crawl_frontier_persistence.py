@@ -15,8 +15,13 @@ def clean_db(monkeypatch):
     from app.config import settings
     from app.crawl_frontier import CrawlFrontier
 
+    class AllowAllPolicy:
+        async def check_domain(self, _url: str) -> None:
+            return None
+
     monkeypatch.setattr(settings, "CRAWL_RESPECT_ROBOTS", False)
     crawl_policy._policy_engine = None
+    monkeypatch.setattr("app.crawl_frontier.get_crawl_policy", AllowAllPolicy)
 
     # Use an isolated temporary database path so this test never collides
     # with other test processes writing to the shared crawl_frontier.db.

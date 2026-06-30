@@ -7,7 +7,7 @@ real HTTP, AI, or disk I/O is needed.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.models import Job, JobStatus
@@ -180,7 +180,7 @@ class TestJobRecleanerService:
             "quality_filtered_after_ai": 0,
         }
         with (
-            patch("app.scraper.ai_clean_and_align_records", new_callable=MagicMock) as mock_ai,
+            patch("app.scraper.ai_clean_and_align_records", new_callable=AsyncMock) as mock_ai,
             patch("app.filters.process_results") as mock_process,
             patch("app.services.job_mutation_service.normalize_job_results", side_effect=lambda x, _: x),
             patch("app.services.job_mutation_service.save_job"),

@@ -127,30 +127,7 @@ async def run_workflow_in_browser(
                 last_url = page.url
                 page_html = await page.content()
 
-                try:
-                    raw_bytes = await page.screenshot(full_page=False, type="jpeg", quality=60)
-                    if len(raw_bytes) <= MAX_SCREENSHOT_BYTES:
-                        screenshot_b64 = base64.b64encode(raw_bytes).decode("ascii")
-                    else:
-                        timeline.append(
-                            {
-                                "order": -1,
-                                "action": "screenshot",
-                                "status": "capped",
-                                "timestamp": _now_iso(),
-                                "detail": f"screenshot {len(raw_bytes)}b exceeds {MAX_SCREENSHOT_BYTES}b cap",
-                            }
-                        )
-                except Exception as exc:
-                    timeline.append(
-                        {
-                            "order": -1,
-                            "action": "screenshot",
-                            "status": "failed",
-                            "timestamp": _now_iso(),
-                            "detail": str(exc)[:200],
-                        }
-                    )
+                screenshot_b64 = await _capture_screenshot_b64(page, timeline)
 
             except Exception as exc:
                 return _browser_failure(
@@ -166,7 +143,7 @@ async def run_workflow_in_browser(
                 # exceptions raised by ``_execute_steps`` or ``page.content``
                 # — these previously short-circuited the inner ``finally`` and
                 # let page handles accumulate in the BrowserPool's LRU.
-                with suppress(Exception):
+                with suppress(RuntimeError, OSError):
                     await page.close()
     except ImportError:
         return _browser_failure(
@@ -328,6 +305,42 @@ async def _execute_steps(
     return None  # all steps succeeded
 
 
+async def _capture_screenshot_b64(page: Any, timeline: list[dict[str, Any]]) -> str | None:
+    """Capture a bounded JPEG screenshot with short retries for transient protocol errors."""
+    last_error = ""
+    for attempt in range(3):
+        try:
+            raw_bytes = await page.screenshot(full_page=False, type="jpeg", quality=60)
+            if len(raw_bytes) <= MAX_SCREENSHOT_BYTES:
+                return base64.b64encode(raw_bytes).decode("ascii")
+            timeline.append(
+                {
+                    "order": -1,
+                    "action": "screenshot",
+                    "status": "capped",
+                    "timestamp": _now_iso(),
+                    "detail": f"screenshot {len(raw_bytes)}b exceeds {MAX_SCREENSHOT_BYTES}b cap",
+                }
+            )
+            return None
+        except Exception as exc:
+            last_error = str(exc)[:200]
+            if attempt < 2:
+                with suppress(Exception):
+                    await page.wait_for_timeout(100 * (attempt + 1))
+
+    timeline.append(
+        {
+            "order": -1,
+            "action": "screenshot",
+            "status": "failed",
+            "timestamp": _now_iso(),
+            "detail": last_error,
+        }
+    )
+    return None
+
+
 # ── Fixture server ───────────────────────────────────────────────────────
 
 
@@ -356,7 +369,7 @@ async def _start_fixture_server(html: str) -> tuple[str, Any, int]:
         # the runner lingers in aiohttp's internal registry until the
         # process exits.  Re-raise after cleanup so the caller still sees
         # the original error.
-        with suppress(Exception):
+        with suppress(RuntimeError, OSError):
             await runner.cleanup()
         raise
 
@@ -368,7 +381,7 @@ async def _start_fixture_server(html: str) -> tuple[str, Any, int]:
 
 async def _stop_fixture_server(runner: Any, _port: int) -> None:
     """Clean up the fixture server."""
-    with suppress(Exception):
+    with suppress(RuntimeError, OSError):
         await runner.cleanup()
 
 

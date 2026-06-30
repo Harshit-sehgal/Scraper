@@ -71,6 +71,7 @@ def check_dangling_references(filepath):
         "detect_allocation_contradictions",
         "re_alloc_graph",
         "_field_contradiction_penalty",
+        "_field_contradiction_delta",
         "apply_contradiction_learning",
         "SemanticMemory",
     ]
@@ -147,13 +148,14 @@ def check_metric_ownership(filepath):
     return errors
 
 
-def check_forbidden_patterns(_filepath: str) -> list[str]:
+def check_forbidden_patterns(filepath: str) -> list[str]:
     """No-op placeholder retained for backward compat.
 
     The ``FORBIDDEN_PATTERNS`` table has been removed (see module
     docstring). Returns an empty list so ``main()``'s call site stays
     stable if a future, properly-scoped law check is added here.
     """
+    _ = filepath
     return []
 
 
@@ -166,7 +168,7 @@ def main():
 
     print("--- ARCHITECTURE VALIDATION START ---")  # noqa: T201
 
-    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]
+    files = [os.path.join(dp, f) for dp, _dn, filenames in os.walk(backend_dir) for f in filenames if f.endswith(".py")]
     if not files:
         print(f"ERROR: no .py files found under {backend_dir}", file=sys.stderr)  # noqa: T201
         sys.exit(2)

@@ -19,7 +19,7 @@ echo "=== DataForge Scraper: Benchmark Runner ==="
 
 # 1. Setup environment
 export PYTHONPATH=backend
-PYTHON_EXEC="./backend/venv/bin/python"
+PYTHON_EXEC=".venv/bin/python"
 
 if [ ! -f "$PYTHON_EXEC" ]; then
     echo "Virtualenv not found at $PYTHON_EXEC. Falling back to system python."

@@ -63,7 +63,7 @@ async def run_insight_phase(
         _log(job, "AI insight generation timed out", level="warning")
         logger.warning("AI insight timed out after %ds", insight_timeout_seconds)
         job.analysis = "Insight generation timed out."
-    except Exception:
+    except (ValueError, RuntimeError):
         job.total_llm_calls += get_llm_call_count()
         logger.exception("AI insight generation failed")
         _log(job, "AI insight generation failed", level="error")

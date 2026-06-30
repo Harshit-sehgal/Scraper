@@ -61,7 +61,7 @@ indicates a stale pointer, not a clean run.
 ## Benchmark
 
 - `artifacts/benchmark/<UTC-timestamp>/` — per-corpus outputs from
-  `scripts/run_benchmark.py` and friends.
+  `scripts/run_benchmark_smoke.py` (the original `scripts/run_benchmark.py` is not yet implemented) and friends.
 
 ## Playwright / E2E
 

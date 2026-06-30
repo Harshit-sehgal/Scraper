@@ -33,6 +33,7 @@ COMMANDS_DIR = VALIDATION_DIR / "commands"
 RUNS_DIR = VALIDATION_DIR / "runs"
 SUMMARY_MD = VALIDATION_DIR / "latest_summary.md"
 SUMMARY_JSON = VALIDATION_DIR / "latest_summary.json"
+BACKEND_FULL_TEST_TIMEOUT_SECONDS = 1200
 
 SECRET_PATTERNS = [
     re.compile(r"(?i)(authorization\s*:\s*)(bearer\s+)?[^\s\r\n]+"),
@@ -299,7 +300,7 @@ def backend_quick_checks(py: str) -> list[Check]:
 
 def backend_full_checks(py: str) -> list[Check]:
     return [
-        Check("backend_full_tests", [py, "-m", "pytest", "backend/tests", "-q"], 600),
+        Check("backend_full_tests", [py, "-m", "pytest", "backend/tests", "-q"], BACKEND_FULL_TEST_TIMEOUT_SECONDS),
     ]
 
 

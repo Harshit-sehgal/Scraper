@@ -554,10 +554,18 @@ async def discover_sitemaps(domain: str, *, fetch_robots: bool = True) -> list[s
     sitemaps: list[str] = []
     robots_url = f"https://{domain}/robots.txt"
 
+    from app.url_safety import get_safe_async_client, validate_public_http_url
+
+    try:
+        validate_public_http_url(robots_url)
+    except ValueError as ssrf_err:
+        logger.warning("Refusing sitemap discovery for unsafe domain %r: %s", domain, ssrf_err)
+        return []
+
     try:
         import httpx
 
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        async with get_safe_async_client(timeout=10.0, follow_redirects=True) as client:
             if fetch_robots:
                 try:
                     resp = await client.get(robots_url)

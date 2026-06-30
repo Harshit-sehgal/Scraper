@@ -1,5 +1,5 @@
 {
-  "route_count": 176,
+  "route_count": 185,
   "routes": [
     {
       "method": "GET",
@@ -182,6 +182,18 @@
       "test_coverage": "yes"
     },
     {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
+      "path": "/api/discover/sitemap",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
       "method": "GET",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
@@ -284,6 +296,18 @@
       "path": "/api/jobs/{job_id}/cancel",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/jobs/{job_id}/cascade-trace",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
@@ -424,6 +448,18 @@
     {
       "method": "GET",
       "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/jobs/{job_id}/network-log",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
       "path": "/api/jobs/{job_id}/notification-channels",
       "public_protected_unknown": "protected",
@@ -533,9 +569,45 @@
       "method": "PATCH",
       "middleware_protected": "yes",
       "notes": "route dependency accepts admin/operator",
+      "path": "/api/jobs/{job_id}/results/{record_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/jobs/{job_id}/screenshot",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/jobs/{job_id}/strategy",
       "public_protected_unknown": "protected",
       "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "yes",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user",
+      "path": "/api/jobs/{job_id}/structured-events",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
       "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
@@ -744,6 +816,42 @@
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/reviews",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "unknown"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/reviews/{review_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "unknown"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/reviews/{review_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "unknown"
     },
     {
       "method": "POST",
@@ -2116,6 +2224,43 @@
   ],
   "unknown_auth_count": 0,
   "unknown_auth_routes": [],
-  "unknown_tenant_scope_count": 0,
-  "unknown_tenant_scope_routes": []
+  "unknown_tenant_scope_count": 3,
+  "unknown_tenant_scope_routes": [
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/reviews",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "unknown"
+    },
+    {
+      "method": "GET",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator/user Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/reviews/{review_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "unknown"
+    },
+    {
+      "method": "PATCH",
+      "middleware_protected": "yes",
+      "notes": "route dependency accepts admin/operator Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/reviews/{review_id}",
+      "public_protected_unknown": "protected",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "unknown"
+    }
+  ]
 }

@@ -45,8 +45,7 @@ pytest backend/benchmarks/benchmark_replay.py -v
 # Run with live benchmarks (requires network)
 DATAFORGE_RUN_LIVE_BENCHMARKS=true pytest backend/benchmarks/ -v
 
-# Generate benchmark report
-python3 scripts/generate_benchmark_report.py
+# Generate benchmark report (script not yet implemented; see scripts/run_benchmark_smoke.py for live smoke tests)
 ```
 
 ### Benchmark Categories
@@ -154,8 +153,7 @@ The Grafana dashboard includes:
 # Run accuracy validation
 pytest backend/benchmarks/benchmark_accuracy.py -v
 
-# Generate accuracy report
-python3 scripts/generate_accuracy_report.py
+# Generate accuracy report (script not yet implemented; see scripts/run_benchmark_smoke.py for live smoke tests)
 ```
 
 ## Best Practices

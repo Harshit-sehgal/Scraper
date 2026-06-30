@@ -13,6 +13,97 @@ This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
 
+## 2026-06-29/30 - Full Validation Repair Pass
+
+Scope: continue the repo-wide audit/fix loop from the dirty checkout,
+repair current full-validation failures, and re-run the complete local
+gate. Baseline and final evidence are in the validation archives named
+below; the final current run is `20260630T040239Z_full`.
+
+### Issues Fixed
+
+- `F-VALIDATION-TIMEOUT-001`: full backend pytest exceeded the old
+  600-second harness timeout before reaching a useful failure summary.
+  `scripts/validate_local.py` now gives `backend_full_tests` a
+  1200-second subprocess timeout, and `docs/VALIDATION.md` documents
+  the full-suite timeout separately from the quick gate.
+- `F-STATIC-CLEANUP-001`: current full validation exposed ruff, mypy,
+  Bandit, and frontend Prettier failures. Fixed stale test style,
+  missing/loose type annotations, duplicate-exception ruff findings,
+  a Bandit false-positive local name, and malformed frontend HTML.
+- `F-FAILURE-TAXONOMY-SSL-001`: SSL/certificate failures were not a
+  first-class failure category. Added `SSL_ERROR` classification and a
+  skip-without-bypass recovery path, with regression coverage.
+- `F-TEST-ISOLATION-001`: full-suite order exposed shared idempotency
+  store and audit-log state in `test_idempotency_keys.py` and
+  `test_production_audit_log.py`. Added isolated test storage/log
+  fixtures and reset hooks.
+- `F-RECLEAN-ASYNC-MOCK-001`: `test_reclean_success_path` patched the
+  async `ai_clean_and_align_records` collaborator with a synchronous
+  `MagicMock`, causing `TypeError: object tuple can't be used in
+  'await' expression` in full validation. The test now uses
+  `AsyncMock`.
+- `F-COST-TRACKING-PERSIST-MOCK-001`: cost-tracking tests passed an
+  async fake persist function to a synchronous logging helper, producing
+  unawaited-coroutine warnings. The tests now use synchronous fakes.
+- `F-BROWSER-WORKFLOW-SCREENSHOT-001`: Chromium sometimes returns a
+  transient `Page.captureScreenshot` protocol error after successful
+  fixture navigation/extraction. Browser workflow preview now retries
+  bounded screenshot capture and tests the retry path.
+- `F-BROWSER-POOL-CLOSE-HANG-001`: `BrowserPool.close()` could hang
+  during teardown when cleanup tasks waited on the pool lock or when
+  Playwright's `Browser.close()` never completed. Cleanup/background
+  tasks are now cancelled outside the lock, and shutdown awaits for
+  contexts/browser/Playwright are timeout-bounded.
+- `F-STATIC-FOLLOWUP-001`: later full validation exposed one mypy
+  narrowing issue, one low-confidence Bandit SQL-construction finding,
+  and Prettier drift in `frontend/js/mock-api.js`. Encoding detection
+  now narrows chardet's optional encoding before normalization, stale
+  claim cleanup uses static parameterized deletes, and the mock API file
+  is formatted.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full` | 1 | RED run `20260629T213619Z_full`; summary counts `passed=19`, `failed=4`, `timeout=1`. `backend_full_tests` timed out at 600s. Failed gates also included `ruff_check` (`FURB171` in `test_anti_bot_header_randomization.py`), `mypy` (unsupported `object` operations in compliance tests), `bandit_backend` (`B105` false-positive token name), and `frontend_lint_js` (unexpected closing `div` in `frontend/index.html`). |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS after the first repair batch; quick validation displayed 12/12 passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_idempotency_keys.py backend/tests/test_production_audit_log.py -q -o addopts=` | 0 | PASS after isolation fixes; 21 tests passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_idempotency_fail_closed.py backend/tests/test_idempotency_keys.py -q -o addopts=` | 0 | PASS; 17 tests passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_prod_security_validator.py backend/tests/test_production_audit_log.py -q -o addopts=` | 0 | PASS; 21 tests passed. |
+| `python3 -m ruff check backend scripts` | 0 | PASS after static cleanup; no ruff findings. |
+| `python3 scripts/validate_local.py --full` | 1 | RED run `20260629T223420Z_full`; summary counts `passed=22`, `failed=2`, `timeout=0`. `backend_full_tests` failed `test_repeated_key_with_different_payload_returns_409` (`201` instead of `409`) and `test_log_auth_event_writes_to_audit` (`category` was `job` instead of `auth`); `ruff_check` also failed on duplicate exception handling in `insight.py`. |
+| `python3 scripts/validate_local.py --full` | 1 | RED run `20260629T225443Z_full`; summary counts `passed=23`, `failed=1`, `timeout=0`. Only `backend_full_tests` failed: `backend/tests/test_job_mutation_service.py::TestJobRecleanerService::test_reclean_success_path[asyncio]` with `TypeError: object tuple can't be used in 'await' expression`. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_job_mutation_service.py::TestJobRecleanerService::test_reclean_success_path -q -o addopts=` | 0 | PASS after `AsyncMock` fix; 1 test passed in 0.13s. |
+| `python3 -m ruff check backend/tests/test_job_mutation_service.py` | 0 | PASS; `All checks passed!`. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_job_mutation_service.py -q -o addopts=` | 0 | PASS; 11 tests passed in 0.21s. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m mypy backend/tests/test_job_mutation_service.py` | 0 | PASS; `Success: no issues found in 1 source file`. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS run `20260629T231222Z_full`; summary reported `passed=24`, `failed=0`, `skipped=0`, `timed_out=0`, `not_installed=0`. `backend_full_tests` passed in 834.93s, followed by passing ruff, pyflakes, mypy, Bandit, pip-audit, npm install, frontend tests, JS lint, and CSS lint gates. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_production_cost_tracking.py -q -o addopts=` | 0 | PASS after synchronous persist-fake fix; 5 tests passed. |
+| `python3 scripts/validate_local.py --full` | 1 | RED run `20260629T233035Z_full`; `backend_full_tests` failed `backend/tests/test_browser_workflow_runner.py::TestBrowserWorkflowRunner::test_screenshot_included_on_success` because the workflow succeeded but returned `screenshot=None`. Static/security/frontend gates passed except this backend failure. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_browser_pool.py::TestClose backend/tests/test_browser_pool.py::TestCloseWithCleanup backend/tests/test_browser_workflow_runner.py -q -o addopts=` | 0 | PASS after screenshot retry and BrowserPool close fixes; 19 tests passed. Pytest still reports the known Playwright/CPython `BaseSubprocessTransport.__del__` warning. |
+| `python3 -m ruff check backend/app/browser_pool.py backend/app/services/browser_workflow_runner.py backend/tests/test_browser_pool.py backend/tests/test_browser_workflow_runner.py` | 0 | PASS after browser pool/workflow changes. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m mypy backend/app/browser_pool.py backend/app/services/browser_workflow_runner.py backend/tests/test_browser_pool.py backend/tests/test_browser_workflow_runner.py` | 0 | PASS; no issues found in 4 source files. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS run `20260629T235322Z_full`; summary reported `passed=24`, `failed=0`, `skipped=0`, `timed_out=0`, `not_installed=0`. Backend log still contained non-fatal Playwright subprocess transport warnings. |
+| `python3 scripts/validate_local.py --full` | 1 | RED run `20260630T034448Z_full`; `backend_full_tests` passed in 869.38s, but `mypy` failed on `encoding_detection.py`, `bandit_backend` failed on dynamic stale-claim SQL in `distributed.py`, and `frontend_lint_js` failed on Prettier drift in `frontend/js/mock-api.js`. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m pytest backend/tests/test_encoding_detection.py backend/tests/test_horizontal_scaling.py::TestJobClaimService -q -o addopts=` | 0 | PASS after encoding and stale-claim cleanup fixes; 46 tests passed. |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_ENV=test DATAFORGE_STORAGE_BACKEND=sqlite DATAFORGE_API_KEY=user-key DATAFORGE_OPERATOR_API_KEY=operator-key DATAFORGE_ADMIN_API_KEY=admin-key DATAFORGE_SESSION_SECRET=test-session-secret-change-me DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false DATAFORGE_SKIP_DB_CHECK=true python3 -m mypy backend/app/encoding_detection.py backend/app/distributed.py backend/app/browser_pool.py backend/app/services/browser_workflow_runner.py backend/tests/test_browser_pool.py backend/tests/test_browser_workflow_runner.py` | 0 | PASS; no issues found in 6 source files. |
+| `python3 -m ruff check backend/app/encoding_detection.py backend/app/distributed.py backend/app/browser_pool.py backend/app/services/browser_workflow_runner.py backend/tests/test_browser_pool.py backend/tests/test_browser_workflow_runner.py` | 0 | PASS after follow-up fixes. |
+| `python3 -m bandit -r backend/app --ini backend/.bandit -q` | 0 | PASS after replacing dynamic stale-claim SQL with static parameterized deletes. |
+| `npm run lint:js` | 0 | PASS after formatting `frontend/js/mock-api.js`; Prettier reported all matched files use the configured style. |
+| `python3 scripts/validate_local.py --full` | 0 | PASS final run `20260630T040239Z_full`; latest summary reports `passed=24`, `failed=0`, `skipped=0`, `timed_out=0`, `not_installed=0`. `backend_full_tests` passed in 901.33s, followed by passing ruff, pyflakes, mypy, Bandit, pip-audit, npm install, frontend tests, JS lint, and CSS lint gates. |
+| `git diff --check` | 0 | PASS after final full validation; no whitespace errors. |
+
+### Current Status
+
+Full local validation is green for the current checkout. The latest
+backend log still contains non-fatal `PytestUnraisableExceptionWarning`
+entries from Playwright/CPython subprocess transport cleanup; no
+validation gate fails on them, and the BrowserPool functional teardown
+hang is fixed. The working tree remains dirty with broader audit/fix
+changes from this active workstream; run `git status --short` before
+attributing unrelated files to a single fix.
+
 ## 2026-06-29 - Tenant Scoped Download/Templates/Usage and Stale Test Cleanup
 
 Scope: continue the repo-wide audit/fix loop on the current dirty
@@ -935,7 +1026,7 @@ current checkout rather than relying on the prior run:
 After pushing `codex/codebase-green-validation-20260618`, GitHub
 Actions `Pre-commit Checks` failed in job `Ruff Lint & Format` because
 `ruff format --check backend/app backend/tests backend/benchmarks scripts`
-reported one file: `scripts/migrate_workflows_to_json_store.py`.
+reported one file: `scripts/migrate_workflows_to_json_store.py` *(script deleted in task 61; reference is historical)*.
 Local fix and verification:
 
 | Command | Exit | Result |
@@ -1169,7 +1260,7 @@ script so the regression can't return.
 | `npm run lint:css` | 0 | PASS (0 errors). |
 | `npm run lint:js` (prettier) | 0 | PASS. |
 | `python3 scripts/validate_local.py --full` | 0 | PASS; 23/23 checks passed. |
-| `python3 scripts/generate_status.py` | 0 | Now reports "CSS syntax (stylelint) ✅ pass" instead of "❌ fail". |
+| `python3 scripts/generate_status.py` | 0 | Now reports "CSS syntax (stylelint) ✅ pass" instead of "❌ fail". *(script deleted in task 61; reference is historical)* |
 
 Validation count grew from 22/22 → 23/23 (added the new
 ``frontend_lint_css`` step). All other counts unchanged.
@@ -1278,7 +1369,7 @@ directly.
 - `frontend/styles.css` — pill + panels styles.
 - `frontend/js/views.js` — start System Info + Recent Activity
   timers when the Dashboard view is shown.
-- `frontend/js/app.js` — start the health pill on init.
+- `frontend/app.js` — start the health pill on init.
 
 ### Command evidence
 

@@ -236,7 +236,7 @@ class JobRecleanerService:
                 reclean_warnings.append(
                     f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
-            except Exception:
+            except (ValueError, RuntimeError):
                 cleaned_rows = working_rows
                 reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
                 logger.exception("Job %s: Re-clean failed", job_id)

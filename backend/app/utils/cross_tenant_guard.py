@@ -18,6 +18,7 @@ operators can investigate.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -25,17 +26,20 @@ logger = logging.getLogger(__name__)
 # Track the total number of cross-tenant contamination events seen
 # in this process.  Surface in /metrics for alerting.
 _cross_tenant_alerts: int = 0
+_cross_tenant_alerts_lock = threading.Lock()
 
 
 def get_cross_tenant_alert_count() -> int:
     """Return the number of cross-tenant contamination events seen."""
-    return _cross_tenant_alerts
+    with _cross_tenant_alerts_lock:
+        return _cross_tenant_alerts
 
 
 def reset_cross_tenant_alert_count() -> None:
     """Reset the alert counter.  Test helper."""
     global _cross_tenant_alerts
-    _cross_tenant_alerts = 0
+    with _cross_tenant_alerts_lock:
+        _cross_tenant_alerts = 0
 
 
 class CrossTenantContaminationError(Exception):
@@ -75,7 +79,8 @@ def guard_cross_tenant(
             org_ids.add(str(org_id))
 
     if len(org_ids) > 1:
-        _cross_tenant_alerts += 1
+        with _cross_tenant_alerts_lock:
+            _cross_tenant_alerts += 1
         logger.critical(
             "CROSS-TENANT GUARD%s: query returned rows from %d distinct "
             "org_ids (%s)%s. This may indicate a missing WHERE clause. "
@@ -89,7 +94,7 @@ def guard_cross_tenant(
             from app.metrics_collector import record_cross_tenant_guard_alert
 
             record_cross_tenant_guard_alert()
-        except Exception as exc:
+        except (ImportError, ValueError, RuntimeError) as exc:
             logger.debug("Failed to record cross-tenant guard metric: %s", exc)
 
         if strict:

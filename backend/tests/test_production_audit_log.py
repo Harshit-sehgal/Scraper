@@ -18,7 +18,10 @@ from app.audit_logger import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_audit():
+def _reset_audit(tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "AUDIT_LOG_DIR", str(tmp_path))
     reset_audit_logger()
     yield
     reset_audit_logger()

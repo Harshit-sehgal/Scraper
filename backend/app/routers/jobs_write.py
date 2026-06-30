@@ -1391,10 +1391,10 @@ def register_jobs_write_routes(
         record_id: str,
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
         ],
-        field_name: Annotated[str, Query()] = "",
-        corrected_value: Annotated[str, Query()] = "",
+        field_name: Annotated[str, Body()] = "",
+        corrected_value: Annotated[Any, Body()] = "",
     ):
         """Human-in-the-loop field correction (Qual 15).
 
@@ -1422,7 +1422,7 @@ def register_jobs_write_routes(
     async def discover_sitemap(
         auth: Annotated[
             tuple[UserRole, str, str, str],
-            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
         ],
         domain: Annotated[str, Query()] = "",
     ):

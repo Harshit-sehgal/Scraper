@@ -179,15 +179,9 @@ curl http://localhost:8000/api/jobs/$JOB_ID/export/excel \
 
 ### Monitor Usage
 
-```bash
-# Check usage summary
-curl http://localhost:8000/api/usage/summary \
-  -H "X-API-Key: your-api-key"
-
-# Check quota status
-curl http://localhost:8000/api/quota \
-  -H "X-API-Key: your-api-key"
-```
+> **Note:** The `/api/usage/summary` and `/api/quota` endpoints are
+> planned but not yet available. For current usage endpoints, see
+> `docs/API_STABLE.md` under the SaaS section.
 
 ## Troubleshooting
 

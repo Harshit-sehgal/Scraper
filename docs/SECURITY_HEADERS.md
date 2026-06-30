@@ -116,7 +116,7 @@ In production mode (`DATAFORGE_ENV=production`):
 ### Customization
 
 Security headers can be customized via:
-- `backend/app/middleware/security_headers.py`
+- `backend/app/middlewares.py` (where `security_headers_middleware` is defined)
 - Environment variables for specific settings
 - Docker Compose for production deployments
 

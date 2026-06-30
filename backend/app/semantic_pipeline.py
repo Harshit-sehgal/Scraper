@@ -69,14 +69,6 @@ def _field_instability_threshold():
     return max(0.4, min(0.9, 0.5 + p * 0.4 - c * 0.2))
 
 
-def _field_contradiction_penalty():
-    """Contradiction penalty softens as field matures (less disruptive)."""
-    from app.semantic_world_state import get_world_state
-
-    p = get_world_state().metrics.field_pressure
-    return 0.5 + p * 0.3  # range: [0.5, 0.8]
-
-
 def _field_coherence_threshold():
     """Coherence success threshold adapts to field stability."""
     from app.semantic_world_state import get_world_state
@@ -91,14 +83,6 @@ def _field_instability_delta():
 
     p = get_world_state().metrics.field_pressure
     return 0.1 + p * 0.3  # range: [0.1, 0.4]
-
-
-def _field_contradiction_delta():
-    """Contradiction delta modulates with field pressure."""
-    from app.semantic_world_state import get_world_state
-
-    p = get_world_state().metrics.field_pressure
-    return 0.2 + p * 0.4  # range: [0.2, 0.6]
 
 
 def _field_topology_delta():
@@ -305,6 +289,17 @@ def detect_role_swap_warnings(
                     warnings.append(f"{role_name}: expected {sts}, got {vts} ({val})")
                 break
     return warnings
+
+
+async def get_pipeline_status() -> dict[str, Any]:
+    """Return availability and health metadata for the semantic pipeline.
+
+    Used by ``job_creation_service`` (M2 gate) to fail fast when semantic
+    mode is requested but the pipeline dependencies are not operational.
+    Currently always reports available because the pipeline is stateless
+    and does not require external runtime services.
+    """
+    return {"available": True, "version": "1.0"}
 
 
 def run_pipeline(

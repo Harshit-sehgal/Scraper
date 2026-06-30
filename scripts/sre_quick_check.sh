@@ -86,7 +86,7 @@ $PYTHON_EXE architecture_validator.py 2>&1
 
 echo "=== 6. Running Production Hardening Tests ==="
 STEP=6
-cd backend 2>&1
+cd backend
 PYTHONPATH=. $PYTHON_EXE -m pytest tests/test_production_hardening.py -q -o "addopts=" 2>&1
 
 if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then

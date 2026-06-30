@@ -527,7 +527,7 @@ class ObservabilityState:
         def estimate_dict(d: dict[str, Any]) -> int:
             try:
                 return len(json.dumps(d, sort_keys=True, default=str))
-            except Exception:
+            except (TypeError, ValueError):
                 logger.debug("estimate_dict failed for %s", type(d).__name__, exc_info=True)
                 return 0
 

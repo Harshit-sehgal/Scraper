@@ -186,7 +186,7 @@ The benchmark corpus is only 14 offline cases, all synthetic HTML, all regex-tes
 | 12 | **Add benchmark trend tracking** — store historical F1/latency/memory results in `artifacts/benchmarks/trends/`, CI diffs against last 10 runs and alerts on regression beyond 2σ | 2 days | P1 |
 | 13 | **Add field-level accuracy breakdown** — per field type (price, date, name, rating, phone, email), report precision/recall separately. Identifies which extraction layers are weak at which field types | 2 days | P2 |
 | 14 | **Add cost-per-extraction benchmark** — measure CPU time, peak RSS, number of HTTP requests, cascade layers attempted per extraction. Helps optimize and price | 2 days | P2 |
-| 15 | **Add benchmark report visualization** — `scripts/generate_benchmark_dashboard.py` produces an HTML page with charts (F1 trend, latency distribution, field accuracy heatmap) from stored results | 3 days | P2 |
+| 15 | **Add benchmark report visualization** — `scripts/generate_benchmark_dashboard.py` (script not yet implemented) produces an HTML page with charts (F1 trend, latency distribution, field accuracy heatmap) from stored results | 3 days | P2 |
 | 16 | **Add A/B benchmark mode** — compare two extraction strategies or cascade configurations on the same corpus, produce a diff report showing which config wins on which page types | 2 days | P1 |
 | 17 | **Add lazy-load image benchmark** — pages where content images are lazy-loaded (loading="lazy"), verify Playwright scroll triggers image load and extraction captures image-attached data | 1 day | P2 |
 | 18 | **Add iframe content extraction benchmark** — page with same-origin and cross-origin iframes containing extractable data, verify iframe content extraction works | 2 days | P2 |

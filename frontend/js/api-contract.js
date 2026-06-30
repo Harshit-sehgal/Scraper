@@ -3,8 +3,8 @@
    documented frontend/backend contract. */
 
 export const endpoints = {
-  health: "/api/health",
-  ready: "/api/ready",
+  health: "/health",
+  ready: "/ready",
   rootManifest: "/",
   systemStatus: "/api/system/status",
 

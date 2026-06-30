@@ -35,6 +35,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+BROWSER_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+
+
+async def _await_shutdown_step(action: str, awaitable: Any) -> None:
+    try:
+        await asyncio.wait_for(awaitable, timeout=BROWSER_SHUTDOWN_TIMEOUT_SECONDS)
+    except TimeoutError:
+        logger.warning("[BrowserPool] Timed out while %s", action)
+    except (Error, OSError, RuntimeError, ValueError, TypeError) as exc:
+        logger.debug("[BrowserPool] Failed while %s: %s", action, exc)
+
+
 # ── Module-level circuit breaker for browser pool ────────────────────────
 # Opens after 3 consecutive RuntimeError failures (browser crash, pool
 # exhaustion, process cap reached, etc.) so callers get a fast-reject
@@ -429,7 +441,9 @@ class BrowserPool:
                 await self._evict_lru_if_needed()
 
                 is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
-                context_options = self._build_stealth_context_options(domain) if is_stealth else self._build_default_context_options()
+                context_options = (
+                    self._build_stealth_context_options(domain) if is_stealth else self._build_default_context_options()
+                )
                 self._add_proxy_to_options(context_options, domain)
 
                 context = await self._create_browser_context(context_options)
@@ -687,7 +701,7 @@ class BrowserPool:
                 await page.close()
                 return True
             finally:
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(RuntimeError, OSError):
                     await ctx.close()
         except (Error, OSError, RuntimeError, ValueError) as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
@@ -709,39 +723,39 @@ class BrowserPool:
 
     async def close(self) -> None:
         """Gracefully close all contexts and the browser instance."""
+        current_task = asyncio.current_task()
+        cleanup_task = self._cleanup_task
+        if cleanup_task is not None and cleanup_task is not current_task and not cleanup_task.done():
+            cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Error, OSError, RuntimeError, ValueError, TypeError):
+                await cleanup_task
+
+        background_tasks = [task for task in list(self._background_tasks) if task is not current_task and not task.done()]
+        for task in background_tasks:
+            task.cancel()
+        for task in background_tasks:
+            with contextlib.suppress(asyncio.CancelledError, Error, OSError, RuntimeError, ValueError, TypeError):
+                await task
+
         async with self._lock:
+            if self._cleanup_task in {cleanup_task, current_task}:
+                self._cleanup_task = None
+            self._background_tasks.clear()
+
             # Close pool-managed (reusable) contexts
             for ctx in list(self._contexts.values()):
-                try:
-                    await ctx.close()
-                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
-                    logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
+                await _await_shutdown_step("closing context during close()", ctx.close())
             self._contexts.clear()
             self._context_use_count.clear()
 
             # Close isolated contexts
             for ctx in list(self._isolated_contexts.values()):
-                try:
-                    await ctx.close()
-                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
-                    logger.debug("[BrowserPool] Failed to close isolated context during close(): %s", e)
+                await _await_shutdown_step("closing isolated context during close()", ctx.close())
             self._isolated_contexts.clear()
             self._active_acquires = 0
 
-            # Cancel any lingering background tasks to avoid RuntimeWarnings
-            # about unawaited coroutines (AsyncMock in tests, or leaked tasks
-            # in production).
-            for task in list(self._background_tasks):
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Error, OSError, RuntimeError, ValueError, TypeError):
-                    await task
-            self._background_tasks.clear()
-
             if self._browser:
-                try:
-                    await self._browser.close()
-                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
-                    logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
+                await _await_shutdown_step("closing browser during close()", self._browser.close())
                 self._browser = None
                 # Return the process slot so the cap can be re-armed
                 # after the next launch. If no slot had been reserved
@@ -749,17 +763,8 @@ class BrowserPool:
                 # ``_release_process_slot`` is a no-op.
                 self._release_process_slot()
 
-            if self._cleanup_task and not self._cleanup_task.done():
-                self._cleanup_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Error, OSError, RuntimeError, ValueError, TypeError):
-                    await self._cleanup_task
-                self._cleanup_task = None
-
             if self._playwright:
-                try:
-                    await self._playwright.stop()
-                except (Error, OSError, RuntimeError, ValueError, TypeError) as e:
-                    logger.debug("[BrowserPool] Failed to stop playwright during close(): %s", e)
+                await _await_shutdown_step("stopping Playwright during close()", self._playwright.stop())
                 self._playwright = None
 
             self.active_contexts = 0
@@ -1117,35 +1122,43 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
     try:
         # 1. navigator.webdriver
         val = await page.evaluate("() => navigator.webdriver")
-        checks.append({
-            "name": "navigator.webdriver",
-            "status": "pass" if val is None or val is False else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "navigator.webdriver",
+                "status": "pass" if val is None or val is False else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 2. navigator.plugins.length
         val = await page.evaluate("() => navigator.plugins.length")
-        checks.append({
-            "name": "navigator.plugins.length",
-            "status": "pass" if int(val) > 0 else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "navigator.plugins.length",
+                "status": "pass" if int(val) > 0 else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 3. chrome.runtime
         val = await page.evaluate("() => !!(window.chrome && window.chrome.runtime)")
-        checks.append({
-            "name": "chrome.runtime",
-            "status": "pass" if val else "warn",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "chrome.runtime",
+                "status": "pass" if val else "warn",
+                "detail": str(val),
+            }
+        )
 
         # 4. Notification permissions
         val = await page.evaluate("() => Notification.permission")
-        checks.append({
-            "name": "notification_permission",
-            "status": "pass" if val != "denied" else "warn",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "notification_permission",
+                "status": "pass" if val != "denied" else "warn",
+                "detail": str(val),
+            }
+        )
 
         # 5. permissions.query (notifications)
         val = await page.evaluate("""() => {
@@ -1156,11 +1169,13 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
         actual_val = val
         if hasattr(val, "__await__"):
             actual_val = await val
-        checks.append({
-            "name": "permissions_query_notifications",
-            "status": "pass" if actual_val != "denied" else "warn",
-            "detail": str(actual_val),
-        })
+        checks.append(
+            {
+                "name": "permissions_query_notifications",
+                "status": "pass" if actual_val != "denied" else "warn",
+                "detail": str(actual_val),
+            }
+        )
 
         # 6. WebGL vendor
         val = await page.evaluate("""() => {
@@ -1170,11 +1185,13 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
                 return gl ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_VENDOR_WEBGL) : 'none';
             } catch(e) { return 'error'; }
         }""")
-        checks.append({
-            "name": "webgl_vendor",
-            "status": "pass" if val not in ("", "none", "error") else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "webgl_vendor",
+                "status": "pass" if val not in ("", "none", "error") else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 7. WebGL renderer
         val = await page.evaluate("""() => {
@@ -1184,11 +1201,13 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
                 return gl ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : 'none';
             } catch(e) { return 'error'; }
         }""")
-        checks.append({
-            "name": "webgl_renderer",
-            "status": "pass" if val not in ("", "none", "error") else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "webgl_renderer",
+                "status": "pass" if val not in ("", "none", "error") else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 8. Canvas fingerprint
         val = await page.evaluate("""() => {
@@ -1199,11 +1218,13 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
                 return c.toDataURL().length;
             } catch(e) { return 0; }
         }""")
-        checks.append({
-            "name": "canvas_fingerprint",
-            "status": "pass" if int(val) > 0 else "fail",
-            "detail": f"data_url_length={val}",
-        })
+        checks.append(
+            {
+                "name": "canvas_fingerprint",
+                "status": "pass" if int(val) > 0 else "fail",
+                "detail": f"data_url_length={val}",
+            }
+        )
 
         # 9. Audio fingerprint
         val = await page.evaluate("""() => {
@@ -1212,11 +1233,13 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
                 return ac.sampleRate;
             } catch(e) { return 0; }
         }""")
-        checks.append({
-            "name": "audio_fingerprint",
-            "status": "pass" if val and val > 0 else "warn",
-            "detail": f"sample_rate={val}",
-        })
+        checks.append(
+            {
+                "name": "audio_fingerprint",
+                "status": "pass" if val and val > 0 else "warn",
+                "detail": f"sample_rate={val}",
+            }
+        )
 
         # 10. Fonts detection
         val = await page.evaluate("""() => {
@@ -1227,59 +1250,73 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
             }
             return available.length;
         }""")
-        checks.append({
-            "name": "fonts_count",
-            "status": "pass" if int(val) >= 3 else "warn",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "fonts_count",
+                "status": "pass" if int(val) >= 3 else "warn",
+                "detail": str(val),
+            }
+        )
 
         # 11. Screen resolution
         val = await page.evaluate("() => `${screen.width}x${screen.height}`")
-        checks.append({
-            "name": "screen_resolution",
-            "status": "pass" if val and "0x0" not in str(val) else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "screen_resolution",
+                "status": "pass" if val and "0x0" not in str(val) else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 12. Languages
         val = await page.evaluate("() => navigator.languages")
-        checks.append({
-            "name": "navigator_languages",
-            "status": "pass" if val and len(val) > 0 else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "navigator_languages",
+                "status": "pass" if val and len(val) > 0 else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 13. Platform
         val = await page.evaluate("() => navigator.platform")
-        checks.append({
-            "name": "navigator_platform",
-            "status": "pass" if val in ("Win32", "MacIntel", "Linux x86_64") else "warn",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "navigator_platform",
+                "status": "pass" if val in ("Win32", "MacIntel", "Linux x86_64") else "warn",
+                "detail": str(val),
+            }
+        )
 
         # 14. hardwareConcurrency
         val = await page.evaluate("() => navigator.hardwareConcurrency")
-        checks.append({
-            "name": "hardware_concurrency",
-            "status": "pass" if val and int(val) > 0 else "fail",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "hardware_concurrency",
+                "status": "pass" if val and int(val) > 0 else "fail",
+                "detail": str(val),
+            }
+        )
 
         # 15. deviceMemory
         val = await page.evaluate("() => navigator.deviceMemory")
-        checks.append({
-            "name": "device_memory",
-            "status": "pass" if val and float(val) > 0 else "warn",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "device_memory",
+                "status": "pass" if val and float(val) > 0 else "warn",
+                "detail": str(val),
+            }
+        )
 
         # 16. Touch support
         val = await page.evaluate("() => navigator.maxTouchPoints")
-        checks.append({
-            "name": "touch_support",
-            "status": "pass",
-            "detail": f"maxTouchPoints={val}",
-        })
+        checks.append(
+            {
+                "name": "touch_support",
+                "status": "pass",
+                "detail": f"maxTouchPoints={val}",
+            }
+        )
 
         # 17. WebRTC leak check
         val = await page.evaluate("""() => {
@@ -1288,18 +1325,22 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
                 return pc ? 'exists' : 'none';
             } catch(e) { return 'blocked'; }
         }""")
-        checks.append({
-            "name": "webrtc_leak_check",
-            "status": "pass" if val in ("blocked", "none") else "warn",
-            "detail": str(val),
-        })
+        checks.append(
+            {
+                "name": "webrtc_leak_check",
+                "status": "pass" if val in ("blocked", "none") else "warn",
+                "detail": str(val),
+            }
+        )
 
     except (RuntimeError, OSError, ValueError, TypeError) as exc:
-        checks.append({
-            "name": "runtime_error",
-            "status": "fail",
-            "detail": str(exc),
-        })
+        checks.append(
+            {
+                "name": "runtime_error",
+                "status": "fail",
+                "detail": str(exc),
+            }
+        )
     finally:
         if owns_page:
             with contextlib.suppress(RuntimeError, OSError, ValueError, TypeError):

@@ -12,6 +12,7 @@ States:
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -77,19 +78,37 @@ class CircuitBreaker:
         self._success_count = 0
         self._last_failure_time: float | None = None
         self._half_open_calls = 0
-        self._lock = asyncio.Lock()
+        # Lazily initialized to avoid binding to a dead event loop
+        # (e.g., during test teardown/setup).
+        self._lock: asyncio.Lock | None = None
+        # Threading lock protects the state property's OPEN → HALF_OPEN
+        # transition from concurrent threads (since the property is sync,
+        # asyncio.Lock cannot be used here).
+        self._state_lock = threading.Lock()
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Lazily create the asyncio.Lock so it's bound to the running loop."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     @property
     def state(self) -> CircuitState:
-        """Get current state, checking if we should transition to half-open."""
-        if (
-            self._state == CircuitState.OPEN
-            and self._last_failure_time
-            and time.time() - self._last_failure_time >= self.config.recovery_timeout
-        ):
-            self._state = CircuitState.HALF_OPEN
-            self._half_open_calls = 0
-        return self._state
+        """Get current state, transitioning OPEN → HALF_OPEN atomically.
+
+        The transition is guarded by ``_state_lock`` so two concurrent
+        threads or coroutines cannot both observe OPEN and both reset
+        ``_half_open_calls`` independently.
+        """
+        with self._state_lock:
+            if (
+                self._state == CircuitState.OPEN
+                and self._last_failure_time
+                and time.time() - self._last_failure_time >= self.config.recovery_timeout
+            ):
+                self._state = CircuitState.HALF_OPEN
+                self._half_open_calls = 0
+            return self._state
 
     @property
     def failure_count(self) -> int:
@@ -113,13 +132,18 @@ class CircuitBreaker:
         return False
 
     async def _check_state(self):
-        """Check if we should allow the request."""
+        """Check if we should allow the request.
+
+        The OPEN → HALF_OPEN transition is handled by the ``state``
+        property which holds ``_state_lock``, guaranteeing only one
+        caller can observe the transition.
+        """
         current_state = self.state
         if current_state == CircuitState.OPEN:
             msg = f"Circuit breaker '{self.name}' is OPEN. Service unavailable for {self.config.recovery_timeout}s."
             raise CircuitBreakerError(msg)
         if current_state == CircuitState.HALF_OPEN:
-            async with self._lock:
+            async with self._get_lock():
                 if self._half_open_calls >= self.config.half_open_max_calls:
                     msg = f"Circuit breaker '{self.name}' is HALF_OPEN. Max calls ({self.config.half_open_max_calls}) reached."
                     raise CircuitBreakerError(msg)
@@ -127,7 +151,7 @@ class CircuitBreaker:
 
     async def _on_success(self):
         """Handle successful call."""
-        async with self._lock:
+        async with self._get_lock():
             if self._state == CircuitState.HALF_OPEN:
                 self._success_count += 1
                 # If we have enough successes, close the circuit
@@ -140,7 +164,7 @@ class CircuitBreaker:
 
     async def _on_failure(self):
         """Handle failed call."""
-        async with self._lock:
+        async with self._get_lock():
             self._failure_count += 1
             self._last_failure_time = time.time()
 

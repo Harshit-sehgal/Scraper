@@ -10,7 +10,7 @@ test.describe("Authenticated job creation flow", () => {
     // If it returns 403, the session-less environment can't create jobs.
     const apiStatus = await page.evaluate(async () => {
       try {
-        const r = await fetch("/api/health");
+        const r = await fetch("/health");
         return r.status;
       } catch {
         return 0;

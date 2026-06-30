@@ -108,7 +108,7 @@ def _compute_quality_score(
 
     # Consecutive failure penalty: each consecutive failure reduces
     # the score multiplicatively.
-    con_penalty = 0.5 ** consecutive_failures if consecutive_failures > 0 else 1.0
+    con_penalty = 0.5**consecutive_failures if consecutive_failures > 0 else 1.0
 
     return max(0.0, min(1.0, raw * con_penalty))
 

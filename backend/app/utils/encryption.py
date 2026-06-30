@@ -237,7 +237,7 @@ def _aes_gcm_decrypt(ciphertext: bytes, tag: bytes, nonce: bytes, key: bytes) ->
     ciphertext_with_tag = ciphertext + tag
     try:
         return aesgcm.decrypt(nonce, ciphertext_with_tag, None)
-    except Exception as exc:
+    except (ValueError, TypeError) as exc:
         msg = "Decryption failed — invalid key, corrupted data, or tampering"
         raise DecryptionError(msg) from exc
 
@@ -434,7 +434,7 @@ def decrypt(encrypted_payload: str, user_id: str | None = None) -> str:
 
         payload_bytes = base64.b64decode(encrypted_payload)
         payload = json.loads(payload_bytes.decode("utf-8"))
-    except Exception as exc:
+    except (ValueError, TypeError, UnicodeDecodeError) as exc:
         msg = "Invalid encrypted payload format"
         raise DecryptionError(msg) from exc
 

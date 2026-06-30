@@ -181,7 +181,7 @@ def _compute_next_run(job: ScheduledJob) -> str:
         try:
             nxt = cron_next_after(now, cron_expr)
             return nxt.isoformat()
-        except Exception:
+        except (ValueError, TypeError):
             logger.warning("Cron expression %r failed; falling back to 'now'", cron_expr)
             _record_cron_fallback(job_id=getattr(job, "id", "<unknown>"))
     # Fallback: run immediately (the processor loop will respect frequency deltas)
@@ -207,7 +207,7 @@ def _compute_next_from_record(record: dict[str, Any]) -> str:
         try:
             nxt = cron_next_after(now, cron_expr)
             return nxt.isoformat()
-        except Exception:
+        except (ValueError, TypeError):
             logger.warning("Cron expression %r failed; falling back to 'now'", cron_expr)
             _record_cron_fallback(job_id=record.get("id", "<unknown>"))
     # Frequency-based: compute from hardcoded deltas

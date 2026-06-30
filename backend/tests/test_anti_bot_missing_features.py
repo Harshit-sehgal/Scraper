@@ -134,7 +134,7 @@ class TestWebRTCAndDetection:
                 return "prompt"
             if "webgl_vendor" in expr or "UNMASKED_VENDOR_WEBGL" in expr:
                 return "NVIDIA Corporation"
-            if ("webgl_renderer" in expr or ("UNMASKED_RENDERER_WEBGL" in expr and "VENDOR" not in expr)):
+            if "webgl_renderer" in expr or ("UNMASKED_RENDERER_WEBGL" in expr and "VENDOR" not in expr):
                 return "GeForce RTX 3060/PCIe/SSE2"
             if "canvas" in expr and "toDataURL" in expr:
                 return 12345

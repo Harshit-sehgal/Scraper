@@ -82,7 +82,7 @@ def _user_tier(user_id: str) -> str:
             tier_str = local_sub.get("plan_tier")
             if tier_str in KNOWN_TIERS:
                 return tier_str
-    except Exception as e:
+    except (ValueError, KeyError, OSError) as e:
         logger.debug("Failed to read local subscription for %s: %s", user_id, e)
 
     try:

@@ -14,7 +14,7 @@ Routes marked as **stable** are:
 - Breaking changes require major version bump
 - Documented in `docs/API.md`
 
-**Current stable routes:** 45
+**Current stable routes:** ~141 *(approximate — see `docs/API_STABLE.md` for exact counts)*
 
 ### Experimental API (Research)
 
@@ -24,7 +24,7 @@ Routes marked as **experimental** are:
 - May change or be removed without notice
 - Used for research and development
 
-**Current experimental routes:** 80
+**Current experimental routes:** ~80 *(approximate — see `docs/API_EXPERIMENTAL.md` for exact counts)*
 
 ## Versioning Strategy
 

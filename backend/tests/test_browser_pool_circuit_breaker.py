@@ -214,15 +214,14 @@ class TestGetBrowserPoolHealth:
         # Overall health flag
         assert health["healthy"] is True
 
-    def test_healthy_is_false_when_circuit_open(self) -> None:
+    @pytest.mark.asyncio
+    async def test_healthy_is_false_when_circuit_open(self) -> None:
         """When breaker is OPEN, healthy flag should be False."""
         reset_browser_pool_circuit_breaker()
         cb = _bp_module.browser_pool_circuit_breaker
         # Force it open
         for _ in range(3):
-            import asyncio
-
-            asyncio.get_event_loop().run_until_complete(cb._on_failure())
+            await cb._on_failure()
 
         health = get_browser_pool_health()
         assert health["healthy"] is False

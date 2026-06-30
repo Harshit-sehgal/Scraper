@@ -4,8 +4,8 @@
 
 ### Recovery from Data Corruption
 1. Stop all API workers
-2. Restore database from latest clean backup: `./scripts/restore_backup.sh`
-3. Verify integrity: `python3 scripts/verify_backup_integrity.py`
+2. Restore database from latest clean backup: `bash scripts/restore_postgres.sh` (script not yet implemented; for manual restore see `scripts/backup_postgres.sh`)
+3. Verify integrity: `python3 scripts/backup_and_restore_test.py` (replaces `scripts/verify_backup_integrity.py`, which does not exist)
 4. Restart API + worker pool
 5. Monitor for 1 hour before resuming customer traffic
 

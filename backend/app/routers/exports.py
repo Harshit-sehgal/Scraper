@@ -176,7 +176,7 @@ def _log_export_access(
             if ctx is not None:
                 org_id = getattr(ctx, "org_id", "") or ""
                 project_id = getattr(ctx, "project_id", "") or ""
-        except Exception:
+        except (AttributeError, TypeError):
             org_id = ""
             project_id = ""
         log_data_access(

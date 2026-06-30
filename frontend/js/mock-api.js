@@ -220,7 +220,10 @@ export async function maybeHandleMockRequest(input, options = {}) {
     return jsonResponse({ detail: "Mock API failure" }, { status: 503 });
   }
 
-  if (method === "GET" && (path === "/api/health" || path === "/api/ready")) {
+  if (
+    method === "GET" &&
+    (path === "/health" || path === "/ready" || path === "/api/health" || path === "/api/ready")
+  ) {
     return jsonResponse({ status: "ok" });
   }
 

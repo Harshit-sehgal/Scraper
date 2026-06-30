@@ -14,7 +14,7 @@ Configured via `app.utils.data_retention.get_retention_config()`:
 
 ## Enforcement
 
-- Automated enforcement runs in the background sweep (`scripts/run_retention.py` / `app/lifespan.py` interval).  Dry-run sweep surfaces counts via `app.utils.data_retention.get_retention_ops()`.
+- Automated enforcement runs in the background sweep (`scripts/run_retention.py` not yet implemented; retention is enforced via `app/lifespan.py` interval using `app.utils.data_retention.enforce_retention`).  Dry-run sweep surfaces counts via `app.utils.data_retention.get_retention_ops()`.
 - Implementation: `app.utils.data_retention.enforce_retention`
 - Tests: `backend/tests/test_retention.py`
 

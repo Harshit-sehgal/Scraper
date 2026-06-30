@@ -242,7 +242,7 @@ class PayPalClient:
                 self._access_token_expires_at = time.time() + max(expires_in - 60, 60)
                 logger.debug("PayPal access token refreshed (expires_in=%ds)", expires_in)
             finally:
-                with suppress(Exception):
+                with suppress(OSError, RuntimeError):
                     resp.close()
         except (requests.RequestException, ValueError, KeyError, OSError) as e:
             logger.warning("Failed to refresh PayPal access token: %s", e)
@@ -339,7 +339,7 @@ class PayPalClient:
                     subscription_id=customer_id,
                 )
             finally:
-                with suppress(Exception):
+                with suppress(OSError, RuntimeError):
                     resp.close()
         except (requests.RequestException, ValueError, KeyError, OSError) as e:
             logger.warning("Failed to lookup subscription %s: %s", _redact_id(customer_id), e)

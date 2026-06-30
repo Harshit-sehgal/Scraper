@@ -6,6 +6,7 @@ using a temporary directory so no real data directory is touched.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,7 +19,7 @@ from app import extraction_screenshot_store as ess
 
 
 @pytest.fixture(autouse=True)
-def _tmp_screenshots_dir(tmp_path: Path) -> None:
+def _tmp_screenshots_dir(tmp_path: Path) -> Iterator[None]:
     """Redirect the screenshots directory to a temp dir and reset the latch."""
     target = tmp_path / "screenshots"
     target.mkdir(parents=True, exist_ok=True)
