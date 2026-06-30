@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import random
 import threading
 import time
 import uuid
@@ -109,6 +110,15 @@ class BrowserPool:
                     "--no-first-run",
                 ],
             )
+        # WebRTC leak prevention (Anti 14) — always applied alongside
+        # page-level JS patching so real IPs cannot leak via STUN/TURN.
+        browser_args.extend(
+            [
+                "--disable-webrtc-encryption",
+                "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+                "--enforce-webrtc-ip-permission-check",
+            ],
+        )
         try:
             self._browser = await self._playwright.chromium.launch(
                 headless=settings.PLAYWRIGHT_HEADLESS,
@@ -159,7 +169,7 @@ class BrowserPool:
         from app.anti_bot_engine import get_anti_bot_engine
 
         sp = get_anti_bot_engine().get_stealth_profile(domain)
-        return {
+        options: dict[str, Any] = {
             "user_agent": sp["user_agent"],
             "viewport": sp["viewport"],
             "device_scale_factor": sp["device_scale_factor"],
@@ -167,7 +177,10 @@ class BrowserPool:
             "has_touch": False,
             "locale": sp["locale"],
             "timezone_id": sp["timezone"],
+            "geolocation": sp["geolocation"],
+            "permissions": ["geolocation"],
         }
+        return options
 
     def _build_default_context_options(self) -> dict[str, Any]:
         """Build context options from settings defaults."""
@@ -305,6 +318,42 @@ class BrowserPool:
         }}
         """
         await context.add_init_script(advanced_js)
+
+        # WebRTC leak prevention (Anti 14) — defense-in-depth: patch
+        # RTCPeerConnection so it never emits ICE candidates that could
+        # reveal the real IP.  Combined with the Chromium args in
+        # _ensure_browser_launched_locked(), this blocks WebRTC at both
+        # the browser and JS levels.
+        webrtc_js = """
+        (function() {
+            const origRTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+            if (!origRTCPeerConnection) return;
+            const newRTC = function(config, constraints) {
+                if (config && config.iceServers) {
+                    config.iceServers = [];
+                }
+                return new origRTCPeerConnection(config, constraints);
+            };
+            newRTC.prototype = origRTCPeerConnection.prototype;
+            if (window.RTCPeerConnection) window.RTCPeerConnection = newRTC;
+            if (window.webkitRTCPeerConnection) window.webkitRTCPeerConnection = newRTC;
+            if (window.mozRTCPeerConnection) window.mozRTCPeerConnection = newRTC;
+            const origCreateOffer = origRTCPeerConnection.prototype.createOffer;
+            origRTCPeerConnection.prototype.createOffer = function() {
+                const promise = origCreateOffer.apply(this, arguments);
+                const pc = this;
+                return promise.then(function(offer) {
+                    if (offer && offer.sdp) {
+                        offer.sdp = offer.sdp.replace(/a=candidate:.*\r\n/g, '');
+                        offer.sdp = offer.sdp.replace(/a=ice-ufrag:.*\r\n/g, '');
+                        offer.sdp = offer.sdp.replace(/a=ice-pwd:.*\r\n/g, '');
+                    }
+                    return offer;
+                });
+            };
+        })();
+        """
+        await context.add_init_script(webrtc_js)
 
     async def _await_recycle_if_needed(self) -> None:
         """Check recycle condition and wait if recycling is in progress."""
@@ -849,6 +898,386 @@ def reset_global_browser_pool() -> None:
                     task.cancel()
             _pool._background_tasks.clear()
         _pool = None
+
+
+# ── Mouse Movement Simulation (Anti 10) ───────────────────────────────
+
+
+def _cubic_bezier(
+    t: float,
+    p0: float,
+    p1: float,
+    p2: float,
+    p3: float,
+) -> float:
+    """Evaluate a cubic Bezier curve at parameter *t* in [0, 1]."""
+    u = 1.0 - t
+    return u * u * u * p0 + 3.0 * u * u * t * p1 + 3.0 * u * t * t * p2 + t * t * t * p3
+
+
+def _generate_bezier_points(
+    start_x: float,
+    start_y: float,
+    target_x: float,
+    target_y: float,
+    num_points: int = 50,
+) -> list[tuple[float, float]]:
+    """Generate Bezier-curve waypoints from start to target.
+
+    Two random control points create a natural curved trajectory.
+    A human-like acceleration profile (slow-fast-slow) is achieved
+    by mapping uniform *t* through an ease-in-out function.
+    """
+    # Random control points offset from the straight line
+    dx = target_x - start_x
+    dy = target_y - start_y
+    dist = (dx * dx + dy * dy) ** 0.5
+
+    # Perpendicular offset for control points (proportional to distance)
+    perp_x = -dy / max(dist, 1.0)
+    perp_y = dx / max(dist, 1.0)
+
+    offset1 = random.uniform(0.15, 0.45) * dist * random.choice([-1, 1])  # nosec B311
+    offset2 = random.uniform(0.15, 0.45) * dist * random.choice([-1, 1])  # nosec B311
+
+    cp1_x = start_x + dx * 0.3 + perp_x * offset1
+    cp1_y = start_y + dy * 0.3 + perp_y * offset1
+    cp2_x = start_x + dx * 0.7 + perp_x * offset2
+    cp2_y = start_y + dy * 0.7 + perp_y * offset2
+
+    points: list[tuple[float, float]] = []
+    for i in range(num_points + 1):
+        # Ease-in-out for slow-fast-slow acceleration
+        raw_t = i / num_points
+        # Hermite interpolation for smooth easing
+        t = raw_t * raw_t * (3.0 - 2.0 * raw_t)
+
+        x = _cubic_bezier(t, start_x, cp1_x, cp2_x, target_x)
+        y = _cubic_bezier(t, start_y, cp1_y, cp2_y, target_y)
+
+        # Add micro-jitter at each waypoint (+-1-3 px)
+        jitter_x = random.uniform(-3.0, 3.0)  # nosec B311
+        jitter_y = random.uniform(-3.0, 3.0)  # nosec B311
+        points.append((x + jitter_x, y + jitter_y))
+
+    # Micro-overshoot: go 2-5 px past target, then correct back
+    overshoot = random.uniform(2.0, 5.0)  # nosec B311
+    overshoot_dx = dx / max(dist, 1.0) * overshoot
+    overshoot_dy = dy / max(dist, 1.0) * overshoot
+    points.append((target_x + overshoot_dx, target_y + overshoot_dy))
+    # Correct back to target
+    points.append((target_x, target_y))
+
+    return points
+
+
+async def human_mouse_move(
+    page: Any,
+    target_x: float,
+    target_y: float,
+    duration_ms: int = 500,
+) -> None:
+    """Move the mouse from current position to target along a Bezier curve.
+
+    Simulates human-like mouse movement with:
+    - Bezier-curve trajectory (not straight line)
+    - Ease-in-out acceleration (slow-fast-slow)
+    - Micro-jitter at waypoints (+-1-3 px)
+    - Occasional micro-overshoot (2-5 px past target, then correct)
+    """
+    try:
+        # Get current mouse position (default to top-left if unknown)
+        current_pos = await page.evaluate("() => ({x: window.__mouseX || 0, y: window.__mouseY || 0})")
+        start_x = float(current_pos.get("x", 0))
+        start_y = float(current_pos.get("y", 0))
+    except (RuntimeError, ValueError, TypeError, OSError):
+        start_x = 0.0
+        start_y = 0.0
+
+    # Determine number of intermediate steps based on duration
+    num_points = max(20, duration_ms // 10)
+    points = _generate_bezier_points(start_x, start_y, target_x, target_y, num_points)
+
+    # Calculate delay between steps
+    step_delay = max(1, duration_ms / len(points)) / 1000.0  # seconds
+
+    for px, py in points:
+        try:
+            await page.mouse.move(px, py)
+            await asyncio.sleep(step_delay)
+        except (RuntimeError, OSError, ValueError, TypeError):
+            # Page may have navigated or closed mid-movement
+            break
+
+    # Track the final position for subsequent moves
+    with contextlib.suppress(RuntimeError, ValueError, TypeError, OSError):
+        await page.evaluate(f"() => {{ window.__mouseX = {target_x}; window.__mouseY = {target_y}; }}")
+
+
+async def human_scroll(
+    page: Any,
+    delta_y: float,
+    duration_ms: int = 300,
+) -> None:
+    """Smoothly scroll the page by *delta_y* pixels over *duration_ms*.
+
+    Breaks the scroll into intermediate steps with human-like acceleration
+    instead of an instant ``scrollTo``.
+    """
+    total_steps = max(5, duration_ms // 30)
+    step_delta = delta_y / total_steps
+    step_delay = max(0.001, (duration_ms / total_steps) / 1000.0)  # seconds
+
+    current_scroll = 0.0
+    for i in range(total_steps):
+        # Ease-in-out acceleration curve
+        raw_t = (i + 1) / total_steps
+        t = raw_t * raw_t * (3.0 - 2.0 * raw_t)  # smoothstep
+        progress = t - ((i / total_steps) ** 2 * (3.0 - 2.0 * (i / total_steps)))
+
+        delta = step_delta * (1.0 + progress * 0.5)  # slightly accelerate
+        try:
+            await page.mouse.wheel(0, delta)
+            current_scroll += delta
+        except (RuntimeError, OSError, ValueError, TypeError):
+            break
+        await asyncio.sleep(step_delay)
+
+    # Ensure we've scrolled the full amount (in case rounding caused drift)
+    remaining = delta_y - current_scroll
+    if abs(remaining) > 1.0:
+        with contextlib.suppress(RuntimeError, OSError, ValueError, TypeError):
+            await page.mouse.wheel(0, remaining)
+
+
+# ── Headless Detection Checks (Anti 33) ──────────────────────────────
+
+
+async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
+    """Run 15+ detection checks against a Playwright page or context.
+
+    Returns a dict with ``checks`` (list of {name, status, detail}) and
+    an overall ``score`` (0-100, higher = less detectable).
+
+    All checks run purely against the browser context itself — no
+    external URLs are needed (fully offline).
+    """
+    # If we received a context, create a temporary page for checks.
+    context = page_or_context
+    owns_page = False
+    if hasattr(context, "new_page"):
+        page = await context.new_page()
+        owns_page = True
+        # Navigate to a blank page so JS evaluation has a document
+        with contextlib.suppress(RuntimeError, OSError, ValueError, TypeError):
+            await page.goto("about:blank")
+    else:
+        page = context
+
+    checks: list[dict[str, str]] = []
+
+    try:
+        # 1. navigator.webdriver
+        val = await page.evaluate("() => navigator.webdriver")
+        checks.append({
+            "name": "navigator.webdriver",
+            "status": "pass" if val is None or val is False else "fail",
+            "detail": str(val),
+        })
+
+        # 2. navigator.plugins.length
+        val = await page.evaluate("() => navigator.plugins.length")
+        checks.append({
+            "name": "navigator.plugins.length",
+            "status": "pass" if int(val) > 0 else "fail",
+            "detail": str(val),
+        })
+
+        # 3. chrome.runtime
+        val = await page.evaluate("() => !!(window.chrome && window.chrome.runtime)")
+        checks.append({
+            "name": "chrome.runtime",
+            "status": "pass" if val else "warn",
+            "detail": str(val),
+        })
+
+        # 4. Notification permissions
+        val = await page.evaluate("() => Notification.permission")
+        checks.append({
+            "name": "notification_permission",
+            "status": "pass" if val != "denied" else "warn",
+            "detail": str(val),
+        })
+
+        # 5. permissions.query (notifications)
+        val = await page.evaluate("""() => {
+            try {
+                return navigator.permissions.query({name: 'notifications'}).then(r => r.state);
+            } catch(e) { return 'error'; }
+        }""")
+        actual_val = val
+        if hasattr(val, "__await__"):
+            actual_val = await val
+        checks.append({
+            "name": "permissions_query_notifications",
+            "status": "pass" if actual_val != "denied" else "warn",
+            "detail": str(actual_val),
+        })
+
+        # 6. WebGL vendor
+        val = await page.evaluate("""() => {
+            try {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl');
+                return gl ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_VENDOR_WEBGL) : 'none';
+            } catch(e) { return 'error'; }
+        }""")
+        checks.append({
+            "name": "webgl_vendor",
+            "status": "pass" if val not in ("", "none", "error") else "fail",
+            "detail": str(val),
+        })
+
+        # 7. WebGL renderer
+        val = await page.evaluate("""() => {
+            try {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl');
+                return gl ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : 'none';
+            } catch(e) { return 'error'; }
+        }""")
+        checks.append({
+            "name": "webgl_renderer",
+            "status": "pass" if val not in ("", "none", "error") else "fail",
+            "detail": str(val),
+        })
+
+        # 8. Canvas fingerprint
+        val = await page.evaluate("""() => {
+            try {
+                const c = document.createElement('canvas');
+                const ctx = c.getContext('2d');
+                ctx.fillText('test', 0, 0);
+                return c.toDataURL().length;
+            } catch(e) { return 0; }
+        }""")
+        checks.append({
+            "name": "canvas_fingerprint",
+            "status": "pass" if int(val) > 0 else "fail",
+            "detail": f"data_url_length={val}",
+        })
+
+        # 9. Audio fingerprint
+        val = await page.evaluate("""() => {
+            try {
+                const ac = new (window.AudioContext || window.webkitAudioContext)();
+                return ac.sampleRate;
+            } catch(e) { return 0; }
+        }""")
+        checks.append({
+            "name": "audio_fingerprint",
+            "status": "pass" if val and val > 0 else "warn",
+            "detail": f"sample_rate={val}",
+        })
+
+        # 10. Fonts detection
+        val = await page.evaluate("""() => {
+            const fonts = ['Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana'];
+            const available = [];
+            for (const f of fonts) {
+                if (document.fonts.check('12px ' + f)) available.push(f);
+            }
+            return available.length;
+        }""")
+        checks.append({
+            "name": "fonts_count",
+            "status": "pass" if int(val) >= 3 else "warn",
+            "detail": str(val),
+        })
+
+        # 11. Screen resolution
+        val = await page.evaluate("() => `${screen.width}x${screen.height}`")
+        checks.append({
+            "name": "screen_resolution",
+            "status": "pass" if val and "0x0" not in str(val) else "fail",
+            "detail": str(val),
+        })
+
+        # 12. Languages
+        val = await page.evaluate("() => navigator.languages")
+        checks.append({
+            "name": "navigator_languages",
+            "status": "pass" if val and len(val) > 0 else "fail",
+            "detail": str(val),
+        })
+
+        # 13. Platform
+        val = await page.evaluate("() => navigator.platform")
+        checks.append({
+            "name": "navigator_platform",
+            "status": "pass" if val in ("Win32", "MacIntel", "Linux x86_64") else "warn",
+            "detail": str(val),
+        })
+
+        # 14. hardwareConcurrency
+        val = await page.evaluate("() => navigator.hardwareConcurrency")
+        checks.append({
+            "name": "hardware_concurrency",
+            "status": "pass" if val and int(val) > 0 else "fail",
+            "detail": str(val),
+        })
+
+        # 15. deviceMemory
+        val = await page.evaluate("() => navigator.deviceMemory")
+        checks.append({
+            "name": "device_memory",
+            "status": "pass" if val and float(val) > 0 else "warn",
+            "detail": str(val),
+        })
+
+        # 16. Touch support
+        val = await page.evaluate("() => navigator.maxTouchPoints")
+        checks.append({
+            "name": "touch_support",
+            "status": "pass",
+            "detail": f"maxTouchPoints={val}",
+        })
+
+        # 17. WebRTC leak check
+        val = await page.evaluate("""() => {
+            try {
+                const pc = new RTCPeerConnection({iceServers: []});
+                return pc ? 'exists' : 'none';
+            } catch(e) { return 'blocked'; }
+        }""")
+        checks.append({
+            "name": "webrtc_leak_check",
+            "status": "pass" if val in ("blocked", "none") else "warn",
+            "detail": str(val),
+        })
+
+    except (RuntimeError, OSError, ValueError, TypeError) as exc:
+        checks.append({
+            "name": "runtime_error",
+            "status": "fail",
+            "detail": str(exc),
+        })
+    finally:
+        if owns_page:
+            with contextlib.suppress(RuntimeError, OSError, ValueError, TypeError):
+                await page.close()
+
+    # Compute overall score: pass=100, warn=50, fail=0 per check
+    pass_count = sum(1 for c in checks if c["status"] == "pass")
+    warn_count = sum(1 for c in checks if c["status"] == "warn")
+    total = len(checks) if checks else 1
+    score = round((pass_count * 100 + warn_count * 50) / total, 1)
+
+    return {
+        "checks": checks,
+        "score": score,
+        "summary": {"pass": pass_count, "warn": warn_count, "fail": total - pass_count - warn_count, "total": total},
+    }
 
 
 # ── Cookie Parsing ──────────────────────────────────────────────────────

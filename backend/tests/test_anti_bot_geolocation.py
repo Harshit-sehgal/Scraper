@@ -73,4 +73,10 @@ class TestGeolocationSpoofing:
         pool = BrowserPool()
         opts = pool._build_stealth_context_options("example.com")
         assert isinstance(opts, dict)
-        assert "geolocation" not in opts
+        assert "geolocation" in opts
+        geo = opts["geolocation"]
+        assert "latitude" in geo
+        assert "longitude" in geo
+        assert "accuracy" in geo
+        assert -90 <= geo["latitude"] <= 90
+        assert -180 <= geo["longitude"] <= 180

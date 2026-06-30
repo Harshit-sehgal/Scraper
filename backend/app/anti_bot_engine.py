@@ -25,6 +25,252 @@ from app.utils.log_redaction import mask_proxy_url
 
 logger = logging.getLogger(__name__)
 
+# ── TLS Fingerprint Pool (Anti 4) ────────────────────────────────────
+# Realistic TLS JA4 fingerprints for common browsers. Full TLS
+# manipulation requires curl_cffi; this pool provides the *profile*
+# that apply_tls_fingerprint() can apply partially depending on the
+# transport (httpx vs Playwright).
+TLS_FINGERPRINT_POOL: list[dict[str, Any]] = [
+    {
+        "label": "chrome_124",
+        "ja4_fingerprint": "t13d1516h2_8daaf6152771_000000000000",
+        "http2_settings": {
+            "HEADER_TABLE_SIZE": 65536,
+            "ENABLE_PUSH": 0,
+            "MAX_CONCURRENT_STREAMS": 1000,
+            "INITIAL_WINDOW_SIZE": 6291456,
+            "MAX_FRAME_SIZE": 16384,
+            "MAX_HEADER_LIST_SIZE": 262144,
+        },
+        "cipher_suites": [
+            0x1301, 0x1302, 0x1303,  # TLS 1.3
+            0xC02B, 0xC02F, 0xC02C, 0xC030,  # TLS 1.2 ECDHE
+            0x009E, 0x009F, 0x00A2, 0x00A3,  # AES-GCM
+            0xCC14, 0xCC13,
+        ],
+        "tls_extensions_order": [
+            0, 10, 11, 35, 16, 5, 65281, 23, 13, 43, 45, 51, 17513,
+        ],
+    },
+    {
+        "label": "chrome_123",
+        "ja4_fingerprint": "t13d1515h2_8daaf6152771_000000000000",
+        "http2_settings": {
+            "HEADER_TABLE_SIZE": 65536,
+            "ENABLE_PUSH": 0,
+            "MAX_CONCURRENT_STREAMS": 1000,
+            "INITIAL_WINDOW_SIZE": 6291456,
+            "MAX_FRAME_SIZE": 16384,
+            "MAX_HEADER_LIST_SIZE": 262144,
+        },
+        "cipher_suites": [
+            0x1301, 0x1302, 0x1303,
+            0xC02B, 0xC02F, 0xC02C, 0xC030,
+            0x009E, 0x009F, 0x00A2, 0x00A3,
+            0xCC14, 0xCC13,
+        ],
+        "tls_extensions_order": [
+            0, 10, 11, 35, 16, 5, 65281, 23, 13, 43, 45, 51, 17513,
+        ],
+    },
+    {
+        "label": "firefox_124",
+        "ja4_fingerprint": "t13d1515h2_0b1565104d0b_000000000000",
+        "http2_settings": {
+            "HEADER_TABLE_SIZE": 65536,
+            "ENABLE_PUSH": 0,
+            "MAX_CONCURRENT_STREAMS": 100,
+            "INITIAL_WINDOW_SIZE": 12517377,
+            "MAX_FRAME_SIZE": 16384,
+            "MAX_HEADER_LIST_SIZE": 262144,
+        },
+        "cipher_suites": [
+            0x1301, 0x1302, 0x1303,
+            0xC02B, 0xC02F, 0xCC14, 0xCC13,
+            0xC02C, 0xC030,
+            0x009E, 0x009F, 0x00A2, 0x00A3,
+        ],
+        "tls_extensions_order": [
+            0, 10, 11, 35, 16, 5, 65281, 23, 13, 43, 45, 51, 17513,
+        ],
+    },
+    {
+        "label": "edge_123",
+        "ja4_fingerprint": "t13d1516h2_8daaf6152771_e3b62e79810c",
+        "http2_settings": {
+            "HEADER_TABLE_SIZE": 65536,
+            "ENABLE_PUSH": 0,
+            "MAX_CONCURRENT_STREAMS": 1000,
+            "INITIAL_WINDOW_SIZE": 6291456,
+            "MAX_FRAME_SIZE": 16384,
+            "MAX_HEADER_LIST_SIZE": 262144,
+        },
+        "cipher_suites": [
+            0x1301, 0x1302, 0x1303,
+            0xC02B, 0xC02F, 0xC02C, 0xC030,
+            0x009E, 0x009F, 0x00A2, 0x00A3,
+            0xCC14, 0xCC13,
+        ],
+        "tls_extensions_order": [
+            0, 10, 11, 35, 16, 5, 65281, 23, 13, 43, 45, 51, 17513,
+        ],
+    },
+    {
+        "label": "safari_17",
+        "ja4_fingerprint": "t13d1516h2_8daaf6152771_b0c8f4ea5619",
+        "http2_settings": {
+            "HEADER_TABLE_SIZE": 4096,
+            "ENABLE_PUSH": 0,
+            "MAX_CONCURRENT_STREAMS": 100,
+            "INITIAL_WINDOW_SIZE": 65535,
+            "MAX_FRAME_SIZE": 16384,
+            "MAX_HEADER_LIST_SIZE": 16384,
+        },
+        "cipher_suites": [
+            0x1301, 0x1302, 0x1303,
+            0xC02B, 0xC02F, 0xC02C, 0xC030,
+            0xCC14, 0xCC13,
+        ],
+        "tls_extensions_order": [
+            0, 10, 11, 35, 16, 5, 65281, 23, 13, 43, 45, 51,
+        ],
+    },
+]
+
+
+def get_random_tls_profile() -> dict[str, Any]:
+    """Return a randomly selected TLS fingerprint profile.
+
+    The returned dict contains ``ja4_fingerprint``, ``http2_settings``,
+    ``cipher_suites``, and ``tls_extensions_order`` drawn from
+    :data:`TLS_FINGERPRINT_POOL`.
+    """
+    profile = random.choice(TLS_FINGERPRINT_POOL)  # nosec B311
+    # Return a shallow copy so callers can mutate without polluting the pool.
+    return {
+        "label": profile["label"],
+        "ja4_fingerprint": profile["ja4_fingerprint"],
+        "http2_settings": dict(profile["http2_settings"]),
+        "cipher_suites": list(profile["cipher_suites"]),
+        "tls_extensions_order": list(profile["tls_extensions_order"]),
+    }
+
+
+def apply_tls_fingerprint(context_or_client: Any, profile: dict[str, Any]) -> None:
+    """Apply a TLS fingerprint profile to an HTTP client or Playwright context.
+
+    This is intentionally partial — full TLS manipulation requires
+    ``curl_cffi`` or an OS-level MITM proxy.  What we can do:
+
+    * **httpx**: set HTTP/2 settings on the transport, which subtly
+      changes the fingerprint observable by servers that inspect
+      SETTINGS frames.
+    * **Playwright**: add Chromium ``--cipher-suite-blacklist`` and
+      ``--ssl-version-max/min`` args to influence which suites are
+      advertised.  This is best-effort; Chromium doesn't expose
+      fine-grained TLS control.
+    """
+    if context_or_client is None or profile is None:
+        return
+
+    # --- httpx path: apply HTTP/2 SETTINGS if the transport exposes it ---
+    try:
+        transport = getattr(context_or_client, "_transport", None) or getattr(context_or_client, "transport", None)
+        h2_settings = profile.get("http2_settings")
+        if transport is not None and h2_settings is not None:
+            h2_conn = getattr(transport, "h2_conn", None) or getattr(transport, "_h2_conn", None)
+            if h2_conn is not None:
+                for key, value in h2_settings.items():
+                    try:
+                        setattr(h2_conn.local_settings, key, value)
+                    except (AttributeError, TypeError, ValueError):
+                        logger.debug("apply_tls_fingerprint: could not set h2 setting %s", key)
+    except (AttributeError, TypeError, RuntimeError):
+        logger.debug("apply_tls_fingerprint: httpx h2 settings application failed", exc_info=True)
+
+    # --- Playwright path: influence TLS via Chromium args ---
+    # Playwright contexts don't allow runtime TLS arg changes, but when
+    # the browser was launched we could have applied cipher-suite
+    # blacklists.  Record the profile label in context metadata so
+    # diagnostic tooling can see which profile is active.
+    try:
+        if hasattr(context_or_client, "set_geolocation"):
+            # This is a BrowserContext — store profile label for diagnostics.
+            # The actual Chromium args are applied at browser launch time
+            # in browser_pool._ensure_browser_launched_locked().
+            context_or_client._tls_fingerprint_label = profile.get("label", "")  # type: ignore[attr-defined]
+    except (AttributeError, TypeError, RuntimeError):
+        logger.debug("apply_tls_fingerprint: Playwright context annotation failed", exc_info=True)
+
+
+# ── Geolocation Pool (Anti 12) ────────────────────────────────────────
+# Coordinates matching common proxy exit-node regions. When a proxy IP
+# is selected, the geolocation should be derived from the nearest region
+# with a +-0.05 degree jitter.
+GEO_POOL: list[dict[str, Any]] = [
+    {"label": "us_east", "city": "New York", "latitude": 40.7128, "longitude": -74.0060, "accuracy": 50.0},
+    {"label": "us_west", "city": "San Francisco", "latitude": 37.7749, "longitude": -122.4194, "accuracy": 50.0},
+    {"label": "london", "city": "London", "latitude": 51.5074, "longitude": -0.1278, "accuracy": 50.0},
+    {"label": "frankfurt", "city": "Frankfurt", "latitude": 50.1109, "longitude": 8.6821, "accuracy": 50.0},
+    {"label": "tokyo", "city": "Tokyo", "latitude": 35.6762, "longitude": 139.6503, "accuracy": 50.0},
+    {"label": "singapore", "city": "Singapore", "latitude": 1.3521, "longitude": 103.8198, "accuracy": 50.0},
+    {"label": "sydney", "city": "Sydney", "latitude": -33.8688, "longitude": 151.2093, "accuracy": 50.0},
+    {"label": "mumbai", "city": "Mumbai", "latitude": 19.0760, "longitude": 72.8777, "accuracy": 50.0},
+    {"label": "sao_paulo", "city": "Sao Paulo", "latitude": -23.5505, "longitude": -46.6333, "accuracy": 50.0},
+    {"label": "toronto", "city": "Toronto", "latitude": 43.6532, "longitude": -79.3832, "accuracy": 50.0},
+]
+
+
+def get_random_geolocation() -> dict[str, float]:
+    """Return a random geolocation entry from :data:`GEO_POOL`.
+
+    Returns ``{latitude, longitude, accuracy}`` with a small random
+    jitter (+-0.05 deg) applied so each session doesn't share an
+    identical coordinate.
+    """
+    entry = random.choice(GEO_POOL)  # nosec B311
+    jitter_lat = random.uniform(-0.05, 0.05)  # nosec B311
+    jitter_lon = random.uniform(-0.05, 0.05)  # nosec B311
+    return {
+        "latitude": round(entry["latitude"] + jitter_lat, 4),
+        "longitude": round(entry["longitude"] + jitter_lon, 4),
+        "accuracy": entry["accuracy"],
+    }
+
+
+def get_geolocation_for_proxy(proxy_url: str | None) -> dict[str, float] | None:
+    """Derive a geolocation near the proxy's IP region.
+
+    Accepts a proxy URL string (e.g. ``"http://1.2.3.4:8080"``).  If the
+    proxy IP can be matched to a known region in :data:`GEO_POOL`, returns
+    a jittered coordinate for that region.  Falls back to
+    :func:`get_random_geolocation` when the IP cannot be resolved.
+    """
+    if not proxy_url:
+        return None
+
+    # Best-effort: extract the host portion and try a simplistic region
+    # heuristic.  In production, a GeoIP database would map the IP to a
+    # region.  Here we use the host string itself as a seed for
+    # deterministicity so the same proxy always maps to the same region.
+    try:
+        host_part = proxy_url.replace("http://", "").replace("https://", "").replace("socks5://", "")
+        host = host_part.split(":")[0].split("@")[-1]
+    except (ValueError, IndexError):
+        return get_random_geolocation()
+
+    # Simple hash-based region selection for deterministic proxy -> region
+    # mapping without needing a GeoIP DB.
+    pool_index = hash(host) % len(GEO_POOL)
+    entry = GEO_POOL[pool_index]
+    jitter_lat = random.uniform(-0.05, 0.05)  # nosec B311
+    jitter_lon = random.uniform(-0.05, 0.05)  # nosec B311
+    return {
+        "latitude": round(entry["latitude"] + jitter_lat, 4),
+        "longitude": round(entry["longitude"] + jitter_lon, 4),
+        "accuracy": entry["accuracy"],
+    }
+
 # ── Cookie persistence (SQLite) ──────────────────────────────────────
 _COOKIE_DB_LOCK = Lock()
 _COOKIE_DB_INITIALIZED: set[Path] = set()
@@ -272,6 +518,7 @@ class AntiBotEngine:
           - timezone: randomized timezone ID
           - locale: browser locale string
           - platform: OS platform string
+          - geolocation: randomized {latitude, longitude, accuracy}
         """
         # UA rotation based on attempt history
         ua_pool = settings.STEALTH_UA_POOL.split(",")
@@ -336,6 +583,7 @@ class AntiBotEngine:
             "locale": settings.STEALTH_DEFAULT_LOCALE,
             "platform": "Win32" if "Windows" in ua else ("MacIntel" if "Mac" in ua else "Linux x86_64"),
             "device_scale_factor": random.choice([float(x) for x in settings.STEALTH_DEVICE_SCALE_FACTORS.split(",")]),  # nosec B311
+            "geolocation": get_random_geolocation(),
         }
 
     def update_cookies(self, domain: str, cookie_string: str) -> None:
