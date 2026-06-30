@@ -91,6 +91,7 @@ async def run_post_extraction_processing(
     js_render_delay: float,
     token_density: float,
     retry_count: int,
+    job_id: str = "",
 ) -> tuple[list[dict], list[str]]:
     """Run post-extraction processing on extracted results.
 
@@ -213,6 +214,20 @@ async def run_post_extraction_processing(
 
     llm_calls = get_llm_call_count()
     estimated_cost = (llm_calls * settings.COST_PER_LLM_CALL) + (fetch_ms / 1000.0 * settings.COST_PER_FETCH_MS)
+
+    # Per-job cost tracking: record browser time and bandwidth
+    try:
+        from app.job_cost_tracker import get_job_cost_tracker
+
+        jct = get_job_cost_tracker()
+        if job_id:
+            # Record browser time if Playwright was used
+            if fetch_method == "playwright":
+                jct.record_browser_time(job_id, seconds=fetch_ms / 1000.0)
+            # Record CPU time (approximation: fetch_ms is wall-clock; CPU ≈ 50% for JS rendering)
+            jct.record_cpu_time(job_id, seconds=(fetch_ms / 1000.0) * 0.5)
+    except (ImportError, RuntimeError, ValueError, TypeError):
+        pass  # Cost tracking is best-effort; never block extraction
 
     telemetry = get_scrape_telemetry()
     telemetry.record(

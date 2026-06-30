@@ -1,7 +1,14 @@
-"""Health Router — liveness, readiness, and root path probes.
+"""Health Router — liveness, readiness, and component-level health probes.
 
 Extracted from main.py as part of Phase 3 refactoring to decouple
 health-check concerns from the app factory.
+
+Sub-endpoints:
+- ``GET /health`` — liveness (process is alive)
+- ``GET /ready`` — readiness (DB backend reachable)
+- ``GET /health/worker`` — worker queue status (pending, running, idle capacity)
+- ``GET /health/db`` — database connection & migration status
+- ``GET /health/browser`` — Playwright browser pool status
 """
 
 from __future__ import annotations
@@ -118,3 +125,124 @@ async def ready():
             status_code=503,
             content=content,
         )
+
+
+# ── Component-level health sub-endpoints ─────────────────────────────────
+
+
+@router.get("/health/worker", response_model=dict)
+async def health_worker():
+    """Worker queue health — pending jobs, running tasks, idle capacity.
+
+    Returns 503 if the worker queue reports zero idle capacity while
+    tasks are pending (queue saturation).
+    """
+    try:
+        from app.worker_queue import get_worker_queue
+
+        queue = get_worker_queue()
+        # get_status() is synchronous for the in-memory queue backend
+        status = queue.get_status()
+        pending = status.get("pending", 0)
+        running = status.get("running", 0)
+        max_concurrency = status.get("max_concurrency", 0)
+        idle_capacity = max(0, max_concurrency - running)
+        dead_letter = status.get("dead_letter", 0)
+        retrying = status.get("retrying", 0)
+
+        saturated = pending > 0 and idle_capacity == 0
+        result = {
+            "status": "saturated" if saturated else "ok",
+            "pending": pending,
+            "running": running,
+            "idle_capacity": idle_capacity,
+            "max_concurrency": max_concurrency,
+            "retrying": retrying,
+            "dead_letter": dead_letter,
+        }
+        if saturated:
+            return JSONResponse(status_code=503, content=result)
+        return result
+    except Exception as e:
+        logger.debug("[health/worker] Error inspecting worker queue", exc_info=True)
+        content: dict = {"status": "error"}
+        if settings.ENV.lower() != "production":
+            content["error"] = _sanitise_error(str(e))
+        return JSONResponse(status_code=503, content=content)
+
+
+@router.get("/health/db", response_model=dict)
+async def health_db():
+    """Database health — connection status, migrations, schema version.
+
+    Returns 503 if the database backend reports unhealthy.
+    """
+    try:
+        repo = get_job_repository()
+        health_info = await run_in_threadpool(repo.health_check)
+        ok = health_info.get("ok", False)
+        result: dict = {
+            "status": "ok" if ok else "error",
+            "backend": getattr(repo, "backend", "sqlite"),
+            "migrations": "ok" if health_info.get("schema_version", 0) >= 0 else "unknown",
+            "schema_version": health_info.get("schema_version", 0),
+        }
+        if not ok:
+            if settings.ENV.lower() != "production":
+                result["error"] = _sanitise_error(health_info.get("error", "Backend unhealthy"))
+            return JSONResponse(status_code=503, content=result)
+        return result
+    except Exception as e:
+        logger.debug("[health/db] Error checking database", exc_info=True)
+        content = {"status": "error"}
+        if settings.ENV.lower() != "production":
+            content["error"] = _sanitise_error(str(e))
+        return JSONResponse(status_code=503, content=content)
+
+
+@router.get("/health/browser", response_model=dict)
+async def health_browser():
+    """Browser pool health — live browser count, context availability, circuit breaker state.
+
+    Returns 503 if the circuit breaker is OPEN (browser pool unavailable)
+    or if the browser reports disconnected with active contexts.
+    """
+    try:
+        from app.browser_pool import get_browser_pool_health
+
+        pool_health = await run_in_threadpool(get_browser_pool_health)
+
+        # get_browser_pool_health returns a dict with circuit_breaker + pool metrics
+        cb_stats = pool_health.get("circuit_breaker", {})
+        pool_metrics = pool_health.get("pool", {})
+        cb_state = cb_stats.get("state", "unknown")
+        is_open = cb_state == "open"
+        connected = pool_metrics.get("connected", False)
+        active_contexts = pool_metrics.get("active_contexts", 0)
+        reusable_contexts = pool_metrics.get("reusable_contexts", 0)
+        isolated_contexts = pool_metrics.get("isolated_contexts", 0)
+        active_acquires = pool_metrics.get("active_acquires", 0)
+        crash_count = pool_metrics.get("crash_count", 0)
+        context_reuse_rate = pool_metrics.get("context_reuse_rate", 0.0)
+
+        unhealthy = is_open or (not connected and (active_contexts > 0 or active_acquires > 0))
+        result = {
+            "status": "unhealthy" if unhealthy else "ok",
+            "circuit_breaker": cb_state,
+            "connected": connected,
+            "active_contexts": active_contexts,
+            "reusable_contexts": reusable_contexts,
+            "isolated_contexts": isolated_contexts,
+            "active_acquires": active_acquires,
+            "crash_count": crash_count,
+            "context_reuse_rate": context_reuse_rate,
+        }
+        if unhealthy:
+            return JSONResponse(status_code=503, content=result)
+        return result
+    except Exception as e:
+        logger.debug("[health/browser] Error checking browser pool", exc_info=True)
+        content = {"status": "error"}
+        if settings.ENV.lower() != "production":
+            content["error"] = _sanitise_error(str(e))
+        return JSONResponse(status_code=503, content=content)

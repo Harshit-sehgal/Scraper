@@ -888,6 +888,7 @@ async def scrape_url(
         js_render_delay=js_render_delay,
         token_density=token_density,
         retry_count=retry_count,
+        job_id="",  # scrape_url doesn't have a job reference; cost tracking is best-effort
     )
 
     # ── Step 7: Zero-Result Classification ────────────────────────

@@ -241,7 +241,8 @@ class DistributedLock:
                 with conn.cursor() as cur:
                     # pg_advisory_lock blocks until acquired; use try_lock for non-blocking
                     cur.execute("SELECT pg_try_advisory_lock(%s)", (lock_int,))
-                    acquired = cur.fetchone()[0]
+                    row = cur.fetchone()
+                    acquired = row[0] if row is not None else False
                 if acquired:
                     self._pg_conn = conn
                     return True

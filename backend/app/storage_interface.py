@@ -31,6 +31,7 @@ _JOBS_COLUMNS_SQL = [
     "progress_current INTEGER DEFAULT 0",
     "progress_total INTEGER DEFAULT 0",
     "estimated_cost_usd REAL DEFAULT 0",
+    "cost_breakdown TEXT DEFAULT '{}'",
     "cancel_requested BOOLEAN DEFAULT FALSE",
     "created_by TEXT DEFAULT ''",
     "org_id TEXT DEFAULT ''",

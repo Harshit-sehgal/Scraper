@@ -91,10 +91,26 @@ async def run_finalization(
     """Finalize job: calculate cost, offload large results, set terminal status."""
     persist_job_state_fn = persist_single_fn or persist_fn
 
-    job.estimated_cost_usd = round(
+    # LLM + per-URL base cost (existing formula)
+    llm_url_cost = round(
         (job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE),
         4,
     )
+
+    # Per-job cost breakdown from the resource tracker
+    try:
+        from app.job_cost_tracker import get_job_cost_tracker
+
+        tracker = get_job_cost_tracker()
+        cost_breakdown = tracker.finalize_job(job.id)
+        job.cost_breakdown = cost_breakdown
+        resource_cost = cost_breakdown.get("total_usd", 0.0)
+    except Exception:
+        logger.debug("[finalization] Cost tracker unavailable, using LLM+URL formula only", exc_info=True)
+        resource_cost = 0.0
+        job.cost_breakdown = {}
+
+    job.estimated_cost_usd = round(llm_url_cost + resource_cost, 4)
 
     if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
         try:
