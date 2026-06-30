@@ -154,6 +154,9 @@ async def run_finalization(
     # Fire outbound webhook if configured
     await _deliver_webhook_if_configured(job)
 
+    # Fire notification channels if configured (Feat 35/36)
+    await _deliver_notifications_if_configured(job)
+
     logger.info("Completed (%s): %d total results", job.status.value, len(all_raw_results))
 
 
@@ -191,6 +194,41 @@ async def _deliver_webhook_if_configured(job: Any) -> None:
         logger.debug("Webhook delivery skipped for job %s: %s", getattr(job, "id", ""), exc)
     except Exception:
         logger.exception("Webhook delivery threw unexpected error for job %s", getattr(job, "id", ""))
+
+
+async def _deliver_notifications_if_configured(job: Any) -> None:
+    """Deliver notifications to all configured channels for a job (Feat 35/36).
+
+    Notification delivery is best-effort — failures are logged but never
+    prevent the job from being marked terminal.
+    """
+    job_id = getattr(job, "id", "")
+    if not job_id:
+        return
+    try:
+        from app.services.notifications import deliver_notifications
+
+        status_value = getattr(getattr(job, "status", ""), "value", str(getattr(job, "status", "")))
+        subject = f"DataForge Job {job_id[:8]} — {status_value}"
+        body = (
+            f"Job *{getattr(job, 'name', '')}* finished with status *{status_value}*.\n"
+            f"Records: {getattr(job, 'total_records', 0)} total, "
+            f"{getattr(job, 'filtered_records', 0)} filtered.\n"
+            f"Cost: ${getattr(job, 'estimated_cost_usd', 0.0):.4f}"
+        )
+        error = getattr(job, "error", None)
+        if error:
+            body += f"\nError: {error}"
+        metadata: dict = {
+            "Job ID": job_id,
+            "Status": status_value,
+            "Records": str(getattr(job, "total_records", 0)),
+        }
+        await deliver_notifications(job_id, "completed", subject, body, metadata)
+    except (ImportError, RuntimeError, ValueError) as exc:
+        logger.debug("Notification delivery skipped for job %s: %s", job_id, exc)
+    except Exception:
+        logger.exception("Notification delivery threw unexpected error for job %s", job_id)
 
 
 async def _run_in_threadpool(fn: Callable, *args: Any) -> Any:
