@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import HTTPException, Request
 
 from app.audit_logger import log_rbac_event
+from app.utils.log_redaction import redact_pii
 from app.utils.rbac import resolve_auth_context
 from app.utils.usage_ledger import QuotaPeriod, UsageType, get_usage_ledger
 
@@ -83,7 +84,7 @@ def _user_tier(user_id: str) -> str:
             if tier_str in KNOWN_TIERS:
                 return tier_str
     except (ValueError, KeyError, OSError) as e:
-        logger.debug("Failed to read local subscription for %s: %s", user_id, e)
+        logger.debug("Failed to read local subscription for %s: %s", redact_pii(str(user_id)), e)
 
     try:
         from app.billing.service import get_user_tier_from_billing
@@ -103,11 +104,11 @@ def _user_tier(user_id: str) -> str:
             "falling back to free. This usually indicates a "
             "billing-layer contract regression — investigate the "
             "return type of get_user_tier_from_billing.",
-            user_id,
+            redact_pii(str(user_id)),
         )
         return "free"
     except (RuntimeError, ValueError, KeyError, TypeError):
-        logger.debug("Failed to look up tier for %s, using free", user_id, exc_info=True)
+        logger.debug("Failed to look up tier for %s, using free", redact_pii(str(user_id)), exc_info=True)
         return "free"
 
     return tier_value if tier_value in KNOWN_TIERS else "free"

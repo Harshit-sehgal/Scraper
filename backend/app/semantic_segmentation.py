@@ -1195,7 +1195,7 @@ def is_likely_noise_field(name: str, value: str) -> tuple[bool, float, list[str]
 
         segments = segment_single_text(value)
         # Name fields shouldn't contain structured data (prices, dates, etc.)
-        typed_candidates = [c for c in segments.candidates if c.primary_type not in ("text", "number")]
+        typed_candidates = [c for c in segments.candidates if c.primary_type not in (SemanticType.TEXT, SemanticType.NUMBER)]
         if typed_candidates:
             evidence.append(f"name_field_has_typed_content:{typed_candidates[0].primary_type}")
             return False, 0.4, evidence

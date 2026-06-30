@@ -106,7 +106,7 @@ class FederationManager:
 
         policy = get_crawl_policy()
         domain_states = {}
-        for domain, state in policy._domains.items():
+        for domain, state in policy.iter_domain_states():
             domain_states[domain] = {
                 "consecutive_failures": state.consecutive_failures,
                 "total_fetches": state.total_fetches,
@@ -115,28 +115,13 @@ class FederationManager:
             }
 
         # 2. Gather learned motifs from world state.
-        motifs = [_decode_motif_key(m) for m in getattr(self.ws, "_evolved_schema", set())]
+        motifs = [_decode_motif_key(m) for m in self.ws.evolved_schema]
 
         # 3. Gather local topology coordinates from world state (serialize
-        # tuple keys)
-        topology_coords = {}
-        topology_metadata = {}
-        if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
-            if not hasattr(self.ws._topology, "_cohesion_metadata"):
-                self.ws._topology._cohesion_metadata = {}
-            for (src, tgt), cohesion in self.ws._topology._neighborhood_cohesion.items():
-                key = f"{src}:{tgt}"
-                topology_coords[key] = cohesion
-                meta = self.ws._topology._cohesion_metadata.get(
-                    (src, tgt),
-                    {
-                        "node_id": self.node_id,
-                        "timestamp": time.time(),
-                        "version": 1,
-                        "epoch": getattr(self.ws._topology, "topology_epoch", 0),
-                    },
-                )
-                topology_metadata[key] = meta
+        # tuple keys) — use public cohesion accessor
+        exported_cohesion = self.ws.export_cohesion_state()
+        topology_coords = {k: v["cohesion"] for k, v in exported_cohesion.items()}
+        topology_metadata = {k: v["metadata"] for k, v in exported_cohesion.items()}
 
         # 4. Gather local transaction journals / deltas
         delta_log = getattr(self.ws, "_current_journal", [])
@@ -176,7 +161,7 @@ class FederationManager:
 
             policy = get_crawl_policy()
             for domain, rep in remote.domain_reputation.items():
-                local_state = policy._get_state(domain)
+                local_state = policy.get_or_create_domain_state(domain)
                 remote_timestamp = rep.get("last_update", 0.0)
 
                 # Only merge if remote was updated more recently
@@ -190,81 +175,90 @@ class FederationManager:
             # Rule 2: Structural Union for Learned Motifs
             for motif_fields in remote.motifs:
                 motif_hash = _encode_motif_fields(motif_fields)
-                if not _schema_contains_motif(self.ws._evolved_schema, motif_fields):
+                evolved = set(self.ws.evolved_schema)
+                if not _schema_contains_motif(evolved, motif_fields):
                     self.ws._evolved_schema.add(motif_hash)
                     merge_report["merged_motifs"] += 1
 
             # Rule 3: Topological Affinity Merging via Deterministic Epoch &
-            # Version Consensus
-            if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
-                if not hasattr(self.ws._topology, "_cohesion_metadata"):
-                    self.ws._topology._cohesion_metadata = {}
+            # Version Consensus  — uses public cohesion export/import API
+            local_cohesion_state = self.ws.export_cohesion_state()
+            remote_meta_dict = getattr(remote, "topology_metadata", {})
 
-                remote_meta_dict = getattr(remote, "topology_metadata", {})
+            for key, remote_cohesion in remote.topology.items():
+                parts = key.split(":")
+                if len(parts) != 2:
+                    continue
 
-                for key, remote_cohesion in remote.topology.items():
-                    parts = key.split(":")
-                    if len(parts) == 2:
-                        k = (parts[0], parts[1])
+                # 1. Fetch remote version metadata, or default to standard LWW
+                r_meta = remote_meta_dict.get(
+                    key,
+                    {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0},
+                )
+                r_epoch = r_meta.get("epoch", 0)
+                r_ver = r_meta.get("version", 1)
+                r_ts = r_meta.get("timestamp", remote.timestamp)
+                r_node = r_meta.get("node_id", remote.node_id)
 
-                        # 1. Fetch remote version metadata, or default to standard
-                        # LWW
-                        r_meta = remote_meta_dict.get(
+                # 2. Fetch local version metadata from exported state
+                local_entry = local_cohesion_state.get(key)
+                l_meta = (
+                    local_entry["metadata"]
+                    if local_entry
+                    else {
+                        "node_id": self.node_id,
+                        "timestamp": 0.0,
+                        "version": 0,
+                        "epoch": 0,
+                    }
+                )
+                l_epoch = l_meta.get("epoch", 0)
+                l_ver = l_meta.get("version", 0)
+                l_ts = l_meta.get("timestamp", 0.0)
+                l_node = l_meta.get("node_id", self.node_id)
+
+                # If remote metadata was not explicitly provided, fall back
+                # to cooperative averaging
+                if not remote_meta_dict or key not in remote_meta_dict:
+                    if local_entry:
+                        averaged = (local_entry["cohesion"] + remote_cohesion) / 2.0
+                        self.ws.import_cohesion_entry(
                             key,
-                            {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0},
-                        )
-                        r_epoch = r_meta.get("epoch", 0)
-                        r_ver = r_meta.get("version", 1)
-                        r_ts = r_meta.get("timestamp", remote.timestamp)
-                        r_node = r_meta.get("node_id", remote.node_id)
-
-                        # 2. Fetch local version metadata, or initialize standard
-                        # local info if absent
-                        l_meta = self.ws._topology._cohesion_metadata.get(
-                            k,
+                            averaged,
                             {
-                                "node_id": self.node_id,
-                                "timestamp": 0.0,
-                                "version": 0,
-                                "epoch": getattr(self.ws._topology, "topology_epoch", 0),
-                            },
-                        )
-                        l_epoch = l_meta.get("epoch", getattr(self.ws._topology, "topology_epoch", 0))
-                        l_ver = l_meta.get("version", 0)
-                        l_ts = l_meta.get("timestamp", 0.0)
-                        l_node = l_meta.get("node_id", self.node_id)
-
-                        # If remote metadata was not explicitly provided, fall back
-                        # to cooperative averaging
-                        if not remote_meta_dict or key not in remote_meta_dict:
-                            if k in self.ws._topology._neighborhood_cohesion:
-                                local_cohesion = self.ws._topology._neighborhood_cohesion[k]
-                                self.ws._topology._neighborhood_cohesion[k] = (local_cohesion + remote_cohesion) / 2.0
-                            else:
-                                self.ws._topology._neighborhood_cohesion[k] = remote_cohesion
-                            self.ws._topology._cohesion_metadata[k] = {
                                 "node_id": self.node_id,
                                 "timestamp": time.time(),
                                 "version": l_ver + 1,
                                 "epoch": l_epoch,
-                            }
-                            merge_report["reconciled_topologies"] += 1
-                            continue
+                            },
+                        )
+                    else:
+                        self.ws.import_cohesion_entry(
+                            key,
+                            remote_cohesion,
+                            {
+                                "node_id": self.node_id,
+                                "timestamp": time.time(),
+                                "version": 1,
+                                "epoch": l_epoch,
+                            },
+                        )
+                    merge_report["reconciled_topologies"] += 1
+                    continue
 
-                        # 3. Apply Deterministic Multi-Shard Consensus Policies
-                        remote_wins = False
-                        if r_epoch > l_epoch or (
-                            r_epoch == l_epoch
-                            and (r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))))
-                        ):
-                            remote_wins = True
+                # 3. Apply Deterministic Multi-Shard Consensus Policies
+                remote_wins = False
+                if r_epoch > l_epoch or (
+                    r_epoch == l_epoch
+                    and (r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))))
+                ):
+                    remote_wins = True
 
-                        # 4. If remote wins, write remote cohesion and metadata
-                        # Otherwise, remote is discarded (local retains authority)
-                        if remote_wins or k not in self.ws._topology._neighborhood_cohesion:
-                            self.ws._topology._neighborhood_cohesion[k] = remote_cohesion
-                            self.ws._topology._cohesion_metadata[k] = r_meta
-                            merge_report["reconciled_topologies"] += 1
+                # 4. If remote wins, write remote cohesion and metadata
+                # Otherwise, remote is discarded (local retains authority)
+                if remote_wins or not local_entry:
+                    self.ws.import_cohesion_entry(key, remote_cohesion, r_meta)
+                    merge_report["reconciled_topologies"] += 1
 
             self.divergence_metrics["reconciled_merges"] += 1
         logger.info("[Federation] Successfully merged remote state from node %s: %s", remote.node_id, merge_report)
@@ -311,10 +305,8 @@ class FederationManager:
 
     def compute_drift_divergence(self, remote: ShardStateSnapshot) -> float:
         """Calculate topological drift and semantic distance divergence [0.0 - 1.0]."""
-        local_coords = {}
-        if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
-            for (src, tgt), cohesion in self.ws._topology._neighborhood_cohesion.items():
-                local_coords[f"{src}:{tgt}"] = cohesion
+        exported = self.ws.export_cohesion_state()
+        local_coords = {k: v["cohesion"] for k, v in exported.items()}
 
         if not local_coords or not remote.topology:
             return 0.0

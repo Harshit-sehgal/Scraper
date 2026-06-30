@@ -82,7 +82,7 @@ async def signup(body: SignupRequest, request: Request) -> SignupResponse:
         action="user_signup",
         job_id="signup",
         outcome="success",
-        details={"email": result.user.email, "org_id": result.organization.id, "project_id": result.project.id},
+        details={"email": redact_pii(result.user.email), "org_id": result.organization.id, "project_id": result.project.id},
     )
 
     return SignupResponse(

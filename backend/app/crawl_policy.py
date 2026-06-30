@@ -26,6 +26,7 @@ import sqlite3
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -244,9 +245,24 @@ class CrawlPolicyEngine:
             "active_fetches": state.active_fetches,
             "consecutive_failures": state.consecutive_failures,
             "total_fetches": state.total_fetches,
-            "cooldown": max(0.0, state.cooldown_until - time.time()),
-            "robots_checked": state.robots_checked,
         }
+
+    def iter_domain_states(self) -> Iterator[tuple[str, DomainState]]:
+        """Iterate over (domain, DomainState) pairs.
+
+        Public accessor so callers (e.g. FederationManager) don't need
+        to reach into the private ``_domains`` dict.
+        """
+        yield from self._domains.items()
+
+    def get_or_create_domain_state(self, domain: str) -> DomainState:
+        """Return the mutable DomainState for ``domain``, creating it if needed.
+
+        Public wrapper around the internal ``_get_state`` helper. Used
+        by external consumers (e.g. ``FederationManager``) that need to
+        mutate per-domain state in response to remote events.
+        """
+        return self._get_state(domain)
 
     def get_domain_health_score(self, domain: str) -> float:
         """Calculate a health score [0, 1] for a domain based on recent successes / failures."""

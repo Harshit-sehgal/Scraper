@@ -555,10 +555,11 @@ async def _data_retention_loop() -> None:
             # Persist the deletions to the database
             if result["jobs_purged"] > 0 or result["recycle_purged"] > 0:
                 try:
-                    from app.job_store import save_state
+                    from app.storage_interface import get_job_repository
 
+                    repo = get_job_repository()
                     with _jobs_store_lock:
-                        save_state(jobs_store, recycle_bin_store, prune_missing=True)
+                        repo.save_all(jobs=dict(jobs_store), recycle_bin=dict(recycle_bin_store), prune_missing=True)
                 except (ImportError, RuntimeError) as e:
                     logger.warning("Retention background task failed to persist: %s", e)
 

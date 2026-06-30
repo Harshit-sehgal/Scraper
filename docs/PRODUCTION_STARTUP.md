@@ -18,7 +18,7 @@ python3 scripts/check_prod_env.py --env-file .env.production
 4. Build the image:
 
 ```bash
-docker build -f Dockerfile -t dataforge:local .
+docker build -f Dockerfile --target production -t dataforge:local .
 ```
 
 Current audit result: local smoke built `dataforge:local` image successfully.

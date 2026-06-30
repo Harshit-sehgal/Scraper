@@ -667,7 +667,7 @@ async def handle_abort_domain(
             domain = parsed.netloc.lower() if parsed.hostname else ""
             if domain:
                 attempt_ctx.skip_domain = domain
-        except (ImportError, ValueError) as exc:
+        except ValueError as exc:
             logger.debug("Could not derive domain for skip_domain: %s", exc)
     return True
 

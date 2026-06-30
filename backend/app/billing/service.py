@@ -375,7 +375,7 @@ class PayPalClient:
             logger.warning(
                 "Billing is not configured — denying balance check for customer=%s. "
                 "PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET env vars must be set.",
-                customer_id,
+                _redact_id(customer_id),
             )
             return False
 

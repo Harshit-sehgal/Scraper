@@ -20,55 +20,15 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from app.heartbeat_manager import HeartbeatManager
 
+from app.vector_clock import VectorClock
+
 logger = logging.getLogger(__name__)
 
 
-class VectorClock:
-    """Track causality of events across distributed nodes."""
-
-    def __init__(self, node_id: str) -> None:
-        self.node_id = node_id
-        self.clock: dict[str, int] = defaultdict(int)
-        self.clock[node_id] = 0
-
-    def increment(self) -> None:
-        """Increment this node's clock value."""
-        self.clock[self.node_id] += 1
-
-    def update(self, other_clock: dict[str, int]) -> None:
-        """Update this node's clock based on received clock."""
-        for node_id, ts in other_clock.items():
-            self.clock[node_id] = max(self.clock.get(node_id, 0), ts)
-        self.increment()
-
-    def to_dict(self) -> dict[str, int]:
-        """Export clock as dict."""
-        return dict(self.clock)
-
-    def compare(self, other: VectorClock) -> str:
-        """Compare with another clock.
-
-        Returns: 'before', 'after', 'concurrent', or 'equal'
-        """
-        self_lt_other = False
-        self_gt_other = False
-
-        all_nodes = set(self.clock.keys()) | set(other.clock.keys())
-        for node_id in all_nodes:
-            s = self.clock.get(node_id, 0)
-            o = other.clock.get(node_id, 0)
-            if s < o:
-                self_lt_other = True
-            if s > o:
-                self_gt_other = True
-
-        if self_lt_other and self_gt_other:
-            return "concurrent"
-        if self_lt_other:
-            return "before"
-        if self_gt_other:
-            return "after"
-        return "equal"
+# VectorClock is imported from app.vector_clock to avoid duplication.
+# The canonical VectorClock stores the clock dict in ._clock (exposed via
+# .get_clock() / .to_dict()).  The legacy inline class used .clock;
+# the code below accesses .clock via a thin compatibility wrapper.
 
 
 class NodeHealth:
@@ -256,7 +216,7 @@ class GossipSubstrate:
             if peer_id == self.node_id:
                 continue
             health = self.peer_health[peer_id]
-            checksum = str(hash(frozenset(self.vector_clock.clock.items())))
+            checksum = str(hash(frozenset(self.vector_clock.get_clock().items())))
 
             heartbeat_manager.record_heartbeat(
                 node_id=peer_id,
@@ -269,7 +229,7 @@ class GossipSubstrate:
         heartbeat_manager.record_heartbeat(
             node_id=self.node_id,
             clock=self.vector_clock.to_dict(),
-            checksum=str(hash(frozenset(self.vector_clock.clock.items()))),
+            checksum=str(hash(frozenset(self.vector_clock.get_clock().items()))),
             energy=1.0,
         )
 

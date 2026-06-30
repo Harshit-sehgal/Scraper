@@ -646,13 +646,13 @@ def ensure_required_tables(conn, execute_fn: Callable) -> None:
     for col_def in columns_sql():
         try:
             execute_fn(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-        except sqlite3.OperationalError as op_err:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError) as op_err:
             logger.warning("ALTER TABLE jobs ADD COLUMN %s failed: %s", col_def, op_err)
     execute_fn(conn, build_create_recycle_bin_sql())
     for col_def in columns_sql():
         try:
             execute_fn(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
-        except sqlite3.OperationalError as op_err:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError) as op_err:
             logger.warning("ALTER TABLE recycle_bin ADD COLUMN %s failed: %s", col_def, op_err)
 
     for idx_sql in [
@@ -667,7 +667,7 @@ def ensure_required_tables(conn, execute_fn: Callable) -> None:
     ]:
         try:
             execute_fn(conn, idx_sql)
-        except sqlite3.OperationalError as op_err:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError) as op_err:
             logger.warning("CREATE INDEX failed: %s — %s", idx_sql, op_err)
 
 

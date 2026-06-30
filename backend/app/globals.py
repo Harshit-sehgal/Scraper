@@ -69,10 +69,11 @@ def rebuild_config_from_settings() -> dict[str, Any]:
         "max_job_history": settings.MAX_JOB_HISTORY,
         "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
     }
-    # Atomic swap: build the new dict first, then clear+update in one
-    # step to minimize the window where CONFIG is empty (TOCTOU fix).
-    CONFIG.clear()
-    CONFIG.update(new_values)
+    # Atomic swap: build the new dict first, then replace CONFIG's
+    # contents in one step to avoid a window where CONFIG is empty.
+    with _jobs_store_lock:
+        CONFIG.clear()
+        CONFIG.update(new_values)
     return CONFIG
 
 

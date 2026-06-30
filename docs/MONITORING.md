@@ -13,7 +13,8 @@ DataForge includes comprehensive monitoring, alerting, and observability for pro
 | Prometheus | Metrics collection | 9090 |
 | Grafana | Dashboard visualization | 3000 |
 | Alertmanager | Alert routing | 9093 |
-| Loki | Log aggregation | 3100 |
+
+> **Note:** Loki is *not* deployed in the default `docker-compose.prod.yml` stack. If you need log aggregation, add the Loki service and `loki-config.yml` separately (see [Loki Setup](#loki-setup-optional) below).
 
 ### Data Flow
 
@@ -21,8 +22,6 @@ DataForge includes comprehensive monitoring, alerting, and observability for pro
 Application → Prometheus → Alertmanager → Email/Slack
                 ↓
             Grafana (Dashboards)
-                ↓
-            Loki (Logs)
 ```
 
 ## Metrics
@@ -31,11 +30,19 @@ Application → Prometheus → Alertmanager → Email/Slack
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `dataforge_jobs_total` | Counter | Total jobs by status |
+| `dataforge_jobs_total` | Gauge | Total jobs by status |
 | `dataforge_queue_pending` | Gauge | Pending queue depth |
-| `dataforge_rate_limit_global_hits_total` | Counter | Rate limit hits |
-| `dataforge_rate_limit_per_ip_hits_total` | Counter | Per-IP rate limit hits |
+| `dataforge_queue_running` | Gauge | Running queue depth |
+| `dataforge_queue_dead_letter` | Gauge | Dead-letter queue depth |
+| `dataforge_rate_limit_global_hits_total` | Gauge | Rate limit hits |
+| `dataforge_rate_limit_per_ip_hits_total` | Gauge | Per-IP rate limit hits |
 | `dataforge_worker_heartbeat_alive` | Gauge | Worker heartbeat status |
+| `dataforge_worker_heartbeat_age_seconds` | Gauge | Worker heartbeat age |
+| `dataforge_worker_failures_total` | Gauge | Worker failures by task type |
+| `dataforge_recycle_bin_total` | Gauge | Recycle bin entries |
+| `dataforge_errors_total` | Gauge | Error counts by type |
+| `dataforge_llm_calls_total` | Gauge | Total LLM calls |
+| `dataforge_requests_total` | Gauge | HTTP request counts |
 
 ### System Metrics
 
@@ -50,9 +57,27 @@ Application → Prometheus → Alertmanager → Email/Slack
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `dataforge_extraction_success_total` | Counter | domain | Extraction successes |
-| `dataforge_extraction_duration_seconds` | Histogram | domain | Extraction latency |
-| `dataforge_anti_bot_detection_total` | Counter | domain | Anti-bot detections |
+| `dataforge_extraction_method_total` | Gauge | method | Extraction method counts |
+| `dataforge_anti_bot_classifications_total` | Gauge | classification | Anti-bot classification counts |
+| `dataforge_export_outcomes_total` | Gauge | outcome | Export outcome counts |
+| `dataforge_browser_launch_total` | Gauge | outcome | Browser launch outcomes |
+| `dataforge_ssrf_rejects_total` | Gauge | reason | SSRF rejection counts |
+| `dataforge_domain_failure_rate` | Gauge | domain | Per-domain failure rate |
+| `dataforge_csp_violations_total` | Gauge | directive | CSP violation counts |
+| `dataforge_auth_profile_ops_total` | Gauge | action | Auth profile operation counts |
+| `dataforge_workflow_ops_total` | Gauge | action | Workflow operation counts |
+| `dataforge_signup_outcomes_total` | Gauge | outcome | Signup outcome counts |
+| `dataforge_scheduled_job_ops_total` | Gauge | action | Scheduled job operation counts |
+| `dataforge_retention_ops_total` | Gauge | action | Retention operation counts |
+| `dataforge_job_duration_seconds` | Histogram | — | Job latency |
+| `dataforge_request_duration_seconds` | Histogram | — | HTTP request latency |
+| `dataforge_page_fetch_duration_seconds` | Histogram | — | Page fetch latency |
+| `dataforge_backend_health_check_duration_seconds` | Histogram | — | Backend health check latency |
+| `dataforge_repo_query_latency_seconds` | Gauge | quantile | Repository query latency |
+| `dataforge_backend` | Gauge | backend | Active storage backend |
+| `dataforge_backend_collection_ok` | Gauge | — | Backend collection OK status |
+| `dataforge_queue_collection_ok` | Gauge | — | Queue collection OK status |
+| `dataforge_metrics_collection_error_total` | Gauge | — | Metrics collection error count |
 
 ## Dashboards
 
@@ -119,7 +144,9 @@ Location: `grafana/dashboards/dataforge_overview.json`
 | ERROR | Failures requiring attention |
 | CRITICAL | System-threatening issues |
 
-### Log Queries (Loki)
+### Log Queries
+
+If you have deployed Loki (see below), use LogQL to query logs:
 
 ```logql
 # All errors
@@ -134,6 +161,9 @@ Location: `grafana/dashboards/dataforge_overview.json`
 # Rate limit hits
 {job="dataforge"} | logfmt | status=429
 ```
+
+Without Loki, logs can be viewed via `docker compose logs dataforge` or
+by configuring a file-based log aggregator of your choice.
 
 ## Health Checks
 
@@ -269,21 +299,29 @@ python3 scripts/run_alert_delivery_drill.py \
   --json-file artifacts/alert_drill/latest_drill.json
 ```
 
-## Loki Setup
+## Loki Setup (Optional)
+
+Loki is **not included** in the default `docker-compose.prod.yml` stack. Add it
+only if you need centralized log aggregation.
 
 ### Installation
 
 ```bash
-# Using Docker Compose
-docker compose up -d loki
-
-# Or standalone
+# Standalone
 docker run -d -p 3100:3100 grafana/loki
+
+# Or add a loki service to docker-compose.prod.yml:
+#   loki:
+#     image: grafana/loki:2.x
+#     ports:
+#       - "3100:3100"
+#     volumes:
+#       - ./loki-config.yml:/etc/loki/local-config.yaml
 ```
 
 ### Configuration
 
-Location: `loki-config.yml`
+Location: `loki-config.yml` (must be created if Loki is deployed)
 
 **Scrape Targets:**
 - Application logs
@@ -307,7 +345,7 @@ Location: `loki-config.yml`
 |-------|-------|----------|
 | No metrics | Prometheus not scraping | Check `prometheus.yml` |
 | No alerts | Alertmanager not configured | Check `alertmanager.yml` |
-| Missing logs | Loki not configured | Check `loki-config.yml` |
+| Missing logs | Loki not deployed or configured | Deploy Loki + create `loki-config.yml` |
 | Dashboard empty | Data source not configured | Add Prometheus to Grafana |
 
 ### Debug Commands
@@ -319,6 +357,6 @@ curl http://localhost:9090/api/v1/targets
 # Check Alertmanager config
 curl http://localhost:9093/api/v1/status
 
-# Check Loki health
+# Check Loki health (if deployed)
 curl http://localhost:3100/ready
 ```

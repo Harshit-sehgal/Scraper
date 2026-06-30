@@ -103,14 +103,31 @@ class SubstratePolicy:
 
         # Policy 2: Convergence
         # Critical actions require minimum system certainty
-        from app.semantic_inference_engine import RoleEmbeddingEngine
 
-        certainty = RoleEmbeddingEngine().get_certainty()
+        certainty = _get_role_embedding_engine().get_certainty()
         return not certainty < 0.1
 
 
 _policy_instances: WeakKeyDictionary | None = None
 _policy_instances_lock = threading.Lock()
+
+# Module-level singleton for RoleEmbeddingEngine so we don't re-seed
+# the baseline manifold on every can_dispatch_action() call.
+_role_embedding_engine = None
+_role_embedding_engine_lock = threading.Lock()
+
+
+def _get_role_embedding_engine():
+    """Return the module-level RoleEmbeddingEngine singleton."""
+    global _role_embedding_engine
+    if _role_embedding_engine is not None:
+        return _role_embedding_engine
+    with _role_embedding_engine_lock:
+        if _role_embedding_engine is None:
+            from app.semantic_inference_engine import RoleEmbeddingEngine
+
+            _role_embedding_engine = RoleEmbeddingEngine()
+    return _role_embedding_engine
 
 
 def get_policy_engine(ws: SemanticWorldState | None = None) -> SubstratePolicy:

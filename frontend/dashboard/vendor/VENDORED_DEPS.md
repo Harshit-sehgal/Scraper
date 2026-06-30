@@ -5,7 +5,7 @@
 | Library | File | Version | Source |
 |---------|------|---------|--------|
 | Chart.js | `chart.min.js` | 4.5.1 | https://www.chartjs.org |
-| Tailwind CSS | `tailwind.min.js` | 3.x (standalone CLI build) | https://tailwindcss.com |
+| Tailwind CSS | `tailwind.min.js` | 3.x Play CDN | https://tailwindcss.com |
 
 ## Update Process
 

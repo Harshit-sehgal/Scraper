@@ -13,8 +13,8 @@ DataForge uses `DATAFORGE_` prefixed environment variables for configuration. Al
 | `DATAFORGE_DOTENV_PATH` | `.env` | Path to dotenv file |
 | `DATAFORGE_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` or `postgres` |
 | `DATAFORGE_DATABASE_URL` | - | PostgreSQL connection URL (required for postgres backend) |
-| `DATAFORGE_STATE_FILE` | *unset* | Legacy alias for `DATAFORGE_STATE_FILE_PATH`. Read by `STATE_FILE_PATH_DYNAMIC` when the path override is not configured. |
-| `DATAFORGE_STATE_FILE_PATH` | `""` | Override path for `jobs_state.json` (empty = `./backend/data/jobs_state.json`) |
+| `DATAFORGE_STATE_FILE` | *unset* | **Deprecated.** Legacy alias — if set, takes priority over `DATAFORGE_STATE_FILE_PATH` for backward compatibility. New deployments should use `DATAFORGE_STATE_FILE_PATH` instead. |
+| `DATAFORGE_STATE_FILE_PATH` | `""` | Override path for `jobs_state.json` (preferred; empty = `./backend/data/jobs_state.json`) |
 | `DATAFORGE_SEMANTIC_STATE_PATH` | `data/semantic_state.json` | Path to semantic state file |
 
 ## Production Ingress

@@ -13,6 +13,71 @@ class TopologyMixin:
     def detect_communities(self) -> None:
         self._topology.detect_communities()
 
+    def export_cohesion_state(self) -> dict[str, Any]:
+        """Public accessor for the topology cohesion data federation needs.
+
+        Returns a dict mapping serialized pair-keys to ``{"cohesion":
+        float, "metadata": {...}}``. Used by ``FederationManager`` to
+        avoid reaching into private ``_topology._neighborhood_cohesion``
+        and ``_cohesion_metadata`` attributes directly.
+        """
+        topology = getattr(self, "_topology", None)
+        if topology is None:
+            return {}
+        cohesion_map = getattr(topology, "_neighborhood_cohesion", None)
+        if cohesion_map is None:
+            return {}
+        metadata_map = getattr(topology, "_cohesion_metadata", {})
+        if metadata_map is None:
+            metadata_map = {}
+        result: dict[str, Any] = {}
+        for (src, tgt), cohesion in cohesion_map.items():
+            key = f"{src}:{tgt}"
+            result[key] = {
+                "cohesion": cohesion,
+                "metadata": metadata_map.get(
+                    (src, tgt),
+                    {
+                        "node_id": getattr(self, "node_id", ""),
+                        "timestamp": 0.0,
+                        "version": 1,
+                        "epoch": getattr(topology, "topology_epoch", 0),
+                    },
+                ),
+            }
+        return result
+
+    def import_cohesion_entry(
+        self,
+        key: str,
+        cohesion: float,
+        metadata: dict[str, Any] | None,
+    ) -> None:
+        """Set a single cohesion entry from a federated remote state.
+
+        Public counterpart to :meth:`export_cohesion_state`. Updates
+        the topology cohesion map and metadata under the correct
+        internal keys without leaking private attributes out of the
+        topology layer.
+        """
+        topology = getattr(self, "_topology", None)
+        if topology is None:
+            return
+        cohesion_map = getattr(topology, "_neighborhood_cohesion", None)
+        if cohesion_map is None:
+            return
+        if not isinstance(key, str) or ":" not in key:
+            return
+        src, tgt = key.split(":", 1)
+        pair = (src, tgt)
+        cohesion_map[pair] = cohesion
+        if isinstance(metadata, dict):
+            metadata_map = getattr(topology, "_cohesion_metadata", None)
+            if metadata_map is None:
+                metadata_map = {}
+                topology._cohesion_metadata = metadata_map
+            metadata_map[pair] = metadata
+
     @requires_invariants
     def propagate_field_regions(self) -> int:
         """Propagate instability through the unified edge field — topology canonical.

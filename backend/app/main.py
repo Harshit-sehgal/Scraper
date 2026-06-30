@@ -310,10 +310,6 @@ def configure_exception_handlers(app: FastAPI) -> None:
         )
 
 
-def configure_lifespan(app: FastAPI) -> None:
-    """Configure lifespan settings (handled in FastAPI initialization)."""
-
-
 def create_app() -> FastAPI:
     """FastAPI App Factory."""
     _docs_url = None if settings.ENV.lower() == "production" else "/docs"
@@ -375,7 +371,6 @@ def create_app() -> FastAPI:
     configure_static(app_instance)
     configure_routes(app_instance)
     configure_exception_handlers(app_instance)
-    configure_lifespan(app_instance)
     return app_instance
 
 
