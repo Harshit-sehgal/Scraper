@@ -2,9 +2,25 @@
 
 ``POST /api/scraper/preview`` accepts the same payload as job creation
 but runs extraction on the first URL only without persisting results.
+
+All tests that expect 200 responses mock ``scrape_url_attempt`` so they
+don't hit the real network.
 """
 
 from __future__ import annotations
+
+from app.scraper_models import ScrapeAttemptResult
+
+
+async def _fake_scrape_url_attempt(url, schema_fields, **kwargs):
+    """Return a minimal successful ScrapeAttemptResult."""
+    return ScrapeAttemptResult(
+        records=[{"title": "Example Domain"}],
+        final_url=url,
+        html="<html>...</html>",
+        fetch_method="httpx",
+        extraction_method="llm",
+    )
 
 
 class TestExtractionPreview:
@@ -52,19 +68,7 @@ class TestExtractionPreview:
 
     def test_preview_response_shape(self, client, monkeypatch):
         """Preview response includes expected fields."""
-
-        from app.scraper_models import ScrapeAttemptResult
-
-        async def fake_scrape_url_attempt(url, schema_fields, **kwargs):
-            return ScrapeAttemptResult(
-                records=[{"title": "Example Domain"}],
-                final_url=url,
-                html="<html>...</html>",
-                fetch_method="httpx",
-                extraction_method="llm",
-            )
-
-        monkeypatch.setattr("app.scraper.scrape_url_attempt", fake_scrape_url_attempt)
+        monkeypatch.setattr("app.scraper.scrape_url_attempt", _fake_scrape_url_attempt)
 
         resp = client.post(
             "/api/scraper/preview",
@@ -85,8 +89,10 @@ class TestExtractionPreview:
         else:
             assert "detail" in resp.json(), f"Expected error detail for {resp.status_code}"
 
-    def test_preview_with_selectors(self, client):
+    def test_preview_with_selectors(self, client, monkeypatch):
         """Preview accepts selectors_map from the job config."""
+        monkeypatch.setattr("app.scraper.scrape_url_attempt", _fake_scrape_url_attempt)
+
         resp = client.post(
             "/api/scraper/preview",
             json={
@@ -102,8 +108,10 @@ class TestExtractionPreview:
         )
         assert resp.status_code in (200, 422)
 
-    def test_preview_with_extraction_params(self, client):
+    def test_preview_with_extraction_params(self, client, monkeypatch):
         """Preview forwards extraction params to the scraper."""
+        monkeypatch.setattr("app.scraper.scrape_url_attempt", _fake_scrape_url_attempt)
+
         resp = client.post(
             "/api/scraper/preview",
             json={
@@ -118,8 +126,10 @@ class TestExtractionPreview:
         )
         assert resp.status_code in (200, 422)
 
-    def test_preview_with_headers(self, client):
+    def test_preview_with_headers(self, client, monkeypatch):
         """Preview forwards headers to the scraper."""
+        monkeypatch.setattr("app.scraper.scrape_url_attempt", _fake_scrape_url_attempt)
+
         resp = client.post(
             "/api/scraper/preview",
             json={
@@ -131,8 +141,10 @@ class TestExtractionPreview:
         )
         assert resp.status_code in (200, 400, 422)
 
-    def test_preview_does_not_persist_job(self, client):
+    def test_preview_does_not_persist_job(self, client, monkeypatch):
         """Preview must NOT create a job in the store."""
+        monkeypatch.setattr("app.scraper.scrape_url_attempt", _fake_scrape_url_attempt)
+
         import app.main as main_mod
 
         initial_count = len(main_mod.jobs_store)
