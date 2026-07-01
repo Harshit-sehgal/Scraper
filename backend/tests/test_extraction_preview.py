@@ -68,6 +68,8 @@ class TestExtractionPreview:
             assert body["dry_run"] is True
             assert "preview_records" in body
             assert "total_records_found" in body
+        else:
+            assert "detail" in resp.json(), f"Expected error detail for {resp.status_code}"
 
     def test_preview_with_selectors(self, client):
         """Preview accepts selectors_map from the job config."""

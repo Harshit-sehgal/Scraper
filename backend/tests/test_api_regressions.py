@@ -447,7 +447,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch) -> None:
 
     monkeypatch.setattr("app.discovery.discover_urls", fake_discover_urls)
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
@@ -484,7 +484,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch) -> None:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
@@ -516,7 +516,7 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch) -
 
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
@@ -549,7 +549,7 @@ def test_run_job_creates_logs(monkeypatch) -> None:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
@@ -581,7 +581,11 @@ def test_run_job_updates_progress(monkeypatch) -> None:
         return [{"company_name": "Progress Studio", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", lambda r: "ok")
+
+    async def _fake_insight(r):
+        return "ok"
+
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", _fake_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
@@ -623,7 +627,7 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None
         return ""
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", slow_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", tracking_persist)
     monkeypatch.setattr(main_mod, "_persist_single_wrapper", tracking_persist)
 
@@ -680,7 +684,7 @@ def test_cancel_check_before_all_done_avoids_race(monkeypatch) -> None:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fast_scrape_url)
-    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(

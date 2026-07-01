@@ -228,6 +228,8 @@ class TestRouterUsesTargetedReads:
             mock_repo.list_job_summaries.assert_called_once()
             mock_repo.load_jobs.assert_not_called()
             assert resp.json()["jobs"][0]["id"] == "job-1"
+        else:
+            assert resp.status_code == 403  # Explicitly document expected denial
 
         # Reset for subsequent tests
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "false")

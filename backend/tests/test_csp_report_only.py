@@ -24,9 +24,10 @@ class TestCSPReportOnlyHeader:
     def test_health_response_carries_csp_header(self, client) -> None:
         r = client.get("/health")
         assert r.status_code in (200, 401, 403, 503)
+        # CSP header should be present on any valid response
+        header = "content-security-policy-report-only"
+        assert header in {k.lower() for k in r.headers}, dict(r.headers)
         if r.status_code == 200:
-            header = "content-security-policy-report-only"
-            assert header in {k.lower() for k in r.headers}, dict(r.headers)
             value = r.headers.get(header) or r.headers.get(header.title())
             assert "default-src 'self'" in value
             assert "report-uri /api/system/csp-violations" in value
@@ -100,10 +101,10 @@ class TestCSPViolationsInMetricsEndpoint:
         record_csp_violation("script-src")
         record_csp_violation("img-src")
         r = client.get("/metrics")
-        if r.status_code == 200:
-            assert "dataforge_csp_violations_total" in r.text, r.text
-            assert 'directive="script-src"' in r.text
-            assert 'directive="img-src"' in r.text
+        assert r.status_code == 200, f"Metrics endpoint returned {r.status_code}"
+        assert "dataforge_csp_violations_total" in r.text, r.text
+        assert 'directive="script-src"' in r.text
+        assert 'directive="img-src"' in r.text
 
 
 class TestCSPReportOnlyToggle:

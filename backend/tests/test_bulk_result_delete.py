@@ -31,6 +31,7 @@ class TestBulkResultDelete:
 
     def test_delete_response_shape(self, client) -> None:
         response = client.delete("/api/jobs/fake-job-1/results")
+        assert response.status_code in (200, 404), f"Unexpected status: {response.status_code}"
         if response.status_code == 200:
             data = response.json()
             assert "removed" in data

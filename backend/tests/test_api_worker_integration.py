@@ -318,7 +318,7 @@ class TestRealWorkerHandler:
         async def mock_generate_data_insight(results) -> str:
             return "Mock insight for worker integration test."
 
-        monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
+        monkeypatch.setattr("app.insight_engine.generate_data_insight", mock_generate_data_insight)
 
         # ── Setup: enable worker queue, point SQLite at temp path ───────
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")

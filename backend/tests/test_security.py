@@ -60,9 +60,13 @@ class TestInputValidation:
         # the response body or in any echoed field of an error payload.
         body_text = response.text
         assert "<script>" not in body_text, f"Raw <script> tag in response body: {body_text!r}"
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
+            # Server created the job — verify the name was sanitized.
             data = response.json()
             assert "<script>" not in data.get("name", "")
+        else:
+            # Server rejected the request — verify it returned a validation error.
+            assert response.status_code in (400, 422), f"Unexpected status for XSS name: {response.status_code}"
 
     def test_path_traversal_in_url(self, client: TestClient, auth_headers: dict):
         """Test path traversal attempts in URL."""

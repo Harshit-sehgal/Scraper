@@ -233,7 +233,7 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch) -> None:
 
     reset_domain_runtime_policy()
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
-    monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", mock_generate_data_insight)
     monkeypatch.setattr("app.services.job_runner.load_semantic_state", lambda: None)
     monkeypatch.setattr("app.services.job_runner.save_semantic_state", lambda: None)
 
@@ -521,7 +521,7 @@ def test_same_domain_concurrency_respected(monkeypatch) -> None:
         return "Mock insight."
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
-    monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", mock_generate_data_insight)
     monkeypatch.setattr("app.services.job_runner.load_semantic_state", lambda: None)
     monkeypatch.setattr("app.services.job_runner.save_semantic_state", lambda: None)
 

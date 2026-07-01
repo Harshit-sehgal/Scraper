@@ -86,9 +86,9 @@ async def test_workflow_update_and_delete(clean_db, session_client):
         json={"name": "Updated Name"},
     )
 
-    if update_resp.status_code == 200:
-        updated = update_resp.json()
-        assert updated["name"] == "Updated Name"
+    assert update_resp.status_code == 200, f"PATCH returned {update_resp.status_code}: {update_resp.text}"
+    updated = update_resp.json()
+    assert updated["name"] == "Updated Name"
 
     delete_resp = session_client.delete(f"/api/workflows/{workflow_id}")
     assert delete_resp.status_code in (200, 204)

@@ -126,7 +126,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     async def mock_generate_data_insight(results) -> str:
         return "Mock insight for E2E test."
 
-    monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
+    monkeypatch.setattr("app.insight_engine.generate_data_insight", mock_generate_data_insight)
 
     # Enable worker queue
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")

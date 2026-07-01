@@ -14,12 +14,14 @@ class TestApiUsageDashboard:
 
     def test_usage_returns_keys(self, client) -> None:
         response = client.get("/api/usage/stats")
+        assert response.status_code in (200, 404)
         if response.status_code == 200:
             data = response.json()
             assert "keys" in data or isinstance(data, dict)
 
     def test_usage_includes_record_count(self, client) -> None:
         response = client.get("/api/usage/stats")
+        assert response.status_code in (200, 404)
         if response.status_code == 200:
             data = response.json()
             keys = data.get("keys", {})
@@ -34,6 +36,7 @@ class TestApiUsageDashboard:
 
     def test_usage_includes_failure_count(self, client) -> None:
         response = client.get("/api/usage/stats")
+        assert response.status_code in (200, 404)
         if response.status_code == 200:
             data = response.json()
             keys = data.get("keys", {})

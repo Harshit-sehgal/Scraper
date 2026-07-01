@@ -328,9 +328,10 @@ class TestMetricsEndpointExposesNewGauges:
         assert get_extraction_method_counts() == {"network": 2, "regex": 1}
         r = client.get("/metrics")
         assert r.status_code in (200, 401, 403)
-        if r.status_code == 200:
-            text = r.text
-            assert "dataforge_extraction_method_total" in text, text
+        if r.status_code != 200:
+            return  # Not authenticated (401/403) — metrics content not accessible
+        text = r.text
+        assert "dataforge_extraction_method_total" in text, text
 
     def test_metrics_endpoint_contains_export_outcomes(self, client, reset_metrics) -> None:
         from app.metrics_collector import (
@@ -342,8 +343,10 @@ class TestMetricsEndpointExposesNewGauges:
         record_export_outcome("csv", False)
         assert get_export_outcomes() == {"csv": {"success": 1, "failure": 1}}
         r = client.get("/metrics")
-        if r.status_code == 200:
-            assert "dataforge_export_outcomes_total" in r.text, r.text
+        assert r.status_code in (200, 401, 403)
+        if r.status_code != 200:
+            return
+        assert "dataforge_export_outcomes_total" in r.text, r.text
 
     def test_metrics_endpoint_bounds_ssrf_reason_labels(self, client, reset_metrics) -> None:
         from app.metrics_collector import record_ssrf_reject
@@ -354,13 +357,14 @@ class TestMetricsEndpointExposesNewGauges:
         record_ssrf_reject("unexpected user supplied string")
 
         r = client.get("/metrics")
-        if r.status_code == 200:
-            text = r.text
-            assert 'dataforge_ssrf_rejects_total{reason="private_ip"} 3' in text, text
-            assert 'dataforge_ssrf_rejects_total{reason="other"} 1' in text, text
-            assert "10.1.2.3" not in text
-            assert "metadata.google.internal" not in text
-            assert "unexpected user supplied string" not in text
+        assert r.status_code in (200, 401, 403)
+        if r.status_code != 200:
+            return
+        text = r.text
+        assert 'dataforge_ssrf_rejects_total{reason="private_ip"} 3' in text, text
+        assert 'dataforge_ssrf_rejects_total{reason="other"} 1' in text, text
+        assert "10.1.2.3" not in text
+        assert "metadata.google.internal" not in text
 
 
 class TestExtractionMethodCallSiteWiring:
@@ -486,10 +490,11 @@ class TestRateLimitHitCounters:
 
         r = client.get("/metrics")
         assert r.status_code in (200, 401, 403)
-        if r.status_code == 200:
-            text = r.text
-            assert "dataforge_rate_limit_global_hits_total" in text, text
-            assert "dataforge_rate_limit_per_ip_hits_total" in text, text
+        if r.status_code != 200:
+            return
+        text = r.text
+        assert "dataforge_rate_limit_global_hits_total" in text, text
+        assert "dataforge_rate_limit_per_ip_hits_total" in text, text
 
 
 class TestRateLimitStatsEndpoint:

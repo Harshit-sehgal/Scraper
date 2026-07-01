@@ -165,14 +165,15 @@ class TestPlanEndpoint:
     def test_get_plan(self, client: TestClient):
         resp = client.get("/api/saas/plan")
         assert resp.status_code in (200, 401)
-        if resp.status_code == 200:
-            data = resp.json()
-            assert data["tier"] == "free"
-            assert data["max_jobs"] == 10
-            assert data["max_scrapes"] == 1000
-            assert data["max_teammates"] == 2
-            assert data["max_projects"] == 2
-            assert isinstance(data["features"], list)
+        if resp.status_code != 200:
+            return  # Not authenticated — nothing to check
+        data = resp.json()
+        assert data["tier"] == "free"
+        assert data["max_jobs"] == 10
+        assert data["max_scrapes"] == 1000
+        assert data["max_teammates"] == 2
+        assert data["max_projects"] == 2
+        assert isinstance(data["features"], list)
 
     def test_plan_limits_match_enforcement_source_of_truth(self, client: TestClient):
         """The /plan endpoint MUST derive usage limits from the same
@@ -268,23 +269,24 @@ class TestUsageEndpoint:
         resp = client.get("/api/saas/usage")
         # Dev auth fallback allows access
         assert resp.status_code in (200, 401)
-        if resp.status_code == 200:
-            data = resp.json()
-            assert set(data.keys()) >= {
-                "jobs_created",
-                "pages_fetched",
-                "scheduled_jobs",
-                "ai_structuring",
-                "api_requests",
-            }
-            assert data["jobs_created"] >= 0
-            assert data["pages_fetched"] >= 0
-            assert data["scheduled_jobs"] >= 0
-            assert data["ai_structuring"] >= 0
-            # The API-request counter always increments at least once per
-            # request via the request counter middleware, so it must be
-            # at least 1 (and certainly non-negative).
-            assert data["api_requests"] >= 1
+        if resp.status_code != 200:
+            return  # Not authenticated — nothing to check
+        data = resp.json()
+        assert set(data.keys()) >= {
+            "jobs_created",
+            "pages_fetched",
+            "scheduled_jobs",
+            "ai_structuring",
+            "api_requests",
+        }
+        assert data["jobs_created"] >= 0
+        assert data["pages_fetched"] >= 0
+        assert data["scheduled_jobs"] >= 0
+        assert data["ai_structuring"] >= 0
+        # The API-request counter always increments at least once per
+        # request via the request counter middleware, so it must be
+        # at least 1 (and certainly non-negative).
+        assert data["api_requests"] >= 1
 
 
 class TestAupEnforcementOnMutationRoutes:

@@ -83,10 +83,10 @@ async def test_ready_includes_backend_info_on_success(health_app):
     transport = httpx.ASGITransport(app=health_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         resp = await client.get("/ready")
-    if resp.status_code == 200:
-        data = resp.json()
-        assert "storage" in data
-        assert data["storage"] == "ok"
+    assert resp.status_code == 200, f"Ready endpoint returned {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert "storage" in data
+    assert data["storage"] == "ok"
 
 
 @pytest.mark.asyncio
@@ -179,6 +179,8 @@ async def test_health_db_returns_db_status(health_app):
     if resp.status_code == 200:
         assert data["status"] == "ok"
         assert "schema_version" in data
+    else:
+        assert data["status"] == "error"
 
 
 @pytest.mark.asyncio
