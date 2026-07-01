@@ -139,8 +139,11 @@ class TestAsyncPaginateInfiniteScroll:
     async def test_deduplicates_within_scroll(self):
         """Should deduplicate records within a single scroll extraction."""
         page = _make_mock_page()
-        # Provide enough evaluate values for scrollHeight + scrollTo calls
-        page.evaluate.side_effect = [1000, None, 2000]
+        # Provide enough evaluate values for scrollHeight + scrollTo calls.
+        # Each iteration calls evaluate twice (scrollHeight, scrollTo).
+        # Iteration 0: height=1000, scrollTo=None → last_height=1000
+        # Iteration 1: height=1000 (same → stop)
+        page.evaluate.side_effect = [1000, None, 1000, None]
         # Make wait_for_function work without raising (called inside loop)
         page.wait_for_function = AsyncMock()
 
@@ -283,9 +286,11 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
         growing — the executor must respect the record limit before the
         page limit or the timeout."""
         page = _make_mock_page()
-        # max_records=2 is reached on the FIRST iteration, so the loop returns
-        # immediately — exact 2 evaluate awaits: scrollHeight probe + scrollTo.
-        page.evaluate.side_effect = [1000, None]
+        # max_records=2 is reached on the FIRST iteration, so the loop
+        # breaks after iter 0.  But after the loop, scrollTo(0,0) calls
+        # evaluate once more, so provide 3 values total:
+        # scrollHeight, scrollTo, scrollTo-reset.
+        page.evaluate.side_effect = [1000, None, None]
         page.wait_for_function = AsyncMock()
 
         async def extract_two_records(_page: Any) -> list[dict]:
@@ -330,8 +335,10 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
         so the total is 6 records with 0 duplicates removed.
         """
         page = _make_mock_page()
-        # 3 iterations × (scrollHeight probe + scrollTo) = 6 awaits.
-        page.evaluate.side_effect = [1000, None, 2000, None, 3000, None]
+        # 3 iterations × (scrollHeight probe + scrollTo) = 6 awaits,
+        # plus 1 more scrollTo-reset after the loop = 7 total.
+        # Heights 1000, 2000, 3000 — all different → 3 full iterations.
+        page.evaluate.side_effect = [1000, None, 2000, None, 3000, None, None]
         page.wait_for_function = AsyncMock()
 
         extract_iter = iter(
@@ -347,7 +354,7 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
 
         config = PaginationConfig(
             strategy="infinite_scroll",
-            max_pages=5,
+            max_pages=3,
             max_records=20,
             delay_between_pages=0,
             stop_on_duplicates=True,

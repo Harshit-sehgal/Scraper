@@ -399,7 +399,7 @@ async def _async_paginate_infinite_scroll(
                 )
             except (TimeoutError, RuntimeError, OSError):
                 logger.debug("DOM stabilization timeout during infinite scroll, continuing")
-        except Exception as exc:
+        except (TimeoutError, RuntimeError, OSError, AttributeError) as exc:
             logger.warning("Infinite scroll failed on attempt %d: %s", scroll_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -428,7 +428,7 @@ async def _async_paginate_infinite_scroll(
         result.stopped_reason = "max_pages"  # Reset scroll position to top
     try:
         await page.evaluate("window.scrollTo(0, 0)")
-    except Exception as exc:
+    except (TimeoutError, RuntimeError, OSError, AttributeError) as exc:
         logger.debug("Failed to reset scroll position: %s", exc)
 
     result.total_records = len(result.records)
@@ -498,7 +498,7 @@ async def _async_paginate_load_more(
                 )
             except (TimeoutError, RuntimeError, OSError):
                 logger.debug("DOM stabilization timeout during load-more, continuing")
-        except Exception as exc:
+        except (TimeoutError, RuntimeError, OSError, AttributeError) as exc:
             logger.warning("Load-more click failed on attempt %d: %s", click_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -729,7 +729,7 @@ async def _async_paginate_url_pattern(
 
             # Wait for DOM stabilization
             await asyncio.sleep(config.delay_between_pages)
-        except Exception as exc:
+        except (TimeoutError, RuntimeError, OSError, AttributeError, ValueError) as exc:
             logger.warning("Failed to navigate to page %d: %s", page_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -826,7 +826,7 @@ async def async_paginate(
 
     try:
         return await strategy_fn(page, config, extract_fn, base_url=base_url)
-    except Exception as exc:
+    except (TimeoutError, RuntimeError, OSError, AttributeError, ValueError, TypeError, KeyError) as exc:
         logger.exception("Async pagination failed")
         return PaginationResult(
             stopped_reason="error",
@@ -879,7 +879,7 @@ def _fetch_page_sync(url: str, *, base_url: str = "") -> str:
             resp = client.get(url)
             resp.raise_for_status()
             return resp.text
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError, TimeoutError) as exc:
         logger.debug("Sync pagination: fetch failed for %s: %s", url, exc)
         return ""
 
@@ -957,7 +957,7 @@ def _extract_records_from_html(
             SchemaField(name="value", field_type=FieldType.STRING, description="Value", required=False),
         ]
         return extract_with_regex(html, schema_fields, base_url=base_url)
-    except Exception as exc:
+    except (ImportError, ValueError, TypeError, RuntimeError, AttributeError) as exc:
         logger.debug("Regex-based extraction failed; falling back to last-resort table/list extraction: %s", exc)
 
     # Last resort: extract table rows or list items as flat records
@@ -1326,7 +1326,7 @@ def paginate(config: PaginationConfig | None = None) -> PaginationResult:
 
     try:
         return strategy_fn(config)
-    except Exception as exc:
+    except (RuntimeError, ValueError, TypeError, KeyError, OSError, TimeoutError, AttributeError) as exc:
         logger.exception("Pagination failed")
         return PaginationResult(
             stopped_reason="error",
