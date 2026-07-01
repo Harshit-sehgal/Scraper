@@ -33,7 +33,7 @@ class TestSlowNetwork:
 
         config = PaginationConfig(strategy="next_button", max_pages=2, delay_between_pages=0)
 
-        async def slow_extract(page) -> list[dict]:
+        async def slow_extract(_page) -> list[dict]:
             await asyncio.sleep(0.1)
             return [{"data": "slow content"}]
 
@@ -63,7 +63,7 @@ class TestSlowNetwork:
             delay_between_pages=0,
         )
 
-        async def very_slow(page) -> list[dict]:
+        async def very_slow(_page) -> list[dict]:
             await asyncio.sleep(5)
             return [{"x": "y"}]
 
@@ -89,7 +89,7 @@ class TestSlowNetwork:
 
         config = PaginationConfig(strategy="next_button", max_pages=2, delay_between_pages=0)
 
-        async def extract(page) -> list[dict]:
+        async def extract(_page) -> list[dict]:
             return [{"data": "test"}]
 
         result = await async_paginate(page, config, extract)

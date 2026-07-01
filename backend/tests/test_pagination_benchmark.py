@@ -43,6 +43,7 @@ def _make_mock_page(**overrides: Any) -> MagicMock:
     page.goto = AsyncMock()
     page.click = AsyncMock()
     page.title = AsyncMock(return_value="Test Page")
+    page.wait_for_load_state = AsyncMock()
     page.wait_for_function = AsyncMock()
     page.url = "https://example.com"
     nav = AsyncMock()
@@ -54,7 +55,7 @@ def _make_mock_page(**overrides: Any) -> MagicMock:
     return page
 
 
-async def _extract_fn(page: Any) -> list[dict]:
+async def _extract_fn(_page: Any) -> list[dict]:
     return [{"id": f"item_{i}", "value": f"val_{i}"} for i in range(10)]
 
 
@@ -119,7 +120,7 @@ class TestPaginationBenchmarkDeduplication:
         """Duplicate records across pages are counted."""
         page = _make_mock_page()
 
-        async def extract_with_dupes(page: Any) -> list[dict]:
+        async def extract_with_dupes(_page: Any) -> list[dict]:
             return [{"id": "dup"}, {"id": "dup"}]
 
         config = PaginationConfig(
@@ -148,7 +149,7 @@ class TestPaginationBenchmarkLimits:
         """max_records=5 limits total extracted records."""
         page = _make_mock_page()
 
-        async def extract_many(page: Any) -> list[dict]:
+        async def extract_many(_page: Any) -> list[dict]:
             return [{"id": f"r{j}"} for j in range(20)]
 
         config = PaginationConfig(

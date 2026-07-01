@@ -51,6 +51,7 @@ def _make_mock_page(locator_visible: bool = False, **overrides: Any) -> MagicMoc
     page.goto = AsyncMock()
     page.click = AsyncMock()
     page.title = AsyncMock(return_value="Test Page")
+    page.wait_for_load_state = AsyncMock()
     page.wait_for_function = AsyncMock()
     page.url = "https://example.com"
 
@@ -65,7 +66,7 @@ def _make_mock_page(locator_visible: bool = False, **overrides: Any) -> MagicMoc
     return page
 
 
-async def _dummy_extract_fn(page: Any) -> list[dict]:
+async def _dummy_extract_fn(_page: Any) -> list[dict]:
     """Dummy extraction that returns a single record."""
     return [{"title": "Item 1", "price": "$10"}]
 
@@ -143,7 +144,7 @@ class TestAsyncPaginateInfiniteScroll:
         # Make wait_for_function work without raising (called inside loop)
         page.wait_for_function = AsyncMock()
 
-        async def extract_with_dupes(page: Any) -> list[dict]:
+        async def extract_with_dupes(_page: Any) -> list[dict]:
             # Each page returns 2 identical records
             return [{"id": "dup", "value": "same"}, {"id": "dup", "value": "same"}]
 
@@ -247,7 +248,7 @@ class TestAsyncPaginateEdgeCases:
         """Should handle extraction function failures gracefully."""
         page = _make_mock_page()
 
-        async def broken_extract(page: Any) -> list[dict]:
+        async def broken_extract(_page: Any) -> list[dict]:
             msg = "Extraction failed"
             raise RuntimeError(msg)
 
@@ -287,7 +288,7 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
         page.evaluate.side_effect = [1000, None]
         page.wait_for_function = AsyncMock()
 
-        async def extract_two_records(page: Any) -> list[dict]:
+        async def extract_two_records(_page: Any) -> list[dict]:
             return [
                 {"id": "a", "value": "1"},
                 {"id": "b", "value": "2"},
@@ -341,7 +342,7 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
             ],
         )
 
-        async def extract_progressive(page: Any) -> list[dict]:
+        async def extract_progressive(_page: Any) -> list[dict]:
             return next(extract_iter)
 
         config = PaginationConfig(
@@ -368,7 +369,7 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
             visible_third_call = call_state["calls"] >= 2
             loc.is_visible = AsyncMock(return_value=not visible_third_call)
             loc.is_checked = AsyncMock(return_value=False)
-            loc.click = AsyncMock(side_effect=lambda *a, **kw: call_state.__setitem__("calls", call_state["calls"] + 1))
+            loc.click = AsyncMock(side_effect=lambda *_a, **_kw: call_state.__setitem__("calls", call_state["calls"] + 1))
             loc.count = AsyncMock(return_value=1 if not visible_third_call else 0)
             loc.text_content = AsyncMock(return_value="Load more")
             loc.first = loc
