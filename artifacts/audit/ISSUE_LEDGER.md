@@ -10,19 +10,18 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 
 | Metric | Count |
 | --- | ---: |
-| Open verified/deferred issues | 0 |
+| Open verified issues | 0 |
+| Deferred issues | 2 |
 | Fixed issues | 108 |
 | Not reproducible issues | 1 |
 | Candidate issues | 0 |
 | P0 issue rows | 15 |
 | Open verified P0 issue rows | 0 |
-| Fixed P0 issue rows | 14 |
+| Fixed P0 issue rows | 15 |
 
-> Updated 2026-07-02: Deep cleanup + documentation finalization pass.
-> Removed stale `.original` migration backup, deleted 8 stale remote branches,
-> fixed `docs/RUN_JOB_CHARACTERIZATION.md` reference, regenerated all docs,
-> updated CHANGELOG and truth. No new issues opened or fixed.
-> (fixed 103 → 108, not_reproducible 3 → 1, candidate 3 → 0).
+> Updated 2026-07-02: Second pass — fixed P0 count (14→15), split
+> deferred from open (2 deferred), deleted stale benchmark_report.json,
+> pruned 6 devin/* remote branches, synced CSV counts.
 >
 > Updated 2026-06-28: Quality improvement pass — fixed remaining
 > `/api/compliance/gdpr/forget` unknown_tenant route, updated stale
