@@ -69,6 +69,8 @@ The static dashboard is strictly **internal-only** and is not mounted in product
 
 ## Quick Start
 
+**Option A — Local Python (no Docker):**
+
 ```bash
 cp .env.example .env
 cd backend
@@ -76,6 +78,19 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
+```
+
+**Option B — Docker (via Make):**
+
+```bash
+cp .env.example .env
+make setup
+```
+
+Both options prepare the project. Verify your setup:
+
+```bash
+python3 scripts/doctor.py
 ```
 
 Start the API from the repository root:
@@ -90,6 +105,8 @@ Smoke check:
 curl http://localhost:8000/health
 curl http://localhost:8000/ready
 ```
+
+> **Tip:** If the dashboard shows 404s for assets, make sure the URL ends with a trailing slash (`/app/` not `/app`) so relative paths resolve correctly.
 
 Most `/api/*` routes require an API key once keys are configured. Development mode with no configured keys is permissive and must not be treated as a production security model.
 

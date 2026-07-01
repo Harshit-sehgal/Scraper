@@ -245,6 +245,11 @@ class CrawlPolicyEngine:
             "active_fetches": state.active_fetches,
             "consecutive_failures": state.consecutive_failures,
             "total_fetches": state.total_fetches,
+            "cooldown_until": state.cooldown_until,
+            "cooldown": max(0.0, state.cooldown_until - time.time()) if state.cooldown_until > 0 else 0.0,
+            "robots_checked": state.robots_checked,
+            "robots_disallowed": state.robots_disallowed,
+            "crawl_delay": state.crawl_delay,
         }
 
     def iter_domain_states(self) -> Iterator[tuple[str, DomainState]]:

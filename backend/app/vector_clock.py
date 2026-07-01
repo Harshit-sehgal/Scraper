@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 
 
@@ -16,6 +18,11 @@ class VectorClock:
         """Increment the local clock value."""
         self._clock[self.node_id] = self._clock.get(self.node_id, 0) + 1
 
+    @property
+    def clock(self) -> dict[str, int]:
+        """Read-only access to the internal clock dict."""
+        return self._clock
+
     def update(self, remote_clock: dict[str, int]) -> None:
         """Merge a remote clock into the local clock."""
         for node, value in remote_clock.items():
@@ -27,21 +34,27 @@ class VectorClock:
     def get_clock(self) -> dict[str, int]:
         return copy.deepcopy(self._clock)
 
-    def compare(self, other: dict[str, int]) -> str:
+    def compare(self, other: dict[str, int] | VectorClock) -> str:
         """Compare with another clock to determine causality.
+
+        Args:
+            other: A dict mapping node IDs to clock values, or a VectorClock
+                instance (its internal clock dict is used).
 
         Returns:
             "equal", "ancestor", "descendant", or "concurrent"
 
         """
+        other_clock = other._clock if isinstance(other, VectorClock) else other
+
         self_newer = False
         other_newer = False
 
-        all_nodes = set(self._clock.keys()) | set(other.keys())
+        all_nodes = set(self._clock.keys()) | set(other_clock.keys())
 
         for node in all_nodes:
             v_self = self._clock.get(node, 0)
-            v_other = other.get(node, 0)
+            v_other = other_clock.get(node, 0)
 
             if v_self > v_other:
                 self_newer = True
@@ -64,5 +77,5 @@ class VectorClock:
         return self.get_clock()
 
     @classmethod
-    def from_dict(cls, node_id: str, data: dict[str, int]) -> "VectorClock":
+    def from_dict(cls, node_id: str, data: dict[str, int]) -> VectorClock:
         return cls(node_id, copy.deepcopy(data))

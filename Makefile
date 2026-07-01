@@ -37,7 +37,7 @@ _need-container:
 	@$(DC) ps -q $(SERVICE) 2>/dev/null | grep -q . || \
 		{ echo "Error: $(SERVICE) container is not running. Run 'make up' first, or use 'make validate' for local checks." >&2; exit 1; }
 
-.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate validate-full validate-backend validate-frontend validate-security doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability _need-container
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate validate-full validate-backend validate-frontend validate-security doctor api-docs api-docs-check test-coverage test-coverage-report test-flaky test-reliability setup-verify _need-container
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -45,11 +45,13 @@ help: ## Show this help
 
 # ─── Setup (first-time) ──────────────────────────────────────────────────────
 
-setup: ## Fresh clone → running dev stack (pip, npm, migrate, build, up)
+setup: ## Fresh clone → running dev stack (pip, npm, playwright, migrate, build, up)
 	@echo "==> Installing Python dependencies..."
 	pip install -e ".[dev]"
 	@echo "==> Installing Node dependencies..."
 	npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund
+	@echo "==> Installing Playwright browsers (chromium)..."
+	@python3 -m playwright install chromium 2>/dev/null || echo "    (Playwright install skipped — run \`python3 -m playwright install chromium\` later if browser tests fail)"
 	@echo "==> Building frontend..."
 	npm run build
 	@echo "==> Preparing .env..."
@@ -66,6 +68,12 @@ setup: ## Fresh clone → running dev stack (pip, npm, migrate, build, up)
 	@echo "   API:       http://localhost:${PORT:-8000}"
 	@echo "   Dashboard: http://localhost:${PORT:-8000}/app"
 	@echo "   Docs:      http://localhost:${PORT:-8000}/docs"
+	@echo ""
+	@echo "==> Running doctor health check..."
+	@PYTHONPATH=backend python3 scripts/doctor.py || true
+
+setup-verify: ## Verify installed setup against all required health checks (no doctor changes)
+	@PYTHONPATH=backend python3 scripts/doctor.py --strict
 
 build-frontend: ## Build the frontend bundle locally (esbuild, no Docker)
 	npm run build
