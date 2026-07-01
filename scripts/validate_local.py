@@ -33,7 +33,9 @@ COMMANDS_DIR = VALIDATION_DIR / "commands"
 RUNS_DIR = VALIDATION_DIR / "runs"
 SUMMARY_MD = VALIDATION_DIR / "latest_summary.md"
 SUMMARY_JSON = VALIDATION_DIR / "latest_summary.json"
-BACKEND_FULL_TEST_TIMEOUT_SECONDS = 1200
+# With pytest-xdist -n auto distributing across 20 cores, the full suite
+# finishes in under 120s. The 600s cap is a generous safety buffer.
+BACKEND_FULL_TEST_TIMEOUT_SECONDS = 600
 
 SECRET_PATTERNS = [
     re.compile(r"(?i)(authorization\s*:\s*)(bearer\s+)?[^\s\r\n]+"),

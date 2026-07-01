@@ -4288,8 +4288,42 @@ reproduces green from current code and artifacts.
 | `python3 scripts/validate_local.py --full` | 0 | Final PASS; run `20260630T060444Z_full`, 24 passed, 0 failed, 0 skipped, 0 timed out. |
 | `git diff --check` | 0 | PASS after the truth-log update; no whitespace errors. |
 
+## 2026-07-02 — Deep Cleanup + Documentation Finalization
+
+Scope: finalize all remaining cleanup tasks from sessions 88-89:
+delete `.original` backup, prune stale remote branches, regenerate
+all documentation artifacts, update CHANGELOG and truth.
+
+### Action taken
+
+- `backend/migrations/008_postgres_storage_v8.sql.original` — deleted from disk
+  (previously removed from git tracking in d49ef06a).
+- 8 stale remote backup branches deleted from origin:
+  `codex/codebase-green-validation-20260618`, `copilot/harshit-sehgal`,
+  `copilot/scraper-commit-update`, `feat/v1.1-observability`,
+  `fix/deep-scan-hardening`, `frontend-foundation`,
+  `scraper-schema-alignment`, `stabilize/phase-0-truth`.
+- `docs/RUN_JOB_CHARACTERIZATION.md` — stale `_helpers.py` reference updated.
+- Route inventory, auth matrix, OpenAPI spec, file audit ledger regenerated.
+- `CHANGELOG.md` — updated with current session additions.
+- `ISSUE_LEDGER.md` — entries synchronized.
+
+### Command Evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | PASS; 12/12 checks. |
+| `python3 scripts/generate_route_inventory.py` | 0 | PASS; routes=199 stable=164 experimental=35. |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | PASS; routes=185 unknown_auth=0 unknown_tenant=0. |
+| `python3 scripts/generate_openapi.py` | 0 | PASS; PATCH=12 DELETE=18. |
+| `python3 artifacts/audit/gen_full_ledger.py` | 0 | PASS; regenerated FILE_AUDIT_LEDGER.md. |
+| `npx vitest run --config frontend/vitest.config.js` | 0 | PASS; 36/36 test files, 458/458 tests. |
+| `rm backend/migrations/008_postgres_storage_v8.sql.original` | 0 | File removed from disk. |
+| `git push origin --delete <7 stale branches>` | 0 | Branches removed from remote. |
+| `git diff --check` | 0 | PASS; no whitespace errors. |
+
 ### Current Status
 
 Latest validation artifact is
-`artifacts/validation/runs/20260630T060444Z_full`; `artifacts/validation/latest_summary.md`
+`artifacts/validation/runs/20260702T040815Z_quick`; `artifacts/validation/latest_summary.md`
 reports `overall_status: passed`.

@@ -40,9 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Centralized auth through `app.utils.rbac.resolve_auth_context` (eliminated inline auth checks)
 - SaaS delete endpoints (`DELETE /api/saas/orgs/{id}`, `DELETE /api/saas/projects/{id}`) now backed by store methods
 - Moved `CURRENT_AUP_VERSION` from `app.saas/router.py` to `app.saas/__init__.py` (circular import fix)
+- `.gitignore` — added `*.original` pattern for migration backups
+- Route inventory, auth matrix, OpenAPI, file audit ledger regenerated
+- `docs/RUN_JOB_CHARACTERIZATION.md` — stale `_helpers.py` reference updated
 - Frontend esbuild bundler with code splitting (106 KB CSS < 200 KB threshold)
 - Production Docker Compose uses split-volume layout (read-only root filesystem)
 - Updated route inventory and auth matrix generators
+- Full backend test suite now runs with `pytest-xdist -n auto` across all available CPU cores to parallelize 7,601 tests
+- Reduced `BACKEND_FULL_TEST_TIMEOUT_SECONDS` from 1200 to 600 in `scripts/validate_local.py`
 
 ### Fixed
 
@@ -63,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 3 review routes had `unknown_tenant` scope — added to `TENANT_SCOPED_PREFIXES`
 - 41 undocumented `.env.example` vars — documented in `docs/CONFIG_AUDIT.md`
 - `coverage/` and `artifacts/frontend_review/` added to `.gitignore` (35 PNGs, 3.7 MB removed from tracking)
+- `backend/migrations/008_postgres_storage_v8.sql.original` — stale 14 KB pg_dump backup removed from tracking and disk
+- `test_security_audit.py` — extra blank line removed (ruff-format)
+- 8 stale remote backup branches on origin — deleted (codex/*, copilot/*, feat/*, fix/*, frontend-foundation, scraper-schema-alignment, stabilize/phase-0-truth)
 
 ### Removed
 
@@ -73,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 8 merged backup branches
 - 5 stale `worktree-agent-*` branches
 - `backend/tests/helpers.py` (orphaned, zero imports)
+- `backend/app/utils/ssrf_defense.py` — SSRF + DNS-rebinding defense module (superseded by `url_safety.py`)
+- `backend/migrations/008_postgres_storage_v8.sql.original` — stale pg_dump backup
 
 ## [0.1.0] - 2026-06-10
 

@@ -181,6 +181,36 @@
         "title": "ApiKeyResponse",
         "type": "object"
       },
+      "AuditLogResponse": {
+        "description": "Response model for GET /api/system/audit-log.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "items": {
+            "items": {},
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "category",
+          "items"
+        ],
+        "title": "AuditLogResponse",
+        "type": "object"
+      },
       "AupAcceptRequest": {
         "description": "Request body for recording AUP acceptance.",
         "properties": {
@@ -277,6 +307,68 @@
         "title": "BatchExportRequest",
         "type": "object"
       },
+      "BatchSubmitRequest": {
+        "description": "Request body to submit multiple URLs as a single batch.",
+        "properties": {
+          "cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Cookies",
+            "type": "object"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "object"
+          },
+          "name": {
+            "default": "batch",
+            "maxLength": 255,
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SchemaField"
+            },
+            "maxItems": 50,
+            "title": "Schema Fields",
+            "type": "array"
+          },
+          "urls": {
+            "description": "List of URLs to scrape",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "urls"
+        ],
+        "title": "BatchSubmitRequest",
+        "type": "object"
+      },
+      "Body_correct_record_api_jobs__job_id__results__record_id__patch": {
+        "properties": {
+          "corrected_value": {
+            "default": "",
+            "title": "Corrected Value"
+          },
+          "field_name": {
+            "default": "",
+            "title": "Field Name",
+            "type": "string"
+          }
+        },
+        "title": "Body_correct_record_api_jobs__job_id__results__record_id__patch",
+        "type": "object"
+      },
       "CheckoutRequest": {
         "description": "Request body for POST /api/billing/checkout.",
         "properties": {
@@ -351,6 +443,89 @@
           "plan_tier"
         ],
         "title": "CheckoutResponse",
+        "type": "object"
+      },
+      "ClearTerminalResponse": {
+        "description": "Response model for DELETE /api/jobs/cleanup/terminal.",
+        "properties": {
+          "cleared": {
+            "title": "Cleared",
+            "type": "integer"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed"
+          },
+          "kept_recent": {
+            "title": "Kept Recent",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "message",
+          "cleared",
+          "kept_recent",
+          "remaining"
+        ],
+        "title": "ClearTerminalResponse",
+        "type": "object"
+      },
+      "DeleteMyDataResponse": {
+        "description": "Response model for DELETE /api/user/data.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "receipt": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Receipt",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Summary",
+            "type": "object"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "user_id",
+          "summary",
+          "message",
+          "receipt"
+        ],
+        "title": "DeleteMyDataResponse",
         "type": "object"
       },
       "DenylistAddRequest": {
@@ -526,6 +701,83 @@
         "title": "DiscoveryRequest",
         "type": "object"
       },
+      "DomainConfidenceResponse": {
+        "description": "Response model for GET /api/scraper/selectors/domain/{domain}.",
+        "properties": {
+          "age_factor": {
+            "title": "Age Factor",
+            "type": "number"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "final_score": {
+            "title": "Final Score",
+            "type": "number"
+          },
+          "freshness_factor": {
+            "title": "Freshness Factor",
+            "type": "number"
+          },
+          "raw_confidence": {
+            "title": "Raw Confidence",
+            "type": "number"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "raw_confidence",
+          "age_factor",
+          "freshness_factor",
+          "final_score",
+          "reason"
+        ],
+        "title": "DomainConfidenceResponse",
+        "type": "object"
+      },
+      "EmailDeliveryRequest": {
+        "description": "Request body to email job results.",
+        "properties": {
+          "format": {
+            "default": "csv",
+            "description": "Export format (csv, json)",
+            "maxLength": 16,
+            "title": "Format",
+            "type": "string"
+          },
+          "recipients": {
+            "description": "Email recipients",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Recipients",
+            "type": "array"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          }
+        },
+        "required": [
+          "recipients"
+        ],
+        "title": "EmailDeliveryRequest",
+        "type": "object"
+      },
       "EmailVerificationSendResponse": {
         "description": "Response for requesting email verification.",
         "properties": {
@@ -613,6 +865,133 @@
           "message"
         ],
         "title": "EmailVerifyResponse",
+        "type": "object"
+      },
+      "ExtractionTemplate": {
+        "description": "A reusable extraction template.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "created_at": {
+            "maxLength": 64,
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SchemaField"
+            },
+            "title": "Schema Fields",
+            "type": "array"
+          },
+          "selectors_map": {
+            "additionalProperties": true,
+            "title": "Selectors Map",
+            "type": "object"
+          },
+          "updated_at": {
+            "maxLength": 64,
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "title": "ExtractionTemplate",
+        "type": "object"
+      },
+      "ExtractionTemplateUpdate": {
+        "description": "Request body to update an extraction template.",
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "schema_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SchemaField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Fields"
+          },
+          "selectors_map": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors Map"
+          }
+        },
+        "title": "ExtractionTemplateUpdate",
+        "type": "object"
+      },
+      "FetchStrategyUpdate": {
+        "description": "Request body to update a job's fetch strategy (Literal-strained variant).\n\nAccepts the same values as ``JobStrategyUpdate`` but uses a\n``Literal`` type so OpenAPI documentation and client code generators\ncan enumerate the valid strategies without inspecting the\n``strategy_evolution`` module at runtime.",
+        "properties": {
+          "strategy": {
+            "description": "Fetch strategy to use. The empty-string reset supported by JobStrategyUpdate is not available via this model \u2014 callers that need auto-select should use ``PATCH /api/jobs/{id}/strategy`` with ``fetch_strategy: \"\"``.",
+            "enum": [
+              "playwright_full",
+              "playwright_lightweight",
+              "playwright_stealth",
+              "httpx_basic",
+              "httpx_with_ua",
+              "httpx_smart",
+              "hybrid",
+              "cached"
+            ],
+            "title": "Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy"
+        ],
+        "title": "FetchStrategyUpdate",
         "type": "object"
       },
       "FieldType": {
@@ -869,6 +1248,41 @@
         "title": "InvitationResponse",
         "type": "object"
       },
+      "JobCloneRequest": {
+        "description": "Request body to clone a job.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Name for the cloned job",
+            "title": "Name"
+          },
+          "urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override URLs for the cloned job",
+            "title": "Urls"
+          }
+        },
+        "title": "JobCloneRequest",
+        "type": "object"
+      },
       "JobCreate": {
         "description": "Request body to create a new scraping job.",
         "properties": {
@@ -1106,6 +1520,13 @@
             "title": "Urls",
             "type": "array"
           },
+          "user_agent": {
+            "default": "",
+            "description": "Custom User-Agent string for this job. Empty means use platform default.",
+            "maxLength": 512,
+            "title": "User Agent",
+            "type": "string"
+          },
           "webhook_secret": {
             "anyOf": [
               {
@@ -1137,6 +1558,86 @@
           "name"
         ],
         "title": "JobCreate",
+        "type": "object"
+      },
+      "JobCreateResponse": {
+        "description": "Response model for POST /api/jobs.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotent_replay": {
+            "title": "Idempotent Replay",
+            "type": "boolean"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "status",
+          "idempotent_replay"
+        ],
+        "title": "JobCreateResponse",
+        "type": "object"
+      },
+      "JobEventsResponse": {
+        "description": "Response model for GET /api/jobs/{job_id}/events.",
+        "properties": {
+          "events": {
+            "items": {},
+            "title": "Events",
+            "type": "array"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "events",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "JobEventsResponse",
         "type": "object"
       },
       "JobExtractionUpdate": {
@@ -1229,6 +1730,77 @@
         "title": "JobExtractionUpdate",
         "type": "object"
       },
+      "JobExtractionUpdateResponse": {
+        "description": "Response model for PATCH /api/jobs/{job_id}/extraction.",
+        "properties": {
+          "hydration_wait_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hydration Wait Ms"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "max_concurrent_urls": {
+            "title": "Max Concurrent Urls",
+            "type": "integer"
+          },
+          "max_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Pages"
+          },
+          "request_delay_ms": {
+            "title": "Request Delay Ms",
+            "type": "integer"
+          },
+          "scroll_attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scroll Attempts"
+          },
+          "selectors_map": {
+            "additionalProperties": true,
+            "title": "Selectors Map",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "job_id",
+          "hydration_wait_ms",
+          "scroll_attempts",
+          "max_pages",
+          "selectors_map",
+          "request_delay_ms",
+          "max_concurrent_urls"
+        ],
+        "title": "JobExtractionUpdateResponse",
+        "type": "object"
+      },
       "JobHeadersUpdate": {
         "description": "Request body to update job headers and cookies.",
         "properties": {
@@ -1252,6 +1824,57 @@
         "title": "JobHeadersUpdate",
         "type": "object"
       },
+      "JobResultsResponse": {
+        "description": "Response model for GET /api/jobs/{job_id}/results.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "results": {
+            "items": {},
+            "title": "Results",
+            "type": "array"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "results",
+          "total",
+          "limit",
+          "offset",
+          "returned"
+        ],
+        "title": "JobResultsResponse",
+        "type": "object"
+      },
       "JobStrategyUpdate": {
         "description": "Request body to update a job's fetch strategy.",
         "properties": {
@@ -1266,6 +1889,79 @@
           "fetch_strategy"
         ],
         "title": "JobStrategyUpdate",
+        "type": "object"
+      },
+      "JobUserAgentUpdate": {
+        "description": "Request body to update a job's custom User-Agent string.",
+        "properties": {
+          "user_agent": {
+            "default": "",
+            "description": "Custom User-Agent string. Empty string resets to platform default.",
+            "maxLength": 512,
+            "title": "User Agent",
+            "type": "string"
+          }
+        },
+        "title": "JobUserAgentUpdate",
+        "type": "object"
+      },
+      "JobWaitConditionsUpdate": {
+        "description": "Request body to update per-job JS wait condition configuration.\n\nAll fields are optional; absent fields leave existing values unchanged.\nSet a field to ``null`` to clear it (restore platform default behaviour).",
+        "properties": {
+          "wait_for_function": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JavaScript expression that must evaluate to truthy before extraction. None = no custom function wait.",
+            "title": "Wait For Function"
+          },
+          "wait_for_navigation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "If true, wait for a page navigation event after the initial load (useful for JS redirects). None = platform default (no extra wait).",
+            "title": "Wait For Navigation"
+          },
+          "wait_for_selector": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "CSS selector to wait for before extraction. None = no custom selector wait.",
+            "title": "Wait For Selector"
+          },
+          "wait_for_timeout": {
+            "anyOf": [
+              {
+                "maximum": 120000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explicit timeout (ms) to wait after navigation before extraction. None = use platform default hydration logic.",
+            "title": "Wait For Timeout"
+          }
+        },
+        "title": "JobWaitConditionsUpdate",
         "type": "object"
       },
       "JobWebhookUpdate": {
@@ -1299,6 +1995,82 @@
           }
         },
         "title": "JobWebhookUpdate",
+        "type": "object"
+      },
+      "LowConfidenceSelectorItem": {
+        "description": "A single low-confidence selector entry.",
+        "properties": {
+          "age_factor": {
+            "title": "Age Factor",
+            "type": "number"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "freshness_factor": {
+            "title": "Freshness Factor",
+            "type": "number"
+          },
+          "raw_confidence": {
+            "title": "Raw Confidence",
+            "type": "number"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "success_count": {
+            "title": "Success Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "domain",
+          "score",
+          "raw_confidence",
+          "age_factor",
+          "freshness_factor",
+          "success_count",
+          "failure_count",
+          "reason"
+        ],
+        "title": "LowConfidenceSelectorItem",
+        "type": "object"
+      },
+      "LowConfidenceSelectorsResponse": {
+        "description": "Response model for GET /api/scraper/selectors/low-confidence.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/LowConfidenceSelectorItem"
+            },
+            "title": "Selectors",
+            "type": "array"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "threshold",
+          "count",
+          "selectors"
+        ],
+        "title": "LowConfidenceSelectorsResponse",
         "type": "object"
       },
       "MembershipResponse": {
@@ -1338,6 +2110,81 @@
           "created_at"
         ],
         "title": "MembershipResponse",
+        "type": "object"
+      },
+      "NotificationChannelCreate": {
+        "description": "Request body to create a notification channel.",
+        "properties": {
+          "events": {
+            "description": "Events to notify on",
+            "items": {
+              "type": "string"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "type": {
+            "description": "Channel type: slack, teams, discord, email",
+            "maxLength": 32,
+            "title": "Type",
+            "type": "string"
+          },
+          "webhook_url": {
+            "description": "Webhook URL for the channel",
+            "maxLength": 2048,
+            "title": "Webhook Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "webhook_url"
+        ],
+        "title": "NotificationChannelCreate",
+        "type": "object"
+      },
+      "NotificationChannelUpdate": {
+        "description": "Request body to update a notification channel.",
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Url"
+          }
+        },
+        "title": "NotificationChannelUpdate",
         "type": "object"
       },
       "OrgCreateRequest": {
@@ -1524,7 +2371,7 @@
         "type": "object"
       },
       "PlanInfoResponse": {
-        "description": "Current plan information for the user.",
+        "description": "Current plan information for the user.\n\nIncludes both subscription limits (max_*) and current consumption\ncounters (used_*) so the billing UI can show \"3 / 10 jobs used\"\nwithout a second round-trip.",
         "properties": {
           "features": {
             "items": {
@@ -1558,12 +2405,52 @@
             "maxLength": 32,
             "title": "Tier",
             "type": "string"
+          },
+          "used_jobs": {
+            "default": 0,
+            "title": "Used Jobs",
+            "type": "integer"
+          },
+          "used_scrapes": {
+            "default": 0,
+            "title": "Used Scrapes",
+            "type": "integer"
           }
         },
         "required": [
           "features"
         ],
         "title": "PlanInfoResponse",
+        "type": "object"
+      },
+      "PreviewResponse": {
+        "description": "Response model for POST /api/scraper/preview.",
+        "properties": {
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "preview_records": {
+            "items": {},
+            "title": "Preview Records",
+            "type": "array"
+          },
+          "total_records_found": {
+            "title": "Total Records Found",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "total_records_found",
+          "preview_records",
+          "dry_run"
+        ],
+        "title": "PreviewResponse",
         "type": "object"
       },
       "ProjectCreateRequest": {
@@ -1651,6 +2538,158 @@
         "title": "ProjectResponse",
         "type": "object"
       },
+      "RegressionGenerateAllResponse": {
+        "description": "Response model for POST /api/scraper/regressions/generate-all-tests.",
+        "properties": {
+          "test_code": {
+            "title": "Test Code",
+            "type": "string"
+          },
+          "total_tests_generated": {
+            "title": "Total Tests Generated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_tests_generated",
+          "test_code"
+        ],
+        "title": "RegressionGenerateAllResponse",
+        "type": "object"
+      },
+      "RegressionTestGenerateResponse": {
+        "description": "Response model for POST /api/scraper/regressions/{entry_id}/generate-test.",
+        "properties": {
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "test_code": {
+            "title": "Test Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "test_code"
+        ],
+        "title": "RegressionTestGenerateResponse",
+        "type": "object"
+      },
+      "RemoveDenylistResponse": {
+        "description": "Response model for DELETE /api/operator/denylist.",
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "path_prefix": {
+            "title": "Path Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "domain",
+          "path_prefix"
+        ],
+        "title": "RemoveDenylistResponse",
+        "type": "object"
+      },
+      "ScheduledJobChangesResponse": {
+        "description": "Response model for GET /api/scheduled/{job_id}/changes.",
+        "properties": {
+          "changes_detected": {
+            "title": "Changes Detected",
+            "type": "boolean"
+          },
+          "frequency": {
+            "title": "Frequency",
+            "type": "string"
+          },
+          "frequency_met": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Met"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_name": {
+            "title": "Job Name",
+            "type": "string"
+          },
+          "last_records_count": {
+            "title": "Last Records Count",
+            "type": "integer"
+          },
+          "last_run_at": {
+            "title": "Last Run At",
+            "type": "string"
+          },
+          "last_status": {
+            "title": "Last Status",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "previous_records_count": {
+            "title": "Previous Records Count",
+            "type": "integer"
+          },
+          "previous_status": {
+            "title": "Previous Status",
+            "type": "string"
+          },
+          "record_count_delta": {
+            "title": "Record Count Delta",
+            "type": "integer"
+          },
+          "status_changed": {
+            "title": "Status Changed",
+            "type": "boolean"
+          },
+          "summary_count": {
+            "title": "Summary Count",
+            "type": "integer"
+          },
+          "target_url": {
+            "title": "Target Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_name",
+          "target_url",
+          "frequency",
+          "changes_detected",
+          "last_run_at",
+          "last_status",
+          "previous_status",
+          "last_records_count",
+          "previous_records_count",
+          "record_count_delta",
+          "status_changed",
+          "summary_count",
+          "message"
+        ],
+        "title": "ScheduledJobChangesResponse",
+        "type": "object"
+      },
       "ScheduledJobFrequency": {
         "description": "How often a scheduled job should run.",
         "enum": [
@@ -1728,6 +2767,50 @@
         "title": "ScrapeMode",
         "type": "string"
       },
+      "ScraperConfigResponse": {
+        "description": "Response model for GET /api/scraper/config.",
+        "properties": {
+          "max_records_per_source": {
+            "title": "Max Records Per Source",
+            "type": "integer"
+          },
+          "max_retries": {
+            "title": "Max Retries",
+            "type": "integer"
+          },
+          "page_settle_delay": {
+            "title": "Page Settle Delay",
+            "type": "number"
+          },
+          "playwright_timeout": {
+            "title": "Playwright Timeout",
+            "type": "integer"
+          },
+          "regex_max_containers": {
+            "title": "Regex Max Containers",
+            "type": "integer"
+          },
+          "request_timeout": {
+            "title": "Request Timeout",
+            "type": "integer"
+          },
+          "selector_snippet_max_chars": {
+            "title": "Selector Snippet Max Chars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "playwright_timeout",
+          "page_settle_delay",
+          "request_timeout",
+          "max_retries",
+          "max_records_per_source",
+          "selector_snippet_max_chars",
+          "regex_max_containers"
+        ],
+        "title": "ScraperConfigResponse",
+        "type": "object"
+      },
       "ScraperDiagnosticsRequest": {
         "description": "Request body for the scraper diagnostics endpoint.\n\nReplaces the broken inline ``fields: list[SchemaField]`` signature\nthat caused PydanticUserError in OpenAPI generation.",
         "properties": {
@@ -1760,6 +2843,302 @@
           "fields"
         ],
         "title": "ScraperDiagnosticsRequest",
+        "type": "object"
+      },
+      "ScraperStatsResponse": {
+        "description": "Response model for GET /api/scraper/stats.",
+        "properties": {
+          "confidence_histogram": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Confidence Histogram",
+            "type": "array"
+          },
+          "recent_latency_avg": {
+            "title": "Recent Latency Avg",
+            "type": "number"
+          },
+          "recent_success_rate": {
+            "title": "Recent Success Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "confidence_histogram",
+          "recent_latency_avg",
+          "recent_success_rate"
+        ],
+        "title": "ScraperStatsResponse",
+        "type": "object"
+      },
+      "SelectorCleanupResponse": {
+        "description": "Response model for POST /api/scraper/selectors/cleanup.",
+        "properties": {
+          "deleted_domains": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Domains"
+          },
+          "domains_checked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domains Checked"
+          },
+          "low_confidence_selectors": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Confidence Selectors"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "next_cleanup_available_in_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cleanup Available In Seconds"
+          },
+          "selectors_deleted": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors Deleted"
+          }
+        },
+        "title": "SelectorCleanupResponse",
+        "type": "object"
+      },
+      "SelectorMemoryFullStatsResponse": {
+        "description": "Response model for GET /api/scraper/selectors/stats.",
+        "properties": {
+          "avg_confidence": {
+            "title": "Avg Confidence",
+            "type": "number"
+          },
+          "confidence_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Confidence Distribution",
+            "type": "object"
+          },
+          "high_confidence": {
+            "title": "High Confidence",
+            "type": "integer"
+          },
+          "low_confidence": {
+            "title": "Low Confidence",
+            "type": "integer"
+          },
+          "medium_confidence": {
+            "title": "Medium Confidence",
+            "type": "integer"
+          },
+          "total_domains": {
+            "title": "Total Domains",
+            "type": "integer"
+          },
+          "total_selectors": {
+            "title": "Total Selectors",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_domains",
+          "total_selectors",
+          "avg_confidence",
+          "high_confidence",
+          "medium_confidence",
+          "low_confidence",
+          "confidence_distribution"
+        ],
+        "title": "SelectorMemoryFullStatsResponse",
+        "type": "object"
+      },
+      "SelectorMemoryStatsResponse": {
+        "description": "Response model for GET /api/scraper/memory/stats.",
+        "properties": {
+          "domain_count": {
+            "title": "Domain Count",
+            "type": "integer"
+          },
+          "top_domains": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Top Domains",
+            "type": "array"
+          },
+          "total_failures": {
+            "title": "Total Failures",
+            "type": "integer"
+          },
+          "total_successes": {
+            "title": "Total Successes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "domain_count",
+          "total_successes",
+          "total_failures",
+          "top_domains"
+        ],
+        "title": "SelectorMemoryStatsResponse",
+        "type": "object"
+      },
+      "SessionCreateResponse": {
+        "description": "Response model for POST /api/session.",
+        "properties": {
+          "authenticated": {
+            "default": true,
+            "title": "Authenticated",
+            "type": "boolean"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "role",
+          "message"
+        ],
+        "title": "SessionCreateResponse",
+        "type": "object"
+      },
+      "SessionDestroyResponse": {
+        "description": "Response model for DELETE /api/session.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "SessionDestroyResponse",
+        "type": "object"
+      },
+      "SessionMeResponse": {
+        "description": "Response model for GET /api/session/me.",
+        "properties": {
+          "authenticated": {
+            "title": "Authenticated",
+            "type": "boolean"
+          },
+          "org_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "authenticated"
+        ],
+        "title": "SessionMeResponse",
         "type": "object"
       },
       "SignupRequest": {
@@ -1867,6 +3246,20 @@
         "title": "SourcePolicy",
         "type": "string"
       },
+      "StatusResponse": {
+        "description": "Generic status response.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StatusResponse",
+        "type": "object"
+      },
       "URLPreviewRequest": {
         "properties": {
           "acquisition_mode": {
@@ -1906,6 +3299,48 @@
           "url"
         ],
         "title": "URLPreviewRequest",
+        "type": "object"
+      },
+      "UsageRecord": {
+        "description": "Request body for recording usage events (Feat 30).",
+        "properties": {
+          "api_key": {
+            "default": "",
+            "description": "API key identifier",
+            "maxLength": 128,
+            "title": "Api Key",
+            "type": "string"
+          },
+          "failures": {
+            "default": 0,
+            "description": "Number of failures",
+            "minimum": 0.0,
+            "title": "Failures",
+            "type": "integer"
+          },
+          "latency_ms": {
+            "default": 0,
+            "description": "Maximum latency in milliseconds",
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "records": {
+            "default": 0,
+            "description": "Number of records extracted",
+            "minimum": 0.0,
+            "title": "Records",
+            "type": "integer"
+          },
+          "requests": {
+            "default": 1,
+            "description": "Number of requests to record",
+            "minimum": 0.0,
+            "title": "Requests",
+            "type": "integer"
+          }
+        },
+        "title": "UsageRecord",
         "type": "object"
       },
       "UsageSummaryResponse": {
@@ -2297,6 +3732,40 @@
         "title": "WorkflowPreviewRequest",
         "type": "object"
       },
+      "WorkflowRunQueuedResponse": {
+        "description": "Response model for POST /api/workflows/{workflow_id}/run.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workflow_id": {
+            "title": "Workflow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "job_id",
+          "run_id",
+          "status",
+          "message"
+        ],
+        "title": "WorkflowRunQueuedResponse",
+        "type": "object"
+      },
       "WorkflowStatus": {
         "description": "Status of a saved workflow.",
         "enum": [
@@ -2528,7 +3997,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Root  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3103,9 +4576,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Gdpr Forget Api Compliance Gdpr Forget Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteMyDataResponse"
                 }
               }
             },
@@ -3136,7 +4607,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Discover Api Discover Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3156,6 +4631,90 @@
         "tags": [
           "jobs"
         ]
+      }
+    },
+    "/api/discover/sitemap": {
+      "post": {
+        "description": "Discover sitemap URLs from a domain's robots.txt (Comp 3).",
+        "operationId": "discover_sitemap_api_discover_sitemap_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Domain",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Discover Sitemap Api Discover Sitemap Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discover Sitemap",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/download/{filename}": {
+      "get": {
+        "description": "Serve a previously-downloaded binary file (PDF, image, ZIP, etc.).\n\nFiles are stored by ``scrape_url(extract_binary=True)`` in the\nconfigured ``DATA_DIR/binaries/`` directory. The endpoint streams\nthe file with the correct Content-Type and Content-Disposition so\nbrowsers download it natively.\n\nReturns 404 if the file does not exist or has been cleaned up.",
+        "operationId": "serve_binary_download_api_download__filename__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Serve Binary Download"
       }
     },
     "/api/exports/batch": {
@@ -3232,7 +4791,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Jobs Api Jobs Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3270,7 +4833,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -3287,6 +4852,49 @@
           }
         },
         "summary": "Create Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/batch": {
+      "post": {
+        "operationId": "batch_submit_api_jobs_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Batch Submit Api Jobs Batch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Batch Submit",
         "tags": [
           "jobs"
         ]
@@ -3313,7 +4921,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ClearTerminalResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -3353,7 +4963,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Job Api Jobs  Job Id  Delete",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3401,7 +5015,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Api Jobs  Job Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3442,7 +5060,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cancel Job Api Jobs  Job Id  Cancel Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3459,6 +5081,286 @@
           }
         },
         "summary": "Cancel Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/cascade-trace": {
+      "get": {
+        "description": "Return the extraction cascade layer trace for a job.",
+        "operationId": "get_job_cascade_trace_api_jobs__job_id__cascade_trace_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Cascade Trace Api Jobs  Job Id  Cascade Trace Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Cascade Trace",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/clone": {
+      "post": {
+        "operationId": "clone_job_api_jobs__job_id__clone_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCloneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clone Job Api Jobs  Job Id  Clone Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clone Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/debug": {
+      "get": {
+        "description": "Return diagnostic information for a job and its crawl domains.\n\nCombines job metadata, per-domain crawl-policy state, and\nquality/cascade telemetry into a single debug payload.",
+        "operationId": "debug_job_api_jobs__job_id__debug_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Debug Job Api Jobs  Job Id  Debug Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Debug Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/diff": {
+      "get": {
+        "operationId": "get_job_diff_api_jobs__job_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "compare_to",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Compare To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "record_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Record Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "field_threshold",
+            "required": false,
+            "schema": {
+              "default": 0.05,
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Field Threshold",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Diff Api Jobs  Job Id  Diff Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Diff",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/email": {
+      "post": {
+        "operationId": "email_job_results_api_jobs__job_id__email_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDeliveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Email Job Results Api Jobs  Job Id  Email Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Email Job Results",
         "tags": [
           "jobs"
         ]
@@ -3522,7 +5424,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/JobEventsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -3684,7 +5588,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/JobExtractionUpdateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -3701,6 +5607,59 @@
           }
         },
         "summary": "Update Job Extraction",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/fetch-strategy": {
+      "patch": {
+        "description": "Update the fetch strategy for a job using the ``FetchStrategyUpdate`` body.\n\nCompanion to ``PATCH /api/jobs/{job_id}/strategy``. This variant\nis constrained to the enumerated ``Literal`` set so OpenAPI\nclients can discover the valid strategies without inspecting the\n``strategy_evolution`` module.  Empty-string (auto-select) reset\nis not supported here \u2014 use ``PATCH /api/jobs/{job_id}/strategy``\nwith ``fetch_strategy: \"\"`` for that.",
+        "operationId": "update_fetch_strategy_literal_api_jobs__job_id__fetch_strategy_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FetchStrategyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Fetch Strategy Literal",
         "tags": [
           "jobs"
         ]
@@ -3735,7 +5694,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -3752,6 +5713,396 @@
           }
         },
         "summary": "Update Job Headers",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/network-log": {
+      "get": {
+        "description": "Return the captured network request log for a job's last extraction.",
+        "operationId": "get_job_network_log_api_jobs__job_id__network_log_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Network Log Api Jobs  Job Id  Network Log Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Network Log",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/notification-channels": {
+      "get": {
+        "operationId": "list_notification_channels_api_jobs__job_id__notification_channels_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Notification Channels Api Jobs  Job Id  Notification Channels Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notification Channels",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "operationId": "create_notification_channel_api_jobs__job_id__notification_channels_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationChannelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Notification Channel Api Jobs  Job Id  Notification Channels Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Notification Channel",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/notification-channels/{channel_id}": {
+      "delete": {
+        "operationId": "delete_notification_channel_api_jobs__job_id__notification_channels__channel_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Notification Channel",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "operationId": "update_notification_channel_api_jobs__job_id__notification_channels__channel_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationChannelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Notification Channel Api Jobs  Job Id  Notification Channels  Channel Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Notification Channel",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/quality": {
+      "get": {
+        "description": "Return per-record quality scores for a completed job.\n\nComputes completeness, type conformance, and plausibility for\neach record and returns a paginated list of detailed scores.",
+        "operationId": "get_job_quality_api_jobs__job_id__quality_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Quality Api Jobs  Job Id  Quality Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Quality",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/quality/trends": {
+      "get": {
+        "description": "Return quality trend history for the domain+schema of a given job.\n\nIncludes per-field score breakdown, aggregate summary stats, and\nthe configured alert threshold.",
+        "operationId": "get_job_quality_trends_api_jobs__job_id__quality_trends_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Quality Trends Api Jobs  Job Id  Quality Trends Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Quality Trends",
         "tags": [
           "jobs"
         ]
@@ -3776,7 +6127,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reclean Job Api Jobs  Job Id  Reclean Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -3799,8 +6154,83 @@
       }
     },
     "/api/jobs/{job_id}/results": {
+      "delete": {
+        "description": "Delete results for a job, optionally filtered by date range.\n\nRoadmap Feat 26 \u2014 Bulk result delete with optional date range filter.",
+        "operationId": "delete_job_results_api_jobs__job_id__results_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Job Results Api Jobs  Job Id  Results Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Job Results",
+        "tags": [
+          "jobs"
+        ]
+      },
       "get": {
-        "description": "Return a paginated slice of job results.\n\nWhen results live on disk (large jobs), we read the JSONL\nfile directly via ``load_paginated_job_results_from_disk``.\nOtherwise we prefer the ``job_results`` companion table\n(storage-split v4) and only fall back to ``job.results``\nfor back-compat with v3 deployments.",
+        "description": "Return a paginated slice of job results with search/filter/sort (Feat 25).\n\nSupports:\n- **q**: Full-text search across all result field values.\n- **field**: Filter results to only include records where this field exists.\n- **sort_by**: Field name to sort results by.\n- **sort_order**: ``asc`` or ``desc`` (default ``asc``).",
         "operationId": "get_job_results_api_jobs__job_id__results_get",
         "parameters": [
           {
@@ -3834,6 +6264,170 @@
               "title": "Offset",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "title": "Sort Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "field",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResultsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Results",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/results/{record_id}": {
+      "patch": {
+        "description": "Human-in-the-loop field correction (Qual 15).\n\nCorrects a single field value on an extracted record and\ncreates a review entry for auditability.",
+        "operationId": "correct_record_api_jobs__job_id__results__record_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_correct_record_api_jobs__job_id__results__record_id__patch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Correct Record Api Jobs  Job Id  Results  Record Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Record",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/screenshot": {
+      "get": {
+        "description": "Return the saved screenshot for a job, if one exists.\n\nReturns a PNG image with ``Content-Type: image/png``, or 404 if\nno screenshot has been stored for this job.",
+        "operationId": "get_job_screenshot_api_jobs__job_id__screenshot_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3856,7 +6450,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Get Job Results",
+        "summary": "Get Job Screenshot",
         "tags": [
           "jobs"
         ]
@@ -3891,7 +6485,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -3908,6 +6504,178 @@
           }
         },
         "summary": "Update Job Strategy",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/structured-events": {
+      "get": {
+        "description": "Return structured job events emitted via ``log_job_event``.",
+        "operationId": "get_job_structured_events_api_jobs__job_id__structured_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Structured Events Api Jobs  Job Id  Structured Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Structured Events",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/user-agent": {
+      "patch": {
+        "description": "Update the custom User-Agent string for a job (Feat 23).",
+        "operationId": "update_job_user_agent_api_jobs__job_id__user_agent_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobUserAgentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job User Agent",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/wait-conditions": {
+      "patch": {
+        "description": "Update per-job JavaScript wait conditions (Roadmap Wave 5, Item 3).\n\nAccepts any subset of ``wait_for_selector``, ``wait_for_function``,\n``wait_for_timeout``, ``wait_for_navigation``.  Absent keys leave\nexisting values unchanged; explicit ``null`` clears the value.",
+        "operationId": "update_job_wait_conditions_api_jobs__job_id__wait_conditions_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobWaitConditionsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Job Wait Conditions",
         "tags": [
           "jobs"
         ]
@@ -3983,7 +6751,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Redeliver Job Webhook Api Jobs  Job Id  Webhook Redeliver Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4024,9 +6796,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Remove Denylist Entry Api Operator Denylist Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RemoveDenylistResponse"
                 }
               }
             },
@@ -4120,7 +6890,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clear Recycle Bin Api Recycle Bin Delete",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4167,7 +6941,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Recycle Bin Api Recycle Bin Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4207,7 +6985,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Hard Delete Job Api Recycle Bin  Job Id  Delete",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4247,7 +7029,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Restore Job Api Recycle Bin  Job Id  Restore Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -4264,6 +7050,181 @@
           }
         },
         "summary": "Restore Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/reviews": {
+      "get": {
+        "description": "List pending review items from the manual review queue.",
+        "operationId": "list_reviews_api_reviews_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Reviews Api Reviews Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reviews",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/reviews/{review_id}": {
+      "get": {
+        "description": "Get a single review item by ID.",
+        "operationId": "get_review_api_reviews__review_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Review Api Reviews  Review Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Review",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "description": "Approve or reject a review item (Qual 9).",
+        "operationId": "update_review_api_reviews__review_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "title": "Review Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "default": "approve",
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Corrected Fields"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Review Api Reviews  Review Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Review",
         "tags": [
           "jobs"
         ]
@@ -4981,7 +7942,7 @@
     },
     "/api/saas/plan": {
       "get": {
-        "description": "Return the current user's plan and limits.\n\nLooks up the caller's tier via the billing service (falling back to\n``free`` when billing is unconfigured) and derives the usage limits\nfrom the same ``app.plan_enforcer`` source of truth that enforces\nthem at job-creation time, so the informational view and the\nenforcement gate can never drift.",
+        "description": "Return the current user's plan and limits.\n\nLooks up the caller's tier via the billing service (falling back to\n``free`` when billing is unconfigured) and derives the usage limits\nfrom the same ``app.plan_enforcer`` source of truth that enforces\nthem at job-creation time, so the informational view and the\nenforcement gate can never drift.\n\nAlso reads the user's current consumption from the usage ledger so\nthe frontend billing meter (\"3 / 10 jobs used\") renders without an\nextra ``/usage`` round-trip.",
         "operationId": "get_plan_info_api_saas_plan_get",
         "responses": {
           "200": {
@@ -5366,7 +8327,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Scheduled Jobs Api Scheduled Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5469,7 +8434,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Scheduled Job Api Scheduled Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5544,7 +8513,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Scheduled Job Api Scheduled  Job Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5682,7 +8655,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Scheduled Job Api Scheduled  Job Id  Put",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5723,7 +8700,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledJobChangesResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5763,7 +8742,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Suggest Schema Api Schema Suggest Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5793,7 +8776,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Browser Stats Api Scraper Browser Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5813,7 +8800,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperConfigResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5843,7 +8832,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Scraper Diagnostics Api Scraper Diagnostics Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5873,7 +8866,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Legacy Domain Health Api Scraper Health Legacy Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5893,7 +8890,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorMemoryStatsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5923,7 +8922,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5967,7 +8968,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Regression Archive Api Scraper Regressions Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -5997,7 +9002,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RegressionGenerateAllResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6028,7 +9035,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Regression Detail Api Scraper Regressions  Entry Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6069,7 +9080,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RegressionTestGenerateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6091,6 +9104,51 @@
         ]
       }
     },
+    "/api/scraper/screenshot": {
+      "post": {
+        "operationId": "capture_screenshot_api_scraper_screenshot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Capture Screenshot Api Scraper Screenshot Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capture Screenshot",
+        "tags": [
+          "scraper"
+        ]
+      }
+    },
     "/api/scraper/selectors/cleanup": {
       "post": {
         "description": "Manually trigger selector memory cleanup. Admin only.\n\nForces deletion of all selectors below the confidence threshold,\nregardless of the normal cleanup interval.\n\nReturns cleanup statistics.",
@@ -6099,7 +9157,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorCleanupResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6130,7 +9190,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DomainConfidenceResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6174,7 +9236,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/LowConfidenceSelectorsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6204,7 +9268,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorMemoryFullStatsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6224,7 +9290,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperStatsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6244,7 +9312,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6274,7 +9344,14 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Recent Telemetry Api Scraper Telemetry Get",
+                  "type": "array"
+                }
               }
             },
             "description": "Successful Response"
@@ -6304,7 +9381,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDestroyResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6340,7 +9419,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCreateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6364,13 +9445,15 @@
     },
     "/api/session/me": {
       "get": {
-        "description": "Return the current session role if authenticated via cookie.",
+        "description": "Return the current session role if authenticated via cookie.\n\nExposes the tenant scope (org_id, project_id) embedded in the\nsession cookie so the frontend can render tenant-aware UI without\nan extra API call.",
         "operationId": "get_session_api_session_me_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMeResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -6423,9 +9506,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Audit Log Api System Audit Log Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AuditLogResponse"
                 }
               }
             },
@@ -6468,6 +9549,54 @@
         ]
       }
     },
+    "/api/system/extraction-health": {
+      "get": {
+        "description": "Extraction health dashboard data.\n\nReturns aggregated extraction success rate, p95 latency by cascade\nlayer, and top 10 failing domains over the last hour.\n\nRequires operator or admin role.",
+        "operationId": "extraction_health_api_system_extraction_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Extraction Health Api System Extraction Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Extraction Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/extraction-rate": {
+      "get": {
+        "description": "Extraction request rate over multiple intervals.\n\nReturns req/sec over 1m, 5m, and 15m windows based on the\ntimestamped request ring buffer in the metrics collector.\n\nRequires operator or admin role.",
+        "operationId": "extraction_rate_api_system_extraction_rate_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Extraction Rate Api System Extraction Rate Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Extraction Rate",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/system/rate-limit-stats": {
       "get": {
         "description": "Return current rate limiter configuration and active counter stats.\n\nExposes the rate limiter's internal state for operational debugging:\n- ``enabled`` \u2014 whether any tier (global or per-IP) is active\n- ``global_limit_per_window`` / ``global_window_seconds`` \u2014 aggregate cap\n- ``per_ip_enabled`` / ``per_ip_limit_per_window`` / ``per_ip_window_seconds`` \u2014 fair-share cap\n- ``active_keys`` \u2014 how many distinct counter keys are currently tracked\n- ``route_limits`` \u2014 per-route override limits (max + window per prefix)\n\nRequires operator or admin role.",
@@ -6476,7 +9605,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rate Limit Stats Api System Rate Limit Stats Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6496,7 +9629,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response System Status Api System Status Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6516,7 +9653,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Storage Status Api System Storage Status Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6525,6 +9666,202 @@
         "summary": "Storage Status",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/templates": {
+      "get": {
+        "operationId": "list_templates_api_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Templates Api Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "operationId": "create_template_api_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionTemplate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Template Api Templates Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Template",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/templates/{template_id}": {
+      "delete": {
+        "operationId": "delete_template_api_templates__template_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Template",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "get": {
+        "operationId": "get_template_api_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Template Api Templates  Template Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "operationId": "update_template_api_templates__template_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Template Api Templates  Template Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Template",
+        "tags": [
+          "jobs"
         ]
       }
     },
@@ -6546,7 +9883,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Analyze Url Api Url Analyze Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6568,6 +9909,74 @@
         ]
       }
     },
+    "/api/usage/stats": {
+      "get": {
+        "description": "Return per-key usage statistics for the usage dashboard (Feat 30).\n\nShows requests/day, records extracted, failures, average latency.",
+        "operationId": "get_usage_stats_api_usage_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Usage Stats Api Usage Stats Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Usage Stats",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/usage/stats/record": {
+      "post": {
+        "description": "Record a usage event for the dashboard.",
+        "operationId": "record_usage_api_usage_stats_record_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Usage Api Usage Stats Record Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Usage",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/user/data": {
       "delete": {
         "description": "Delete all data owned by the authenticated user.\n\nClears the following data scoped to the caller's identity:\n- Scraping jobs and their results from disk\n- Saved workflows\n- Auth profiles\n- Scheduled monitoring jobs\n- SaaS identity records (API keys, memberships, user account)\n\nThe current stable API deletes only the caller's own data. Admin/operator\ndeletion of another user's data is intentionally not exposed here.\n\nReturns a summary of what was deleted.",
@@ -6577,9 +9986,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete My Data Api User Data Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteMyDataResponse"
                 }
               }
             },
@@ -6610,7 +10017,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Workflow Draft From Url Analysis Api Workflow Drafts From Url Analysis Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6661,7 +10072,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Detect Workflow Draft Fields Api Workflow Drafts  Draft Id  Detect Fields Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6712,7 +10127,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Workflow From Manual Mapping Api Workflow Drafts  Draft Id  Manual Mapping Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6799,7 +10218,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Workflows Api Workflows Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6837,7 +10260,11 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Workflow Api Workflows Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6912,7 +10339,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Workflow Api Workflows  Workflow Id  Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -6961,7 +10392,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Workflow Api Workflows  Workflow Id  Patch",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7010,7 +10445,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Workflow Api Workflows  Workflow Id  Put",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7068,7 +10507,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Workflow Api Workflows  Workflow Id  Preview Post",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
@@ -7109,7 +10552,9 @@
           "202": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunQueuedResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7268,13 +10713,89 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"
           }
         },
         "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/browser": {
+      "get": {
+        "description": "Browser pool health \u2014 live browser count, context availability, circuit breaker state.\n\nReturns 503 if the circuit breaker is OPEN (browser pool unavailable)\nor if the browser reports disconnected with active contexts.",
+        "operationId": "health_browser_health_browser_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Browser Health Browser Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Browser",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/db": {
+      "get": {
+        "description": "Database health \u2014 connection status, migrations, schema version.\n\nReturns 503 if the database backend reports unhealthy.",
+        "operationId": "health_db_health_db_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Db Health Db Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Db",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/worker": {
+      "get": {
+        "description": "Worker queue health \u2014 pending jobs, running tasks, idle capacity.\n\nReturns 503 if the worker queue reports zero idle capacity while\ntasks are pending (queue saturation).",
+        "operationId": "health_worker_health_worker_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Worker Health Worker Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Worker",
         "tags": [
           "system"
         ]
@@ -7308,7 +10829,11 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Ready Ready Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"

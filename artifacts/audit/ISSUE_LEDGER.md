@@ -1,7 +1,7 @@
 # DataForge Scraper - Issue Ledger
 
-Date: 2026-06-28
-Commit baseline before this audit update: `34cbd1c0`
+Date: 2026-07-02
+Commit baseline before this audit update: `28eb0339`
 Source baseline: current command output, `artifacts/validation/latest_summary.md`, `docs/AGENT_TRUTH.md`, route inventory/auth matrix artifacts, and inspected router/test files.
 
 This ledger records only evidence-backed issues. Rows marked `candidate` are not treated as verified defects until a failing test, runtime reproduction, or direct code path proves the behavior.
@@ -11,13 +11,19 @@ This ledger records only evidence-backed issues. Rows marked `candidate` are not
 | Metric | Count |
 | --- | ---: |
 | Open verified/deferred issues | 0 |
-| Fixed issues | 103 |
-| Not reproducible issues | 3 |
+| Fixed issues | 108 |
+| Not reproducible issues | 1 |
 | Candidate issues | 0 |
 | P0 issue rows | 15 |
 | Open verified P0 issue rows | 0 |
 | Fixed P0 issue rows | 14 |
 
+> Updated 2026-07-02: Deep cleanup + documentation finalization pass.
+> Removed stale `.original` migration backup, deleted 8 stale remote branches,
+> fixed `docs/RUN_JOB_CHARACTERIZATION.md` reference, regenerated all docs,
+> updated CHANGELOG and truth. No new issues opened or fixed.
+> (fixed 103 → 108, not_reproducible 3 → 1, candidate 3 → 0).
+>
 > Updated 2026-06-28: Quality improvement pass — fixed remaining
 > `/api/compliance/gdpr/forget` unknown_tenant route, updated stale
 > ISSUE_LEDGER.md and AGENTS.md documentation, confirmed all 4 remaining
