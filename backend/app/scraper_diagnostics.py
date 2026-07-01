@@ -109,7 +109,7 @@ async def run_diagnostics(url: str, schema_fields: list[SchemaField], min_record
         report.final_records_count = len(final_results)
         report.record_samples = final_results
 
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, AttributeError, OSError) as e:
         logger.exception("Diagnostics failed for %s", url)
         report.errors.append(str(e))
 

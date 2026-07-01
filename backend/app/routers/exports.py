@@ -188,7 +188,7 @@ def _log_export_access(
             org_id=org_id,
             project_id=project_id,
         )
-    except Exception as e:  # pragma: no cover - defensive
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as e:  # pragma: no cover - defensive
         logger.debug("Failed to log export access for %s: %s", fmt, e)
 
 

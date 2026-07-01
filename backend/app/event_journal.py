@@ -97,7 +97,7 @@ class EventJournal:
                     },
                 },
             )
-        except Exception as e:
+        except (OSError, RuntimeError, ValueError, TypeError) as e:
             # ReplayBuffer failure is non-fatal — journal continues normally
             logger.debug("ReplayBuffer persist skipped: %s", e)
 

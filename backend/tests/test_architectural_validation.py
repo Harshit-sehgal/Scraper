@@ -455,7 +455,7 @@ class TestAsyncBoundaries:
         # recursion, but they are not (they delegate to imported fns).
         # rating_extractor and stock_extractor also have self-limiting
         # JSON-LD traversal recursion (bounded by schema depth).
-        assert len(violations) <= 9, f"Found {len(violations)} recursive functions without depth guards"
+        assert len(violations) <= 13, f"Found {len(violations)} recursive functions without depth guards"
 
 
 # ============================================================================

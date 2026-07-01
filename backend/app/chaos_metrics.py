@@ -61,7 +61,7 @@ class ChaosTestSuite:
             }
             return result
 
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, OSError, AttributeError) as e:
             self.logger.exception("Error running scenario %s", scenario.name)
             return {
                 "scenario": scenario.name,

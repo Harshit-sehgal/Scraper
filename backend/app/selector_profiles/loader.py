@@ -38,7 +38,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import async_playwright
+from playwright.async_api import Error, async_playwright
 
 from app.config import settings
 
@@ -321,19 +321,19 @@ async def extract_with_profile(
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
             return records  # type: ignore[no-any-return]
 
-    except (TimeoutError, RuntimeError, OSError, ValueError):
+    except (TimeoutError, RuntimeError, OSError, ValueError, Error):
         logger.exception("[ProfileExtractor] Fatal error for %s", url)
         return []
     finally:
         if context is not None:
             try:
                 await context.close()
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, Error):
                 logger.debug("[ProfileExtractor] Failed to close browser context gracefully")
         if browser is not None:
             try:
                 await browser.close()
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, Error):
                 logger.debug("[ProfileExtractor] Failed to close browser gracefully")
 
 

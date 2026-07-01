@@ -69,7 +69,11 @@ def test_build_error_response_with_suggestions(ctx: _UrlAnalysisContext) -> None
 @pytest.mark.anyio
 async def test_stage_resolve_url_passthrough_on_error(pipeline: URLAnalysisPipeline, ctx: _UrlAnalysisContext) -> None:
     """When httpx raises (network error), final_url should remain as url."""
-    await pipeline._stage_resolve_url(ctx)
+    from unittest.mock import patch
+
+    with patch("app.url_safety.get_safe_async_client") as mock_client:
+        mock_client.return_value.__aenter__.side_effect = RuntimeError("connection refused")
+        await pipeline._stage_resolve_url(ctx)
     assert ctx.final_url == ctx.url
 
 
@@ -165,6 +169,7 @@ def test_stage_analyze_page_calls_detection(pipeline: URLAnalysisPipeline) -> No
 @pytest.mark.anyio
 async def test_run_happy_path(pipeline: URLAnalysisPipeline) -> None:
     with (
+        patch("app.url_safety.get_safe_async_client") as mock_client,
         patch("app.services.url_analysis_pipeline._import_sd") as mock_import_sd,
         patch("app.html_utils.fetch_page_content", new_callable=AsyncMock) as mock_fetch,
         patch("app.scrape_telemetry.detect_anti_bot", return_value=0.0),
@@ -173,6 +178,7 @@ async def test_run_happy_path(pipeline: URLAnalysisPipeline) -> None:
         patch("app.acquisition_mode.should_escalate", return_value=False),
         patch("app.acquisition_mode.escalate_mode"),
     ):
+        mock_client.return_value.__aenter__.side_effect = RuntimeError("connection refused")
         mock_mode_cls.return_value = MagicMock()
         mock_cfg = MagicMock()
         mock_cfg.detect_session_params = False
@@ -265,11 +271,13 @@ async def test_run_happy_path(pipeline: URLAnalysisPipeline) -> None:
 @pytest.mark.anyio
 async def test_run_fetch_error_returns_error_response(pipeline: URLAnalysisPipeline) -> None:
     with (
+        patch("app.url_safety.get_safe_async_client") as mock_client,
         patch("app.services.url_analysis_pipeline._import_sd") as mock_import_sd,
         patch("app.html_utils.fetch_page_content", side_effect=RuntimeError("timeout")),
         patch("app.acquisition_mode.AcquisitionConfig") as mock_cfg_cls,
         patch("app.acquisition_mode.AcquisitionMode") as mock_mode_cls,
     ):
+        mock_client.return_value.__aenter__.side_effect = RuntimeError("connection refused")
         mock_mode_cls.return_value = MagicMock()
         mock_cfg = MagicMock()
         mock_cfg.detect_session_params = False

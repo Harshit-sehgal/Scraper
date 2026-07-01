@@ -207,7 +207,7 @@ def _normalise_ssrf_reject_reason(reason: str | None) -> str:
             return "private_ip"
         if "loopback" in raw or "localhost" in raw or _LOOPBACK_RE.search(raw):
             return "loopback"
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, AttributeError) as e:
         logger.warning("[Metrics] SSRF regex matching failed on reason %r: %s", raw, e)
         return "other"
     if "disallowed_port" in raw or " port" in raw or raw.startswith("port"):

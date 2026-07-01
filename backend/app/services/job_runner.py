@@ -260,7 +260,7 @@ async def run_job(
         filtered_count = job.filtered_records
         logger.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, AttributeError) as e:
         logger.exception("Job %s failed", job_id)
         if job.cancel_requested:
             mark_canceled(job)

@@ -75,7 +75,7 @@ def _record_job_completed_usage(job: Any) -> None:
         )
     except ValueError:
         logger.warning("Job-completion quota exceeded for job %s", getattr(job, "id", ""))
-    except Exception as exc:
+    except (RuntimeError, OSError, TypeError) as exc:
         logger.debug("Job-completion metering skipped: %s", exc)
 
 

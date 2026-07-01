@@ -211,5 +211,5 @@ def verify_psycopg3_connectivity() -> dict[str, Any]:
             return {"ok": result[0] == 1}
     except ImportError as e:
         return {"ok": False, "error": f"psycopg 3 not installed: {e}"}
-    except Exception as e:
+    except (OSError, RuntimeError, ValueError) as e:
         return {"ok": False, "error": str(e)}

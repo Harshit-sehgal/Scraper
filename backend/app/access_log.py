@@ -136,7 +136,7 @@ class StructuredAccessLogMiddleware(BaseHTTPMiddleware):
             self._emit_log(request, response.status_code, elapsed, request_id)
             response.headers["X-Request-ID"] = request_id
             return response
-        except Exception as exc:
+        except (OSError, ValueError, TypeError, RuntimeError) as exc:
             elapsed = time.perf_counter() - start
             self._emit_log(
                 request,

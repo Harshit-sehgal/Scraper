@@ -134,7 +134,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             try:
                 self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
                 self._subscribed_to_dispatcher = False
-            except Exception as exc:
+            except (RuntimeError, ValueError, AttributeError, TypeError, OSError, KeyError) as exc:
                 logger.debug("Failed to unsubscribe from dispatcher in close(): %s", exc)
 
     # ─── Public Getters & Identifiers ─────────────────────────────────────
@@ -330,7 +330,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 if hasattr(s, "rollback"):
                     try:
                         s.rollback()
-                    except Exception as rb_err:
+                    except (RuntimeError, ValueError, AttributeError, TypeError, OSError, KeyError) as rb_err:
                         rb_msg = f"{type(s).__name__}.rollback(): {rb_err}"
                         rollback_errors.append(rb_msg)
                         logger.exception(
@@ -404,7 +404,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                                 details["event_type"] = details.pop("type", None)
                             details = self._filter_replay_details(method, details)
                             method(**details)
-                        except Exception as e:
+                        except (RuntimeError, ValueError, AttributeError, TypeError, OSError, KeyError) as e:
                             logger.warning("Replay failed for %s.%s: %s", subsystem, action, e)
         finally:
             self._replaying = False
@@ -886,7 +886,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                                 tool_result = None
                                 try:
                                     tool_result = plugins.call_tool(handler_name, role=role, token=region.token)
-                                except Exception as e:
+                                except (RuntimeError, ValueError, AttributeError, TypeError, OSError, KeyError) as e:
                                     logger.warning("Plugin execution failed for %s: %s", handler_name, e)
                                     success = False
 

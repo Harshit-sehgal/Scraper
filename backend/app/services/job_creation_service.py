@@ -404,7 +404,7 @@ class JobCreationService:
             # Quota rejection — rollback
             self._rollback_job(job_id)
             raise WorkerQueueQuotaExceededError(detail=str(e)) from e
-        except Exception as e:
+        except (RuntimeError, TypeError, OSError, AttributeError) as e:
             if settings.ENV.lower() == "production":
                 logger.exception("Failed to enqueue job %s to worker queue in production", job_id)
                 self._rollback_job(job_id)

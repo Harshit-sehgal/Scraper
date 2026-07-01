@@ -130,7 +130,7 @@ async def run_workflow_in_browser(
 
                 screenshot_b64 = await _capture_screenshot_b64(page, timeline)
 
-            except Exception as exc:
+            except (RuntimeError, OSError, AttributeError, TimeoutError, ValueError) as exc:
                 return _browser_failure(
                     workflow,
                     failure_type="browser_execution_error",
@@ -155,7 +155,7 @@ async def run_workflow_in_browser(
             timeline=timeline,
             last_url=last_url,
         )
-    except Exception as exc:
+    except (RuntimeError, OSError, AttributeError, TimeoutError, ValueError) as exc:
         return _browser_failure(
             workflow,
             failure_type="browser_launch_error",
@@ -288,7 +288,7 @@ async def _execute_steps(
             elif step_type == WorkflowStepType.EXTRACT:
                 pass  # extraction happens after all steps complete
 
-        except Exception as exc:
+        except (RuntimeError, OSError, AttributeError, TimeoutError, ValueError) as exc:
             event["status"] = "failed"
             event["detail"] = str(exc)[:200]
             timeline.append(event)
@@ -324,7 +324,7 @@ async def _capture_screenshot_b64(page: Any, timeline: list[dict[str, Any]]) -> 
                 }
             )
             return None
-        except Exception as exc:
+        except (RuntimeError, OSError, AttributeError, TimeoutError, ValueError) as exc:
             last_error = str(exc)[:200]
             if attempt < 2:
                 with suppress(asyncio.TimeoutError, RuntimeError, OSError):

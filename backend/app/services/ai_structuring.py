@@ -55,7 +55,7 @@ def _record_ai_structuring_usage(
         )
     except ValueError:
         logger.warning("AI-structuring quota exceeded for job %s", job_id)
-    except Exception as exc:
+    except (RuntimeError, TypeError, ImportError, OSError, AttributeError) as exc:
         logger.debug("AI-structuring metering skipped: %s", exc)
 
 

@@ -776,7 +776,7 @@ def verify_ssrf_self_check() -> dict[str, Any]:
             return diag
 
         return diag
-    except Exception as e:
+    except (ValueError, RuntimeError, OSError, TypeError, AttributeError) as e:
         diag["ok"] = False
         diag["reason"] = f"Self-check raised: {e}"
         return diag

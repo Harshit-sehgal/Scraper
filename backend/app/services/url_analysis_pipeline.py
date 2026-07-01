@@ -244,7 +244,7 @@ class URLAnalysisPipeline:
                         ctx.final_url,
                         hops,
                     )
-        except Exception as exc:
+        except (RuntimeError, ValueError, TypeError, AttributeError, OSError, ImportError) as exc:
             logger.debug("[URLAnalyzer] Could not determine final URL via httpx for %s: %s", ctx.url, exc, exc_info=True)
 
     # ── Stage 2: Session Detection ───────────────────────────────────────
@@ -280,7 +280,7 @@ class URLAnalysisPipeline:
             )
             ctx.html = html
             ctx.fetch_method = fetch_method
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, AttributeError, OSError, ImportError) as e:
             logger.exception("[URLAnalyzer] Failed to fetch %s", ctx.url)
             ctx.error_response = self._build_error_response(
                 ctx,

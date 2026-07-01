@@ -65,7 +65,7 @@ class GracefulDegradation:
                 # deprecated ``asyncio.get_event_loop().time()`` pattern.
                 self._cache_ttl[key] = time.monotonic() + cache_ttl
             return result
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, OSError) as e:
             logger.warning("Primary function %s failed: %s", key, e)
 
             # Check cache first (also under the lock to avoid a
@@ -170,7 +170,7 @@ def with_circuit_breaker_fallback(
                         async with cb:
                             return await func(*args, **kwargs)
                 return await func(*args, **kwargs)
-            except Exception as e:
+            except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, OSError) as e:
                 logger.warning("Circuit breaker %s triggered: %s", circuit_breaker_name, e)
                 return fallback_value
 

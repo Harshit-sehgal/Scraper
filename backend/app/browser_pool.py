@@ -183,7 +183,8 @@ class BrowserPool:
             self.context_reuse_rate = self.reused_fetches / self.total_fetches
             return context
         logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
-        await context.close()
+        with contextlib.suppress(Error, OSError, RuntimeError):
+            await context.close()
         self._contexts.pop(context_key, None)
         self._context_use_count.pop(context_key, None)
         self._context_last_used.pop(context_key, None)
@@ -561,7 +562,8 @@ class BrowserPool:
                 raw_bytes = await page.screenshot(full_page=full_page, type="jpeg", quality=60)
                 return base64.b64encode(raw_bytes).decode("ascii")
             finally:
-                await page.close()
+                with contextlib.suppress(Error, OSError, RuntimeError):
+                    await page.close()
 
     async def _create_isolated_context(
         self,
@@ -701,7 +703,7 @@ class BrowserPool:
                 await page.close()
                 return True
             finally:
-                with contextlib.suppress(RuntimeError, OSError):
+                with contextlib.suppress(RuntimeError, OSError, Error):
                     await ctx.close()
         except (Error, OSError, RuntimeError, ValueError) as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
@@ -1343,7 +1345,7 @@ async def run_headless_detection_checks(page_or_context: Any) -> dict[str, Any]:
         )
     finally:
         if owns_page:
-            with contextlib.suppress(RuntimeError, OSError, ValueError, TypeError):
+            with contextlib.suppress(RuntimeError, OSError, ValueError, TypeError, Error):
                 await page.close()
 
     # Compute overall score: pass=100, warn=50, fail=0 per check

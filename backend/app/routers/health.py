@@ -113,7 +113,7 @@ async def ready():
             "job_count": job_count,
             "recycle_bin_count": recycle_bin_count,
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, AttributeError, ImportError) as e:
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency
 
@@ -163,7 +163,7 @@ async def health_worker():
         if saturated:
             return JSONResponse(status_code=503, content=result)
         return result
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, AttributeError, ImportError) as e:
         logger.debug("[health/worker] Error inspecting worker queue", exc_info=True)
         content: dict = {"status": "error"}
         if settings.ENV.lower() != "production":
@@ -192,7 +192,7 @@ async def health_db():
                 result["error"] = _sanitise_error(health_info.get("error", "Backend unhealthy"))
             return JSONResponse(status_code=503, content=result)
         return result
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, AttributeError, ImportError) as e:
         logger.debug("[health/db] Error checking database", exc_info=True)
         content = {"status": "error"}
         if settings.ENV.lower() != "production":
@@ -240,7 +240,7 @@ async def health_browser():
         if unhealthy:
             return JSONResponse(status_code=503, content=result)
         return result
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, AttributeError, ImportError) as e:
         logger.debug("[health/browser] Error checking browser pool", exc_info=True)
         content = {"status": "error"}
         if settings.ENV.lower() != "production":

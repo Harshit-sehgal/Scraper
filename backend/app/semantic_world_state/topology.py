@@ -479,7 +479,7 @@ class TopologyMixin:
                     if role not in anchored_roles:
                         noise = [random.uniform(-0.1, 0.1) for _ in range(16)]  # nosec B311
                         self._manifold.apply_force_to_manifold(role, noise)
-            except Exception as e:
+            except (RuntimeError, ValueError, AttributeError, KeyError, OSError) as e:
                 logger.warning("Manifold perturbation failed: %s", e)
 
             self._energy.stability_debt = 0.0
@@ -880,7 +880,7 @@ class TopologyMixin:
                         "active_drift": len([r for r in self.role_manifold if r in before_manifold]),
                     },
                 )
-            except Exception as e:
+            except (RuntimeError, ValueError, AttributeError, KeyError, OSError) as e:
                 logger.warning("RoleEmbeddingEngine.relax_manifold failed in relax_topology: %s", e)
 
             self.record_delta(

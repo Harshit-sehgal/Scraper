@@ -99,7 +99,7 @@ def _validate_startup_config() -> None:
         from app.utils.env_validation import validate_startup_config
 
         validate_startup_config()
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError, TypeError, ImportError) as exc:
         logger.debug("Startup config validation skipped: %s", exc)
 
 
@@ -163,7 +163,7 @@ def _verify_schema_version() -> None:
                     )
     except RuntimeError:
         raise
-    except Exception as exc:
+    except (OSError, ValueError, TypeError, ImportError) as exc:
         logger.debug("Schema version fence skipped: %s", exc)
 
 
@@ -577,7 +577,7 @@ async def _data_retention_loop() -> None:
 
         except asyncio.CancelledError:
             break
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError, TypeError, ImportError) as e:
             from app.utils.retention_monitoring import record_retention_run
 
             record_retention_run(result=None, error=e)

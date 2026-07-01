@@ -76,7 +76,7 @@ def _record_scheduled_job_usage(
         )
     except ValueError:
         raise
-    except Exception as exc:
+    except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, OSError, AttributeError, ImportError) as exc:
         logger.debug("Scheduled-job metering skipped: %s", exc)
 
 
@@ -1073,7 +1073,15 @@ class WorkerQueue:
                 await self.complete(task.id, result)
         except TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
-        except Exception as e:
+        except (
+            sqlite3.OperationalError,
+            sqlite3.DatabaseError,
+            RuntimeError,
+            OSError,
+            ValueError,
+            AttributeError,
+            ImportError,
+        ) as e:
             error_msg = f"{type(e).__name__}: {e}"
             # Rate-limit-aware retry: check if the error is rate-limit related
             # and parse Retry-After from error context if available

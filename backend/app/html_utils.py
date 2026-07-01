@@ -510,7 +510,8 @@ async def _playwright_navigate_and_stabilize(
             _validate_url_safe(final_url)
         except ValueError:
             logger.warning("[SSRF] Playwright navigated to blocked target %s from %s — aborting", page.url, url)
-            await page.close()
+            with suppress(RuntimeError, OSError):
+                await page.close()
             raise
 
         # Custom navigation wait (Roadmap Wave 5 Item 3)
@@ -601,7 +602,7 @@ async def _playwright_navigate_and_stabilize(
             await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
         return js_render_delay_ms
-    except Exception as e:
+    except (RuntimeError, OSError, AttributeError, ValueError, TimeoutError) as e:
         try:
             partial_html = await page.content()
             if detect_anti_bot(partial_html) > 0.5:
@@ -643,7 +644,7 @@ async def _collect_playwright_results(
             from app.anti_bot_engine import get_anti_bot_engine
 
             get_anti_bot_engine().update_cookies(domain, cookie_header)
-    except Exception as cookie_err:
+    except (RuntimeError, OSError, AttributeError, ValueError, TimeoutError) as cookie_err:
         logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
 
     html = await page.content()
@@ -770,7 +771,7 @@ async def fetch_page_content(
 
     except ValueError:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, AttributeError, TimeoutError) as e:
         return await _detect_anti_bot_and_fallback(page, e, url, extra_headers, timeout_ms)
     finally:
         if browser_metered_initial and browser_meter_started_at is not None:

@@ -76,7 +76,7 @@ def requires_invariants(mutation_fn: Callable):
                         original = getattr(ws.from_dict, "__wrapped__", ws.from_dict)
                         original(ws, snapshot)
                         logger.warning("Rolled back %s — %d issue(s) prevented", mutation_fn.__name__, len(post_issues))
-                    except Exception as rollback_err:
+                    except (RuntimeError, ValueError, AttributeError, OSError, TypeError) as rollback_err:
                         logger.critical("ROLLBACK FAILED for %s: %s — state may be corrupt!", mutation_fn.__name__, rollback_err)
                         with suppress(AttributeError, TypeError, ValueError, RuntimeError):
                             ws.record_degradation(

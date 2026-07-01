@@ -72,7 +72,7 @@ class ResourceGovernor:
                     if ctx:
                         try:
                             await ctx.close()
-                        except Exception as e:
+                        except (RuntimeError, ValueError, OSError, TypeError) as e:
                             logger.debug("Failed to close context during prune: %s", e)
                         pruned += 1
 

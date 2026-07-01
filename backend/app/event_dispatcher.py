@@ -56,7 +56,7 @@ class EventDispatcher:
         for callback in callbacks:
             try:
                 callback(event)
-            except Exception as e:
+            except (RuntimeError, ValueError, TypeError, AttributeError, OSError) as e:
                 logger.exception("Error in event callback")
                 # Record degradation telemetry (best-effort)
                 try:

@@ -449,7 +449,7 @@ except ImportError:
     class LLMCircuitOpen(RuntimeError):  # type: ignore[no-redef]
         """Placeholder when llm_circuit_breaker is not available."""
 
-        def __init__(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        def __init__(self, *args: object, **kwargs: object) -> None:
             super().__init__("LLM cascade circuit breaker is open (placeholder)")
 
 
@@ -587,7 +587,7 @@ async def llm_json(
             last_err = e
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
-        except Exception as e:  # g4f may raise arbitrary exception types
+        except Exception as e:
             last_err = e
             logger.exception(
                 "g4f JSON fallback failed (prompt_len=%d, unexpected type=%s)",
@@ -670,6 +670,12 @@ async def llm_json_fast(
             _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
     _record_silent_failure("llm_json_fast", last_err)
+
+    if raise_on_failure is None:
+        from app.utils.llm_bridge_settings import llm_raise_on_failure_default
+
+        raise_on_failure = llm_raise_on_failure_default()
+    _handle_silent_failure("llm_json_fast", last_err, raise_on_failure=bool(raise_on_failure))
     return {}
 
 
@@ -767,7 +773,7 @@ async def llm_text(
         except _MODEL_FALLBACK_ERRORS as e:
             last_err = e
             logger.exception("g4f text fallback failed")
-        except Exception as e:  # g4f may raise arbitrary exception types
+        except Exception as e:
             last_err = e
             logger.exception("g4f text fallback failed (unexpected type=%s)", type(e).__name__)
 
@@ -914,7 +920,7 @@ class SubstratePluginManager:
                 return f"Success: Merged {role_b} into {role_a}"
         return "Fail"
 
-    def _native_manifold_compressor(self, **kwargs) -> str:  # noqa: ARG002, RUF100
+    def _native_manifold_compressor(self, **_kwargs) -> str:  # noqa: ARG002, RUF100
         """Native Tool: Prune low-impact manifold dimensions (Phase 44)."""
         if not self.ws:
             return "Fail: No WS"

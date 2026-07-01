@@ -106,7 +106,7 @@ class ChaosSimulator:
             recovery_time = time.time() - recovery_start
             impact_metrics["recovered"] = recovered
             impact_metrics["recovery_time"] = recovery_time
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, AttributeError) as e:
             self.logger.exception("Error during chaos injection")
             impact_metrics["error"] = str(e)
 

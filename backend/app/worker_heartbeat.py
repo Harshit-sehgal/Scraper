@@ -19,6 +19,7 @@ import asyncio
 import logging
 import os
 import socket
+import sqlite3
 
 from app.utils.worker_id import resolve_worker_id
 
@@ -93,7 +94,7 @@ class HeartbeatManager:
         while self._running:
             try:
                 await self._record_heartbeat()
-            except Exception as exc:
+            except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, OSError, ValueError) as exc:
                 logger.warning(
                     "Failed to record heartbeat for %s: %s",
                     self._worker_id,

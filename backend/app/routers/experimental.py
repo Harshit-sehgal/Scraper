@@ -566,7 +566,7 @@ async def get_extraction_trends(
                 for d, t in report.domain_trends.items()
             },
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get extraction trends")
         raise HTTPException(status_code=500, detail="Failed to analyze extraction trends") from e
 
@@ -617,7 +617,7 @@ async def get_domain_trend(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get trend for domain %s", domain)
         raise HTTPException(status_code=500, detail="Failed to get domain trend") from e
 
@@ -787,7 +787,7 @@ async def get_current_mode(
             "available_modes": [m.value for m in OperatorMode],
             "settings": governance_summary,
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get operator mode")
         raise HTTPException(status_code=500, detail="Failed to get operator mode") from e
 
@@ -828,7 +828,7 @@ async def set_operator_mode(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to set operator mode")
         raise HTTPException(status_code=500, detail="Failed to switch operator mode") from e
 
@@ -889,7 +889,7 @@ async def get_system_dashboard(
                 "queue_sheds": governance.get("resources", {}).get("metrics", {}).get("queue_sheds", 0),
             },
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get operator system dashboard")
         raise HTTPException(status_code=500, detail="Failed to load dashboard") from e
 
@@ -946,7 +946,7 @@ async def get_degradation_predictions(
             result["summary"]["total_filtered"] = len(result["predictions"])
 
         return result
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get degradation predictions")
         raise HTTPException(status_code=500, detail="Failed to get degradation predictions") from e
 
@@ -996,7 +996,7 @@ async def get_domain_prediction(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get prediction for domain %s", domain)
         raise HTTPException(status_code=500, detail="Failed to predict for domain") from e
 
@@ -1113,7 +1113,7 @@ async def optimize_domain_selectors(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to optimize selectors for domain %s", domain)
         raise HTTPException(status_code=500, detail="Selector optimization failed") from e
 
@@ -1139,7 +1139,7 @@ async def get_optimization_history(
             "count": len(history),
             "history": history,
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get optimization history for domain %s", domain)
         raise HTTPException(status_code=500, detail="Failed to get optimization history") from e
 
@@ -1166,7 +1166,7 @@ async def record_selector_learning(
             "domain": domain,
             "quality": quality,
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed selector learning for domain %s", domain)
         raise HTTPException(status_code=500, detail="Selector learning failed") from e
 
@@ -1197,7 +1197,7 @@ async def recommend_fetch_strategy(
             "confidence": round(recommendation.confidence, 3),
             "estimated_success_rate": round(recommendation.estimated_success_rate, 3),
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to recommend strategy for domain %s", domain)
         raise HTTPException(status_code=500, detail="Failed to recommend strategy") from e
 
@@ -1236,7 +1236,7 @@ async def record_strategy_attempt(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to record strategy attempt for domain %s", domain)
         raise HTTPException(status_code=500, detail="Failed to record strategy attempt") from e
 
@@ -1255,7 +1255,7 @@ async def get_domain_strategy_analysis(
 
         engine = get_strategy_evolution_engine()
         return await run_in_threadpool(engine.get_domain_strategy_report, domain)
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get strategy analysis for domain %s", domain)
         raise HTTPException(status_code=500, detail="Failed to get domain strategy report") from e
 
@@ -1273,7 +1273,7 @@ async def get_all_strategies_report(
 
         engine = get_strategy_evolution_engine()
         return await run_in_threadpool(engine.get_all_domains_strategy_report)
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed to get all strategies report")
         raise HTTPException(status_code=500, detail="Failed to get all strategy reports") from e
 
@@ -1308,6 +1308,6 @@ async def evolve_domain_strategy(
             "new_strategy": new_strategy.value,
             "status": "evolved",
         }
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, ImportError, OSError) as e:
         logger.exception("Failed manual strategy evolution for domain %s", domain)
         raise HTTPException(status_code=500, detail="Strategy evolution failed") from e

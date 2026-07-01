@@ -113,7 +113,7 @@ class RedisRateLimiter:
                 self.redis = redis.from_url(self.redis_url, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
                 self.redis.ping()
                 logger.info("H5: Redis rate limiter initialized: %s", self.redis_url[:20])
-            except Exception as e:
+            except (RuntimeError, ValueError, OSError, TypeError) as e:
                 logger.warning("H5: Redis connection failed, falling back to in-memory degraded mode: %s", e)
                 self.redis = None
 
@@ -134,7 +134,7 @@ class RedisRateLimiter:
             if count == 1:
                 self.redis.expire(rate_key, window)
             return count <= limit
-        except Exception as e:
+        except (RuntimeError, ValueError, OSError, TypeError) as e:
             # A transient Redis failure must not disable rate limiting
             # globally; switch to in-process fallback rather than
             # silently allow every request through. The previous

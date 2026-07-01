@@ -508,7 +508,7 @@ class CrawlPolicyEngine:
                 finally:
                     await resp.aclose()
 
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, AttributeError) as e:
             logger.debug("Failed to fetch robots.txt for %s: %s", domain, e)
             # Non-fatal — proceed without robots.txt constraints
 

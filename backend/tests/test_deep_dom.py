@@ -45,7 +45,7 @@ class TestDeepDom:
 
         config = PaginationConfig(strategy="next_button", max_pages=1, delay_between_pages=0)
 
-        async def extract(page) -> list[dict]:
+        async def extract(_page) -> list[dict]:
             return [{"id": i} for i in range(100)]
 
         result = await async_paginate(page, config, extract)
@@ -54,13 +54,13 @@ class TestDeepDom:
     @pytest.mark.asyncio
     async def test_deep_dom_scroll_does_not_overflow(self) -> None:
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[100, 5000, 10000, 15000, 20000, 20000])
+        page.evaluate = AsyncMock(side_effect=[100, 5000, 10000, 15000, 20000, 20000, 20000, None])
         page.wait_for_function = AsyncMock()
         page.locator = MagicMock(return_value=MagicMock())
 
         config = PaginationConfig(strategy="infinite_scroll", max_pages=5, delay_between_pages=0)
 
-        async def extract(page) -> list[dict]:
+        async def extract(_page) -> list[dict]:
             return [{"x": i} for i in range(50)]
 
         result = await async_paginate(page, config, extract)
@@ -87,7 +87,7 @@ class TestDeepDom:
             delay_between_pages=0,
         )
 
-        async def extract(page) -> list[dict]:
+        async def extract(_page) -> list[dict]:
             return [{"deep": True} for _ in range(100)]
 
         result = await async_paginate(page, config, extract)

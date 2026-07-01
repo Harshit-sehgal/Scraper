@@ -358,7 +358,7 @@ async def run_scraping_phase(
                 await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
                 await _mark_completed()
                 return idx, [], False, {}
-            except Exception as e:
+            except (RuntimeError, OSError, ValueError, TypeError, AttributeError) as e:
                 policy.record_failure(url, failure_type=type(e).__name__)
                 logger.exception("URL scrape failed: %s", url)
                 await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")

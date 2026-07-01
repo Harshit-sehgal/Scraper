@@ -399,7 +399,7 @@ async def _async_paginate_infinite_scroll(
                 )
             except (TimeoutError, RuntimeError, OSError):
                 logger.debug("DOM stabilization timeout during infinite scroll, continuing")
-        except (TimeoutError, RuntimeError, OSError, AttributeError) as exc:
+        except (TimeoutError, RuntimeError, OSError, AttributeError, StopAsyncIteration, asyncio.CancelledError) as exc:
             logger.warning("Infinite scroll failed on attempt %d: %s", scroll_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -428,7 +428,7 @@ async def _async_paginate_infinite_scroll(
         result.stopped_reason = "max_pages"  # Reset scroll position to top
     try:
         await page.evaluate("window.scrollTo(0, 0)")
-    except (TimeoutError, RuntimeError, OSError, AttributeError) as exc:
+    except (TimeoutError, RuntimeError, OSError, AttributeError, StopAsyncIteration, asyncio.CancelledError) as exc:
         logger.debug("Failed to reset scroll position: %s", exc)
 
     result.total_records = len(result.records)
@@ -859,7 +859,7 @@ def _format_unknown_strategy_error(strategy: str) -> str:
     return f"Unknown pagination strategy: {strategy}"
 
 
-def _fetch_page_sync(url: str, *, base_url: str = "") -> str:
+def _fetch_page_sync(url: str, *, _base_url: str = "") -> str:
     """Fetch a page via the SSRF-safe sync httpx client.
 
     Returns the response text on success, or an empty string on failure.
@@ -1019,7 +1019,7 @@ def _paginate_next_button(
             break
         seen_urls.add(current_url)
 
-        html = _fetch_page_sync(current_url, base_url=current_url)
+        html = _fetch_page_sync(current_url, _base_url=current_url)
         if not html:
             result.stopped_reason = "error"
             result.error = f"Failed to fetch page: {current_url}"
@@ -1104,7 +1104,7 @@ def _paginate_page_number(config: PaginationConfig) -> PaginationResult:
             break
 
         page_url = config.url_pattern.format(page=page_num)
-        html = _fetch_page_sync(page_url, base_url=page_url)
+        html = _fetch_page_sync(page_url, _base_url=page_url)
         if not html:
             # A single page fetch failure stops the run — continuing
             # would risk hammering a broken target.
@@ -1183,7 +1183,7 @@ def _paginate_url_pattern(config: PaginationConfig) -> PaginationResult:
             result.error = str(exc)
             break
 
-        html = _fetch_page_sync(page_url, base_url=page_url)
+        html = _fetch_page_sync(page_url, _base_url=page_url)
         if not html:
             result.stopped_reason = "error"
             result.error = f"Failed to fetch page {page_num}: {page_url}"
@@ -1220,7 +1220,7 @@ def _paginate_url_pattern(config: PaginationConfig) -> PaginationResult:
     return result
 
 
-def _paginate_infinite_scroll(config: PaginationConfig) -> PaginationResult:
+def _paginate_infinite_scroll(_config: PaginationConfig) -> PaginationResult:
     """Synchronous infinite-scroll placeholder.
 
     Infinite-scroll requires browser-driven JS to trigger scroll events and
