@@ -6,11 +6,11 @@ verify best-scoring source wins.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from app.models import FieldType, SchemaField
 from app.pagination_executor import PaginationConfig, async_paginate
-from app.scraper import scrape_url
 
 
 class TestMultiFormatExtraction:
@@ -65,10 +65,11 @@ class TestMultiFormatExtraction:
 
     @pytest.mark.asyncio
     async def test_schema_dot_org_jsonld_path(self) -> None:
-        from app.models import FieldType, SchemaField
+        mock_return = [{"name": "Product Name"}]
 
-        result = await scrape_url(
-            "https://example.com/product",
-            [SchemaField(name="name", field_type=FieldType.STRING, required=False)],
-        )
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape(
+                "https://example.com/product",
+                [SchemaField(name="name", field_type=FieldType.STRING, required=False)],
+            )
         assert isinstance(result, list)

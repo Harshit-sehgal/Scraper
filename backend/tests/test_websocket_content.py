@@ -58,7 +58,9 @@ class TestWebSocketContent:
     @pytest.mark.asyncio
     async def test_websocket_with_infinite_scroll(self) -> None:
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[500, 1000, 1500, 1500])
+        # Each scroll iteration calls page.evaluate twice (scrollHeight + scrollTo),
+        # plus one final scrollTo(0,0) after the loop.  max_pages=3 → 3*2+1=7 values.
+        page.evaluate = AsyncMock(side_effect=[500, 1000, 1500, 1500, 1500, 1500, 1500])
         page.wait_for_function = AsyncMock()
         page.locator = MagicMock(return_value=MagicMock())
 

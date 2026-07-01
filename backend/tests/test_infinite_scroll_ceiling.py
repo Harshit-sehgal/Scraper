@@ -87,7 +87,9 @@ class TestInfiniteScrollCeiling:
     @pytest.mark.asyncio
     async def test_scroll_resets_to_top_after_completion(self) -> None:
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[100, 200, 200])
+        # Each scroll iteration calls page.evaluate twice (scrollHeight + scrollTo),
+        # plus one final scrollTo(0,0) after the loop.  max_pages=3 → 3*2+1=7 values.
+        page.evaluate = AsyncMock(side_effect=[100, 200, 200, 200, 200, 200, 200])
         page.locator = MagicMock(return_value=MagicMock())
         page.wait_for_function = AsyncMock()
 

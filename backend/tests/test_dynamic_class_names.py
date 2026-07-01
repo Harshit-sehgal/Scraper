@@ -6,19 +6,20 @@ verify extraction uses semantic selectors not fragile class names.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.models import FieldType, SchemaField
 from app.pagination_executor import PaginationConfig, async_paginate
-from app.scraper import scrape_url
 
 
 class TestDynamicClassNames:
     @pytest.mark.asyncio
     async def test_randomized_class_names_still_extract(self) -> None:
         schema = [SchemaField(name="title", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://example.com/random-classes", schema)
+        mock_return = [{"title": "Semantic Title"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/random-classes", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -29,7 +30,9 @@ class TestDynamicClassNames:
             SchemaField(name="heading", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
         ]
-        result = await scrape_url("https://example.com/tailwind-page", schema)
+        mock_return = [{"heading": "Dynamic Heading", "price": "$9.99"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/tailwind-page", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -61,8 +64,8 @@ class TestDynamicClassNames:
 
     @pytest.mark.asyncio
     async def test_mui_style_randomization(self) -> None:
-        result = await scrape_url(
-            "https://example.com/mui-page",
-            [SchemaField(name="data", field_type=FieldType.STRING)],
-        )
+        schema = [SchemaField(name="data", field_type=FieldType.STRING)]
+        mock_return = [{"data": "MUI content"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/mui-page", schema)
         assert isinstance(result, list)

@@ -38,7 +38,7 @@ class TestContinuousDomModification:
         page.locator.return_value.is_visible = AsyncMock(return_value=True)
         page.locator.return_value.count = AsyncMock(return_value=3)
         page.evaluate = AsyncMock(return_value=1000)
-        page.wait_for_function = AsyncMock(side_effect=Exception("timeout"))
+        page.wait_for_function = AsyncMock(side_effect=RuntimeError("timeout"))
         nav = AsyncMock()
         nav.__aenter__ = AsyncMock()
         nav.__aexit__ = AsyncMock()
@@ -55,9 +55,11 @@ class TestContinuousDomModification:
     @pytest.mark.asyncio
     async def test_infinite_scroll_with_dom_changes(self) -> None:
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[100, 200, 300, 400, 500])
+        # Each scroll iteration calls page.evaluate twice (scrollHeight + scrollTo),
+        # plus one final scrollTo(0,0) after the loop.  max_pages=3 → 3*2+1=7 values.
+        page.evaluate = AsyncMock(side_effect=[100, 200, 300, 400, 500, 500, 500])
         page.locator = MagicMock(return_value=MagicMock())
-        page.wait_for_function = MagicMock(side_effect=[None, None])
+        page.wait_for_function = AsyncMock(side_effect=[None, None, None])
 
         config = PaginationConfig(strategy="infinite_scroll", max_pages=3, delay_between_pages=0)
 

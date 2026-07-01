@@ -16,7 +16,11 @@ class TestIntersectionObserver:
     @pytest.mark.asyncio
     async def test_scroll_loads_lazy_content(self) -> None:
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[100, 500, 1000, 1500, 1500])
+        # Each scroll iteration calls page.evaluate twice (scrollHeight + scrollTo),
+        # plus one final scrollTo(0,0) after the loop.  max_pages=5 → 5*2+1=11 values.
+        page.evaluate = AsyncMock(
+            side_effect=[100, 500, 1000, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500],
+        )
         page.wait_for_function = AsyncMock()
         page.locator = MagicMock(return_value=MagicMock())
         page.locator.return_value.is_visible = AsyncMock(return_value=True)
@@ -59,7 +63,13 @@ class TestIntersectionObserver:
     @pytest.mark.asyncio
     async def test_scroll_then_extract_preserves_order(self) -> None:
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[100, 300, 500, 700, 900, 1100, 1100])
+        # Each scroll iteration calls page.evaluate twice (scrollHeight + scrollTo),
+        # plus one final scrollTo(0,0) after the loop.  max_pages=4 → 4*2+1=9 values.
+        # With duplicate last height (1100=1100), loop breaks at iter 3 before
+        # exhausting all 8 intra-loop calls, but final scrollTo(0,0) still needs one more.
+        page.evaluate = AsyncMock(
+            side_effect=[100, 300, 500, 700, 900, 1100, 1100, 1100, 1100],
+        )
         page.wait_for_function = AsyncMock()
         page.locator = MagicMock(return_value=MagicMock())
 

@@ -439,7 +439,7 @@ class TestExtractWithProfilePlaywright:
         mock_page = _make_page_mock(
             evaluate_return=[{"n": "valuable"}],
             goto_side_effect=[
-                Exception("Timeout 30000ms exceeded"),  # networkidle fails
+                RuntimeError("Timeout 30000ms exceeded"),  # networkidle fails
                 None,  # domcontentloaded succeeds
             ],
         )
@@ -471,7 +471,7 @@ class TestExtractWithProfilePlaywright:
         }
 
         mock_page = _make_page_mock(
-            wait_for_selector_side_effect=Exception("Timeout exceeded"),
+            wait_for_selector_side_effect=RuntimeError("Timeout exceeded"),
         )
         mock_pw = _make_browser_chain(mock_page)
         mock_factory, _pw_ctx = _make_pw_mocks(mock_pw)

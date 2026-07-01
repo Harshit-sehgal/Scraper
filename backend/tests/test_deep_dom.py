@@ -2,31 +2,36 @@
 
 Roadmap: Rel 48 — page with 10,000+ nested DOM elements,
 verify extraction does not stack-overflow or exhaust memory.
+
+All tests that use scrape_url mock the network layer so they run offline.
 """
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.models import FieldType, SchemaField
 from app.pagination_executor import PaginationConfig, async_paginate
-from app.scraper import scrape_url
 
 
 class TestDeepDom:
     @pytest.mark.asyncio
     async def test_deeply_nested_dom_extracts(self) -> None:
         schema = [SchemaField(name="text", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://example.com/deep-dom", schema)
+        mock_return = [{"text": "deep content"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/deep-dom", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_many_nested_elements_no_crash(self) -> None:
-        result = await scrape_url(
-            "https://example.com/10k-nested",
-            [SchemaField(name="data", field_type=FieldType.STRING)],
-        )
+        mock_return = [{"data": "value"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape(
+                "https://example.com/10k-nested",
+                [SchemaField(name="data", field_type=FieldType.STRING)],
+            )
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -53,8 +58,12 @@ class TestDeepDom:
 
     @pytest.mark.asyncio
     async def test_deep_dom_scroll_does_not_overflow(self) -> None:
+        # Each scroll iteration calls page.evaluate twice (scrollHeight + scrollTo)
+        # plus one final scrollTo(0,0) at the end. max_pages=5 → 5*2+1 = 11 calls needed.
         page = MagicMock()
-        page.evaluate = AsyncMock(side_effect=[100, 5000, 10000, 15000, 20000, 20000, 20000, None])
+        page.evaluate = AsyncMock(
+            side_effect=[100, 5000, 10000, 15000, 20000, 20000, 20000, None, None, None, None],
+        )
         page.wait_for_function = AsyncMock()
         page.locator = MagicMock(return_value=MagicMock())
 

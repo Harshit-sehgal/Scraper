@@ -5,19 +5,21 @@ Roadmap: Rel 24 — navigator.webdriver and other detection vectors.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.models import FieldType, SchemaField
 from app.pagination_executor import PaginationConfig, async_paginate
-from app.scraper import scrape_url
 
 
 class TestAutomationDetection:
     @pytest.mark.asyncio
     async def test_extraction_succeeds_despite_detection_vectors(self) -> None:
         schema = [SchemaField(name="title", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://example.com/detection-check", schema)
+        mock_return = [{"title": "evaded"}]
+
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/detection-check", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio

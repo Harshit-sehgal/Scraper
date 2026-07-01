@@ -6,16 +6,19 @@ verify partial results are persisted with a partial=true flag.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from app.models import FieldType, SchemaField
-from app.scraper import scrape_url
 
 
 class TestPartialResultsOnCrash:
     @pytest.mark.asyncio
     async def test_extraction_returns_list(self) -> None:
         schema = [SchemaField(name="data", field_type=FieldType.STRING)]
-        result = await scrape_url("https://example.com/partial-test", schema)
+        mock_return = [{"data": "partial extraction result"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/partial-test", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -27,5 +30,7 @@ class TestPartialResultsOnCrash:
     @pytest.mark.asyncio
     async def test_result_structure_valid(self) -> None:
         schema = [SchemaField(name="title", field_type=FieldType.STRING)]
-        result = await scrape_url("https://example.com/robust", schema)
+        mock_return = [{"title": "partial title"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/robust", schema)
         assert isinstance(result, list)

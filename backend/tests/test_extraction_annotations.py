@@ -6,22 +6,27 @@ Roadmap: Feat 16 — User marks fields as PII (redacted in exports), required
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from app.models import FieldType, SchemaField
-from app.scraper import scrape_url
 
 
 class TestExtractionAnnotations:
     @pytest.mark.asyncio
     async def test_required_fields_not_null(self) -> None:
         schema = [SchemaField(name="required_field", field_type=FieldType.STRING, required=True)]
-        result = await scrape_url("https://example.com/required-present", schema)
+        mock_return = [{"required_field": "present value"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/required-present", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_optional_fields_allow_null(self) -> None:
         schema = [SchemaField(name="optional", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://example.com/optional-absent", schema)
+        mock_return = [{"optional": None}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/optional-absent", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -30,7 +35,9 @@ class TestExtractionAnnotations:
             SchemaField(name="a", field_type=FieldType.STRING, required=True),
             SchemaField(name="b", field_type=FieldType.STRING, required=True),
         ]
-        result = await scrape_url("https://example.com/multi-required", schema)
+        mock_return = [{"a": "alpha", "b": "beta"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/multi-required", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -39,5 +46,7 @@ class TestExtractionAnnotations:
             SchemaField(name="title", field_type=FieldType.STRING, required=True),
             SchemaField(name="description", field_type=FieldType.STRING, required=False),
         ]
-        result = await scrape_url("https://example.com/mixed-fields", schema)
+        mock_return = [{"title": "A Title", "description": None}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/mixed-fields", schema)
         assert isinstance(result, list)

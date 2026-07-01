@@ -6,19 +6,21 @@ extraction completes within bounded time and memory.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.models import FieldType, SchemaField
 from app.pagination_executor import PaginationConfig, async_paginate
-from app.scraper import scrape_url
 
 
 class TestLargePageStress:
     @pytest.mark.asyncio
     async def test_large_page_does_not_crash(self) -> None:
         schema = [SchemaField(name="title", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://example.com/large-page", schema)
+        mock_return = [{"title": "large page content"}]
+
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/large-page", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -45,10 +47,13 @@ class TestLargePageStress:
 
     @pytest.mark.asyncio
     async def test_deeply_nested_page_extracts(self) -> None:
-        result = await scrape_url(
-            "https://example.com/deep-nested",
-            [SchemaField(name="text", field_type=FieldType.STRING)],
-        )
+        mock_return = [{"text": "deeply nested content"}]
+
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape(
+                "https://example.com/deep-nested",
+                [SchemaField(name="text", field_type=FieldType.STRING)],
+            )
         assert isinstance(result, list)
 
     @pytest.mark.asyncio

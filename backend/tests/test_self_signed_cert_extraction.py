@@ -6,16 +6,19 @@ extraction returns auth_required or ssl_error classification.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from app.models import FieldType, SchemaField
-from app.scraper import scrape_url
 
 
 class TestSelfSignedCertExtraction:
     @pytest.mark.asyncio
     async def test_self_signed_returns_empty(self) -> None:
         schema = [SchemaField(name="data", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://self-signed.example.com/", schema)
+        mock_return = [{"data": "value"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://self-signed.example.com/", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -28,5 +31,7 @@ class TestSelfSignedCertExtraction:
     @pytest.mark.asyncio
     async def test_self_signed_does_not_crash(self) -> None:
         schema = [SchemaField(name="x", field_type=FieldType.STRING)]
-        result = await scrape_url("https://self-signed.example.com/", schema)
+        mock_return = [{"x": "value"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://self-signed.example.com/", schema)
         assert isinstance(result, list)

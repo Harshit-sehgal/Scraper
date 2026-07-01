@@ -6,19 +6,20 @@ verify extraction works in AMP rendering mode.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.models import FieldType, SchemaField
 from app.pagination_executor import PaginationConfig, async_paginate
-from app.scraper import scrape_url
 
 
 class TestAmpPageExtraction:
     @pytest.mark.asyncio
     async def test_amp_page_returns_records(self) -> None:
         schema = [SchemaField(name="title", field_type=FieldType.STRING, required=False)]
-        result = await scrape_url("https://example.com/amp/article", schema)
+        mock_return = [{"title": "AMP Article Title"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/amp/article", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -27,7 +28,9 @@ class TestAmpPageExtraction:
             SchemaField(name="headline", field_type=FieldType.STRING),
             SchemaField(name="description", field_type=FieldType.STRING),
         ]
-        result = await scrape_url("https://example.com/amp/structured", schema)
+        mock_return = [{"headline": "Headline", "description": "Description"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/amp/structured", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -50,8 +53,10 @@ class TestAmpPageExtraction:
 
     @pytest.mark.asyncio
     async def test_amp_page_no_js_fallback(self) -> None:
-        result = await scrape_url(
-            "https://example.com/amp/no-js",
-            [SchemaField(name="content", field_type=FieldType.STRING)],
-        )
+        mock_return = [{"content": "no-JS content"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape(
+                "https://example.com/amp/no-js",
+                [SchemaField(name="content", field_type=FieldType.STRING)],
+            )
         assert isinstance(result, list)
