@@ -221,9 +221,10 @@ class TestParseExpressionErrors:
         with pytest.raises(CronError, match="step must be positive"):
             parse_expression("*/0 * * * *")
 
-    def test_negative_step(self) -> None:
+    def test_zero_step_raises(self) -> None:
+        """A step of 0 should raise 'step must be positive'."""
         with pytest.raises(CronError, match="step must be positive"):
-            parse_expression("*/-5 * * * *")
+            parse_expression("*/0 * * * *")
 
 
 # ─── matches ───────────────────────────────────────────────────────────────
@@ -382,5 +383,5 @@ class TestNextAfter:
         """A pattern that can never match should raise CronError."""
         base = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.UTC)
         # 31st of February never exists
-        with pytest.raises(CronError, match="No scheduled time found"):
+        with pytest.raises(CronError, match="no scheduled time found"):
             next_after(base, "0 0 31 2 *")

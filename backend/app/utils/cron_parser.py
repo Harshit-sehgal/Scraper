@@ -121,6 +121,9 @@ def _expand_token(token: str, lo: int, hi: int, names: dict[str, int] | None = N
         return {names[token]}
 
     # Step syntax: ``*/N`` or ``A-B/N``
+    # Bail early if token ends with `/` but no step value follows.
+    if token.endswith("/"):
+        raise CronError(_INVALID_VALUE_TPL.format(token=token))
     step_match = re.match(r"^(.+)/(\d+)$", token)
     if step_match:
         range_part, step_str = step_match.group(1), step_match.group(2)

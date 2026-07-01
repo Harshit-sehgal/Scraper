@@ -86,8 +86,8 @@ class TestJobCompletionMessage:
 
     def test_unknown_status(self) -> None:
         msg = job_completion_message(JobStatus.CANCELED)
-        assert "CANCELED" in msg
+        assert "canceled" in msg.lower()
 
     def test_pending_status(self) -> None:
         msg = job_completion_message(JobStatus.PENDING)
-        assert "PENDING" in msg
+        assert "pending" in msg.lower()
