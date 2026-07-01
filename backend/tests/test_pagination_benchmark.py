@@ -76,7 +76,8 @@ class TestPaginationBenchmarkCompleteness:
     async def test_benchmark_infinite_scroll_completeness(self) -> None:
         """Infinite-scroll strategy: multiple scrolls produce multiple pages."""
         page = _make_mock_page()
-        page.evaluate.side_effect = [1000, None, 2000, None, 3000]
+        # 3 iterations × (scrollHeight + scrollTo) + 1 scrollTo-reset = 7 awaits
+        page.evaluate.side_effect = [1000, None, 2000, None, 3000, None, None]
         config = PaginationConfig(strategy="infinite_scroll", max_pages=3, delay_between_pages=0)
         result = await async_paginate(page, config, extract_fn=_extract_fn)
         assert result.pages_scraped > 0

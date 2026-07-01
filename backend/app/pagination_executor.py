@@ -879,7 +879,7 @@ def _fetch_page_sync(url: str, *, base_url: str = "") -> str:
             resp = client.get(url)
             resp.raise_for_status()
             return resp.text
-    except (OSError, RuntimeError, ValueError, TimeoutError) as exc:
+    except Exception as exc:
         logger.debug("Sync pagination: fetch failed for %s: %s", url, exc)
         return ""
 

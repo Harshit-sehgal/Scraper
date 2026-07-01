@@ -180,7 +180,7 @@ class TestInfiniteScrollStrategy:
     @pytest.mark.asyncio
     async def test_scroll_height_stable_stops(self) -> None:
         page = _mock_page()
-        page.evaluate = AsyncMock(side_effect=[500, 500, 500])
+        page.evaluate = AsyncMock(side_effect=[500, 500, 500, 500])
         config = PaginationConfig(strategy="infinite_scroll", max_pages=10, delay_between_pages=0)
         result = await async_paginate(page, config, _extract_dummy)
         assert result.stopped_reason in {"no_new_records", "max_pages"}
