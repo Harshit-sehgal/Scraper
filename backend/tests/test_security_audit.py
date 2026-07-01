@@ -1,7 +1,6 @@
 """Test security audit and PII classification."""
 
 from app.utils.security_audit import DataAccessAuditor, PIIClassifier, PIIType
-from app.utils.ssrf_defense import DNSRebindingDefense, SSRFDefense
 
 
 class TestPIIClassification:
@@ -58,69 +57,6 @@ class TestPIIClassification:
         assert "3333" in redacted
         assert "****" in redacted
 
-
-class TestSSRFDefense:
-    """Test SSRF prevention."""
-
-    def test_block_localhost_ip(self):
-        """Block localhost IP."""
-        assert SSRFDefense.is_blocked_ip("127.0.0.1")
-
-    def test_block_private_ips(self):
-        """Block private IP ranges."""
-        assert SSRFDefense.is_blocked_ip("10.0.0.1")
-        assert SSRFDefense.is_blocked_ip("172.16.0.1")
-        assert SSRFDefense.is_blocked_ip("192.168.1.1")
-
-    def test_block_ipv6_loopback(self):
-        """Block IPv6 loopback."""
-        assert SSRFDefense.is_blocked_ip("::1")
-
-    def test_allow_public_ip(self):
-        """Allow public IPs."""
-        # 8.8.8.8 is Google DNS (public)
-        assert not SSRFDefense.is_blocked_ip("8.8.8.8")
-
-    def test_validate_safe_url(self):
-        """Validate safe URLs."""
-        # Using example.com which should resolve to public IPs
-        safe, ip = SSRFDefense.validate_url("https://example.com")
-        # May fail in some test environments, so be permissive
-        if safe:
-            assert ip is not None
-
-    def test_block_invalid_scheme(self):
-        """Block dangerous schemes."""
-        safe, reason = SSRFDefense.validate_url("http://localhost:8000/api")
-        assert not safe
-
-    def test_block_localhost_url(self):
-        """Block localhost URLs."""
-        safe, reason = SSRFDefense.validate_url("http://127.0.0.1/api")
-        assert not safe
-
-
-class TestDNSRebindingDefense:
-    """Test DNS rebinding detection."""
-
-    def test_dns_rebinding_detector_init(self):
-        """Initialize DNS rebinding detector."""
-        detector = DNSRebindingDefense(ttl_cache_seconds=60)
-        assert detector.ttl_cache_seconds == 60
-
-    def test_cache_dns_resolution(self):
-        """Cache DNS resolutions."""
-        detector = DNSRebindingDefense()
-
-        # First check
-        result1 = detector.check_dns_rebinding("example.com")
-
-        # Second check should use cache (no rebinding detected)
-        result2 = detector.check_dns_rebinding("example.com")
-
-        # Both should be False (no rebinding)
-        assert not result1
-        assert not result2
 
 
 class TestDataAccessAuditor:

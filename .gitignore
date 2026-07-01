@@ -121,3 +121,6 @@ artifacts/benchmarks/
 # Coverage reports
 coverage/
 artifacts/frontend_review/
+
+# Stale database dump backups
+*.original
