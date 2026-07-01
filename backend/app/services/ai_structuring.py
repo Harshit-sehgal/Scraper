@@ -208,7 +208,7 @@ async def apply_global_ai_structuring(
         structured = all_raw_results
         report = _build_skipped_report(all_raw_results, schema_fields)
         report["reason"] = "timeout"
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         logger.exception("AI structuring failed")
         new_warnings.append("AI structuring failed; continuing with deterministic processing.")
         add_job_log("AI structuring failed, using fallback", level="error")

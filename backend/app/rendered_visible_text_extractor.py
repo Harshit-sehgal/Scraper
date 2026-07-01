@@ -135,7 +135,7 @@ async def capture_bounding_boxes(page) -> list[dict]:
             return results;
         }""")
         return boxes if isinstance(boxes, list) else []
-    except Exception:
+    except (TimeoutError, RuntimeError, OSError):
         logger.debug("page.evaluate() for bounding boxes failed", exc_info=True)
         return []
 

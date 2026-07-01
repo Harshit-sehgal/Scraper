@@ -19,7 +19,7 @@ from app.postgres_repository_base import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def _get_pool():
                 )
                 try:
                     _pool.open()
-                except Exception:
+                except (OSError, RuntimeError, ValueError):
                     # Reset the cached pool so the next call retries
                     # instead of holding a half-initialised singleton.
                     with suppress(RuntimeError, OSError):
@@ -113,7 +113,7 @@ def _close_pool() -> None:
             if pool is not None:
                 try:
                     pool.close()
-                except Exception:
+                except (RuntimeError, OSError):
                     logger.debug("Failed to close psycopg3 pool during shutdown")
                 logger.info("Closed psycopg3 pool")
 
@@ -142,7 +142,7 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
         super().__init__(auto_ensure_schema=auto_ensure_schema)
 
     @contextmanager
-    def _conn(self) -> Iterator:
+    def _conn(self) -> Generator:
         """Acquire a connection from the psycopg 3 pool (context manager).
 
         Any exception inside the ``with`` block triggers a rollback so
@@ -157,13 +157,13 @@ class Psycopg3JobRepository(PostgresRepositoryBase):
             try:
                 yield conn
                 conn.commit()
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 conn.rollback()
                 try:
                     from app.metrics_collector import record_error
 
                     record_error("database")
-                except Exception:
+                except (RuntimeError, OSError, ValueError):
                     logger.debug("Failed to record database error metric during psycopg3 rollback")
                 raise
 

@@ -169,7 +169,7 @@ class TelegramNotifier:
         def _runner() -> None:
             try:
                 self.send_message(text)
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 logger.exception("Telegram background send failed")
 
         thread = threading.Thread(target=_runner, name="telegram-notifier", daemon=True)

@@ -135,7 +135,7 @@ def restore_semantic_world_state(world_state_data: dict | None, state_file_path:
 
         get_world_state().from_dict(world_state_data)
         logger.info("Restored semantic world state from %s", state_file_path)
-    except Exception:
+    except (ImportError, RuntimeError, OSError, ValueError, TypeError):
         logger.exception("Failed to restore semantic world state")
 
 

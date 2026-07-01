@@ -234,12 +234,10 @@ def get_scheduler() -> GraphUpdateScheduler | None:
     with _scheduler_lock:
         if _scheduler is not None:
             return _scheduler
-        if _scheduler_initializing:
-            return None
         _scheduler_initializing = True
         try:
             scheduler = GraphUpdateScheduler()
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError):
             logger.exception("GraphUpdateScheduler init failed")
             return None
         finally:

@@ -116,7 +116,7 @@ def load_semantic_state() -> None:
             with ws._lock:
                 ws.from_dict(full_state)
         logger.info("Loaded unified semantic state from %s", path)
-    except Exception:
+    except (OSError, ValueError, TypeError, RuntimeError):
         logger.exception("Failed to load semantic state")
     finally:
         _release_lock(lock_fd)
@@ -153,7 +153,7 @@ def save_semantic_state() -> None:
         os.replace(tmp_path, path)
         tmp_path = None  # ownership transferred via rename
         logger.info("Saved unified semantic state to %s", path)
-    except Exception:
+    except (OSError, ValueError, TypeError, RuntimeError):
         logger.exception("Failed to save semantic state")
         with contextlib.suppress(OSError):
             if fd is not None:

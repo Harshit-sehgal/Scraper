@@ -364,7 +364,7 @@ async def _start_fixture_server(html: str) -> tuple[str, Any, int]:
     site = web.TCPSite(runner, "127.0.0.1", 0)
     try:
         await site.start()
-    except Exception:
+    except OSError:
         # C1: if ``site.start()`` fails (port collision, network down, etc.)
         # we must release the just-initialised ``AppRunner`` — otherwise
         # the runner lingers in aiohttp's internal registry until the

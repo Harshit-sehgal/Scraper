@@ -132,7 +132,7 @@ class _SubscriptionStore:
                     )
                 else:
                     raise
-        except Exception:
+        except (OSError, ValueError, TypeError):
             os.close(lock_fd)
             raise
         return lock_fd
@@ -158,7 +158,7 @@ class _SubscriptionStore:
                     f.flush()
                     os.fsync(f.fileno())
                 os.replace(tmp_path, self.path)
-            except Exception:
+            except (OSError, ValueError, TypeError):
                 with contextlib.suppress(FileNotFoundError):
                     Path(tmp_path).unlink()
                 raise

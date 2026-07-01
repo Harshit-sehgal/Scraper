@@ -105,7 +105,7 @@ async def run_finalization(
         cost_breakdown = tracker.finalize_job(job.id)
         job.cost_breakdown = cost_breakdown
         resource_cost = cost_breakdown.get("total_usd", 0.0)
-    except Exception:
+    except (ImportError, RuntimeError, ValueError, OSError):
         logger.debug("[finalization] Cost tracker unavailable, using LLM+URL formula only", exc_info=True)
         resource_cost = 0.0
         job.cost_breakdown = {}
@@ -208,7 +208,7 @@ async def _deliver_webhook_if_configured(job: Any) -> None:
         await deliver_webhook(job)
     except (ImportError, RuntimeError, ValueError) as exc:
         logger.debug("Webhook delivery skipped for job %s: %s", getattr(job, "id", ""), exc)
-    except Exception:
+    except (OSError, TypeError):
         logger.exception("Webhook delivery threw unexpected error for job %s", getattr(job, "id", ""))
 
 
@@ -243,7 +243,7 @@ async def _deliver_notifications_if_configured(job: Any) -> None:
         await deliver_notifications(job_id, "completed", subject, body, metadata)
     except (ImportError, RuntimeError, ValueError) as exc:
         logger.debug("Notification delivery skipped for job %s: %s", job_id, exc)
-    except Exception:
+    except (OSError, TypeError):
         logger.exception("Notification delivery threw unexpected error for job %s", job_id)
 
 

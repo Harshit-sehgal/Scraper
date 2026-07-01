@@ -20,21 +20,45 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-_PRICE_CLEAN_RE = re.compile(r"[^\d.]")
-
 
 def _parse_price(value: object) -> float | None:
     """Parse a price value from a string or number.
 
-    Handles common formats: "$29.99", "29,99 €", "1,234.56", 29.99.
+    Handles common formats:
+    - "$29.99" (US/UK decimal dot)
+    - "29,99 €" (European decimal comma)
+    - "1,234.56" (US thousands comma)
+    - "1.234,56 €" (European thousands dot)
+    - 29.99 (float)
     """
     if value is None:
         return None
     if isinstance(value, (int, float)):
         return float(value)
+    raw = str(value).strip()
+    if not raw:
+        return None
     try:
-        cleaned = _PRICE_CLEAN_RE.sub("", str(value).replace(",", ""))
-        return float(cleaned) if cleaned else None
+        # First pass: keep only digits, commas, dots
+        numeric = re.sub(r"[^\d,.]", "", raw)
+        if not numeric:
+            return None
+
+        # Detect European format: comma used as decimal separator.
+        # European prices end with comma + 1-2 digits (e.g. "29,99" or "1.234,56").
+        # US/UK prices use comma as thousands separator (e.g. "1,234.56").
+        if re.search(r",\d{1,2}$", numeric):
+            # European: comma is decimal, dots are thousands
+            numeric = numeric.replace(".", "")  # remove thousands dots
+            numeric = numeric.replace(",", ".")  # replace decimal comma with dot
+        else:
+            # US/UK: remove commas (thousands), keep dot as decimal
+            numeric = numeric.replace(",", "")
+
+        # Final cleanup: remove any remaining non-digit, non-dot characters
+        # (handles trailing minus like "10,-" which becomes "10")
+        final = re.sub(r"[^\d.]", "", numeric)
+        return float(final) if final else None
     except (ValueError, TypeError):
         return None
 
@@ -216,7 +240,7 @@ class PriceHistory:
             key = self._key(url, field_name)
             chain = list(self._store.get(key, []))
         if not chain:
-            return PriceTrend()
+            return PriceTrend(direction="new")
 
         prices = [s.price for s in chain]
         sorted_asc = sorted(prices)

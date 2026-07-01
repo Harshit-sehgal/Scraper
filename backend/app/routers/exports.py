@@ -111,7 +111,7 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
         record_export_outcome(fmt, success)
         if success:
             record_export_created()
-    except Exception:
+    except (ImportError, RuntimeError, ValueError, OSError):
         logger.exception("Failed to record export outcome metric for %s", fmt)
 
 
@@ -275,7 +275,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             if fresh is not None:
                 with _store_lock:
                     jobs_store[job_id] = fresh
-        except Exception:
+        except (ImportError, RuntimeError, ValueError, OSError):
             logger.debug("Failed to refresh job %s from repo for export", job_id)
 
     def _ensure_export_job_access(job: Any, auth: tuple[UserRole, str, str, str], action: str) -> None:
@@ -385,7 +385,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_outcome("csv", False)
             _log_export_access(auth[1], "csv", [job_id], request, success=False)
             raise
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             _record_export_outcome("csv", False)
             _log_export_access(auth[1], "csv", [job_id], request, success=False)
             raise
@@ -443,7 +443,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_outcome("json", False)
             _log_export_access(auth[1], "json", [job_id], request, success=False)
             raise
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             _record_export_outcome("json", False)
             _log_export_access(auth[1], "json", [job_id], request, success=False)
             raise
@@ -500,7 +500,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_outcome("excel", False)
             _log_export_access(auth[1], "excel", [job_id], request, success=False)
             raise
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             _record_export_outcome("excel", False)
             _log_export_access(auth[1], "excel", [job_id], request, success=False)
             raise
@@ -685,7 +685,7 @@ def create_exports_router(jobs_store: dict[str, Any]):
             _record_export_outcome(fmt, False)
             _log_export_access(auth[1], fmt, body.job_ids, request, success=False)
             raise
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             _record_export_outcome(fmt, False)
             _log_export_access(auth[1], fmt, body.job_ids, request, success=False)
             raise

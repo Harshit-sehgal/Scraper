@@ -154,16 +154,20 @@ async def get_plan_info(
 
     used_jobs = 0
     used_scrapes = 0
+    _usage_type_job = "job_created"
+    _usage_type_page = "page_fetched"
     if user_id:
         try:
             from app.utils.rbac import resolve_auth_context
             from app.utils.usage_ledger import UsageType, get_usage_ledger
 
+            _usage_type_job = UsageType.JOB_CREATED.value
+            _usage_type_page = UsageType.PAGE_FETCHED.value
             quota_owner = user_id
             try:
                 ctx = resolve_auth_context(request)
                 quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
-            except Exception:
+            except (ImportError, RuntimeError, ValueError, OSError):
                 logger.debug("Quota context resolution failed; falling back to user_id")
 
             ledger = get_usage_ledger()
@@ -174,8 +178,8 @@ async def get_plan_info(
 
     return PlanInfoResponse(
         tier=tier,
-        max_jobs=limits.get(UsageType.JOB_CREATED.value, 10),
-        max_scrapes=limits.get(UsageType.PAGE_FETCHED.value, 1000),
+        max_jobs=limits.get(_usage_type_job, 10),
+        max_scrapes=limits.get(_usage_type_page, 1000),
         max_teammates=_TIER_TEAMMATES.get(tier, 2),
         max_projects=_TIER_PROJECTS.get(tier, 2),
         features=_TIER_FEATURES.get(tier, _TIER_FEATURES["free"]),
@@ -216,7 +220,7 @@ async def get_usage_summary(
 
         ctx = resolve_auth_context(request)
         quota_owner = ctx.org_id or ctx.project_id or ctx.user_id
-    except Exception:
+    except (ImportError, RuntimeError, ValueError, OSError):
         logger.debug("Quota context resolution failed; falling back to user_id: %s", redact_pii(str(user_id)))
         quota_owner = user_id
 

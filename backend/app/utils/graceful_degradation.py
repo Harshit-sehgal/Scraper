@@ -83,7 +83,7 @@ class GracefulDegradation:
                 logger.info("Using fallback for %s", key)
                 try:
                     return await fallback(*args, **kwargs) if asyncio.iscoroutinefunction(fallback) else fallback(*args, **kwargs)
-                except Exception:
+                except (RuntimeError, OSError, ValueError, TypeError):
                     logger.exception("Fallback %s also failed", key)
 
             raise
@@ -143,7 +143,7 @@ def with_fallback_value(default: Any, log_error: bool = True) -> Callable:
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError):
                 if log_error:
                     logger.exception("Function %s failed", func.__name__)
                 return default

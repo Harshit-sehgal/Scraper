@@ -321,7 +321,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     },
                 )
 
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError):
             # Best-effort rollback: if one subsystem fails to rollback,
             # log it and continue rolling back the others. Preserve the
             # original exception and re-raise it.

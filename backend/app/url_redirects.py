@@ -192,6 +192,6 @@ def build_redirect_info(
         )
 
         return lineage.to_dict()
-    except Exception:
+    except (RuntimeError, OSError, ValueError, ImportError):
         logger.warning("[URLRedirects] Could not build acquisition lineage; falling back to raw redirect info")
         return dict(redirect_info)

@@ -371,6 +371,7 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
             loc.click = AsyncMock(side_effect=lambda *a, **kw: call_state.__setitem__("calls", call_state["calls"] + 1))
             loc.count = AsyncMock(return_value=1 if not visible_third_call else 0)
             loc.text_content = AsyncMock(return_value="Load more")
+            loc.first = loc
             return loc
 
         page.locator = MagicMock(side_effect=lambda _: make_disappearing_locator())

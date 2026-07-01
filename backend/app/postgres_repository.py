@@ -24,7 +24,7 @@ from app.postgres_repository_base import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 register_db_error_class(psycopg2.Error)
@@ -96,7 +96,7 @@ class PostgresJobRepository(PostgresRepositoryBase):
         super().__init__(auto_ensure_schema=auto_ensure_schema)
 
     @contextmanager
-    def _conn(self) -> Iterator[psycopg2.extensions.connection]:
+    def _conn(self) -> Generator[psycopg2.extensions.connection, None, None]:
         with _db_conn() as conn:
             yield conn
 
@@ -116,20 +116,20 @@ class PostgresJobRepository(PostgresRepositoryBase):
 
 
 @contextmanager
-def _db_conn() -> Iterator[psycopg2.extensions.connection]:
+def _db_conn() -> Generator[psycopg2.extensions.connection, None, None]:
     """Acquire a connection from the psycopg2 pool (context manager)."""
     pool = _get_pool()
     conn = pool.getconn()
     try:
         yield conn
         conn.commit()
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         conn.rollback()
         try:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:
+        except (RuntimeError, OSError, ValueError):
             logger.debug("Failed to record database error metric during psycopg2 rollback")
         raise
     finally:

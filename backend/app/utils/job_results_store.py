@@ -94,7 +94,7 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
             f.flush()
             os.fsync(f.fileno())
         temp_path.replace(path)
-    except Exception:
+    except (OSError, ValueError, gzip.BadGzipFile):
         logger.exception("Failed to write job results to disk for %s", job_id)
         if temp_path.exists():
             from contextlib import suppress
@@ -127,7 +127,7 @@ def load_job_results_from_disk(job_id: str, file_path: str | None = None) -> lis
                 line = line.strip()  # noqa: PLW2901, RUF100
                 if line:
                     results.append(json.loads(line))
-    except Exception:
+    except (OSError, ValueError, gzip.BadGzipFile):
         logger.exception("Failed to read job results from disk for %s", job_id)
         raise
 
@@ -169,7 +169,7 @@ def load_paginated_job_results_from_disk(
                 if total_count >= offset and len(records) < limit:
                     records.append(json.loads(line))
                 total_count += 1
-    except Exception:
+    except (OSError, ValueError, gzip.BadGzipFile):
         logger.exception("Failed to read paginated job results from disk for %s", job_id)
         raise
 
@@ -250,6 +250,6 @@ def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> b
         return True
     except FileNotFoundError:
         return False
-    except Exception:
+    except (OSError, RuntimeError):
         logger.exception("Failed to delete results file from disk for job %s", job_id)
         return False

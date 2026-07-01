@@ -142,7 +142,7 @@ class ChaosSimulator:
             if not healths:
                 return True
             return all(h.get("health_level") not in ["unhealthy", "critical", "blacklisted"] for h in healths)
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError):
             # F-CHAOS-001: when the health monitor is unreachable, the
             # safe default is to assume NOT healthy and SUPPRESS
             # failure injection — the chaos simulator must NOT escalate

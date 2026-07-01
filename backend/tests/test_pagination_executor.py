@@ -17,11 +17,18 @@ from app.pagination_executor import (
 
 
 def _mock_page() -> MagicMock:
+    locator = MagicMock()
+    locator.first = MagicMock()
+    locator.first.is_visible = AsyncMock(return_value=True)
+    locator.first.count = AsyncMock(return_value=3)
+    locator.first.text_content = AsyncMock(return_value="Next")
+    locator.first.click = AsyncMock()
+    locator.is_visible = AsyncMock(return_value=True)
+    locator.count = AsyncMock(return_value=3)
+    locator.text_content = AsyncMock(return_value="Next")
+    locator.click = AsyncMock()
     page = MagicMock()
-    page.locator = MagicMock(return_value=MagicMock())
-    page.locator.return_value.is_visible = AsyncMock(return_value=True)
-    page.locator.return_value.count = AsyncMock(return_value=3)
-    page.locator.return_value.text_content = AsyncMock(return_value="Next")
+    page.locator = MagicMock(return_value=locator)
     page.evaluate = AsyncMock(return_value=1000)
     page.goto = AsyncMock()
     page.wait_for_function = AsyncMock()
@@ -93,6 +100,7 @@ class TestNextButtonStrategy:
     async def test_button_not_found_stops_gracefully(self) -> None:
         page = _mock_page()
         page.locator.return_value.is_visible = AsyncMock(return_value=False)
+        page.locator.return_value.first.is_visible = AsyncMock(return_value=False)
         config = PaginationConfig(strategy="next_button", max_pages=5, delay_between_pages=0)
         result = await async_paginate(page, config, _extract_dummy)
         assert result.stopped_reason == "button_gone"
@@ -198,6 +206,7 @@ class TestLoadMoreStrategy:
     async def test_load_more_button_not_found(self) -> None:
         page = _mock_page()
         page.locator.return_value.is_visible = AsyncMock(return_value=False)
+        page.locator.return_value.first.is_visible = AsyncMock(return_value=False)
         config = PaginationConfig(strategy="load_more", max_pages=5, delay_between_pages=0)
         result = await async_paginate(page, config, _extract_dummy)
         assert result.stopped_reason == "button_gone"

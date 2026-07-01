@@ -264,7 +264,7 @@ class BrowserPool:
                 self._active_fetches += 1
                 self._cumulative_fetches += 1
 
-            def on_close(p) -> None:
+            def on_close(_p) -> None:
                 with self._counter_lock:
                     self._active_fetches = max(0, self._active_fetches - 1)
                 if self._should_recycle():
@@ -1379,7 +1379,7 @@ def get_browser_pool_health() -> dict[str, Any]:
     cb_stats = browser_pool_circuit_breaker.get_stats()
     try:
         pool_metrics = get_browser_pool().get_metrics()
-    except Exception:
+    except (RuntimeError, OSError, AttributeError):
         pool_metrics = {
             "startup_latency_ms": 0.0,
             "active_contexts": 0,

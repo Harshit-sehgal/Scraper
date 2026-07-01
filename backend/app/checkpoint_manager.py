@@ -59,7 +59,7 @@ class CheckpointManager:
             tmp_path = None  # ownership transferred via rename
             logger.info("Created checkpoint: %s", filename)
             return str(filepath)
-        except Exception:
+        except (OSError, ValueError, TypeError, RuntimeError):
             logger.exception("Failed to create checkpoint")
             with contextlib.suppress(OSError):
                 if fd is not None:
@@ -80,7 +80,7 @@ class CheckpointManager:
                 state_dict = json.load(f)
             get_world_state().from_dict(state_dict)
             logger.info("Restored from checkpoint: %s", filepath)
-        except Exception:
+        except (OSError, ValueError, TypeError, RuntimeError, AttributeError):
             logger.exception("Failed to load checkpoint")
             raise
 

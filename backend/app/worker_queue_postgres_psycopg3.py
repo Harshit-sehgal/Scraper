@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover — psycopg3 absent in dev-only installs
     psycopg = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def _get_pool():
                 )
                 try:
                     _pool.open()
-                except Exception:
+                except (OSError, RuntimeError, ValueError):
                     # H2: if ``open()`` fails we must release the
                     # partially-initialised pool and reset the module
                     # global — otherwise the next caller reuses a dead
@@ -115,7 +115,7 @@ def _close_pool() -> None:
 
 
 @contextmanager
-def _conn() -> Iterator:
+def _conn() -> Generator:
     """Acquire a connection from the psycopg 3 pool (context manager).
 
     Any exception inside the ``with`` block must trigger a rollback so
@@ -127,7 +127,7 @@ def _conn() -> Iterator:
         try:
             yield conn
             conn.commit()
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             conn.rollback()
             try:
                 from app.metrics_collector import record_error
@@ -178,7 +178,7 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
             _ensure_schema_via(conn, self._fetch_one, self._execute)
 
     @contextmanager
-    def _conn(self) -> Iterator:
+    def _conn(self) -> Generator:
         """Acquire a connection from the psycopg 3 pool (context manager).
 
         Co-operates with the class-level rollback policy: any exception
@@ -190,7 +190,7 @@ class PostgresWorkerQueuePsycopg3(PostgresWorkerQueueBase):
             try:
                 yield conn
                 conn.commit()
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 conn.rollback()
                 try:
                     from app.metrics_collector import record_error

@@ -400,7 +400,7 @@ async def _scheduled_job_processor_loop() -> None:
             await _process_due_scheduled_jobs()
         except asyncio.CancelledError:
             break
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError):
             logger.exception("Scheduled job processor loop failed (non-blocking)")
 
 
@@ -479,7 +479,7 @@ async def _process_due_scheduled_jobs() -> None:
                     from app.utils.cron_parser import next_after as cron_next_after
 
                     next_run_dt = cron_next_after(now_dt, cron_expr)
-                except Exception:
+                except (ValueError, TypeError, RuntimeError):
                     logger.warning("Cron %r failed; falling back to frequency delta", cron_expr)
                     frequency = str(scheduled.get("frequency") or "daily").lower()
                     delta = _FREQUENCY_DELTAS.get(frequency, timedelta(days=1))
@@ -516,7 +516,7 @@ async def _process_due_scheduled_jobs() -> None:
                 sched_id,
                 scheduled["next_run_at"],
             )
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError):
             logger.exception("Failed to process scheduled job %s", sched_id)
 
 

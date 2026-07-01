@@ -832,7 +832,7 @@ class SQLiteJobRepository(JobRepository):
             # M1: if fdopen() itself fails the raw fd leaks — guard it.
             try:
                 fh = os.fdopen(fd, "w", encoding="utf-8")
-            except Exception:
+            except OSError:
                 os.close(fd)
                 raise
             with fh as f:

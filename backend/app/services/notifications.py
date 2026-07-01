@@ -499,7 +499,7 @@ async def deliver_notifications(
         try:
             success = await notifier_instance.send(recipient, subject, body, metadata)
             results[ch_id] = success
-        except Exception:
+        except (OSError, RuntimeError, ValueError, TypeError):
             logger.exception(
                 "Notification delivery threw unexpected error for channel %s (job %s)",
                 ch_id,

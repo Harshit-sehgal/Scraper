@@ -217,7 +217,7 @@ class DistributedLock:
                 if remaining > 0:
                     time.sleep(min(0.1, remaining))
                 continue
-            except Exception:
+            except (sqlite3.DatabaseError, OSError):
                 logger.debug("[DistributedLock] Unexpected error acquiring SQLite lock", exc_info=True)
                 if self._conn:
                     with contextlib.suppress(sqlite3.ProgrammingError, sqlite3.OperationalError, OSError):
@@ -283,7 +283,7 @@ class DistributedLock:
             try:
                 with self._pg_conn.cursor() as cur:
                     cur.execute("SELECT pg_advisory_unlock(%s)", (lock_int,))
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 logger.debug("[DistributedLock] Error releasing Postgres lock", exc_info=True)
             finally:
                 with contextlib.suppress(OSError, RuntimeError, TypeError):

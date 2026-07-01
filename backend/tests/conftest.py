@@ -3,6 +3,7 @@ import contextlib
 import logging
 import os
 import socket
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -61,6 +62,7 @@ _TEST_ENV_DEFAULTS = {
     "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
 }
 _HOST_ENV_BEFORE_TESTS = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
+_key = _value = ""  # will be overwritten by the loop (dict is non-empty by construction)
 for _key, _value in _TEST_ENV_DEFAULTS.items():
     # Tests must override any host / .env value so pydantic-settings
     # instantiates ``settings`` with the test values at import time.
@@ -163,7 +165,7 @@ def pytest_configure(config) -> None:
     try:
         from testcontainers.postgres import PostgresContainer
 
-        def patched_get_connection_url(self, host=None):
+        def patched_get_connection_url(self, host=None, driver=None):
             username = getattr(self, "username", getattr(self, "POSTGRES_USER", "testuser"))
             password = getattr(self, "password", getattr(self, "POSTGRES_PASSWORD", "testpassword"))
             dbname = getattr(self, "dbname", getattr(self, "POSTGRES_DB", "testdb"))
@@ -279,7 +281,7 @@ def pytest_sessionstart(session) -> None:
         from app.utils.telegram_notifier import get_notifier
 
         notifier = get_notifier()
-    except Exception:
+    except ImportError:
         return
 
     if not notifier.is_configured:
@@ -307,7 +309,7 @@ def pytest_runtest_logreport(report) -> None:
         from app.utils.telegram_notifier import get_notifier
 
         notifier = get_notifier()
-    except Exception:
+    except ImportError:
         return
 
     session = getattr(report, "session", None)
@@ -875,7 +877,7 @@ def clean_db():
             conn.execute("DELETE FROM idempotency_keys")
             conn.commit()
             conn.close()
-    except Exception:
+    except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError):
         logger.warning("Failed to clean idempotency keys", exc_info=True)
     from app.utils.usage_ledger import reset_usage_ledger
 

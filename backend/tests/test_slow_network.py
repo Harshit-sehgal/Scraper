@@ -17,9 +17,12 @@ class TestSlowNetwork:
     @pytest.mark.asyncio
     async def test_slow_page_eventually_extracts(self) -> None:
         page = MagicMock()
-        page.locator = MagicMock(return_value=MagicMock())
-        page.locator.return_value.is_visible = AsyncMock(return_value=True)
-        page.locator.return_value.count = AsyncMock(return_value=3)
+        locator = MagicMock()
+        locator.is_visible = AsyncMock(return_value=True)
+        locator.count = AsyncMock(return_value=3)
+        locator.click = AsyncMock()
+        locator.first = locator
+        page.locator = MagicMock(return_value=locator)
         page.evaluate = AsyncMock(return_value=1000)
         page.goto = AsyncMock()
         page.wait_for_function = AsyncMock()
@@ -40,11 +43,18 @@ class TestSlowNetwork:
     @pytest.mark.asyncio
     async def test_slow_network_timeout_graceful(self) -> None:
         page = MagicMock()
-        page.locator = MagicMock(return_value=MagicMock())
-        page.locator.return_value.is_visible = AsyncMock(return_value=True)
-        page.locator.return_value.count = AsyncMock(return_value=3)
+        locator = MagicMock()
+        locator.is_visible = AsyncMock(return_value=True)
+        locator.count = AsyncMock(return_value=3)
+        locator.click = AsyncMock()
+        locator.first = locator
+        page.locator = MagicMock(return_value=locator)
         page.evaluate = AsyncMock(return_value=1000)
         page.wait_for_function = AsyncMock()
+        nav = AsyncMock()
+        nav.__aenter__ = AsyncMock()
+        nav.__aexit__ = AsyncMock()
+        page.expect_navigation = MagicMock(return_value=nav)
 
         config = PaginationConfig(
             strategy="next_button",
@@ -63,9 +73,12 @@ class TestSlowNetwork:
     @pytest.mark.asyncio
     async def test_delay_between_pages_respected(self) -> None:
         page = MagicMock()
-        page.locator = MagicMock(return_value=MagicMock())
-        page.locator.return_value.is_visible = AsyncMock(return_value=True)
-        page.locator.return_value.count = AsyncMock(return_value=3)
+        locator = MagicMock()
+        locator.is_visible = AsyncMock(return_value=True)
+        locator.count = AsyncMock(return_value=3)
+        locator.click = AsyncMock()
+        locator.first = locator
+        page.locator = MagicMock(return_value=locator)
         page.evaluate = AsyncMock(return_value=1000)
         page.goto = AsyncMock()
         page.wait_for_function = AsyncMock()
@@ -85,8 +98,11 @@ class TestSlowNetwork:
     @pytest.mark.asyncio
     async def test_slow_load_more_does_not_hang(self) -> None:
         page = MagicMock()
-        page.locator = MagicMock(return_value=MagicMock())
-        page.locator.return_value.is_visible = AsyncMock(return_value=True)
+        locator = MagicMock()
+        locator.is_visible = AsyncMock(return_value=True)
+        locator.count = AsyncMock(return_value=3)
+        locator.first = locator
+        page.locator = MagicMock(return_value=locator)
         page.evaluate = AsyncMock(return_value=1000)
         page.wait_for_function = AsyncMock()
 

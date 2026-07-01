@@ -245,7 +245,7 @@ async def extract_with_profile(
 
             try:
                 await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.warning("[ProfileExtractor] networkidle timeout, trying domcontentloaded")
                 await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_FALLBACK_TIMEOUT)
 
@@ -253,7 +253,7 @@ async def extract_with_profile(
             if wait_for_sel:
                 try:
                     await page.wait_for_selector(wait_for_sel, timeout=max_wait * 1000)
-                except Exception:
+                except (TimeoutError, RuntimeError, OSError):
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",
                         wait_for_sel,
@@ -269,7 +269,7 @@ async def extract_with_profile(
                 await asyncio.sleep(settings.PAGE_SETTLE_DELAY / 2)
                 try:
                     count = await container_locator.count()
-                except Exception:
+                except (RuntimeError, OSError, ValueError):
                     logger.debug("container_locator.count() failed, defaulting to 0", exc_info=True)
                     count = 0
                 if count > 0 and count == prev_count:
@@ -321,19 +321,19 @@ async def extract_with_profile(
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
             return records  # type: ignore[no-any-return]
 
-    except Exception:
+    except (TimeoutError, RuntimeError, OSError, ValueError):
         logger.exception("[ProfileExtractor] Fatal error for %s", url)
         return []
     finally:
         if context is not None:
             try:
                 await context.close()
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.debug("[ProfileExtractor] Failed to close browser context gracefully")
         if browser is not None:
             try:
                 await browser.close()
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.debug("[ProfileExtractor] Failed to close browser gracefully")
 
 

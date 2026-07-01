@@ -15,7 +15,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -70,7 +70,7 @@ class _PostgresWorkflowRepositoryBase(WorkflowRepository, ABC):
 
     @abstractmethod
     @contextmanager
-    def _conn(self) -> Iterator:
+    def _conn(self) -> Generator:
         """Acquire a connection."""
 
     @abstractmethod
@@ -246,7 +246,7 @@ class PostgresWorkflowRepository(_PostgresWorkflowRepositoryBase):
         self._get_pool = _get_pool
 
     @contextmanager
-    def _conn(self) -> Iterator:
+    def _conn(self) -> Generator:
         # H3: commit on successful yield, rollback on user exception, and
         # always return the connection to the pool.  The previous pattern
         # yielded the connection and returned it to the pool without
@@ -257,7 +257,7 @@ class PostgresWorkflowRepository(_PostgresWorkflowRepositoryBase):
         try:
             yield conn
             conn.commit()
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             import psycopg2
 
             with contextlib.suppress(psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.ProgrammingError):
@@ -304,7 +304,7 @@ class Psycopg3WorkflowRepository(_PostgresWorkflowRepositoryBase):
         self._get_pool = _get_pool
 
     @contextmanager
-    def _conn(self) -> Iterator:
+    def _conn(self) -> Generator:
         pool = self._get_pool()
         with pool.connection() as conn:
             yield conn

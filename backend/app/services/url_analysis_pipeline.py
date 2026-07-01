@@ -427,7 +427,7 @@ class URLAnalysisPipeline:
                 temperature=settings.URL_ANALYZER_TEMPERATURE,
                 timeout=settings.LLM_SELECTOR_TIMEOUT,
             )
-        except Exception:
+        except (TimeoutError, OSError, RuntimeError, ValueError):
             logger.exception("[URLAnalyzer] LLM analysis failed for %s", ctx.url)
             result = None
 
@@ -527,7 +527,7 @@ class URLAnalysisPipeline:
                 recovered_url=acquisition_lineage.recovered_url,
                 fetch_time_ms=round((time.time() - ctx.start_time) * 1000, 1),
             )
-        except Exception:
+        except (OSError, RuntimeError, ValueError, ImportError):
             logger.debug("[URLAnalyzer] Failed to record acquisition telemetry", exc_info=True)
 
         return {

@@ -243,7 +243,7 @@ class DomainHealthMonitor:
                 _task = asyncio.create_task(self.alert_callback(alert))
                 _background_tasks.add(_task)
                 _task.add_done_callback(_background_tasks.discard)
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError):
                 logger.exception("Alert callback failed")
 
         self._last_alert_time[domain] = now

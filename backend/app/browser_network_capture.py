@@ -555,7 +555,7 @@ async def setup_network_capture(page) -> tuple[list[dict], list[dict]]:
     async def _on_console(msg: Any) -> None:
         try:
             args = [await arg.json_value() for arg in msg.args]
-        except Exception:
+        except (RuntimeError, OSError, ValueError, TypeError):
             args = [str(arg) for arg in msg.args]
         location = getattr(msg, "location", None)
         if isinstance(location, dict):

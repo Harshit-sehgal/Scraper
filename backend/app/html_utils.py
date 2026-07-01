@@ -610,7 +610,7 @@ async def _playwright_navigate_and_stabilize(
                 raise ValueError(_ab_msg)
         except ValueError:
             raise
-        except Exception:
+        except (TimeoutError, RuntimeError, OSError):
             logger.debug("Secondary load state wait failed for %s", url, exc_info=True)
 
         logger.warning("[Scraper] %s slow load for %s: %s. Falling to domcontentloaded", strategy.value, url, e)
@@ -675,7 +675,7 @@ async def _detect_anti_bot_and_fallback(
     try:
         if (html_content and detect_anti_bot(html_content) > 0.5) or any(marker in err_msg for marker in anti_bot_keywords):
             is_antibot = True
-    except Exception:
+    except (TypeError, ValueError, AttributeError):
         is_antibot = any(marker in err_msg for marker in anti_bot_keywords)
 
     if is_antibot:

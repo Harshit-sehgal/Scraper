@@ -68,7 +68,7 @@ class EventDispatcher:
                         severity="warning",
                         cause=f"Event callback failed for {event.event_type.value} from {event.source}: {e}",
                     )
-                except Exception:
+                except (AttributeError, TypeError, ValueError, RuntimeError):
                     logger.debug("Failed to record degradation for event callback failure", exc_info=True)
 
 

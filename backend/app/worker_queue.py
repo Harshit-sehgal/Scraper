@@ -632,7 +632,7 @@ class WorkerQueue:
                         from app.metrics_collector import record_worker_failure
 
                         record_worker_failure(actual_type)
-                    except Exception:
+                    except (ImportError, RuntimeError, ValueError, TypeError, OSError):
                         logger.debug("Failed to record worker failure metric", exc_info=True)
                     conn.execute(
                         """INSERT OR REPLACE INTO task_history
@@ -864,7 +864,7 @@ class WorkerQueue:
         """
         try:
             await asyncio.to_thread(self._sync_check_stuck_tasks)
-        except Exception:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, OSError):
             logger.debug("Periodic stuck-task check failed", exc_info=True)
 
     async def stop(self, drain: bool = True) -> None:
@@ -911,7 +911,7 @@ class WorkerQueue:
                         await asyncio.to_thread(claim_svc.heartbeat)
                     except (ImportError, OSError, sqlite3.OperationalError):
                         logger.debug("[WorkerQueue] Heartbeat skipped (distributed module / DB unavailable)")
-                    except Exception:
+                    except (RuntimeError, ValueError, sqlite3.DatabaseError, sqlite3.IntegrityError):
                         logger.debug("[WorkerQueue] Heartbeat failed", exc_info=True)
 
                 # Acquire a concurrency permit *before* dequeue so the
@@ -965,7 +965,7 @@ class WorkerQueue:
                 except (ImportError, OSError, sqlite3.OperationalError):
                     # Single-node mode or DB unavailable — proceed without claiming.
                     logger.debug("[WorkerQueue] Job claim check skipped (distributed module / DB unavailable)")
-                except Exception:
+                except (RuntimeError, ValueError, sqlite3.DatabaseError, sqlite3.IntegrityError):
                     logger.debug("[WorkerQueue] Job claim check failed, proceeding without claim", exc_info=True)
 
                 # Dispatch
@@ -998,7 +998,7 @@ class WorkerQueue:
                         # map doesn't accumulate orphans across restarts.
                         try:
                             self._in_flight.pop(tid, None)
-                        except Exception:
+                        except (RuntimeError, OSError):
                             logger.debug(
                                 "Sync drop of orphan in-flight task %s failed",
                                 tid,
@@ -1032,7 +1032,7 @@ class WorkerQueue:
                         claim_svc.release_claim(tid)
                     except (ImportError, OSError, sqlite3.OperationalError):
                         pass
-                    except Exception:
+                    except (RuntimeError, ValueError, sqlite3.DatabaseError, sqlite3.IntegrityError):
                         logger.debug("[WorkerQueue] Claim release for task %s failed", tid, exc_info=True)
 
                 t.add_done_callback(_on_task_done)
@@ -1040,7 +1040,7 @@ class WorkerQueue:
 
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError):
                 logger.exception("Worker loop error")
                 # Best-effort release if we acquired a permit but failed
                 # before installing the done-callback. ``acquired_sem``
@@ -1111,7 +1111,7 @@ class WorkerQueue:
                         # burn another request against the rate-limited
                         # endpoint.
                         await asyncio.sleep(cooldown)
-            except Exception:
+            except (RuntimeError, OSError, ValueError, TypeError):
                 logger.debug("Error in post-execution cooldown logic", exc_info=True)
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 

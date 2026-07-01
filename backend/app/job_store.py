@@ -212,7 +212,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
                 _sync_job_events(conn, job.id, job.logs)
 
             conn.commit()
-        except Exception:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, sqlite3.IntegrityError, OSError):
             conn.rollback()
             raise
         finally:
@@ -242,7 +242,7 @@ def persist_state_single(job: Job) -> None:
             _sync_job_results(conn, job.id, job.results)
             _sync_job_events(conn, job.id, job.logs)
             conn.commit()
-        except Exception:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, sqlite3.IntegrityError, OSError):
             conn.rollback()
             logger.exception("Failed to persist single job %s", job.id)
             raise

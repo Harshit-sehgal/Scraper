@@ -326,7 +326,7 @@ async def _async_paginate_next_button(
                 if await btn.is_visible(timeout=2000):
                     next_btn = btn
                     break
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError, AttributeError):
                 logger.debug("Selector not found: %s", sel)
                 continue
 
@@ -337,7 +337,7 @@ async def _async_paginate_next_button(
         try:
             async with page.expect_navigation(timeout=10000):  # type: ignore[var-annotated]
                 await next_btn.click()
-        except Exception as exc:
+        except (TimeoutError, RuntimeError, OSError) as exc:
             logger.warning("Next button click failed: %s", exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -397,7 +397,7 @@ async def _async_paginate_infinite_scroll(
                     _DOM_STABILIZATION_JS,
                     timeout=max(1000, int(config.delay_between_pages * 1000)),
                 )
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.debug("DOM stabilization timeout during infinite scroll, continuing")
         except Exception as exc:
             logger.warning("Infinite scroll failed on attempt %d: %s", scroll_num, exc)
@@ -477,7 +477,7 @@ async def _async_paginate_load_more(
                 if await btn.is_visible(timeout=1000):
                     load_btn = btn
                     break
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError, AttributeError):
                 logger.debug("Load-more button not found for selector: %s", sel)
                 continue
 
@@ -496,7 +496,7 @@ async def _async_paginate_load_more(
                     _DOM_STABILIZATION_JS,
                     timeout=max(1000, int(config.delay_between_pages * 1000)),
                 )
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.debug("DOM stabilization timeout during load-more, continuing")
         except Exception as exc:
             logger.warning("Load-more click failed on attempt %d: %s", click_num, exc)
@@ -589,7 +589,7 @@ async def _async_paginate_page_number(
                     link = links.nth(i)
                     try:
                         text = await link.text_content()
-                    except Exception:
+                    except (RuntimeError, OSError, AttributeError):
                         logger.debug("Failed to get text content for page link")
                         text = ""
                     if text and str(page_num) in text.strip():
@@ -599,7 +599,7 @@ async def _async_paginate_page_number(
                         break
                 if clicked:
                     break
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.debug("Failed to find page link for page %d with selector %s", page_num, sel)
                 continue
 
@@ -724,7 +724,7 @@ async def _async_paginate_url_pattern(
             # Short wait for JS rendering
             try:
                 await page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 logger.debug("networkidle timeout on page %d, continuing with domcontentloaded", page_num)
 
             # Wait for DOM stabilization
@@ -903,7 +903,7 @@ def _extract_records_from_html(
 
     try:
         soup = BeautifulSoup(html, "html.parser")
-    except Exception:
+    except (TypeError, ValueError, AttributeError):
         logger.debug("Sync pagination: BeautifulSoup parse failed")
         return []
 

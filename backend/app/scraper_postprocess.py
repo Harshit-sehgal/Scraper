@@ -151,6 +151,43 @@ async def run_post_extraction_processing(
             r["_page_type"] = page_type_result.page_type.value
             r["_page_type_confidence"] = page_type_result.confidence
 
+        # FAQ enrichment — always set so consumers can distinguish "checked none" from "unchecked"
+        try:
+            from app.faq_extractor import extract_faq
+
+            faq_result = extract_faq(html)
+            faq_dicts = [p.to_dict() for p in faq_result.pairs] if faq_result.pairs else []
+            for r in results:
+                r["_faq_pairs"] = faq_dicts
+                r["_has_faq"] = bool(faq_result.pairs)
+                r["_faq_source"] = faq_result.source
+        except (ImportError, AttributeError, TypeError, ValueError):
+            logger.debug("FAQ enrichment failed", exc_info=True)
+
+        # Rating enrichment — always set
+        try:
+            from app.rating_extractor import extract_ratings
+
+            rating_result = extract_ratings(html)
+            best_rating = rating_result.best()
+            rd = best_rating.to_dict() if best_rating else None
+            for r in results:
+                r["_rating"] = rd
+        except (ImportError, AttributeError, TypeError, ValueError):
+            logger.debug("Rating enrichment failed", exc_info=True)
+
+        # Stock enrichment — always set
+        try:
+            from app.stock_extractor import extract_stock
+
+            stock_result = extract_stock(html)
+            best_stock = stock_result.best()
+            for r in results:
+                r["_stock_status"] = best_stock.status if best_stock else None
+                r["_stock_quantity"] = best_stock.quantity if (best_stock and best_stock.quantity is not None) else None
+        except (ImportError, AttributeError, TypeError, ValueError):
+            logger.debug("Stock enrichment failed", exc_info=True)
+
         # Data quality pipeline (cleaning + validation + scoring)
         from app.data_quality import run_quality_pipeline
 
