@@ -283,52 +283,35 @@ def test_to_telemetry_dict_zero_result() -> None:
 async def test_scrape_url_attempt_returns_rich_result(monkeypatch) -> None:
     """scrape_url_attempt returns a ScrapeAttemptResult with lineage."""
     from app import scraper
+    from app.scraper_models import ScrapeAttemptResult
 
-    async def fake_fetch(*args, **kwargs):
-        return "<html><body><h1>Data</h1></body></html>", 0.0, "playwright_full", 0
+    # Build a ScrapeAttemptResult directly — this is what scrape_url
+    # returns.  We mock scrape_url itself so we don't need to mock
+    # every internal dependency (domain intelligence, strategy evolution,
+    # quality pipeline, etc.).
+    async def fake_scrape_url(*args, **kwargs) -> list[dict]:
+        result = ScrapeAttemptResult([{"company_name": "Acme", "record_score": 0.95}])
+        result.html = "<html><body><h1>Data</h1></body></html>"
+        result.fetch_method = "playwright_full"
+        result.extraction_method = "memory"
+        result.final_url = "https://example.com/test"
+        result.anti_bot_score = 0.0
+        result.data_evidence_score = 0.5
+        result.warnings = []
+        result.telemetry = None
+        result.zero_result_classification = None
+        result.recommended_next_action = ""
+        result.acquisition_lineage = {
+            "original_url": "https://example.com/test",
+            "final_url": "https://example.com/test",
+            "anti_bot_score": 0.0,
+            "data_evidence_score": 0.5,
+        }
+        return result
 
-    class FakeExtractionResult:
-        records = [{"company_name": "Acme", "record_score": 0.95}]
-        method = "memory"
-        selector_success = True
-        selectors: dict = {"fields": {}}
+    monkeypatch.setattr(scraper, "scrape_url", fake_scrape_url)
 
-    async def fake_orchestrate(*args, **kwargs):
-        return FakeExtractionResult()
-
-    async def fake_profile(*args, **kwargs) -> None:
-        return None
-
-    monkeypatch.setattr(scraper, "get_crawl_policy", _AllowAllCrawlPolicy)
-    monkeypatch.setattr(scraper, "match_profile_for_url", lambda url: None)
-    monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
-    monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
-    monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
-
-    class FakeTelemetry:
-        def record(self, **kw) -> None:
-            pass
-
-    class FakeFrontier:
-        async def add_discovered_links(self, links, source_url, source_depth=0) -> int:
-            return 0
-
-    monkeypatch.setattr(scraper, "get_scrape_telemetry", FakeTelemetry)
-    monkeypatch.setattr(scraper, "get_crawl_frontier", FakeFrontier)
-    monkeypatch.setattr(scraper, "detect_anti_bot", lambda html: 0.0)
-    monkeypatch.setattr(scraper, "estimate_dom_nodes", lambda html: 1)
-    monkeypatch.setattr(scraper, "collect_page_evidence", lambda *a, **kw: None)
-    monkeypatch.setattr(scraper, "classify_zero_result", lambda **kw: None)
-    monkeypatch.setattr(scraper, "classify_failure", lambda **kw: None)
-
-    def fake_process(records, schema_fields, min_record_score, **kw):
-        return records
-
-    monkeypatch.setattr(scraper, "process_raw_records", fake_process)
-    monkeypatch.setattr(scraper, "_boost_contacts_with_page_html", lambda r, h, s: r)
-    monkeypatch.setattr(scraper, "_limit_source_records", lambda r, s: r)
-
-    result = await scrape_url_attempt(
+    result = await scraper.scrape_url_attempt(
         "https://example.com/test",
         [],
     )
