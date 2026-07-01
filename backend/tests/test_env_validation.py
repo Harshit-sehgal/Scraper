@@ -103,17 +103,30 @@ def test_valid_integer_accepted(_reset_env):
 
 def test_sqlite_in_production_warns(_reset_env, caplog):
     _reset_env.setenv("DATAFORGE_ENV", "production")
-    # default backend is sqlite
+    _reset_env.setenv("DATAFORGE_WORKFLOW_BACKEND", "sqlite")
+    # default backend is sqlite; workflow is sqlite → only sqlite job-store warning
     with caplog.at_level(logging.WARNING, logger="app.utils.env_validation"):
         summary = validate_startup_config()
+    # sqlite + no json-workflow → 1 storage warning (sqlite only)
     assert summary["storage_warnings"] == 1
 
 
 def test_postgres_in_production_silent(_reset_env):
     _reset_env.setenv("DATAFORGE_ENV", "production")
     _reset_env.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
+    _reset_env.setenv("DATAFORGE_WORKFLOW_BACKEND", "postgres")
     summary = validate_startup_config()
     assert summary["storage_warnings"] == 0
+
+
+def test_json_workflow_in_production_warns(_reset_env):
+    """JSON workflow backend should be flagged deprecated in production."""
+    _reset_env.setenv("DATAFORGE_ENV", "production")
+    _reset_env.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
+    _reset_env.setenv("DATAFORGE_WORKFLOW_BACKEND", "json")
+    summary = validate_startup_config()
+    # jobs is postgres; workflow is json → 1 warning for workflow
+    assert summary["storage_warnings"] == 1
 
 
 def test_summary_returns_counters(_reset_env):

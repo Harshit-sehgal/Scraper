@@ -30,6 +30,8 @@ MINIMUMS: dict[str, float] = {
     "backend/app/routers/jobs.py": 70.0,
     "backend/app/routers/exports.py": 60.0,
     "backend/app/lifespan.py": 40.0,
+    "backend/app/services/job_state_machine.py": 80.0,
+    "backend/app/utils/prod_security_validator.py": 80.0,
     # The two Postgres backends require a running Postgres instance
     # (via testcontainers) for proper coverage. In SQLite-only CI runs
     # they achieve ~20-22%. The floors here are a *floor* not a goal;

@@ -19,6 +19,7 @@ class MockSettings:
         admin_api_key: str = "",
         storage_backend: str = "sqlite",
         database_url: str = "",
+        workflow_backend: str = "sqlite",
     ) -> None:
         self.ENV = env
         self.API_KEY = api_key
@@ -26,6 +27,7 @@ class MockSettings:
         self.ADMIN_API_KEY = admin_api_key
         self.STORAGE_BACKEND = storage_backend
         self.DATABASE_URL = database_url
+        self.WORKFLOW_BACKEND = workflow_backend
 
 
 def test_validator_does_nothing_in_development() -> None:
@@ -175,3 +177,18 @@ def test_validator_passes_on_strong_credentials_in_production() -> None:
     )
     # This should pass without raising ValueError
     validate_production_credentials(settings)
+
+
+def test_validator_fails_on_json_workflow_backend_in_production() -> None:
+    """Verify that validator raises ValueError in production if WORKFLOW_BACKEND is json."""
+    settings = MockSettings(
+        env="production",
+        api_key="strong_key_api_12345",
+        operator_api_key="strong_key_operator_12345",
+        admin_api_key="strong_key_admin_12345",
+        storage_backend="postgres",
+        database_url="postgresql://postgres:strong_db_password_12345@localhost:5432/db",
+        workflow_backend="json",
+    )
+    with pytest.raises(ValueError, match="WORKFLOW_BACKEND='json'"):
+        validate_production_credentials(settings)

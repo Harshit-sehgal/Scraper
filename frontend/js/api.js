@@ -150,6 +150,18 @@ export function getSessionRole() {
   return _sessionRole;
 }
 
+export function getSessionOrgId() {
+  return _sessionUser?.org_id || "";
+}
+
+export function getSessionProjectId() {
+  return _sessionUser?.project_id || "";
+}
+
+export function getSessionUserId() {
+  return _sessionUser?.user_id || "";
+}
+
 // ─── Session Login (exchange API key for cookie) ───
 
 export async function loginWithApiKey(apiKey) {

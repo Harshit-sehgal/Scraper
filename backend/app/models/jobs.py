@@ -1,172 +1,40 @@
-"""Pydantic models for the scraper API.
-
-Defines the data structures for jobs, schemas, filters, and results.
+"""Job domain models — the core job entity and all request/response models
+for the jobs lifecycle (create, update, extract, clone, batch, events, etc.).
 """
 
 import datetime
-import re
 import uuid
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
-# Field names reserved for system / metadata use — cannot be used as schema field names
-# These are internal fields injected by the extraction pipeline at runtime
-RESERVED_FIELD_NAMES: frozenset = frozenset(
-    {
-        "_provenance",
-        "_extraction_method",
-        "_ai_source_structured",
-        "_calibrated_confidence",
-        "_acquisition_lineage",
-        "source_url",
-        "source_type",
-        "source_trust_score",
-        "scraped_at",
-        "record_score",
-        "_source_url",
-        "_field_provenance",
-        "_zero_result_failure",
-        "_element_text",
-        "_record_id",
-    },
+from app.models.scraping import (
+    FilterRule,
+    SchemaField,
+    ScrapeMode,
+    SelectorMap,
+    SourcePolicy,
 )
 
 
-class FieldType(StrEnum):
-    STRING = "string"
-    INTEGER = "integer"
-    FLOAT = "float"
-    BOOLEAN = "boolean"
-    EMAIL = "email"
-    URL = "url"
-    PHONE = "phone"
-    LOCATION = "location"
-    DATE = "date"
-    LIST_STRING = "list_string"
-    CURRENCY = "currency"
-    PERCENTAGE = "percentage"
-    CODE = "code"
-    RATING = "rating"
-    NUMBER = "number"
+class JobStatus(StrEnum):
+    PENDING = "pending"
+    DISCOVERING = "discovering"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    DEGRADED = "degraded"
+    EMPTY_RESULT = "empty_result"
+    CANCELED = "canceled"
+    FAILED = "failed"
 
 
-class FilterOperator(StrEnum):
-    EQUALS = "equals"
-    NOT_EQUALS = "not_equals"
-    GREATER_THAN = "greater_than"
-    LESS_THAN = "less_than"
-    GREATER_EQUAL = "greater_equal"
-    LESS_EQUAL = "less_equal"
-    CONTAINS = "contains"
-    NOT_CONTAINS = "not_contains"
-    STARTS_WITH = "starts_with"
-    ENDS_WITH = "ends_with"
-    IN_LIST = "in_list"
-    IS_EMPTY = "is_empty"
-    IS_NOT_EMPTY = "is_not_empty"
-    MATCHES_REGEX = "matches_regex"
-    DISTANCE_WITHIN = "distance_within"
+class LogEntry(BaseModel):
+    """A single log entry for a job."""
 
-
-class ScrapeMode(StrEnum):
-    MANUAL = "manual"  # User provides URLs
-    AUTO = "auto"  # AI discovers best URLs
-
-
-class SourcePolicy(StrEnum):
-    OFFICIAL_ONLY = "official_only"
-    OFFICIAL_PLUS_DIRECTORY = "official_plus_directory"
-    ALL_SOURCES = "all_sources"
-
-
-class SchemaField(BaseModel):
-    """A single field definition in the extraction schema."""
-
-    name: str = Field(..., description="Field name, e.g. 'company_name'", max_length=64)
-    field_type: FieldType = Field(..., description="Data type for this field")
-    description: str = Field("", description="Optional hint for the LLM about what this field is", max_length=1024)
-    required: bool = Field(True, description="Whether this field is required")
-
-    @field_validator("name")
-    @classmethod
-    def validate_name(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v):
-            msg = "Field name must be snake_case, start with a letter, and be at most 64 characters"
-            raise ValueError(msg)
-        if v in RESERVED_FIELD_NAMES:
-            msg = f"Field name '{v}' is reserved for system use"
-            raise ValueError(msg)
-        return v
-
-
-class FilterRule(BaseModel):
-    """A single filter rule to apply to scraped data."""
-
-    field_name: str = Field(..., description="Which schema field to filter on", max_length=64)
-    operator: FilterOperator = Field(..., description="Filter operator")
-    value: str = Field("", description="Value to compare against", max_length=2048)
-    origin_address: str | None = Field(None, description="Origin address for distance calculation", max_length=512)
-    distance_unit: str | None = Field("km", description="km or miles", max_length=10)
-
-
-class DiscoveryRequest(BaseModel):
-    """Request body for auto-discovery mode."""
-
-    topic: str = Field(..., description="What topic / data to search for", max_length=512)
-    location: str = Field("", description="Geographic focus, e.g. 'New York, USA'", max_length=256)
-    domain: str = Field("", description="Preferred domain to search, e.g. 'example.com'", max_length=253)
-    num_results: int = Field(8, ge=1, le=50, description="How many URLs to discover")
-    max_per_domain: int = Field(4, ge=1, le=25, description="Maximum URLs allowed per domain in discovery")
-    source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Source inclusion policy for discovery")
-    schema_field_names: list[str] = Field(
-        default_factory=list,
-        description="Optional schema field names to improve search relevance",
-    )
-    origin_location: str = Field("", description="Center point for radius-aware optimization", max_length=256)
-    max_distance_km: float | None = Field(None, ge=0, description="Optional discovery radius in kilometers")
-
-
-class SchemaSuggestionRequest(BaseModel):
-    """Request body to infer topic and schema fields from plain language."""
-
-    intent: str = Field(..., description="Natural language description of what data to scrape", max_length=4096)
-    max_fields: int = Field(8, ge=1, le=20, description="Maximum number of fields to generate")
-
-
-class SelectorMap(BaseModel):
-    """Validated selector map produced by URL analysis."""
-
-    item_container: str = Field("", max_length=500)
-    fields: dict[str, str] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def validate_fields(self):
-        if len(self.fields) > 50:
-            msg = "selectors_map.fields must have at most 50 entries"
-            raise ValueError(msg)
-        for name, selector in self.fields.items():
-            if not isinstance(name, str) or not name.strip():
-                msg = "selectors_map.fields keys must be non-empty strings"
-                raise ValueError(msg)
-            if not isinstance(selector, str) or len(selector) > 500:
-                msg = "selectors_map field selectors must be strings up to 500 characters"
-                raise ValueError(msg)
-        return self
-
-
-class ScraperDiagnosticsRequest(BaseModel):
-    """Request body for the scraper diagnostics endpoint.
-
-    Replaces the broken inline ``fields: list[SchemaField]`` signature
-    that caused PydanticUserError in OpenAPI generation.
-    """
-
-    url: str = Field(..., max_length=2048, description="The URL to run diagnostics on")
-    fields: list[SchemaField] = Field(..., description="Schema fields to attempt extraction for", max_length=50)
-    min_score: float = Field(0.3, ge=0.0, le=1.0, description="Minimum quality score for records to be included")
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    message: str = Field(max_length=8192)
+    level: str = Field("info", max_length=16)
 
 
 class JobCreate(BaseModel):
@@ -368,25 +236,6 @@ class JobCreate(BaseModel):
                 raise ValueError(msg)
 
         return self
-
-
-class JobStatus(StrEnum):
-    PENDING = "pending"
-    DISCOVERING = "discovering"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    DEGRADED = "degraded"
-    EMPTY_RESULT = "empty_result"
-    CANCELED = "canceled"
-    FAILED = "failed"
-
-
-class LogEntry(BaseModel):
-    """A single log entry for a job."""
-
-    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-    message: str = Field(max_length=8192)
-    level: str = Field("info", max_length=16)
 
 
 class Job(BaseModel):
@@ -761,358 +610,6 @@ class JobExtractionUpdate(BaseModel):
         return self
 
 
-# ─── Workflow System ──────────────────────────────────────────────────────
-
-
-class WorkflowStatus(StrEnum):
-    """Status of a saved workflow."""
-
-    DRAFT = "draft"
-    ACTIVE = "active"
-    PAUSED = "paused"
-    FAILED = "failed"
-    ARCHIVED = "archived"
-    DISABLED = "disabled"
-
-
-class WorkflowStepType(StrEnum):
-    """Type of action in a workflow step.
-
-    Members are explicit aliases for historically-used names (OPEN→GOTO,
-    WAIT_FOR_TIMEOUT_LIMITED→WAIT); all aliases are first-class — both names
-    resolve to the same string value and both appear in ``list(``cls``)``.
-    """
-
-    GOTO = "goto"
-    OPEN = "goto"
-    CLICK = "click"
-    FILL = "fill"
-    SELECT = "select"
-    CHECK = "check"
-    UNCHECK = "uncheck"
-    PRESS = "press"
-    SCROLL = "scroll"
-    WAIT = "wait_for_timeout_limited"
-    WAIT_FOR_URL = "wait_for_url"
-    WAIT_FOR_SELECTOR = "wait_for_selector"
-    WAIT_FOR_TEXT = "wait_for_text"
-    WAIT_FOR_TIMEOUT_LIMITED = "wait_for_timeout_limited"
-    EXTRACT = "extract"
-
-
-class WorkflowStep(BaseModel):
-    """A single step in a scraping workflow."""
-
-    step_type: WorkflowStepType = Field(..., description="Action type for this step")
-    selector: str = Field("", description="CSS or XPath selector for the target element", max_length=500)
-    value: str = Field("", description="Value to fill in or select", max_length=500)
-    description: str = Field("", description="Human-readable description of this step", max_length=255)
-    order: int = Field(0, ge=0, description="Execution order within the workflow")
-
-    @field_validator("selector")
-    @classmethod
-    def validate_selector(cls, v: str) -> str:
-        if v and len(v) > 500:
-            msg = "Selector must be at most 500 characters"
-            raise ValueError(msg)
-        return v
-
-
-class WorkflowPaginationConfig(BaseModel):
-    """Pagination configuration for a workflow."""
-
-    enabled: bool = Field(False, description="Whether pagination is enabled")
-    strategy: Literal[
-        "next_button",
-        "page_number",
-        "url_pattern",
-        "infinite_scroll",
-        "load_more",
-    ] = Field(
-        "next_button",
-        description="Pagination strategy: next_button, page_number, url_pattern, infinite_scroll, load_more",
-    )
-    max_pages: int = Field(10, ge=1, le=100, description="Maximum pages to follow")
-    stop_condition: str = Field(
-        "none", description="Stop condition: none, no_more_records, duplicate_threshold, custom", max_length=64
-    )
-    selector: str = Field("", description="Selector for next button or page links", max_length=500)
-
-
-class Workflow(BaseModel):
-    """A saved scraping workflow that can be replayed."""
-
-    # Identity
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
-    name: str = Field(..., description="Human-readable workflow name", max_length=255)
-    description: str = Field("", description="Optional workflow description", max_length=1000)
-
-    # Ownership
-    user_id: str = Field(default="", description="Creator user ID", max_length=128)
-    org_id: str = Field(default="", description="Organization ID for multi-tenant isolation", max_length=128)
-    project_id: str = Field(default="", description="Project ID for grouping", max_length=128)
-
-    # Target
-    mode: str = Field(default="workflow_replay", description="Workflow execution mode", max_length=64)
-    domain: str = Field(default="", description="Target domain for this workflow", max_length=255)
-    start_url: str = Field(default="", description="Starting URL for replay", max_length=2048)
-    original_url: str = Field(default="", description="Original URL that inspired this workflow", max_length=2048)
-
-    # Workflow definition
-    search_params: dict[str, str] = Field(default_factory=dict, description="Search parameters for form submission")
-    steps: list[WorkflowStep] = Field(default_factory=list, description="Ordered list of workflow steps")
-    extraction_schema: list[SchemaField] = Field(default_factory=list, description="Fields to extract after replay")
-    auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
-    pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)  # type: ignore[arg-type]
-
-    # Status
-    status: WorkflowStatus = Field(default=WorkflowStatus.DRAFT, description="Current workflow status")
-    version: int = Field(1, ge=1, description="Workflow version for change tracking")
-
-    # Timestamps
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-    last_run_at: str | None = Field(default=None, description="When this workflow was last executed", max_length=64)
-    last_success_at: str | None = Field(default=None, description="When this workflow last completed successfully", max_length=64)
-    last_failure_reason: str | None = Field(default=None, description="Last workflow failure reason", max_length=4096)
-    last_run_job_id: str | None = Field(default=None, description="ID of the last job created from this workflow", max_length=64)
-
-    # Statistics
-    total_runs: int = Field(0, ge=0, description="Total number of times this workflow has been run")
-    success_runs: int = Field(0, ge=0, description="Number of successful executions")
-
-    @model_validator(mode="after")
-    def validate_workflow(self):
-        if len(self.steps) > 100:
-            msg = "Workflow cannot have more than 100 steps"
-            raise ValueError(msg)
-        if len(self.search_params) > 50:
-            msg = "search_params cannot have more than 50 keys"
-            raise ValueError(msg)
-        return self
-
-
-class WorkflowCreate(BaseModel):
-    """Request body to create a new workflow."""
-
-    name: str = Field(..., description="Human-readable workflow name", max_length=255)
-    description: str = Field("", max_length=1000)
-    mode: str = Field(default="workflow_replay", max_length=64)
-    start_url: str = Field(default="", max_length=2048)
-    original_url: str = Field(default="", max_length=2048)
-    search_params: dict[str, str] = Field(default_factory=dict)
-    steps: list[WorkflowStep] = Field(default_factory=list)
-    extraction_schema: list[SchemaField] = Field(default_factory=list)
-    auth_profile_id: str | None = Field(default=None, description="Optional auth profile for authenticated scraping")
-    pagination_config: WorkflowPaginationConfig = Field(default_factory=WorkflowPaginationConfig)  # type: ignore[arg-type]
-
-    @model_validator(mode="after")
-    def validate_create(self):
-        if not self.name or not self.name.strip():
-            msg = "Workflow name is required"
-            raise ValueError(msg)
-        if len(self.steps) > 100:
-            msg = "Workflow cannot have more than 100 steps"
-            raise ValueError(msg)
-        if len(self.search_params) > 50:
-            msg = "search_params cannot have more than 50 keys"
-            raise ValueError(msg)
-        return self
-
-
-class WorkflowUpdate(BaseModel):
-    """Request body to update an existing workflow."""
-
-    name: str | None = Field(default=None, max_length=255)
-    description: str | None = Field(default=None, max_length=1000)
-    mode: str | None = Field(default=None, max_length=64)
-    start_url: str | None = Field(default=None, max_length=2048)
-    original_url: str | None = Field(default=None, max_length=2048)
-    search_params: dict[str, str] | None = Field(default=None)
-    steps: list[WorkflowStep] | None = Field(default=None)
-    extraction_schema: list[SchemaField] | None = Field(default=None)
-    pagination_config: WorkflowPaginationConfig | None = Field(default=None)
-    status: WorkflowStatus | None = Field(default=None)
-
-
-# ─── Auth Profiles ────────────────────────────────────────────────────────
-
-
-class AuthProfileStatus(StrEnum):
-    """Status of an auth profile."""
-
-    PENDING_LOGIN = "pending_login"
-    ACTIVE = "active"
-    EXPIRED = "expired"
-    REVOKED = "revoked"
-    FAILED = "failed"
-
-
-class AuthProfile(BaseModel):
-    """Stored browser session for authenticated scraping.
-
-    Encrypted ``storage_state`` is never exposed in API responses;
-    it is only decrypted inside the job runner when needed.
-    """
-
-    # Identity
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
-    name: str = Field(..., description="Human-readable profile name", max_length=255)
-    description: str = Field("", max_length=1000)
-
-    # Ownership
-    user_id: str = Field(default="", description="Owner user ID")
-    org_id: str = Field(default="", description="Organization ID")
-    project_id: str = Field(default="", description="Project ID")
-
-    # Target domain (enforced to prevent cross-domain leakage)
-    domain: str = Field(..., description="Domain this auth profile is restricted to", max_length=255)
-
-    # Session state (opaque to the API; encrypted at rest)
-    encrypted_storage_state: str = Field(
-        "",
-        description="Base64-encoded encrypted Playwright storage state",
-        max_length=100000,
-    )
-    encryption_key_version: str = Field("", description="Version of the encryption key used")
-
-    # Status
-    status: AuthProfileStatus = AuthProfileStatus.PENDING_LOGIN
-    failure_reason: str = Field("", max_length=1000, description="Reason for failure if applicable")
-
-    # Timestamps
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    expires_at: str | None = Field(default=None, description="Optional expiration timestamp (ISO 8601)")
-    last_validated_at: str | None = None
-
-    # Statistics
-    last_used_at: str | None = None
-    usage_count: int = Field(0, ge=0)
-
-
-# ─── Scheduled Monitoring ────────────────────────────────────────────────
-
-
-class ScheduledJobFrequency(StrEnum):
-    """How often a scheduled job should run."""
-
-    HOURLY = "hourly"
-    DAILY = "daily"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
-
-
-class ScheduledJob(BaseModel):
-    """A recurring scraping job that runs on a schedule.
-
-    Each scheduled job is linked to a base job template. When the
-    schedule fires, a new job is created from the template and
-    queued for execution.
-
-    Scheduling can be specified via the ``frequency`` enum (RHoulY/
-    DAILY/WEEKLY/MONTHLY) or via a standard cron expression
-    (``cron_expression``).  When ``cron_expression`` is set it takes
-    precedence over ``frequency``.
-    """
-
-    # Identity
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
-    name: str = Field(..., description="Human-readable schedule name", max_length=255)
-
-    # Ownership
-    user_id: str = Field(default="", description="Owner user ID", max_length=128)
-    org_id: str = Field(default="", description="Organization ID", max_length=128)
-    project_id: str = Field(default="", description="Project ID", max_length=128)
-
-    # Scheduling
-    frequency: ScheduledJobFrequency = Field(default=ScheduledJobFrequency.DAILY)
-    cron_expression: str | None = Field(
-        default=None,
-        description=(
-            "Standard 5-field cron expression (minute hour dom month dow). "
-            "When set, takes precedence over ``frequency``. "
-            "Example: ``0 9 * * 1-5`` for weekdays at 09:00 UTC."
-        ),
-        max_length=128,
-    )
-    timezone: str = Field(
-        default="UTC",
-        description="IANA timezone for cron scheduling (default UTC).",
-        max_length=64,
-    )
-    last_run_at: str | None = Field(None, max_length=64)
-
-    # Job template (snapshot of a JobCreate payload)
-    job_name: str = Field(..., description="Name pattern for generated jobs", max_length=255)
-    mode: ScrapeMode = Field(ScrapeMode.MANUAL)
-    urls: list[str] = Field(default_factory=list, max_length=100, description="Target URLs for manual-mode jobs")
-    topic: str = Field("", max_length=255)
-    location: str = Field("", max_length=255)
-    schema_fields: list[SchemaField] = Field(default_factory=list)
-    filters: list[FilterRule] = Field(default_factory=list)
-    pagination: bool = False
-    max_pages: int = 10
-    deduplicate: bool = True
-    min_record_score: float = 0.35
-
-    # Status
-    enabled: bool = True
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-
-    # Statistics
-    total_executions: int = Field(0, ge=0)
-    successful_executions: int = Field(0, ge=0)
-
-
-# ─── Scraper Router Response Models ───────────────────────────────────
-
-
-class ScraperConfigResponse(BaseModel):
-    """Response model for GET /api/scraper/config."""
-
-    playwright_timeout: int
-    page_settle_delay: float
-    request_timeout: int
-    max_retries: int
-    max_records_per_source: int
-    selector_snippet_max_chars: int
-    regex_max_containers: int
-
-
-class SelectorMemoryStatsResponse(BaseModel):
-    """Response model for GET /api/scraper/memory/stats."""
-
-    domain_count: int
-    total_successes: int
-    total_failures: int
-    top_domains: list[dict[str, Any]]
-
-
-class ScraperStatsResponse(BaseModel):
-    """Response model for GET /api/scraper/stats."""
-
-    confidence_histogram: list[list[int | float]]
-    recent_latency_avg: float
-    recent_success_rate: float
-
-
-class PreviewResponse(BaseModel):
-    """Response model for POST /api/scraper/preview."""
-
-    url: str
-    total_records_found: int
-    preview_records: list[Any]
-    dry_run: bool
-
-
-class StatusResponse(BaseModel):
-    """Generic status response."""
-
-    status: str
-
-
 class JobUserAgentUpdate(BaseModel):
     """Request body to update a job's custom User-Agent string."""
 
@@ -1134,152 +631,6 @@ class JobExtractionUpdateResponse(BaseModel):
     selectors_map: dict[str, Any]
     request_delay_ms: int
     max_concurrent_urls: int
-
-
-class RegressionTestGenerateResponse(BaseModel):
-    """Response model for POST /api/scraper/regressions/{entry_id}/generate-test."""
-
-    entry_id: str
-    test_code: str
-
-
-class RegressionGenerateAllResponse(BaseModel):
-    """Response model for POST /api/scraper/regressions/generate-all-tests."""
-
-    total_tests_generated: int
-    test_code: str
-
-
-class SelectorMemoryFullStatsResponse(BaseModel):
-    """Response model for GET /api/scraper/selectors/stats."""
-
-    total_domains: int
-    total_selectors: int
-    avg_confidence: float
-    high_confidence: int
-    medium_confidence: int
-    low_confidence: int
-    confidence_distribution: dict[str, int]
-
-
-class DomainConfidenceResponse(BaseModel):
-    """Response model for GET /api/scraper/selectors/domain/{domain}."""
-
-    domain: str
-    raw_confidence: float
-    age_factor: float
-    freshness_factor: float
-    final_score: float
-    reason: str
-
-
-class SelectorCleanupResponse(BaseModel):
-    """Response model for POST /api/scraper/selectors/cleanup."""
-
-    message: str | None = None
-    next_cleanup_available_in_seconds: int | None = None
-    domains_checked: int | None = None
-    selectors_deleted: int | None = None
-    deleted_domains: int | None = None
-    low_confidence_selectors: int | None = None
-
-
-class LowConfidenceSelectorItem(BaseModel):
-    """A single low-confidence selector entry."""
-
-    domain: str
-    score: float
-    raw_confidence: float
-    age_factor: float
-    freshness_factor: float
-    success_count: int
-    failure_count: int
-    reason: str
-
-
-class LowConfidenceSelectorsResponse(BaseModel):
-    """Response model for GET /api/scraper/selectors/low-confidence."""
-
-    threshold: float
-    count: int
-    selectors: list[LowConfidenceSelectorItem]
-
-
-# ─── Session Router Response Models ──────────────────────────────────
-
-
-class SessionCreateResponse(BaseModel):
-    """Response model for POST /api/session."""
-
-    status: str
-    role: str
-    message: str
-    authenticated: bool = True
-
-
-class SessionDestroyResponse(BaseModel):
-    """Response model for DELETE /api/session."""
-
-    status: str
-    message: str
-
-
-class SessionMeResponse(BaseModel):
-    """Response model for GET /api/session/me."""
-
-    authenticated: bool
-    role: str | None = None
-    user_id: str | None = None
-    org_id: str | None = None
-    project_id: str | None = None
-
-
-class AuditLogResponse(BaseModel):
-    """Response model for GET /api/system/audit-log."""
-
-    total: int
-    limit: int
-    category: str
-    items: list[Any]
-
-
-# ─── Scheduled Monitoring Response Models ────────────────────────────
-
-
-class ScheduledJobChangesResponse(BaseModel):
-    """Response model for GET /api/scheduled/{job_id}/changes."""
-
-    job_id: str
-    job_name: str
-    target_url: str
-    frequency: str
-    changes_detected: bool
-    last_run_at: str
-    last_status: str
-    previous_status: str
-    last_records_count: int
-    previous_records_count: int
-    record_count_delta: int
-    status_changed: bool
-    frequency_met: bool | None = None
-    summary_count: int
-    message: str
-
-
-# ─── Workflow Response Models ─────────────────────────────────────────
-
-
-class WorkflowRunQueuedResponse(BaseModel):
-    """Response model for POST /api/workflows/{workflow_id}/run."""
-
-    workflow_id: str
-    job_id: str
-    run_id: str
-    status: str
-    message: str
-
-
-# ─── Jobs Response Models ─────────────────────────────────────────────
 
 
 class JobCreateResponse(BaseModel):
@@ -1348,64 +699,11 @@ class JobQualityTrendsResponse(BaseModel):
     alert_threshold: float
 
 
-# ─── User Data Response Models ────────────────────────────────────────
+class JobCloneRequest(BaseModel):
+    """Request body to clone a job."""
 
-
-class DeleteMyDataResponse(BaseModel):
-    """Response model for DELETE /api/user/data."""
-
-    status: str
-    user_id: str
-    summary: dict[str, int]
-    message: str
-    receipt: dict[str, str]
-
-
-# ─── Operator Response Models ─────────────────────────────────────────
-
-
-class RemoveDenylistResponse(BaseModel):
-    """Response model for DELETE /api/operator/denylist."""
-
-    message: str
-    domain: str
-    path_prefix: str
-
-
-# ─── Extraction Templates ──────────────────────────────────────────────────
-
-
-class ExtractionTemplateCreate(BaseModel):
-    """Request body to create a new extraction template."""
-
-    name: str = Field(..., max_length=255, description="Template name")
-    config: dict[str, Any] = Field(default_factory=dict, description="Extraction configuration overrides")
-    schema_fields: list[SchemaField] = Field(default_factory=list, max_length=50)
-    selectors_map: dict[str, Any] = Field(default_factory=dict)
-
-
-class ExtractionTemplateUpdate(BaseModel):
-    """Request body to update an extraction template."""
-
-    name: str | None = Field(default=None, max_length=255)
-    config: dict[str, Any] | None = None
-    schema_fields: list[SchemaField] | None = None
-    selectors_map: dict[str, Any] | None = None
-
-
-class ExtractionTemplate(BaseModel):
-    """A reusable extraction template."""
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
-    name: str = Field("", max_length=255)
-    config: dict[str, Any] = Field(default_factory=dict)
-    schema_fields: list[SchemaField] = Field(default_factory=list)
-    selectors_map: dict[str, Any] = Field(default_factory=dict)
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-
-
-# ─── Batch Submission ─────────────────────────────────────────────────────
+    name: str | None = Field(default=None, max_length=255, description="Name for the cloned job")
+    urls: list[str] | None = Field(default=None, description="Override URLs for the cloned job")
 
 
 class BatchSubmitRequest(BaseModel):
@@ -1427,35 +725,12 @@ class BatchSubmitResponse(BaseModel):
     message: str
 
 
-class JobCloneRequest(BaseModel):
-    """Request body to clone a job."""
-
-    name: str | None = Field(default=None, max_length=255, description="Name for the cloned job")
-    urls: list[str] | None = Field(default=None, description="Override URLs for the cloned job")
-
-
 class EmailDeliveryRequest(BaseModel):
     """Request body to email job results."""
 
     recipients: list[str] = Field(..., max_length=10, description="Email recipients")
     format: str = Field("csv", max_length=16, description="Export format (csv, json)")
     subject: str | None = Field(default=None, max_length=255)
-
-
-class NotificationChannelCreate(BaseModel):
-    """Request body to create a notification channel."""
-
-    type: str = Field(..., max_length=32, description="Channel type: slack, teams, discord, email")
-    webhook_url: str = Field(..., max_length=2048, description="Webhook URL for the channel")
-    events: list[str] = Field(default_factory=lambda: ["completed"], description="Events to notify on")
-
-
-class NotificationChannelUpdate(BaseModel):
-    """Request body to update a notification channel."""
-
-    webhook_url: str | None = Field(default=None, max_length=2048)
-    events: list[str] | None = None
-    enabled: bool | None = None
 
 
 class UsageRecord(BaseModel):
@@ -1468,14 +743,11 @@ class UsageRecord(BaseModel):
     latency_ms: int = Field(default=0, ge=0, description="Maximum latency in milliseconds")
 
 
-class NotificationChannel(BaseModel):
-    """A notification channel for a job."""
+class DeleteMyDataResponse(BaseModel):
+    """Response model for DELETE /api/user/data."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
-    job_id: str = Field("", max_length=64)
-    type: str = Field("", max_length=32)
-    webhook_url: str = Field("", max_length=2048)
-    events: list[str] = Field(default_factory=list)
-    enabled: bool = True
-    created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat(), max_length=64)
+    status: str
+    user_id: str
+    summary: dict[str, int]
+    message: str
+    receipt: dict[str, str]

@@ -725,15 +725,18 @@ def _render_basic_metrics_text() -> str:
     for reason, count in get_ssrf_rejects().items():
         lines.append(_basic_metric_line("dataforge_ssrf_rejects_total", count, {"reason": reason}))
 
+    # EXPERIMENTAL: domain_runtime_policy is a research-shell module.
+    # Surface its metrics only when experimental routes are enabled.
     try:
-        from app.domain_runtime_policy import get_domain_runtime_policy
+        if settings.ENABLE_EXPERIMENTAL_ROUTES:
+            from app.domain_runtime_policy import get_domain_runtime_policy
 
-        for domain, summary in get_domain_runtime_policy().get_summary().items():
-            total_attempts = int(str(summary.get("total_attempts", 0) or 0))
-            if total_attempts <= 0:
-                continue
-            rate = float(str(summary.get("failure_rate", 0.0) or 0.0))
-            lines.append(_basic_metric_line("dataforge_domain_failure_rate", rate, {"domain": domain}))
+            for domain, summary in get_domain_runtime_policy().get_summary().items():
+                total_attempts = int(str(summary.get("total_attempts", 0) or 0))
+                if total_attempts <= 0:
+                    continue
+                rate = float(str(summary.get("failure_rate", 0.0) or 0.0))
+                lines.append(_basic_metric_line("dataforge_domain_failure_rate", rate, {"domain": domain}))
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         logger.debug("Metrics fallback: domain failure-rate collection failed")
 
@@ -1140,23 +1143,25 @@ def _add_domain_latency_csp_rate_gauges(registry) -> None:
         record_metrics_collection_error,
     )
 
+    # EXPERIMENTAL: domain_runtime_policy is a research-shell module.
     try:
-        from app.domain_runtime_policy import get_domain_runtime_policy
+        if settings.ENABLE_EXPERIMENTAL_ROUTES:
+            from app.domain_runtime_policy import get_domain_runtime_policy
 
-        domain_summaries = get_domain_runtime_policy().get_summary()
-        if domain_summaries:
-            domain_failure_gauge = Gauge(
-                "dataforge_domain_failure_rate",
-                "Per-domain failure ratio from recorded fetch attempts",
-                ["domain"],
-                registry=registry,
-            )
-            for domain, summary in domain_summaries.items():
-                total_attempts = int(str(summary.get("total_attempts", 0) or 0))
-                if total_attempts <= 0:
-                    continue
-                rate = float(str(summary.get("failure_rate", 0.0) or 0.0))
-                domain_failure_gauge.labels(domain=domain).set(rate)
+            domain_summaries = get_domain_runtime_policy().get_summary()
+            if domain_summaries:
+                domain_failure_gauge = Gauge(
+                    "dataforge_domain_failure_rate",
+                    "Per-domain failure ratio from recorded fetch attempts",
+                    ["domain"],
+                    registry=registry,
+                )
+                for domain, summary in domain_summaries.items():
+                    total_attempts = int(str(summary.get("total_attempts", 0) or 0))
+                    if total_attempts <= 0:
+                        continue
+                    rate = float(str(summary.get("failure_rate", 0.0) or 0.0))
+                    domain_failure_gauge.labels(domain=domain).set(rate)
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         record_metrics_collection_error()
         logger.debug("Metrics: domain failure-rate collection failed")

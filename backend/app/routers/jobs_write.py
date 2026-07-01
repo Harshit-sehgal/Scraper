@@ -234,13 +234,14 @@ async def _clear_terminal_jobs_logic(
     manager: JobStoreManager,
     keep_recent: int,
 ) -> dict[str, Any]:
-    terminal_statuses = {
-        JobStatus.COMPLETED,
-        JobStatus.DEGRADED,
-        JobStatus.EMPTY_RESULT,
-        JobStatus.FAILED,
-        JobStatus.CANCELED,
-    }
+    # Clear "completed-like" statuses: truly terminal (degraded, empty_result,
+    # canceled, failed) plus completed (which is not is_terminal because reclean
+    # allows COMPLETED→RUNNING, but operators expect "clear completed" to work).
+    # Using the state machine's _COMPLETING_STATUSES set ensures we stay in
+    # sync with the canonical definition.
+    from app.services.job_state_machine import _COMPLETING_STATUSES
+
+    terminal_statuses = _COMPLETING_STATUSES
     with manager.lock:
         terminal = [(jid, job) for jid, job in manager.jobs_store.items() if job.status in terminal_statuses]
     if not terminal:

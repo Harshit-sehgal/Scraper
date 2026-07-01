@@ -1,5 +1,12 @@
 """Simple JSON persistence for job and recycle-bin state with safety guarantees.
 
+.. deprecated::
+    JSON storage (``jobs_state.json``) is the **legacy** persistence path.
+    For new deployments use the SQLite or Postgres backends selected via
+    ``DATAFORGE_STORAGE_BACKEND``.  This module is retained for backward
+    compatibility and the dev default but must NOT be used in production
+    (the production security validator will reject non-Postgres backends).
+
 Storage safety features:
 - Atomic writes via temp-file + rename (no partial writes)
 - Automatic backup before overwrite

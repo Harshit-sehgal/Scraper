@@ -1,5 +1,8 @@
+import pytest
 from app.globals import jobs_store
 from app.models import Job, JobStatus
+
+pytestmark = pytest.mark.api
 
 
 def test_list_jobs_returns_summary_only(client, monkeypatch) -> None:

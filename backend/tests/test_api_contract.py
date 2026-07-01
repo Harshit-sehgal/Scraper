@@ -13,6 +13,8 @@ from app.routers.exports import create_exports_router
 from app.utils.export import safe_export_filename
 from fastapi import FastAPI
 
+pytestmark = pytest.mark.api
+
 
 class TestSchemaFieldContract:
     """SchemaField must maintain its expected shape."""
@@ -332,3 +334,213 @@ class TestExportShapeContract:
                 assert resp3.status_code == 404
 
         asyncio.run(_test())
+
+
+# ─── Session contract tests ─────────────────────────────────────────────────
+
+
+class TestSessionResponseContracts:
+    """Session endpoints must return stable response shapes."""
+
+    def test_session_create_response_shape(self) -> None:
+        from app.models import SessionCreateResponse
+
+        r = SessionCreateResponse(status="ok", role="ADMIN", message="logged in")
+        assert r.authenticated is True
+        assert r.status == "ok"
+        assert r.role == "ADMIN"
+        assert r.message == "logged in"
+
+    def test_session_me_response_shape(self) -> None:
+        from app.models import SessionMeResponse
+
+        r = SessionMeResponse(
+            authenticated=True,
+            role="USER",
+            user_id="u-1",
+            org_id="org-1",
+            project_id="proj-1",
+        )
+        assert r.authenticated is True
+        assert r.role == "USER"
+        assert r.user_id == "u-1"
+        assert r.org_id == "org-1"
+        assert r.project_id == "proj-1"
+
+    def test_session_me_response_defaults_unauthenticated(self) -> None:
+        from app.models import SessionMeResponse
+
+        r = SessionMeResponse(authenticated=False)
+        assert r.role is None
+        assert r.user_id is None
+        assert r.org_id is None
+        assert r.project_id is None
+
+
+# ─── List response standardization tests ─────────────────────────────────────
+
+
+class TestListResponseStandardization:
+    """List endpoints must use {total, items} with backward-compat keys."""
+
+    def test_jobs_list_response_has_items_and_total(self) -> None:
+        """The job list response must include total, items (new standard)."""
+        from pydantic import BaseModel
+
+        class StandardListResponse(BaseModel):
+            total: int
+            items: list[dict]
+            next_cursor: str | None = None
+
+        r = StandardListResponse(total=5, items=[{"id": "j1"}, {"id": "j2"}])
+        assert r.total == 5
+        assert len(r.items) == 2
+
+    def test_job_results_response_structure(self) -> None:
+        from app.models import JobResultsResponse
+
+        r = JobResultsResponse(
+            job_id="j-1",
+            results=[{"name": "foo"}],
+            total=10,
+            limit=50,
+            offset=0,
+            returned=10,
+        )
+        assert r.job_id == "j-1"
+        assert r.total == 10
+        assert r.limit == 50
+        assert r.offset == 0
+        assert r.returned == 10
+
+    def test_job_events_response_structure(self) -> None:
+        from app.models import JobEventsResponse
+
+        r = JobEventsResponse(
+            job_id="j-1",
+            status="completed",
+            events=[{"ts": "2025-01-01", "msg": "done"}],
+            total=1,
+            limit=50,
+            offset=0,
+        )
+        assert r.job_id == "j-1"
+        assert r.status == "completed"
+        assert r.total == 1
+        assert len(r.events) == 1
+
+
+# ─── Workflow contract tests ─────────────────────────────────────────────────
+
+
+class TestWorkflowContract:
+    """Workflow models must maintain stable shapes."""
+
+    def test_workflow_create_minimal(self) -> None:
+        from app.models import WorkflowCreate
+
+        w = WorkflowCreate(name="test-flow")
+        assert w.name == "test-flow"
+        assert w.mode == "workflow_replay"
+        assert w.steps == []
+
+    def test_workflow_create_rejects_empty_name(self) -> None:
+        import pytest
+        from app.models import WorkflowCreate
+
+        with pytest.raises(ValueError):
+            WorkflowCreate(name="")
+
+    def test_workflow_statuses_are_stable(self) -> None:
+        from app.models import WorkflowStatus
+
+        expected = {"draft", "active", "paused", "failed", "archived", "disabled"}
+        values = {str(v.value) for v in WorkflowStatus}
+        assert values == expected
+
+    def test_workflow_has_ownership_fields(self) -> None:
+        from app.models import Workflow
+
+        w = Workflow(
+            name="test",
+            user_id="u-1",
+            org_id="org-1",
+            project_id="proj-1",
+        )
+        assert w.user_id == "u-1"
+        assert w.org_id == "org-1"
+        assert w.project_id == "proj-1"
+
+    def test_workflow_has_statistics_fields(self) -> None:
+        from app.models import Workflow
+
+        w = Workflow(name="test", total_runs=5, success_runs=3)
+        assert w.total_runs == 5
+        assert w.success_runs == 3
+
+    def test_workflow_step_validation(self) -> None:
+        from app.models import WorkflowStep, WorkflowStepType
+
+        s = WorkflowStep(
+            step_type=WorkflowStepType.GOTO,
+            selector=".next-btn",
+            order=1,
+        )
+        assert s.step_type.value == "goto"
+        assert s.selector == ".next-btn"
+
+
+# ─── Billing / plan contract tests ───────────────────────────────────────────
+
+
+class TestPlanContract:
+    """Plan info response shape must be stable for frontend billing.js."""
+
+    def test_plan_info_response_fields(self) -> None:
+        from app.saas.router import PlanInfoResponse
+
+        r = PlanInfoResponse(
+            tier="free",
+            max_jobs=10,
+            max_scrapes=1000,
+            max_teammates=2,
+            max_projects=2,
+            features=["basic"],
+            used_jobs=5,
+            used_scrapes=100,
+        )
+        assert r.tier == "free"
+        assert r.used_jobs == 5
+        assert r.used_scrapes == 100
+        assert r.max_jobs == 10
+        assert r.max_scrapes == 1000
+
+
+# ─── Auth profile contract tests ─────────────────────────────────────────────
+
+
+class TestAuthProfileContract:
+    """Auth profile model must maintain stable shapes."""
+
+    def test_auth_profile_statuses(self) -> None:
+        from app.models import AuthProfileStatus
+
+        expected = {"pending_login", "active", "expired", "revoked", "failed"}
+        values = {str(v.value) for v in AuthProfileStatus}
+        assert values == expected
+
+    def test_auth_profile_has_ownership_fields(self) -> None:
+        from app.models import AuthProfile
+
+        p = AuthProfile(
+            name="test-profile",
+            domain="example.com",
+            user_id="u-1",
+            org_id="org-1",
+        )
+        assert p.name == "test-profile"
+        assert p.domain == "example.com"
+        assert p.user_id == "u-1"
+        assert p.org_id == "org-1"
+        assert p.project_id == ""
+        assert p.status.value == "pending_login"

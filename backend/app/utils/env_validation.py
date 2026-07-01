@@ -61,6 +61,7 @@ _KNOWN_INT_VARS: Final[dict[str, tuple[int, int]]] = {
 
 # Patterns that suggest an env var has leaked its secret value into
 # something user-readable (logs, help text, etc).
+# (Future: used by _scan_output_for_secrets — not yet wired)
 _LEAK_SUSPECTS: Final[tuple[str, ...]] = (
     # Common env vars that must never appear in customer-facing output.
     "DATAFORGE_ENCRYPTION_KEY",
@@ -153,6 +154,7 @@ def _warn_suspicious_storage_backend() -> int:
     """
     if not _is_production_like():
         return 0
+    warned = 0
     backend = (os.environ.get("DATAFORGE_STORAGE_BACKEND") or "sqlite").strip().lower()
     if backend in {"sqlite", ""}:
         logger.warning(
@@ -162,8 +164,21 @@ def _warn_suspicious_storage_backend() -> int:
             backend,
             os.environ.get("DATAFORGE_ENV"),
         )
-        return 1
-    return 0
+        warned += 1
+
+    # Also flag JSON workflow backend in production-like envs
+    wf_backend = (os.environ.get("DATAFORGE_WORKFLOW_BACKEND") or "json").strip().lower()
+    if wf_backend == "json":
+        logger.warning(
+            "STARTUP: DATAFORGE_WORKFLOW_BACKEND='json' in %s environment. "
+            "JSON workflow storage is deprecated for production — "
+            "it lacks concurrency control and atomicity. "
+            "Use sqlite or postgres instead.",
+            os.environ.get("DATAFORGE_ENV"),
+        )
+        warned += 1
+
+    return warned
 
 
 def validate_startup_config() -> dict[str, int]:

@@ -16,6 +16,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.api
+
 REPO = Path(__file__).resolve().parents[2]
 GENERATOR = REPO / "scripts" / "generate_openapi.py"
 

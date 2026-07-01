@@ -65,7 +65,13 @@ class PathSettings(BaseSettings):
     """CAND-P1-WORKFLOW-STORAGE-001: workflow storage backend.
     'json' (default) uses the existing JSONFileStore; 'sqlite' and
     'postgres' use the workflows table from storage_migrations.py.
-    Can be overridden at runtime via DATAFORGE_WORKFLOW_BACKEND."""
+    Can be overridden at runtime via DATAFORGE_WORKFLOW_BACKEND.
+
+    .. deprecated::
+        'json' is the dev default and must NOT be used in production.
+        The production security validator will reject WORKFLOW_BACKEND='json'
+        when DATAFORGE_ENV=production.  Use 'sqlite' or 'postgres' instead.
+    """
 
     @property
     def DATA_DIR(self) -> str:

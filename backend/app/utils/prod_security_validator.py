@@ -209,4 +209,15 @@ def validate_production_credentials(settings) -> None:
         msg = f"Production check failed: STORAGE_BACKEND={storage_backend!r}. Production requires 'postgres' storage backend."
         raise ValueError(msg)
 
+    # 5. Workflow backend validation — production requires non-JSON backend
+    # JSON workflow storage is not safe for multi-worker production: no
+    # concurrency control, no atomicity, and writes can corrupt under load.
+    workflow_backend = getattr(settings, "WORKFLOW_BACKEND", "json")
+    if workflow_backend == "json":
+        msg = (
+            "Production check failed: WORKFLOW_BACKEND='json'. "
+            "JSON workflow storage is deprecated for production — use 'sqlite' or 'postgres'."
+        )
+        raise ValueError(msg)
+
     logger.info("Production security credential validation: ALL PASS")
