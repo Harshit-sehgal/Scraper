@@ -83,7 +83,7 @@ def maybe_migrate_from_json(conn: sqlite3.Connection, db_path: Path) -> None:
                         list(row_data.values()),
                     )
             conn.commit()
-        except Exception:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError, ValueError):
             conn.rollback()
             raise
         logger.info(
@@ -380,7 +380,7 @@ def _run_migration_v6(conn: sqlite3.Connection) -> int:
                 WHERE rn = 1
                 """,
             )
-        except Exception:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError):
             conn.execute("DROP TABLE worker_heartbeats")
             conn.execute("ALTER TABLE worker_heartbeats_v5_backup RENAME TO worker_heartbeats")
             raise
@@ -389,7 +389,7 @@ def _run_migration_v6(conn: sqlite3.Connection) -> int:
             try:
                 conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
                 backup_dropped = True
-            except Exception:
+            except (sqlite3.OperationalError, sqlite3.DatabaseError):
                 logger.debug(
                     "L4: deferred DROP of worker_heartbeats_v5_backup failed; will retry on next migration run",
                     exc_info=True,
@@ -397,7 +397,7 @@ def _run_migration_v6(conn: sqlite3.Connection) -> int:
     try:
         conn.execute("DROP TABLE IF EXISTS worker_heartbeats_v5_backup")
         backup_dropped = True
-    except Exception:
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
         logger.debug("L4: explicit DROP of worker_heartbeats_v5_backup failed", exc_info=True)
     return 6
 
