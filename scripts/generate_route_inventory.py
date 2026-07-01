@@ -34,6 +34,7 @@ TENANT_SCOPED_PREFIXES = (
     "/api/download",
     "/api/jobs",
     "/api/recycle_bin",
+    "/api/reviews",
     "/api/exports",
     "/api/templates",
     "/api/usage",

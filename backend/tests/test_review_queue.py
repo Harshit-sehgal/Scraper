@@ -200,3 +200,61 @@ class TestClearReviewQueue:
         rq.clear_review_queue()
         assert rq.get_pending_reviews() == []
         assert rq.get_review("j1") is None
+
+
+# ---------------------------------------------------------------------------
+# API Integration
+# ---------------------------------------------------------------------------
+
+
+class TestReviewApi:
+    """E2E tests for the review API endpoints."""
+
+    def test_list_reviews_returns_empty_list(self, client):
+        """GET /api/reviews returns an empty list when no reviews exist."""
+        resp = client.get("/api/reviews")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "reviews" in body
+        assert body["reviews"] == []
+
+    def test_list_reviews_with_items(self, client):
+        """GET /api/reviews returns queued review items."""
+        rq.submit_for_review("test-job", "test-rec")
+        resp = client.get("/api/reviews")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["reviews"]) == 1
+        assert body["reviews"][0]["job_id"] == "test-job"
+
+    def test_get_review_by_id(self, client):
+        """GET /api/reviews/{id} returns a single review item."""
+        rq.submit_for_review("job-1", "rec-1")
+        items = rq.get_pending_reviews()
+        review_id = items[0]["review_id"]
+        resp = client.get(f"/api/reviews/{review_id}")
+        assert resp.status_code == 200
+        assert resp.json()["job_id"] == "job-1"
+
+    def test_get_review_not_found(self, client):
+        """GET /api/reviews/{id} returns 404 for unknown IDs."""
+        resp = client.get("/api/reviews/nonexistent")
+        assert resp.status_code == 404
+
+    def test_approve_review(self, client):
+        """PATCH /api/reviews/{id}?action=approve approves the item."""
+        rq.submit_for_review("job-2", "rec-2")
+        items = rq.get_pending_reviews()
+        review_id = items[0]["review_id"]
+        resp = client.patch(f"/api/reviews/{review_id}?action=approve")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "approved"
+
+    def test_reject_review(self, client):
+        """PATCH /api/reviews/{id}?action=reject rejects the item."""
+        rq.submit_for_review("job-3", "rec-3")
+        items = rq.get_pending_reviews()
+        review_id = items[0]["review_id"]
+        resp = client.patch(f"/api/reviews/{review_id}?action=reject")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "rejected"

@@ -1119,7 +1119,7 @@
       "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown"
+      "tenant_scoped": "yes"
     },
     {
       "auth_dependency_if_known": "require_principal",
@@ -1135,7 +1135,7 @@
       "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown"
+      "tenant_scoped": "yes"
     },
     {
       "auth_dependency_if_known": "require_principal",
@@ -1151,7 +1151,7 @@
       "response_model_if_known": "dict",
       "router_module": "app.routers.jobs_write",
       "stable_or_experimental": "stable",
-      "tenant_scoped": "unknown"
+      "tenant_scoped": "yes"
     },
     {
       "auth_dependency_if_known": "require_role_with_user",
