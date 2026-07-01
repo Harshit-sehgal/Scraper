@@ -120,3 +120,4 @@ artifacts/benchmarks/
 
 # Coverage reports
 coverage/
+artifacts/frontend_review/
