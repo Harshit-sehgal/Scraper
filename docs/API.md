@@ -11,6 +11,9 @@ This route list was generated from the FastAPI app during the audit. Production 
 | GET | `/` | Public |
 | GET | `/health` | Public liveness |
 | GET | `/ready` | Public readiness; production response is minimal |
+| GET | `/health/browser` | Public liveness (browser pool health) |
+| GET | `/health/db` | Public liveness (database reachability) |
+| GET | `/health/worker` | Public liveness (background worker) |
 | GET | `/app` | Static main dashboard |
 | GET | `/dashboard` | Static semantic dashboard |
 | GET | `/landing` | Static landing page preview |
@@ -21,9 +24,17 @@ This route list was generated from the FastAPI app during the audit. Production 
 | --- | --- | --- |
 | GET | `/api/jobs` | Authenticated user (paginated: `?limit=&cursor=`, returns `next_cursor`) |
 | GET | `/api/jobs/{job_id}` | Authenticated user |
-| GET | `/api/jobs/{job_id}/results` | Authenticated user (paginated: `?limit=&offset=`) |
-| GET | `/api/jobs/{job_id}/events` | Authenticated user (paginated: `?limit=&offset=&level=`) |
+| GET | `/api/jobs/{job_id}/cascade-trace` | Authenticated user |
 | GET | `/api/jobs/{job_id}/debug` | Authenticated user |
+| GET | `/api/jobs/{job_id}/diff` | Authenticated user |
+| GET | `/api/jobs/{job_id}/events` | Authenticated user (paginated: `?limit=&offset=&level=`) |
+| GET | `/api/jobs/{job_id}/network-log` | Authenticated user |
+| GET | `/api/jobs/{job_id}/notification-channels` | Operator or admin |
+| GET | `/api/jobs/{job_id}/quality` | Authenticated user |
+| GET | `/api/jobs/{job_id}/quality/trends` | Authenticated user |
+| GET | `/api/jobs/{job_id}/results` | Authenticated user (paginated: `?limit=&offset=`) |
+| GET | `/api/jobs/{job_id}/screenshot` | Authenticated user |
+| GET | `/api/jobs/{job_id}/structured-events` | Authenticated user |
 | GET | `/api/jobs/{job_id}/diff` | Authenticated user |
 | GET | `/api/jobs/{job_id}/quality` | Authenticated user |
 | GET | `/api/jobs/{job_id}/quality/trends` | Authenticated user |
@@ -40,6 +51,7 @@ This route list was generated from the FastAPI app during the audit. Production 
 | PATCH | `/api/jobs/{job_id}/fetch-strategy` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/headers` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/notification-channels/{channel_id}` | Operator or admin |
+| PATCH | `/api/jobs/{job_id}/results/{record_id}` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/strategy` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/user-agent` | Operator or admin |
 | PATCH | `/api/jobs/{job_id}/wait-conditions` | Operator or admin |
@@ -52,6 +64,14 @@ This route list was generated from the FastAPI app during the audit. Production 
 | GET | `/api/jobs/{job_id}/export/json` | Operator or admin |
 | GET | `/api/jobs/{job_id}/export/excel` | Operator or admin |
 | GET | `/api/download/{filename}` | Operator or admin |
+
+## Review Routes
+
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/reviews` | Authenticated user |
+| GET | `/api/reviews/{review_id}` | Authenticated user |
+| PATCH | `/api/reviews/{review_id}` | Operator or admin |
 
 ## Recycle Bin Routes
 
@@ -67,6 +87,7 @@ This route list was generated from the FastAPI app during the audit. Production 
 | Method | Path | Intended Access |
 | --- | --- | --- |
 | POST | `/api/discover` | Operator or admin |
+| POST | `/api/discover/sitemap` | Operator or admin |
 | POST | `/api/schema/suggest` | Operator or admin |
 | POST | `/api/url/analyze` | Operator or admin |
 

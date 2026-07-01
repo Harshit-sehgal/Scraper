@@ -28,7 +28,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/compliance/gdpr/forget` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/discover/sitemap` | protected | operator-or-admin | require_principal | yes | no | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/download/{filename}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/download/{filename}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | unknown | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
@@ -43,9 +43,9 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `GET` | `/api/jobs/{job_id}/diff` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs/{job_id}/email` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs/{job_id}/events` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `GET` | `/api/jobs/{job_id}/export/csv` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/jobs/{job_id}/export/excel` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/jobs/{job_id}/export/json` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/jobs/{job_id}/export/csv` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/jobs/{job_id}/export/excel` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/jobs/{job_id}/export/json` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `PATCH` | `/api/jobs/{job_id}/extraction` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/fetch-strategy` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/jobs/{job_id}/headers` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |

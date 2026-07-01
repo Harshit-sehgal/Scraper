@@ -20,6 +20,7 @@
 | `scripts/run_worker.py` | `DATAFORGE_JOB_ID` | Acceptable worker script |
 | `scripts/manual_test.py` | `DATAFORGE_API_BASE` | Manual script |
 | `scripts/staging_smoke_test.py` | `STATE_FILE_PATH` test override | Smoke script |
+| `backend/app/distributed.py` | `DATAFORGE_NODE_ROLE` | Acceptable direct env read (role: api/worker/scheduler/standalone) |
 
 ## Dynamic Env Reads In `config/`
 

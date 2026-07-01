@@ -1,6 +1,6 @@
 # DataForge Scraper - File Inventory
 
-_Generated: 2026-06-29T21:34:10+00:00 from `35237` files in the current checkout._
+_Generated: 2026-07-01T20:50:25+00:00 from `45907` files in the current checkout._
 
 This inventory accounts for every file found by `os.walk()` from the repository root. Project-owned text files were opened and scanned in full. Vendor, cache, generated, binary, archive, and log files were listed but not deep-inspected.
 
@@ -12,56 +12,57 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Metric | Count |
 | --- | ---: |
-| Total files inventoried | 35237 |
-| Project-owned files | 1291 |
-| Project-owned files deeply inspected | 1283 |
-| Skipped generated/vendor/binary/cache/log/archive files | 33954 |
-| Files needing follow-up | 4 |
+| Total files inventoried | 45907 |
+| Project-owned files | 7784 |
+| Project-owned files deeply inspected | 2315 |
+| Skipped generated/vendor/binary/cache/log/archive files | 43592 |
+| Files needing follow-up | 5455 |
 
 ## By Classification
 
 | Classification | Total | Project-owned | Deep-inspected | Skipped |
 | --- | ---: | ---: | ---: | ---: |
-| backend_source | 275 | 275 | 275 | 0 |
-| frontend_source | 96 | 96 | 96 | 0 |
-| test | 678 | 678 | 677 | 1 |
-| script | 51 | 51 | 51 | 0 |
-| config | 57 | 57 | 54 | 3 |
-| documentation | 113 | 113 | 113 | 0 |
-| docker_deployment | 14 | 14 | 14 | 0 |
-| database_migration | 3 | 3 | 3 | 0 |
-| asset | 0 | 0 | 0 | 0 |
-| generated | 383 | 0 | 0 | 383 |
-| vendor | 17225 | 0 | 0 | 17225 |
-| cache | 5668 | 0 | 0 | 5668 |
-| binary | 653 | 0 | 0 | 653 |
-| archive | 1 | 0 | 0 | 1 |
-| log | 10016 | 0 | 0 | 10016 |
-| unknown | 4 | 4 | 0 | 4 |
+| backend_source | 301 | 301 | 301 | 0 |
+| frontend_source | 98 | 98 | 98 | 0 |
+| test | 700 | 700 | 699 | 1 |
+| script | 56 | 56 | 56 | 0 |
+| config | 388 | 388 | 380 | 8 |
+| documentation | 694 | 694 | 694 | 0 |
+| docker_deployment | 69 | 69 | 69 | 0 |
+| database_migration | 18 | 18 | 18 | 0 |
+| asset | 5 | 5 | 0 | 5 |
+| generated | 624 | 0 | 0 | 624 |
+| vendor | 16000 | 0 | 0 | 16000 |
+| cache | 8596 | 0 | 0 | 8596 |
+| binary | 1857 | 0 | 0 | 1857 |
+| archive | 6 | 0 | 0 | 6 |
+| log | 11040 | 0 | 0 | 11040 |
+| unknown | 5455 | 5455 | 0 | 5455 |
 
 ## Top-Level Counts
 
 | Top-level path | Files |
 | --- | ---: |
-| `.venv/` | 11073 |
-| `artifacts/` | 10048 |
+| `artifacts/` | 10983 |
+| `.venv/` | 9848 |
+| `.claude/` | 8089 |
 | `node_modules/` | 6151 |
-| `.git/` | 2637 |
-| `backend/` | 2559 |
-| `.mypy_cache/` | 1415 |
-| `MagicMock/` | 572 |
-| `frontend/` | 366 |
+| `.git/` | 3910 |
+| `backend/` | 2988 |
+| `.mypy_cache/` | 1561 |
+| `MagicMock/` | 1345 |
+| `frontend/` | 608 |
 | `docs/` | 101 |
 | `.agents/` | 81 |
 | `scripts/` | 79 |
-| `.ruff_cache/` | 59 |
+| `.ruff_cache/` | 67 |
 | `playwright-report/` | 18 |
 | `.github/` | 11 |
-| `data/` | 8 |
+| `data/` | 9 |
+| `logs/` | 6 |
 | `.pytest_cache/` | 5 |
-| `logs/` | 4 |
 | `grafana/` | 3 |
-| `.claude/` | 2 |
+| `.coverage/` | 1 |
 | `.dockerignore/` | 1 |
 | `.env/` | 1 |
 | `.env.example/` | 1 |
@@ -83,7 +84,6 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `THIRD_PARTY_NOTICES.md/` | 1 |
 | `alertmanager.yml/` | 1 |
 | `architecture_validator.py/` | 1 |
-| `auth/` | 1 |
 | `blackbox.yml/` | 1 |
 | `dataforge_denylist.sqlite/` | 1 |
 | `docker-compose.dev.yml/` | 1 |
@@ -101,7 +101,6 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 | `prometheus_alerts.yml/` | 1 |
 | `prometheus_web.yml/` | 1 |
 | `pyproject.toml/` | 1 |
-| `setup/` | 1 |
 | `test_js_sdk.mjs/` | 1 |
 | `uv.lock/` | 1 |
 | `.vscode/` | 1 |
@@ -112,36 +111,36 @@ The complete per-file records with the required fields live in `FILE_AUDIT_LEDGE
 
 | Extension | Files |
 | --- | ---: |
-| `.md` | 10071 |
-| `.py` | 7140 |
-| `(none)` | 3797 |
-| `.js` | 2868 |
-| `.pyc` | 2678 |
-| `.json` | 2417 |
+| `.py` | 11626 |
+| `.md` | 11522 |
+| `(none)` | 5185 |
+| `.json` | 4191 |
+| `.js` | 3440 |
+| `.db` | 1677 |
+| `.pyc` | 1513 |
 | `.pyi` | 1217 |
 | `.ts` | 889 |
-| `.db` | 656 |
+| `.map` | 577 |
 | `.cjs` | 534 |
-| `.mjs` | 457 |
-| `.map` | 457 |
+| `.html` | 509 |
+| `.mjs` | 482 |
 | `.so` | 385 |
-| `.txt` | 187 |
+| `.png` | 217 |
+| `.txt` | 200 |
+| `.yml` | 174 |
 | `.h` | 169 |
+| `.log` | 147 |
 | `.typed` | 111 |
-| `.html` | 99 |
 | `.c` | 99 |
+| `.sh` | 98 |
+| `.css` | 77 |
 | `.f90` | 61 |
-| `.log` | 60 |
-| `.yml` | 59 |
 | `.pxd` | 54 |
 | `.jsonl` | 52 |
 | `.jst` | 50 |
-| `.png` | 42 |
 | `.cts` | 41 |
+| `.csv` | 38 |
 | `.pyx` | 37 |
-| `.mts` | 37 |
-| `.csv` | 33 |
-| `.sh` | 33 |
 
 ## Skip Policy
 

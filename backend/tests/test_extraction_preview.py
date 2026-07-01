@@ -50,8 +50,22 @@ class TestExtractionPreview:
         # auto mode is valid as long as urls are provided
         assert resp.status_code in (200, 400, 422)
 
-    def test_preview_response_shape(self, client):
+    def test_preview_response_shape(self, client, monkeypatch):
         """Preview response includes expected fields."""
+
+        from app.scraper_models import ScrapeAttemptResult
+
+        async def fake_scrape_url_attempt(url, schema_fields, **kwargs):
+            return ScrapeAttemptResult(
+                records=[{"title": "Example Domain"}],
+                final_url=url,
+                html="<html>...</html>",
+                fetch_method="httpx",
+                extraction_method="llm",
+            )
+
+        monkeypatch.setattr("app.scraper.scrape_url_attempt", fake_scrape_url_attempt)
+
         resp = client.post(
             "/api/scraper/preview",
             json={

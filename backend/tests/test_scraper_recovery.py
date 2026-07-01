@@ -650,6 +650,7 @@ class TestScopedSelectorCleanup:
             category=FailureCategory.SELECTOR_DECAY,
             confidence=0.85,
             to_dict=lambda: {"category": "selector_decay", "confidence": 0.85},
+            reason="selector decay detected",
         )
 
         mock_executor = MagicMock()
@@ -668,6 +669,7 @@ class TestScopedSelectorCleanup:
             patch("app.crawl_state.get_crawl_state"),
             patch("app.acquisition_telemetry.get_acquisition_telemetry"),
             patch("app.scraper_recovery_integration.AcquisitionLineage"),
+            patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=[{"title": "Product 42"}]),
         ):
             results, stats = await scrape_url_with_recovery(
                 url="https://example.com/products/42",
