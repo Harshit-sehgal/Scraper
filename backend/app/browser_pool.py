@@ -21,6 +21,7 @@ import random
 import threading
 import time
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -472,7 +473,7 @@ class BrowserPool:
         viewport_width: int | None = None,
         viewport_height: int | None = None,
         user_agent: str | None = None,
-    ):
+    ) -> AsyncIterator[tuple[str, Any]]:
         """Acquire an isolated browser context via async context manager.
 
         Yields ``(context_id, context)``.  The context gets fresh
