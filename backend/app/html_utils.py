@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 from contextlib import suppress
 
 import httpx
+
+try:
+    from playwright.async_api import Error as PlaywrightError
+except ImportError:
+    PlaywrightError = RuntimeError  # type: ignore[misc,assignment]
 from bs4 import BeautifulSoup
 
 from app.browser_network_capture import (
@@ -510,30 +515,30 @@ async def _playwright_navigate_and_stabilize(
             _validate_url_safe(final_url)
         except ValueError:
             logger.warning("[SSRF] Playwright navigated to blocked target %s from %s — aborting", page.url, url)
-            with suppress(RuntimeError, OSError):
+            with suppress(RuntimeError, OSError, PlaywrightError):
                 await page.close()
             raise
 
         # Custom navigation wait (Roadmap Wave 5 Item 3)
         if wait_for_navigation:
-            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError, PlaywrightError):
                 await page.wait_for_event("framenavigated", timeout=initial_timeout)
 
         # Custom selector wait (Roadmap Wave 5 Item 3)
         if wait_for_selector:
-            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError, PlaywrightError):
                 selector_timeout = wait_for_timeout if wait_for_timeout is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
                 await page.wait_for_selector(wait_for_selector, timeout=selector_timeout)
 
         # Custom function wait (Roadmap Wave 5 Item 3)
         if wait_for_function:
-            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError, PlaywrightError):
                 function_timeout = wait_for_timeout if wait_for_timeout is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
                 await page.wait_for_function(wait_for_function, timeout=function_timeout)
 
         # Fixed-timeout wait (Roadmap Wave 5 Item 3)
         if wait_for_timeout is not None and wait_for_selector is None and wait_for_function is None:
-            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError, PlaywrightError):
                 await page.wait_for_timeout(int(wait_for_timeout))
 
         intel = get_domain_intelligence().get_intelligence(url)
@@ -541,7 +546,7 @@ async def _playwright_navigate_and_stabilize(
         if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
             loading_selectors = [".loading", ".spinner", ".loader", "[class*='Loading']", "[class*='Spinner']"]
             for sel in loading_selectors:
-                with suppress(asyncio.TimeoutError, RuntimeError, OSError):
+                with suppress(asyncio.TimeoutError, RuntimeError, OSError, PlaywrightError):
                     await page.wait_for_selector(sel, state="hidden", timeout=2000)
 
         telemetry = get_telemetry_state()
@@ -554,7 +559,7 @@ async def _playwright_navigate_and_stabilize(
         settle_timeout = max(settle_timeout, 3.0)
 
         min_wait_ms = 2500
-        with suppress(asyncio.TimeoutError, RuntimeError, OSError, ValueError):
+        with suppress(asyncio.TimeoutError, RuntimeError, OSError, ValueError, PlaywrightError):
             await page.wait_for_function(
                 f"""() => {{
                      const body = document.body;
@@ -602,7 +607,7 @@ async def _playwright_navigate_and_stabilize(
             await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
         return js_render_delay_ms
-    except (RuntimeError, OSError, AttributeError, ValueError, TimeoutError) as e:
+    except (RuntimeError, OSError, AttributeError, ValueError, TimeoutError, PlaywrightError) as e:
         try:
             partial_html = await page.content()
             if detect_anti_bot(partial_html) > 0.5:
@@ -611,7 +616,7 @@ async def _playwright_navigate_and_stabilize(
                 raise ValueError(_ab_msg)
         except ValueError:
             raise
-        except (TimeoutError, RuntimeError, OSError):
+        except (TimeoutError, RuntimeError, OSError, PlaywrightError):
             logger.debug("Secondary load state wait failed for %s", url, exc_info=True)
 
         logger.warning("[Scraper] %s slow load for %s: %s. Falling to domcontentloaded", strategy.value, url, e)
@@ -644,7 +649,7 @@ async def _collect_playwright_results(
             from app.anti_bot_engine import get_anti_bot_engine
 
             get_anti_bot_engine().update_cookies(domain, cookie_header)
-    except (RuntimeError, OSError, AttributeError, ValueError, TimeoutError) as cookie_err:
+    except (RuntimeError, OSError, AttributeError, ValueError, TimeoutError, PlaywrightError) as cookie_err:
         logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
 
     html = await page.content()
@@ -667,7 +672,7 @@ async def _detect_anti_bot_and_fallback(
 
     html_content = ""
     if page:
-        with suppress(RuntimeError, OSError):
+        with suppress(RuntimeError, OSError, PlaywrightError):
             html_content = await page.content()
 
     err_msg = str(e).lower()
@@ -771,7 +776,7 @@ async def fetch_page_content(
 
     except ValueError:
         raise
-    except (RuntimeError, OSError, AttributeError, TimeoutError) as e:
+    except (RuntimeError, OSError, AttributeError, TimeoutError, PlaywrightError) as e:
         return await _detect_anti_bot_and_fallback(page, e, url, extra_headers, timeout_ms)
     finally:
         if browser_metered_initial and browser_meter_started_at is not None:
@@ -788,7 +793,7 @@ async def fetch_page_content(
                     duration_ms=elapsed_seconds * 1000,
                 )
         if page:
-            with suppress(RuntimeError, OSError):
+            with suppress(RuntimeError, OSError, PlaywrightError):
                 await page.close()
 
 

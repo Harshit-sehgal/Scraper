@@ -37,6 +37,11 @@ from typing import Any
 from app.models import Workflow, WorkflowStepType
 from app.url_safety import validate_public_http_url
 
+try:
+    from playwright.async_api import Error as PlaywrightError
+except ImportError:
+    PlaywrightError = RuntimeError  # type: ignore[misc,assignment]
+
 logger = logging.getLogger(__name__)
 
 # Cap on how long a single step can wait
@@ -103,7 +108,7 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
                 )
                 try:
                     await page.wait_for_load_state("networkidle", timeout=5000)
-                except (RuntimeError, OSError, ValueError):
+                except (RuntimeError, OSError, ValueError, PlaywrightError):
                     logger.debug("networkidle timeout during goto step %d, continuing", step.order)
                 await asyncio.sleep(PAGE_SETTLE_SECONDS)
                 event["url"] = page.url
@@ -157,7 +162,7 @@ async def _replay_steps(page: Any, workflow: Workflow) -> list[dict[str, Any]]:
                 # EXTRACT is handled separately by the extraction schema
                 event["status"] = "deferred"
 
-        except (RuntimeError, OSError, ValueError, TypeError) as exc:
+        except (RuntimeError, OSError, ValueError, TypeError, PlaywrightError) as exc:
             logger.warning("Workflow step %d (%s) failed: %s", step.order, step.step_type.value, exc)
             event["status"] = "failed"
             event["error"] = str(exc)
@@ -238,7 +243,7 @@ async def _extract_records_from_page(
             }""",
             [{"name": f.name, "field_type": f.field_type.value} for f in workflow.extraction_schema],
         )
-    except (RuntimeError, OSError, ValueError) as exc:
+    except (RuntimeError, OSError, ValueError, PlaywrightError) as exc:
         logger.warning("Page extraction failed: %s", exc)
 
     return records
@@ -353,10 +358,10 @@ async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
             )
             try:
                 await page.wait_for_load_state("networkidle", timeout=5000)
-            except (RuntimeError, OSError, TimeoutError):
+            except (RuntimeError, OSError, TimeoutError, PlaywrightError):
                 logger.debug("networkidle timeout during initial navigation")
             await asyncio.sleep(PAGE_SETTLE_SECONDS)
-        except (RuntimeError, OSError, ValueError) as exc:
+        except (RuntimeError, OSError, ValueError, PlaywrightError) as exc:
             logger.warning("Failed to navigate to start URL: %s", exc)
             return {
                 "workflow_id": workflow.id,
@@ -375,7 +380,7 @@ async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
         try:
             final_url = page.url
             page_title = await page.title()
-        except (RuntimeError, OSError, ValueError):
+        except (RuntimeError, OSError, ValueError, PlaywrightError):
             final_url = workflow.start_url
             page_title = ""
 
@@ -394,7 +399,7 @@ async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
             "timestamp": start_time.isoformat(),
         }
 
-    except (RuntimeError, OSError, ValueError) as exc:
+    except (RuntimeError, OSError, ValueError, PlaywrightError) as exc:
         logger.exception("Workflow execution failed for %s", workflow.id)
         return {
             "workflow_id": workflow.id,
@@ -406,7 +411,7 @@ async def execute_workflow(workflow: Workflow) -> dict[str, Any]:
         if page is not None:
             try:
                 await page.close()
-            except (RuntimeError, OSError, ValueError):
+            except (RuntimeError, OSError, ValueError, PlaywrightError):
                 logger.debug("Failed to close Playwright page after workflow execution")
 
 
@@ -437,7 +442,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
             workflow.start_url,
             source=f"workflow {workflow.id!r} start_url (fallback path)",
         )
-        with contextlib.suppress(TimeoutError, RuntimeError):
+        with contextlib.suppress(TimeoutError, RuntimeError, PlaywrightError):
             await page.wait_for_load_state("networkidle", timeout=5000)
         await asyncio.sleep(PAGE_SETTLE_SECONDS)
 
@@ -449,7 +454,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
         sample_records = sample_records[:5]  # Limit to 5 for preview
 
         page_title = ""
-        with contextlib.suppress(RuntimeError, OSError):
+        with contextlib.suppress(RuntimeError, OSError, PlaywrightError):
             page_title = await page.title()
 
         return {
@@ -463,7 +468,7 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
             "warnings": [] if sample_records else ["No sample rows matched the extraction schema."],
         }
 
-    except (RuntimeError, OSError, ValueError) as exc:
+    except (RuntimeError, OSError, ValueError, PlaywrightError) as exc:
         logger.exception("Workflow preview failed for %s", workflow.id)
         return {
             "workflow_id": workflow.id,
@@ -475,5 +480,5 @@ async def preview_workflow(workflow: Workflow) -> dict[str, Any]:
         if page is not None:
             try:
                 await page.close()
-            except (RuntimeError, OSError, ValueError):
+            except (RuntimeError, OSError, ValueError, PlaywrightError):
                 logger.debug("Failed to close Playwright page after workflow preview")

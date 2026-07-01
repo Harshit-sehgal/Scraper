@@ -27,6 +27,13 @@ from typing import Any
 
 from app.url_safety import validate_public_http_url
 
+# Playwright Error — lazy import so the module doesn't require Playwright
+# at import time (the sync path works without it).
+try:
+    from playwright.async_api import Error as PlaywrightError
+except ImportError:
+    PlaywrightError = RuntimeError  # type: ignore[misc,assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -326,7 +333,7 @@ async def _async_paginate_next_button(
                 if await btn.is_visible(timeout=2000):
                     next_btn = btn
                     break
-            except (TimeoutError, RuntimeError, OSError, AttributeError):
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError):
                 logger.debug("Selector not found: %s", sel)
                 continue
 
@@ -337,7 +344,7 @@ async def _async_paginate_next_button(
         try:
             async with page.expect_navigation(timeout=10000):  # type: ignore[var-annotated]
                 await next_btn.click()
-        except (TimeoutError, RuntimeError, OSError) as exc:
+        except (TimeoutError, RuntimeError, OSError, PlaywrightError) as exc:
             logger.warning("Next button click failed: %s", exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -397,9 +404,9 @@ async def _async_paginate_infinite_scroll(
                     _DOM_STABILIZATION_JS,
                     timeout=max(1000, int(config.delay_between_pages * 1000)),
                 )
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError):
                 logger.debug("DOM stabilization timeout during infinite scroll, continuing")
-        except (TimeoutError, RuntimeError, OSError, AttributeError, StopAsyncIteration, asyncio.CancelledError) as exc:
+        except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError) as exc:
             logger.warning("Infinite scroll failed on attempt %d: %s", scroll_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -428,7 +435,7 @@ async def _async_paginate_infinite_scroll(
         result.stopped_reason = "max_pages"  # Reset scroll position to top
     try:
         await page.evaluate("window.scrollTo(0, 0)")
-    except (TimeoutError, RuntimeError, OSError, AttributeError, StopAsyncIteration, asyncio.CancelledError) as exc:
+    except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError) as exc:
         logger.debug("Failed to reset scroll position: %s", exc)
 
     result.total_records = len(result.records)
@@ -477,7 +484,7 @@ async def _async_paginate_load_more(
                 if await btn.is_visible(timeout=1000):
                     load_btn = btn
                     break
-            except (TimeoutError, RuntimeError, OSError, AttributeError):
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError):
                 logger.debug("Load-more button not found for selector: %s", sel)
                 continue
 
@@ -496,9 +503,9 @@ async def _async_paginate_load_more(
                     _DOM_STABILIZATION_JS,
                     timeout=max(1000, int(config.delay_between_pages * 1000)),
                 )
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError):
                 logger.debug("DOM stabilization timeout during load-more, continuing")
-        except (TimeoutError, RuntimeError, OSError, AttributeError) as exc:
+        except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError) as exc:
             logger.warning("Load-more click failed on attempt %d: %s", click_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)
@@ -599,7 +606,7 @@ async def _async_paginate_page_number(
                         break
                 if clicked:
                     break
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError):
                 logger.debug("Failed to find page link for page %d with selector %s", page_num, sel)
                 continue
 
@@ -724,12 +731,12 @@ async def _async_paginate_url_pattern(
             # Short wait for JS rendering
             try:
                 await page.wait_for_load_state("networkidle", timeout=5000)
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError):
                 logger.debug("networkidle timeout on page %d, continuing with domcontentloaded", page_num)
 
             # Wait for DOM stabilization
             await asyncio.sleep(config.delay_between_pages)
-        except (TimeoutError, RuntimeError, OSError, AttributeError, ValueError) as exc:
+        except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError, ValueError) as exc:
             logger.warning("Failed to navigate to page %d: %s", page_num, exc)
             result.stopped_reason = "error"
             result.error = str(exc)

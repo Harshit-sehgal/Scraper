@@ -245,7 +245,7 @@ async def extract_with_profile(
 
             try:
                 await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
-            except (TimeoutError, RuntimeError, OSError):
+            except (TimeoutError, RuntimeError, OSError, Error):
                 logger.warning("[ProfileExtractor] networkidle timeout, trying domcontentloaded")
                 await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_FALLBACK_TIMEOUT)
 
@@ -253,7 +253,7 @@ async def extract_with_profile(
             if wait_for_sel:
                 try:
                     await page.wait_for_selector(wait_for_sel, timeout=max_wait * 1000)
-                except (TimeoutError, RuntimeError, OSError):
+                except (TimeoutError, RuntimeError, OSError, Error):
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",
                         wait_for_sel,
@@ -269,7 +269,7 @@ async def extract_with_profile(
                 await asyncio.sleep(settings.PAGE_SETTLE_DELAY / 2)
                 try:
                     count = await container_locator.count()
-                except (RuntimeError, OSError, ValueError):
+                except (RuntimeError, OSError, ValueError, Error):
                     logger.debug("container_locator.count() failed, defaulting to 0", exc_info=True)
                     count = 0
                 if count > 0 and count == prev_count:

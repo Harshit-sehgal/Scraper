@@ -50,6 +50,11 @@ from app.selector_profiles.loader import match_profile_for_url, try_profile_extr
 from app.utils.log_redaction import redact_url
 from app.zero_result_classifier import classify_zero_result
 
+try:
+    from playwright.async_api import Error as PlaywrightError
+except ImportError:
+    PlaywrightError = RuntimeError  # type: ignore[misc,assignment]
+
 if TYPE_CHECKING:
     from app.models import SchemaField
     from app.recovery_strategies import AttemptContext
@@ -159,7 +164,7 @@ async def _try_profile_extraction(
         matched_profile = match_profile_for_url(url)
         try:
             profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
-        except (RuntimeError, OSError, TypeError, ValueError):
+        except (RuntimeError, OSError, TypeError, ValueError, PlaywrightError):
             get_crawl_policy().record_result(url, success=False)
             raise
 
@@ -598,6 +603,7 @@ async def _execute_fetch_phase(
         AttributeError,
         httpx.HTTPError,
         httpx.TimeoutException,
+        PlaywrightError,
     ) as e:
         fetch_ms = (time.time() - fetch_start) * 1000
         strategy_engine.record_fetch_attempt(

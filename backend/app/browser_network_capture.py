@@ -26,6 +26,11 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+try:
+    from playwright.async_api import Error as PlaywrightError
+except ImportError:
+    PlaywrightError = RuntimeError  # type: ignore[misc,assignment]
+
 
 # ---------------------------------------------------------------------------
 # Global capture registry
@@ -218,7 +223,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
     raw_cookies: list[dict[str, Any]] = []
     try:
         raw_cookies = await page.context.cookies()
-    except (RuntimeError, OSError, AttributeError, TimeoutError) as exc:
+    except (RuntimeError, OSError, AttributeError, TimeoutError, PlaywrightError) as exc:
         logger.debug("[BrowserState] Could not read context cookies: %s", exc)
 
     storage_snapshot: dict[str, Any] = {}
@@ -252,7 +257,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
                     cacheStorageKeys: cacheStorageKeys || []
                 };
             }""")
-    except (RuntimeError, OSError, AttributeError, TimeoutError) as exc:
+    except (RuntimeError, OSError, AttributeError, TimeoutError, PlaywrightError) as exc:
         logger.debug("[BrowserState] Could not read browser storage: %s", exc)
     if not isinstance(storage_snapshot, dict):
         storage_snapshot = {}
@@ -547,7 +552,7 @@ async def setup_network_capture(page) -> tuple[list[dict], list[dict]]:
                 resource_type,
             )
 
-        except (RuntimeError, OSError, AttributeError, TimeoutError) as e:
+        except (RuntimeError, OSError, AttributeError, TimeoutError, PlaywrightError) as e:
             logger.debug("[BrowserNetwork] Error capturing response: %s", e)
 
     captured_console: list[dict[str, Any]] = []
@@ -555,7 +560,7 @@ async def setup_network_capture(page) -> tuple[list[dict], list[dict]]:
     async def _on_console(msg: Any) -> None:
         try:
             args = [await arg.json_value() for arg in msg.args]
-        except (RuntimeError, OSError, ValueError, TypeError):
+        except (RuntimeError, OSError, ValueError, TypeError, PlaywrightError):
             args = [str(arg) for arg in msg.args]
         location = getattr(msg, "location", None)
         if isinstance(location, dict):

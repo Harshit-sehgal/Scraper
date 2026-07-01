@@ -38,6 +38,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+try:
+    from playwright.async_api import Error as PlaywrightError
+except ImportError:
+    PlaywrightError = RuntimeError  # type: ignore[misc,assignment]
+
 
 def build_cookie_header_from_dict(cookies: list[dict[str, Any]]) -> str:
     """Render a Playwright-style ``[{name, value, ...}, ...]`` cookie list
@@ -128,7 +133,7 @@ async def harvest_cf_clearance(
         try:
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=int(actual_render_wait * 1000))
-            except (TimeoutError, KeyError, ValueError, OSError) as exc:
+            except (TimeoutError, KeyError, ValueError, OSError, PlaywrightError) as exc:
                 logger.debug("CF harvester initial render failure (expected for challenges): %s", exc)
 
             # Poll cookies every second up to actual_timeout seconds
@@ -182,10 +187,10 @@ async def harvest_cf_clearance(
             # when the polling loop exits early or the outer handler fails.
             try:
                 await page.close()
-            except (RuntimeError, OSError, ValueError):
+            except (RuntimeError, OSError, ValueError, PlaywrightError):
                 logger.debug("CF harvester page.close() failed (ignored)")
 
-    except (ImportError, AttributeError, RuntimeError, ValueError, TypeError, OSError) as exc:
+    except (ImportError, AttributeError, RuntimeError, ValueError, TypeError, OSError, PlaywrightError) as exc:
         try:
             from app.metrics_collector import record_cf_harvest_attempt
 
@@ -202,5 +207,5 @@ async def harvest_cf_clearance(
                 result = release(context)
                 if hasattr(result, "__await__"):
                     await result  # type: ignore[func-returns-value]
-            except (RuntimeError, ValueError, TypeError, OSError):
+            except (RuntimeError, ValueError, TypeError, OSError, PlaywrightError):
                 pass

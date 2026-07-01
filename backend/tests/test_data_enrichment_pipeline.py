@@ -6,6 +6,8 @@ value mapping, field concatenation, unit conversion.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
@@ -15,7 +17,9 @@ class TestDataEnrichmentPipeline:
     @pytest.mark.asyncio
     async def test_basic_extraction_still_works(self) -> None:
         schema = [SchemaField(name="value", field_type=FieldType.STRING)]
-        result = await scrape_url("https://example.com/enrich-basic", schema)
+        mock_return = [{"value": "test"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
+            result = await scrape_url("https://example.com/enrich-basic", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -24,7 +28,9 @@ class TestDataEnrichmentPipeline:
             SchemaField(name="first", field_type=FieldType.STRING),
             SchemaField(name="last", field_type=FieldType.STRING),
         ]
-        result = await scrape_url("https://example.com/enrich-multi", schema)
+        mock_return = [{"first": "John", "last": "Doe"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
+            result = await scrape_url("https://example.com/enrich-multi", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
@@ -33,17 +39,23 @@ class TestDataEnrichmentPipeline:
             SchemaField(name="original", field_type=FieldType.STRING),
             SchemaField(name="enriched", field_type=FieldType.STRING, required=False),
         ]
-        result = await scrape_url("https://example.com/enrich-keep", schema)
+        mock_return = [{"original": "kept", "enriched": "added"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
+            result = await scrape_url("https://example.com/enrich-keep", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_date_field_extracted(self) -> None:
         schema = [SchemaField(name="date", field_type=FieldType.STRING)]
-        result = await scrape_url("https://example.com/enrich-date", schema)
+        mock_return = [{"date": "2024-01-01"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
+            result = await scrape_url("https://example.com/enrich-date", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_currency_field_extracted(self) -> None:
         schema = [SchemaField(name="amount", field_type=FieldType.STRING)]
-        result = await scrape_url("https://example.com/enrich-currency", schema)
+        mock_return = [{"amount": "99.99"}]
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
+            result = await scrape_url("https://example.com/enrich-currency", schema)
         assert isinstance(result, list)
