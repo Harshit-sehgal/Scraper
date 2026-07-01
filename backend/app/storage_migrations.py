@@ -671,7 +671,7 @@ def ensure_required_tables(conn, execute_fn: Callable) -> None:
             logger.warning("CREATE INDEX failed: %s — %s", idx_sql, op_err)
 
 
-def migrate_worker_heartbeats_v6(conn, execute_fn: Callable, fetch_one_fn: Callable) -> None:
+def migrate_worker_heartbeats_v6(conn, _execute_fn: Callable, _fetch_one_fn: Callable) -> None:
     """Schema v6: composite primary key on worker_heartbeats."""
     with conn.cursor() as cur:
         cur.execute("SAVEPOINT migrate_wh_v6")
@@ -703,7 +703,7 @@ def migrate_worker_heartbeats_v6(conn, execute_fn: Callable, fetch_one_fn: Calla
                 """,
             )
             cur.execute("DROP TABLE worker_heartbeats_v5_backup")
-        except Exception:
+        except (RuntimeError, OSError, ValueError):
             cur.execute("ROLLBACK TO SAVEPOINT migrate_wh_v6")
             logger.exception("worker_heartbeats v5→v6 migration failed")
             raise
@@ -787,11 +787,11 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
             for col in ["org_id", "project_id"]:
                 try:
                     execute_fn(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT ''")
-                except Exception:
+                except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                     logger.debug("ALTER TABLE jobs ADD COLUMN %s failed", col)
                 try:
                     execute_fn(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT ''")
-                except Exception:
+                except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                     logger.debug("ALTER TABLE recycle_bin ADD COLUMN %s failed", col)
 
         if current < 8:
@@ -832,7 +832,7 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
             ]:
                 try:
                     execute_fn(conn, idx_sql)
-                except Exception:
+                except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                     logger.debug("CREATE INDEX failed: %s", idx_sql)
 
         if current < 9:
@@ -840,7 +840,7 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                 try:
                     execute_fn(conn, f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS headers TEXT DEFAULT '{{}}'")
                     execute_fn(conn, f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS cookies TEXT DEFAULT '{{}}'")
-                except Exception:
+                except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                     logger.debug("ALTER TABLE %s ADD COLUMN headers/cookies failed", table_name)
             current = 9
 
@@ -862,7 +862,7 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                             conn,
                             f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_ddl}",
                         )
-                    except Exception:
+                    except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                         logger.debug(
                             "ALTER TABLE %s ADD COLUMN %s failed",
                             table_name,
@@ -885,7 +885,7 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                             conn,
                             f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_ddl}",
                         )
-                    except Exception:
+                    except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                         logger.debug(
                             "ALTER TABLE %s ADD COLUMN %s failed",
                             table_name,
@@ -912,7 +912,7 @@ def run_postgres_migrations(conn, execute_fn: Callable, fetch_one_fn: Callable) 
                             conn,
                             f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_ddl}",
                         )
-                    except Exception:
+                    except (sqlite3.OperationalError, sqlite3.DatabaseError, RuntimeError, ValueError):
                         logger.debug(
                             "ALTER TABLE %s ADD COLUMN %s failed",
                             table_name,
