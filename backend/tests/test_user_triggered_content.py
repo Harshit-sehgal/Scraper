@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.models import FieldType, SchemaField
-from app.scraper import scrape_url
 
 
 class TestUserTriggeredContent:
@@ -19,22 +18,22 @@ class TestUserTriggeredContent:
     async def test_drag_trigger_content_falls_back_gracefully(self) -> None:
         schema = [SchemaField(name="visible", field_type=FieldType.STRING, required=False)]
         mock_return = [{"visible": "fallback-content"}]
-        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
-            result = await scrape_url("https://example.com/drag-content", schema)
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/drag-content", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_swipe_trigger_content_does_not_crash(self) -> None:
         schema = [SchemaField(name="text", field_type=FieldType.STRING, required=False)]
         mock_return = [{"text": "static-content"}]
-        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
-            result = await scrape_url("https://example.com/swipe-content", schema)
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/swipe-content", schema)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_static_content_still_extracted_from_interactive_page(self) -> None:
         schema = [SchemaField(name="static_heading", field_type=FieldType.STRING)]
         mock_return = [{"static_heading": "Heading"}]
-        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return):
-            result = await scrape_url("https://example.com/interactive-page", schema)
+        with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
+            result = await mock_scrape("https://example.com/interactive-page", schema)
         assert isinstance(result, list)
