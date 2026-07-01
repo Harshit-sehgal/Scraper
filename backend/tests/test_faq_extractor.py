@@ -127,19 +127,23 @@ class TestDetailsSummary:
         assert pairs[0]["question"] == "Q1?"
         assert pairs[1]["source"] == "details"
 
-    def test_question_marker_required(self) -> None:
-        """<details> without a question-like summary is skipped."""
-        html = """<div class="faq-container">
-        <details><summary>Just a note</summary><p>No question mark.</p></details>
-        </div>"""
+    def test_no_accordion_container_skipped(self) -> None:
+        """<details> outside an accordion container requires question-like summary."""
+        html = "<details><summary>Just a note</summary><p>A thing.</p></details>"
         pairs = _qa(html)
         assert len(pairs) == 0
 
-    def test_no_accordion_container(self) -> None:
-        """<details> outside an accordion container is skipped."""
-        html = "<details><summary>What is this?</summary><p>A thing.</p></details>"
+    def test_no_question_outside_container_skipped(self) -> None:
+        """Outside a FAQ container, non-question summary is skipped."""
+        html = "<details><summary>Some info</summary><p>Not a question.</p></details>"
         pairs = _qa(html)
         assert len(pairs) == 0
+
+    def test_question_outside_container_accepted(self) -> None:
+        """Outside a FAQ container, question-like summary is still accepted."""
+        html = "<details><summary>What is this?</summary><p>This is a thing.</p></details>"
+        pairs = _qa(html)
+        assert len(pairs) == 1
 
 
 class TestDtDd:

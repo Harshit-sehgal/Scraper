@@ -207,19 +207,22 @@ def _extract_dt_dd(soup: BeautifulSoup) -> list[QAPair]:
 def _extract_data_attr(soup: BeautifulSoup) -> list[QAPair]:
     """Extract Q&A from ``[data-faq]`` / ``[data-question]`` annotated elements."""
     pairs: list[QAPair] = []
-    for container in soup.find_all(attrs={"data-faq": True}):
-        questions = container.find_all(attrs={"data-question": True})
+    for container in soup.find_all(lambda tag: tag.name and tag.has_attr("data-faq")):
+        questions = container.find_all(lambda tag: tag.name and tag.has_attr("data-question"))
         for q_elem in questions:
             q_text = q_elem.get("data-question") or q_elem.get_text(strip=True)
             if not q_text:
                 q_text = q_elem.get_text(strip=True)
             if not q_text:
                 continue
-            # Answer is the next sibling with data-answer, or the next sibling element
-            ans = q_elem.find_next_sibling(attrs={"data-answer": True})
-            if not ans:
-                ans = q_elem.find_next_sibling()
-            a_text = ans.get("data-answer") if ans and ans.get("data-answer") else (ans.get_text(strip=True) if ans else "")
+            # Answer may be on the same element (data-answer attribute), or
+            # the next sibling with data-answer, or the next sibling element.
+            a_text = q_elem.get("data-answer") or ""
+            if not a_text:
+                ans = q_elem.find_next_sibling(lambda tag: tag.name and tag.has_attr("data-answer"))
+                if not ans:
+                    ans = q_elem.find_next_sibling()
+                a_text = ans.get("data-answer") if ans and ans.get("data-answer") else (ans.get_text(strip=True) if ans else "")
             if a_text:
                 pairs.append(
                     QAPair(
