@@ -14,8 +14,8 @@ def _mock_dependencies() -> Iterator[dict[str, MagicMock]]:
     """Mock all heavyweight external dependencies to avoid real IO."""
     deps: dict[str, MagicMock] = {}
     with (
-        patch("app.scraper._boost_contacts_with_page_html", return_value=[]),
-        patch("app.scraper.process_raw_records", side_effect=lambda r, *a, **kw: r),
+        patch("app.scraper_postprocess._boost_contacts_with_page_html", return_value=[]),
+        patch("app.scraper_postprocess.process_raw_records", side_effect=lambda r, *a, **kw: r),
         patch("app.llm_bridge.get_llm_call_count", return_value=0),
         patch("app.scrape_telemetry.get_scrape_telemetry"),
         patch("app.scraper_adapt._run_crawl_frontier_link_discovery"),
