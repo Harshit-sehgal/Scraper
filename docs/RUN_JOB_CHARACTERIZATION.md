@@ -36,7 +36,7 @@ async def run_job(
 
 | Phase | Lines | Responsibility | Extraction target |
 |-------|-------|---------------|-------------------|
-| 1. Init & helpers | 95-135 | Inner functions (`_cancel_requested_from_db`, `_persist_job_state`, `_add_job_log`) | Keep as helpers or extract to `_helpers.py` |
+| 1. Init & helpers | 95-135 | Inner functions (`_cancel_requested_from_db`, `_persist_job_state`, `_add_job_log`) | Keep as helpers (extracted into scraper.py) |
 | 2. Auto-discovery | 140-210 | DuckDuckGo URL discovery, safety filtering, cancel checks | `discovery_orchestrator.py` |
 | 3. URL scraping | 215-320 | Per-URL async scrape with semaphore, domain policy, recovery, cancellation | `scrape_orchestrator.py` |
 | 4. Cancel watcher | 322-335 | Active polling loop for cancel_requested + DB signal | Merge into phase 3 |
