@@ -48,7 +48,7 @@ def requires_invariants(mutation_fn: Callable):
             except (ValueError, TypeError, AttributeError, RuntimeError) as snapshot_err:
                 snapshot = None
                 logger.warning("Could not take snapshot before %s — rollback unavailable", mutation_fn.__name__)
-                with suppress(Exception):
+                with suppress(AttributeError, TypeError, ValueError, RuntimeError):
                     ws.record_degradation(
                         subsystem="invariant_firewall",
                         severity="warning",
@@ -78,7 +78,7 @@ def requires_invariants(mutation_fn: Callable):
                         logger.warning("Rolled back %s — %d issue(s) prevented", mutation_fn.__name__, len(post_issues))
                     except Exception as rollback_err:
                         logger.critical("ROLLBACK FAILED for %s: %s — state may be corrupt!", mutation_fn.__name__, rollback_err)
-                        with suppress(Exception):
+                        with suppress(AttributeError, TypeError, ValueError, RuntimeError):
                             ws.record_degradation(
                                 subsystem="invariant_firewall",
                                 severity="critical",
@@ -88,7 +88,7 @@ def requires_invariants(mutation_fn: Callable):
                         setattr(ws, _ROLLBACK_GUARD_ATTR, False)
                 else:
                     logger.critical("Cannot rollback %s — no snapshot available. State may be corrupt!", mutation_fn.__name__)
-                    with suppress(Exception):
+                    with suppress(AttributeError, TypeError, ValueError, RuntimeError):
                         ws.record_degradation(
                             subsystem="invariant_firewall",
                             severity="critical",

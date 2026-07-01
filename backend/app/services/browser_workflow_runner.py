@@ -20,6 +20,7 @@ Safety constraints:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 from contextlib import suppress
@@ -326,7 +327,7 @@ async def _capture_screenshot_b64(page: Any, timeline: list[dict[str, Any]]) -> 
         except Exception as exc:
             last_error = str(exc)[:200]
             if attempt < 2:
-                with suppress(Exception):
+                with suppress(asyncio.TimeoutError, RuntimeError, OSError):
                     await page.wait_for_timeout(100 * (attempt + 1))
 
     timeline.append(

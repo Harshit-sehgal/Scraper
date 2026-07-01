@@ -515,24 +515,24 @@ async def _playwright_navigate_and_stabilize(
 
         # Custom navigation wait (Roadmap Wave 5 Item 3)
         if wait_for_navigation:
-            with suppress(Exception):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
                 await page.wait_for_event("framenavigated", timeout=initial_timeout)
 
         # Custom selector wait (Roadmap Wave 5 Item 3)
         if wait_for_selector:
-            with suppress(Exception):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
                 selector_timeout = wait_for_timeout if wait_for_timeout is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
                 await page.wait_for_selector(wait_for_selector, timeout=selector_timeout)
 
         # Custom function wait (Roadmap Wave 5 Item 3)
         if wait_for_function:
-            with suppress(Exception):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
                 function_timeout = wait_for_timeout if wait_for_timeout is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
                 await page.wait_for_function(wait_for_function, timeout=function_timeout)
 
         # Fixed-timeout wait (Roadmap Wave 5 Item 3)
         if wait_for_timeout is not None and wait_for_selector is None and wait_for_function is None:
-            with suppress(Exception):
+            with suppress(asyncio.TimeoutError, RuntimeError, OSError):
                 await page.wait_for_timeout(int(wait_for_timeout))
 
         intel = get_domain_intelligence().get_intelligence(url)
@@ -540,7 +540,7 @@ async def _playwright_navigate_and_stabilize(
         if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
             loading_selectors = [".loading", ".spinner", ".loader", "[class*='Loading']", "[class*='Spinner']"]
             for sel in loading_selectors:
-                with suppress(Exception):
+                with suppress(asyncio.TimeoutError, RuntimeError, OSError):
                     await page.wait_for_selector(sel, state="hidden", timeout=2000)
 
         telemetry = get_telemetry_state()
@@ -553,7 +553,7 @@ async def _playwright_navigate_and_stabilize(
         settle_timeout = max(settle_timeout, 3.0)
 
         min_wait_ms = 2500
-        with suppress(Exception):
+        with suppress(asyncio.TimeoutError, RuntimeError, OSError, ValueError):
             await page.wait_for_function(
                 f"""() => {{
                      const body = document.body;
@@ -666,7 +666,7 @@ async def _detect_anti_bot_and_fallback(
 
     html_content = ""
     if page:
-        with suppress(Exception):
+        with suppress(RuntimeError, OSError):
             html_content = await page.content()
 
     err_msg = str(e).lower()
@@ -787,7 +787,7 @@ async def fetch_page_content(
                     duration_ms=elapsed_seconds * 1000,
                 )
         if page:
-            with suppress(Exception):
+            with suppress(RuntimeError, OSError):
                 await page.close()
 
 

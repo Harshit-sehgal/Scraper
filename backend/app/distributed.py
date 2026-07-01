@@ -210,7 +210,7 @@ class DistributedLock:
             except sqlite3.OperationalError:
                 # Database is locked by another process — retry
                 if self._conn:
-                    with contextlib.suppress(Exception):
+                    with contextlib.suppress(sqlite3.ProgrammingError, sqlite3.OperationalError, OSError):
                         self._conn.close()
                     self._conn = None
                 remaining = deadline - time.time()
@@ -220,7 +220,7 @@ class DistributedLock:
             except Exception:
                 logger.debug("[DistributedLock] Unexpected error acquiring SQLite lock", exc_info=True)
                 if self._conn:
-                    with contextlib.suppress(Exception):
+                    with contextlib.suppress(sqlite3.ProgrammingError, sqlite3.OperationalError, OSError):
                         self._conn.close()
                     self._conn = None
                 return False
@@ -273,7 +273,7 @@ class DistributedLock:
             except (sqlite3.OperationalError, sqlite3.ProgrammingError):
                 logger.debug("[DistributedLock] Error releasing SQLite lock", exc_info=True)
             finally:
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(sqlite3.ProgrammingError, sqlite3.OperationalError, OSError):
                     self._conn.close()
                 self._conn = None
 
@@ -286,7 +286,7 @@ class DistributedLock:
             except Exception:
                 logger.debug("[DistributedLock] Error releasing Postgres lock", exc_info=True)
             finally:
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(OSError, RuntimeError, TypeError):
                     self._pg_conn.close()
                 self._pg_conn = None
 
@@ -369,7 +369,7 @@ class JobClaimService:
             conn.execute("COMMIT")
             return True
         except (sqlite3.OperationalError, sqlite3.IntegrityError):
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(sqlite3.OperationalError, sqlite3.ProgrammingError, sqlite3.InterfaceError):
                 conn.execute("ROLLBACK")
             return False
         finally:
