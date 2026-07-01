@@ -763,3 +763,27 @@ class TestBatchExportEdgeCases:
     def test_user_fieldnames_skips_system(self) -> None:
         records = [{"_id": "1", "name": "Alice"}]
         assert export_service.user_fieldnames(records) == ["name"]
+
+
+# ---------------------------------------------------------------------------
+# API Integration
+# ---------------------------------------------------------------------------
+
+
+class TestBatchExportApi:
+    """E2E tests for the POST /api/exports/batch endpoint."""
+
+    def test_batch_export_empty_job_ids_returns_422(self, client):
+        """POST /api/exports/batch with empty job_ids returns 422."""
+        resp = client.post("/api/exports/batch", json={"format": "json", "job_ids": []})
+        assert resp.status_code == 422
+
+    def test_batch_export_invalid_format_returns_400(self, client):
+        """POST /api/exports/batch with unsupported format returns 400."""
+        resp = client.post("/api/exports/batch", json={"format": "pdf", "job_ids": ["j1"]})
+        assert resp.status_code == 400
+
+    def test_batch_export_nonexistent_jobs_returns_404(self, client):
+        """POST /api/exports/batch with only nonexistent jobs returns 404."""
+        resp = client.post("/api/exports/batch", json={"format": "csv", "job_ids": ["nonexistent-job"]})
+        assert resp.status_code == 404

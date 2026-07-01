@@ -117,3 +117,6 @@ frontend/e2e/.auth/
 
 # Runtime benchmark results
 artifacts/benchmarks/
+
+# Coverage reports
+coverage/

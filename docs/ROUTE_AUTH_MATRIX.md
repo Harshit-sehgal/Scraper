@@ -29,7 +29,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/discover/sitemap` | protected | operator-or-admin | require_principal | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/download/{filename}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | unknown | stable | route dependency accepts admin/operator |
+| `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/jobs/batch` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
