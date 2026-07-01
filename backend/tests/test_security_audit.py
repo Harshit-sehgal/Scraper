@@ -58,7 +58,6 @@ class TestPIIClassification:
         assert "****" in redacted
 
 
-
 class TestDataAccessAuditor:
     """Test audit logging."""
 
