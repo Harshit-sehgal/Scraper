@@ -158,8 +158,13 @@ def _parse_range(token: str, lo: int, hi: int, names: dict[str, int] | None) -> 
     if len(parts) != 2:
         raise CronError(_MALFORMED_RANGE_TPL.format(token=token))
     a_raw, b_raw = parts[0], parts[1]
-    a = names[a_raw.upper()] if names and a_raw.upper() in names else int(a_raw)
-    b = names[b_raw.upper()] if names and b_raw.upper() in names else int(b_raw)
+    if not a_raw or not b_raw:
+        raise CronError(_MALFORMED_RANGE_TPL.format(token=token))
+    try:
+        a = names[a_raw.upper()] if names and a_raw.upper() in names else int(a_raw)
+        b = names[b_raw.upper()] if names and b_raw.upper() in names else int(b_raw)
+    except ValueError as exc:
+        raise CronError(_MALFORMED_RANGE_TPL.format(token=token)) from exc
     if a > b:
         # Wrap-around like SAT(6)-SUN(0); store both endpoints and expand modulo 7.
         a_norm = a % (hi + 1)

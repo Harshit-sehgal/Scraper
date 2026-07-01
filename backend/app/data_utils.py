@@ -36,6 +36,10 @@ def _value_matches_schema_type(value: Any, field_type: FieldType) -> bool:
     if value is None:
         return False
 
+    # Check Python bool BEFORE (int, float) since bool is a subclass of int in Python.
+    if isinstance(value, bool):
+        return field_type == FieldType.BOOLEAN
+
     s_value = value
     if isinstance(s_value, (int, float)):
         if field_type in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT, FieldType.CURRENCY):

@@ -486,3 +486,206 @@ class TestValidateAgainstSchema:
         for value in ("hello", "123 Main St", "https://example.com", "$100"):
             valid, _ = validate_against_schema({"note": value}, schema)
             assert valid is True, f"String field should accept {value!r}"
+
+
+# ─── _value_matches_schema_type (direct unit tests) ──────────────────────────
+
+
+class TestValueMatchesSchemaType:
+    """Direct tests for the core type-matching primitive."""
+
+    def _call(self, value, field_type):
+        from app.data_utils import _value_matches_schema_type
+
+        return _value_matches_schema_type(value, field_type)
+
+    # ── NUMBER ──
+
+    def test_number_accepts_int_string(self) -> None:
+        assert self._call("42", FieldType.NUMBER) is True
+
+    def test_number_accepts_float_string(self) -> None:
+        assert self._call("3.14", FieldType.NUMBER) is True
+
+    def test_number_accepts_negative(self) -> None:
+        assert self._call("-5", FieldType.NUMBER) is True
+
+    def test_number_rejects_non_numeric(self) -> None:
+        assert self._call("abc", FieldType.NUMBER) is False
+
+    def test_number_rejects_empty(self) -> None:
+        assert self._call("", FieldType.NUMBER) is False
+
+    def test_number_accepts_python_int(self) -> None:
+        assert self._call(42, FieldType.NUMBER) is True
+
+    def test_number_accepts_python_float(self) -> None:
+        assert self._call(3.14, FieldType.NUMBER) is True
+
+    def test_number_rejects_none(self) -> None:
+        assert self._call(None, FieldType.NUMBER) is False
+
+    # ── INTEGER ──
+
+    def test_integer_accepts_int_string(self) -> None:
+        assert self._call("42", FieldType.INTEGER) is True
+
+    def test_integer_accepts_float_string(self) -> None:
+        assert self._call("3.14", FieldType.INTEGER) is True  # regex matches digits with optional decimal
+
+    def test_integer_rejects_non_numeric(self) -> None:
+        assert self._call("abc", FieldType.INTEGER) is False
+
+    def test_integer_accepts_python_int(self) -> None:
+        assert self._call(42, FieldType.INTEGER) is True
+
+    def test_integer_rejects_none(self) -> None:
+        assert self._call(None, FieldType.INTEGER) is False
+
+    # ── FLOAT ──
+
+    def test_float_accepts_float_string(self) -> None:
+        assert self._call("3.14", FieldType.FLOAT) is True
+
+    def test_float_accepts_int_string(self) -> None:
+        assert self._call("42", FieldType.FLOAT) is True
+
+    def test_float_rejects_non_numeric(self) -> None:
+        assert self._call("abc", FieldType.FLOAT) is False
+
+    def test_float_accepts_python_float(self) -> None:
+        assert self._call(3.14, FieldType.FLOAT) is True
+
+    def test_float_rejects_none(self) -> None:
+        assert self._call(None, FieldType.FLOAT) is False
+
+    # ── CURRENCY ──
+
+    def test_currency_accepts_dollar_amount(self) -> None:
+        assert self._call("$1,299.50", FieldType.CURRENCY) is True
+
+    def test_currency_accepts_simple_number(self) -> None:
+        assert self._call("100", FieldType.CURRENCY) is True
+
+    def test_currency_accepts_euro_format(self) -> None:
+        assert self._call("€50", FieldType.CURRENCY) is True
+
+    def test_currency_accepts_python_number(self) -> None:
+        assert self._call(99.99, FieldType.CURRENCY) is True
+
+    def test_currency_rejects_empty(self) -> None:
+        assert self._call("", FieldType.CURRENCY) is False
+
+    def test_currency_rejects_none(self) -> None:
+        assert self._call(None, FieldType.CURRENCY) is False
+
+    # ── EMAIL ──
+
+    def test_email_accepts_valid(self) -> None:
+        assert self._call("alice@example.com", FieldType.EMAIL) is True
+
+    def test_email_accepts_plus_addressing(self) -> None:
+        assert self._call("alice+tag@example.co.uk", FieldType.EMAIL) is True
+
+    def test_email_rejects_no_domain(self) -> None:
+        assert self._call("not-an-email", FieldType.EMAIL) is False
+
+    def test_email_rejects_empty(self) -> None:
+        assert self._call("", FieldType.EMAIL) is False
+
+    def test_email_rejects_none(self) -> None:
+        assert self._call(None, FieldType.EMAIL) is False
+
+    # ── URL ──
+
+    def test_url_accepts_https(self) -> None:
+        assert self._call("https://example.com", FieldType.URL) is True
+
+    def test_url_accepts_http(self) -> None:
+        assert self._call("http://example.com", FieldType.URL) is True
+
+    def test_url_rejects_no_scheme(self) -> None:
+        assert self._call("example.com", FieldType.URL) is False
+
+    def test_url_rejects_empty(self) -> None:
+        assert self._call("", FieldType.URL) is False
+
+    def test_url_rejects_none(self) -> None:
+        assert self._call(None, FieldType.URL) is False
+
+    # ── DATE ──
+
+    def test_date_accepts_iso_format(self) -> None:
+        assert self._call("2026-06-15", FieldType.DATE) is True
+
+    def test_date_accepts_slash_format(self) -> None:
+        assert self._call("06/15/2026", FieldType.DATE) is True
+
+    def test_date_rejects_non_date(self) -> None:
+        assert self._call("hello", FieldType.DATE) is False
+
+    def test_date_rejects_empty(self) -> None:
+        assert self._call("", FieldType.DATE) is False
+
+    def test_date_rejects_none(self) -> None:
+        assert self._call(None, FieldType.DATE) is False
+
+    # ── PHONE ──
+
+    def test_phone_accepts_formatted(self) -> None:
+        assert self._call("+1-555-123-4567", FieldType.PHONE) is True
+
+    def test_phone_accepts_spaces(self) -> None:
+        assert self._call("+1 555 123 4567", FieldType.PHONE) is True
+
+    def test_phone_accepts_bare_digits(self) -> None:
+        assert self._call("1234567890", FieldType.PHONE) is True
+
+    def test_phone_rejects_short(self) -> None:
+        assert self._call("12", FieldType.PHONE) is False
+
+    def test_phone_rejects_empty(self) -> None:
+        assert self._call("", FieldType.PHONE) is False
+
+    def test_phone_rejects_none(self) -> None:
+        assert self._call(None, FieldType.PHONE) is False
+
+    # ── BOOLEAN ──
+
+    def test_boolean_accepts_true_string(self) -> None:
+        assert self._call("true", FieldType.BOOLEAN) is True
+
+    def test_boolean_accepts_false_string(self) -> None:
+        assert self._call("false", FieldType.BOOLEAN) is True
+
+    def test_boolean_accepts_yes_string(self) -> None:
+        assert self._call("yes", FieldType.BOOLEAN) is True
+
+    def test_boolean_accepts_no_string(self) -> None:
+        assert self._call("no", FieldType.BOOLEAN) is True
+
+    def test_boolean_accepts_python_bool(self) -> None:
+        assert self._call(True, FieldType.BOOLEAN) is True
+        assert self._call(False, FieldType.BOOLEAN) is True
+
+    def test_boolean_rejects_numeric_as_bool(self) -> None:
+        assert self._call(1, FieldType.BOOLEAN) is False
+
+    def test_boolean_rejects_none(self) -> None:
+        assert self._call(None, FieldType.BOOLEAN) is False
+
+    def test_boolean_rejects_random_text(self) -> None:
+        assert self._call("maybe", FieldType.BOOLEAN) is False
+
+    # ── TEXT / STRING ──
+
+    def test_text_accepts_any_non_empty(self) -> None:
+        assert self._call("hello", FieldType.STRING) is True
+        assert self._call("123", FieldType.STRING) is True
+        assert self._call("https://example.com", FieldType.STRING) is True
+
+    def test_text_rejects_empty(self) -> None:
+        assert self._call("", FieldType.STRING) is False
+
+    def test_text_rejects_none(self) -> None:
+        assert self._call(None, FieldType.STRING) is False
