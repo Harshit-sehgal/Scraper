@@ -226,9 +226,12 @@ bash scripts/backup_postgres.sh
 
 ## Escalation Contacts
 
-> **Template note:** Replace the contact details below with your team's actual
-> on-call rotation before publishing this runbook. The phone numbers and Slack
-> handles shown here are placeholders.
+> **IMPORTANT — TEMPLATE:** The contacts below are placeholder values.
+> Replace each `(replace)` marker with your team's real on-call rotation,
+> phone number, and Slack handle **before** this runbook is shared with
+> operators. The values shown (`+1-555-0100`, `@on-call`, etc.) are
+> intentionally per-replace examples so that grep-able placeholders stay
+> obvious in markdown render: `grep "replace" docs/INCIDENT_RUNBOOK.md`.
 
 | Role | Phone | Slack |
 | ---- | ----- | ----- |
