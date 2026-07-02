@@ -15,7 +15,7 @@ import { refreshJobs, onJobsFilterChanged } from "./jobs.js";
 import { renderFilteredResults } from "./results.js";
 import { hydrateIcons } from "./icons.js";
 
-export let currentView = "dashboard";
+export let currentView = "jobs";
 export let currentMode = "manual";
 
 // Track the previously-shown view so switchView can stop per-view
@@ -35,7 +35,7 @@ export function setCurrentMode(mode) {
 // ─── Router ───
 
 const VIEW_MAP = {
-  "/": "dashboard",
+  "/": "jobs",
   "/jobs": "jobs",
   "/new": "new",
   "/dashboard": "dashboard",

@@ -27,7 +27,7 @@ class TestAuthenticatedPageExtraction:
     @pytest.mark.asyncio
     async def test_invalid_session_returns_empty_or_error(self) -> None:
         schema = [SchemaField(name="private", field_type=FieldType.STRING, required=False)]
-        mock_return = []
+        mock_return: list[object] = []
         with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
             result = await mock_scrape(
                 "https://example.com/auth-required",
@@ -38,7 +38,7 @@ class TestAuthenticatedPageExtraction:
     @pytest.mark.asyncio
     async def test_expired_session_handled_gracefully(self) -> None:
         schema = [SchemaField(name="profile", field_type=FieldType.STRING, required=False)]
-        mock_return = []
+        mock_return: list[object] = []
         with patch("app.scraper.scrape_url", new_callable=AsyncMock, return_value=mock_return) as mock_scrape:
             result = await mock_scrape("https://example.com/session-expired", schema)
         assert isinstance(result, list)

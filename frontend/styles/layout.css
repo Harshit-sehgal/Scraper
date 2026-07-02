@@ -433,6 +433,79 @@
   font-size: 18px;
 }
 
+/* ─── Sidebar: primary nav items (prominent product-path buttons) ─── */
+
+.nav-item-primary {
+  height: 40px;
+  font-size: var(--text-base);
+  font-weight: 550;
+  margin-bottom: var(--space-1);
+}
+
+.nav-item-primary .nav-icon {
+  font-size: 20px;
+}
+
+.nav-shortcut-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-3);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  line-height: 1;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Sidebar: collapsible advanced section ─── */
+
+.sidebar-collapsible {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-collapsible > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-collapsible > summary::marker {
+  display: none;
+  content: "";
+}
+
+.sidebar-collapsible .sidebar-category-label.clickable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  margin: 0;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.sidebar-collapsible .sidebar-category-label.clickable:hover {
+  color: var(--ink-1);
+}
+
+.sidebar-chevron {
+  font-size: 16px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.sidebar-collapsible[open] .sidebar-chevron {
+  transform: rotate(180deg);
+}
+
 /* ═══ Main content ═══ */
 
 .main-content {

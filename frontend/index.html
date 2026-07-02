@@ -98,98 +98,125 @@
 
         <!-- Navigation -->
         <nav class="sidebar-nav" aria-label="Main navigation">
-          <div class="sidebar-category-label">Overview</div>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="dashboard" id="nav-dashboard">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">dashboard</span>
-            <span class="nav-text">Dashboard</span>
-          </button>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="jobs" id="nav-jobs">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">list_alt</span>
-            <span class="nav-text">Jobs</span>
-          </button>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="new" id="nav-new">
+          <button
+            type="button"
+            class="nav-item nav-item-primary"
+            data-action="switch-view"
+            data-view="new"
+            id="nav-new"
+          >
             <span class="material-symbols-outlined nav-icon" aria-hidden="true">add_box</span>
             <span class="nav-text">New Job</span>
+            <span class="nav-shortcut-hint">N</span>
+          </button>
+          <button
+            type="button"
+            class="nav-item nav-item-primary"
+            data-action="switch-view"
+            data-view="jobs"
+            id="nav-jobs"
+          >
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">list_alt</span>
+            <span class="nav-text">Jobs</span>
+            <span class="nav-shortcut-hint">1</span>
           </button>
 
-          <div class="sidebar-category-label">Advanced</div>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="workflows" id="nav-workflows">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">account_tree</span>
-            <span class="nav-text">Workflows</span>
-          </button>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="audit" id="nav-audit">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">history</span>
-            <span class="nav-text">Audit Trail</span>
-          </button>
+          <div class="sidebar-divider"></div>
+
+          <div class="sidebar-category-label">Operations</div>
           <button type="button" class="nav-item" data-action="switch-view" data-view="api-keys" id="nav-api-keys">
             <span class="material-symbols-outlined nav-icon" aria-hidden="true">vpn_key</span>
             <span class="nav-text">API Keys</span>
           </button>
-          <button
-            type="button"
-            class="nav-item"
-            data-action="switch-view"
-            data-view="auth-profiles"
-            id="nav-auth-profiles"
-          >
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">verified_user</span>
-            <span class="nav-text">Auth Profiles</span>
+          <button type="button" class="nav-item" data-action="switch-view" data-view="dashboard" id="nav-dashboard">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">dashboard</span>
+            <span class="nav-text">Dashboard</span>
           </button>
           <button type="button" class="nav-item" data-action="switch-view" data-view="recycle" id="nav-recycle">
             <span class="material-symbols-outlined nav-icon" aria-hidden="true">delete</span>
             <span class="nav-text">Recycle Bin</span>
           </button>
-          <button
-            type="button"
-            class="nav-item"
-            data-action="switch-view"
-            data-view="scheduled-monitoring"
-            id="nav-scheduled-monitoring"
-          >
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">schedule</span>
-            <span class="nav-text">Scheduled</span>
-          </button>
 
-          <div class="sidebar-category-label">System</div>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">payments</span>
-            <span class="nav-text">Billing</span>
-          </button>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="settings" id="nav-settings">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">settings</span>
-            <span class="nav-text">Settings</span>
-          </button>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="retention" id="nav-retention">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">archive</span>
-            <span class="nav-text">Retention</span>
-          </button>
+          <details class="sidebar-collapsible" id="sidebar-advanced">
+            <summary class="sidebar-category-label clickable">
+              <span>Advanced</span>
+              <span class="material-symbols-outlined sidebar-chevron" aria-hidden="true">expand_more</span>
+            </summary>
+            <button type="button" class="nav-item" data-action="switch-view" data-view="workflows" id="nav-workflows">
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">account_tree</span>
+              <span class="nav-text">Workflows</span>
+            </button>
+            <button
+              type="button"
+              class="nav-item"
+              data-action="switch-view"
+              data-view="auth-profiles"
+              id="nav-auth-profiles"
+            >
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">verified_user</span>
+              <span class="nav-text">Auth Profiles</span>
+            </button>
+            <button
+              type="button"
+              class="nav-item"
+              data-action="switch-view"
+              data-view="scheduled-monitoring"
+              id="nav-scheduled-monitoring"
+            >
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">schedule</span>
+              <span class="nav-text">Scheduled</span>
+            </button>
+            <button type="button" class="nav-item" data-action="switch-view" data-view="audit" id="nav-audit">
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">history</span>
+              <span class="nav-text">Audit Trail</span>
+            </button>
 
-          <div class="sidebar-divider"></div>
+            <div class="sidebar-category-label">System</div>
+            <button type="button" class="nav-item" data-action="switch-view" data-view="billing" id="nav-billing">
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">payments</span>
+              <span class="nav-text">Billing</span>
+            </button>
+            <button type="button" class="nav-item" data-action="switch-view" data-view="settings" id="nav-settings">
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">settings</span>
+              <span class="nav-text">Settings</span>
+            </button>
+            <button type="button" class="nav-item" data-action="switch-view" data-view="retention" id="nav-retention">
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">archive</span>
+              <span class="nav-text">Retention</span>
+            </button>
 
-          <button
-            type="button"
-            class="nav-item"
-            data-action="switch-view"
-            data-view="email-verification"
-            id="nav-email-verification"
-          >
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">mail</span>
-            <span class="nav-text">Email Verification</span>
-          </button>
-          <button
-            type="button"
-            class="nav-item"
-            data-action="switch-view"
-            data-view="password-reset"
-            id="nav-password-reset"
-          >
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">refresh</span>
-            <span class="nav-text">Password Reset</span>
-          </button>
-          <button type="button" class="nav-item" data-action="switch-view" data-view="invitations" id="nav-invitations">
-            <span class="material-symbols-outlined nav-icon" aria-hidden="true">group</span>
-            <span class="nav-text">Invitations</span>
-          </button>
+            <div class="sidebar-category-label">Account</div>
+            <button
+              type="button"
+              class="nav-item"
+              data-action="switch-view"
+              data-view="email-verification"
+              id="nav-email-verification"
+            >
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">mail</span>
+              <span class="nav-text">Email Verification</span>
+            </button>
+            <button
+              type="button"
+              class="nav-item"
+              data-action="switch-view"
+              data-view="password-reset"
+              id="nav-password-reset"
+            >
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">refresh</span>
+              <span class="nav-text">Password Reset</span>
+            </button>
+            <button
+              type="button"
+              class="nav-item"
+              data-action="switch-view"
+              data-view="invitations"
+              id="nav-invitations"
+            >
+              <span class="material-symbols-outlined nav-icon" aria-hidden="true">group</span>
+              <span class="nav-text">Invitations</span>
+            </button>
+          </details>
 
           <div class="sidebar-divider"></div>
 
@@ -202,7 +229,7 @@
           >
             <span class="material-symbols-outlined nav-icon" aria-hidden="true">science</span>
             <span class="nav-text">Cognition</span>
-            <span class="nav-badge">beta</span>
+            <span class="nav-badge">experimental</span>
           </button>
         </nav>
 

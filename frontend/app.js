@@ -674,7 +674,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let initialView = getViewFromPath(window.location.pathname);
   // Fall back to saved state if URL is at root and we have a saved view
   if (initialView === "jobs" && window.location.pathname === "/" && uiState.view) {
-    initialView = uiState.view;
+    // Only restore saved views that are product-path (not experimental/dashboard)
+    if (uiState.view !== "cognition" && uiState.view !== "dashboard") {
+      initialView = uiState.view;
+    }
   }
   // H2: Guard initial view restoration for cognition
   if (initialView === "cognition" && window.DATAFORGE_EXPERIMENTAL !== true) {

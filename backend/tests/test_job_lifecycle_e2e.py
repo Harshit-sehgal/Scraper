@@ -185,9 +185,9 @@ class TestJobLifecycleE2E:
 
         data = json.loads(resp.text)
         if isinstance(data, list):
-            records = data
+            records: list[object] = data
         elif isinstance(data, dict):
-            records = data.get("results", data.get("records", [data]))
+            records = data.get("results", data.get("records", [data]))  # type: ignore[assignment]
         else:
             records = []
         assert len(records) >= 2, f"Expected ≥2 JSON records, got {len(records)}"
@@ -325,9 +325,9 @@ class TestJobLifecycleE2E:
         assert json_resp.status_code == 200
         json_data = json.loads(json_resp.text)
         if isinstance(json_data, list):
-            json_records = json_data
+            json_records: list[dict[str, object]] = json_data  # type: ignore[assignment]
         elif isinstance(json_data, dict):
-            json_records = json_data.get("results", json_data.get("records", [json_data]))
+            json_records = json_data.get("results", json_data.get("records", [json_data]))  # type: ignore[assignment]
         else:
             json_records = []
 
