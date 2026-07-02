@@ -150,8 +150,8 @@ afterEach(async () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("view state management", () => {
-  it("starts with dashboard view and manual mode", () => {
-    expect(currentView).toBe("dashboard");
+  it("starts with jobs view and manual mode", () => {
+    expect(currentView).toBe("jobs");
     expect(currentMode).toBe("manual");
   });
 
