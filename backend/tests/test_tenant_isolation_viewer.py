@@ -17,7 +17,6 @@ import pytest
 from app.config import settings
 from app.models import Job, JobStatus, ScrapeMode
 from app.saas.models import ApiKeyScope, MembershipRole
-from app.utils.rbac import _fingerprint_key  # noqa: F401  (kept for parity with sibling tests)
 
 # ─── helpers ──────────────────────────────────────────────────────────────
 
