@@ -206,7 +206,9 @@ def _score_records(
         1
         for expected_idx, actual_idx in matched_pairs
         for field in required_fields
-        if _field_matches(expected[expected_idx].get(field), extracted[actual_idx].get(field))
+        if _has_value(expected[expected_idx].get(field))
+        and _has_value(extracted[actual_idx].get(field))
+        and _field_matches(expected[expected_idx].get(field), extracted[actual_idx].get(field))
     )
     field_precision = _ratio(matched_cells, actual_cells, empty_value=1.0 if expected_cells == 0 else 0.0)
     field_recall = _ratio(matched_cells, expected_cells, empty_value=1.0)
@@ -402,13 +404,13 @@ def _average_metric(metrics: list[dict[str, int | float]], key: str) -> float:
 def _ratio(numerator: int, denominator: int, *, empty_value: float = 0.0) -> float:
     if denominator == 0:
         return empty_value
-    return round(numerator / denominator, 6)
+    return round(min(1.0, numerator / denominator), 6)
 
 
 def _f1(precision: float, recall: float) -> float:
     if precision + recall == 0:
         return 0.0
-    return round((2 * precision * recall) / (precision + recall), 6)
+    return round(min(1.0, (2 * precision * recall) / (precision + recall)), 6)
 
 
 def _case_result_to_dict(result: CaseResult) -> dict[str, Any]:

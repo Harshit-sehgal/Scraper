@@ -6,5 +6,6 @@ export default defineConfig({
     include: ["**/*.test.js"],
     exclude: ["e2e/**", "node_modules/**"],
     globals: true,
+    setupFiles: ["./frontend/vitest.setup.js"],
   },
 });

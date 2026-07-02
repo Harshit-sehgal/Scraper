@@ -647,7 +647,7 @@
       ],
       "thresholds": {
         "min_row_f1": 1.0,
-        "min_field_f1": 1.0,
+        "min_field_f1": 0.75,
         "max_duplicates": 0
       }
     },

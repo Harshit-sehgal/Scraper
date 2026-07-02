@@ -33,9 +33,11 @@ COMMANDS_DIR = VALIDATION_DIR / "commands"
 RUNS_DIR = VALIDATION_DIR / "runs"
 SUMMARY_MD = VALIDATION_DIR / "latest_summary.md"
 SUMMARY_JSON = VALIDATION_DIR / "latest_summary.json"
-# With pytest-xdist -n auto distributing across 20 cores, the full suite
-# finishes in under 120s. The 600s cap is a generous safety buffer.
-BACKEND_FULL_TEST_TIMEOUT_SECONDS = 600
+# Full backend pytest may exceed 600s on cold CI runners and when
+# Playwright downloads are needed. 1200s (20 minutes) aligns with the
+# documented gate in docs/VALIDATION.md and was chosen after Session 90
+# full-validation runs hit the old 600s cap.
+BACKEND_FULL_TEST_TIMEOUT_SECONDS = 1200
 
 SECRET_PATTERNS = [
     re.compile(r"(?i)(authorization\s*:\s*)(bearer\s+)?[^\s\r\n]+"),
@@ -363,6 +365,35 @@ def required_path_result() -> dict[str, Any]:
     return internal_result("required_paths", status, stdout)
 
 
+def preflight_result() -> dict[str, Any]:
+    """Check that required pytest plugins are importable before running pytest gates.
+
+    Missing plugins cause ``pytest`` to fail with a confusing
+    ``unrecognized option`` error, so we detect the common offenders early
+    and tell the caller exactly what to run.
+    """
+    required_plugins = {
+        "pytest_timeout": "pytest-timeout",
+        "pytest_asyncio": "pytest-asyncio",
+    }
+    missing: list[str] = []
+    for module_name, pip_name in sorted(required_plugins.items()):
+        try:
+            __import__(module_name)
+        except ImportError:
+            missing.append(pip_name)
+
+    if missing:
+        stdout = (
+            "Missing pytest plugins required by pyproject.toml addopts.\n"
+            "Run: pip install "
+            + " ".join(missing)
+            + "\n(Dev extras include these:  pip install -e '.[dev]')"
+        )
+        return internal_result("preflight", "not_installed", stdout, note=stdout)
+    return internal_result("preflight", "passed", "All required pytest plugins importable.")
+
+
 def checks_for_mode(mode: str, py: str) -> list[Check]:
     frontend_exists = (ROOT / "package.json").exists()
     common = build_common_checks(py, frontend_exists)
@@ -494,12 +525,14 @@ def main() -> int:
     for old_log in COMMANDS_DIR.glob("*.md"):
         old_log.unlink()
 
-    results = [required_path_result()]
+    results = [required_path_result(), preflight_result()]
     results[0]["log_path"] = str(write_command_log(0, results[0], COMMANDS_DIR))
     results[0]["archive_log_path"] = str(write_command_log(0, results[0], archive_commands_dir))
+    results[1]["log_path"] = str(write_command_log(1, results[1], COMMANDS_DIR))
+    results[1]["archive_log_path"] = str(write_command_log(1, results[1], archive_commands_dir))
 
     checks = checks_for_mode(mode, py)
-    for index, check in enumerate(checks, start=1):
+    for index, check in enumerate(checks, start=2):
         print(f"[{index}/{len(checks)}] {check.name}...", file=progress_stream, flush=True)
         result = run_check(check)
         result["log_path"] = str(write_command_log(index, result, COMMANDS_DIR))
