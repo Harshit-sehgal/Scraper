@@ -79,21 +79,35 @@ curl -s http://localhost:8000/api/exports/<job_id>/xlsx > results.xlsx
 
 ## Current Status
 
-| Gate | CI Status |
-|------|-----------|
-| **Fast Gates** (syntax, architecture, invariants, security audit) | [![Fast Gates](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=fast-gates)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **Static Analysis** (ruff, mypy, bandit, pyflakes) | [![Static Analysis](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=static-analysis)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **Backend Tests** (8,000+ passing) | [![Backend Tests](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=backend-tests)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **Frontend** (vitest, stylelint, Prettier) | [![Frontend](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=frontend)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **Chaos Engineering** | [![Chaos Engineering](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=chaos-engineering)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **Docker Image Build & Smoke** | [![Image Build](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=image-build)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **SBOM Generation** | [![SBOM](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml/badge.svg?job=sbom)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) |
-| **Dependabot** (auto-merge safe updates) | [![Dependabot](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml) |
-| **Postgres Integration** | [![Postgres](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml) |
-| **Browser E2E** (Playwright) | [![Browser E2E](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml) |
-| **Local Validation** | `make validate` runs `python3 scripts/validate_local.py --full`; `make validate-quick` for the bounded quick gate |
+The badges above link to the CI workflow file itself (overall workflow status). The
+table below describes the *named jobs* the CI workflow contains so you can read a
+specific job's badge. For each name use `?job=<job-id>` in your badge URL.
 
-Run `make validate` or `python3 scripts/validate_local.py --full` for fresh evidence on your machine. Check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) for current results.
+| Job | What it does |
+|----|----|
+| **`quick-validation`** | Compile, architecture validator, research boundary, dependency bounds, URL safety tests, P0 regression tests, OpenAPI spec |
+| **`lint`** | ruff (lint + format check), mypy |
+| **`frontend`** | npm ci + audit signatures, vitest tests, esbuild build, eslint/stylelint/prettier, dist artifact checks |
+| **`docker-smoke`** | Builds `Dockerfile.smoke` and runs `test_docker_smoke.py` (4 endpoint probes) |
+| **`unit-tests`** | Full pytest unit suite with coverage floor checks |
+| **`contract-tests`** | API contract tests (maked with `-m api`) |
+| **`migrate-check`** | Storage migration / regression / DDL-only Postgres tests |
+
+Local-side static analysis (not part of `ci.yml` but enforced via pre-commit):
+**ruff format + lint**, **mypy**, **bandit** (medium+ severity).
+
+Run `make validate` or `python3 scripts/validate_local.py --quick` for fresh local
+evidence. Check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) for current results.
+
+> Adjust the workbook row above (`?job=<job-id>`) to point at any of the jobs
+> listed in the table — for example `?job=docker-smoke` or `?job=quick-validation`.
+
+For ongoing test pipelines:
+- **Dependabot auto-merge** — see the `dependabot-auto-merge.yml` workflow.
+- **Postgres integration** — `postgres-tests.yml` runs weekly and on dispatch.
+- **Browser E2E** — `browser-e2e.yml` runs the Playwright browser paths.
+- **Golden-dataset** — `golden-dataset.yml` records live extraction accuracy.
+- **Nightly integration** — `nightly-integration.yml` runs the heaviest integration suite overnight.
 
 ## Quick Start
 
