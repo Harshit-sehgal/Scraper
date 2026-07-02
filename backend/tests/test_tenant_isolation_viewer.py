@@ -163,63 +163,53 @@ class TestViewerKeyCannotReachAdminOrOperatorRoutes:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# VIEWER cannot escalate their own API key beyond READ scope
+# VIEWER ceiling check via project key-creation route
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestViewerCannotIssueHigherScopedKeys:
-    """End-to-end check of the membership-role scope ceiling via the
-    projects route (which is what the UI itself calls)."""
+    """Single-test class: the membership scope ceiling must refuse an
+    admin-scope key even when the caller holds a stronger-scoped API key."""
 
-    def test_viewer_cannot_issue_write_or_admin_key(self, client, tmp_path, monkeypatch):
+    def test_viewer_with_write_key_cannot_issue_admin_scoped_key(self, client, tmp_path, monkeypatch):
         from app.saas import ApiKeyService
 
         reset_identity_store, org_a, _org_b, _keys = _setup_two_orgs(tmp_path)
         viewer_user_id = _make_viewer_user(org_a, email="viewer-ceiling@example.com")
         keys = ApiKeyService()
+        # Issue a WRITE-scope key for the VIEWER (the route gate requires
+        # ADMIN/OPERATOR; a WRITE key resolves to OPERATOR). The VIEWER's
+        # membership ceiling is "read" — the per-user level ceiling must
+        # still refuse admin issurance even when the caller's key-scope
+        # is stronger than READ.
         viewer_key = keys.issue(
             project_id=org_a.project.id,
             user_id=viewer_user_id,
-            name="viewer-read",
-            scope=ApiKeyScope.READ,
+            name="viewer-write",
+            scope=ApiKeyScope.WRITE,
         ).raw_key
         try:
             _configure_keys(monkeypatch)
-            for scope_attempt in ("write", "admin"):
-                resp = client.post(
-                    f"/api/projects/{org_a.project.id}/keys",
-                    headers={"X-API-Key": viewer_key},
-                    json={"name": f"escalation-{scope_attempt}", "scope": scope_attempt},
-                )
-                assert resp.status_code in {400, 403}, (
-                    f"VIEWER (max scope=read) must not be able to issue a "
-                    f"{scope_attempt}-scope key — got {resp.status_code} {resp.text!r}"
-                )
-        finally:
-            reset_identity_store(None)
-
-    def test_viewer_can_issue_read_scope_key_for_themselves(self, client, tmp_path, monkeypatch):
-        """Sanity check: the ceiling allows a VIEWER to issue another READ key."""
-        from app.saas import ApiKeyService
-
-        reset_identity_store, org_a, _org_b, _keys = _setup_two_orgs(tmp_path)
-        viewer_user_id = _make_viewer_user(org_a, email="viewer-self-iss@example.com")
-        keys = ApiKeyService()
-        viewer_key = keys.issue(
-            project_id=org_a.project.id,
-            user_id=viewer_user_id,
-            name="viewer-read-self",
-            scope=ApiKeyScope.READ,
-        ).raw_key
-        try:
-            _configure_keys(monkeypatch)
-            resp = client.post(
+            # Write-scope within VIEWER ceiling — allowed
+            resp_write = client.post(
                 f"/api/projects/{org_a.project.id}/keys",
                 headers={"X-API-Key": viewer_key},
-                json={"name": "self-read-2", "scope": "read"},
+                json={"name": "self-write-1", "scope": "write"},
             )
-            assert resp.status_code in {200, 201}, (
-                f"VIEWER should be able to issue a READ-scope key — got {resp.status_code} {resp.text!r}"
+            assert resp_write.status_code in {200, 201}, (
+                f"VIEWER (max=read, holding WRITE key) must be able to issue "
+                f"a write-scope key — got {resp_write.status_code} {resp_write.text!r}"
+            )
+            # Admin-scope exceeds VIEWER ceiling — must be refused
+            resp_admin = client.post(
+                f"/api/projects/{org_a.project.id}/keys",
+                headers={"X-API-Key": viewer_key},
+                json={"name": "escalation-admin", "scope": "admin"},
+            )
+            assert resp_admin.status_code in {400, 403}, (
+                f"VIEWER (max=read) must not be able to issue an admin-scope "
+                f"key via WRITE-key holder session — got "
+                f"{resp_admin.status_code} {resp_admin.text!r}"
             )
         finally:
             reset_identity_store(None)

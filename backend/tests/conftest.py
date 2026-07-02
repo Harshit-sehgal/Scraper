@@ -61,6 +61,15 @@ _TEST_ENV_DEFAULTS = {
     "DATAFORGE_STORAGE_BACKEND": "sqlite",
     "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
 }
+# When running under pytest-xdist each worker process needs its own
+# SQLite database to avoid test-interference failures (shared-DB
+# writes from parallel workers race against each other).  xdist sets
+# ``PYTEST_XDIST_WORKER`` to ``gw0``, ``gw1``, etc.
+_worker_id: str | None = os.environ.get("PYTEST_XDIST_WORKER")
+if _worker_id:
+    stem, _dot, _ext = "jobs_state_test.json".partition(".")
+    _TEST_ENV_DEFAULTS["DATAFORGE_STATE_FILE"] = str(ROOT / "backend" / "data" / f"{stem}_{_worker_id}.{_ext}")
+del _worker_id
 _HOST_ENV_BEFORE_TESTS = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
 _key = _value = ""  # will be overwritten by the loop (dict is non-empty by construction)
 for _key, _value in _TEST_ENV_DEFAULTS.items():
@@ -241,6 +250,18 @@ def pytest_sessionfinish(session, exitstatus) -> None:
                         artifact.unlink()
     except Exception:  # noqa: RUF100, S110
         pass
+
+    # Scrub per-worker xdist database files created during this session.
+    try:
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[2]
+        data_dir = root / "backend" / "data"
+        for p in data_dir.glob("jobs_state_test_gw*.json*"):
+            with contextlib.suppress(OSError):
+                p.unlink()
+    except Exception:
+        logger.warning("Failed to clean up job state files", exc_info=True)
 
     # ─── Telegram end-of-session summary ──────────────────────────────────
     # The notifier short-circuits silently when TELEGRAM_ENABLED is false
