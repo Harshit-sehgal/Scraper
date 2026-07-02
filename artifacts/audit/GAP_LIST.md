@@ -23,7 +23,7 @@ Generated from fresh verification against current code, tests, and command outpu
 | Results endpoint | ✅ | /api/jobs/{id}/results with pagination, search |
 | Preview endpoint | ✅ | /api/scraper/preview (dry-run) |
 | Test coverage | ✅ | 156 tests pass (lifecycle+exports+security core) |
-| **Gap** | ⚠️ | No direct "create job → run job → check status → get results" E2E API test integrated in quick validation |
+| E2E API lifecycle test | ✅ | test_job_lifecycle_e2e.py (12 tests, 1.06s) + test_lifecycle_e2e_default.py (8 tests, 0.87s) — both cover create→run→status→results→export flow |
 
 ## Goal 3 — Frontend Product Path: 75/100 ⚠️
 | Check | Status | Detail |
@@ -46,9 +46,9 @@ Generated from fresh verification against current code, tests, and command outpu
 | SSRF protection | ✅ | 19 tests: loopback, cloud metadata, bad schemes, internal TLDs, ports, restricted IPs, empty URLs, redirect-to-private |
 | Rate limits | ✅ | CrawlPolicyEngine, domain rate limiting |
 | Audit logs | ✅ | SSRF audit logging, access logs |
-| Body limits | ⚠️ | Not explicitly tested — need to verify |
+| Body limits | ✅ | 4 tests in test_production_hardening.py + 4 in test_middlewares_unit.py (Content-Length + chunked paths, both 413) |
 | Unsafe URL blocking | ✅ | Denylist, validate_public_http_url |
-| **Gap** | ⚠️ | No explicit test showing VIEWER cannot hit admin routes |
+| VIEWER tenant isolation | ✅ | test_tenant_isolation_viewer.py — 5 tests (admin + operator deny, key ceiling, cross-org list/fetch) |
 
 ## Goal 5 — Data/Export Reliability: 78/100 ⚠️
 | Check | Status | Detail |
@@ -57,9 +57,9 @@ Generated from fresh verification against current code, tests, and command outpu
 | Export tests | ✅ | test_exports_router.py, test_batch_exports.py, test_export_signing.py |
 | Result schema consistency | ✅ | SchemaField, FieldType, ScrapeAttemptResult |
 | Source URL in export | ✅ | final_url in ScrapeAttemptResult |
-| Scrape time in export | ⚠️ | completed_at present but not explicitly verified in export tests |
-| **Gap** | ⚠️ | No test verifying CSV content matches JSON content |
-| **Gap** | ⚠️ | No test verifying Excel XLSX integrity |
+| Scrape time in export | ✅ | test_export_cross_format.py — TestTimestampTransmission: 3 tests verify scraped_at across formats |
+| Cross-format value consistency | ✅ | test_export_cross_format.py — 10 tests (row counts + values + system fields + lists + formulas + schema) |
+| Excel XLSX integrity | ✅ | test_export_cross_format.py — 4 Excel-specific checks across TestRowCountConsistency + TestValueConsistency |
 
 ## Goal 6 — Production Readiness (Docker): 72/100 ⚠️
 | Check | Status | Detail |
@@ -72,8 +72,8 @@ Generated from fresh verification against current code, tests, and command outpu
 | /health/worker | ✅ | Worker queue status |
 | /health/db | ✅ | DB connection + migration check |
 | /health/browser | ✅ | Browser pool check |
-| **Gap** | ⚠️ | No Docker integration test verifying stack starts and survives restart |
-| **Gap** | ❌ | No CI job that builds Docker image and runs smoke tests against it |
+| Docker integration test | ✅ | test_docker_smoke.py — 4 tests (build + /health + /ready + docs) |
+| CI Docker smoke job | ✅ | ci.yml docker-smoke job (builds Dockerfile.smoke, runs test_docker_smoke.py per push/PR) |
 
 ## Goal 7 — Product Clarity: 74/100 ⚠️
 | Check | Status | Detail |
@@ -81,8 +81,8 @@ Generated from fresh verification against current code, tests, and command outpu
 | README positioning | ⚠️ | Describes as "pre-production" and "not production-ready" — honest but downplays MVP viability |
 | Experimental modules | ✅ | Marked explicitly ("experimental unless a specific test result says otherwise") |
 | Docs clarity | ✅ | AGENT_TRUTH.md, MODULE_CLASSIFICATION.md, LIMITATIONS.md |
-| **Gap** | ⚠️ | README says "Do not claim this project is a universal scraper" — defensive, not aspirational |
-| **Gap** | ⚠️ | No simple "How to scrape a website" quick start in README |
+| README positioning | ✅ | "A web scraping SaaS ..." aspirational framing + "What It Does" core product section |
+| Quick-start in README | ✅ | "In 60 Seconds: Scrape a Website" section with curl-based job lifecycle (create→status→results→export) |
 
 ## Goal 8 — Benchmarks: 68/100 ⚠️
 | Check | Status | Detail |

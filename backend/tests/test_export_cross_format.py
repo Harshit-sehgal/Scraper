@@ -317,3 +317,53 @@ class TestSchemaDrivenExportConsistency:
         # Excel: schema fields determine columns
         xl_cols = set(xl_rows[0])
         assert xl_cols == {"name", "price"}, f"Excel columns w/ schema: {xl_cols}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Scrape-time metadata transmission across formats
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+_WITH_TIMESTAMP = [
+    {"name": "Alice", "price": "$19.99", "scraped_at": "2026-06-29T15:30:00Z"},
+    {"name": "Bob", "price": "$24.50", "scraped_at": "2026-06-29T15:31:22Z"},
+]
+
+
+class TestTimestampTransmission:
+    """Every export format must carry the ``scraped_at`` metadata field
+    (a reserved non-system field) without alteration."""
+
+    def test_scraped_at_present_and_equal_across_formats(self):
+        job = _make_job(results=_WITH_TIMESTAMP)
+        csv_rows = _parse_csv_bytes(build_csv_bytes(job))
+        json_rows = json.loads(build_json_bytes(job))
+        xl_rows = _parse_excel_rows(build_excel_bytes(job))
+
+        # timestamp must survive in every format
+        for i in range(2):
+            csv_val = _csv_cell_to_compare(csv_rows[i]["scraped_at"])
+            json_val = json_rows[i]["scraped_at"]
+            xl_col_map = {name: idx for idx, name in enumerate(xl_rows[0])}
+            xl_val = xl_rows[i + 1][xl_col_map["scraped_at"]]
+            assert csv_val == json_val == xl_val, f"Row {i} scraped_at: CSV={csv_val!r}, JSON={json_val!r}, Excel={xl_val!r}"
+
+    def test_scraped_at_not_escaped_in_csv_and_excel(self):
+        """scraped_at is an ISO timestamp, not a formula — must not be prefixed."""
+        job = _make_job(results=_WITH_TIMESTAMP)
+        csv_rows = _parse_csv_bytes(build_csv_bytes(job))
+        xl_rows = _parse_excel_rows(build_excel_bytes(job))
+
+        for i in range(2):
+            csv_val = csv_rows[i]["scraped_at"]
+            assert not csv_val.startswith("'"), f"CSV row {i} scraped_at must not be escaped: {csv_val!r}"
+            xl_col_map = {name: idx for idx, name in enumerate(xl_rows[0])}
+            xl_val = xl_rows[i + 1][xl_col_map["scraped_at"]]
+            assert not xl_val.startswith("'"), f"Excel row {i} scraped_at must not be escaped: {xl_val!r}"
+
+    def test_scraped_at_raw_value_in_json(self):
+        """JSON does not escape — the raw ISO string must match."""
+        job = _make_job(results=_WITH_TIMESTAMP)
+        json_rows = json.loads(build_json_bytes(job))
+        assert json_rows[0]["scraped_at"] == "2026-06-29T15:30:00Z"
+        assert json_rows[1]["scraped_at"] == "2026-06-29T15:31:22Z"
