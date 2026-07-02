@@ -91,7 +91,7 @@ curl -s http://localhost:8000/api/exports/<job_id>/xlsx > results.xlsx
 | **Dependabot** (auto-merge safe updates) | [![Dependabot](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/dependabot-auto-merge.yml) |
 | **Postgres Integration** | [![Postgres](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/postgres-tests.yml) |
 | **Browser E2E** (Playwright) | [![Browser E2E](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml/badge.svg)](https://github.com/Harshit-sehgal/Scraper/actions/workflows/browser-e2e.yml) |
-| **Local Validation** | `make validate` runs the full local gate; `make validate-quick` for the bounded quick gate |
+| **Local Validation** | `make validate` runs `python3 scripts/validate_local.py --full`; `make validate-quick` for the bounded quick gate |
 
 Run `make validate` or `python3 scripts/validate_local.py --full` for fresh evidence on your machine. Check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) for current results.
 
