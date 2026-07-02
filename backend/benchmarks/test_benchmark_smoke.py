@@ -351,6 +351,87 @@ SITES: list[SiteTest] = [
         ],
         min_expected=0,
     ),
+    SiteTest(
+        name="Wikipedia Lists of Countries",
+        category="table",
+        url="https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)",
+        schema=[
+            SchemaField(name="country", field_type=FieldType.STRING, description="Country name", required=False),
+            SchemaField(name="gdp", field_type=FieldType.STRING, description="GDP value", required=False),
+        ],
+        min_expected=5,
+    ),
+    SiteTest(
+        name="GitHub Trending Python",
+        category="listing",
+        url="https://github.com/trending/python",
+        schema=[
+            SchemaField(name="repo", field_type=FieldType.STRING, description="Repository name", required=False),
+            SchemaField(name="description", field_type=FieldType.STRING, description="Repository description", required=False),
+            SchemaField(name="language", field_type=FieldType.STRING, description="Repo language", required=False),
+            SchemaField(name="stars", field_type=FieldType.STRING, description="Star count", required=False),
+        ],
+        min_expected=1,
+    ),
+    SiteTest(
+        name="Hacker News Best",
+        category="listing",
+        url="https://news.ycombinator.com/best",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Article title", required=False),
+            SchemaField(name="score", field_type=FieldType.INTEGER, description="Upvotes", required=False),
+        ],
+        min_expected=5,
+    ),
+    SiteTest(
+        name="Wikipedia Computer Programming",
+        category="content",
+        url="https://en.wikipedia.org/wiki/Computer_programming",
+        schema=[
+            SchemaField(name="heading", field_type=FieldType.STRING, description="Section heading", required=False),
+            SchemaField(name="paragraph", field_type=FieldType.STRING, description="Section text", required=False),
+        ],
+        min_expected=3,
+    ),
+    SiteTest(
+        name="Open Library Search (Author)",
+        category="api_content",
+        url="https://openlibrary.org/search/authors.json?q=asimov",
+        schema=[
+            SchemaField(name="name", field_type=FieldType.STRING, description="Author name", required=False),
+            SchemaField(name="key", field_type=FieldType.STRING, description="Author OL key", required=False),
+        ],
+        min_expected=1,
+    ),
+    SiteTest(
+        name="GitHub Explore Topics",
+        category="listing",
+        url="https://github.com/topics",
+        schema=[
+            SchemaField(name="topic", field_type=FieldType.STRING, description="Topic name", required=False),
+            SchemaField(name="description", field_type=FieldType.STRING, description="Topic description", required=False),
+        ],
+        min_expected=5,
+    ),
+    SiteTest(
+        name="Wikipedia Hello World",
+        category="content",
+        url="https://en.wikipedia.org/wiki/%22Hello,_World!%22_program",
+        schema=[
+            SchemaField(name="heading", field_type=FieldType.STRING, description="Section heading", required=False),
+        ],
+        min_expected=1,
+    ),
+    SiteTest(
+        name="Books to Scrape Travel",
+        category="ecommerce",
+        url="https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Book title", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="Book price", required=False),
+        ],
+        min_expected=1,
+    ),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -651,8 +732,21 @@ if __name__ == "__main__":
 
 def test_benchmark_smoke_configuration_is_importable() -> None:
     """Keep pytest collection honest without running live benchmark traffic."""
-    assert SITES
-    assert all(site.url.startswith(("http://", "https://")) for site in SITES)
+    assert SITES, "SITES list must not be empty"
+    # Goal 8 minimum corpus size — 20+ diverse public pages.
+    assert len(SITES) >= 20, (
+        f"Live benchmark corpus must have at least 20 sites; got {len(SITES)}. "
+        f"Add more public test pages to satisfy the bench coverage requirement."
+    )
+    # URL shape: every site must be a public http(s) URL.
+    for site in SITES:
+        assert site.url.startswith(("http://", "https://")), f"{site.name}: bad url {site.url}"
+        assert site.name, f"site missing name: {site.url}"
+        assert site.category, f"site {site.name!r} missing category"
+        assert site.schema, f"site {site.name!r} missing schema"
+    # Coverage sanity: at least 6 distinct page categories exercised.
+    categories = {site.category for site in SITES}
+    assert len(categories) >= 6, f"Live corpus should span at least 6 categories for breadth; got {sorted(categories)}"
 
 
 @pytest.mark.live_benchmark
