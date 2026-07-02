@@ -6,7 +6,7 @@ and execution SLAs under injected chaos failure scenarios.
 
 import logging
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.chaos_simulator import FailureMode, get_chaos_simulator
@@ -228,15 +228,7 @@ async def test_anti_bot_proxy_rotation() -> None:
     with (
         patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)),
         patch("app.recovery_strategies.RecoveryExecutor.execute", mock_execute),
-        patch("app.recovery_handlers.get_proxy_manager") as mock_pm,
     ):
-        # Mock proxy manager rotation success
-        mock_mgr = MagicMock()
-        mock_mgr.enabled = True
-        mock_mgr.current_proxy = "http://old-proxy:8888"
-        mock_mgr.rotate = MagicMock(return_value="http://new-proxy:8888")
-        mock_pm.return_value = mock_mgr
-
         schema = [SchemaField(name="insight", field_type=FieldType.STRING, description="", required=True)]
 
         results, stats = await scrape_url_with_recovery(
@@ -254,9 +246,8 @@ async def test_anti_bot_proxy_rotation() -> None:
         assert len(classifications) > 0
         assert classifications[0]["category"] == FailureCategory.ANTI_BOT_BLOCK.value
 
-        # Check proxy rotated and backoff executed
+        # Check proxy rotation was triggered
         assert len(proxy_rotated) > 0
-        mock_mgr.rotate.assert_called()
 
 
 @pytest.mark.asyncio

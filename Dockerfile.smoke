@@ -1,0 +1,40 @@
+# =============================================================================
+# DataForge — Smoke-only Dockerfile
+# =============================================================================
+# A minimal image that runs `uvicorn app.main:app` so the liveness and
+# readiness endpoints can be probed. Skips Playwright browsers and the
+# frontend Node build to keep CI smoke tests under ~60s.
+#
+# Build (CI uses this):
+#     docker build -f Dockerfile.smoke -t dataforge:test-smoke .
+#
+# Runtime:
+#     docker run -d -p 18000:8000 -e PYTHONPATH=/app/backend dataforge:test-smoke
+# =============================================================================
+
+FROM python:3.12-slim AS base
+
+WORKDIR /app
+
+ENV PYTHONPATH=/app/backend \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# We deliberately omit Playwright system libs — the smoke image only serves
+# HTTP endpoints (/health, /ready, /apidoc) and does not run scrapes.
+
+COPY pyproject.toml ./
+COPY backend ./backend
+# Heavy python deps - install. Tests use build-system ~= hatch, so we follow it.
+RUN pip install --no-cache-dir .
+
+COPY frontend ./frontend
+COPY scripts ./scripts
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=4s --start-period=5s --retries=3 \
+    CMD python -c "import http.client,sys; c=http.client.HTTPConnection('localhost', 8000, timeout=3); c.request('GET', '/health'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)" || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

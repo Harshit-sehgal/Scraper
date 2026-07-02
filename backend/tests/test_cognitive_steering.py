@@ -1,14 +1,14 @@
 import pytest
 from app.semantic_inference_engine import RoleEmbeddingEngine
 from app.semantic_os import get_semantic_os
-from app.semantic_world_state import get_world_state
+from app.semantic_world_state import get_world_state, reset_world_state
 
 pytestmark = pytest.mark.filterwarnings("ignore::ResourceWarning")
 
 
 def test_intent_biasing_manifold() -> None:
+    reset_world_state()
     ws = get_world_state()
-    ws.clear()
     sos = get_semantic_os()
 
     # 1. Setup a role at neutral position
@@ -22,7 +22,7 @@ def test_intent_biasing_manifold() -> None:
     # 3. Perform relaxation
     reng = RoleEmbeddingEngine()
     # Mock multiple cycles to see movement
-    for _ in range(50):
+    for _ in range(200):
         reng.relax_manifold()
 
     # 4. Verify vector moved toward target
@@ -32,8 +32,8 @@ def test_intent_biasing_manifold() -> None:
 
 
 def test_targeted_intent_isolation() -> None:
+    reset_world_state()
     ws = get_world_state()
-    ws.clear()
     sos = get_semantic_os()
 
     # r1 is targeted, r2 is NOT
@@ -45,7 +45,7 @@ def test_targeted_intent_isolation() -> None:
 
     # Relaxation
     reng = RoleEmbeddingEngine()
-    for _ in range(20):
+    for _ in range(100):
         reng.relax_manifold()
 
     v1 = ws._manifold.get_manifold_vector("r1")
@@ -57,8 +57,8 @@ def test_targeted_intent_isolation() -> None:
 
 
 def test_intent_persistence_checkpoint() -> None:
+    reset_world_state()
     ws = get_world_state()
-    ws.clear()
     sos = get_semantic_os()
 
     sos.set_cognitive_intent("p1", [0.9] * 16)

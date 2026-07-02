@@ -16,6 +16,8 @@ from __future__ import annotations
 import pytest
 from app.config import settings
 from app.models import Job, JobStatus, ScrapeMode
+from app.saas import CURRENT_AUP_VERSION
+from app.saas.identity_store import get_identity_store
 from app.saas.models import ApiKeyScope, MembershipRole
 
 # ─── helpers ──────────────────────────────────────────────────────────────
@@ -176,6 +178,7 @@ class TestViewerCannotIssueHigherScopedKeys:
 
         reset_identity_store, org_a, _org_b, _keys = _setup_two_orgs(tmp_path)
         viewer_user_id = _make_viewer_user(org_a, email="viewer-ceiling@example.com")
+        get_identity_store().mark_aup_accepted(viewer_user_id, aup_version=CURRENT_AUP_VERSION)
         keys = ApiKeyService()
         # Issue a WRITE-scope key for the VIEWER (the route gate requires
         # ADMIN/OPERATOR; a WRITE key resolves to OPERATOR). The VIEWER's
@@ -190,19 +193,30 @@ class TestViewerCannotIssueHigherScopedKeys:
         ).raw_key
         try:
             _configure_keys(monkeypatch)
-            # Write-scope within VIEWER ceiling — allowed
-            resp_write = client.post(
-                f"/api/projects/{org_a.project.id}/keys",
+            # READ-scope within VIEWER ceiling — allowed
+            resp_read = client.post(
+                f"/api/saas/projects/{org_a.project.id}/keys",
                 headers={"X-API-Key": viewer_key},
-                json={"name": "self-write-1", "scope": "write"},
+                json={"name": "self-read-1", "scope": "read"},
             )
-            assert resp_write.status_code in {200, 201}, (
+            assert resp_read.status_code in {200, 201}, (
                 f"VIEWER (max=read, holding WRITE key) must be able to issue "
-                f"a write-scope key — got {resp_write.status_code} {resp_write.text!r}"
+                f"a read-scope key — got {resp_read.status_code} {resp_read.text!r}"
+            )
+            # Write-scope exceeds VIEWER ceiling — must be refused
+            resp_write = client.post(
+                f"/api/saas/projects/{org_a.project.id}/keys",
+                headers={"X-API-Key": viewer_key},
+                json={"name": "escalation-write", "scope": "write"},
+            )
+            assert resp_write.status_code in {400, 403}, (
+                f"VIEWER (max=read) must not be able to issue a write-scope "
+                f"key via WRITE-key holder session — got "
+                f"{resp_write.status_code} {resp_write.text!r}"
             )
             # Admin-scope exceeds VIEWER ceiling — must be refused
             resp_admin = client.post(
-                f"/api/projects/{org_a.project.id}/keys",
+                f"/api/saas/projects/{org_a.project.id}/keys",
                 headers={"X-API-Key": viewer_key},
                 json={"name": "escalation-admin", "scope": "admin"},
             )

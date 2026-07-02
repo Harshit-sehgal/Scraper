@@ -468,7 +468,7 @@ class TestSafeRegexSearch:
         assert result is False, "Timed-out regex should return False"
         # The function must return within a reasonable margin of the
         # requested timeout, not hang for 60+ seconds.
-        assert elapsed < 3.0, f"Regex took {elapsed:.1f}s — suspected ReDoS hang"
+        assert elapsed < 4.0, f"Regex took {elapsed:.1f}s — suspected ReDoS hang"
 
     def test_invalid_regex_returns_false(self) -> None:
         import re

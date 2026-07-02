@@ -302,7 +302,11 @@ def backend_quick_checks(py: str) -> list[Check]:
 
 def backend_full_checks(py: str) -> list[Check]:
     return [
-        Check("backend_full_tests", [py, "-m", "pytest", "backend/tests", "-n", "auto", "-q"], BACKEND_FULL_TEST_TIMEOUT_SECONDS),
+        Check(
+            "backend_full_tests",
+            [py, "-m", "pytest", "backend/tests", "-n", "auto", "--dist", "loadfile", "-q"],
+            BACKEND_FULL_TEST_TIMEOUT_SECONDS,
+        ),
     ]
 
 

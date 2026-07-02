@@ -63,9 +63,20 @@ class _StubRepo(PostgresRepositoryBase):
         self._fetch_one_impl: MagicMock = MagicMock(return_value=None)
         self._execute_impl: MagicMock = MagicMock(side_effect=self._record_execute)
 
+        self._register_driver()
+
     @contextmanager
     def _conn(self):
         yield self._mock_conn
+
+    def _register_driver(self) -> None:
+        from app.postgres_repository_base import _set_driver_functions
+
+        _set_driver_functions(
+            self._fetch_all,
+            self._fetch_one,
+            self._execute_impl,
+        )
 
     def _record_execute(self, conn: Any, sql: str, params: Any = None) -> MagicMock:
         self.executed.append((sql, params))
