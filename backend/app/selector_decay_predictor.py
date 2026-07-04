@@ -68,6 +68,10 @@ class SelectorDecayPredictor:
         self._decay_history: dict[str, list[float]] = defaultdict(list)
         # Track confidence snapshots over time per domain
         self._confidence_snapshots: dict[str, list[tuple[float, float]]] = defaultdict(list)
+        # Guards the read-modify-write on ``_confidence_snapshots`` so
+        # concurrent observations don't lose appends or clobber each
+        # other's bounded trims.
+        self._lock = threading.Lock()
         self._load()
 
     @staticmethod
@@ -89,7 +93,8 @@ class SelectorDecayPredictor:
 
             path = self._get_snapshots_path()
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-            data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
+            with self._lock:
+                data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
             fd, tmp_path = tempfile.mkstemp(dir=Path(path).parent, suffix=".tmp")
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
@@ -137,10 +142,11 @@ class SelectorDecayPredictor:
 
         """
         now = time.time()
-        self._confidence_snapshots[domain].append((now, confidence))
-        # Keep only last 100 observations
-        if len(self._confidence_snapshots[domain]) > 100:
-            self._confidence_snapshots[domain] = self._confidence_snapshots[domain][-100:]
+        with self._lock:
+            self._confidence_snapshots[domain].append((now, confidence))
+            # Keep only last 100 observations
+            if len(self._confidence_snapshots[domain]) > 100:
+                self._confidence_snapshots[domain] = self._confidence_snapshots[domain][-100:]
         self._save()
 
     def predict_decay(self, domain: str) -> DecayPrediction:
@@ -168,7 +174,8 @@ class SelectorDecayPredictor:
             )
 
         confidence_score = memory._compute_confidence(entry)
-        snapshots = self._confidence_snapshots.get(domain, [])
+        with self._lock:
+            snapshots = list(self._confidence_snapshots.get(domain, []))
 
         # ── Signal 1: Confidence trend (30% weight) ────────────────────
         confidence_risk = 1.0 - confidence_score.final_score

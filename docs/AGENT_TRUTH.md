@@ -4322,8 +4322,204 @@ all documentation artifacts, update CHANGELOG and truth.
 | `git push origin --delete <7 stale branches>` | 0 | Branches removed from remote. |
 | `git diff --check` | 0 | PASS; no whitespace errors. |
 
+### 2026-07-04 - Loop Iteration Session 93: Gap Hunt #1
+
+#### Quick Validation Evidence
+
+| Command | Exit | Output |
+|---|---|---|
+| `python3 scripts/validate_local.py --quick` (12/12 + openapi) | 0 | overall_status: passed |
+| `python3 -m pytest backend/tests/test_owasp.py test_api_usage_dashboard.py test_extraction_preview.py test_bulk_result_delete.py test_pdf_generation.py test_shareable_job_link.py test_templates_marketplace.py test_workspace_exports.py` | 0 | 43 passed, 23 skipped |
+| `npm test` (vitest run) | 0 | 36 test files, 458 tests passed |
+| `npm run build` (esbuild) | 0 | built + mock-api split chunk confirmed |
+| `npm run lint` (css + eslint + prettier) | 0 | all clean |
+
+**Working tree**: 10 files modified (8 test vacuum-assertion fixes + 2 frontend bundle/mock improvements);
+all verified green. No stray artifacts, `frontend/dist/` is gitignored.
+
+#### Gap Hunt Results (Exploration Agents)
+
+1. **Vacuous assertion — 1 remaining**: `backend/tests/test_csp_report_only.py:30` — value-level
+   CSP assertions run only inside `if r.status_code == 200` with no else branch; a non-200
+   response would silently pass.
+
+2. **Broad `except Exception` — 3 remaining** (down from 15+ in prior sessions):
+   - **CRITICAL**: `backend/app/pagination_executor.py:889` — `_fetch_page_sync()` catches
+     `Exception` and returns `""`, swallowing errors in the hot synchronous-fetch path.
+   - **HIGH**: `backend/app/llm_bridge.py:590` — `llm_json()` catches `Exception` after
+     the g4f fallback, silently converting novel exception types (including programming bugs)
+     into `{}`.
+   - **HIGH**: `backend/app/llm_bridge.py:776` — identical pattern in `llm_text()`,
+     silently converting into `""`.
+
+3. **Resource leaks — zero active leaks**: All Playwright contexts, httpx clients, SQLite
+   connections, SMTP sessions, file FDs, and locks are managed with context managers
+   or finally blocks. Two MEDIUM design notes (factory-oriented `get_safe_client` and
+   lazy Telegram notifier) but both are correctly handled by all current callers.
+
+4. **`suppress(Exception)` / bare `except:` — zero occurrences** in product code.
+
+#### Fixes Applied This Iteration
+
+| Finding | Fix |
+|---|---|
+| `pagination_executor.py:889` CRITICAL | Narrow `except Exception` to `(httpx.HTTPError, OSError)` |
+| `llm_bridge.py:590` HIGH | Remove blanket `except Exception` — fallback tuple already catches all expected errors |
+| `llm_bridge.py:776` HIGH | Same as above |
+| `test_csp_report_only.py:30` vacuous | Add else branch asserting expected non-200 status |
+
+#### Validation Re-Run After All Fixes (2026-07-04)
+
+| Command | Exit | Output |
+|---|---|---|
+| `python3 scripts/validate_local.py --quick` | 0 | 12/12 passed + openapi |
+| `python3 -m pytest backend/tests/ --timeout=30 -q` | 0 | full suite passed, 0 failures |
+| `python3 -m pytest backend/tests/test_p1_config_monitoring_foundation.py` | 0 | 6 passed (README fix confirmed) |
+| `npm test` | 0 | 36 files, 458 tests passed |
+| `ruff check + format` (pagination_executor, llm_bridge) | 0 | clean |
+| `mypy` (pagination_executor, llm_bridge) | 0 | no issues |
+| `bandit -ll` (pagination_executor, llm_bridge) | 0 | clean |
+
+#### Fix Summary
+
+| ID | Severity | File | Fix |
+|---|---|---|---|
+| BRD-EXEC-001 | CRITICAL | pagination_executor.py:889 | `except Exception` → `except (httpx.HTTPError, OSError)` |
+| BRD-LLM-002 | HIGH | llm_bridge.py:590 | Removed blanket `except Exception` (g4f JSON path) |
+| BRD-LLM-003 | HIGH | llm_bridge.py:776 | Removed blanket `except Exception` (g4f text path) |
+| VAC-CSP-004 | VACUOUS | test_csp_report_only.py:30 | Unconditional CSP value assertions |
+| DOC-VAL-005 | DOC-DRIFT | README.md:99 | Fixed validate semantics to match Makefile `--full` |
+
+#### Gap Hunt Round 2 — Broader Sweep (2026-07-04)
+
+| Command | Exit | Output |
+|---|---|---|
+| `python3 scripts/verify_docs_match_code.py` | 0 | routes ✓ env vars ✓ |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | 185 routes, unknown_auth=0, unknown_tenant=0 |
+| `python3 scripts/generate_route_inventory.py` | 0 | 199 routes, 164 stable, 35 experimental |
+
+#### Round 2 Findings (Exploration Agents)
+
+1. **Doc-vs-code**: Clean — zero mismatches. Routes, env vars, auth matrix all consistent.
+2. **Untested routes**: Zero unknown_auth/unknown_tenant in the auth matrix. All routes
+   accounted for with auth and tenant scope documented.
+3. **Flaky tests**: ~56 findings across HIGH/MEDIUM/LOW tiers. Common patterns:
+   `time.sleep()` for thread ordering, `asyncio.sleep()` for task cancellation timing,
+   `time.time()` without freezing in tight 10ms tolerance windows. None have caused
+   CI failures in recent runs; all are pre-existing and well-characterized.
+4. **Partial implementations**: Zero TODO/FIXME/HACK in product code. Zero stray
+   `NotImplementedError` outside the ABC `storage_interface.py`. All ~35 `pass`
+   statements are intentional (exception suppression, no-op branches, transaction
+   context managers). Codebase is remarkably clean.
+5. **Frontend security**: Zero CRITICAL vulnerabilities. 1 HIGH finding fixed:
+   `data-profile.js:158` — `f.types` (from scraped web content) interpolated into
+   `innerHTML` without `esc()`. All other innerHTML uses consistently apply `esc()`.
+   No `eval()`, `document.write()`, or hardcoded secrets found.
+
+#### Fix Applied Round 2
+
+| ID | Severity | File | Fix |
+|---|---|---|---|
+| XSS-DATA-006 | HIGH | data-profile.js:158 | `esc(f.types \|\| "—")` on scraped-data field |
+
+#### Gap Hunt Round 3 — Deferred Items (2026-07-04)
+
+Focused on the deferred work from Round 2: LLM silent-empty audit,
+most-dangerous flaky tests, and proxy degradation metrics.
+
+##### Round 3 Fixes
+
+| ID | Severity | File | Fix |
+|---|---|---|---|
+| LLM-CASCADE-007 | HIGH | url_analysis_pipeline.py:435 | Added catch for `LLMCascadeExhausted` — callers using `llm_json()` with the default silent-empty path would otherwise get an unhandled 500 if `DATAFORGE_LLM_RAISE_ON_FAILURE=true` is set. Also fixed the pre-existing Pyright "LLMCascadeExhausted not defined" diagnostic. |
+| FLAKY-MVCC-008 | HIGH | test_mvcc.py:22-70 | Replaced `time.sleep(0.4/0.1)` thread ordering with `threading.Event` (B signals event after commit, A waits for event before modification). Also removed unused `import time`. |
+| FLAKY-STATE-009 | HIGH | test_state_store.py:235-329 | Replaced 3 `time.sleep(0.1)` polling loops with `flush_state_writes()` — the production function already has a deterministic `executor.shutdown(wait=True)` mechanism. 13 tests pass. |
+| FLAKY-CANCEL-010 | HIGH | test_api_regressions.py:609-658 | Replaced `await asyncio.sleep(0.3)` before cancel with `asyncio.Event` — the mock scrape sets `scrape_started.set()` when it begins, and the canceler awaits `scrape_started.wait()` before setting `cancel_requested`. |
+| PROXY-METR-011 | MEDIUM | proxy_manager.py:20-34,119-126 | Added `_record_degradation()` helper wired into `refresh_from_provider()` — `record_proxy_provider_refresh(proxy_count=...)` is now emitted on every provider refresh, success or failure. Operators can monitor `_proxy_provider_last_count` for pool degradation. |
+
+##### LLM Silent-Empty Audit Summary
+
+- Confirmed `llm_raise_on_failure_default()` returns `False` (documented backwards-compat design)
+- `_handle_silent_failure()` always records metrics even on silent path
+- All callers catch `LLMCascadeExhausted` (via `RuntimeError` in their error tuples)
+- 1 gap fixed: `url_analysis_pipeline.py` now catches `LLMCascadeExhausted` explicitly
+- `insight_engine.py` already uses `raise_on_failure=True` → catches `LLMCascadeExhausted` → returns empty (intentional)
+- `cleaning_engine.py` catches `RuntimeError` (parent class) in `_LLM_CALL_ERRORS`
+- `selector_discovery_analysis.py` catches `RuntimeError` (parent class)
+- Design is sound — no further changes needed
+
+##### Remaining Flaky Tests
+
+~53 remaining flaky-test findings across MEDIUM/LOW tiers. They are well-characterized
+in the Round 2 report. Fixing all of them would be a sprint-length effort. None have
+caused CI failures in recent runs. The 3 HIGH findings fixed above were the
+highest-risk patterns.
+
 ### Current Status
 
-Latest validation artifact is
-`artifacts/validation/runs/20260702T040815Z_quick`; `artifacts/validation/latest_summary.md`
-reports `overall_status: passed`.
+Latest validation artifact:
+`artifacts/validation/runs/20260704_gap_hunt_1_quick`.
+`artifacts/validation/latest_summary.md` reports `overall_status: passed`.
+Full backend suite: **0 failures**. Frontend: 36 files, 458 tests passed.
+Build + lint + ruff + mypy + bandit: all clean.
+Working tree: 25 files changed, 321 insertions, 96 deletions.
+
+---
+
+## Iteration 5 — Race Condition Sweep (4 MEDIUM fixes)
+
+Date: 2026-07-04
+
+Race-condition Explore agent identified 5 MEDIUM issues; 4 fixed this
+round (all verified). Pattern: unlocked check-then-act / read-modify-write
+on shared mutable state across concurrent scrapers.
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| RACE-01 | MEDIUM | `price_history.py:308` | `get_price_history()` got double-checked locking under `_PRICE_HISTORY_LOCK` so concurrent first-callers can't build-and-discard two stores. |
+| RACE-02 | MEDIUM | `policy_engine.py:133` | `get_policy_engine()` check+assign on `WeakKeyDictionary` wrapped in `_policy_instances_lock` (WeakKeyDictionary mutation is not thread-safe). |
+| RACE-03 | MEDIUM | `domain_intelligence.py:57,82,105,112` | Added `self._lock` to `DomainIntelligenceRegistry`; guarded `get_intelligence` check-then-act, `update_from_telemetry` read-modify-write (inlined lookup to avoid reentrant lock), and `_save` snapshot. |
+| RACE-04 | MEDIUM | `selector_decay_predictor.py:67,81,131,146` | Added `self._lock` to `SelectorDecayPredictor`; guarded `record_observation` append+trim, `predict_decay` snapshot read, and `_save` snapshot. |
+| RACE-05 | MEDIUM | `distributed.py:61` | `_generate_node_id` now writes via mkstemp+os.replace+fsync so a crash mid-write can't leave a truncated `node_id.txt` (concurrent reader sees complete-or-old only). |
+
+Remaining LOW: `workflow_repository.py:273` idempotent backfill flag race
+(duplicate work, not corruption — deferred). ×
+
+Verified: `py_compile` clean, ruff clean, 45 targeted tests pass
+(`test_domain_intelligence`, `test_selector_decay_predictor`,
+`test_distributed_consensus`). Quick validation gate: **passed** (12/12 + openapi).
+
+---
+
+## Iteration 6 — cf_harvester async-context-manager bug (HIGH)
+
+Date: 2026-07-04
+
+The CF Cloudflare-clearance harvester was using `await pool.acquire_context(url=..., domain=...)`
+to drive an `@asynccontextmanager`-decorated function — two failures:
+
+1. **TypeError on every call**: `BrowserPool.acquire_context` accepts only
+   `viewport_width`, `viewport_height`, `user_agent` kwargs. Passing `url`
+   and `domain` raised `TypeError` which the outer `except Exception` tuple
+   swallowed. The CF harvester always returned silently-empty — the
+   user-facing failure mode was "CF clearance harvest never works".
+
+2. **Semaphore slot leak**: even with the kwargs fixed, `await
+   acquire_context(...)` invokes `__anext__` (runs `__aenter__`, stops
+   before `__aexit__`). The `_concurrency_semaphore` slot was never
+   released, inflating the cap silently until process restart.
+
+Fix: rewrote to `async with pool.acquire_context() as (_ctx_id, context):`
+so `__aexit__` always runs the cleanup finally-block.
+
+Rewrote `tests/test_cf_harvester.py` (18 tests now all passing) — the
+existing tests had encoded the broken contract (mocking the bare-`await`
+call shape and asserting `release_context(context)` was called directly,
+instead of the real `release_context(ctx_id)` via `__aexit__`).
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| HARVEST-01 | HIGH | `cf_harvester.py:130` | Use `async with acquire_context()` instead of `await`; remove broken `release_context` fallback. |
+| TEST-01 | (was) bug | `test_cf_harvester.py` | Rewrote against real `acquire_context` contract (yields `(ctx_id, ctx)` tuple; cleanup via `__aexit__`). |
+
+Verified: `py_compile` clean, ruff clean, 18 cf_harvester tests pass.

@@ -137,7 +137,11 @@ def get_policy_engine(ws: SemanticWorldState | None = None) -> SubstratePolicy:
         with _policy_instances_lock:
             if _policy_instances is None:
                 _policy_instances = WeakKeyDictionary()
-    instances = _policy_instances
-    if target_ws not in instances:
-        instances[target_ws] = SubstratePolicy(ws=target_ws)
-    return instances[target_ws]  # type: ignore[no-any-return]
+    # Hold the lock across the check+assign so concurrent callers sharing
+    # the same ``target_ws`` cannot both pass the ``not in`` test and
+    # create duplicate SubstratePolicy instances (WeakKeyDictionary
+    # mutation is not thread-safe).
+    with _policy_instances_lock:
+        if target_ws not in _policy_instances:
+            _policy_instances[target_ws] = SubstratePolicy(ws=target_ws)
+        return _policy_instances[target_ws]  # type: ignore[no-any-return]

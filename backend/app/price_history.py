@@ -16,6 +16,7 @@ if needed.
 from __future__ import annotations
 
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -306,14 +307,23 @@ class PriceHistory:
 
 # Module-level singleton
 _PRICE_HISTORY: PriceHistory | None = None
+_PRICE_HISTORY_LOCK = threading.Lock()
 
 
 def get_price_history() -> PriceHistory:
-    """Get or create the process-wide price history store."""
+    """Get or create the process-wide price history store.
+
+    Double-checked under :data:`_PRICE_HISTORY_LOCK` so concurrent first-callers
+    do not both build a fresh ``PriceHistory`` and discard the other's
+    accumulated in-memory state.
+    """
     global _PRICE_HISTORY
-    if _PRICE_HISTORY is None:
-        _PRICE_HISTORY = PriceHistory()
-    return _PRICE_HISTORY
+    if _PRICE_HISTORY is not None:
+        return _PRICE_HISTORY
+    with _PRICE_HISTORY_LOCK:
+        if _PRICE_HISTORY is None:
+            _PRICE_HISTORY = PriceHistory()
+        return _PRICE_HISTORY
 
 
 def reset_price_history_for_testing() -> None:

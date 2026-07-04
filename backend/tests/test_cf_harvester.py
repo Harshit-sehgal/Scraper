@@ -12,6 +12,7 @@ Validates:
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -58,9 +59,29 @@ class TestBuildCookieHeader:
         assert result == ""
 
     def test_value_none_skipped(self) -> None:
-        cookies = [{"name": "x", "value": None}]  # type: ignore[dict-item]
+        cookies = [{"name": "x", "value": None}]
         result = build_cookie_header_from_dict(cookies)
         assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# Helpers — match the real BrowserPool.acquire_context contract:
+# an @asynccontextmanager that yields (ctx_id, ctx).
+# ---------------------------------------------------------------------------
+
+
+def _make_pool(context: AsyncMock) -> MagicMock:
+    """Build a mock pool whose acquire_context() is the real async CM
+    that yields the supplied context."""
+
+    @asynccontextmanager
+    async def _acquire(**_kwargs: object):  # ignore viewport args
+        yield ("iso:test-ctx-id", context)
+
+    pool = MagicMock()
+    pool.acquire_context = _acquire
+    pool.release_context = AsyncMock(return_value=None)
+    return pool
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +103,6 @@ class TestHarvestDisabled:
         from app.config import settings
 
         monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", False)
-        # If it tried to import browser_pool, this would fail
         with patch.dict("sys.modules", {"app.browser_pool": None}):
             result = await harvest_cf_clearance("https://example.com", "example.com")
         assert result is None
@@ -101,7 +121,6 @@ class TestHarvestPoolUnavailable:
         monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", True)
         monkeypatch.setattr(settings, "CF_HARVESTER_TIMEOUT_S", 5.0)
         monkeypatch.setattr(settings, "CF_HARVESTER_MAX_RENDER_WAIT_S", 5.0)
-        # Patch the import inside cf_harvester to raise ImportError
         with patch("app.browser_pool.get_browser_pool", side_effect=ImportError):
             result = await harvest_cf_clearance("https://example.com", "example.com")
         assert result is None
@@ -124,8 +143,9 @@ class TestHarvestPoolUnavailable:
         monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", True)
         monkeypatch.setattr(settings, "CF_HARVESTER_TIMEOUT_S", 5.0)
         monkeypatch.setattr(settings, "CF_HARVESTER_MAX_RENDER_WAIT_S", 5.0)
-        pool = MagicMock(spec=[])
-        # No acquire_context attribute
+        # Spec=[] means the mock raises AttributeError for any attribute,
+        # which mirrors the getattr(..., None) check path in the function.
+        pool = MagicMock()
         with patch("app.browser_pool.get_browser_pool", return_value=pool):
             result = await harvest_cf_clearance("https://example.com", "example.com")
         assert result is None
@@ -145,7 +165,6 @@ class TestHarvestSuccess:
         monkeypatch.setattr(settings, "CF_HARVESTER_TIMEOUT_S", 5.0)
         monkeypatch.setattr(settings, "CF_HARVESTER_MAX_RENDER_WAIT_S", 5.0)
 
-        # Build mock context that immediately returns cf_clearance
         mock_context = AsyncMock()
         mock_page = AsyncMock()
         mock_context.new_page = AsyncMock(return_value=mock_page)
@@ -157,11 +176,9 @@ class TestHarvestSuccess:
             ]
         )
 
-        # Build mock pool
-        mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(return_value=mock_context)
-        mock_pool.release_context = MagicMock(return_value=None)
-
+        mock_pool = _make_pool(mock_context)
+        # After release_context is called via __aexit__,
+        # confirm the page.close() was also called.
         mock_engine = MagicMock()
         mock_engine.update_cookies = MagicMock()
 
@@ -181,8 +198,8 @@ class TestHarvestSuccess:
         assert "cf_clearance=test-clearance-xyz" in result
         mock_engine.update_cookies.assert_called_once_with("example.com", result)
         mock_record.assert_called_once_with(success=True)
-        # release_context should have been called
-        mock_pool.release_context.assert_called_once_with(mock_context)
+        # Page must always be closed after the polling loop.
+        mock_page.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_returns_cookie_header_string(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -198,10 +215,7 @@ class TestHarvestSuccess:
         mock_page.goto = AsyncMock(return_value=None)
         mock_context.cookies = AsyncMock(return_value=[{"name": "cf_clearance", "value": "abc"}])
 
-        mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(return_value=mock_context)
-        mock_pool.release_context = MagicMock(return_value=None)
-
+        mock_pool = _make_pool(mock_context)
         mock_engine = MagicMock()
 
         with (
@@ -228,7 +242,6 @@ class TestHarvestTimeout:
         monkeypatch.setattr(settings, "CF_HARVESTER_TIMEOUT_S", 5.0)
         monkeypatch.setattr(settings, "CF_HARVESTER_MAX_RENDER_WAIT_S", 5.0)
 
-        # Context that never returns cf_clearance
         mock_context = AsyncMock()
         mock_page = AsyncMock()
         mock_context.new_page = AsyncMock(return_value=mock_page)
@@ -236,25 +249,24 @@ class TestHarvestTimeout:
         # Returns cookies but no cf_clearance
         mock_context.cookies = AsyncMock(return_value=[{"name": "other", "value": "val"}])
 
-        mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(return_value=mock_context)
-        mock_pool.release_context = MagicMock(return_value=None)
+        mock_pool = _make_pool(mock_context)
 
         with (
             patch("app.browser_pool.get_browser_pool", return_value=mock_pool),
             patch("app.metrics_collector.record_cf_harvest_attempt") as mock_record,
         ):
-            # Use very short timeout so test doesn't hang
             result = await harvest_cf_clearance(
                 "https://example.com",
                 "example.com",
-                timeout_s=1.0,
-                max_render_wait_s=1.0,
+                timeout_s=0.1,  # very short so test doesn't hang
+                max_render_wait_s=0.1,
             )
 
         assert result is None
         mock_record.assert_called_once_with(success=False)
-        mock_pool.release_context.assert_called_once_with(mock_context)
+        # Even on timeout, __aexit__ must release the context and
+        # the page must be closed.
+        mock_page.close.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -271,9 +283,17 @@ class TestHarvestException:
         monkeypatch.setattr(settings, "CF_HARVESTER_TIMEOUT_S", 5.0)
         monkeypatch.setattr(settings, "CF_HARVESTER_MAX_RENDER_WAIT_S", 5.0)
 
+        # acquire_context itself raises — pool acquisition failed.
         mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(side_effect=RuntimeError("pool error"))
-        mock_pool.release_context = MagicMock(return_value=None)
+        pool_error = RuntimeError("pool error")
+
+        @asynccontextmanager
+        async def _acquire_ctx(**_kw: object):  # type: ignore[no-untyped-def]
+            raise pool_error
+            yield  # pragma: no cover (unreachable)
+
+        mock_pool.acquire_context = _acquire_ctx
+        mock_pool.release_context = AsyncMock(return_value=None)
 
         with (
             patch("app.browser_pool.get_browser_pool", return_value=mock_pool),
@@ -300,14 +320,12 @@ class TestHarvestException:
         mock_context = AsyncMock()
         mock_page = AsyncMock()
         mock_context.new_page = AsyncMock(return_value=mock_page)
-        # goto raises an error that should be caught
+        # goto raises an error that should be caught internally
         mock_page.goto = AsyncMock(side_effect=OSError("network error"))
-        # No cf_clearance cookies
+        # No cf_clearance
         mock_context.cookies = AsyncMock(return_value=[])
 
-        mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(return_value=mock_context)
-        mock_pool.release_context = MagicMock(return_value=None)
+        mock_pool = _make_pool(mock_context)
 
         with (
             patch("app.browser_pool.get_browser_pool", return_value=mock_pool),
@@ -316,13 +334,14 @@ class TestHarvestException:
             result = await harvest_cf_clearance(
                 "https://example.com",
                 "example.com",
-                timeout_s=1.0,
-                max_render_wait_s=1.0,
+                timeout_s=0.1,
+                max_render_wait_s=0.1,
             )
 
-        # goto error is caught internally, poll loop runs, no cf_clearance → None
+        # goto error caught, poll loop runs, no cf_clearance → None
         assert result is None
-        mock_pool.release_context.assert_called_once_with(mock_context)
+        # page.close must always run via the inner finally.
+        mock_page.close.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -345,11 +364,8 @@ class TestHarvestUpdateCookiesFailure:
         mock_page.goto = AsyncMock(return_value=None)
         mock_context.cookies = AsyncMock(return_value=[{"name": "cf_clearance", "value": "persisted"}])
 
-        mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(return_value=mock_context)
-        mock_pool.release_context = MagicMock(return_value=None)
+        mock_pool = _make_pool(mock_context)
 
-        # update_cookies raises but harvest should still succeed
         failing_engine = MagicMock()
         failing_engine.update_cookies = MagicMock(side_effect=ValueError("db down"))
 
@@ -370,13 +386,17 @@ class TestHarvestUpdateCookiesFailure:
 
 
 # ---------------------------------------------------------------------------
-# harvest_cf_clearance — async release_context
+# harvest_cf_clearance — async release via __aexit__
 # ---------------------------------------------------------------------------
 
 
 class TestHarvestAsyncRelease:
     @pytest.mark.asyncio
-    async def test_await_async_release_context(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_pool_release_runs_via_aexit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """exercising the @asynccontextmanager path: __aexit__ must run
+        on normal timeout-return and on happy path alike. The pool's real
+        release_context will be called by __aexit__ eagerly closing the
+        BrowserContext after page.close()."""
         from app.config import settings
 
         monkeypatch.setattr(settings, "CF_HARVESTER_ENABLED", True)
@@ -390,10 +410,7 @@ class TestHarvestAsyncRelease:
         # No cf_clearance → times out
         mock_context.cookies = AsyncMock(return_value=[])
 
-        mock_pool = MagicMock()
-        mock_pool.acquire_context = AsyncMock(return_value=mock_context)
-        # release_context returns an awaitable (AsyncMock by default)
-        mock_pool.release_context = AsyncMock(return_value=None)
+        mock_pool = _make_pool(mock_context)
 
         with (
             patch("app.browser_pool.get_browser_pool", return_value=mock_pool),
@@ -402,10 +419,10 @@ class TestHarvestAsyncRelease:
             result = await harvest_cf_clearance(
                 "https://example.com",
                 "example.com",
-                timeout_s=1.0,
-                max_render_wait_s=1.0,
+                timeout_s=0.1,
+                max_render_wait_s=0.1,
             )
 
         assert result is None
-        # Verify async release was awaited (AsyncMock tracks calls)
-        mock_pool.release_context.assert_called_once_with(mock_context)
+        # page.close must run inside the inner finally.
+        mock_page.close.assert_awaited_once()

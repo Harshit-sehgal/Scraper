@@ -73,10 +73,30 @@ def _generate_node_id(data_dir: str | None = None) -> str:
             logger.debug("Failed to read existing node_id.txt, generating a new ID")
 
     new_id = str(uuid.uuid4())
+    # Atomic write via mkstemp + os.replace + fsync so a crash mid-write
+    # cannot leave a truncated/empty node_id.txt that a concurrent reader
+    # (or the next restart's existence check) would observe.
+    import tempfile
+
+    fd: int | None = None
+    tmp_path: str | None = None
     try:
-        node_id_file.write_text(new_id)
+        fd, tmp_path = tempfile.mkstemp(dir=ddir, suffix=".tmp")
+        with os.fdopen(fd, "w") as f:
+            fd = None  # ownership transferred to fdopen context manager
+            f.write(new_id)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, node_id_file)
+        tmp_path = None  # ownership transferred via rename
     except OSError:
         logger.warning("Failed to persist node ID to %s; using ephemeral ID", node_id_file)
+        with contextlib.suppress(OSError):
+            if fd is not None:
+                os.close(fd)
+        if tmp_path is not None and os.path.exists(tmp_path):
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
     return new_id
 
 

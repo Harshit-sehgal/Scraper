@@ -67,6 +67,11 @@ class DomainIntelligenceRegistry:
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._registry: dict[str, DomainIntelligence] = {}
+        # Per-instance lock guarding the check-then-act and read-modify-write
+        # paths on ``self._registry`` so concurrent scrapers don't lose
+        # telemetry updates (e.g. two threads bumping ``total_fetches``
+        # from the same snapshot).
+        self._lock = threading.Lock()
         self._load()
 
     def _load(self) -> None:
@@ -82,13 +87,19 @@ class DomainIntelligenceRegistry:
     def _save(self) -> None:
         import tempfile
 
+        # Snapshot the registry under the lock so the dump isn't racing with
+        # a concurrent update_from_telemetry(). The actual write happens
+        # outside the lock (diskfs is slow, no need to block readers).
+        with self._lock:
+            snapshot = {d: i.to_dict() for d, i in self._registry.items()}
+
         fd: int | None = None
         tmp_path: str | None = None
         try:
             fd, tmp_path = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")
             with os.fdopen(fd, "w") as f:
                 fd = None  # ownership transferred to fdopen context manager
-                json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
+                json.dump(snapshot, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_path, self.path)
@@ -105,9 +116,10 @@ class DomainIntelligenceRegistry:
     def get_intelligence(self, url: str) -> DomainIntelligence:
         """Get or create intelligence for a domain."""
         domain = self._extract_domain(url)
-        if domain not in self._registry:
-            self._registry[domain] = DomainIntelligence(domain)
-        return self._registry[domain]
+        with self._lock:
+            if domain not in self._registry:
+                self._registry[domain] = DomainIntelligence(domain)
+            return self._registry[domain]
 
     def update_from_telemetry(self, telemetry: dict[str, Any]) -> None:
         """Update domain intelligence based on a recent scrape telemetry snapshot."""
@@ -116,8 +128,12 @@ class DomainIntelligenceRegistry:
         if not domain:
             return
 
-        intel = self.get_intelligence(url)
         alpha = settings.DOMAIN_INTELLIGENCE_SMOOTHING_ALPHA
+        with self._lock:
+            # Inline check-then-act instead of calling get_intelligence to
+            # avoid re-acquiring the non-reentrant lock.
+            intel = self._registry.get(domain) or DomainIntelligence(domain)
+            self._registry[domain] = intel
 
         # 1. Update basic counts
         intel.total_fetches += 1
