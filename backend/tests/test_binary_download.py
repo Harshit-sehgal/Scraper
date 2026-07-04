@@ -107,6 +107,7 @@ class TestBinaryDownloadUnit:
         mock_response.content = mock_content
         mock_response.headers = {"content-type": "application/pdf"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -135,6 +136,7 @@ class TestBinaryDownloadUnit:
         mock_response.content = b"fake binary content"
         mock_response.headers = {"content-type": "application/zip"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -156,6 +158,7 @@ class TestBinaryDownloadUnit:
         mock_response.content = b"some binary data"
         mock_response.headers = {"content-type": "application/octet-stream"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -175,6 +178,7 @@ class TestBinaryDownloadUnit:
         mock_response.content = b"<html><body>not a binary</body></html>"
         mock_response.headers = {"content-type": "text/html"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -194,6 +198,7 @@ class TestBinaryDownloadUnit:
         mock_response.content = b"test content"
         mock_response.headers = {"content-type": "image/png"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -233,6 +238,7 @@ class TestScrapeUrlBinaryIntegration:
         mock_response.content = b"%PDF-1.4 sample pdf bytes"
         mock_response.headers = {"content-type": "application/pdf"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -317,6 +323,7 @@ class TestScrapeUrlBinaryIntegration:
         mock_response.content = b"\x89PNG\r\n\x1a\nbinary png content"
         mock_response.headers = {"content-type": "image/png"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -344,6 +351,7 @@ class TestScrapeUrlBinaryIntegration:
         mock_response.content = b"PK\x03\x04fake zip content"
         mock_response.headers = {"content-type": "application/zip"}
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)

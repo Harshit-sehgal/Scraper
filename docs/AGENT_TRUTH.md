@@ -4654,3 +4654,30 @@ Date: 2026-07-04
 | LOCK-03 | LOW | backend/app/workflow_repository.py:259 | `SQLiteWorkflowRepository._backfill_done` check-then-act wrapped in a `self._backfill_lock` so concurrent first-callers on a fresh process don't both run the full upsert loop (idempotent inserts → wasted work). |
 
 Verified: frontend build + 458 vitest pass, eslint + prettier clean, 28+ workflow tests pass, full quick validation gate passed.
+
+### Iteration 11 — Resource-leak sweep: httpx Response `aclose()` + sqlite3 connection lifetime
+
+Two gap classes surfaced from a context-manager / async-iterator lifecycle audit (Explore agent).
+
+**Class A — httpx Response never `aclose()`d (connection-pool slot leak).** `async with get_safe_async_client(...) as client:` releases the *client/pool* but a per-call `Response` object holds its own pooled connection; abandoning it (returning without closing, or raising from `.raise_for_status()` before any read) keeps that slot tied up until GC. The worst offender was `webhook_delivery.py` (body never read × retries → slots never returned to the pool at all until GC).
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| LEAK-A1 | HIGH | backend/app/services/webhook_delivery.py:211 | `resp` wrapped in `try/finally: await resp.aclose()` — releases the pool slot on both success and HTTP-error branches (was leaking on every attempt × retries, body never drained). |
+| LEAK-A2 | HIGH | backend/app/binary_handler.py:214 | `resp` wrapped in `try/finally: await resp.aclose()` — `raise_for_status()` previously leaked the Response on 4xx/5xx before any read. |
+| LEAK-A3 | MED | backend/app/form_filling_engine.py:690 | `resp` wrapped in `try/finally: await resp.aclose()` — leaked on every form submit (success and failure). |
+| LEAK-A4 | MED | backend/app/routers/auth_profiles.py:319 | `response` wrapped in `try/finally: await response.aclose()` after the multi-branch live-session check (6 early returns + fall-through were all leaking). |
+| LEAK-A5 | MED | backend/app/services/url_analysis_pipeline.py:215 | The redirect loop correctly closed *intermediate* responses but abandoned the *final* `resp` at loop's end; wrapped the whole loop body in `try/finally: await resp.aclose()`. |
+| LEAK-A6 | MED | backend/app/llm_bridge.py:325,381 | Both `_call_openai_compatible_json` and `_call_openai_compatible_text` now `await response.aclose()` in `try/finally` — was leaking on the success `return` and on malformed-JSON raises from `response.json()`. |
+
+**Class B — `with sqlite3.connect(...) as conn:` without `conn.close()` (file-descriptor leak).** A common misconception: using `sqlite3.Connection` as a context manager only manages the *transaction* (commit on success, rollback on exception); it does **NOT** close the connection. The file descriptor leaks until GC. The three modules below re-open the DB per call, so this leaks on every operation — amplified on hot paths (`geocode_cache.get` runs on every Nominatim lookup, `crawl_frontier._db_*` run in `asyncio.to_thread` on every frontier enqueue/complete/fail).
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| LEAK-B1 | HIGH | backend/app/geocode_cache.py:38,70,84,89,107,118 | All 6 sites (`_init_db`, `get` negative-cache check, expired-entry delete, primary-cache lookup, `set`, `set_negative`) rewritten to `conn = sqlite3.connect(...); try: ...; (commit on success); except: conn.rollback(); raise; finally: conn.close()`. Read-only lookups omit the commit/except. Fixed the FD leak on the hot geocoding path. |
+| LEAK-B2 | MED | backend/app/benchmark_reporter.py:52,76,95,130 | All 4 sites (`_init_db`, `record_run`, `compare_against_history`, `get_history`) rewritten to explicit `try/finally: conn.close()` with transaction management. |
+| LEAK-B3 | HIGH | backend/app/crawl_frontier.py:41,52,60,70,79,123,163 | All 7 module-level `_db_*` helpers + `_init_db` + `_load_from_db` rewritten to `try/finally: conn.close()`. `_load_from_db` nests the `try/finally` inside its existing `_DB_FALLBACK_ERRORS` guard so the connection still closes on partial-load failure. FD leak amplified by `asyncio.to_thread` callers. |
+
+**Test updates** (mechanical, no behaviour change): the httpx mock responses in the affected test files gained `aclose = AsyncMock(return_value=None)` so the new `await resp.aclose()` in production code resolves against an awaitable. Files touched: `test_form_filling_engine.py` (1 site), `test_llm_bridge.py` (`_MockAsyncClient.post` now sets `aclose` on every returned MagicMock, plus the two inline `mock_response` sites), `test_webhook_retry.py` (`_mock_ok_response` helper), `test_webhook_delivery.py` (11 inline sites patched via script).
+
+Verified: `python3 -m pytest backend/tests/ -q` full suite green (exit 0), 458/458 vitest pass, eslint + prettier clean, compileall + ruff clean (the one B904 in llm_bridge.py:1158 is pre-existing and untouched by this iteration), full quick validation gate passed (13/13).
