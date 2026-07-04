@@ -595,7 +595,7 @@ async def discover_sitemaps(domain: str, *, fetch_robots: bool = True) -> list[s
                             line = line.strip()
                             if line.lower().startswith("sitemap:"):
                                 url = line.split(":", 1)[1].strip()
-                                if url:
+                                if url and _looks_like_valid_sitemap_url(url):
                                     sitemaps.append(url)
                 except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError, OSError):
                     logger.debug("Could not fetch robots.txt for %s", domain)
@@ -607,18 +607,44 @@ async def discover_sitemaps(domain: str, *, fetch_robots: bool = True) -> list[s
                 line = line.strip()
                 if line.lower().startswith("sitemap:"):
                     url = line.split(":", 1)[1].strip()
-                    if url:
+                    if url and _looks_like_valid_sitemap_url(url):
                         sitemaps.append(url)
         except (OSError, ValueError, RuntimeError):
             logger.debug("Could not fetch robots.txt for %s", domain)
 
-    # Fallback: try the standard sitemap URL
+    # Fallback: try the standard sitemap URL — already HTTP(S) over the
+    # caller-supplied domain; the domain itself was validated at the top
+    # of discover_sitemaps via robots_url going through validate_public_http_url.
     if not sitemaps:
         standard = f"https://{domain}/sitemap.xml"
         logger.debug("No Sitemap directives found in robots.txt for %s; trying %s", domain, standard)
         sitemaps.append(standard)
 
     return sitemaps
+
+
+def _looks_like_valid_sitemap_url(url: str) -> bool:
+    """Validate a sitemap URL extracted from a remote ``robots.txt``.
+
+    ``robots.txt`` content is attacker-controlled (the target site's
+    operator can put whatever they want there, including private-IP
+    URLs).  The downstream caller may iterate the returned list and
+    fetch each entry — defense-in-depth requires that we never hand
+    back a URL we would not ourselves fetch.  We reject the same set
+    of SSRF targets the rest of the codebase rejects via
+    :func:`validate_public_http_url`, plus non-http(s) schemes (which
+    sitemap URLs should never legitimately carry).
+    """
+    if not url.startswith(("https://", "http://")):
+        return False
+    try:
+        from app.url_safety import validate_public_http_url
+
+        validate_public_http_url(url)
+    except ValueError:
+        logger.debug("Rejecting sitemap URL from robots.txt: %s", url)
+        return False
+    return True
 
 
 def _fetch_robots_with_urllib(robots_url: str) -> str:
