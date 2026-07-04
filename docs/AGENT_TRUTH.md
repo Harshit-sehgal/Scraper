@@ -4587,3 +4587,47 @@ Date: 2026-07-04
 | UX-05 | HIGH | frontend/js/dashboard.js:16 | `refreshDashboard` got a request-token (`_dashRefreshToken`) — a slow in-flight 5-fetch batch (triggered by popstate/route-only dispatch) can't overwrite newer dashboard data with stale payloads. |
 
 Verified: compileall clean, ruff clean, 3 distributed_consensus tests + 11 idempotency tests pass, frontend build + 458 vitest tests pass, eslint + prettier clean. Quick validation gate: passed.
+
+---
+
+## Iteration 9 — Test-coverage gap inventory (57 findings across 17 modules)
+
+Date: 2026-07-04
+
+A thorough sweep of backend/app/ for untested functions/branches identified
+57 gaps across 17 modules. Key clusters:
+
+### Completely untested modules
+- **page_profiler.py** — entire module (no test file exists). 5 internal
+  regex-based structure detectors (`_detect_table_structure`,
+  `_detect_cards_structure`, `_detect_list_structure`,
+  `_detect_key_value_structure`, `_generate_container_selector`) have
+  zero coverage.
+
+### Completely untested production paths
+- **binary_handler.py**: `_write_binary_file_atomic` (crash-safe atomic
+  write), `_iter_binary_file` (streaming download), `_sanitize_filename`
+  error branch (path-traversal rejection)
+- **regression_capture.py**: 6 internal atomic-write/registry-reload
+  methods including `classify_severity` and `prune_fixtures` — disk
+  exhaustion prevention with zero test coverage
+- **replay_buffer.py**: `_CheckpointIndex` (binary-search based snapshot
+  index, zero unit tests), `_load_existing_segments` (startup disk-scan
+  with regex segment parsing)
+- **routers/operator.py**: add/remove denylist error-path branches
+  (409/404) never exercised
+- **llm_bridge.py**: `_check_cascade_breaker` / `LLMCircuitOpen` /
+  `_record_token_usage` — dedicated circuit-breaker + token cost tracking,
+  both never tested
+- **auth_profiles.py + scheduled_monitoring.py**: RBAC helpers
+  (`_can_access_profile`, `_can_access_scheduled_job`, `_safe_profile`)
+  with multi-role branching, none tested directly
+
+### Pattern
+Most gaps are in internal `_private` helper methods (atomic fsync
+writers, RBAC checkers, data sanitizers) that are exercised only
+indirectly through public API calls but whose edge-case branches
+(error paths, boundary conditions) are never asserted.
+
+These are test-quality findings, not operational bugs. Documented
+for a focused "test-coverage hardening" sprint.
