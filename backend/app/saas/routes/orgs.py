@@ -17,7 +17,14 @@ from app.saas.models import (
 )
 from app.utils.rbac import UserRole, require_principal, require_role_with_user
 
-from ._common import _INVITATION_CREATE_LIMITERS, _check_rate_limit, _env_backed_all_access, _validate_email
+from ._common import (
+    _INVITABLE_ROLES,
+    _INVITATION_CREATE_LIMITERS,
+    _check_rate_limit,
+    _env_backed_all_access,
+    _membership_rank,
+    _validate_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +306,8 @@ async def remove_member(
     # ENABLE_OPERATOR_CROSS_TENANT is explicitly True (issue #135).
     # For SaaS-scoped keys, the caller MUST be a member of the target
     # membership's org.
-    if not _env_backed_all_access(role, org_id) and not get_identity_store().is_org_member(user_id, membership.org_id):
+    store = get_identity_store()
+    if not _env_backed_all_access(role, org_id) and not store.is_org_member(user_id, membership.org_id):
         log_job_event(
             actor=user_id,
             action="member_remove",
@@ -313,15 +321,43 @@ async def remove_member(
         )
         raise HTTPException(status_code=403, detail="not a member of this organization")
 
+    # FU-2026-07-05 (HIGH privilege-destruction fix): the caller's
+    # membership rank must be >= the target's. Without this, a viewer-
+    # membership OPERATOR-keyholder could remove co-org admins/owners —
+    # gating on ``is_org_member`` alone isn't sufficient. Env-backed
+    # all-access principals (above) are exempt.
+    if not _env_backed_all_access(role, org_id):
+        caller = store.get_org_membership(user_id, membership.org_id)
+        caller_rank = _membership_rank(caller.role) if caller else -1
+        target_rank = _membership_rank(membership.role)
+        if caller_rank < target_rank:
+            log_job_event(
+                actor=user_id,
+                action="member_remove",
+                job_id="saas",
+                outcome="denied",
+                details={
+                    "membership_id": membership_id,
+                    "org_id": membership.org_id,
+                    "reason": "insufficient_rank",
+                    "caller_rank": caller_rank,
+                    "target_rank": target_rank,
+                },
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="cannot remove a member whose role outranks yours",
+            )
+
     # Cannot remove self if the last owner
     if membership.role == MembershipRole.OWNER and membership.user_id == user_id:
         # Check if there's another owner
-        all_members = get_identity_store().list_org_memberships(membership.org_id)
+        all_members = store.list_org_memberships(membership.org_id)
         owners = [m for m in all_members if m.role == MembershipRole.OWNER and m.id != membership_id]
         if not owners:
             raise HTTPException(status_code=409, detail="cannot remove the last owner")
 
-    get_identity_store().remove_membership(membership_id)
+    store.remove_membership(membership_id)
     log_job_event(
         actor=user_id,
         action="member_remove",
@@ -340,6 +376,10 @@ class InvitationCreateRequest(BaseModel):
     """Request to invite a user to an organization."""
 
     email: str = Field(..., max_length=320, description="Email address to invite")
+    # FU-2026-07-05 (CRITICAL org-takeover fix): ``role`` is constrained
+    # to the invitable allowlist at the pydantic layer so an attacker
+    # cannot pass ``"owner"`` (or any future role) through the body. The
+    # route additionally checks the inviter's membership rank.
     role: str = Field("member", max_length=32, description="Role to assign (member/admin/viewer)")
 
 
@@ -421,6 +461,43 @@ async def create_invitation(
     if not store.is_org_member(user_id, org_id):
         raise HTTPException(status_code=403, detail="not a member of this organization")
 
+    # FU-2026-07-05 — CRITICAL org-takeover mitigation:
+    # ``role`` from body must be on the invitable allowlist. "owner" is
+    # never invitable (ownership is only established at org creation or
+    # via explicit owner-transfer). A viewer/member cannot invite with
+    # role="admin" — only an OWNER may grant ADMIN. Without this check a
+    # viewer-membership attacker could invite their own second email as
+    # "owner" and on acceptance take over the org (identity_store inserts
+    # the role verbatim into memberships).
+    normalised_role = (body.role or "").strip().lower()
+    if normalised_role not in _INVITABLE_ROLES:
+        raise HTTPException(
+            status_code=422,
+            detail="role must be one of member/admin/viewer",
+        )
+
+    caller_membership = store.get_org_membership(user_id, org_id)
+    if caller_membership is None:
+        # is_org_member passed above but get_org_membership returned None
+        # (membership soft-removed between calls) — fail closed.
+        raise HTTPException(status_code=403, detail="not a member of this organization")
+
+    caller_rank = _membership_rank(caller_membership.role)
+    if caller_rank < _membership_rank(MembershipRole.ADMIN):
+        # members/viewers may only invite at their own tier or below;
+        # admin-granting requires caller to be OWNER.
+        if normalised_role == "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="only an owner may invite an admin",
+            )
+        # viewers/members may not invite at a tier above their own
+        if _membership_rank(normalised_role) > caller_rank:
+            raise HTTPException(
+                status_code=403,
+                detail="cannot invite a member role above your own",
+            )
+
     # Verify the org exists
     org = store.get_organization(org_id)
     if not org:
@@ -430,7 +507,7 @@ async def create_invitation(
         org_id=org_id,
         invited_email=validated_email,
         invited_by_user_id=user_id,
-        role=body.role,
+        role=normalised_role,
     )
 
     log_job_event(

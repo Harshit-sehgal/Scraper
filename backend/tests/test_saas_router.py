@@ -491,3 +491,239 @@ class TestProjectDeleteEndpoint:
 
         resp = client.delete("/api/saas/projects/nonexistent-project-id", cookies=cookies)
         assert resp.status_code == 404
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# FU-2026-07-05 — Invitation Role Passthrough / Org-Takeover Fix Tests
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestInvitationSecurity:
+    """Regression tests for the CRITICAL org-takeover fix (FU-2026-07-05):
+
+    - ``role="owner"`` in invitation body is rejected (allowlist gate).
+    - A viewer-membership caller cannot invite an admin.
+    - A member-membership caller cannot invite an admin.
+    - The invite-role allowlist is validated at both route and
+      identity_store layers (defense-in-depth).
+    """
+
+    @staticmethod
+    def _cookies_for(user_id: str, role: str = "admin") -> dict:
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        return {SESSION_COOKIE: create_session_cookie(role=role, user_id=user_id)}
+
+    def test_invitation_with_owner_role_is_rejected(self, client: TestClient):
+        """``role="owner"`` must be 422 regardless of inviter's own rank."""
+        # Create owner user + org
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "org-owner@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201, signup.text
+        user_id = signup.json()["user_id"]
+        org_id = signup.json()["organization_id"]
+        cookies = self._cookies_for(user_id)
+
+        resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "attacker@evil.com", "role": "owner"},
+            cookies=cookies,
+        )
+        # Expect 422 — "owner" is not in _INVITABLE_ROLES
+        assert resp.status_code == 422, resp.text
+        assert "role must be one of member/admin/viewer" in resp.json()["detail"].lower()
+
+    def test_viewer_cannot_invite_as_admin(self, client: TestClient):
+        """A viewer-membership caller cannot invite with role='admin'."""
+        # Create owner
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "owner-viewer@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201, signup.text
+        owner_id = signup.json()["user_id"]
+        org_id = signup.json()["organization_id"]
+
+        # Create a second user (viewer)
+        signup2 = client.post(
+            "/api/saas/signup",
+            json={"email": "viewer-user@example.com", "password": "SecurePass123!"},
+        )
+        assert signup2.status_code == 201, signup2.text
+        viewer_id = signup2.json()["user_id"]
+
+        # Add viewer as a member of the org (via owner's cookies)
+        owner_cookies = self._cookies_for(owner_id)
+        # First add viewer as member via invitation
+        invite_resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "viewer-user@example.com", "role": "member"},
+            cookies=owner_cookies,
+        )
+        assert invite_resp.status_code == 201
+        invitation_id = invite_resp.json()["id"]
+
+        # Viewer accepts the invitation
+        viewer_cookies_raw = self._cookies_for(viewer_id, role="admin")
+        accept_resp = client.post(
+            f"/api/saas/invitations/{invitation_id}/respond",
+            json={"accept": True},
+            cookies=viewer_cookies_raw,
+        )
+        assert accept_resp.status_code == 200, accept_resp.text
+
+        # Now viewer tries to invite someone as admin
+        resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "new-admin@example.com", "role": "admin"},
+            cookies=viewer_cookies_raw,
+        )
+        assert resp.status_code == 403, resp.text
+        # The message should indicate rank insufficiency (either
+        # "only an owner may invite an admin" or
+        # "cannot invite a member role above your own")
+        detail_lower = resp.json()["detail"].lower()
+        assert "owner" in detail_lower or "above your own" in detail_lower
+
+    def test_member_cannot_invite_as_admin(self, client: TestClient):
+        """A member-membership caller cannot invite with role='admin'."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "owner-member@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201, signup.text
+        owner_id = signup.json()["user_id"]
+        org_id = signup.json()["organization_id"]
+
+        signup2 = client.post(
+            "/api/saas/signup",
+            json={"email": "member-user@example.com", "password": "SecurePass123!"},
+        )
+        assert signup2.status_code == 201, signup2.text
+        member_id = signup2.json()["user_id"]
+
+        # Owner invites member
+        owner_cookies = self._cookies_for(owner_id)
+        invite_resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "member-user@example.com", "role": "member"},
+            cookies=owner_cookies,
+        )
+        assert invite_resp.status_code == 201
+        invitation_id = invite_resp.json()["id"]
+
+        # Member accepts
+        member_cookies = self._cookies_for(member_id, role="admin")
+        accept_resp = client.post(
+            f"/api/saas/invitations/{invitation_id}/respond",
+            json={"accept": True},
+            cookies=member_cookies,
+        )
+        assert accept_resp.status_code == 200
+
+        # Member tries to invite admin — must be rejected
+        resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "admin-wannabe@example.com", "role": "admin"},
+            cookies=member_cookies,
+        )
+        assert resp.status_code == 403, resp.text
+        detail_lower = resp.json()["detail"].lower()
+        assert "owner" in detail_lower or "above your own" in detail_lower
+
+    def test_owner_can_invite_admin(self, client: TestClient):
+        """Owner can still invite admins (baseline — fix must not break legit flow)."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "owner-legit@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201, signup.text
+        user_id = signup.json()["user_id"]
+        org_id = signup.json()["organization_id"]
+        cookies = self._cookies_for(user_id)
+
+        # Owner invites member
+        resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "some-member@example.com", "role": "member"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 201, resp.text
+
+        # Owner invites admin — should still work
+        resp = client.post(
+            f"/api/saas/orgs/{org_id}/invitations",
+            json={"email": "some-admin@example.com", "role": "admin"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["role"] == "admin"
+
+    def test_identity_store_defense_in_depth_rejects_non_invitable_role(self) -> None:
+        """``respond_to_invitation`` must return None for non-invitable roles even if DB row says 'owner'."""
+        import os
+        import tempfile
+
+        from app.saas.identity_store import SQLiteIdentityStore, reset_identity_store
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            store = SQLiteIdentityStore(storage_path=db_path)
+            reset_identity_store(store)
+            # Sign up a user via the service so we get valid user/org rows
+            from app.saas import SignupService
+
+            svc = SignupService()
+            signup_result = svc.signup("hostile@example.com", "SecurePass123!", org_name="HostileCorp")
+            assert signup_result.user.id
+
+            # Directly inject an invitation row with role='owner' — simulating
+            # a stale DB migration, a second code path, or an attacker-injected
+            # row. The circuit-allowlist in respond_to_invitation should reject
+            # it (return None) before any membership row is inserted.
+            import uuid
+            from datetime import UTC, datetime, timedelta
+
+            invite_id = str(uuid.uuid4())
+            now = datetime.now(UTC).isoformat()
+            expires = (datetime.now(UTC) + timedelta(days=7)).isoformat()
+            with store._lock, store._connect() as conn:
+                conn.execute(
+                    """INSERT INTO team_invitations
+                       (id, org_id, invited_email, invited_by_user_id, role, status, created_at, expires_at)
+                       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)""",
+                    (
+                        invite_id,
+                        signup_result.organization.id,
+                        "attacker@evil.com",
+                        signup_result.user.id,
+                        "owner",
+                        now,
+                        expires,
+                    ),
+                )
+                conn.commit()
+
+            # Now try to respond. Should return None because role="owner"
+            # is rejected by the defense-in-depth check.
+            result = store.respond_to_invitation(
+                invite_id,
+                accept=True,
+                requesting_user_id=signup_result.user.id,
+            )
+            assert result is None, f"Should reject owner role; got {result}"
+
+            # Verify no membership was created for owner role
+            members = store.list_org_memberships(signup_result.organization.id)
+            # Only the original OWNER from signup should exist
+            assert len(members) == 1
+            assert members[0].role.value == "owner"
+        finally:
+            reset_identity_store(None)
+            try:
+                os.remove(db_path)
+            except OSError:
+                pass

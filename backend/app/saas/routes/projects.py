@@ -447,19 +447,49 @@ async def revoke_api_key(
     if not user_id:
         raise HTTPException(status_code=401, detail="authenticated user required")
 
-    project = get_identity_store().get_project(project_id)
+    store = get_identity_store()
+    project = store.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="project not found")
 
-    if not get_identity_store().is_org_member(user_id, project.org_id):
+    if not store.is_org_member(user_id, project.org_id):
         raise HTTPException(status_code=403, detail="not a member of this organization")
 
     from app.saas.service import ApiKeyService
 
-    svc = ApiKeyService(store=get_identity_store())
+    svc = ApiKeyService(store=store)
     key = svc.store.get_api_key(key_id)
     if not key or key.project_id != project_id:
         raise HTTPException(status_code=404, detail="key not found")
+
+    # FU-2026-07-05 (HIGH revoke-privilege-escalation fix): the caller's
+    # membership role must permit a key of this scope. ``create_api_key``
+    # already enforces ``_MAX_KEY_SCOPE_FOR_ROLE`` on issuance; the same
+    # gate must apply on revocation or a viewer-tier member with a write
+    # key could revoke the owner's admin-scoped key and lock the owner
+    # out of their own project.
+    caller_membership = store.get_org_membership(user_id, project.org_id)
+    caller_role_value = caller_membership.role.value if caller_membership else "viewer"
+    caller_max_scope = _MAX_KEY_SCOPE_FOR_ROLE.get(caller_role_value, "read")
+    key_scope_value = key.scope.value if getattr(key.scope, "value", None) is not None else str(key.scope)
+    if _SCOPE_RANK.get(key_scope_value, 0) > _SCOPE_RANK.get(caller_max_scope, 0):
+        log_job_event(
+            actor=user_id,
+            action="api_key_revoke",
+            job_id="saas",
+            outcome="denied",
+            details={
+                "project_id": project_id,
+                "key_id": key_id,
+                "key_scope": key_scope_value,
+                "caller_membership_role": caller_role_value,
+                "reason": "scope_exceeds_membership_role",
+            },
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot revoke a key whose scope exceeds your membership role in this org.",
+        )
 
     svc.revoke(key_id)
 

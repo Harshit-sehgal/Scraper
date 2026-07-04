@@ -202,3 +202,27 @@ _SCOPE_RANK: dict[str, int] = {
     "write": 1,
     "admin": 2,
 }
+
+# ─── Org-membership rank helpers ──────────────────────────────────────
+# Higher = more privileged. Used to gate member-removal and invitation-
+# grant operations: a caller may only affect members at or below their
+# own membership rank, and only OWNERs may grant ADMIN/OWNER roles
+# (preventing the invitation-role-passthrough org-takeover where a
+# viewer could invite themselves as "owner").
+_MEMBERSHIP_RANK: dict[str, int] = {
+    "viewer": 0,
+    "member": 1,
+    "admin": 2,
+    "owner": 3,
+}
+
+
+def _membership_rank(role: str) -> int:
+    """Return the integer rank of a membership role (unknown -> -1)."""
+    return _MEMBERSHIP_RANK.get(str(role), -1)
+
+
+# Roles that may be granted via invitation. "owner" is deliberately
+# excluded — ownership is only established at org creation or via an
+# explicit owner-transfer flow, never via a self-serve invitation.
+_INVITABLE_ROLES: frozenset[str] = frozenset({"member", "admin", "viewer"})

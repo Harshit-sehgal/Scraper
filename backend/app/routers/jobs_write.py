@@ -205,15 +205,7 @@ async def _delete_job_logic(
     manager: JobStoreManager,
     job_id: str,
 ) -> dict[str, str]:
-    with manager.lock:
-        if job_id not in manager.jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
-        job = manager.jobs_store[job_id]
-        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-            raise HTTPException(
-                status_code=409,
-                detail="Cannot delete/recycle an active job. Cancel the job first.",
-            )
+    """Move a job to the recycle bin (ownership already verified by route handler)."""
     repo = get_job_repository()
     try:
         await run_in_threadpool(repo.move_to_recycle_bin, job_id)
@@ -233,6 +225,11 @@ async def _delete_job_logic(
 async def _clear_terminal_jobs_logic(
     manager: JobStoreManager,
     keep_recent: int,
+    *,
+    role: UserRole = UserRole.ADMIN,
+    user_id: str = "",
+    org_id: str = "",
+    project_id: str = "",
 ) -> dict[str, Any]:
     # Clear "completed-like" statuses: truly terminal (degraded, empty_result,
     # canceled, failed) plus completed (which is not is_terminal because reclean
@@ -240,10 +237,26 @@ async def _clear_terminal_jobs_logic(
     # Using the state machine's _COMPLETING_STATUSES set ensures we stay in
     # sync with the canonical definition.
     from app.services.job_state_machine import _COMPLETING_STATUSES
+    from app.utils.rbac import can_access_scoped_resource
 
     terminal_statuses = _COMPLETING_STATUSES
     with manager.lock:
         terminal = [(jid, job) for jid, job in manager.jobs_store.items() if job.status in terminal_statuses]
+    # FU-2026-07-05: tenant-scope the snapshot for SaaS-scoped keys.
+    if org_id or project_id:
+        terminal = [
+            (jid, job)
+            for jid, job in terminal
+            if can_access_scoped_resource(
+                role,
+                user_id,
+                org_id,
+                project_id,
+                resource_owner_id=getattr(job, "created_by", ""),
+                resource_org_id=getattr(job, "org_id", ""),
+                resource_project_id=getattr(job, "project_id", ""),
+            )
+        ]
     if not terminal:
         return {
             "message": "No terminal jobs to clear",
@@ -292,9 +305,7 @@ async def _restore_job_logic(
     manager: JobStoreManager,
     job_id: str,
 ) -> dict[str, str]:
-    with manager.lock:
-        if job_id not in manager.recycle_bin_store:
-            raise HTTPException(status_code=404, detail="Job not in recycle bin")
+    """Restore a job from the recycle bin (ownership already verified by route handler)."""
     repo = get_job_repository()
     try:
         await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
@@ -314,9 +325,8 @@ async def _hard_delete_job_logic(
     manager: JobStoreManager,
     job_id: str,
 ) -> dict[str, str]:
+    """Permanently delete a job (ownership already verified by route handler)."""
     with manager.lock:
-        if job_id not in manager.recycle_bin_store:
-            raise HTTPException(status_code=404, detail="Job not in recycle bin")
         job = manager.recycle_bin_store.get(job_id)
         file_path = job.results_file_path if job else None
     repo = get_job_repository()
@@ -340,11 +350,32 @@ async def _hard_delete_job_logic(
 
 async def _clear_recycle_bin_logic(
     manager: JobStoreManager,
+    *,
+    role: UserRole = UserRole.ADMIN,
+    user_id: str = "",
+    org_id: str = "",
+    project_id: str = "",
 ) -> dict[str, Any]:
     from app.utils.job_results_store import delete_job_results_from_disk
+    from app.utils.rbac import can_access_scoped_resource
 
     with manager.lock:
         snapshot = list(manager.recycle_bin_store.items())
+    # FU-2026-07-05: tenant-scope the snapshot for SaaS-scoped keys.
+    if org_id or project_id:
+        snapshot = [
+            (jid, job)
+            for jid, job in snapshot
+            if can_access_scoped_resource(
+                role,
+                user_id,
+                org_id,
+                project_id,
+                resource_owner_id=getattr(job, "created_by", ""),
+                resource_org_id=getattr(job, "org_id", ""),
+                resource_project_id=getattr(job, "project_id", ""),
+            )
+        ]
     repo = get_job_repository()
     deleted_ids: list[str] = []
     failed_ids: list[str] = []
@@ -796,36 +827,90 @@ def register_jobs_write_routes(
     @router.delete("/api/jobs/{job_id}", response_model=dict)
     async def delete_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
+        # FU-2026-07-05 (HIGH cross-tenant fix): tenant-issued admin-scoped
+        # keys must pass the same tenant-isolation gate as every other job
+        # mutation.  Env-backed admin keys (no org_id/org_id="") bypass this
+        # via the existing ADMIN shortcut in can_access_scoped_resource.
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(manager.jobs_store[job_id], role, user_id, org_id, project_id, "delete_job")
+            if manager.jobs_store[job_id].status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cannot delete/recycle an active job. Cancel the job first.",
+                )
         return await _delete_job_logic(manager, job_id)
 
     @router.delete("/api/jobs/cleanup/terminal", response_model=ClearTerminalResponse)
     async def clear_terminal_jobs(
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],  # noqa: B008, RUF100
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
         keep_recent: Annotated[int, Query(ge=0, le=5000)] = 5,
     ):
-        return await _clear_terminal_jobs_logic(manager, keep_recent)
+        # FU-2026-07-05 (HIGH cross-tenant fix): bulk terminal clear must
+        # be tenant-scoped for SaaS keys. Env-backed admin passes all-access.
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        return await _clear_terminal_jobs_logic(
+            manager, keep_recent, role=role, user_id=user_id, org_id=org_id, project_id=project_id
+        )
 
     @router.post("/api/recycle_bin/{job_id}/restore", response_model=dict)
     async def restore_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
+        # FU-2026-07-05 (HIGH cross-tenant fix): identity-scope the restore.
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.recycle_bin_store:
+                raise HTTPException(status_code=404, detail="Job not in recycle bin")
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(manager.recycle_bin_store[job_id], role, user_id, org_id, project_id, "restore_job")
         return await _restore_job_logic(manager, job_id)
 
     @router.delete("/api/recycle_bin/{job_id}", response_model=dict)
     async def hard_delete_job(
         job_id: str,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
+        # FU-2026-07-05 (HIGH cross-tenant fix): identity-scope the hard delete.
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        with manager.lock:
+            if job_id not in manager.recycle_bin_store:
+                raise HTTPException(status_code=404, detail="Job not in recycle bin")
+            from app.services.job_mutation_service import _ensure_job_write_access
+
+            _ensure_job_write_access(manager.recycle_bin_store[job_id], role, user_id, org_id, project_id, "hard_delete_job")
         return await _hard_delete_job_logic(manager, job_id)
 
     @router.delete("/api/recycle_bin", response_model=dict)
     async def clear_recycle_bin(
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+        auth: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        ],
     ):
-        return await _clear_recycle_bin_logic(manager)
+        # FU-2026-07-05: tenant-scope the bulk recycle-bin clear.
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        return await _clear_recycle_bin_logic(manager, role=role, user_id=user_id, org_id=org_id, project_id=project_id)
 
     # ═══════════════════════════════════════════════════════════════════════
     # Extraction Templates (Feat 12)
@@ -1331,11 +1416,44 @@ def register_jobs_write_routes(
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
     ):
-        """List pending review items from the manual review queue."""
-        from app.review_queue import get_pending_reviews
+        """List pending review items from the manual review queue.
 
+        FU-2026-07-05: returns only review items whose associated job_id
+        belongs to the caller's visible tenant scope. Previously this returned
+        ALL pending reviews globally. Env-backed admin keys (no org_id) retain
+        all-access via the ADMIN shortcut in can_access_scoped_resource.
+        """
+        from app.review_queue import get_pending_reviews
+        from app.utils.rbac import can_access_scoped_resource
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        # Fetch ALL pending reviews (call internal to get around the API limit)
+        raw = get_pending_reviews(limit=10000, offset=0)
+
+        # Tenant-filter: keep only reviews whose job is in-scope.
+        # Env-backed admin (no org_id/project_id) sees all reviews
+        # because can_access_scoped_resource returns True for ADMIN role
+        # unconditionally.
+        visible: list[dict[str, Any]] = []
+        with manager.lock:
+            for r in raw:
+                job_id = r.get("job_id") or ""
+                job = manager.jobs_store.get(job_id)
+                if job is not None and not can_access_scoped_resource(
+                    role,
+                    user_id,
+                    org_id,
+                    project_id,
+                    resource_owner_id=getattr(job, "created_by", ""),
+                    resource_org_id=getattr(job, "org_id", ""),
+                    resource_project_id=getattr(job, "project_id", ""),
+                ):
+                    continue
+                visible.append(r)
+
+        visible.sort(key=lambda d: d.get("submitted_at", 0), reverse=True)
         return {
-            "reviews": get_pending_reviews(limit=limit, offset=offset),
+            "reviews": visible[offset : offset + limit],
             "limit": limit,
             "offset": offset,
         }
@@ -1348,11 +1466,34 @@ def register_jobs_write_routes(
             Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
         ],
     ):
-        """Get a single review item by ID."""
-        from app.review_queue import get_review as _get_review
+        """Get a single review item by ID.
 
+        FU-2026-07-05: returns 404 unless the review's associated job belongs
+        to the caller's visible tenant scope. Env-backed admin sees all
+        reviews.
+        """
+        from app.review_queue import get_review as _get_review
+        from app.utils.rbac import can_access_scoped_resource
+
+        role, user_id, org_id, project_id = _auth_tuple(auth)
         review = _get_review(review_id)
         if review is None:
+            raise HTTPException(status_code=404, detail="Review item not found")
+
+        # Tenant-scope: only return the review if the caller can access
+        # the associated job. Env-backed admin (no scope) also passes.
+        review_job_id = review.get("job_id") or ""
+        with manager.lock:
+            job = manager.jobs_store.get(review_job_id)
+        if job is not None and not can_access_scoped_resource(
+            role,
+            user_id,
+            org_id,
+            project_id,
+            resource_owner_id=getattr(job, "created_by", ""),
+            resource_org_id=getattr(job, "org_id", ""),
+            resource_project_id=getattr(job, "project_id", ""),
+        ):
             raise HTTPException(status_code=404, detail="Review item not found")
         return review
 
@@ -1366,7 +1507,14 @@ def register_jobs_write_routes(
         action: Annotated[str, Query()] = "approve",
         corrected_fields: Annotated[dict[str, Any] | None, Body()] = None,
     ):
-        """Approve or reject a review item (Qual 9)."""
+        """Approve or reject a review item (Qual 9).
+
+        FU-2026-07-05: tenant-scoped — caller must have write access to
+        the review's associated job. Env-backed admin keys (no org_id)
+        retain all-access; in that case the job-not-found check still
+        applies (no job in store = 404) since the admin shouldn't blind-
+        approve arbitrary review-IDs.
+        """
         from app.review_queue import (
             approve_review,
             reject_review,
@@ -1374,8 +1522,26 @@ def register_jobs_write_routes(
         from app.review_queue import (
             get_review as _get_review,
         )
+        from app.services.job_mutation_service import _ensure_job_write_access
 
-        _role, user_id, _org_id, _project_id = _auth_tuple(auth)
+        role, user_id, org_id, project_id = _auth_tuple(auth)
+        review = _get_review(review_id)
+        if review is None:
+            raise HTTPException(status_code=404, detail="Review not found or not pending")
+
+        # Tenant-scope: when the review's job IS in memory, gate it via
+        # _ensure_job_write_access. When the job isn't in memory, only
+        # env-backed admin (no org_id/project_id) can proceed — they've
+        # already authenticated as global superuser.
+        review_job_id = review.get("job_id") or ""
+        with manager.lock:
+            job = manager.jobs_store.get(review_job_id)
+        if job is not None:
+            _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_review")
+        elif org_id or project_id:
+            # Tenant-scoped caller; review's job isn't in their scope -> 404
+            raise HTTPException(status_code=404, detail="Review not found or not pending")
+
         if action == "approve":
             ok = approve_review(review_id, corrected_fields=corrected_fields or {}, reviewer=user_id)
         elif action == "reject":

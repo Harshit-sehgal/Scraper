@@ -195,6 +195,9 @@ class IdentityStore(ABC):
     def is_org_member(self, user_id: str, org_id: str) -> bool: ...
 
     @abstractmethod
+    def get_org_membership(self, user_id: str, org_id: str) -> Membership | None: ...
+
+    @abstractmethod
     def create_project(self, project: Project) -> Project: ...
 
     @abstractmethod
@@ -665,6 +668,17 @@ class SQLiteIdentityStore(IdentityStore):
             ).fetchone()
         return row is not None
 
+    def get_org_membership(self, user_id: str, org_id: str) -> Membership | None:
+        """Return the caller's active ``Membership`` row in *org_id*, or None."""
+        if not user_id or not org_id:
+            return None
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM memberships WHERE user_id = ? AND org_id = ? AND removed_at IS NULL LIMIT 1",
+                (user_id, org_id),
+            ).fetchone()
+        return _row_to_membership(row) if row else None
+
     # ── Projects ──────────────────────────────────────────────────────
 
     def create_project(self, project: Project) -> Project:
@@ -1035,6 +1049,19 @@ class SQLiteIdentityStore(IdentityStore):
             if accept:
                 invited_email = row["invited_email"]
                 role = row["role"]
+                # FU-2026-07-05 (CRITICAL defense-in-depth): the route layer
+                # allowlists invitable roles, but enforce the same allowlist
+                # here so a directly-injected invitation row (DB write from
+                # another path, a stale migration, or a future code path)
+                # cannot realize "owner" into memberships. "owner" is only
+                # ever established at org creation.
+                if (role or "").strip().lower() not in {"viewer", "member", "admin"}:
+                    logger.warning(
+                        "respond_to_invitation: refusing invitation %s with non-invitable role %r",
+                        invitation_id,
+                        role,
+                    )
+                    return None
                 user_row = conn.execute(
                     "SELECT id FROM users WHERE LOWER(email) = LOWER(?)",
                     (invited_email,),
