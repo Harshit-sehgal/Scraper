@@ -4830,3 +4830,120 @@ of crashing with a scoping error.
 save path, an operator would previously see a confusing
 `UnboundLocalError` in the logs and a stranded `.tmp` sibling file on
 the next startup. The cleanup branch now runs as designed.
+
+## 2026-07-04 — Test-Coverage Backlog: replay_buffer _CheckpointIndex
+
+`_CheckpointIndex` (replay_buffer.py:34-113) had ZERO direct test coverage
+— the in-memory binary-search index that gives ReplayBuffer its O(log N)
+seek cost. Bugs here silently corrupt replay-seek semantics.
+
+### Coverage added (19 tests in `backend/tests/test_replay_buffer_checkpoint.py`)
+
+| Group | Cases | Notes |
+| --- | ---: | --- |
+| `_CheckpointIndex.add` + `find_nearest` bisect_right semantics | 5 | Empty→None, exact→self, between two→lower, above last→last, before-first→None, duplicate idx→last entry |
+| `clear` | 1 | Resets both `_indices` + `entries`; index usable again after |
+| `remove_segment` | 3 | Drops matching entries keeping `_indices` in lockstep; unknown segment noop; seek still works after eviction |
+| `to_dict_list` | 2 | Shape includes idx/segment/offset (drops snapshot); empty list |
+| ReplayBuffer rotation/eviction | 3 | `_rotate_segment` advances + resets count; `_rotate_segment` past `max_segments` evicts oldest; eviction calls `remove_segment` on the checkpoint index |
+| `_get_file_offset` | 2 | Missing file → 0; existing → byte size |
+| `status` / `get_segment_info` | 3 | Status shape (max_segments / current_segment_idx / total_entries / segments); empty segment_info list; size_bytes after writes |
+
+### Anti-tripwire
+
+`find_nearest` returns `Optional[tuple]`. Tests must add explicit
+`is not None` guards before subscripting the result, even though every
+test seeds entries — pyright flags `find_nearest(...)[1]` as
+`reportOptionalSubscript`. The runtime contract is fine; the lint surface
+needs the guard.
+
+Verified: 19/19 pass; full backend suite green (exit 0).
+
+## 2026-07-04 — Test-Coverage Backlog: llm_bridge cascade-breaker / token / silent-failure
+
+`_check_cascade_breaker`, `_record_token_usage`, `_handle_silent_failure`,
+and the `LLMCircuitOpen` re-export/placeholder each had ZERO direct test
+coverage in test_llm_bridge.py.
+
+### Coverage added (18 tests in `backend/tests/test_llm_bridge_cascade.py`)
+
+| Group | Cases | Notes |
+| --- | ---: | --- |
+| `_check_cascade_breaker` gate semantics | 4 | Disabled→noop; OPEN→raises LLMCircuitOpen; non-CircuitOpen RuntimeError swallowed (settings init fault can never crash an LLM call); ImportError during breaker lookup swallowed (optional dep) |
+| `LLMCircuitOpen` re-export | 2 | Re-exported symbol IS the real class (not the ImportError placeholder); placeholder pattern is itself a RuntimeError subclass |
+| `_record_token_usage` accumulator | 7 | No-usage fast path; empty-usage fast path; full/partial/missing field accum; return-by-copy semantics; concurrent threadsafe (8 threads × 200 calls → final total == sum) |
+| `_handle_silent_failure` routing | 5 | raise_on_failure=True raises LLMCascadeExhausted (public_name/last_exception/attempt_count); False increments per-name counter + notifies breaker; per-function counter isolation; None last_exception substitutes RuntimeError('silent cascade exhaustion') |
+
+### Anti-tripwire: env-backed operand patching
+
+`monkeypatch.setattr(settings, "ENABLE_OPERATOR_CROSS_TENANT", True)` works
+because settings is a singleton instance — but `monkeypatch.setattr` does
+NOT accept `side_effect` (use `unittest.mock.patch` for that). For the
+non-CircuitOpen "_GrumpyBreaker" test, the
+`get_llm_cascade_breaker` factory MUST be patched as a *callable*
+(`_GrumpyBreaker`), not `lambda: _GrumpyBreaker()` — `PLW0108` flags the
+redundant lambda wrapping a zero-arg constructor.
+
+Verified: 18/18 pass; combined with test_llm_bridge.py + sandbox → 76.1%
+on llm_bridge.py.
+
+## 2026-07-04 — Test-Coverage Backlog: operator denylist ValueError→400 + scoped audit
+
+The `ValueError as exc → HTTPException(400)` branch in `add_denylist_entry`
+(operator.py:88) had ZERO direct test coverage — existing tests only
+exercised the 201/404/403 paths.
+
+### Coverage added (9 tests appended to `backend/tests/test_p1_compliance_denylist.py`)
+
+| Case | Notes |
+| --- | --- |
+| Invalid domain chars → 400 | `ValueError` from `DomainDenylist.add` surfaces as 400, not 500 |
+| Empty domain → 422 | pydantic `min_length=1` rejects before route body |
+| `path_prefix` without `/` → 400 | Third validation branch |
+| Scoped add | `path_prefix` persisted into response; `is_blocked` honours scope (private blocked, public allowed) |
+| Scoped remove | 200 with `path_prefix` round-trip; scoped block gone after |
+| Remove wrong `path_prefix` → 404 | Domain has an entry but with a different prefix |
+| Operator read-only | Can GET but POST/DELETE → 403 (`require_role_with_user([UserRole.ADMIN])`) |
+| Admin remove of scoped entry writes audit log with `path_prefix` embedded in resource string (`domain:foo.example.com:/admin`) | |
+
+### Pitfall
+
+`client.post(...)` inside an `async def` test is an un-awaited coroutine —
+FastAPI returns the route response only after `await`. The 404 above is
+the symptom (the mutation never happened server-side). `await` is required
+on every `client.*` call in async tests, even when the test only cares
+about a later assertion.
+
+Verified: 26/26 pass (17 prior + 9 new).
+
+## 2026-07-04 — Test-Coverage Backlog: rbac.can_access_scoped_resource P0-SAAS-001 primitive
+
+`can_access_scoped_resource` (rbac.py:408-473) — the tenant-isolation
+primitive called by every router that enforces data isolation
+(auth-profiles, scheduled-monitoring, template/preview) — had ZERO
+direct test coverage. A bug here silently leaks tenants' data to one
+another.
+
+### Coverage added (24 tests in `backend/tests/test_rbac_can_access_scoped.py`)
+
+| Group | Cases | Notes |
+| --- | ---: | --- |
+| ADMIN | 3 | Always True (ownerless/other-tenant); does NOT fire cross-tenant audit |
+| env-backed OPERATOR gate (issue #135) | 4 | Cross-tenant flag on → True + CRITICAL audit; flag off → falls through to owner/scoped (not blanket); flag-off + owner match → True; persistent SaaS key (org_id set) is NOT env-backed, mismatch denied, no audit |
+| project scope | 3 | Match grants; mismatch denies (even if owner matches); resource-project-empty falls through to org/owner |
+| org scope | 2 | Match grants; mismatch denies |
+| owner fallback | 4 | Match → True; mismatch → False; empty owner → False for everyone; None owner → False (coalesced to '') |
+| precedence | 2 | project > org: project-match grants even with differing org; org > owner: org-match grants even with differing owner |
+| Router helpers (_can_access_profile, _can_access_scheduled_job) | 3 | Delegate correctly without twisting args; coerce missing keys to '' |
+| `_safe_profile` strip | 3 | Strips `encrypted_storage_state` and ONLY that field; does not mutate source; passthrough when field absent |
+
+### Anti-tripwire
+
+The router-level `_can_access_profile`/`_can_access_scheduled_job` wrappers
+delegate straight to `can_access_scoped_resource`, so the project-scope match
+grants access *even when the owner differs from the principal*. A naïve test
+that flips `item["user_id"]` to "someone-else" with project_id still matching
+will see True, not False — the test must change the project, not the owner,
+to exercise the deny path through a wrapper.
+
+Verified: 24/24 pass.
