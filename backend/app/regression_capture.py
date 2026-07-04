@@ -529,8 +529,6 @@ class RegressionCapture:
                 fd = None  # ownership transferred to fdopen context manager
                 f.write(payload)
                 f.flush()
-                from contextlib import suppress
-
                 with suppress(OSError):
                     os.fsync(f.fileno())
             os.replace(tmp_path, self._registry_path)

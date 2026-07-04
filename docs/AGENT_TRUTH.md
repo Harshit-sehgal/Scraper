@@ -4784,3 +4784,49 @@ Going forward, a code review that adds a `_sanitize_filename` test asserting
 - `replay_buffer.py: _CheckpointIndex`, `regression_capture.py: classify_severity` / `prune_fixtures` remain untested — next two candidates.
 
 Verified: 31/31 new tests pass; full backend suite green (exit 0).
+
+## 2026-07-04 — Test-Coverage Backlog: regression_capture + real UnboundLocalError bug
+
+The 57-item test-coverage backlog flagged `regression_capture.py` — 6
+internal atomic-write / registry-reload methods including `classify_severity`
+and `prune_fixtures` with zero direct coverage.
+
+### Coverage added (31 tests in `backend/tests/test_regression_capture_coverage.py`)
+
+| Group | Cases | Notes |
+| --- | ---: | --- |
+| `classify_severity` table-driven mapping | 21 | All 17 failure_categories parametrized → 5 severity tiers (critical/high/low/info); empty + unmapped → info |
+| `prune_fixtures` disk-exhaustion prevention | 6 | No-dir no-op; empty dir; age-out old fixtures; cap-discard (max_fixtures); registry cleanup; OSError on unlink continues with remaining files |
+| Atomic-write helpers | 4 | `_save_fixture` writes HTML, swallows OSError on mkstemp failure; `_save_registry` round-trip, swallows OSError on mkstemp failure |
+| `_build_replay_test` edge case | 1 | Returns None-or-str when fixture / URL data missing |
+
+Coverage: 79% → 96%.
+
+### REAL BUG discovered + fixed (UnboundLocalError in `_save_registry`)
+
+Writing the `_save_registry` OSError test surfaced a **latent production bug**:
+
+`_save_registry` (original lines 520-545) declared a local
+`from contextlib import suppress` *inside* the `try` block at line 532,
+**after** `tempfile.mkstemp` at line 523. Python's bytecode compiler
+treats every `from X import Y` as a function-local assignment, so all
+references to `suppress` in the function — including the two uses in
+the `except OSError:` cleanup branch (lines 540, 544) — resolve to the
+local name. When `tempfile.mkstemp` raised `OSError` (disk full / EROFS /
+ENOSPC) *before* reaching line 532, the local `suppress` was never
+bound, so the `except` block's `with suppress(OSError): ...` raised
+`UnboundLocalError: cannot access local variable 'suppress' where it is
+not associated with a value` — masking the real `OSError`, aborting the
+cleanup, and leaking the `.tmp` file.
+
+**Fix**: removed the redundant local `from contextlib import suppress`
+inside the `try`. The module-level import (line 23) is already present
+and used by `_save_fixture`'s identical pattern, so the function now
+uses the module-level `suppress` consistently. The `except OSError:`
+cleanup branch now correctly logs + closes fd + unlinks `.tmp` instead
+of crashing with a scoping error.
+
+**Production impact**: on any disk-full / EROFS event in the registry
+save path, an operator would previously see a confusing
+`UnboundLocalError` in the logs and a stranded `.tmp` sibling file on
+the next startup. The cleanup branch now runs as designed.
