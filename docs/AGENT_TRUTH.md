@@ -4947,3 +4947,73 @@ will see True, not False — the test must change the project, not the owner,
 to exercise the deny path through a wrapper.
 
 Verified: 24/24 pass.
+
+## 2026-07-04 — SSRF Audit: 2 CRITICAL + 1 HIGH closed
+
+The new-gap-classes audit surfaced real, exploitable SSRF vulnerabilities
+in the product-kernel webhook delivery paths. All three are now closed,
+validated by 62 new tests, with two-layer defense (model + transport).
+
+### CRITICAL-1 / CRITICAL-2 — NotificationChannelCreate / Update webhook_url
+
+Both Pydantic models took `webhook_url` raw (`max_length=2048` only).
+An authenticated ADMIN/OPERATOR could register a channel pointing at
+`http://169.254.169.254` (AWS IMDS), `http://localhost:6379`, or any
+internal service, and the next job-completion would trigger a
+server-side POST — bypassing the SSRF safe-transport every other
+outbound-HTTP path uses.
+
+**Fix (models/auth.py):**
+Added `@model_validator(mode="after")` on both `NotificationChannelCreate`
+and `NotificationChannelUpdate` mirroring the existing
+`JobWebhookUpdate` pattern (models/jobs.py:433). Rejects:
+  - empty / whitespace-only strings
+  - non-http(s) scheme prefixes
+  - private IP / loopback / link-local / CGNAT / cloud-metadata /
+    IPv6-private / IPv6-link-local / internal-DNS (via
+    `validate_public_http_url`)
+Persists the stripped/normalized form.
+
+### CRITICAL (defense-in-depth) — SlackNotifier / TeamsNotifier / DiscordNotifier
+
+The three HTTP notifiers in `services/notifications.py` posted via raw
+`httpx.AsyncClient()`. Even though the model now rejects bad URLs, the
+transport layer should also re-validate (DNS rebinding between the
+Pydantic check and the TCP dial would still pierce).
+
+**Fix (services/notifications.py):**
+Added module-level `_resolve_async_http_client(timeout)` helper that
+delegates to `get_safe_async_client` (carries `_UrlValidatingAsyncTransport`
++ `SafeAsyncHTTPTransport` for in-process IP-class rejection and
+secondary connect-time check). Slack/Teams/Discord `send()` methods now
+all use it instead of raw `httpx.AsyncClient`.
+
+### HIGH — `discover_sitemaps` returned raw URLs from robots.txt
+
+**Fix (crawl_policy.py):**
+New `_looks_like_valid_sitemap_url(url)` helper. Both httpx and urllib
+robots.txt branches now drop entries that fail:
+  - missing http(s):// scheme prefix
+  - validate_public_http_url rejection (same set as above)
+Standard-fallback URL `f"https://{domain}/sitemap.xml"` is safe by
+construction — `domain` already survived validate_public_http_url at
+the function's entry.
+
+### Test coverage added
+
+  - `test_notification_channel_ssrf.py` (39 tests):
+    - 15 parametrized SSRF targets rejected at Create
+    - 17 parametrized SSRF targets rejected at Update
+    - Edge inputs: empty/whitespace, whitespace-padded-bad-URL
+    - Public URLs (with paths, IPv4 literals) accepted and normalized
+    - 3 runtime tests confirm Slack/Teams/Discord delegate to
+      get_safe_async_client
+  - `test_crawl_policy_sitemap_ssrf.py` (23 tests):
+    - 14 parametrized SSRF schemes/targets rejected
+    - 5 public http(s) URLs accepted
+    - Edge inputs: empty / whitespace-only / scheme-only
+
+All 62 pass; full notification + sitemap test suites (existing 73 + 42)
+remain green.
+
+Verified: 62/62 new pass; combined existing suites all green.
