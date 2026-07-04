@@ -11,11 +11,19 @@ import { renderDomainHealth } from "./domain-health.js";
 import { renderPredictions } from "./predictions.js";
 import { refreshDashboardBilling } from "./dashboard-billing.js";
 
+// Round-7 fix: request-token so a slow in-flight refreshDashboard batch
+// (e.g. triggered by popstate / route-only dispatch while a previous
+// batch is already in flight) can't overwrite newer data with stale
+// payloads. Each refresh increments the token; DOM writes commit only
+// if the token still matches.
+let _dashRefreshToken = 0;
+
 // ─── Refresh Dashboard ───
 
 export async function refreshDashboard() {
   const refreshBtn = document.querySelector("#view-dashboard .btn.primary.small");
   if (refreshBtn) refreshBtn.disabled = true;
+  const myToken = ++_dashRefreshToken;
 
   try {
     const [modeRes, dashRes, healthRes, predRes, rateLimitRes] = await Promise.all([
@@ -25,6 +33,9 @@ export async function refreshDashboard() {
       apiFetch(`${API}/api/operator/predictions`).catch(() => null),
       apiFetch(`${API}/api/system/rate-limit-stats`).catch(() => null),
     ]);
+
+    // A newer refresh has superseded us — drop our stale payload silently.
+    if (myToken !== _dashRefreshToken) return;
 
     const parseJson = async (res) => {
       try {
@@ -40,6 +51,8 @@ export async function refreshDashboard() {
       parseJson(predRes),
       parseJson(rateLimitRes),
     ]);
+
+    if (myToken !== _dashRefreshToken) return;
 
     // Mode switcher
     const modeBadge = document.getElementById("dash-current-mode");
@@ -89,9 +102,12 @@ export async function refreshDashboard() {
     // Billing widget
     refreshDashboardBilling();
   } catch (e) {
+    if (myToken !== _dashRefreshToken) return;
     console.error("Dashboard refresh failed:", e);
   } finally {
-    if (refreshBtn) refreshBtn.disabled = false;
+    if (myToken === _dashRefreshToken && refreshBtn) {
+      refreshBtn.disabled = false;
+    }
   }
 }
 

@@ -489,6 +489,15 @@ def record_idempotency_key(
                 (idem_key, job_id, request_fingerprint),
             )
             conn.commit()
+        except (sqlite3.OperationalError, sqlite3.ProgrammingError, sqlite3.DatabaseError):
+            # Round-7 fix: the job row is already committed at this point.
+            # A transient SQLite error on the idempotency-key write must not
+            # crash the entire request.  We log and continue so the client
+            # still receives their job_id; the idempotency mapping is
+            # best-effort (a missing row means a double-submit can create a
+            # duplicate — far better than dropping the user's just-created
+            # job with a 500).
+            logger.warning("Failed to persist idempotency key %s for job %s", idem_key, job_id, exc_info=True)
         finally:
             conn.close()
 

@@ -226,6 +226,14 @@ class DistributedLock:
                     if row is not None:
                         conn.rollback()
                         conn.close()
+                    else:
+                        # Round-7 fix: concurrent release deleted the row
+                        # between our failed INSERT and the SELECT above.
+                        # We must roll back the failed INSERT and close the
+                        # connection — the prior code skipped both and
+                        # ``continue``d, leaking a SQLite connection + fd.
+                        conn.rollback()
+                        conn.close()
                     continue
             except sqlite3.OperationalError:
                 # Database is locked by another process — retry
@@ -291,7 +299,12 @@ class DistributedLock:
                 self._conn.execute("DELETE FROM distributed_lock WHERE lock_name = ?", (self.lock_name,))
                 self._conn.commit()
             except (sqlite3.OperationalError, sqlite3.ProgrammingError):
-                logger.debug("[DistributedLock] Error releasing SQLite lock", exc_info=True)
+                # Round-7 fix: escalate to ERROR so operators notice a stuck
+                # lock row (the prior DEBUG-level swallow masked indefinite
+                # lock outages).  A stuck distributed_lock row causes every
+                # subsequent acquire() for this lock_name to hit
+                # IntegrityError and time out.
+                logger.exception("[DistributedLock] Error releasing SQLite lock — row may be stuck")
             finally:
                 with contextlib.suppress(sqlite3.ProgrammingError, sqlite3.OperationalError, OSError):
                     self._conn.close()

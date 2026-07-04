@@ -4572,3 +4572,18 @@ tests pass, eslint + prettier clean. Quick validation gate: passed.
   rapid double-click).
 - `scheduled-monitoring.js` per-row `_fetchChangesForJob` orphaned
   fetches after row detach (HTTP pool exhaustion under rapid refresh).
+
+---
+
+## Iteration 8 — Distributed lock + idempotency-key + dashboard race fixes
+
+Date: 2026-07-04
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| LOCK-01 | MEDIUM | distributed.py:288 | `_release_sqlite` escalated from DEBUG to logger.exception (previously swallowed release failure and operators couldn't detect stuck distributed_lock rows causing indefinite acquire timeouts). |
+| LOCK-02 | MEDIUM | distributed.py:226 | `_acquire_sqlite` IntegrityError branch: added `else` case (row is None → concurrent release deleted the row between INSERT and SELECT) that calls `conn.rollback()` + `conn.close()` — previously skipped both, leaking a SQLite connection + fd. |
+| IDEM-01 | MEDIUM | job_store.py:462 | `record_idempotency_key` added try/except around INSERT/commit — the job row is already committed, so a transient SQLite error on the idempotency mapping must not crash the entire request with a 500. Logs and continues (best-effort idempotency). |
+| UX-05 | HIGH | frontend/js/dashboard.js:16 | `refreshDashboard` got a request-token (`_dashRefreshToken`) — a slow in-flight 5-fetch batch (triggered by popstate/route-only dispatch) can't overwrite newer dashboard data with stale payloads. |
+
+Verified: compileall clean, ruff clean, 3 distributed_consensus tests + 11 idempotency tests pass, frontend build + 458 vitest tests pass, eslint + prettier clean. Quick validation gate: passed.
