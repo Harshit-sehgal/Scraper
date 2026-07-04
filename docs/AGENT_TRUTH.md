@@ -4631,3 +4631,11 @@ indirectly through public API calls but whose edge-case branches
 
 These are test-quality findings, not operational bugs. Documented
 for a focused "test-coverage hardening" sprint.
+
+### Stale mock-path sweep
+
+A second sweep verified every `patch()` / `patch.object()` target across
+backend/tests actually resolves (verified against canonical sources).
+**No broken mocks found** — the codebase has disciplined mock hygiene
+(mocks target canonical sources, re-exports are not abused as mock
+targets in production test paths).
