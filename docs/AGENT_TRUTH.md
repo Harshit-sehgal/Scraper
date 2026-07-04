@@ -4744,3 +4744,43 @@ logic never executed. Production callers depend on this module:
 4. **`test_table_beats_cards_precedence` requires ≥15 rows and 2+ headers** to push table confidence above 0.8 AND above the cards' ~0.82 ceiling.
 
 Verified: 54/54 new tests pass, full backend test suite green (exit 0).
+
+## 2026-07-04 — Test-Coverage Backlog: binary_handler (path-traversal defense + atomic-write safety)
+
+The 57-item test-coverage backlog flagged `binary_handler.py` as the
+second-highest-leverage target: 4 production paths with **zero direct
+test coverage** — including `_sanitize_filename` (the single line of
+defense against path-traversal in `/api/download/{filename}`) and
+`_write_binary_file_atomic` (crash-safe atomic write with `.tmp` cleanup).
+
+### Coverage added (31 tests in `backend/tests/test_binary_handler.py`)
+
+| Group | Cases | Notes |
+| --- | ---: | --- |
+| `_sanitize_filename` path-traversal defense | 11 | Standalone `..` / `.` / `""` REJECTED; traversal-like paths like `"../../../etc/passwd"` are SAFE-by-basename (return `"passwd"`); 4 parametrized traversal patterns assert stay-in-binaries-dir contract |
+| `_write_binary_file_atomic` crash-safety | 4 | Success path; OSError cleanup (no orphan `.tmp`); ValueError from fsync cleanup; os.replace failure cleanup — all assert temporary file removed when the write aborts |
+| `_iter_binary_file` chunked streaming | 4 | Yields exact chunks (10 bytes / chunk-size=3 → 4 chunks of `[3, 3, 3, 1]`); empty file; missing file; traversal input reduces to safe basename |
+| `get_binary_metadata` / `get_binary_file_path` lookup | 3 | Missing returns None; traversal basename lookup returns None; standalone `..` raises |
+| `_get_binaries_dir` directory creation | 2 | Creates `binaries/` subdir if missing; idempotent on subsequent calls |
+| Round-trip: download → metadata → iter | 2 | Full-cycle integration; `_get_binary_file_path_raw` for pre-sanitized basenames |
+
+### Critical finding (anti-tripwire)
+
+**`_sanitize_filename` does NOT raise on `../../../etc/passwd`** — it correctly
+reduces it to `"passwd"` via `Path(...).name`. The defense-in-depth contract
+is: *whatever the input, the output is always a single basename that cannot
+escape `binaries_dir/` when joined onto it*. The sanitizer only raises when
+`Path(...).name` is `""`, `"."`, or contains literal `..` (i.e. the input
+was standalone `..`). The tests now encode BOTH the "must raise" cases
+(standalone `..`) AND the "must reduce to safe basename" cases
+(traversal paths).
+
+Going forward, a code review that adds a `_sanitize_filename` test asserting
+*every* traversal pattern raises WILL be wrong — the design is correct.
+
+### Backlog impact
+
+- `binary_handler.py` coverage gap closed (0 → 31 direct tests; 30 integration tests in test_binary_download.py remain green).
+- `replay_buffer.py: _CheckpointIndex`, `regression_capture.py: classify_severity` / `prune_fixtures` remain untested — next two candidates.
+
+Verified: 31/31 new tests pass; full backend suite green (exit 0).
