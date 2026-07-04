@@ -26,6 +26,21 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_async_http_client(timeout: float) -> httpx.AsyncClient:
+    """Return an SSRF-safe AsyncClient for webhook notifications.
+
+    Defense-in-depth: even though ``NotificationChannelCreate.webhook_url``
+    and ``NotificationChannelUpdate.webhook_url`` validate the URL
+    synchronously at the Pydantic edge, we also use the safe transport
+    here so DNS-rebinding, redirect-to-private-IP, and misconfigured
+    scheme-bytes-in-hostname cannot pivot into internal services.
+    """
+    from app.url_safety import get_safe_async_client
+
+    return get_safe_async_client(timeout=timeout)
+
+
 # ─── Default timeout for webhook notifiers ──────────────────────────────────
 
 _DEFAULT_TIMEOUT: float = 10.0
@@ -110,7 +125,7 @@ class SlackNotifier(BaseNotifier):
                 )
         timeout = _resolve_timeout()
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with _resolve_async_http_client(timeout) as client:
                 resp = await client.post(recipient, json=payload)
                 try:
                     resp.raise_for_status()
@@ -195,7 +210,7 @@ class TeamsNotifier(BaseNotifier):
         }
         timeout = _resolve_timeout()
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with _resolve_async_http_client(timeout) as client:
                 resp = await client.post(recipient, json=payload)
                 try:
                     resp.raise_for_status()
@@ -252,7 +267,7 @@ class DiscordNotifier(BaseNotifier):
         payload: dict = {"embeds": [embed]}
         timeout = _resolve_timeout()
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with _resolve_async_http_client(timeout) as client:
                 resp = await client.post(recipient, json=payload)
                 try:
                     resp.raise_for_status()

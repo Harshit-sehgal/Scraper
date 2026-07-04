@@ -9,7 +9,7 @@ import uuid
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.scraping import FilterRule, SchemaField, ScrapeMode
 
@@ -174,6 +174,34 @@ class NotificationChannelCreate(BaseModel):
     webhook_url: str = Field(..., max_length=2048, description="Webhook URL for the channel")
     events: list[str] = Field(default_factory=lambda: ["completed"], description="Events to notify on")
 
+    @model_validator(mode="after")
+    def _validate_webhook_url(self):
+        """SSRF defense: enforce scheme + public-host check at model layer
+        so the downstream ``SlackNotifier``/``TeamsNotifier``/``DiscordNotifier``
+        POSTs cannot pivot to private IPs, cloud metadata endpoints, or
+        internal services — the routes used to take ``webhook_url`` raw,
+        then retry-loop and deliver via raw ``httpx.AsyncClient``.  Now
+        we reject bad URLs at the Pydantic validation edge so they never
+        reach storage.
+        """
+        if not self.webhook_url or not self.webhook_url.strip():
+            msg = "webhook_url must not be empty"
+            raise ValueError(msg)
+        stripped = self.webhook_url.strip()
+        if not stripped.startswith(("https://", "http://")):
+            msg = "webhook_url must start with https:// or http://"
+            raise ValueError(msg)
+        try:
+            from app.url_safety import validate_public_http_url
+
+            validate_public_http_url(stripped)
+        except ValueError as exc:
+            msg = f"webhook_url failed security check: {exc}"
+            raise ValueError(msg) from exc
+        # Persist the stripped form.
+        self.webhook_url = stripped
+        return self
+
 
 class NotificationChannelUpdate(BaseModel):
     """Request body to update a notification channel."""
@@ -181,6 +209,27 @@ class NotificationChannelUpdate(BaseModel):
     webhook_url: str | None = Field(default=None, max_length=2048)
     events: list[str] | None = None
     enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_webhook_url(self):
+        """Same SSRF defense as Create — applied before the field reaches
+        the ``NotificationChannel.webhook_url`` storage column, otherwise
+        a PATCH could swap a previously-valid Slack URL for a private IP
+        (CRITICAL SSRF vector surfaced by audit)."""
+        if self.webhook_url:
+            stripped = self.webhook_url.strip()
+            if not stripped.startswith(("https://", "http://")):
+                msg = "webhook_url must start with https:// or http://"
+                raise ValueError(msg)
+            try:
+                from app.url_safety import validate_public_http_url
+
+                validate_public_http_url(stripped)
+            except ValueError as exc:
+                msg = f"webhook_url failed security check: {exc}"
+                raise ValueError(msg) from exc
+            self.webhook_url = stripped
+        return self
 
 
 class NotificationChannel(BaseModel):
