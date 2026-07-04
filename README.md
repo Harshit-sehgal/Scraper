@@ -96,8 +96,9 @@ specific job's badge. For each name use `?job=<job-id>` in your badge URL.
 Local-side static analysis (not part of `ci.yml` but enforced via pre-commit):
 **ruff format + lint**, **mypy**, **bandit** (medium+ severity).
 
-Run `make validate` or `python3 scripts/validate_local.py --quick` for fresh local
-evidence. Check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) for current results.
+`make validate` runs `python3 scripts/validate_local.py --full` (the default
+local validation gate). For a faster smoke check use `make validate-quick` or
+`python3 scripts/validate_local.py --quick`. Check the [latest CI run](https://github.com/Harshit-sehgal/Scraper/actions/workflows/ci.yml) for current results.
 
 > Adjust the workbook row above (`?job=<job-id>`) to point at any of the jobs
 > listed in the table — for example `?job=docker-smoke` or `?job=quick-validation`.

@@ -4,9 +4,24 @@
 
 import { toast, attachFocusTrapTo, detachFocusTrapFrom } from "./utils.js";
 import { refreshSystemStatus, refreshJobs } from "./jobs.js";
-import { maybeHandleMockRequest, isMockMode } from "./mock-api.js";
 export { endpoints } from "./api-contract.js";
-export { isMockMode };
+
+// ─── Mock mode ──────────────────────────────────────────────────────────
+// `mock-api.js` is intentionally NOT statically imported here. esbuild
+// would otherwise bundle it — and its ~100 lines of FALLBACK_* fixtures —
+// into the production chunk, even though `isMockMode()` can never return
+// true in prod (the `window.DATAFORGE_USE_MOCKS` flag is only ever set
+// from the browser devtools console for offline/frontend-first dev).
+//
+// Instead we (a) inline the trivial flag check so callers/tests still see
+// an `isMockMode` export with the same shape, and (b) load mock-api.js
+// on-demand via dynamic `import()` from `apiFetch()` the first time a
+// request is issued with mocks enabled. The whole module then becomes a
+// separate esbuild chunk that is never fetched in production.
+export function isMockMode() {
+  if (typeof window === "undefined") return false;
+  return window.DATAFORGE_USE_MOCKS === true;
+}
 
 // ─── API Base URL ───
 
@@ -306,8 +321,13 @@ export async function apiFetch(url, options = {}) {
   // recent-activity) pass relative URLs; in production (same-origin SPA)
   // the prefix is a no-op.
   const resolvedUrl = url.startsWith("/api/") ? `${API}${url}` : url;
-  const mockResponse = await maybeHandleMockRequest(resolvedUrl, rest);
-  if (mockResponse) return mockResponse;
+  // Load mock-api.js on-demand only when mocks are enabled, so the mock
+  // fixtures ship in a split chunk that production never fetches.
+  if (isMockMode()) {
+    const { maybeHandleMockRequest } = await import("./mock-api.js");
+    const mockResponse = await maybeHandleMockRequest(resolvedUrl, rest);
+    if (mockResponse) return mockResponse;
+  }
 
   const headers = { ...(rest.headers || {}) };
   // For session-authenticated clients, the cookie is sent automatically.

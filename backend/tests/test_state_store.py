@@ -13,6 +13,7 @@ from typing import Any
 
 from app.models import Job, JobStatus
 from app.state_store import (
+    flush_state_writes,
     get_state_file_path,
     load_state,
     save_state,
@@ -249,15 +250,10 @@ class TestSaveState:
                     **_JOB_KWARGS,
                 )
                 save_state({"save-test": job}, {})
-
-                # Wait for the background thread to write (up to 3s)
-                import time
-
-                for _ in range(30):
-                    if os.path.exists(fpath):
-                        break
-                    time.sleep(0.1)
-
+                # flush_state_writes() shuts down the background writer executor
+                # with wait=True, guaranteeing the file has been written.
+                # Replaces the old ``time.sleep(0.1)`` polling loop.
+                flush_state_writes()
                 assert os.path.exists(fpath)
                 data = json.loads(Path(fpath).read_text())
                 assert "jobs" in data
@@ -287,14 +283,7 @@ class TestSaveState:
                     **_JOB_KWARGS,
                 )
                 save_state({"roundtrip-job": job}, {})
-
-                import time
-
-                for _ in range(30):
-                    if os.path.exists(fpath):
-                        break
-                    time.sleep(0.1)
-
+                flush_state_writes()
                 jobs, _recycle, _world_state = load_state()
                 assert "roundtrip-job" in jobs
                 assert jobs["roundtrip-job"].results == [{"items": ["a", "b"]}]
@@ -322,14 +311,7 @@ class TestSaveState:
                     **_JOB_KWARGS,
                 )
                 save_state({}, {"deleted": deleted_job})
-
-                import time
-
-                for _ in range(30):
-                    if os.path.exists(fpath):
-                        break
-                    time.sleep(0.1)
-
+                flush_state_writes()
                 _jobs, recycle, _world_state = load_state()
                 assert "deleted" in recycle
             finally:

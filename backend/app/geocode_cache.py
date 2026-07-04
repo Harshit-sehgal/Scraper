@@ -35,7 +35,13 @@ class GeocodeCache:
 
     def _init_db(self) -> None:
         """Initialize geocode cache SQLite tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        # Resource-leak fix: ``with sqlite3.connect(...) as conn:`` only
+        # manages the *transaction* (commit/rollback) — it does NOT close
+        # the connection. The file descriptor leaks until GC. On the hot
+        # geocoding path (every Nominatim lookup) this leaks fast. Use an
+        # explicit ``try/finally: conn.close()`` instead.
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=FULL")
             conn.execute("""
@@ -56,6 +62,11 @@ class GeocodeCache:
                 )
             """)
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _hash_query(self, query: str) -> str:
         """Create a stable normalized query hash key."""
@@ -67,10 +78,18 @@ class GeocodeCache:
         q_hash = self._hash_query(query)
 
         # 1. Check negative cache first (7-day TTL check)
-        with sqlite3.connect(self.db_path) as conn:
+        # Resource-leak fix: ``with sqlite3.connect(...) as conn:`` only
+        # manages the *transaction* — it does NOT close the connection, so
+        # the file descriptor leaks until GC. On the hot geocoding path
+        # this leaks fast. Use ``try/finally: conn.close()`` and manage
+        # the transaction explicitly (read-only here, so no commit).
+        conn = sqlite3.connect(self.db_path)
+        try:
             cursor = conn.cursor()
             cursor.execute("SELECT timestamp FROM negative_cache WHERE query_hash = ?", (q_hash,))
             row = cursor.fetchone()
+        finally:
+            conn.close()
 
         if row:
             timestamp = row[0]
@@ -81,15 +100,24 @@ class GeocodeCache:
                 logger.info("[Geocode Cache] Negative cache HIT for query '%s' (suppressed)", query)
                 return (0.0, 0.0, "EXCLUDED_NEGATIVE_CACHE")
             # Expired negative cache entry
-            with sqlite3.connect(self.db_path) as conn:
+            conn = sqlite3.connect(self.db_path)
+            try:
                 conn.execute("DELETE FROM negative_cache WHERE query_hash = ?", (q_hash,))
                 conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
 
         # 2. Check primary geocoding cache
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             cursor = conn.cursor()
             cursor.execute("SELECT lat, lon, resolved_address FROM geocoding_cache WHERE query_hash = ?", (q_hash,))
             row = cursor.fetchone()
+        finally:
+            conn.close()
 
         if row:
             with self._lock:
@@ -104,20 +132,32 @@ class GeocodeCache:
     def set(self, query: str, lat: float, lon: float, resolved_address: str | None = None) -> None:
         """Store coordinates in the geocoding cache."""
         q_hash = self._hash_query(query)
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.execute(
                 "INSERT OR REPLACE INTO geocoding_cache VALUES (?, ?, ?, ?, ?, ?)",
                 (q_hash, query, lat, lon, resolved_address, time.time()),
             )
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
         logger.info("[Geocode Cache] Cached coordinates for query '%s' -> (%.4f, %.4f)", query, lat, lon)
 
     def set_negative(self, query: str) -> None:
         """Mark a query as failed in the negative cache to suppress retries."""
         q_hash = self._hash_query(query)
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.execute("INSERT OR REPLACE INTO negative_cache VALUES (?, ?, ?)", (q_hash, query, time.time()))
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
         logger.info("[Geocode Cache] Cached negative failure for query '%s'", query)
 
     @property

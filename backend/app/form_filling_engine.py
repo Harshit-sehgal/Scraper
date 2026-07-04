@@ -691,12 +691,15 @@ async def submit_form_http(
             else:
                 resp = await client.post(action, data=mapped)
 
-            return {
-                "success": resp.status_code < 400,
-                "final_url": str(resp.url),
-                "html": resp.text,
-                "status_code": resp.status_code,
-            }
+            try:
+                return {
+                    "success": resp.status_code < 400,
+                    "final_url": str(resp.url),
+                    "html": resp.text,
+                    "status_code": resp.status_code,
+                }
+            finally:
+                await resp.aclose()
 
     except (httpx.HTTPError, httpx.TimeoutException, ValueError, OSError) as exc:
         logger.warning("HTTP form submission failed: %s", exc)

@@ -79,15 +79,16 @@ class TestExtractionPreview:
                 "schema_fields": [{"name": "title", "field_type": "string"}],
             },
         )
-        assert resp.status_code in (200, 422)
-        if resp.status_code == 200:
-            body = resp.json()
-            assert "url" in body
-            assert body["dry_run"] is True
-            assert "preview_records" in body
-            assert "total_records_found" in body
-        else:
-            assert "detail" in resp.json(), f"Expected error detail for {resp.status_code}"
+        # scrape_url_attempt is mocked to always succeed, so 422 should
+        # never happen here. The prior ``in (200, 422)`` gate was a
+        # vacuous allowance: if 422 somehow materialised it would mask a
+        # broken test fixture. Assert 200 unconditionally and verify body.
+        assert resp.status_code == 200, f"Successful preview mocked; got {resp.status_code}: {resp.text}"
+        body = resp.json()
+        assert "url" in body
+        assert body["dry_run"] is True
+        assert "preview_records" in body
+        assert "total_records_found" in body
 
     def test_preview_with_selectors(self, client, monkeypatch):
         """Preview accepts selectors_map from the job config."""

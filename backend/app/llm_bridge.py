@@ -323,11 +323,14 @@ async def _call_openai_compatible_json(
 
             async with get_safe_async_client(timeout=timeout) as client:
                 response = await client.post(endpoint, json=payload, headers=headers or {})
-                response.raise_for_status()
-                data = response.json()
-                _record_token_usage(data)
-                content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-                return _extract_json_payload(content)
+                try:
+                    response.raise_for_status()
+                    data = response.json()
+                    _record_token_usage(data)
+                    content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+                    return _extract_json_payload(content)
+                finally:
+                    await response.aclose()
         except _LLM_RETRY_ERRORS as error:
             # WARN (not exception) on transient retry — full stack
             # traces on every retry storm drown signal in logs.
@@ -379,10 +382,13 @@ async def _call_openai_compatible_text(
 
             async with get_safe_async_client(timeout=timeout) as client:
                 response = await client.post(endpoint, json=payload, headers=headers or {})
-                response.raise_for_status()
-                data = response.json()
-                _record_token_usage(data)
-                return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
+                try:
+                    response.raise_for_status()
+                    data = response.json()
+                    _record_token_usage(data)
+                    return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
+                finally:
+                    await response.aclose()
         except _LLM_RETRY_ERRORS as error:
             # WARN (not exception) on transient retry — full stack
             # traces on every retry storm drown signal in logs.
@@ -586,15 +592,10 @@ async def llm_json(
         except _MODEL_FALLBACK_ERRORS as e:
             last_err = e
             logger.exception("g4f JSON fallback failed (prompt_len=%d)", len(messages))
-            _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
-        except Exception as e:
-            last_err = e
-            logger.exception(
-                "g4f JSON fallback failed (prompt_len=%d, unexpected type=%s)",
-                len(messages),
-                type(e).__name__,
-            )
-            _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
+            _record_llm_degradation(subsystem="g4f", cause=f"g4f JSON fallback failed: {e}")
+        # Let novel exception types (SyntaxError, GeneratorExit, etc.)
+        # propagate — they indicate programming bugs, not runtime failures.
+        # _MODEL_FALLBACK_ERRORS already covers all expected g4f errors.
 
     if raise_on_failure is None:
         from app.utils.llm_bridge_settings import llm_raise_on_failure_default
@@ -773,9 +774,9 @@ async def llm_text(
         except _MODEL_FALLBACK_ERRORS as e:
             last_err = e
             logger.exception("g4f text fallback failed")
-        except Exception as e:
-            last_err = e
-            logger.exception("g4f text fallback failed (unexpected type=%s)", type(e).__name__)
+        # Let novel exception types (SyntaxError, GeneratorExit, etc.)
+        # propagate — they indicate programming bugs, not runtime failures.
+        # _MODEL_FALLBACK_ERRORS already covers all expected g4f errors.
 
     if raise_on_failure is None:
         from app.utils.llm_bridge_settings import llm_raise_on_failure_default

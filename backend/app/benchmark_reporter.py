@@ -49,7 +49,11 @@ class BenchmarkReporter:
 
     def _init_db(self) -> None:
         """Initialize the SQLite benchmark reporting database schema."""
-        with sqlite3.connect(self.db_path) as conn:
+        # Resource-leak fix: ``with sqlite3.connect(...) as conn:`` only
+        # manages the *transaction* — it does NOT close the connection.
+        # Use ``try/finally: conn.close()`` and manage transactions explicitly.
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS benchmark_runs (
                     run_id TEXT PRIMARY KEY,
@@ -68,12 +72,18 @@ class BenchmarkReporter:
                 )
             """)
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def record_run(self, run: BenchmarkRun) -> dict[str, Any]:
         """Record a benchmark run and check for regressions against previous averages."""
         comparison = self.compare_against_history(run.precision, run.recall)
 
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.execute(
                 "INSERT INTO benchmark_runs VALUES (?, ?, ?, ?, ?, ?)",
                 (run.run_id, run.timestamp, run.precision, run.recall, run.fallback_rate, run.latency_ms),
@@ -81,6 +91,11 @@ class BenchmarkReporter:
             for selector in run.failed_selectors:
                 conn.execute("INSERT INTO run_failures VALUES (?, ?)", (run.run_id, selector))
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
         # Update the visual regression dashboard
         try:
@@ -92,10 +107,13 @@ class BenchmarkReporter:
 
     def compare_against_history(self, current_precision: float, current_recall: float) -> dict[str, Any]:
         """Compare current precision / recall against historical averages."""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             cursor = conn.cursor()
             cursor.execute("SELECT AVG(precision), AVG(recall) FROM benchmark_runs")
             row = cursor.fetchone()
+        finally:
+            conn.close()
 
         avg_precision, avg_recall = row or (None, None)
         if avg_precision is None or avg_recall is None:
@@ -127,7 +145,8 @@ class BenchmarkReporter:
     def get_history(self, limit: int = 10) -> list[BenchmarkRun]:
         """Retrieve recent benchmark runs from the persistent store."""
         runs = []
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT run_id, timestamp, precision, recall, fallback_rate, latency_ms "
@@ -151,6 +170,8 @@ class BenchmarkReporter:
                         failed_selectors=failures,
                     ),
                 )
+        finally:
+            conn.close()
         return runs
 
     def generate_dashboard(self) -> None:

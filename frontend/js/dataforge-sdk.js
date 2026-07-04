@@ -1,4 +1,11 @@
 /**
+ * NOTE: This SDK module is not currently used by the DataForge dashboard.
+ * It is intended as a standalone client library for external consumers
+ * (scripts, integrations, and the `test_js_sdk.mjs` smoke test). It is
+ * not included in the esbuild bundle — `build.mjs` only declares
+ * `app.js` and `styles.css` as entry points, and no app code imports
+ * this module.
+ *
  * DataForge — JavaScript/TypeScript SDK for the DataForge Scraper API.
  *
  * Usage:

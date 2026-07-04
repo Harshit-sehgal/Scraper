@@ -27,10 +27,12 @@ class TestCSPReportOnlyHeader:
         # CSP header should be present on any valid response
         header = "content-security-policy-report-only"
         assert header in {k.lower() for k in r.headers}, dict(r.headers)
-        if r.status_code == 200:
-            value = r.headers.get(header) or r.headers.get(header.title())
-            assert "default-src 'self'" in value
-            assert "report-uri /api/system/csp-violations" in value
+        # The CSP header carries specific directives regardless of status
+        # code — the middleware attaches it unconditionally. Verify the
+        # expected directives on all status codes, not just 200.
+        value = r.headers.get(header) or r.headers.get(header.title())
+        assert "default-src 'self'" in value, f"CSP header missing default-src: {value}"
+        assert "report-uri /api/system/csp-violations" in value, f"CSP header missing report-uri: {value}"
 
     def test_api_response_carries_csp_header(self, client) -> None:
         r = client.get("/api/system/status")

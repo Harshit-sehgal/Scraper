@@ -20,6 +20,20 @@ from app.utils.log_redaction import mask_proxy_url
 logger = logging.getLogger(__name__)
 
 
+def _record_degradation(proxy_count: int) -> None:
+    """Emit a proxy-provider refresh metric so operators can monitor
+    proxy pool health regardless of refresh outcome (success, failure,
+    or empty response).  Falls back to a warning-level log when the
+    metrics collector is unavailable.
+    """
+    try:
+        from app.metrics_collector import record_proxy_provider_refresh
+
+        record_proxy_provider_refresh(proxy_count=proxy_count)
+    except (ImportError, RuntimeError, OSError) as exc:
+        logger.warning("Unable to record proxy-provider refresh metric: %s", exc)
+
+
 class ProxyManager:
     """Manages proxy rotation for anti-bot resilience.
 
@@ -119,10 +133,12 @@ class ProxyManager:
                 fresh = self._provider.refresh()
             except (RuntimeError, ValueError, OSError) as exc:
                 logger.warning("Provider refresh failed: %s", exc)
+                _record_degradation(len(self._proxy_list))
                 return len(self._proxy_list)
             self._proxy_list = [str(p).strip() for p in fresh if str(p).strip()]
             self._current_index = 0
             logger.info("Proxy pool refreshed via provider: %d proxies", len(self._proxy_list))
+            _record_degradation(len(self._proxy_list))
             return len(self._proxy_list)
 
     @property

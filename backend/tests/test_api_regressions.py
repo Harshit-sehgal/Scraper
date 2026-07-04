@@ -618,8 +618,13 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None
     def tracking_persist(*args, **kwargs) -> None:
         persist_called[0] = True
 
+    # asyncio.Event so the canceler knows the scrape is in flight before
+    # setting cancel_requested — replaces the fragile ``await asyncio.sleep(0.3)``.
+    scrape_started = asyncio.Event()
+
     # Simulate a long-running scrape that gives us time to cancel
     async def slow_scrape_url(url, schema_fields, **kwargs):
+        scrape_started.set()
         await asyncio.sleep(5.0)  # Long enough to be in-flight when cancel fires
         return [], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
@@ -644,8 +649,9 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None
         # Start the job in a task so we can cancel while it's running
         job_task = asyncio.create_task(main_mod._run_job_wrapper(job.id))
 
-        # Give the job time to start scraping
-        await asyncio.sleep(0.3)
+        # Wait for the scrape to actually start (Event-based, no wall-clock
+        # dependency) before canceling.
+        await asyncio.wait_for(scrape_started.wait(), timeout=5.0)
 
         # Cancel the job
         assert job.id in main_mod.jobs_store

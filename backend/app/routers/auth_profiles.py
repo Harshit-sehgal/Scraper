@@ -324,30 +324,33 @@ async def _try_live_session_check(profile: dict[str, Any]) -> dict[str, Any] | N
                 },
             )
 
-            status_code = response.status_code
-            final_url = str(response.url)
-            content_lower = response.text[:2000].lower() if response.text else ""
+            try:
+                status_code = response.status_code
+                final_url = str(response.url)
+                content_lower = response.text[:2000].lower() if response.text else ""
 
-            # Detect login page redirects or login form indicators
-            login_keywords = ["login", "sign in", "log in", "signin", "auth", "authenticate", "session expired"]
-            redirected_to_login = any(kw in final_url.lower() for kw in login_keywords)
-            page_has_login_form = any(kw in content_lower for kw in login_keywords[:3])
+                # Detect login page redirects or login form indicators
+                login_keywords = ["login", "sign in", "log in", "signin", "auth", "authenticate", "session expired"]
+                redirected_to_login = any(kw in final_url.lower() for kw in login_keywords)
+                page_has_login_form = any(kw in content_lower for kw in login_keywords[:3])
 
-            if status_code == 200 and not redirected_to_login and not page_has_login_form:
-                return {"valid": True, "status": "active", "reason": "Live HTTP check passed."}
-            if status_code in (301, 302, 303, 307, 308) and redirected_to_login:
-                return {"valid": False, "status": "expired", "reason": f"Redirected to login page: {final_url}"}
-            if page_has_login_form:
-                return {"valid": False, "status": "expired", "reason": "Response contains login form — session expired."}
-            if status_code in (401, 403):
-                return {"valid": False, "status": "expired", "reason": f"HTTP {status_code} — authentication required."}
-            if status_code >= 500:
-                logger.debug("Live session check got %d for %s, treating as inconclusive", status_code, target_url)
+                if status_code == 200 and not redirected_to_login and not page_has_login_form:
+                    return {"valid": True, "status": "active", "reason": "Live HTTP check passed."}
+                if status_code in (301, 302, 303, 307, 308) and redirected_to_login:
+                    return {"valid": False, "status": "expired", "reason": f"Redirected to login page: {final_url}"}
+                if page_has_login_form:
+                    return {"valid": False, "status": "expired", "reason": "Response contains login form — session expired."}
+                if status_code in (401, 403):
+                    return {"valid": False, "status": "expired", "reason": f"HTTP {status_code} — authentication required."}
+                if status_code >= 500:
+                    logger.debug("Live session check got %d for %s, treating as inconclusive", status_code, target_url)
+                    return None
+
+                # Fall back to treating non-200 as inconclusive
+                logger.debug("Live session check got status %d for %s", status_code, target_url)
                 return None
-
-            # Fall back to treating non-200 as inconclusive
-            logger.debug("Live session check got status %d for %s", status_code, target_url)
-            return None
+            finally:
+                await response.aclose()
 
     except httpx.ConnectError:
         logger.debug("Could not connect to %s for live session check", target_url)

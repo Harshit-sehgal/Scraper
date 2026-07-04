@@ -37,3 +37,5 @@ class TestBulkResultDelete:
             assert "removed" in data
             assert "remaining" in data
             assert "status" in data
+        else:
+            assert response.status_code == 404

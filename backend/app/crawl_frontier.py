@@ -38,48 +38,82 @@ _DB_FALLBACK_ERRORS = (OSError, RuntimeError, ValueError, TypeError, ImportError
 def _db_insert_queue(db_path: str, priority: int, url: str, depth: int, source_url: str | None, added_at: float) -> None:
     import sqlite3
 
-    with sqlite3.connect(db_path) as conn:
+    # Resource-leak fix: ``with sqlite3.connect(...) as conn:`` only manages
+    # the transaction — it does NOT close the connection. These helpers run
+    # inside ``asyncio.to_thread(...)`` on every frontier enqueue/complete/
+    # fail, so the leak is amplified. Use ``try/finally: conn.close()``.
+    conn = sqlite3.connect(db_path)
+    try:
         conn.execute(
             "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
             (priority, url, depth, source_url, added_at),
         )
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _db_delete_queue(db_path: str, url: str) -> None:
     import sqlite3
 
-    with sqlite3.connect(db_path) as conn:
+    conn = sqlite3.connect(db_path)
+    try:
         conn.execute("DELETE FROM queue WHERE url = ?", (url,))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _db_mark_completed(db_path: str, url: str) -> None:
     import sqlite3
 
-    with sqlite3.connect(db_path) as conn:
+    conn = sqlite3.connect(db_path)
+    try:
         conn.execute("DELETE FROM queue WHERE url = ?", (url,))
         conn.execute("DELETE FROM failed WHERE url = ?", (url,))
         conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _db_mark_failed(db_path: str, url: str, count: int) -> None:
     import sqlite3
 
-    with sqlite3.connect(db_path) as conn:
+    conn = sqlite3.connect(db_path)
+    try:
         conn.execute("DELETE FROM queue WHERE url = ?", (url,))
         conn.execute("INSERT OR REPLACE INTO failed VALUES (?, ?)", (url, count))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _db_finalize_failed_as_completed(db_path: str, url: str) -> None:
     import sqlite3
 
-    with sqlite3.connect(db_path) as conn:
+    conn = sqlite3.connect(db_path)
+    try:
         conn.execute("DELETE FROM failed WHERE url = ?", (url,))
         conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 @dataclass(order=True)
@@ -120,7 +154,8 @@ class CrawlFrontier:
         import sqlite3
 
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self._db_path) as conn:
+        conn = sqlite3.connect(self._db_path)
+        try:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=FULL")
             conn.execute("""
@@ -144,6 +179,11 @@ class CrawlFrontier:
                 )
             """)
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _load_from_db(self) -> None:
         import heapq
@@ -160,7 +200,8 @@ class CrawlFrontier:
         new_domain_counts: dict[str, int] = {}
 
         try:
-            with sqlite3.connect(self._db_path) as conn:
+            conn = sqlite3.connect(self._db_path)
+            try:
                 # Load completed
                 for row in conn.execute("SELECT url FROM completed"):
                     url = row[0]
@@ -178,9 +219,11 @@ class CrawlFrontier:
                         item = CrawlItem(priority=row[0], url=row[1], depth=row[2], source_url=row[3], added_at=row[4])
                         new_queue.append(item)
                         new_pending.add(row[1])
+            finally:
+                conn.close()
 
-                # Heapify to establish priority invariant
-                heapq.heapify(new_queue)
+            # Heapify to establish priority invariant
+            heapq.heapify(new_queue)
         except _DB_FALLBACK_ERRORS:
             # L3: discard the partially-loaded fresh state and keep the
             # pre-call snapshot — frontier stays internally consistent.

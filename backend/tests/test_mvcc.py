@@ -5,7 +5,6 @@ global locking bottlenecks. MVCC ensures causality is preserved.
 """
 
 import threading
-import time
 
 import pytest
 from app.semantic_world_state import SemanticWorldState
@@ -27,18 +26,21 @@ def test_mvcc_conflict_detection(ws) -> None:
         region_id = r.region_id
 
     results = []
+    # B signals this event when it has committed, so A knows it's safe
+    # to attempt its own (now-conflicting) modification.
+    b_committed = threading.Event()
 
     def run_tx_A() -> None:
         try:
             with ws.transaction("tx_A"):
-                # 2. Transaction A starts and reads the region (populates read_set/base_versions)
+                # 2. Transaction A starts and reads the region
                 view = ws.get_topology_view()
                 _ = view.all_regions()
 
-                # 3. Delay A to allow B to commit
-                time.sleep(0.4)
+                # 3. Wait for B to commit — no wall-clock dependency
+                b_committed.wait(timeout=5.0)
 
-                # 5. Transaction A tries to modify the region
+                # 4. Transaction A tries to modify the region
                 ws._topology.set_region_instability(region_id, 0.2)
                 # Commit will happen here
             results.append("A_SUCCESS")
@@ -49,11 +51,11 @@ def test_mvcc_conflict_detection(ws) -> None:
 
     def run_tx_B() -> None:
         try:
-            time.sleep(0.1)  # Start B after A has read
             with ws.transaction("tx_B"):
-                # 4. Transaction B modifies AND COMMITS the region
+                # 3. Transaction B modifies AND COMMITS the region
                 ws._topology.set_region_instability(region_id, 0.8)
             results.append("B_SUCCESS")
+            b_committed.set()
         except Exception as e:
             results.append(f"B_ERROR: {e}")
 

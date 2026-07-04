@@ -25,6 +25,8 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 from app.url_safety import validate_public_http_url
 
 # Playwright Error — lazy import so the module doesn't require Playwright
@@ -886,7 +888,7 @@ def _fetch_page_sync(url: str, *, _base_url: str = "") -> str:
             resp = client.get(url)
             resp.raise_for_status()
             return resp.text
-    except Exception as exc:
+    except (httpx.HTTPError, OSError) as exc:
         logger.debug("Sync pagination: fetch failed for %s: %s", url, exc)
         return ""
 

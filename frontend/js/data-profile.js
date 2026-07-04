@@ -155,7 +155,7 @@ export function renderProfilePanel() {
               <div class="profile-field-info">
                 <span class="profile-field-name">${esc(f.name)}</span>
                 <span class="profile-field-meta">
-                  ${f.nonEmpty}/${f.totalRows} · ${f.uniqueValues} unique · ${f.types || "—"}
+                  ${f.nonEmpty}/${f.totalRows} · ${f.uniqueValues} unique · ${esc(f.types || "—")}
                 </span>
               </div>
               <div class="profile-field-bar-track">

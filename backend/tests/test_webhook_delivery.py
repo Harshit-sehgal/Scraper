@@ -104,6 +104,7 @@ class TestDeliverWebhook:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
 
@@ -144,6 +145,7 @@ class TestDeliverWebhook:
 
         mock_response = MagicMock()
         mock_response.status_code = 500
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
 
@@ -168,6 +170,7 @@ class TestDeliverWebhook:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
 
@@ -228,6 +231,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_ctx = MagicMock()
@@ -261,6 +265,7 @@ class TestExtendedWebhookDelivery:
 
         ok_response = MagicMock()
         ok_response.status_code = 200
+        ok_response.aclose = AsyncMock(return_value=None)
         call_count = 0
 
         async def _side(*args: object, **kwargs: object) -> MagicMock:
@@ -296,6 +301,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
 
         async def _make_delivery(job_id: str, url: str) -> bool:
             mclient = MagicMock()
@@ -321,6 +327,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_ctx = MagicMock()
@@ -341,6 +348,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_ctx = MagicMock()
@@ -363,6 +371,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_ctx = MagicMock()
@@ -382,6 +391,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 302
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_ctx = MagicMock()
@@ -404,6 +414,7 @@ class TestExtendedWebhookDelivery:
 
         mock_response = MagicMock()
         mock_response.status_code = 404
+        mock_response.aclose = AsyncMock(return_value=None)
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_ctx = MagicMock()

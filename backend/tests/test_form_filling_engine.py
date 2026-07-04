@@ -428,6 +428,11 @@ class TestHttpFormSubmission:
         mock_response.status_code = 200
         mock_response.text = "<html><body>Success</body></html>"
         mock_response.url = "https://example.com/search"
+        # Round-11 fix: ``async_form_submit`` (in form_filling_engine.py) now
+        # calls ``await resp.aclose()`` in a ``try/finally`` to release the
+        # httpx Response connection-pool slot. The mock response must provide
+        # an awaitable ``aclose`` so the production ``await`` doesn't raise.
+        mock_response.aclose = AsyncMock(return_value=None)
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)

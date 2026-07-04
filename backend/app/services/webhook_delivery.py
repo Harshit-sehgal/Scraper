@@ -209,26 +209,29 @@ async def deliver_webhook(
         try:
             async with get_safe_async_client(timeout=_WEBHOOK_TIMEOUT_SECONDS) as client:
                 resp = await client.post(webhook_url, content=payload_bytes, headers=headers)
-                if resp.status_code < 400:
-                    job.webhook_delivered = True
-                    job.webhook_delivered_at = datetime.datetime.now(datetime.UTC).isoformat()
-                    logger.info(
-                        "Webhook delivered for job %s to %s (HTTP %d, attempt %d/%d)",
+                try:
+                    if resp.status_code < 400:
+                        job.webhook_delivered = True
+                        job.webhook_delivered_at = datetime.datetime.now(datetime.UTC).isoformat()
+                        logger.info(
+                            "Webhook delivered for job %s to %s (HTTP %d, attempt %d/%d)",
+                            getattr(job, "id", ""),
+                            webhook_url,
+                            resp.status_code,
+                            attempt,
+                            MAX_RETRIES,
+                        )
+                        return True
+
+                    logger.warning(
+                        "Webhook delivery failed for job %s (HTTP %d, attempt %d/%d)",
                         getattr(job, "id", ""),
-                        webhook_url,
                         resp.status_code,
                         attempt,
                         MAX_RETRIES,
                     )
-                    return True
-
-                logger.warning(
-                    "Webhook delivery failed for job %s (HTTP %d, attempt %d/%d)",
-                    getattr(job, "id", ""),
-                    resp.status_code,
-                    attempt,
-                    MAX_RETRIES,
-                )
+                finally:
+                    await resp.aclose()
         except transient_exc as exc:
             logger.warning(
                 "Webhook delivery transient error for job %s (attempt %d/%d): %s",

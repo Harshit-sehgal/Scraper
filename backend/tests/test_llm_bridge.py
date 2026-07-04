@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from typing import Never
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -276,13 +276,20 @@ class _MockAsyncClient:
             idx = min(self.call_count - 1, len(self.response_sequence) - 1)
             item = self.response_sequence[idx]
             if isinstance(item, MagicMock):
-                return item
-            if callable(item):
-                return item()
-            return item
-        # Default: return a response with empty data
-        resp = MagicMock()
-        resp.json.return_value = {"choices": [{"message": {"content": ""}}]}
+                resp = item
+            elif callable(item):
+                resp = item()
+            else:
+                resp = item
+        else:
+            # Default: return a response with empty data
+            resp = MagicMock()
+            resp.json.return_value = {"choices": [{"message": {"content": ""}}]}
+        # Round-11 fix: ``_call_openai_compatible_json/text`` now calls
+        # ``await resp.aclose()`` to release the httpx Response connection-
+        # pool slot. The mock must provide an awaitable aclose.
+        if isinstance(resp, MagicMock):
+            resp.aclose = AsyncMock(return_value=None)
         return resp
 
 
@@ -291,6 +298,7 @@ class TestCallOpenaiCompatibleJson:
     async def test_successful_call(self) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": '{"key": "value"}'}}]}
+        mock_response.aclose = AsyncMock(return_value=None)
 
         with patch("app.llm_bridge.httpx.AsyncClient", return_value=_MockAsyncClient([mock_response])):
             result = await _call_openai_compatible_json("http://endpoint", {"model": "test"}, timeout=10)

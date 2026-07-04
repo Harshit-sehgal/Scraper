@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.config import settings
+from app.llm_bridge import LLMCascadeExhausted
 
 logger = logging.getLogger(__name__)
 
@@ -215,35 +216,38 @@ class URLAnalysisPipeline:
 
                 max_hops = 10
                 hops = 0
-                while resp.is_redirect and hops < max_hops:
-                    hops += 1
-                    location = resp.headers.get("location", "")
-                    if not location:
+                try:
+                    while resp.is_redirect and hops < max_hops:
+                        hops += 1
+                        location = resp.headers.get("location", "")
+                        if not location:
+                            await resp.aclose()
+                            break
+                        redirect_target = urljoin(str(resp.url), location)
+                        try:
+                            validate_public_http_url(redirect_target)
+                        except ValueError as e:
+                            logger.warning(
+                                "[URLAnalyzer] Redirect target blocked by SSRF validation: %s -> %s: %s",
+                                ctx.url,
+                                redirect_target,
+                                e,
+                            )
+                            await resp.aclose()
+                            break
                         await resp.aclose()
-                        break
-                    redirect_target = urljoin(str(resp.url), location)
-                    try:
-                        validate_public_http_url(redirect_target)
-                    except ValueError as e:
-                        logger.warning(
-                            "[URLAnalyzer] Redirect target blocked by SSRF validation: %s -> %s: %s",
-                            ctx.url,
-                            redirect_target,
-                            e,
-                        )
-                        await resp.aclose()
-                        break
-                    await resp.aclose()
-                    resp = await client.get(redirect_target, follow_redirects=False)
+                        resp = await client.get(redirect_target, follow_redirects=False)
 
-                if str(resp.url) != ctx.url:
-                    ctx.final_url = str(resp.url)
-                    logger.info(
-                        "[URLAnalyzer] URL resolved: %s -> %s (after %d redirect hops)",
-                        ctx.url,
-                        ctx.final_url,
-                        hops,
-                    )
+                    if str(resp.url) != ctx.url:
+                        ctx.final_url = str(resp.url)
+                        logger.info(
+                            "[URLAnalyzer] URL resolved: %s -> %s (after %d redirect hops)",
+                            ctx.url,
+                            ctx.final_url,
+                            hops,
+                        )
+                finally:
+                    await resp.aclose()
         except (RuntimeError, ValueError, TypeError, AttributeError, OSError, ImportError) as exc:
             logger.debug("[URLAnalyzer] Could not determine final URL via httpx for %s: %s", ctx.url, exc, exc_info=True)
 
@@ -429,6 +433,9 @@ class URLAnalysisPipeline:
             )
         except (TimeoutError, OSError, RuntimeError, ValueError):
             logger.exception("[URLAnalyzer] LLM analysis failed for %s", ctx.url)
+            result = None
+        except LLMCascadeExhausted:
+            logger.warning("[URLAnalyzer] LLM cascade exhausted for %s", ctx.url)
             result = None
 
         ctx.suggested_fields = rename_fields(build_llm(result, ctx.patterns))

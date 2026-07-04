@@ -50,6 +50,10 @@ class TestOWASPTop10:
         if response.status_code in (200, 201):
             data = response.json()
             assert "DROP TABLE" not in data.get("name", ""), "SQL injection payload must be stripped from response"
+        else:
+            assert response.status_code in (400, 422), (
+                f"expected validation rejection for SQL-injection probe, got {response.status_code}"
+            )
 
     def test_a04_insecure_design(self, client: TestClient, auth_headers: dict):
         """A04:2021 - Insecure Design."""
@@ -122,6 +126,10 @@ class TestOWASPTop10:
             # Verify data structure — API returns job_id and status
             assert "job_id" in data or "id" in data
             assert "status" in data
+        else:
+            assert response.status_code in (400, 422), (
+                f"expected validation rejection for data-integrity probe, got {response.status_code}"
+            )
 
     def test_a09_logging_monitoring(self, client: TestClient, auth_headers: dict):
         """A09:2021 - Security Logging and Monitoring Failures."""
@@ -207,11 +215,22 @@ class TestInputValidation:
             assert response.status_code in (200, 201, 400, 422), (
                 f"unexpected status {response.status_code}: XSS probe must be either rejected or sanitized"
             )
+            # The raw script tag must never appear in the response body,
+            # regardless of accept/reject status (mirrors test_security.py
+            # line 62). A 4xx error body echoing the raw payload would be a
+            # reflected XSS bug, not a safe rejection.
+            assert "<script>" not in response.text, (
+                f"Raw <script> tag in response body for payload {payload!r}: {response.text!r}"
+            )
             if response.status_code in (200, 201):
                 data = response.json()
                 # Verify XSS payload is sanitized
                 assert "<script>" not in data.get("name", "")
                 assert "javascript:" not in data.get("name", "")
+            else:
+                assert response.status_code in (400, 422), (
+                    f"expected validation rejection for XSS payload, got {response.status_code}"
+                )
 
     def test_path_traversal(self, client: TestClient, auth_headers: dict):
         """Test path traversal prevention."""
@@ -244,6 +263,10 @@ class TestInputValidation:
             urls = data.get("urls", [])
             if urls:
                 assert "rm -rf" not in urls[0]
+        else:
+            assert response.status_code in (400, 422), (
+                f"expected validation rejection for command-injection probe, got {response.status_code}"
+            )
 
     def test_ldap_injection(self, client: TestClient, auth_headers: dict):
         """Test LDAP injection prevention."""
@@ -262,6 +285,10 @@ class TestInputValidation:
         if response.status_code in (200, 201):
             data = response.json()
             assert "*)(&(objectClass=*)" not in str(data)
+        else:
+            assert response.status_code in (400, 422), (
+                f"expected validation rejection for LDAP-injection probe, got {response.status_code}"
+            )
 
     def test_xml_injection(self, client: TestClient, auth_headers: dict):
         """Test XML injection prevention."""
@@ -274,10 +301,20 @@ class TestInputValidation:
                 "data": '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>',
             },
         )
-        # Should sanitize XML input
+        # Should sanitize XML input — assert status explicitly first so a
+        # vacuous pass (no status assert, only an ``if 200/201`` branch)
+        # cannot hide a regression. Mirrors test_security.py patterns.
+        assert response.status_code in (200, 201, 400, 422), (
+            f"unexpected status {response.status_code}: XML-injection probe must be rejected or safely sanitized"
+        )
+        # The XXE expansion sentinel must never echo back into any response
+        # body, regardless of accept/reject status.
+        assert "&xxe;" not in response.text
         if response.status_code in (200, 201):
             data = response.json()
             assert "&xxe;" not in str(data)
+        else:
+            assert response.status_code in (400, 422), f"expected validation rejection, got {response.status_code}"
 
 
 class TestAuthenticationSecurity:

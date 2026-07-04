@@ -212,24 +212,27 @@ async def download_binary(
 
     async with get_safe_async_client(timeout=httpx.Timeout(60.0), follow_redirects=True) as client:
         resp = await client.get(url, headers=request_headers)
-        resp.raise_for_status()
-        raw_content = resp.content
+        try:
+            resp.raise_for_status()
+            raw_content = resp.content
 
-        # Use the response content-type if available (more accurate than extension guess)
-        actual_ct = resp.headers.get("content-type", "").split(";")[0].strip()
-        if actual_ct:
-            if not is_binary_content_type(actual_ct):
-                msg = f"URL did not return binary content: {actual_ct}"
+            # Use the response content-type if available (more accurate than extension guess)
+            actual_ct = resp.headers.get("content-type", "").split(";")[0].strip()
+            if actual_ct:
+                if not is_binary_content_type(actual_ct):
+                    msg = f"URL did not return binary content: {actual_ct}"
+                    raise ValueError(msg)
+                content_type = actual_ct
+                # Recompute extension if the content-type differs from the URL guess
+                ext_from_ct = _get_extension_for_content_type(actual_ct)
+                if ext_from_ct != file_ext:
+                    filename = _sanitize_filename(f"{file_id}{ext_from_ct}")
+                    save_path = binaries_dir / filename
+            elif not is_binary_content_type(content_type):
+                msg = "URL did not return a binary Content-Type"
                 raise ValueError(msg)
-            content_type = actual_ct
-            # Recompute extension if the content-type differs from the URL guess
-            ext_from_ct = _get_extension_for_content_type(actual_ct)
-            if ext_from_ct != file_ext:
-                filename = _sanitize_filename(f"{file_id}{ext_from_ct}")
-                save_path = binaries_dir / filename
-        elif not is_binary_content_type(content_type):
-            msg = "URL did not return a binary Content-Type"
-            raise ValueError(msg)
+        finally:
+            await resp.aclose()
 
         await asyncio.to_thread(_write_binary_file_atomic, save_path, raw_content)
 

@@ -74,6 +74,10 @@ class _FakeJob:
 def _mock_ok_response(status_code: int = 200) -> MagicMock:
     resp = MagicMock()
     resp.status_code = status_code
+    # Round-11 fix: ``_deliver_webhook`` now calls ``await resp.aclose()``
+    # to release the httpx Response connection-pool slot. The mock must
+    # provide an awaitable aclose.
+    resp.aclose = AsyncMock(return_value=None)
     return resp
 
 
