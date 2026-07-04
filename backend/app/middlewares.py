@@ -527,10 +527,18 @@ _STATEFUL_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"}
 
 _SKIPPED_AUTH_CONTEXTS: frozenset[str] = frozenset(
     {
-        "api_key_admin",
-        "api_key_operator",
-        "api_key_user",
-        "api_key_billing",
+        # FU-2026-07-05 (CRITICAL CSRF skip mismatch): ``AuthContext.source``
+        # is the literal ``"api_key" | "session" | "dev"`` — it never carries
+        # the qualified ``api_key_<role>`` form the previous allowlist
+        # enumerated. The mismatched set never matched, so the CSRF
+        # middleware never actually skipped API-key-authenticated requests,
+        # defeating its stated "API-key tooling works without Origin
+        # headers" design — every legitimate SDK/CLI/server-to-server
+        # POST in production would 403 on "missing Origin/Referer".
+        # Also skip ``dev``: the insecure-dev bypass is local-only by
+        # definition and was already allowed upstream by api_key_middleware.
+        "api_key",
+        "dev",
     }
 )
 

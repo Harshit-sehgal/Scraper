@@ -25,6 +25,10 @@ from app.middlewares import (
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+# Holds the active ``_mock_auth_source`` patcher so the autouse
+# ``csrf_patch_cleanup`` fixture can stop it after each test.
+_ACTIVE_PATCHER: object | None = None
+
 
 @pytest.fixture
 def csrf_app() -> FastAPI:
@@ -80,15 +84,41 @@ def _make_auth_context(*, source: str = "session", role: str = "user", user_id: 
     return ctx
 
 
-def _mock_auth_source(app: FastAPI, source: str) -> None:
-    """Monkeypatch resolve_auth_context at its actual home (app.utils.rbac)."""
+def _mock_auth_source(app: FastAPI | object, source: str) -> None:
+    # ``app`` here is the ASGI instance FastAPI builds after middleware
+    # wrapping; it is only used as a sentinel and never dereferenced.
+    """Monkeypatch resolve_auth_context at its actual home (app.utils.rbac).
+
+    FU-2026-07-05: the previous version used ``atexit.register(patcher.stop)``
+    which only fires at process exit, LEAKING the mock to every subsequent
+    test file in the same pytest run (e.g. test_p0_auth_tenant.py saw
+    ``resolve_auth_context`` returning a MagicMock and broke 47 tests).
+    We store the active patcher in a module-level variable and the
+    autouse ``csrf_patch_cleanup`` fixture stops it after each test.
+    """
+    global _ACTIVE_PATCHER
     import app.utils.rbac as _rbac_mod
 
     patcher = patch.object(_rbac_mod, "resolve_auth_context", return_value=_make_auth_context(source=source))
     patcher.start()
-    import atexit
+    # Stash on a module global so ``csrf_patch_cleanup`` can stop it.
+    _ACTIVE_PATCHER = patcher
 
-    atexit.register(patcher.stop)
+
+@pytest.fixture(autouse=True)
+def csrf_patch_cleanup() -> None:
+    """Stop any active resolve_auth_context patcher after each test.
+
+    Without this, the ``_mock_auth_source`` patcher survives across test
+    files and breaks downstream tests that rely on the real
+    resolve_auth_context (e.g. test_p0_auth_tenant).
+    """
+    yield
+    global _ACTIVE_PATCHER
+    p = _ACTIVE_PATCHER
+    if p is not None:
+        p.stop()
+        _ACTIVE_PATCHER = None
 
 
 class TestOriginValidationMiddleware:
@@ -193,16 +223,31 @@ class TestOriginValidationSkipsAPIKeyAuth:
 
     @pytest.mark.parametrize("auth_source", sorted(_SKIPPED_AUTH_CONTEXTS))
     def test_api_key_auth_skips_origin_check(self, client: TestClient, monkeypatch, auth_source: str) -> None:
-        """API-key-authenticated requests bypass the origin check entirely."""
+        """API-key-authenticated requests bypass the origin check entirely.
+
+        Iterates over ``_SKIPPED_AUTH_CONTEXTS`` directly so it stays in
+        lockstep with the production allowlist (``{"api_key", "dev"}``).
+        The previous version parametrised over qualifed ``api_key_<role>``
+        names that ``AuthContext.source`` never carries in practice —
+        which is what masked the CSRF skip-allowlist mismatch bug.
+        """
         monkeypatch.setattr(settings, "ENV", "production")
         _mock_auth_source(client.app, auth_source)
         resp = client.post("/api/test/post")  # no Origin header
         assert resp.status_code == 200, f"API-key auth {auth_source!r} should bypass CSRF check"
 
     def test_api_key_user_bypasses_all_methods(self, client: TestClient, monkeypatch) -> None:
-        """api_key_user context bypasses origin check for all stateful methods."""
+        """api_key context bypasses origin check for all stateful methods.
+
+        FU-2026-07-05 (CSRF skip only matches real AuthContext.source):
+        ``AuthContext.source`` is the literal ``"api_key" | "session" |
+        "dev"`` — it never carries the qualified ``api_key_<role>`` form.
+        The middleware skips on the unqualified ``api_key`` so any
+        api-key-authenticated request (admin/operator/user/billing) is
+        excluded, regardless of role.
+        """
         monkeypatch.setattr(settings, "ENV", "production")
-        _mock_auth_source(client.app, "api_key_user")
+        _mock_auth_source(client.app, "api_key")
         for method in _STATEFUL_METHODS:
             resp = getattr(client, method.lower())("/api/test/" + method.lower())
-            assert resp.status_code == 200, f"{method} should pass for api_key_user"
+            assert resp.status_code == 200, f"{method} should pass for api_key-authenticated request"
