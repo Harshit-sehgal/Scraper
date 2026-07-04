@@ -313,3 +313,200 @@ async def test_admin_add_writes_audit_log(denylist_client, tmp_path, monkeypatch
         assert "denylist_add" in actions
     finally:
         audit_logger.reset_audit_logger()
+
+
+# ─── uncovered error-path branches (operator router) ────────────────
+
+
+@pytest.mark.asyncio
+async def test_admin_add_invalid_domain_returns_400(denylist_client) -> None:
+    """Adding a domain that fails DomainDenylist.add validation MUST
+    surface as HTTP 400 with the validation message — not a 500 or a
+    silent success.  This is the ``ValueError as exc → HTTPException(400)``
+    branch in operator.add_denylist_entry that was previously untested."""
+    client, _instance = denylist_client
+    # Spaces and '*' are not in the allowed [a-z0-9.-] set.
+    resp = await client.post(
+        "/api/operator/denylist",
+        json={"domain": "has space.invalid", "reason": "bad"},
+        headers={"X-API-Key": "admin-token"},
+    )
+    assert resp.status_code == 400
+    assert "invalid" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_admin_add_empty_domain_rejected_at_pydantic(denylist_client) -> None:
+    """An empty domain (min_length=1) is rejected by pydantic before it
+    even reaches the route body — FastAPI returns 422, not 400."""
+    client, _instance = denylist_client
+    resp = await client.post(
+        "/api/operator/denylist",
+        json={"domain": "", "reason": "empty"},
+        headers={"X-API-Key": "admin-token"},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_admin_add_path_prefix_without_slash_returns_400(denylist_client) -> None:
+    """A path_prefix that does not start with '/' trips the ValueError
+    in DomainDenylist.add → 400 (the third validation branch)."""
+    client, _instance = denylist_client
+    resp = await client.post(
+        "/api/operator/denylist",
+        json={"domain": "pfx.example.com", "reason": "r", "path_prefix": "no-slash"},
+        headers={"X-API-Key": "admin-token"},
+    )
+    assert resp.status_code == 400
+    assert "path_prefix" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_add_with_path_prefix_scopes_block(denylist_client) -> None:
+    """A path_prefix-scoped entry blocks only that path, leaving the
+    rest of the domain accessible. Verifies the persisted row round-trips
+    its path_prefix in the response and is_blocked honours the scope."""
+    client, instance = denylist_client
+    resp = await client.post(
+        "/api/operator/denylist",
+        json={"domain": "scoped.example.com", "reason": "r", "path_prefix": "/private"},
+        headers={"X-API-Key": "admin-token"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["path_prefix"] == "/private"
+
+    # The /private prefix is blocked; the bare domain and another path are not.
+    assert is_blocked("https://scoped.example.com/private/secret") is not None
+    assert is_blocked("https://scoped.example.com/public") is None
+    assert is_blocked("https://scoped.example.com/") is None
+
+
+@pytest.mark.asyncio
+async def test_admin_remove_with_path_prefix_returns_200(denylist_client) -> None:
+    """Removing a path_prefix-scoped entry removes only that entry —
+    the bare-domain entry (if any) is unaffected.  Verifies the
+    remove endpoint round-trips the path_prefix in its response."""
+    client, instance = denylist_client
+    # Add the scoped entry directly so we control its existence.
+    instance.add("scoped-rm.example.com", path_prefix="/admin")
+    assert is_blocked("https://scoped-rm.example.com/admin/x") is not None
+
+    resp = await client.request(
+        "DELETE",
+        "/api/operator/denylist",
+        json={"domain": "scoped-rm.example.com", "path_prefix": "/admin"},
+        headers={"X-API-Key": "admin-token"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["path_prefix"] == "/admin"
+    # The scoped block is gone.
+    assert is_blocked("https://scoped-rm.example.com/admin/x") is None
+
+
+@pytest.mark.asyncio
+async def test_admin_remove_wrong_path_prefix_returns_404(denylist_client) -> None:
+    """If a domain has an entry but with a different path_prefix, the
+    remove with a non-matching prefix MUST 404 — the entry the
+    operator described does not exist."""
+    client, instance = denylist_client
+    instance.add("wrongpfx.example.com", path_prefix="/admin")
+    resp = await client.request(
+        "DELETE",
+        "/api/operator/denylist",
+        json={"domain": "wrongpfx.example.com", "path_prefix": "/other"},
+        headers={"X-API-Key": "admin-token"},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_operator_can_list_but_not_write(denylist_client) -> None:
+    """Operator role may GET /denylist but post/DELETE yield 403 —
+    the require_role_with_user([UserRole.ADMIN]) dependency rejects."""
+    client, instance = denylist_client
+    instance.add("op-list.example.com", reason="r")
+
+    # GET works.
+    resp = await client.get("/api/operator/denylist", headers={"X-API-Key": "operator-token"})
+    assert resp.status_code == 200
+    domains = {row["domain"] for row in resp.json()}
+    assert "op-list.example.com" in domains
+
+    # POST forbidden.
+    resp = await client.post(
+        "/api/operator/denylist",
+        json={"domain": "op-add.example.com"},
+        headers={"X-API-Key": "operator-token"},
+    )
+    assert resp.status_code == 403
+
+    # DELETE forbidden.
+    resp = await client.request(
+        "DELETE",
+        "/api/operator/denylist",
+        json={"domain": "op-list.example.com"},
+        headers={"X-API-Key": "operator-token"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_remove_writes_audit_log_with_path_prefix_resource(
+    denylist_client,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """The audit log resource string for a scoped remove MUST carry the
+    path_prefix (e.g. ``domain:foo.example.com:/admin``) — operators
+    need the scope on the audit trail to explain why a scoped block
+    was lifted."""
+    import json
+    from collections import deque
+
+    client, _instance = denylist_client
+    audit_log = tmp_path / "audit.log"
+    monkeypatch.setattr("app.audit_logger.AUDIT_LOG_DIR", str(tmp_path))
+    from app import audit_logger
+
+    audit_logger.reset_audit_logger()
+    try:
+        # Add a scoped entry to remove.
+        add_resp = await client.post(
+            "/api/operator/denylist",
+            json={"domain": "audit-rm.example.com", "path_prefix": "/admin"},
+            headers={"X-API-Key": "admin-token"},
+        )
+        assert add_resp.status_code == 201
+        # Now remove it.
+        resp = await client.request(
+            "DELETE",
+            "/api/operator/denylist",
+            json={"domain": "audit-rm.example.com", "path_prefix": "/admin"},
+            headers={"X-API-Key": "admin-token"},
+        )
+        assert resp.status_code == 200
+
+        from app.audit_logger import log_system_event
+
+        log_system_event("test_event")
+        assert audit_log.exists()
+        events: deque[dict[str, Any]] = deque(maxlen=200)
+        with open(audit_log) as fh:
+            for line in fh:
+                line = line.strip()
+                if "[AUDIT]" in line:
+                    payload = line.split("[AUDIT]", 1)[1].strip()
+                    try:
+                        events.append(json.loads(payload))
+                    except json.JSONDecodeError:
+                        continue
+        # An audit entry for denylist_remove of the scoped domain exists,
+        # and its resource string embeds the path_prefix.
+        remove_events = [e for e in events if e.get("action") == "denylist_remove"]
+        assert remove_events, "expected a denylist_remove audit entry"
+        assert any("/admin" in (e.get("resource", "") or "") for e in remove_events)
+    finally:
+        audit_logger.reset_audit_logger()
