@@ -73,7 +73,20 @@ async def signup(body: SignupRequest, request: Request) -> SignupResponse:
             project_name=body.project_name,
         )
     except IdentityStoreError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # FU-2026-07-05 (F-DISC-002 email enumeration): IdentityStoreError
+        # carries the raw email in its message ("user with email '...'
+        # already exists"), and surfacing that in a 409 response lets an
+        # attacker harvest registered email addresses. Instead return a
+        # generic conflict that discloses nothing about which email is
+        # already registered. Rate-limiting (3/5min per IP) is a
+        # backstop but not sufficient — a distributed enumeration
+        # campaign with many rotating IPs needs zero signal, not a slow
+        # one.
+        logger.debug("Signup conflict for email=%r", redact_pii(validated_email))
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot complete signup at this time. Please try a different email address or contact support.",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

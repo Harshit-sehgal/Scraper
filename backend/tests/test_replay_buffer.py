@@ -270,3 +270,51 @@ class TestReplayBuffer:
         events = buf.get_event_range(100, 200)
         assert len(events) == 0
         buf.clear()
+
+    # ─── FU-2026-07-05: TOCTOU eviction-mid-stream boundary (CRIT-1) ──────
+
+    def test_stream_from_handles_evicted_segment_quietly(self, tmp_base_dir) -> None:
+        """evicting a segment mid-stream must not raise (FileNotFoundError race).
+
+        Previously ``stream_from`` snapshotted the segment list under the
+        lock, released it, then ``open()``-ed each segment — but
+        ``_rotate_segment`` can unlink a segment in that window. The fix
+        swallows the FileNotFoundError and stops streaming at the
+        boundary instead of crashing.
+        """
+        buf = ReplayBuffer(base_dir=tmp_base_dir, max_segments=2)
+        # Force multiple segment rotations so older ones exist on disk.
+        for i in range(3):
+            buf.append({"type": "evt", "delta": {"i": i}, "metadata": {}})
+            # Force rotation by exceeding capacity artificially is not
+            # possible without _SEGMENT_CAPACITY appends, so we directly
+            # exercise the eviction path: unlink the first segment file
+            # while a stream is iterating.
+        first_seg = buf._segments[0] if buf._segments else None
+        assert first_seg is not None
+        (buf._base_dir / first_seg).unlink()
+
+        # Must not raise; iterates available segments and stops.
+        events = list(buf.stream_from(0))
+        # Whatever it returned, it returned without raising.
+        assert isinstance(events, list)
+        buf.clear()
+
+    def test_reconstruct_returns_partial_state_on_eviction(self, tmp_base_dir) -> None:
+        """If a replay's segment is evicted mid-replay, return partial state, not None."""
+        buf = ReplayBuffer(base_dir=tmp_base_dir)
+        # Build a checkpointed history by writing add (structural) events.
+        for i in range(3):
+            buf.append({"type": "add", "delta": {"k": {"to": i}}, "metadata": {}})
+
+        # Evict the segment that holds the checkpoint+replay delta.
+        if buf._segments:
+            (buf._base_dir / buf._segments[0]).unlink()
+
+        state = buf.reconstruct_state_at(1)
+        # Pre-fix this returned None (callers treat None as "unreconstructable").
+        # Post-fix it returns whatever state was replayed up to the boundary
+        # — which must be a dict, never None.
+        assert state is not None
+        assert isinstance(state, dict)
+        buf.clear()

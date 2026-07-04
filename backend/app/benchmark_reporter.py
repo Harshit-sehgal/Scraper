@@ -52,8 +52,16 @@ class BenchmarkReporter:
         # Resource-leak fix: ``with sqlite3.connect(...) as conn:`` only
         # manages the *transaction* — it does NOT close the connection.
         # Use ``try/finally: conn.close()`` and manage transactions explicitly.
-        conn = sqlite3.connect(self.db_path)
+        #
+        # FU-2026-07-05 (CRIT-3 TOCTOU): enable WAL + a busy_timeout so
+        # concurrent webhook/CLI writers do not get blocked or corrupt
+        # the dashboard, and so ``record_run`` can do its read+INSERT
+        # atomically within one connection.
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=5000")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS benchmark_runs (
                     run_id TEXT PRIMARY KEY,
@@ -79,12 +87,28 @@ class BenchmarkReporter:
             conn.close()
 
     def record_run(self, run: BenchmarkRun) -> dict[str, Any]:
-        """Record a benchmark run and check for regressions against previous averages."""
-        comparison = self.compare_against_history(run.precision, run.recall)
+        """Record a benchmark run and check for regressions against previous averages.
 
-        conn = sqlite3.connect(self.db_path)
+        FU-2026-07-05 (CRIT-3 TOCTOU fix): the historical AVG read and the
+        new-row INSERT now happen inside a SINGLE connection + transaction.
+        Previously ``compare_against_history`` opened its own short-lived
+        connection, committed, then a second connection did the INSERT —
+        a concurrent caller could insert between the read and the write,
+        making the drift comparison stale and letting a regression slip
+        past the alert threshold. A serialization mismatch between the
+        historical read snapshot and the inserted row is now impossible.
+        """
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
-            conn.execute(
+            conn.execute("PRAGMA busy_timeout=5000")
+            # BEGIN IMMEDIATE acquires the write lock up front so two
+            # concurrent ``record_run`` calls serialize at the DB layer
+            # rather than one waiting mid-statement on the other.
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.cursor()
+            cursor.execute("SELECT AVG(precision), AVG(recall) FROM benchmark_runs")
+            row = cursor.fetchone()
+            cursor.execute(
                 "INSERT INTO benchmark_runs VALUES (?, ?, ?, ?, ?, ?)",
                 (run.run_id, run.timestamp, run.precision, run.recall, run.fallback_rate, run.latency_ms),
             )
@@ -97,6 +121,32 @@ class BenchmarkReporter:
         finally:
             conn.close()
 
+        avg_precision, avg_recall = row or (None, None)
+        if avg_precision is None or avg_recall is None:
+            comparison: dict[str, Any] = {
+                "status": "stable",
+                "precision_drift": 0.0,
+                "recall_drift": 0.0,
+                "message": "First recorded benchmark run.",
+            }
+        else:
+            precision_drift = run.precision - avg_precision
+            recall_drift = run.recall - avg_recall
+            status = "stable"
+            message = "Metrics are stable compared to historical averages."
+            if precision_drift < -0.05 or recall_drift < -0.05:
+                status = "regression"
+                message = (
+                    f"ALERT: Regression detected! Precision drift: {precision_drift:+.2%}, Recall drift: {recall_drift:+.2%}"
+                )
+                logger.warning("[Reporter] %s", message)
+            comparison = {
+                "status": status,
+                "precision_drift": round(precision_drift, 4),
+                "recall_drift": round(recall_drift, 4),
+                "message": message,
+            }
+
         # Update the visual regression dashboard
         try:
             self.generate_dashboard()
@@ -107,8 +157,9 @@ class BenchmarkReporter:
 
     def compare_against_history(self, current_precision: float, current_recall: float) -> dict[str, Any]:
         """Compare current precision / recall against historical averages."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
+            conn.execute("PRAGMA busy_timeout=5000")
             cursor = conn.cursor()
             cursor.execute("SELECT AVG(precision), AVG(recall) FROM benchmark_runs")
             row = cursor.fetchone()
@@ -145,8 +196,9 @@ class BenchmarkReporter:
     def get_history(self, limit: int = 10) -> list[BenchmarkRun]:
         """Retrieve recent benchmark runs from the persistent store."""
         runs = []
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
+            conn.execute("PRAGMA busy_timeout=5000")
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT run_id, timestamp, precision, recall, fallback_rate, latency_ms "

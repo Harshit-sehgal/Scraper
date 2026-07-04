@@ -249,9 +249,22 @@ class ReplayBuffer:
         # 2. Stream forward from checkpoint, skipping entries < start_idx
         for i, seg_name in enumerate(segments_to_process):
             seg_path = self._base_dir / seg_name
+            # FU-2026-07-05 (CRIT-1 TOCTOU): the segment list was snapshotted
+            # under the lock above, but ``_rotate_segment`` may evict
+            # (unlink) a segment after our snapshot and before we open it
+            # here. ``exists()`` is racy on its own — wrap the open in a
+            # try/except FileNotFoundError so a concurrent eviction produces a
+            # quiet boundary (we stop streaming what we already have) rather
+            # than a crash. Entries already streamed remain valid because
+            # segments are append-only and never rewritten in place.
             if not seg_path.exists():
                 continue
-            with open(seg_path, encoding="utf-8") as f:
+            try:
+                f = open(seg_path, encoding="utf-8")  # noqa: SIM115
+            except FileNotFoundError:
+                logger.debug("Segment %s evicted mid-stream; stopping at boundary", seg_name)
+                return
+            with f:
                 if i == 0:
                     f.seek(segment_offset)
                 for line in f:
@@ -305,10 +318,24 @@ class ReplayBuffer:
         # Replay deltas from checkpoint to target
         for i, current_seg_name in enumerate(segments_to_process):
             seg_path = self._base_dir / current_seg_name
+            # FU-2026-07-05 (CRIT-1 TOCTOU): a segment may be evicted by
+            # ``_rotate_segment`` after we snapshotted the list. Previously
+            # this returned ``None`` — dropping the entire partially-
+            # reconstructed state, which callers read as "unreconstructable"
+            # and could 500. We instead stop and return whatever state we
+            # have replayed so far; segments are evicted oldest-first so a
+            # missing early segment means the rest (younger ones) are intact
+            # and the checkpoint itself lies at the boundary.
             if not seg_path.exists():
-                return None
+                logger.debug("Segment %s evicted mid-replay; returning partial state", current_seg_name)
+                break
+            try:
+                f = open(seg_path, encoding="utf-8")  # noqa: SIM115
+            except FileNotFoundError:
+                logger.debug("Segment %s evicted mid-replay (open race); returning partial state", current_seg_name)
+                break
 
-            with open(seg_path, encoding="utf-8") as f:
+            with f:
                 if i == 0:
                     f.seek(offset)
                 for line in f:

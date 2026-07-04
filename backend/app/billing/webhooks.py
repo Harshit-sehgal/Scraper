@@ -203,6 +203,48 @@ class _SubscriptionStore:
         self._read_modify_write(_mutate)
         return removed
 
+    def update(
+        self,
+        customer_id: str,
+        mutate: Any,
+    ) -> dict[str, Any] | None:
+        """Atomically read the customer's record, run ``mutate(record)``, and persist.
+
+        FU-2026-07-05 (CRIT-2 TOCTOU fix): the prior pattern did
+        ``get(customer_id)`` (read, releases the lock) then later
+        ``set(customer_id, ...)`` (a fresh read-modify-write). Between
+        those two calls a concurrent webhook for the same customer could
+        land — the SUSPENDED/PAYMENT-FAILED/PAYMENT-COMPLETED handlers
+        read the existing tier to preserve it, then wrote it back, and
+        the second writer would clobber the first (lost update: e.g. a
+        COMPLETED reactivation racing a CANCELLED downgrade).
+
+        ``mutate`` receives a deep copy of the existing record dict (or
+        ``None`` if the customer has no record yet) and may mutate-and-
+        return it, or return a fresh dict / ``None`` to delete.
+        """
+        import copy
+
+        result: dict[str, Any] | None = None
+
+        def _m(snapshot: dict[str, dict[str, Any]]) -> None:
+            nonlocal result
+            existing = copy.deepcopy(snapshot.get(customer_id))
+            new_record = mutate(existing) if mutate is not None else None
+            if new_record is None:
+                # Caller returned None — drop the record if present.
+                snapshot.pop(customer_id, None)
+                result = None
+            else:
+                if not isinstance(new_record, dict):
+                    _msg = "update mutate must return a dict or None"
+                    raise TypeError(_msg)
+                snapshot[customer_id] = {str(k): v for k, v in new_record.items()}
+                result = copy.deepcopy(snapshot[customer_id])
+
+        self._read_modify_write(_m)
+        return result
+
     def values(self) -> list[dict[str, Any]]:
         with self._lock:
             return [dict(v) for v in self._read_json().values()]
@@ -236,6 +278,20 @@ def set_customer_subscription(
 def delete_customer_subscription(customer_id: str) -> bool:
     """Remove a customer's subscription record. Persists the deletion. Returns ``True`` if removed."""
     return _subscription_store.delete(customer_id)
+
+
+def update_customer_subscription(
+    customer_id: str,
+    mutate: Any,
+) -> dict[str, Any] | None:
+    """Atomically read-modify-write a customer record under the cross-process flock.
+
+    Used by webhook handlers that must PRE-PRESERVE an existing field
+    (e.g. the plan tier when flipping status to past_due on a SUSPENDED
+    event). Doing ``get`` then ``set`` separately was a TOCTOU — a
+    concurrent webhook could clobber the preserved tier.
+    """
+    return _subscription_store.update(customer_id, mutate)
 
 
 def _configured_webhook_secret() -> str:
@@ -528,19 +584,24 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
 
     # -- Subscription suspended (preserve existing tier, mark past_due) ------
     elif event_type in _PAYPAL_SUSPENDED_EVENTS:
-        existing = get_customer_subscription(customer_id)
-        if existing:
-            set_customer_subscription(
-                customer_id=customer_id,
-                tier=existing.get("plan_tier", PlanTierId.FREE.value),
-                status=SubscriptionStatus.PAST_DUE.value,
-                subscription_id=existing.get("subscription_id", ""),
-            )
+
+        def _suspend(existing: dict[str, Any] | None) -> dict[str, Any] | None:
+            if not existing:
+                return None
+            return {
+                "customer_id": customer_id,
+                "plan_tier": existing.get("plan_tier", PlanTierId.FREE.value),
+                "status": SubscriptionStatus.PAST_DUE.value,
+                "subscription_id": existing.get("subscription_id", ""),
+            }
+
+        result = update_customer_subscription(customer_id, _suspend)
+        if result:
             logger.info(
                 "Subscription %s: customer=%s tier=%s (preserved) status=past_due",
                 event_type,
                 customer_id,
-                existing.get("plan_tier", PlanTierId.FREE.value),
+                result.get("plan_tier", PlanTierId.FREE.value),
             )
         else:
             logger.warning("SUSPENDED event for unknown customer=%s — no existing record to preserve", _redact_id(customer_id))
@@ -564,14 +625,19 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
 
     # -- Payment failed (subscription-level or sale-level) -------------------
     elif event_type == "invoice.payment_failed" or event_type in _PAYPAL_PAYMENT_FAILED_EVENTS:
-        existing = get_customer_subscription(customer_id)
-        if existing:
-            set_customer_subscription(
-                customer_id=customer_id,
-                tier=existing.get("plan_tier", PlanTierId.FREE.value),
-                status=SubscriptionStatus.PAST_DUE.value,
-                subscription_id=existing.get("subscription_id", ""),
-            )
+
+        def _payment_failed(existing: dict[str, Any] | None) -> dict[str, Any] | None:
+            if not existing:
+                return None
+            return {
+                "customer_id": customer_id,
+                "plan_tier": existing.get("plan_tier", PlanTierId.FREE.value),
+                "status": SubscriptionStatus.PAST_DUE.value,
+                "subscription_id": existing.get("subscription_id", ""),
+            }
+
+        result = update_customer_subscription(customer_id, _payment_failed)
+        if result:
             logger.warning("Payment failed for customer=%s — status set to past_due", _redact_id(customer_id))
         else:
             logger.warning("Payment failed for unknown customer=%s — no existing record", _redact_id(customer_id))
@@ -582,15 +648,20 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
 
     # -- Payment completed / pending -----------------------------------------
     elif event_type in _PAYPAL_PAYMENT_COMPLETED_EVENTS:
-        existing = get_customer_subscription(customer_id)
-        if existing:
+
+        def _payment_completed(existing: dict[str, Any] | None) -> dict[str, Any] | None:
+            if not existing:
+                return None
             # Reactivate the subscription if it was past_due/cancelled.
-            set_customer_subscription(
-                customer_id=customer_id,
-                tier=existing.get("plan_tier", PlanTierId.FREE.value),
-                status=SubscriptionStatus.ACTIVE.value,
-                subscription_id=existing.get("subscription_id", ""),
-            )
+            return {
+                "customer_id": customer_id,
+                "plan_tier": existing.get("plan_tier", PlanTierId.FREE.value),
+                "status": SubscriptionStatus.ACTIVE.value,
+                "subscription_id": existing.get("subscription_id", ""),
+            }
+
+        result = update_customer_subscription(customer_id, _payment_completed)
+        if result:
             logger.info("Payment completed for customer=%s — subscription reactivated", _redact_id(customer_id))
         else:
             logger.info("Payment completed for unknown customer=%s — no existing record", _redact_id(customer_id))

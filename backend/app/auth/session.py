@@ -15,6 +15,7 @@ import logging
 import os
 import secrets
 import sqlite3
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -181,6 +182,9 @@ _SIGNING_KEY = _derive_secret()
 _SIGNING_KEY_SECRET: str | None = settings.SESSION_SECRET
 
 
+_SIGNING_KEY_LOCK = threading.Lock()
+
+
 def _current_signing_key() -> bytes:
     """Return up-to-date signing key, re-deriving if SESSION_SECRET has changed.
 
@@ -192,16 +196,26 @@ def _current_signing_key() -> bytes:
     Why lazy: importing ``_SIGNING_KEY`` once at module load froze rotation
     to "operator must restart the worker to pick up a new secret" which
     silently breaks all live sessions after a legitimate rotation.
+
+    FU-2026-07-05 (HIGH-1 signing-key rotation race): two concurrent
+    sign/unsign calls that both observe a secret rotation would both
+    re-derive the key, overwriting the global without serialisation.
+    A fast-path check outside the lock avoids serialising every call;
+    only the rotation snapshot requires mutual exclusion.
     """
     global _SIGNING_KEY, _SIGNING_KEY_SECRET
     current = settings.SESSION_SECRET
     if current == _SIGNING_KEY_SECRET:
         return _SIGNING_KEY
-    # Rotation observed — rebuild lazily without invalidating existing
-    # keys (the rotated-credentials env var supplies the bridge).
-    _SIGNING_KEY = _derive_secret()
-    _SIGNING_KEY_SECRET = current
-    return _SIGNING_KEY
+    with _SIGNING_KEY_LOCK:
+        # Re-check inside the lock — another thread may have already
+        # performed the rotation while we waited.
+        current2 = settings.SESSION_SECRET
+        if current2 == _SIGNING_KEY_SECRET:
+            return _SIGNING_KEY
+        _SIGNING_KEY = _derive_secret()
+        _SIGNING_KEY_SECRET = current2
+        return _SIGNING_KEY
 
 
 def _sign(payload: str) -> str:

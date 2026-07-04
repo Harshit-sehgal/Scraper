@@ -160,3 +160,100 @@ def test_list_subscriptions_endpoint_sees_persisted_records(
     )
     values = webhooks_b._subscription_store.values()
     assert values[0]["plan_tier"] == "enterprise"
+
+
+def test_concurrent_update_preserves_tier(subscriptions_file: Path) -> None:
+    """FU-2026-07-05 (CRIT-2 TOCTOU regression): the SUSPENDED / PAYMENT-
+    FAILED / PAYMENT-COMPLETED handlers must read-modify-write the
+    subscription record ATOMICALLY under the cross-process flock so a
+    concurrent webhook for the same customer cannot clobber the
+    preserved plan_tier.
+
+    Reproduces the original bug shape: two threads both observe a
+    ``pro`` subscription and both write back with the same preserved
+    tier. With a get-then-set (non-atomic) pattern this succeeds
+    trivially, so we additionally mutate an independent counter field
+    via ``update`` from N threads and assert the counter lands at N — a
+    lost update would leave it below N.
+    """
+    import threading
+
+    webhooks = importlib.import_module("app.billing.webhooks")
+    webhooks.set_customer_subscription(
+        customer_id="cust_race",
+        tier="pro",
+        status="active",
+        subscription_id="sub_race",
+    )
+
+    N = 20
+    barrier = threading.Barrier(N)
+
+    def _incr(existing):
+        assert existing is not None, "update received no record — flock path broken"
+        # Inject a counter we sum across threads to detect lost updates. The
+        # store would normally reject extra keys, but ``update`` preserves
+        # arbitrary keys via the str(k): v copy.
+        cur = int(existing.get("counter", 0)) + 1
+        return {
+            "customer_id": "cust_race",
+            "plan_tier": existing.get("plan_tier", "free"),
+            "status": existing.get("status", "active"),
+            "subscription_id": existing.get("subscription_id", ""),
+            "counter": cur,
+        }
+
+    def _worker() -> None:
+        barrier.wait()
+        webhooks.update_customer_subscription("cust_race", _incr)
+
+    threads = [threading.Thread(target=_worker) for _ in range(N)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    record = webhooks.get_customer_subscription("cust_race")
+    assert record is not None
+    assert record["plan_tier"] == "pro", "preserved tier was clobbered by the race"
+    assert record["counter"] == N, (
+        f"counter={record['counter']} but {N} atomic increments ran — a lost update occurred (TOCTOU between read and write)"
+    )
+
+
+def test_suspended_preserves_tier_atomically(subscriptions_file: Path) -> None:
+    """A SUSPENDED event on a ``pro`` customer must keep the tier at pro."""
+    webhooks = importlib.import_module("app.billing.webhooks")
+    webhooks.set_customer_subscription(
+        customer_id="cust_susp",
+        tier="pro",
+        status="active",
+        subscription_id="sub_susp",
+    )
+    webhooks._process_webhook_event(
+        "BILLING.SUBSCRIPTION.SUSPENDED",
+        {"customer_id": "cust_susp"},
+    )
+    record = webhooks.get_customer_subscription("cust_susp")
+    assert record is not None
+    assert record["plan_tier"] == "pro", "SUSPENDED lost the preserved plan_tier"
+    assert record["status"] == "past_due"
+
+
+def test_payment_completed_reactivates_atomically(subscriptions_file: Path) -> None:
+    """A PAYMENT.SALE.COMPLETED on a past_due customer must flip status to active."""
+    webhooks = importlib.import_module("app.billing.webhooks")
+    webhooks.set_customer_subscription(
+        customer_id="cust_pay",
+        tier="team",
+        status="past_due",
+        subscription_id="sub_pay",
+    )
+    webhooks._process_webhook_event(
+        "PAYMENT.SALE.COMPLETED",
+        {"customer_id": "cust_pay"},
+    )
+    record = webhooks.get_customer_subscription("cust_pay")
+    assert record is not None
+    assert record["status"] == "active"
+    assert record["plan_tier"] == "team", "PAYMENT.COMPLETED lost the preserved plan_tier"

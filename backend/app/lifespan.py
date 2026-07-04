@@ -35,6 +35,11 @@ gossip = None
 heartbeat_mgr = None
 _background_tasks: list[asyncio.Task] = []
 
+# FU-2026-07-05 (HIGH-8): strong references to fire-and-forget background
+# tasks so the event loop cannot GC the coroutine before it runs. Cleaned
+# up by the done-callback installed in ``schedule_background_task``.
+_BACKGROUND_TASK_REFS: set[asyncio.Task] = set()
+
 
 def reset_lifespan_state() -> None:
     """Clear the module-level lifespan state.
@@ -53,6 +58,7 @@ def reset_lifespan_state() -> None:
     gossip = None
     heartbeat_mgr = None
     _background_tasks = []
+    _BACKGROUND_TASK_REFS.clear()
 
 
 def _verify_production_startup() -> None:
@@ -330,10 +336,22 @@ async def lifespan(app: FastAPI):
 
 
 def schedule_background_task(coro):
-    """Schedule a background task with error handling."""
+    """Schedule a background task with error handling.
+
+    FU-2026-07-05 (HIGH-8 strong-reference race): ``asyncio.create_task``
+    only weakly references the task while it is pending — if the caller
+    discards the returned Task, the event loop may garbage-collect the
+    coroutine before it ever runs (CPython "task was destroyed but it is
+    pending" warning, observed as a "background loop never started"
+    outage). We keep a module-level strong-reference set and remove the
+    task on completion so fire-and-forget callers don't need to hold the
+    reference themselves.
+    """
     task = asyncio.create_task(coro)
+    _BACKGROUND_TASK_REFS.add(task)
 
     def _handle_task_result(t: asyncio.Task) -> None:
+        _BACKGROUND_TASK_REFS.discard(t)
         try:
             t.result()
         except asyncio.CancelledError as exc:

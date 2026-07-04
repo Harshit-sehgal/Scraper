@@ -304,13 +304,19 @@ def configure_exception_handlers(app: FastAPI) -> None:
             trace_id,
         )
         # The client never sees the full message — they would otherwise
-        # leak stack frames. The trace_id is enough to look up logs.
+        # leak stack frames. The ``error_class`` field was removed in
+        # FU-2026-07-05 (F-DISC-007 500 error-class leak): exposing
+        # ``type(exc).__name__`` tells an attacker the internal exception
+        # class (e.g. ``psycopg2.OperationalError`` → PostgreSQL driver
+        # is in play, ``SeleniumException`` → browser pool is active),
+        # which maps the server's internal dependency graph. The
+        # trace_id is enough for operators to look up the real class in
+        # the logs.
         return JSONResponse(
             status_code=500,
             content={
                 "detail": (f"Internal server error. Reference trace_id={trace_id} for support."),
                 "trace_id": trace_id,
-                "error_class": type(exc).__name__,
             },
         )
 

@@ -531,13 +531,20 @@ class CrawlFrontier:
             while self._queue and len(domain_urls) < max_urls:
                 item = heapq.heappop(self._queue)
                 if domain in urlparse(item.url).netloc:
-                    domain_urls.append(item.url)
-                    self._pending.discard(item.url)
-
+                    # FU-2026-07-05 (CRIT-4 consistency): if the DB delete
+                    # for a popped domain URL fails, restore the URL to the
+                    # heap and skip returning it. Otherwise in-memory and
+                    # on-disk state diverge: caller thinks the URL is
+                    # dequeued, but the DB row resurrects on restart as an
+                    # orphan the frontier has "forgotten" about.
                     try:
                         await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
                     except _DB_FALLBACK_ERRORS:
-                        logger.exception("Failed to delete domain URL from SQLite")
+                        logger.exception("Failed to delete domain URL from SQLite; restoring to queue")
+                        heapq.heappush(self._queue, item)
+                        continue
+                    domain_urls.append(item.url)
+                    self._pending.discard(item.url)
                 else:
                     remaining.append(item)
             # Re-push non-domain items
