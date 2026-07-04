@@ -50,6 +50,11 @@ class AcquisitionTelemetryCollector:
         self._recovery_attempts: int = 0
         self._recovery_successes: int = 0
         self._session_bound_count: int = 0
+        # CAND-P4-ACQ-TELEMETRY-001: protect mutable shared state against
+        # concurrent access from multiple asyncio coroutines. record() is
+        # called from async scraping paths; append+Slice+Counter.dict-mutation
+        # without a lock would produce corrupted counts and lost events.
+        self._lock = threading.Lock()
 
     def record(
         self,
@@ -66,64 +71,74 @@ class AcquisitionTelemetryCollector:
         fetch_time_ms: float = 0.0,
     ) -> AcquisitionEvent:
         """Record an acquisition event."""
-        event = AcquisitionEvent(
-            url=url,
-            state=state.value if isinstance(state, AcquisitionState) else state,
-            original_url=original_url,
-            final_url=final_url,
-            canonical_url=canonical_url,
-            fetch_method=fetch_method,
-            session_bound=session_bound,
-            ephemeral_params=ephemeral_params or [],
-            recovery_method=recovery_method,
-            recovered_url=recovered_url,
-            fetch_time_ms=fetch_time_ms,
-        )
-        self._history.append(event)
-        if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history :]
+        with self._lock:
+            event = AcquisitionEvent(
+                url=url,
+                state=state.value if isinstance(state, AcquisitionState) else state,
+                original_url=original_url,
+                final_url=final_url,
+                canonical_url=canonical_url,
+                fetch_method=fetch_method,
+                session_bound=session_bound,
+                ephemeral_params=ephemeral_params or [],
+                recovery_method=recovery_method,
+                recovered_url=recovered_url,
+                fetch_time_ms=fetch_time_ms,
+            )
+            self._history.append(event)
+            if len(self._history) > self._max_history:
+                self._history = self._history[-self._max_history :]
 
-        # Update counters
-        self._state_counts[event.state] += 1
-        if session_bound:
-            self._session_bound_count += 1
-        if state in (
-            AcquisitionState.RECOVERED,
-            AcquisitionState.RECOVERY_FAILED,
-            AcquisitionState.AWAITING_SEARCH_PARAMS,
-            AcquisitionState.NO_SEARCH_FORM,
-        ):
-            self._recovery_attempts += 1
-            if state == AcquisitionState.RECOVERED:
-                self._recovery_successes += 1
+            # Update counters
+            self._state_counts[event.state] += 1
+            if session_bound:
+                self._session_bound_count += 1
+            if state in (
+                AcquisitionState.RECOVERED,
+                AcquisitionState.RECOVERY_FAILED,
+                AcquisitionState.AWAITING_SEARCH_PARAMS,
+                AcquisitionState.NO_SEARCH_FORM,
+            ):
+                self._recovery_attempts += 1
+                if state == AcquisitionState.RECOVERED:
+                    self._recovery_successes += 1
 
         return event
 
     def get_recent(self, n: int | None = None) -> list[dict]:
         """Get the N most recent acquisition events."""
         n = n if n is not None else settings.ACQUISITION_TELEMETRY_RECENT_DEFAULT
-        return [e.to_dict() for e in self._history[-n:]]
+        with self._lock:
+            return [e.to_dict() for e in self._history[-n:]]
 
     def get_summary(self) -> dict[str, Any]:
         """Get aggregate acquisition statistics."""
-        total = sum(self._state_counts.values())
-        recovery_rate = self._recovery_successes / self._recovery_attempts if self._recovery_attempts > 0 else 0.0
-        return {
-            "total_acquisitions": total,
-            "state_distribution": dict(self._state_counts),
-            "session_bound_urls": self._session_bound_count,
-            "recovery_attempts": self._recovery_attempts,
-            "recovery_successes": self._recovery_successes,
-            "recovery_success_rate": round(recovery_rate, 3),
-            "recent_events": self.get_recent(10),
-        }
+        # Round-12 fix: guard with self._lock so we read a consistent
+        # snapshot. Inline self.get_recent(10) here to avoid re-acquiring
+        # the (non-reentrant) threading.Lock.
+        n_recent = settings.ACQUISITION_TELEMETRY_RECENT_DEFAULT
+        with self._lock:
+            total = sum(self._state_counts.values())
+            recovery_rate = self._recovery_successes / self._recovery_attempts if self._recovery_attempts > 0 else 0.0
+            recent = [e.to_dict() for e in self._history[-n_recent:]]
+            return {
+                "total_acquisitions": total,
+                "state_distribution": dict(self._state_counts),
+                "session_bound_urls": self._session_bound_count,
+                "recovery_attempts": self._recovery_attempts,
+                "recovery_successes": self._recovery_successes,
+                "recovery_success_rate": round(recovery_rate, 3),
+                "recent_events": recent,
+            }
 
     def clear(self) -> None:
-        self._history.clear()
-        self._state_counts.clear()
-        self._recovery_attempts = 0
-        self._recovery_successes = 0
-        self._session_bound_count = 0
+        """Clear all telemetry (for testing)."""
+        with self._lock:
+            self._history.clear()
+            self._state_counts.clear()
+            self._recovery_attempts = 0
+            self._recovery_successes = 0
+            self._session_bound_count = 0
 
 
 # Module-level singleton

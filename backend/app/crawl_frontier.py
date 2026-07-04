@@ -49,7 +49,7 @@ def _db_insert_queue(db_path: str, priority: int, url: str, depth: int, source_u
             (priority, url, depth, source_url, added_at),
         )
         conn.commit()
-    except Exception:
+    except _DB_FALLBACK_ERRORS:
         conn.rollback()
         raise
     finally:
@@ -63,7 +63,7 @@ def _db_delete_queue(db_path: str, url: str) -> None:
     try:
         conn.execute("DELETE FROM queue WHERE url = ?", (url,))
         conn.commit()
-    except Exception:
+    except _DB_FALLBACK_ERRORS:
         conn.rollback()
         raise
     finally:
@@ -79,7 +79,7 @@ def _db_mark_completed(db_path: str, url: str) -> None:
         conn.execute("DELETE FROM failed WHERE url = ?", (url,))
         conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
         conn.commit()
-    except Exception:
+    except _DB_FALLBACK_ERRORS:
         conn.rollback()
         raise
     finally:
@@ -94,7 +94,7 @@ def _db_mark_failed(db_path: str, url: str, count: int) -> None:
         conn.execute("DELETE FROM queue WHERE url = ?", (url,))
         conn.execute("INSERT OR REPLACE INTO failed VALUES (?, ?)", (url, count))
         conn.commit()
-    except Exception:
+    except _DB_FALLBACK_ERRORS:
         conn.rollback()
         raise
     finally:
@@ -109,7 +109,7 @@ def _db_finalize_failed_as_completed(db_path: str, url: str) -> None:
         conn.execute("DELETE FROM failed WHERE url = ?", (url,))
         conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
         conn.commit()
-    except Exception:
+    except _DB_FALLBACK_ERRORS:
         conn.rollback()
         raise
     finally:
@@ -179,7 +179,7 @@ class CrawlFrontier:
                 )
             """)
             conn.commit()
-        except Exception:
+        except _DB_FALLBACK_ERRORS:
             conn.rollback()
             raise
         finally:

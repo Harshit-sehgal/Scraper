@@ -72,7 +72,7 @@ class BenchmarkReporter:
                 )
             """)
             conn.commit()
-        except Exception:
+        except sqlite3.Error:
             conn.rollback()
             raise
         finally:
@@ -91,7 +91,7 @@ class BenchmarkReporter:
             for selector in run.failed_selectors:
                 conn.execute("INSERT INTO run_failures VALUES (?, ?)", (run.run_id, selector))
             conn.commit()
-        except Exception:
+        except sqlite3.Error:
             conn.rollback()
             raise
         finally:

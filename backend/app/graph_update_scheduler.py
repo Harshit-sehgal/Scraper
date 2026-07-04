@@ -145,6 +145,12 @@ class GraphUpdateScheduler:
         self._total_wave_intensity: float = 0.0
         self.dispatcher = get_dispatcher()
         self._setup_subscriptions()
+        # CAND-P4-GRAPH-SCHEDULER-001: protect mutable shared state against
+        # concurrent access from the multi-source event dispatcher.
+        # on_field_wave() reads-modifies-writes _total_wave_intensity
+        # (lines 176, 181) and two concurrent field-wave events would
+        # race on the += and the dampen-path read-modify-write.
+        self._lock = threading.Lock()
 
     def _setup_subscriptions(self) -> None:
         self.dispatcher.subscribe(SemanticEventType.UNCERTAINTY_SPIKE, self.on_instability)
@@ -173,12 +179,19 @@ class GraphUpdateScheduler:
     def on_field_wave(self, event: SemanticEvent) -> None:
         """Monitor field waves to trigger global manifold relaxation."""
         intensity = event.payload.get("intensity", 0.0)
-        self._total_wave_intensity += intensity
+        with self._lock:
+            self._total_wave_intensity += intensity
 
-        # If total field agitation is high, trigger a manifold relaxation pass
-        if self._total_wave_intensity > 2.0:
+            # If total field agitation is high, trigger a manifold relaxation pass
+            trigger_relaxation = self._total_wave_intensity > 2.0
+            if trigger_relaxation:
+                self._total_wave_intensity *= 0.5  # Dampen after work
+
+        # run_global_relaxation touches world-state and role-embedding
+        # engine — those have their own locks; keep it outside ours to
+        # avoid lock-ordering deadlocks.
+        if trigger_relaxation:
             self.run_global_relaxation()
-            self._total_wave_intensity *= 0.5  # Dampen after work
 
     def run_global_relaxation(self) -> None:
         """Global manifold relaxation triggered by field agitation."""

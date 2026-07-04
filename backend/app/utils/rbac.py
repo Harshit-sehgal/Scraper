@@ -7,6 +7,7 @@ import hashlib
 import logging
 import secrets
 import sqlite3
+import threading
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -17,6 +18,13 @@ logger = logging.getLogger(__name__)
 
 # ── Operator all-access audit counter (kept module-private) ────────────
 _operator_cross_tenant_access_count: int = 0
+# CAND-P4-RBAC-001: protect the audit counter read-modify-write against
+# concurrent access from async request/dependency paths. Several sites
+# (billing/webhooks.py, saas/routes/_common.py, scoped_resource checks)
+# call _record_operator_cross_tenant from async FastAPI handlers; without
+# a lock concurrent operator all-access requests race on the += and the
+# count read (lines 39, 51).
+_operator_cross_tenant_lock = threading.Lock()
 
 
 def _record_operator_cross_tenant(reason: str) -> None:
@@ -30,13 +38,16 @@ def _record_operator_cross_tenant(reason: str) -> None:
     to detect unexpected key use.
     """
     global _operator_cross_tenant_access_count
-    _operator_cross_tenant_access_count += 1
+    with _operator_cross_tenant_lock:
+        _operator_cross_tenant_access_count += 1
+        access_count = _operator_cross_tenant_access_count
+
     logger.critical(
         "OPERATOR CROSS-TENANT ACCESS (#%d): env-backed operator "
         "all-access exercised — %s. If this is not expected, rotate "
         "DATAFORGE_OPERATOR_API_KEY immediately and disable "
         "DATAFORGE_ENABLE_OPERATOR_CROSS_TENANT in production.",
-        _operator_cross_tenant_access_count,
+        access_count,
         reason,
     )
     try:
@@ -48,7 +59,7 @@ def _record_operator_cross_tenant(reason: str) -> None:
             resource="rbac",
             details={
                 "reason": reason,
-                "access_count": _operator_cross_tenant_access_count,
+                "access_count": access_count,
             },
         )
     except ImportError:

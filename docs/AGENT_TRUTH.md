@@ -4681,3 +4681,26 @@ Two gap classes surfaced from a context-manager / async-iterator lifecycle audit
 **Test updates** (mechanical, no behaviour change): the httpx mock responses in the affected test files gained `aclose = AsyncMock(return_value=None)` so the new `await resp.aclose()` in production code resolves against an awaitable. Files touched: `test_form_filling_engine.py` (1 site), `test_llm_bridge.py` (`_MockAsyncClient.post` now sets `aclose` on every returned MagicMock, plus the two inline `mock_response` sites), `test_webhook_retry.py` (`_mock_ok_response` helper), `test_webhook_delivery.py` (11 inline sites patched via script).
 
 Verified: `python3 -m pytest backend/tests/ -q` full suite green (exit 0), 458/458 vitest pass, eslint + prettier clean, compileall + ruff clean (the one B904 in llm_bridge.py:1158 is pre-existing and untouched by this iteration), full quick validation gate passed (13/13).
+
+### Iteration 12 — Narrow broad-except + concurrency hardening (4 modules)
+
+Two gap classes from a focused sweep.
+
+**Category 1 — narrow the broad `except Exception:` I introduced in iteration 11.** The new `try/finally: conn.close()` blocks I added for the sqlite3 FD-leak fix used `except Exception:` for the rollback path — too broad (catches `KeyboardInterrupt`, `SystemExit`, plus programming bugs like `TypeError`/`AttributeError` that have no transaction to roll back). Narrowed to the SQLite-specific or project-error-tuple catch in all 3 modules:
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| EXC-01 | MED | backend/app/geocode_cache.py:65,107,142,156 | All 4 `except Exception:` → `except sqlite3.Error:` (matches `sqlite3` DDL/DML scope). |
+| EXC-02 | MED | backend/app/benchmark_reporter.py:75,94 | Both `except Exception:` → `except sqlite3.Error:`. |
+| EXC-03 | LOW | backend/app/crawl_frontier.py:52,66,82,97,112,182 | All 7 `except Exception:` → `except _DB_FALLBACK_ERRORS:` (the file's existing tuple at line 32 — now consistently used everywhere in the file; previously 6 module-level helpers ignored it). |
+
+**Category 2 — unprotected mutable shared state in async-dispatched code.** Two HIGH + one MED + one MED module-level counter:
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| RACE-06 | HIGH | backend/app/acquisition_telemetry.py:46,82 | `AcquisitionTelemetryCollector` gained `self._lock = threading.Lock()`. `record()` (append+Slice+Counter.dict-mutation+3 `+=` counters) and `clear()` now run under the lock. `get_recent()` / `get_summary()` also locked for consistent snapshots — inlined the `get_recent(10)` call inside `get_summary()` to avoid re-acquiring the non-reentrant lock. |
+| RACE-07 | HIGH | backend/app/event_journal.py:29,78,123,135,157,161,177,181 | `EventJournal` gained `self._lock = threading.Lock()`. `record()` (append + `_current_idx +=` + checkpoint dict write + skeletonization list reassign + checkpoint pruning) all locked. Read paths (`get_snapshot_at`, `replay`, `get_causality_chain`, `get_last_n`) and `clear()` also locked. Early-return fast-path checks stay lock-free. |
+| RACE-08 | MED | backend/app/graph_update_scheduler.py:142,173 | `GraphUpdateScheduler` gained `self._lock = threading.Lock()` (the existing `_stats_lock` belongs to the sibling `GlobalCognitiveScheduler` class, not this one). `on_field_wave()` `+=` / `*=` on `_total_wave_intensity` now locked; `run_global_relaxation()` deliberately moved outside the lock to avoid lock-ordering deadlocks with world-state / role-engine locks. |
+| RACE-09 | MED | backend/app/utils/rbac.py:26,33,51 | Module-level `_operator_cross_tenant_access_count` audit counter had a bare `+= 1` race from async request paths (billing/webhooks.py, saas/routes/_common.py, scoped_resource checks). Added module-level `_operator_cross_tenant_lock`; the increment now happens under the lock and the post-increment reads (critical log + audit `details.access_count`) use the captured local `access_count` snapshot instead of re-reading the unlocked global. Added missing `import threading`. |
+
+Verified: full backend suite green (exit 0), 458/458 vitest pass, eslint + prettier clean, ruff/mypy/bandit all pass pre-commit, full quick validation gate 13/13. The lingering "Task was destroyed but it is pending!" log lines are the pre-existing `browser_pool._periodic_cleanup` shutdown race (Playwright `Connection.run` task not joined before loop close) — not introduced by this iteration.

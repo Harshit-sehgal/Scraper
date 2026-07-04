@@ -62,7 +62,7 @@ class GeocodeCache:
                 )
             """)
             conn.commit()
-        except Exception:
+        except sqlite3.Error:
             conn.rollback()
             raise
         finally:
@@ -104,7 +104,7 @@ class GeocodeCache:
             try:
                 conn.execute("DELETE FROM negative_cache WHERE query_hash = ?", (q_hash,))
                 conn.commit()
-            except Exception:
+            except sqlite3.Error:
                 conn.rollback()
                 raise
             finally:
@@ -139,7 +139,7 @@ class GeocodeCache:
                 (q_hash, query, lat, lon, resolved_address, time.time()),
             )
             conn.commit()
-        except Exception:
+        except sqlite3.Error:
             conn.rollback()
             raise
         finally:
@@ -153,7 +153,7 @@ class GeocodeCache:
         try:
             conn.execute("INSERT OR REPLACE INTO negative_cache VALUES (?, ?, ?)", (q_hash, query, time.time()))
             conn.commit()
-        except Exception:
+        except sqlite3.Error:
             conn.rollback()
             raise
         finally:

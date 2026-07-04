@@ -13,6 +13,7 @@ large-scale ReplayBuffer for streaming replay from persistent storage.
 """
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -32,6 +33,12 @@ class EventJournal:
         self._enabled = True
         self._checkpoints: dict[int, dict] = {}  # event_idx -> full_snapshot
         self._current_idx = 0
+        # CAND-P4-JOURNAL-001: protect mutable shared state against
+        # concurrent access. record() is called from the event dispatcher
+        # which fires from multiple async paths; append + increment + list
+        # reassign without a lock would produce index corruption and lost
+        # entries.
+        self._lock = threading.Lock()
 
     def record(
         self,
@@ -54,135 +61,146 @@ class EventJournal:
             return  # No change
 
         # Phase 66: Hierarchical Causal Pruning - ignore high-frequency noise
-        # in stable epochs
+        # in stable epochs — lock-free fast-path check
         if mutation_type == "apply_force_to_manifold" and metadata and metadata.get("displacement", 0) < 1e-3:
             # Trivial manifold shift, skip if not structural
             return
 
-        entry = {
-            "timestamp": time.time(),
-            "source": source,
-            "type": mutation_type,
-            "delta": delta,
-            "idx": self._current_idx,
-            "metadata": metadata or {},
-        }
+        # CAND-P4-JOURNAL-001: all mutation of shared state (append,
+        # increment, checkpoint dict writes, skeletonization list reassign,
+        # checkpoint pruning) happens inside self._lock so concurrent
+        # record() calls (from the multi-source event dispatcher) don't
+        # produce index corruption or lost entries.
+        with self._lock:
+            entry = {
+                "timestamp": time.time(),
+                "source": source,
+                "type": mutation_type,
+                "delta": delta,
+                "idx": self._current_idx,
+                "metadata": metadata or {},
+            }
 
-        # Phase 57 / 61: Topology-Aware Snapshots
-        # Trigger checkpoint if structural change OR fixed interval
-        is_structural = mutation_type in ["restructure_topology", "merge_state", "add", "remove"]
-        if self._current_idx % 500 == 0 or is_structural:
-            self._checkpoints[self._current_idx] = dict(after)
-            entry["checkpoint"] = True
+            # Phase 57 / 61: Topology-Aware Snapshots
+            # Trigger checkpoint if structural change OR fixed interval
+            is_structural = mutation_type in ["restructure_topology", "merge_state", "add", "remove"]
+            if self._current_idx % 500 == 0 or is_structural:
+                self._checkpoints[self._current_idx] = dict(after)
+                entry["checkpoint"] = True
 
-        self._entries.append(entry)
-        self._current_idx += 1
+            self._entries.append(entry)
+            self._current_idx += 1
 
-        # Phase 66 / ArchWeakness: Persist each event to the large-scale ReplayBuffer
-        # for streaming replay from persistent storage.
-        try:
-            from app.replay_buffer import get_replay_buffer
+            # Phase 66 / ArchWeakness: Persist each event to the large-scale ReplayBuffer
+            # for streaming replay from persistent storage.
+            try:
+                from app.replay_buffer import get_replay_buffer
 
-            rb = get_replay_buffer()
-            rb.append(
-                {
-                    "type": f"{source}.{mutation_type}",
-                    "delta": delta or {"source": source, "mutation_type": mutation_type},
-                    "metadata": {
-                        "source": source,
-                        "mutation_type": mutation_type,
-                        "idx": self._current_idx - 1,
-                        "trace_id": (metadata or {}).get("trace_id"),
-                        **({k: v for k, v in (metadata or {}).items() if k != "trace_id"}),
+                rb = get_replay_buffer()
+                rb.append(
+                    {
+                        "type": f"{source}.{mutation_type}",
+                        "delta": delta or {"source": source, "mutation_type": mutation_type},
+                        "metadata": {
+                            "source": source,
+                            "mutation_type": mutation_type,
+                            "idx": self._current_idx - 1,
+                            "trace_id": (metadata or {}).get("trace_id"),
+                            **({k: v for k, v in (metadata or {}).items() if k != "trace_id"}),
+                        },
                     },
-                },
-            )
-        except (OSError, RuntimeError, ValueError, TypeError) as e:
-            # ReplayBuffer failure is non-fatal — journal continues normally
-            logger.debug("ReplayBuffer persist skipped: %s", e)
+                )
+            except (OSError, RuntimeError, ValueError, TypeError) as e:
+                # ReplayBuffer failure is non-fatal — journal continues normally
+                logger.debug("ReplayBuffer persist skipped: %s", e)
 
-        if len(self._entries) > self._max:
-            # Phase 57 / 58 / 61 / 66: Semantic Retention Prioritization
-            # We keep recent entries AND historical structural transitions
-            # (Skeletonization)  # noqa: ERA001, RUF100
-            keep_count = self._max // 2
+            if len(self._entries) > self._max:
+                # Phase 57 / 58 / 61 / 66: Semantic Retention Prioritization
+                # We keep recent entries AND historical structural transitions
+                # (Skeletonization)  # noqa: ERA001, RUF100
+                keep_count = self._max // 2
 
-            recent = self._entries[-keep_count:]
-            historical = self._entries[:-keep_count]
+                recent = self._entries[-keep_count:]
+                historical = self._entries[:-keep_count]
 
-            # Skeletonization: preserve ONLY structural events or high-value
-            # checkpoints
-            structural_types = {"restructure_topology", "merge_state", "promote_hypo", "crystallize", "add", "remove"}
-            to_retain = [e for e in historical if e["type"] in structural_types or e.get("checkpoint")]
+                # Skeletonization: preserve ONLY structural events or high-value
+                # checkpoints
+                structural_types = {"restructure_topology", "merge_state", "promote_hypo", "crystallize", "add", "remove"}
+                to_retain = [e for e in historical if e["type"] in structural_types or e.get("checkpoint")]
 
-            # Further compress historical structural events if they exceed 10%
-            if len(to_retain) > self._max // 10:
-                # Keep only the most recent structural transitions from history
-                to_retain = to_retain[-(self._max // 10) :]
+                # Further compress historical structural events if they exceed 10%
+                if len(to_retain) > self._max // 10:
+                    # Keep only the most recent structural transitions from history
+                    to_retain = to_retain[-(self._max // 10) :]
 
-            self._entries = to_retain + recent
+                self._entries = to_retain + recent
 
-            # Prune checkpoints that are no longer reachable by any retained
-            # entries
-            if self._entries:
-                first_remaining_idx = self._entries[0]["idx"]
-                latest_valid_checkpoint = max((k for k in self._checkpoints if k <= first_remaining_idx), default=-1)
+                # Prune checkpoints that are no longer reachable by any retained
+                # entries
+                if self._entries:
+                    first_remaining_idx = self._entries[0]["idx"]
+                    latest_valid_checkpoint = max((k for k in self._checkpoints if k <= first_remaining_idx), default=-1)
 
-                for idx in list(self._checkpoints.keys()):
-                    if idx < latest_valid_checkpoint:
-                        del self._checkpoints[idx]
+                    for idx in list(self._checkpoints.keys()):
+                        if idx < latest_valid_checkpoint:
+                            del self._checkpoints[idx]
 
     def get_snapshot_at(self, idx: int) -> dict | None:
         """Reconstruct the state snapshot at a specific event index."""
-        if not self._entries:
-            return None
+        with self._lock:
+            if not self._entries:
+                return None
 
-        first_idx = self._entries[0]["idx"]
-        if idx < first_idx:
-            return None  # Pruned
+            first_idx = self._entries[0]["idx"]
+            if idx < first_idx:
+                return None  # Pruned
 
-        # 1. Find nearest preceding checkpoint
-        checkpoint_idx = max((k for k in self._checkpoints if k <= idx), default=-1)
-        if checkpoint_idx == -1:
-            return None  # Cannot reconstruct without base
+            # 1. Find nearest preceding checkpoint
+            checkpoint_idx = max((k for k in self._checkpoints if k <= idx), default=-1)
+            if checkpoint_idx == -1:
+                return None  # Cannot reconstruct without base
 
-        state = dict(self._checkpoints[checkpoint_idx])
-        # 2. Apply deltas forward
-        relevant_entries = [e for e in self._entries if checkpoint_idx < e["idx"] <= idx]
-        for e in relevant_entries:
-            _apply_delta(state, e.get("delta", {}))
+            state = dict(self._checkpoints[checkpoint_idx])
+            # 2. Apply deltas forward
+            relevant_entries = [e for e in self._entries if checkpoint_idx < e["idx"] <= idx]
+            for e in relevant_entries:
+                _apply_delta(state, e.get("delta", {}))
 
         return state
 
     def replay(self, start: int = 0) -> list[Any]:
         """Return journal entries from index `start` onward for replay."""
-        return list(self._entries[start:])
+        with self._lock:
+            return list(self._entries[start:])
 
     def get_causality_chain(self, mutation_type: str | None = None) -> list[Any]:
         """Return the chain of events by type, showing causal relationships."""
-        chain = []
-        for e in self._entries:
-            if mutation_type and e["type"] != mutation_type:
-                continue
-            chain.append(
-                {
-                    "type": e["type"],
-                    "source": e["source"],
-                    "timestamp": e["timestamp"],
-                    "delta": e.get("delta", {}),
-                },
-            )
-        return chain
+        with self._lock:
+            chain = []
+            for e in self._entries:
+                if mutation_type and e["type"] != mutation_type:
+                    continue
+                chain.append(
+                    {
+                        "type": e["type"],
+                        "source": e["source"],
+                        "timestamp": e["timestamp"],
+                        "delta": e.get("delta", {}),
+                    },
+                )
+            return chain
 
     def get_last_n(self, n: int = 10) -> list[Any]:
         """Return the last N entries for debugging."""
-        return self._entries[-n:]
+        with self._lock:
+            return self._entries[-n:]
 
     def clear(self) -> None:
-        """Clear all journal entries."""
-        self._entries.clear()
-        self._checkpoints.clear()
-        self._current_idx = 0
+        """Clear all journal entries (for testing)."""
+        with self._lock:
+            self._entries.clear()
+            self._checkpoints.clear()
+            self._current_idx = 0
 
     @property
     def count(self) -> int:
