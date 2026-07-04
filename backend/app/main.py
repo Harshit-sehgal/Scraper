@@ -43,6 +43,7 @@ from app.middlewares import (
     body_size_middleware,
     csp_middleware,
     latency_tracking_middleware,
+    origin_validation_middleware,
     rate_limiter,
     request_id_middleware,
     security_headers_middleware,
@@ -124,6 +125,10 @@ def configure_middleware(app: FastAPI) -> None:
     app.middleware("http")(csp_middleware)
     app.middleware("http")(body_size_middleware)
     app.middleware("http")(api_key_middleware)
+    # CSRF defense-in-depth: validate Origin/Referer for state-changing
+    # API requests from session-authenticated clients. Must run AFTER
+    # api_key_middleware so resolve_auth_context() sees the auth state.
+    app.middleware("http")(origin_validation_middleware)
     app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
     app.middleware("http")(latency_tracking_middleware)
     # request_id_middleware must run before access_log_middleware so that

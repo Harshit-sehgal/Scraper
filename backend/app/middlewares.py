@@ -510,3 +510,138 @@ async def access_log_middleware(request: Request, call_next):
 
 
 access_logger = logging.getLogger("dataforge.access")
+
+
+# ─── CSRF Origin Validation ──────────────────────────────────────────────
+# The application uses SameSite=Strict session cookies which block the
+# browser from attaching credentials to cross-origin requests in ~95% of
+# modern browsers. Adding Origin/Referer validation for state-changing
+# API endpoints closes the remaining gap: legacy browsers with incomplete
+# SameSite support, same-site subdomain attacks, and any future cookie
+# attribute downgrade. API-key-authenticated requests (custom headers) are
+# naturally immune to form-based CSRF — the middleware skips those.
+# The check runs only in production/staging environments so local
+# development (localhost in CORS_ORIGINS) continues to work normally.
+
+_STATEFUL_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+_SKIPPED_AUTH_CONTEXTS: frozenset[str] = frozenset(
+    {
+        "api_key_admin",
+        "api_key_operator",
+        "api_key_user",
+        "api_key_billing",
+    }
+)
+
+
+async def origin_validation_middleware(request: Request, call_next):
+    """Validate Origin/Referer for state-changing API requests.
+
+    This middleware adds defense-in-depth CSRF protection on top of the
+    session cookie's SameSite=Strict attribute. It targets browser-origin
+    requests that reach the API through the frontend SPA — cross-origin
+    form posts or XHR from disallowed origins are rejected before they
+    reach any handler.
+
+    Skips:
+      - Non-API paths (static assets, docs)
+      - Read-only methods (GET, HEAD, OPTIONS)
+      - API-key-authenticated requests (headers cannot be set by forms)
+      - Non-production environments (dev localhost is always allowed)
+    """
+    path = request.url.path
+
+    # Only API paths
+    if not path.startswith("/api/"):
+        return await call_next(request)
+
+    # Only state-changing methods
+    method = request.method.upper()
+    if method not in _STATEFUL_METHODS:
+        return await call_next(request)
+
+    # Only enforce in production/staging — dev workflows use localhost
+    # without Origin headers on tool-made calls (curl, httpie, pytest).
+    env = (settings.ENV or "").strip().lower()
+    if env not in {"production", "staging"}:
+        return await call_next(request)
+
+    # Pre-flight OPTIONS is already handled upstream by CORS middleware.
+    # We skip it here so the middleware only gates the actual POST/PUT/etc.
+
+    # API-key-authenticated requests are immune to form-based CSRF:
+    # browsers do not allow <form> elements to set custom headers like
+    # X-API-Key or Authorization. Skip these so legitimate API-key
+    # tooling (SDK, CLI, server-to-server) works without Origin headers.
+    from app.utils.rbac import resolve_auth_context as _resolve_auth
+
+    try:
+        auth_ctx = _resolve_auth(request)
+        if auth_ctx.source in _SKIPPED_AUTH_CONTEXTS:
+            return await call_next(request)
+    except (ValueError, RuntimeError, AttributeError):
+        # Auth resolution failure due to a missing settings attribute or
+        # import — not a security signal; let the api_key_middleware
+        # reject it downstream.
+        return await call_next(request)
+    except HTTPException:
+        # resolve_auth_context raises HTTPException(403) when no auth is
+        # present. For an unauthenticated request there is no session to
+        # protect against CSRF — the api_key_middleware will also reject
+        # it. Pass through rather than double-rejecting.
+        return await call_next(request)
+
+    # Session-authenticated request (or unauthenticated state-changing):
+    # require a valid Origin or Referer header matching the CORS whitelist.
+    origin = request.headers.get("Origin", "").strip()
+    referer = request.headers.get("Referer", "").strip()
+
+    # Resolve the checked origin value: prefer the explicit Origin header;
+    # fall back to the Referer's origin portion when Origin is absent
+    # (some older browsers omit Origin for same-site navigations).
+    checked_origin = ""
+    if origin:
+        checked_origin = origin
+    elif referer:
+        # Extract scheme://host[:port] from the Referer URL.
+        # built-in urllib.parse handles this cleanly.
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(referer)
+            if parsed.scheme and parsed.netloc:
+                checked_origin = f"{parsed.scheme}://{parsed.netloc}"
+        except (ValueError, TypeError):
+            checked_origin = ""
+
+    if not checked_origin:
+        # No origin signal at all on a state-changing request from a
+        # session-authenticated client — reject.
+        logger.warning(
+            "CSRF origin validation: missing Origin/Referer on %s %s from %s",
+            method,
+            path,
+            _get_client_ip(request),
+        )
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Missing Origin header on state-changing request."},
+        )
+
+    # Compare against the configured CORS origin whitelist.
+    allowed_origins = getattr(settings, "CORS_ORIGINS", [])
+    if checked_origin not in allowed_origins:
+        logger.warning(
+            "CSRF origin validation: origin %r not in CORS_ORIGINS for %s %s from %s",
+            checked_origin,
+            method,
+            path,
+            _get_client_ip(request),
+        )
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Origin not allowed for state-changing request."},
+        )
+
+    return await call_next(request)
