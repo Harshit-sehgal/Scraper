@@ -4704,3 +4704,43 @@ Two gap classes from a focused sweep.
 | RACE-09 | MED | backend/app/utils/rbac.py:26,33,51 | Module-level `_operator_cross_tenant_access_count` audit counter had a bare `+= 1` race from async request paths (billing/webhooks.py, saas/routes/_common.py, scoped_resource checks). Added module-level `_operator_cross_tenant_lock`; the increment now happens under the lock and the post-increment reads (critical log + audit `details.access_count`) use the captured local `access_count` snapshot instead of re-reading the unlocked global. Added missing `import threading`. |
 
 Verified: full backend suite green (exit 0), 458/458 vitest pass, eslint + prettier clean, ruff/mypy/bandit all pass pre-commit, full quick validation gate 13/13. The lingering "Task was destroyed but it is pending!" log lines are the pre-existing `browser_pool._periodic_cleanup` shutdown race (Playwright `Connection.run` task not joined before loop close) — not introduced by this iteration.
+
+## 2026-07-04 — Test-Coverage Backlog: page_profiler (zero coverage → 54 cases)
+
+The 57-item test-coverage backlog identified `frontend/.../page_profiler.py`
+as the single highest-leverage target — every existing test patches both
+public functions with canned return values, so the real regex-and-dispatch
+logic never executed. Production callers depend on this module:
+`selector_discovery_analysis.py:75-76` (both functions), `url_value_classification.py:58`
+(reads module-level `VALUE_PATTERNS` directly).
+
+### Coverage added (54 tests in `backend/tests/test_page_profiler.py`)
+
+| Group | Cases | Notes |
+| --- | ---: | --- |
+| Dataclass smoke | 3 | `StructureProfile` defaults, `ValuePatterns` all-18-empty, default-factory field independence |
+| VALUE_PATTERNS table-driven regex matches | 35 | One fixture per pattern across all 18 regex groups — every regression in the regexes that `url_value_classification.py` depends on will now trip a test |
+| Dedup contract | 1 | Repeated values collapse to a single entry |
+| Cap-at-10 contract | 1 | No value-pattern field may exceed 10 entries |
+| `code_3letter` common-word exclusion | 1 | THE/AND/FOR filtered, LON/PAR/BOM retained — the only group with bespoke post-filter logic |
+| get_text-only (no tag-leak) | 1 | `data-sku='SKU-XYZ'` attribute does not leak into `product_codes` |
+| Empty HTML | 1 | Whitespace-only input produces all-empty `ValuePatterns` |
+| 18-group contract | 1 | `len(VALUE_PATTERNS) == 18` |
+| Structure dispatch: table | 1 | `<th>` headers + 4 rows → `structure_type='table'`, confidence > 0.8 |
+| Structure dispatch: cards | 1 | 4 `class~'product-card'` divs → confidence > 0.7 |
+| Structure dispatch: list | 1 | `<ul>` with 12 `<li>` → confidence > 0.7 (formula `0.5 + items/50`) |
+| Structure dispatch: key_value-dl | 1 | `<dl>` with 4 `<dt>` → headers populated |
+| Structure dispatch: key_value-2col (boundary) | 1 | Documents the deliberate gap: helper hardcodes confidence=0.6, dispatch requires `> 0.6` strictly, so falls through to `mixed` |
+| Mixed fallback | 1 | Bare prose → `mixed`, confidence=0.3, selector='body' |
+| Noise-tag stripping | 1 | `<script>/<style>/<nav>/<footer>/<header>` decomposed before dispatch |
+| Table-beats-cards precedence | 1 | Substantial table (2 headers + 15 rows, conf ≈ 0.85) wins over 3 high-confidence card divs (~0.82) |
+| Empty HTML structure | 1 | Returns a valid `StructureProfile(mixed)` instead of raising |
+
+### Decisions captured (anti-tripwire for the next reader)
+
+1. **`re.findall` with capturing groups returns only group content.** Writing the regex fixtures, expected substrings like `"5000 INR"` were wrong — the regex `r"\d+[\d,]*\s*(inr|usd|...)"` captures just `"INR"`. The fixtures deliberately use minimal substrings so consumers can see which branch matched.
+2. **Confidence thresholds are STRICT `>` not `>=`.** The 2-column key_value path hardcodes `structure_confidence=0.6`; the dispatch needs `> 0.6`; therefore 2-column tables always fall through to `mixed` today. Test `test_detect_key_value_two_column_table` asserts the current behavior; if the threshold is ever relaxed to `>= 0.6` this test will catch the change.
+3. **List confidence scales with item count.** Formula `min(0.5 + items/50, 0.8)`. 8 items → 0.66 (below 0.7 threshold). 12 items → 0.74 (passes). Fixture sized accordingly.
+4. **`test_table_beats_cards_precedence` requires ≥15 rows and 2+ headers** to push table confidence above 0.8 AND above the cards' ~0.82 ceiling.
+
+Verified: 54/54 new tests pass, full backend test suite green (exit 0).
