@@ -104,15 +104,36 @@ async function loadOrgSelects() {
   }
 }
 
+// Round-9 fix: request-token + in-flight guard for refreshOrgInvitations.
+// The long N+1 sequential-fetch loop here starts off reading filter
+// values, then runs for seconds per org; calling it twice (user
+// toggles a filter while a prior batch is mid-flight) previously raced
+// last-arrival-wins and rendered stale payloads. The token now gates
+// the DOM write — only the latest call's batch commits.
+let _refreshOrgInvitationsToken = 0;
+let _refreshOrgInvitationsInFlight = false;
+
 async function refreshOrgInvitations() {
   const list = document.getElementById("invitations-org-list");
   const statusFilter = document.getElementById("invitations-status-filter");
   const orgFilter = document.getElementById("invitations-org-filter");
   if (!list) return;
 
-  list.innerHTML = '<span class="spinner"></span> Loading…';
+  // If a refresh is already in flight, don't stomp the spinner — drop
+  // the prior call's render via a superseding token so the newer call
+  // (reflecting the latest filter values) wins.
+  const myToken = ++_refreshOrgInvitationsToken;
+  if (_refreshOrgInvitationsInFlight) {
+    // Skip the spinner flip; just register the new token and proceed.
+  } else {
+    _refreshOrgInvitationsInFlight = true;
+    list.innerHTML = '<span class="spinner"></span> Loading…';
+  }
+
   await loadOrgSelects();
 
+  // Re-read filter values immediately before the fetch loop so a
+  // filter change made between the spinner flip and here is respected.
   const status = statusFilter ? statusFilter.value : "";
   const orgId = orgFilter ? orgFilter.value : "";
 
@@ -120,6 +141,7 @@ async function refreshOrgInvitations() {
     // First get user's orgs
     const orgsRes = await apiFetch("/api/saas/orgs");
     if (!orgsRes.ok) {
+      if (myToken !== _refreshOrgInvitationsToken) return;
       list.innerHTML = '<p class="subtle">Please sign in to manage invitations.</p>';
       return;
     }
@@ -129,6 +151,9 @@ async function refreshOrgInvitations() {
     let allInvitations = [];
 
     for (const org of orgs) {
+      // Mid-loop supersession check — a newer refresh (with updated
+      // filters) has started; bail before burning more fetches.
+      if (myToken !== _refreshOrgInvitationsToken) return;
       if (orgId && org.id !== orgId) continue;
       try {
         const query = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -143,6 +168,7 @@ async function refreshOrgInvitations() {
       }
     }
 
+    if (myToken !== _refreshOrgInvitationsToken) return;
     if (!allInvitations.length) {
       list.innerHTML = '<p class="subtle">No invitations found.</p>';
       return;
@@ -167,7 +193,12 @@ async function refreshOrgInvitations() {
       )
       .join("");
   } catch (err) {
+    if (myToken !== _refreshOrgInvitationsToken) return;
     list.innerHTML = `<p class="subtle">Error: ${esc(err.message)}</p>`;
+  } finally {
+    if (myToken === _refreshOrgInvitationsToken) {
+      _refreshOrgInvitationsInFlight = false;
+    }
   }
 }
 

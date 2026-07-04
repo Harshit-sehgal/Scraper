@@ -11,6 +11,14 @@ import { attrStr, esc, toast } from "./utils.js";
 let _scheduledJobs = [];
 let _isLoading = false;
 
+// Round-9 fix: per-render AbortController for the per-job
+// _fetchChangesForJob fan-out. A re-render (rapid Refresh clicks) used
+// to leave orphaned fetches pending after the rows were detached,
+// filling the 6-connection HTTP/1.1 pool and delaying user actions.
+// Re-rendering aborts the prior batch's in-flight fetches so they
+// short-circuit and release their connection.
+let _changesAbort = null;
+
 const FREQUENCY_LABELS = {
   hourly: "Every hour",
   daily: "Daily",
@@ -44,12 +52,13 @@ export async function refreshScheduledJobs() {
   }
 }
 
-async function _fetchChangesForJob(jobId) {
+async function _fetchChangesForJob(jobId, signal) {
   try {
-    const res = await apiFetch(`${API}/api/scheduled/${jobId}/changes`);
+    const res = await apiFetch(`${API}/api/scheduled/${jobId}/changes`, { signal });
     if (!res.ok) return null;
     return await res.json();
-  } catch {
+  } catch (e) {
+    if (e?.name === "AbortError") return null;
     return null;
   }
 }
@@ -60,6 +69,13 @@ function _renderJobs(jobs) {
   const container = document.getElementById("scheduled-list");
   const emptyState = document.getElementById("scheduled-empty-state");
   if (!container) return;
+
+  // Abort any in-flight per-job change-detection fetches from the prior
+  // render so they don't back up in the HTTP connection pool under rapid
+  // refresh.
+  if (_changesAbort) _changesAbort.abort();
+  _changesAbort = new AbortController();
+  const signal = _changesAbort.signal;
 
   // Remove existing job rows
   container.querySelectorAll(".scheduled-row").forEach((row) => row.remove());
@@ -78,9 +94,11 @@ function _renderJobs(jobs) {
     row.innerHTML = _buildJobRow(job);
     container.appendChild(row);
 
-    // Fetch change detection data asynchronously
-    _fetchChangesForJob(job.id)
+    // Fetch change detection data asynchronously (aborted via signal
+    // when the next render starts).
+    _fetchChangesForJob(job.id, signal)
       .then((changes) => {
+        if (signal.aborted) return;
         if (changes) {
           const changesEl = row.querySelector(".scheduled-changes");
           if (changesEl) {
@@ -88,7 +106,10 @@ function _renderJobs(jobs) {
           }
         }
       })
-      .catch((e) => console.warn("Op:", e));
+      .catch((e) => {
+        if (signal.aborted) return;
+        console.warn("Op:", e);
+      });
   }
 }
 

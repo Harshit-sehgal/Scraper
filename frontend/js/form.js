@@ -12,6 +12,11 @@ let _fieldCounter = 0;
 let _filterCounter = 0;
 export const MAX_MANUAL_URLS = 100;
 
+// Round-9 fix: request-token for previewDiscovery so rapid double-clicks
+// (or triggering discovery with a different topic while a prior call is
+// mid-flight) can't let the older response overwrite the newer URL list.
+let _previewDiscoveryToken = 0;
+
 function setFormErrors(errors) {
   const el = document.getElementById("form-errors");
   if (!el) return;
@@ -392,6 +397,7 @@ export async function previewDiscovery() {
 
   const preview = document.getElementById("discovery-preview");
   if (!preview) return;
+  const myToken = ++_previewDiscoveryToken;
   preview.classList.remove("hidden");
   preview.innerHTML = '<div class="disc-loading"><span class="spinner"></span> Discovering URLs...</div>';
 
@@ -417,8 +423,11 @@ export async function previewDiscovery() {
       }),
     });
 
+    // A newer discovery call has superseded us — drop the stale payload.
+    if (myToken !== _previewDiscoveryToken) return;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || "Discovery failed");
+    if (myToken !== _previewDiscoveryToken) return;
     if (!data.urls?.length) {
       preview.innerHTML = '<div class="disc-loading">No URLs found. Try a different topic.</div>';
       return;
@@ -435,6 +444,7 @@ export async function previewDiscovery() {
       )
       .join("");
   } catch (e) {
+    if (myToken !== _previewDiscoveryToken) return;
     preview.innerHTML = `<div class="disc-loading">Discovery error: ${esc(e.message || "Unknown error")}</div>`;
   }
 }

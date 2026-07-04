@@ -4639,3 +4639,18 @@ backend/tests actually resolves (verified against canonical sources).
 **No broken mocks found** — the codebase has disciplined mock hygiene
 (mocks target canonical sources, re-exports are not abused as mock
 targets in production test paths).
+
+---
+
+## Iteration 10 — Three frontend races + workflow backfill flag race
+
+Date: 2026-07-04
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| UX-06 | HIGH | frontend/js/invitations.js:107 | `refreshOrgInvitations` got a request-token + mid-loop supersession check (the prior filter-snapshot-at-start + N+1 sequential loop now re-checks mid-flight). |
+| UX-07 | HIGH | frontend/js/form.js:376 | `previewDiscovery` got a request-token so rapid double-clicks (or topic-change mid-flight) can't have an older response overwrite the newer URL list. |
+| UX-08 | MED | frontend/js/scheduled-monitoring.js:23,47,59 | `_renderJobs` now aborts the prior render's per-row `_fetchChangesForJob` fetches via a per-render `_changesAbort` AbortController — orphaned fetches no longer accumulate in the 6-connection HTTP/1.1 pool. |
+| LOCK-03 | LOW | backend/app/workflow_repository.py:259 | `SQLiteWorkflowRepository._backfill_done` check-then-act wrapped in a `self._backfill_lock` so concurrent first-callers on a fresh process don't both run the full upsert loop (idempotent inserts → wasted work). |
+
+Verified: frontend build + 458 vitest pass, eslint + prettier clean, 28+ workflow tests pass, full quick validation gate passed.

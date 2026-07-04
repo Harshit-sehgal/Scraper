@@ -258,6 +258,13 @@ class SQLiteWorkflowRepository(WorkflowRepository):
 
     def __init__(self) -> None:
         self._backfill_done = False
+        # Round-9 fix: guard the backfill flag so concurrent first-callers
+        # (e.g. get() and list_workflows() racing on a fresh process)
+        # don't both pass the check-then-set, both set the flag, and
+        # both run the full upsert loop. The upserts are idempotent
+        # (ON CONFLICT) so no data corruption — only wasted duplicate
+        # work, which we now avoid.
+        self._backfill_lock = threading.Lock()
 
     def _maybe_backfill_from_json(self) -> None:
         """One-shot import from workflows.json to SQLite.
@@ -272,13 +279,16 @@ class SQLiteWorkflowRepository(WorkflowRepository):
         """
         if self._backfill_done:
             return
-        self._backfill_done = True
-        try:
-            count = self.count_workflows()
-            if count > 0:
-                return  # table already populated — nothing to import
-        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
-            return  # table may not exist yet — migrations will create it
+        with self._backfill_lock:
+            if self._backfill_done:
+                return
+            self._backfill_done = True
+            try:
+                count = self.count_workflows()
+                if count > 0:
+                    return  # table already populated — nothing to import
+            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+                return  # table may not exist yet — migrations will create it
 
         json_path = Path(__file__).resolve().parents[1] / "data" / "workflows.json"
         if not json_path.exists():
